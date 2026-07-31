@@ -15,7 +15,7 @@ _TODO — fill in. Some prompts to dig into:_
 ## Current State (as of 2026-07-31)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
-- One autonomous agent (`Agent_01`, a `BP_Agent_Placeholder` instance) is placed near the `PlayerStart` and is alive: it thinks and wanders on a 15s cycle.
+- One autonomous agent, **Aster** (`Agent_Aster_01`, a `BP_Agent_Placeholder` instance), is placed near the `PlayerStart` and is alive: Aster thinks and wanders on a 15s cycle.
 - LLM backend: OpenAI-compatible endpoint, model `gpt-5.6-luna`, key via `OPENAI_API_KEY`. Confirmed working end-to-end in PIE.
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
@@ -41,7 +41,7 @@ _TODO — fill in. Some prompts to dig into:_
 
 - Requires `OPENAI_API_KEY` set as a permanent environment variable (`setx`, not just `set`) — and the Editor must be (re)launched after setting it to pick it up.
 - LLM provider/model/timeout config: Project Settings → "Agent LLM Settings" (backed by `Config/DefaultGame.ini`).
-- Open `/Game/Maps/Island`, press Simulate (or Play) — `Agent_01` starts thinking within ~2–17 seconds.
+- Open `/Game/Maps/Island`, press Simulate (or Play) — Aster (`Agent_Aster_01`) starts thinking within ~2–17 seconds.
 
 ## Roadmap / Open Questions
 
