@@ -1,0 +1,40 @@
+
+──────────────────────────────────────────────────────────────────────────────────────────  GAEA BUILD SWARM  2.3.0.1 ──
+
+                                                                                 
+          Filename:  │ D:/Projects - Athena/Gaea/CaptiveSky/Island1_v00.terrain  
+    Build Location:  │ D:\Projects - Athena\Gaea\Builds\Island1_v00\001          
+        Build Type:  │ Standard                                                  
+  Build Resolution:  │ 4096 × 4096                                               
+     Build Profile:  │ None / Last Saved Settings                                
+             Nodes:  │ 07 to build                                               
+                     │ 02 to export                                              
+                                                                                 
+
+──────────────────────────────────────────────────────────────────────────────────────────  GAEA BUILD SWARM  2.3.0.1 ──
+
+                                                                                 
+          Filename:  │ D:/Projects - Athena/Gaea/CaptiveSky/Island1_v00.terrain  
+    Build Location:  │ D:\Projects - Athena\Gaea\Builds\Island1_v00\001          
+        Build Type:  │ Standard                                                  
+  Build Resolution:  │ 4096 × 4096                                               
+     Build Profile:  │ None / Last Saved Settings                                
+             Nodes:  │ 07 to build                                               
+                     │ 02 to export                                              
+                                                                                 
+
+──────────────────────────────────────────────────────────────────────────────────────────────────────── Build Report ──
+
+              Build Results                                Statistics                 
+                                                                                      
+          Result: │ AlreadyBuilt                  Island │ 0:00:03.169                
+      Resolution: │ 4096                     Anastomosis │ 0:00:06.607                
+      Node Count: │ 7                               Blur │ 0:00:00.117                
+      Start Time: │ 07/31/2026 07:07:14          Voronoi │ 0:00:00.345                
+        End Time: │ 07/31/2026 07:07:29         Erosion2 │ 0:00:01.256                
+        Duration: │ 00:00:14.5651703              Unreal │ 0:00:00.217                
+  Non-Build Time: │ 00:00:02.8481702                     │                            
+                                                 Fastest │ Clamp @ 0:00:00.006        
+                                                 Slowest │ Anastomosis @ 0:00:06.607  
+                                                                                      
+                                             * nodes that took <100ms are excluded.   

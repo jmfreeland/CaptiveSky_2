@@ -1,0 +1,55 @@
+{
+  "$id": "1",
+  "Resolution": 4096,
+  "NodeCount": 7,
+  "Result": "AlreadyBuilt",
+  "StartTime": "2026-07-31T07:07:14.7314146+01:00",
+  "EndTime": "2026-07-31T07:07:29.2965849+01:00",
+  "Duration": "00:00:14.5651703",
+  "SecondsTaken": {
+    "$id": "2",
+    "$values": [
+      {
+        "$id": "3",
+        "Item1": "Island",
+        "Item2": "00:00:03.1690000"
+      },
+      {
+        "$id": "4",
+        "Item1": "Anastomosis",
+        "Item2": "00:00:06.6070000"
+      },
+      {
+        "$id": "5",
+        "Item1": "Blur",
+        "Item2": "00:00:00.1170000"
+      },
+      {
+        "$id": "6",
+        "Item1": "Clamp",
+        "Item2": "00:00:00.0060000"
+      },
+      {
+        "$id": "7",
+        "Item1": "Voronoi",
+        "Item2": "00:00:00.3450000"
+      },
+      {
+        "$id": "8",
+        "Item1": "Erosion2",
+        "Item2": "00:00:01.2560000"
+      },
+      {
+        "$id": "9",
+        "Item1": "Unreal",
+        "Item2": "00:00:00.2170000"
+      }
+    ]
+  },
+  "FastestNode": {
+    "$ref": "6"
+  },
+  "SlowestNode": {
+    "$ref": "4"
+  }
+}

@@ -1,0 +1,31 @@
+# This repo tracks non-binary project files only (source, config, docs).
+# Content/ is all binary .uasset/.umap and is handled elsewhere.
+/Content/
+
+# Binary terrain-generation exports (heightmaps/textures) -- keep the JSON/txt provenance files
+Assets/**/*.exr
+Assets/**/*.png
+
+# Unreal-generated / build directories
+/Binaries/
+/Build/
+/DerivedDataCache/
+/Intermediate/
+/Saved/
+/AgentMemory/
+
+# IDE / generated project files
+.vs/
+*.sln
+*.slnx
+*.suo
+*.sdf
+*.opensdf
+*.opendb
+*.VC.db
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
