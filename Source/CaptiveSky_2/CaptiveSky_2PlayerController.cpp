@@ -109,7 +109,8 @@ void ACaptiveSky_2PlayerController::ToggleConversation()
 		GetWorldTimerManager().SetTimer(HideHandle, this, &ACaptiveSky_2PlayerController::CloseConversation, 2.f, false);
 		return;
 	}
-	ConversationWidget->OpenFor(ConversationTarget->GetActorLabel());
+	ConversationTargetDisplayName = ConversationTarget->GetActorLabel();
+	ConversationWidget->OpenFor(ConversationTargetDisplayName);
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(ConversationWidget->TakeWidget());
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
@@ -128,12 +129,12 @@ void ACaptiveSky_2PlayerController::SubmitConversation(const FString& Utterance)
 	}
 	if (ConversationTarget->Brain->bRequestInFlight)
 	{
-		ConversationWidget->ShowMessage(TEXT("Aster is still thinking."), true);
+		ConversationWidget->ShowMessage(FString::Printf(TEXT("%s is still thinking."), *ConversationTargetDisplayName), true);
 		return;
 	}
 	ConversationTarget->Brain->OnDecisionReady.RemoveDynamic(this, &ACaptiveSky_2PlayerController::HandleConversationDecision);
 	ConversationTarget->Brain->OnDecisionReady.AddDynamic(this, &ACaptiveSky_2PlayerController::HandleConversationDecision);
-	ConversationWidget->ShowMessage(TEXT("Aster is thinking…"), false);
+	ConversationWidget->ShowMessage(FString::Printf(TEXT("%s is thinking…"), *ConversationTargetDisplayName), false);
 	ConversationTarget->Brain->RequestDecision(Clean);
 }
 
@@ -144,12 +145,12 @@ void ACaptiveSky_2PlayerController::HandleConversationDecision(const FAgentDecis
 	if (!ConversationWidget) return;
 	if (!Decision.bValid)
 	{
-		ConversationWidget->ShowMessage(TEXT("Aster could not gather his thoughts."), true);
+		ConversationWidget->ShowMessage(FString::Printf(TEXT("%s could not gather their thoughts."), *ConversationTargetDisplayName), true);
 		return;
 	}
 	ConversationWidget->ShowMessage(Decision.Speech.IsEmpty()
-		? TEXT("Aster considers what you said, but does not answer aloud.")
-		: FString::Printf(TEXT("Aster: %s"), *Decision.Speech), true);
+		? FString::Printf(TEXT("%s considers what you said, but does not answer aloud."), *ConversationTargetDisplayName)
+		: FString::Printf(TEXT("%s: %s"), *ConversationTargetDisplayName, *Decision.Speech), true);
 }
 
 void ACaptiveSky_2PlayerController::CloseConversation()
@@ -157,6 +158,7 @@ void ACaptiveSky_2PlayerController::CloseConversation()
 	if (ConversationTarget && ConversationTarget->Brain)
 		ConversationTarget->Brain->OnDecisionReady.RemoveDynamic(this, &ACaptiveSky_2PlayerController::HandleConversationDecision);
 	ConversationTarget = nullptr;
+	ConversationTargetDisplayName.Reset();
 	if (ConversationWidget) ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
 	SetInputMode(FInputModeGameOnly());
 	bShowMouseCursor = false;

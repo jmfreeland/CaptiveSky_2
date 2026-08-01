@@ -26,6 +26,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
 - A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
+- An unnamed autonomous raven (`Agent_Raven_01`) now lives near Aster in a temporary primitive body. It has an independent identity, personality, and memory home; a proper bird asset and flight behavior are still needed.
 
 ## Architecture
 
@@ -64,7 +65,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
-- Introduce an autonomous raven (`Agent_Raven_01` as an internal ID; no personal name yet) as Aster's first potential companion. The raven belongs to the Island rather than to Aster, has its own identity and interests, and may approach, leave, disagree, keep secrets, and return by choice. Their relationship and any personal name should emerge through lived interaction rather than being installed in advance.
+- Replace the unnamed raven's primitive placeholder with a proper bird body and flight behavior. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
 - `Interact` actions are currently just logged. Agent speech is visible in the initial player conversation UI, but ambient speech and agent-to-agent dialogue still need an in-world presentation.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
