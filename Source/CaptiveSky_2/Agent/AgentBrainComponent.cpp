@@ -88,6 +88,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"{\"thought\": \"<brief reasoning>\", "
 		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
+		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Omit new_memories (empty array) if nothing is worth remembering long-term from this moment.");
 
 	return Prompt;
@@ -108,6 +109,12 @@ void UAgentBrainComponent::RequestDecision(const FString& PlayerUtterance)
 
 	AActor* Owner = GetOwner();
 	UAgentMemoryComponent* MemoryComp = Owner ? Owner->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	if (MemoryComp && !PlayerUtterance.IsEmpty())
+	{
+		MemoryComp->AppendMemory(MemoryComp->MakeMemory(EAgentMemoryType::Conversation,
+			FString::Printf(TEXT("A visitor said to me: \"%s\""), *PlayerUtterance), 0.5f,
+			{ TEXT("conversation"), TEXT("visitor") }));
+	}
 
 	const FString Situation = BuildSituationSummary(PlayerUtterance);
 
@@ -150,6 +157,12 @@ void UAgentBrainComponent::RequestDecision(const FString& PlayerUtterance)
 		if (Result.bSuccess)
 		{
 			Decision = ParseDecisionAndStoreMemories(Result.ResponseText, WeakMemory.Get());
+			if (Decision.bValid && !Decision.Speech.IsEmpty() && WeakMemory.IsValid())
+			{
+				WeakMemory->AppendMemory(WeakMemory->MakeMemory(EAgentMemoryType::Conversation,
+					FString::Printf(TEXT("I replied: \"%s\""), *Decision.Speech), 0.5f,
+					{ TEXT("conversation"), TEXT("speech") }));
+			}
 			if (!Decision.bValid)
 			{
 				UE_LOG(LogAgentBrain, Warning, TEXT("Could not parse a decision from the LLM response: %s"), *Result.ResponseText);

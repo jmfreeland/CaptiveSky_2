@@ -8,6 +8,9 @@
 
 class UInputMappingContext;
 class UUserWidget;
+class UCaptiveSkyConversationWidget;
+class AAutonomousAgentCharacter;
+struct FAgentDecision;
 
 /**
  *  Basic PlayerController class for a third person game
@@ -17,6 +20,10 @@ UCLASS(abstract)
 class ACaptiveSky_2PlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
+public:
+	void SubmitConversation(const FString& Utterance);
+	void CloseConversation();
 	
 protected:
 
@@ -36,6 +43,15 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UUserWidget> MobileControlsWidget;
 
+	UPROPERTY()
+	TObjectPtr<UCaptiveSkyConversationWidget> ConversationWidget;
+
+	UPROPERTY(EditAnywhere, Category = "Conversation")
+	float ConversationRadius = 500.f;
+
+	UPROPERTY()
+	TObjectPtr<AAutonomousAgentCharacter> ConversationTarget;
+
 	/** If true, the player will use UMG touch controls even if not playing on mobile platforms */
 	UPROPERTY(EditAnywhere, Config, Category = "Input|Touch Controls")
 	bool bForceTouchControls = false;
@@ -48,5 +64,10 @@ protected:
 
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
+	void ToggleConversation();
+	AAutonomousAgentCharacter* FindNearestConversationAgent() const;
+
+	UFUNCTION()
+	void HandleConversationDecision(const FAgentDecision& Decision);
 
 };

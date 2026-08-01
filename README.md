@@ -25,6 +25,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - LLM backend: OpenAI-compatible endpoint, model `gpt-5.6-luna`, key via `OPENAI_API_KEY`. Confirmed working end-to-end in PIE.
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
+- A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
 
 ## Architecture
 
@@ -57,6 +58,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Requires `OPENAI_API_KEY` set as a permanent environment variable (`setx`, not just `set`) — and the Editor must be (re)launched after setting it to pick it up.
 - LLM provider/model/timeout config: Project Settings → "Agent LLM Settings" (backed by `Config/DefaultGame.ini`).
 - Open `/Game/Maps/Island`, press Simulate (or Play) — Aster (`Agent_Aster_01`) starts thinking within ~2–17 seconds.
+- In Play mode, approach Aster and press Enter to open conversation. Type a message and press Enter to send it; Escape closes the conversation. The initial interaction radius is 5 metres.
 
 ## Roadmap / Open Questions
 
@@ -64,6 +66,6 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Introduce an autonomous raven (`Agent_Raven_01` as an internal ID; no personal name yet) as Aster's first potential companion. The raven belongs to the Island rather than to Aster, has its own identity and interests, and may approach, leave, disagree, keep secrets, and return by choice. Their relationship and any personal name should emerge through lived interaction rather than being installed in advance.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
-- Speak/Interact actions are currently just logged — no dialogue UI or interaction system yet.
+- `Interact` actions are currently just logged. Agent speech is visible in the initial player conversation UI, but ambient speech and agent-to-agent dialogue still need an in-world presentation.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
 - Add a reusable consciousness/consolidation system, with Aster's sleep as its first expression. Consolidation should review lived memories, write reflections, propose small evidence-based personality changes, and append every accepted change to a reversible `personality_history.jsonl`; foundational identity remains protected.
