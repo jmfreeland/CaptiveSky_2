@@ -33,14 +33,33 @@ FString UAgentMemoryComponent::ResolveAgentId() const
 	return TEXT("UnknownAgent");
 }
 
-FString UAgentMemoryComponent::GetMemoryDir() const
+FString UAgentMemoryComponent::GetAgentDirectory() const
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("AgentMemory") / ResolveAgentId());
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / ResolveAgentId());
 }
 
 FString UAgentMemoryComponent::GetMemoryFilePath() const
 {
-	return GetMemoryDir() / TEXT("memory.jsonl");
+	return GetAgentDirectory() / TEXT("memory.jsonl");
+}
+
+FString UAgentMemoryComponent::GetLegacyMemoryFilePath() const
+{
+	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("AgentMemory") / ResolveAgentId() / TEXT("memory.jsonl"));
+}
+
+FString UAgentMemoryComponent::LoadAgentDocument(const FString& FileName) const
+{
+	// Agent documents are deliberately flat: reject paths so callers cannot escape the agent home.
+	if (FileName.IsEmpty() || FileName.Contains(TEXT("/")) || FileName.Contains(TEXT("\\")) || FileName.Contains(TEXT("..")))
+	{
+		UE_LOG(LogAgentMemory, Warning, TEXT("Rejected invalid agent document name: %s"), *FileName);
+		return FString();
+	}
+
+	FString Contents;
+	FFileHelper::LoadFileToString(Contents, *(GetAgentDirectory() / FileName));
+	return Contents;
 }
 
 void UAgentMemoryComponent::EnsureLoaded() const
@@ -51,10 +70,16 @@ void UAgentMemoryComponent::EnsureLoaded() const
 	}
 	bLoaded = true;
 
-	const FString FilePath = GetMemoryFilePath();
+	FString FilePath = GetMemoryFilePath();
 	if (!FPaths::FileExists(FilePath))
 	{
-		return;
+		// Read legacy memories in place. The next append writes to the new agent home;
+		// operators can then remove the old file after confirming the migration.
+		FilePath = GetLegacyMemoryFilePath();
+		if (!FPaths::FileExists(FilePath))
+		{
+			return;
+		}
 	}
 
 	TArray<FString> Lines;
@@ -97,7 +122,7 @@ void UAgentMemoryComponent::AppendMemory(const FAgentMemoryRecord& Record)
 {
 	EnsureLoaded();
 
-	const FString Dir = GetMemoryDir();
+	const FString Dir = GetAgentDirectory();
 	IFileManager::Get().MakeDirectory(*Dir, true);
 
 	const FString Line = Record.ToJsonLine() + LINE_TERMINATOR;

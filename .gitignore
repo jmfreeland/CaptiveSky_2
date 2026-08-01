@@ -12,7 +12,11 @@ Assets/**/*.png
 /DerivedDataCache/
 /Intermediate/
 /Saved/
+# Runtime agent state is backed up externally; authored identity/personality docs remain tracked.
 /AgentMemory/
+/Agents/*/memory.jsonl
+/Agents/*/relationships.json
+/Agents/*/journal/
 
 # IDE / generated project files
 .vs/
@@ -25,6 +29,7 @@ Assets/**/*.png
 *.VC.db
 .vscode/
 .idea/
+.claude/
 
 # OS junk
 .DS_Store

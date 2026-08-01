@@ -11,7 +11,7 @@
  * Long-term memory store for an autonomous agent.
  *
  * Storage: plain-text, append-only JSON Lines under
- * <ProjectDir>/AgentMemory/<AgentId>/memory.jsonl -- deliberately outside
+ * <ProjectDir>/Agents/<AgentId>/memory.jsonl -- deliberately outside
  * Unreal's Saved/ directory (which is disposable/gitignored) so this data
  * survives engine cleanup and can be read, migrated, or re-implemented by
  * different technology later without needing Unreal at all.
@@ -56,6 +56,13 @@ public:
 	FString GetMemoryFilePath() const;
 
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
+	FString GetAgentDirectory() const;
+
+	/** Loads a UTF-8 document from this agent's directory (for example identity.md). */
+	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
+	FString LoadAgentDocument(const FString& FileName) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	int32 GetMemoryCount() const;
 
 protected:
@@ -67,7 +74,7 @@ private:
 
 	void EnsureLoaded() const;
 	FString ResolveAgentId() const;
-	FString GetMemoryDir() const;
+	FString GetLegacyMemoryFilePath() const;
 
 	static float ScoreRecord(const FAgentMemoryRecord& Record, const TArray<FString>& SituationWords, float HalfLifeHours);
 };

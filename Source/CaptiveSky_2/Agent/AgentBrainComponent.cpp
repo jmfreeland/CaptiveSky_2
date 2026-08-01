@@ -42,7 +42,31 @@ FString UAgentBrainComponent::BuildSituationSummary(const FString& PlayerUtteran
 
 FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const
 {
-	FString Prompt = Persona;
+	FString Prompt;
+	if (const AActor* Owner = GetOwner())
+	{
+		if (const UAgentMemoryComponent* MemoryComp = Owner->FindComponentByClass<UAgentMemoryComponent>())
+		{
+			const FString Identity = MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd();
+			const FString Personality = MemoryComp->LoadAgentDocument(TEXT("personality.md")).TrimStartAndEnd();
+			if (!Identity.IsEmpty())
+			{
+				Prompt += TEXT("Identity:\n") + Identity;
+			}
+			if (!Personality.IsEmpty())
+			{
+				if (!Prompt.IsEmpty())
+				{
+					Prompt += TEXT("\n\n");
+				}
+				Prompt += TEXT("Personality:\n") + Personality;
+			}
+		}
+	}
+	if (Prompt.IsEmpty())
+	{
+		Prompt = Persona;
+	}
 	Prompt += TEXT("\n\nRelevant memories:\n");
 
 	if (RelevantMemories.Num() == 0)

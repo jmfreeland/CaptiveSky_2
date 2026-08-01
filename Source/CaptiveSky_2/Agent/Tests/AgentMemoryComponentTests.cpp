@@ -12,7 +12,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMemoryComponentTest, "CaptiveSky2.Agent.M
 bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 {
 	const FString TestAgentId = TEXT("AutomationTest_Memory");
-	const FString TestDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("AgentMemory") / TestAgentId);
+	const FString TestDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / TestAgentId);
 
 	// Start from a clean slate so re-running the test is deterministic.
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
