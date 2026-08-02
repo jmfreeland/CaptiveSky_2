@@ -7,6 +7,7 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonSerializer.h"
+#include "EngineUtils.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -27,17 +28,31 @@ FString UAgentBrainComponent::BuildSituationSummary(const FString& PlayerUtteran
 {
 	const AActor* Owner = GetOwner();
 	const FVector Location = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
+	FString NearbyBeings;
+	if (Owner && GetWorld())
+	{
+		for (TActorIterator<AAutonomousAgentCharacter> It(GetWorld()); It; ++It)
+		{
+			if (*It == Owner) continue;
+			const float Distance = FVector::Dist(Location, It->GetActorLocation());
+			if (Distance <= 2500.f)
+			{
+				NearbyBeings += FString::Printf(TEXT(" %s is %.0f metres away;"), *It->GetActorLabel(), Distance / 100.f);
+			}
+		}
+	}
+	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
 
 	// v1 world-state summary: intentionally minimal (position + any player speech). A richer
 	// perception summary (nearby actors/points of interest) can be layered in here later without
 	// changing anything downstream, since callers only ever see the resulting FString.
 	if (PlayerUtterance.IsEmpty())
 	{
-		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). No one is speaking to you right now. Decide what to do."),
-			Location.X, Location.Y, Location.Z);
+		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
+			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
-	return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Someone just said to you: \"%s\""),
-		Location.X, Location.Y, Location.Z, *PlayerUtterance);
+	return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s someone just said to you: \"%s\""),
+		Location.X, Location.Y, Location.Z, *NearbyBeings, *PlayerUtterance);
 }
 
 FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const

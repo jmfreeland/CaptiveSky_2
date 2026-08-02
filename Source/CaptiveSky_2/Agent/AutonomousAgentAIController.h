@@ -38,6 +38,8 @@ protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
+	virtual void ActOnDecision(const FAgentDecision& Decision);
+
 private:
 	FTimerHandle ThinkTimerHandle;
 
@@ -48,5 +50,4 @@ private:
 	// Timer callback: asks the brain to decide, if it isn't already working on one.
 	void Think();
 
-	void ActOnDecision(const FAgentDecision& Decision);
 };
