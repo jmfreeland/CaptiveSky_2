@@ -44,7 +44,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact), and optional `ActionTarget`/`Speech`.
 - `AgentLLMProvider` — pluggable backend; supports Anthropic and OpenAI-compatible APIs (see `UAgentLLMSettings` in Project Settings for the active configuration).
 - `AgentStateTreeUtility.h` — a StateTree task (`FStateTreeAgentDecideTask`) that wraps `RequestDecision` for a future StateTree-driven version. Not wired into a graph yet.
-- `ARavenAgentAIController` — an asset-independent prototype that translates the raven's Wander/MoveTo decisions into swept 3D flight while leaving thought, speech, memory, and identity in the shared agent system.
+- `ARavenAgentAIController` — an asset-independent locomotion state machine (`Grounded`, `Hopping`, `TakingOff`, `Flying`, `Landing`, `Perched`) that translates the raven's Wander/MoveTo decisions into swept movement while leaving thought, speech, memory, and identity in the shared agent system. Its Blueprint-readable state is ready to drive a future Animation Blueprint.
 
 ### Agent homes
 - `Agents/<AgentId>/identity.md` — stable identity, origin, role, and self-conception; tracked in Git.
@@ -66,7 +66,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
-- Replace the unnamed raven's primitive placeholder with a proper animated bird body, then add takeoff, landing, perching, and ground-hop presentation around the existing prototype flight controller. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
+- Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
 - `Interact` actions are currently just logged. Agent speech is visible in the initial player conversation UI, but ambient speech and agent-to-agent dialogue still need an in-world presentation.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.

@@ -4,7 +4,18 @@
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.generated.h"
 
-/** Asset-independent prototype flight controller for raven consciousnesses. */
+UENUM(BlueprintType)
+enum class ERavenLocomotionState : uint8
+{
+	Grounded,
+	Hopping,
+	TakingOff,
+	Flying,
+	Landing,
+	Perched
+};
+
+/** Asset-independent raven locomotion; animation assets can read LocomotionState later. */
 UCLASS()
 class CAPTIVESKY_2_API ARavenAgentAIController : public AAutonomousAgentAIController
 {
@@ -13,11 +24,23 @@ class CAPTIVESKY_2_API ARavenAgentAIController : public AAutonomousAgentAIContro
 public:
 	ARavenAgentAIController();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Flight")
+	UPROPERTY(BlueprintReadOnly, Category = "Raven|Locomotion")
+	ERavenLocomotionState LocomotionState = ERavenLocomotionState::Grounded;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
 	float FlightSpeed = 500.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Flight")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
 	float VerticalRange = 600.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
+	float TakeoffHeight = 250.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
+	float HopDistance = 140.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
+	float HopHeight = 55.f;
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -25,7 +48,23 @@ protected:
 	virtual void ActOnDecision(const FAgentDecision& Decision) override;
 
 private:
-	FVector FlightTarget = FVector::ZeroVector;
+	FVector MovementTarget = FVector::ZeroVector;
+	FVector CruiseTarget = FVector::ZeroVector;
+	FVector HopStart = FVector::ZeroVector;
+	FVector HopEnd = FVector::ZeroVector;
 	float HomeAltitude = 0.f;
-	bool bHasFlightTarget = false;
+	float HopElapsed = 0.f;
+	float HopDuration = 0.55f;
+	bool bHasMovementTarget = false;
+	bool bTargetIsPerch = false;
+
+	void SetFlyingMovement(bool bFlying) const;
+	void BeginTakeoff(const FVector& Destination);
+	void BeginLanding(const FVector& DesiredLocation);
+	void BeginHop();
+	bool BeginPerch();
+	void SetGrounded();
+	FVector MakeCruiseTarget() const;
+	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
+	bool AdvanceTowardsTarget(float DeltaSeconds);
 };
