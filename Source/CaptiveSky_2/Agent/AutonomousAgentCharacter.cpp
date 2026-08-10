@@ -3,6 +3,7 @@
 #include "AutonomousAgentCharacter.h"
 #include "AgentMemoryComponent.h"
 #include "AgentBrainComponent.h"
+#include "AgentExternalBridgeComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "ImageUtils.h"
@@ -15,6 +16,7 @@ AAutonomousAgentCharacter::AAutonomousAgentCharacter()
 {
 	Memory = CreateDefaultSubobject<UAgentMemoryComponent>(TEXT("Memory"));
 	Brain = CreateDefaultSubobject<UAgentBrainComponent>(TEXT("Brain"));
+	ExternalBridge = CreateDefaultSubobject<UAgentExternalBridgeComponent>(TEXT("ExternalBridge"));
 
 	EyeCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("EyeCapture"));
 	EyeCapture->SetupAttachment(GetMesh());

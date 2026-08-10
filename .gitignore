@@ -17,6 +17,13 @@ Assets/**/*.png
 /Agents/*/memory.jsonl
 /Agents/*/relationships.json
 /Agents/*/journal/
+/Agents/*/.gateway/
+
+# Standalone agent gateway build/runtime output
+/Gateway/**/bin/
+/Gateway/**/obj/
+/.dotnet-cli/
+/.nuget-packages/
 
 # IDE / generated project files
 .vs/

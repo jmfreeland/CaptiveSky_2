@@ -58,6 +58,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	FString GetAgentDirectory() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
+	FString GetResolvedAgentId() const;
+
 	/** Loads a UTF-8 document from this agent's directory (for example identity.md). */
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	FString LoadAgentDocument(const FString& FileName) const;

@@ -1,0 +1,30 @@
+{
+  "projectRoot": "..",
+  "llm": {
+    "endpoint": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-5.6-luna",
+    "apiKeyEnvironmentVariable": "OPENAI_API_KEY",
+    "maxCompletionTokens": 900,
+    "temperature": 1.0,
+    "memoryContextRecords": 20
+  },
+  "embodiment": {
+    "responseTimeoutSeconds": 120,
+    "pollIntervalMilliseconds": 250
+  },
+  "agents": [
+    {
+      "agentId": "Agent_Raven_01",
+      "enabled": true,
+      "discord": {
+        "enabled": true,
+        "tokenEnvironmentVariable": "CAPTIVESKY_RAVEN_DISCORD_TOKEN",
+        "allowDirectMessages": true,
+        "respondToMentions": true,
+        "allowedUserIds": [],
+        "allowedGuildIds": [],
+        "allowedChannelIds": []
+      }
+    }
+  ]
+}

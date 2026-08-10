@@ -8,6 +8,7 @@
 
 class UAgentMemoryComponent;
 class UAgentBrainComponent;
+class UAgentExternalBridgeComponent;
 class USceneCaptureComponent2D;
 class UTextureRenderTarget2D;
 
@@ -33,6 +34,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAgentBrainComponent> Brain;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAgentExternalBridgeComponent> ExternalBridge;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneCaptureComponent2D> EyeCapture;

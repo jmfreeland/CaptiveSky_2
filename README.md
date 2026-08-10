@@ -18,7 +18,7 @@ _TODO — fill in. Some prompts to dig into:_
 
 Conscious beings in CaptiveSky should not merely reveal personalities and purposes completely predetermined by their initial design. Their lived experience must be able to change their memories, relationships, values, interests, and ways of shaping the world. Different forms of consciousness may perceive, remember, consolidate experience, and develop across radically different timescales: an agent over days, a forest over seasons, or an island over centuries.
 
-## Current State (as of 2026-07-31)
+## Current State (as of 2026-08-05)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
 - One autonomous agent, **Aster** (`Agent_Aster_01`, a `BP_Agent_Placeholder` instance), is placed near the `PlayerStart` and is alive: Aster thinks and wanders on a 15s cycle.
@@ -27,6 +27,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
 - A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
 - An unnamed autonomous raven (`Agent_Raven_01`) now lives near Aster in a temporary primitive body. It has an independent identity, personality, memory home, and body-agnostic prototype flight controller; a proper animated bird asset is still needed.
+- A standalone, multi-agent external gateway now provides a channel-neutral correspondence boundary, with Discord as its first adapter. It can host the raven headlessly from the same identity, personality, and JSONL memory when Unreal is offline; Discord activation still requires a private bot token.
 
 ## Architecture
 
@@ -41,6 +42,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
   - `Brain` (`UAgentBrainComponent`) — loads the agent's authored `identity.md` and `personality.md`, then one "think cycle" = retrieve relevant memories + capture a first-person snapshot + call the LLM + parse the decision + store any new memories the model chose to write.
   - `EyeCapture` (`SceneCaptureComponent2D`) — first-person view, base64-PNG-encoded and sent to the LLM as an image input.
 - `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — polls the Brain for a decision every `ThinkIntervalSeconds` and turns the result into a movement command (Wander → random nav-mesh point, MoveTo → actor matched by tag, Speak/Interact → logged, not yet implemented).
+- `UAgentExternalBridgeComponent` — inherited by every autonomous body; publishes a short-lived embodiment lease, consumes durable channel-neutral turns one at a time, and returns embodied speech through the gateway outbox.
 - `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact), and optional `ActionTarget`/`Speech`.
 - `AgentLLMProvider` — pluggable backend; supports Anthropic and OpenAI-compatible APIs (see `UAgentLLMSettings` in Project Settings for the active configuration).
 - `AgentStateTreeUtility.h` — a StateTree task (`FStateTreeAgentDecideTask`) that wraps `RequestDecision` for a future StateTree-driven version. Not wired into a graph yet.
@@ -51,6 +53,14 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - `Agents/<AgentId>/personality.md` — voice, temperament, values, curiosities, and boundaries; tracked in Git.
 - `Agents/<AgentId>/memory.jsonl` — runtime episodic memory; ignored by Git and backed up externally.
 - `Agents/<AgentId>/relationships.json` and `journal/` — reserved for evolving social state and longer reflections; ignored by Git.
+
+### External agent gateway
+- `Gateway/` — standalone .NET service for connecting agent consciousness to external channels without coupling those channels to Unreal.
+- `Gateway/gateway.json` maps stable agent IDs to channel adapters and secret environment-variable names. One process can host multiple agents, each with an independent Discord bot identity.
+- Discord DMs and direct mentions become generic external-message envelopes. Their conversation memories are explicitly tagged with `external`, `discord`, and a stable participant ID.
+- Gateway turns are serialized per agent and Discord redeliveries are deduplicated. Unreal participates through a short-lived embodiment lease: external turns use the body's normal brain and senses while it is authoritative, and otherwise use the headless responder.
+- Graceful shutdown returns an in-flight turn to the inbox; a later authoritative body recovers orphaned processing files. If an embodiment vanishes before claiming a turn, the gateway safely falls back to headless correspondence.
+- Setup, security notes, and run commands live in `Gateway/README.md`.
 
 ### Consciousness principle
 Identity, lived memory, an evolving self-model, and private experience-consolidation belong to a conscious being rather than to its current body or movement controller. Aster sleeps, but other kinds of consciousness may consolidate through dreaming, meditation, hibernation, contemplation, or maintenance. The shared functionality should ultimately live behind a reusable consciousness abstraction (such as `UConsciousnessComponent`), allowing bodies and sensory systems to change without replacing the being.

@@ -38,6 +38,11 @@ FString UAgentMemoryComponent::GetAgentDirectory() const
 	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / ResolveAgentId());
 }
 
+FString UAgentMemoryComponent::GetResolvedAgentId() const
+{
+	return ResolveAgentId();
+}
+
 FString UAgentMemoryComponent::GetMemoryFilePath() const
 {
 	return GetAgentDirectory() / TEXT("memory.jsonl");

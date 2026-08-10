@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "AgentLLMTypes.h"
 #include "AgentMemoryTypes.h"
+#include "AgentExternalTypes.h"
 #include "AgentLLMProvider.h"
 #include "AgentBrainComponent.generated.h"
 
@@ -70,14 +71,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Brain")
 	void RequestDecision(const FString& PlayerUtterance);
 
+	/** Runs an embodied decision for correspondence delivered through an external channel. */
+	UFUNCTION(BlueprintCallable, Category = "Agent Brain")
+	void RequestExternalDecision(const FAgentExternalUtterance& Utterance);
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	TUniquePtr<IAgentLLMProvider> Provider;
 
-	FString BuildSituationSummary(const FString& PlayerUtterance) const;
+	FString BuildSituationSummary(const FAgentExternalUtterance& Utterance) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;
+	void RequestDecisionWithContext(const FAgentExternalUtterance& Utterance);
 
 	// Parses the model's raw response text into a decision, appending any "new_memories" entries via MemoryComp along the way.
 	static FAgentDecision ParseDecisionAndStoreMemories(const FString& ResponseText, UAgentMemoryComponent* MemoryComp);
