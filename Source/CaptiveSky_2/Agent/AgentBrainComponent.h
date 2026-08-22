@@ -7,6 +7,7 @@
 #include "AgentLLMTypes.h"
 #include "AgentMemoryTypes.h"
 #include "AgentExternalTypes.h"
+#include "AgentConversationTypes.h"
 #include "AgentLLMProvider.h"
 #include "AgentBrainComponent.generated.h"
 
@@ -62,6 +63,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Brain")
 	FAgentDecision LastDecision;
 
+	/** Context associated with LastDecision. Empty text means an autonomous think cycle. */
+	UPROPERTY(BlueprintReadOnly, Category = "Agent Brain")
+	FAgentConversationContext LastConversationContext;
+
 	/**
 	 * Runs one full think-cycle: retrieves relevant memory, captures a
 	 * first-person snapshot (if the owner supports it), calls the LLM, and
@@ -75,15 +80,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Brain")
 	void RequestExternalDecision(const FAgentExternalUtterance& Utterance);
 
+	/** Shared entry point for nearby beings, players, and future communication media. */
+	UFUNCTION(BlueprintCallable, Category = "Agent Brain")
+	void RequestContextualDecision(const FAgentConversationContext& Context);
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	TUniquePtr<IAgentLLMProvider> Provider;
 
-	FString BuildSituationSummary(const FAgentExternalUtterance& Utterance) const;
+	FString BuildSituationSummary(const FAgentConversationContext& Context) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;
-	void RequestDecisionWithContext(const FAgentExternalUtterance& Utterance);
+	void RequestDecisionWithContext(const FAgentConversationContext& Context);
 
 	// Parses the model's raw response text into a decision, appending any "new_memories" entries via MemoryComp along the way.
 	static FAgentDecision ParseDecisionAndStoreMemories(const FString& ResponseText, UAgentMemoryComponent* MemoryComp);

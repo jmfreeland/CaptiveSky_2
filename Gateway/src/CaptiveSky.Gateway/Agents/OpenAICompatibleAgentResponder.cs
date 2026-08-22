@@ -16,6 +16,7 @@ public sealed class OpenAICompatibleAgentResponder(
     {
         var identity = home.LoadRequiredDocument("identity.md");
         var personality = home.LoadRequiredDocument("personality.md");
+        var personalityEvolution = home.LoadOptionalPersonalityEvolution();
         var context = await memories.ReadRecentAsync(configuration.MemoryContextRecords, cancellationToken);
 
         var memoryText = context.Count == 0
@@ -27,6 +28,9 @@ public sealed class OpenAICompatibleAgentResponder(
 
             Personality:
             {{personality}}
+
+            Evolving evidence-bound tendencies (subordinate to foundational identity/personality; empty means none yet):
+            {{(string.IsNullOrWhiteSpace(personalityEvolution) ? "(none yet)" : personalityEvolution)}}
 
             Relevant recent memories:
             {{memoryText}}

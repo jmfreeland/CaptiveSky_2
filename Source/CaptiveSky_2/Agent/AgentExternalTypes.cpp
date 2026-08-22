@@ -44,6 +44,19 @@ bool FAgentExternalUtterance::FromJson(const FString& Json, FAgentExternalUttera
 		!OutUtterance.Source.IsEmpty() && !OutUtterance.Text.IsEmpty();
 }
 
+FAgentConversationContext FAgentExternalUtterance::ToConversationContext() const
+{
+	FAgentConversationContext Context;
+	Context.Text = Text;
+	Context.Source = Source;
+	Context.ConversationId = ConversationId;
+	Context.MessageId = MessageId;
+	Context.ParticipantId = ParticipantId;
+	Context.ParticipantName = ParticipantName;
+	Context.bExternal = true;
+	return Context;
+}
+
 FString FAgentExternalResponse::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();

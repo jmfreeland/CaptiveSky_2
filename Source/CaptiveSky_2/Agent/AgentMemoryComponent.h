@@ -68,6 +68,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	int32 GetMemoryCount() const;
 
+	/** Returns every durable memory at or after the supplied UTC timestamp, in chronological order. */
+	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
+	TArray<FAgentMemoryRecord> GetMemoriesSince(const FDateTime& SinceUtc) const;
+
 protected:
 	virtual void BeginPlay() override;
 

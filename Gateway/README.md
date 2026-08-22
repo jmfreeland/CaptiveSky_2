@@ -40,8 +40,26 @@ The raven responds to DMs and direct mentions. It ignores bots and unaddressed g
 ```powershell
 dotnet restore Gateway/src/CaptiveSky.Gateway/CaptiveSky.Gateway.csproj --configfile Gateway/NuGet.Config
 dotnet run --project Gateway/src/CaptiveSky.Gateway/CaptiveSky.Gateway.csproj -- --check Gateway/gateway.json
+dotnet run --project Gateway/src/CaptiveSky.Gateway/CaptiveSky.Gateway.csproj -- --ready Gateway/gateway.json
 dotnet run --project Gateway/src/CaptiveSky.Gateway/CaptiveSky.Gateway.csproj -- Gateway/gateway.json
 ```
+
+`--check` validates configuration and agent homes while reporting missing secrets without failing. `--ready` additionally requires every enabled Discord token and, when `llm.requireApiKey` is true, the configured LLM key; it exits with code 2 when activation is incomplete.
+
+For an unattended process that restarts after failures and writes daily logs under `Gateway/logs/`:
+
+```powershell
+Gateway/start-gateway.ps1
+```
+
+After the readiness check passes, an optional per-user scheduled task can launch that wrapper whenever you log on:
+
+```powershell
+Gateway/install-startup-task.ps1
+Start-ScheduledTask -TaskName 'CaptiveSky Agent Gateway'
+```
+
+The installer is deliberately not run automatically. It creates only the task definition; secrets remain environment variables and are never copied into the task or logs. This logon task is suitable for a continuously logged-in workstation. A future server deployment can run the same gateway executable under a real service manager without changing its routing or agent model.
 
 The existing `OPENAI_API_KEY` is used for the headless OpenAI-compatible responder. Endpoint, model, context size, and key environment-variable name are configurable in `gateway.json`; credentials are never stored there.
 

@@ -9,6 +9,7 @@
 class UInputMappingContext;
 class UUserWidget;
 class UCaptiveSkyConversationWidget;
+class UCaptiveSkyAmbientSpeechWidget;
 class AAutonomousAgentCharacter;
 struct FAgentDecision;
 
@@ -46,6 +47,17 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UCaptiveSkyConversationWidget> ConversationWidget;
 
+	UPROPERTY()
+	TObjectPtr<UCaptiveSkyAmbientSpeechWidget> AmbientSpeechWidget;
+
+	UPROPERTY(EditAnywhere, Category = "Conversation")
+	float AmbientSpeechRadius = 3000.f;
+
+	UPROPERTY(EditAnywhere, Category = "Conversation")
+	float AmbientSpeechDurationSeconds = 6.f;
+
+	FTimerHandle AmbientSpeechHideTimer;
+
 	UPROPERTY(EditAnywhere, Category = "Conversation")
 	float ConversationRadius = 500.f;
 
@@ -60,6 +72,7 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
@@ -71,5 +84,10 @@ protected:
 
 	UFUNCTION()
 	void HandleConversationDecision(const FAgentDecision& Decision);
+
+	UFUNCTION()
+	void HandleAmbientAgentSpeech(AAutonomousAgentCharacter* Speaker, const FString& Speech);
+
+	void HideAmbientSpeech();
 
 };

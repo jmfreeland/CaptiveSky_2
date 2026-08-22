@@ -31,6 +31,10 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	UAgentMemoryComponent* Reader = NewObject<UAgentMemoryComponent>(GetTransientPackage());
 	Reader->AgentId = TestAgentId;
 	TestEqual(TEXT("A fresh component reloads all 3 records from disk"), Reader->GetMemoryCount(), 3);
+	TestEqual(TEXT("A minimum timestamp returns the full chronological consolidation window"),
+		Reader->GetMemoriesSince(FDateTime::MinValue()).Num(), 3);
+	TestEqual(TEXT("A future timestamp returns no consolidation memories"),
+		Reader->GetMemoriesSince(FDateTime::UtcNow() + FTimespan::FromMinutes(1)).Num(), 0);
 
 	// --- Relevance scoring: importance should win when there is no keyword overlap ---
 	{

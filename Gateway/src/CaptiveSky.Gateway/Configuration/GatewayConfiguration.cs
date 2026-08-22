@@ -66,6 +66,7 @@ public sealed class LlmConfiguration
     public string Endpoint { get; set; } = "https://api.openai.com/v1/chat/completions";
     public string Model { get; set; } = "gpt-5.6-luna";
     public string ApiKeyEnvironmentVariable { get; set; } = "OPENAI_API_KEY";
+    public bool RequireApiKey { get; set; } = true;
     public int MaxCompletionTokens { get; set; } = 900;
     public double Temperature { get; set; } = 1.0;
     public int MemoryContextRecords { get; set; } = 20;

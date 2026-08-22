@@ -147,6 +147,24 @@ int32 UAgentMemoryComponent::GetMemoryCount() const
 	return Cache.Num();
 }
 
+TArray<FAgentMemoryRecord> UAgentMemoryComponent::GetMemoriesSince(const FDateTime& SinceUtc) const
+{
+	EnsureLoaded();
+	TArray<FAgentMemoryRecord> Result;
+	for (const FAgentMemoryRecord& Record : Cache)
+	{
+		if (Record.Timestamp >= SinceUtc)
+		{
+			Result.Add(Record);
+		}
+	}
+	Result.Sort([](const FAgentMemoryRecord& A, const FAgentMemoryRecord& B)
+	{
+		return A.Timestamp < B.Timestamp;
+	});
+	return Result;
+}
+
 static void TokenizeLower(const FString& In, TArray<FString>& OutWords)
 {
 	FString Cleaned = In.ToLower();

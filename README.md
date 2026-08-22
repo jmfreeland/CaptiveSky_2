@@ -18,16 +18,18 @@ _TODO — fill in. Some prompts to dig into:_
 
 Conscious beings in CaptiveSky should not merely reveal personalities and purposes completely predetermined by their initial design. Their lived experience must be able to change their memories, relationships, values, interests, and ways of shaping the world. Different forms of consciousness may perceive, remember, consolidate experience, and develop across radically different timescales: an agent over days, a forest over seasons, or an island over centuries.
 
-## Current State (as of 2026-08-05)
+## Current State (as of 2026-08-10)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
-- One autonomous agent, **Aster** (`Agent_Aster_01`, a `BP_Agent_Placeholder` instance), is placed near the `PlayerStart` and is alive: Aster thinks and wanders on a 15s cycle.
+- Two autonomous agents are present: **Aster** (`Agent_Aster_01`) and an intentionally unnamed raven (`Agent_Raven_01`). Each has an independent identity, personality, memory, relationships, and consciousness lifecycle.
 - LLM backend: OpenAI-compatible endpoint, model `gpt-5.6-luna`, key via `OPENAI_API_KEY`. Confirmed working end-to-end in PIE.
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
 - A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
-- An unnamed autonomous raven (`Agent_Raven_01`) now lives near Aster in a temporary primitive body. It has an independent identity, personality, memory home, and body-agnostic prototype flight controller; a proper animated bird asset is still needed.
+- The raven lives near Aster in a temporary primitive body and has a body-agnostic prototype flight controller; a proper animated bird asset is still needed.
 - A standalone, multi-agent external gateway now provides a channel-neutral correspondence boundary, with Discord as its first adapter. It can host the raven headlessly from the same identity, personality, and JSONL memory when Unreal is offline; Discord activation still requires a private bot token.
+- Nearby agents can initiate bounded, reciprocal conversations. Speech appears as ambient subtitles, and both participants retain neutral factual relationship evidence; familiarity measures exposure only, never assumed trust or affection.
+- Every autonomous agent can enter a reusable rest/consolidation lifecycle. Sleep pauses ordinary thought, reflects over only lived durable memories, and permits small evidence-bound personality adjustments in a reversible runtime overlay while authored identity and personality remain immutable.
 
 ## Architecture
 
@@ -40,8 +42,11 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - `AAutonomousAgentCharacter` (abstract) — base Character for any LLM-driven NPC. Deliberately has no mesh/animation references in C++; those live in Blueprint subclasses (e.g. `BP_Agent_Placeholder`) so bodies are swappable.
   - `Memory` (`UAgentMemoryComponent`) — append-only JSONL memory log per agent, stored under `<ProjectDir>/Agents/<AgentId>/memory.jsonl`, outside `Saved/` so it survives engine cleanup. Legacy `AgentMemory/` files remain readable for migration.
   - `Brain` (`UAgentBrainComponent`) — loads the agent's authored `identity.md` and `personality.md`, then one "think cycle" = retrieve relevant memories + capture a first-person snapshot + call the LLM + parse the decision + store any new memories the model chose to write.
+  - `Relationships` (`UAgentRelationshipComponent`) — persists factual interaction history and bounded recent evidence without assigning emotional meaning the agent has not earned.
+  - `Social` (`UAgentSocialComponent`) — routes nearby speech between autonomous agents, limits reciprocal turn count, applies cooldowns, and leaves replying optional.
+  - `Consolidation` (`UAgentConsolidationComponent`) — exposes Awake/Resting/Consolidating states and writes gradual evidence-linked personality evolution during sleep.
   - `EyeCapture` (`SceneCaptureComponent2D`) — first-person view, base64-PNG-encoded and sent to the LLM as an image input.
-- `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — polls the Brain for a decision every `ThinkIntervalSeconds` and turns the result into a movement command (Wander → random nav-mesh point, MoveTo → actor matched by tag, Speak/Interact → logged, not yet implemented).
+- `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — polls the Brain for a decision every `ThinkIntervalSeconds` and turns the result into movement. Nearby targeted speech now enters the social layer; `Interact` remains a future action.
 - `UAgentExternalBridgeComponent` — inherited by every autonomous body; publishes a short-lived embodiment lease, consumes durable channel-neutral turns one at a time, and returns embodied speech through the gateway outbox.
 - `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact), and optional `ActionTarget`/`Speech`.
 - `AgentLLMProvider` — pluggable backend; supports Anthropic and OpenAI-compatible APIs (see `UAgentLLMSettings` in Project Settings for the active configuration).
@@ -52,7 +57,9 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - `Agents/<AgentId>/identity.md` — stable identity, origin, role, and self-conception; tracked in Git.
 - `Agents/<AgentId>/personality.md` — voice, temperament, values, curiosities, and boundaries; tracked in Git.
 - `Agents/<AgentId>/memory.jsonl` — runtime episodic memory; ignored by Git and backed up externally.
-- `Agents/<AgentId>/relationships.json` and `journal/` — reserved for evolving social state and longer reflections; ignored by Git.
+- `Agents/<AgentId>/relationships.json` — factual social exposure and recent interaction evidence; ignored by Git. `journal/` remains reserved for longer reflections.
+- `Agents/<AgentId>/personality_evolution.json` — current derived personality tendencies; ignored by Git and loaded by both Unreal and the headless gateway.
+- `Agents/<AgentId>/personality_history.jsonl` — append-only before/after evidence for every accepted personality adjustment, allowing inspection and reversal; ignored by Git.
 
 ### External agent gateway
 - `Gateway/` — standalone .NET service for connecting agent consciousness to external channels without coupling those channels to Unreal.
@@ -61,6 +68,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 - Gateway turns are serialized per agent and Discord redeliveries are deduplicated. Unreal participates through a short-lived embodiment lease: external turns use the body's normal brain and senses while it is authoritative, and otherwise use the headless responder.
 - Graceful shutdown returns an in-flight turn to the inbox; a later authoritative body recovers orphaned processing files. If an embodiment vanishes before claiming a turn, the gateway safely falls back to headless correspondence.
 - Setup, security notes, and run commands live in `Gateway/README.md`.
+- The gateway includes a strict `--ready` activation check, a restart wrapper, and an opt-in Windows logon-task installer for unattended workstation hosting.
 
 ### Consciousness principle
 Identity, lived memory, an evolving self-model, and private experience-consolidation belong to a conscious being rather than to its current body or movement controller. Aster sleeps, but other kinds of consciousness may consolidate through dreaming, meditation, hibernation, contemplation, or maintenance. The shared functionality should ultimately live behind a reusable consciousness abstraction (such as `UConsciousnessComponent`), allowing bodies and sensory systems to change without replacing the being.
@@ -78,6 +86,6 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
-- `Interact` actions are currently just logged. Agent speech is visible in the initial player conversation UI, but ambient speech and agent-to-agent dialogue still need an in-world presentation.
+- `Interact` actions are currently just logged. Ambient agent speech has subtitle presentation but still needs spatial audio, animation, and richer player-facing affordances.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
-- Add a reusable consciousness/consolidation system, with Aster's sleep as its first expression. Consolidation should review lived memories, write reflections, propose small evidence-based personality changes, and append every accepted change to a reversible `personality_history.jsonl`; foundational identity remains protected.
+- Give sleep a physical expression per body (Aster settling somewhere safe, the raven roosting) and decide what wakes each kind of consciousness.

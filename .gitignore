@@ -16,12 +16,16 @@ Assets/**/*.png
 /AgentMemory/
 /Agents/*/memory.jsonl
 /Agents/*/relationships.json
+/Agents/*/relationship_events.jsonl
+/Agents/*/personality_evolution.json
+/Agents/*/personality_history.jsonl
 /Agents/*/journal/
 /Agents/*/.gateway/
 
 # Standalone agent gateway build/runtime output
 /Gateway/**/bin/
 /Gateway/**/obj/
+/Gateway/logs/
 /.dotnet-cli/
 /.nuget-packages/
 

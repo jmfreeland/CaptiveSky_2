@@ -3,6 +3,8 @@
 #include "AgentBrainComponent.h"
 #include "AgentMemoryComponent.h"
 #include "AgentExternalBridgeComponent.h"
+#include "AgentRelationshipComponent.h"
+#include "AgentConsolidationComponent.h"
 #include "AgentLLMProvider.h"
 #include "AutonomousAgentCharacter.h"
 #include "Dom/JsonObject.h"
@@ -25,7 +27,7 @@ void UAgentBrainComponent::BeginPlay()
 	Provider = CreateAgentLLMProvider();
 }
 
-FString UAgentBrainComponent::BuildSituationSummary(const FAgentExternalUtterance& Utterance) const
+FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
 {
 	const AActor* Owner = GetOwner();
 	const FVector Location = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
@@ -47,19 +49,26 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentExternalUtteranc
 	// v1 world-state summary: intentionally minimal (position + any player speech). A richer
 	// perception summary (nearby actors/points of interest) can be layered in here later without
 	// changing anything downstream, since callers only ever see the resulting FString.
-	if (Utterance.Text.IsEmpty())
+	if (Context.Text.IsEmpty())
 	{
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
 			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
-	if (!Utterance.Source.IsEmpty())
+	if (Context.bExternal)
 	{
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s Through %s correspondence, %s wrote to you: \"%s\""),
-			Location.X, Location.Y, Location.Z, *NearbyBeings, *Utterance.Source,
-			Utterance.ParticipantName.IsEmpty() ? TEXT("a correspondent") : *Utterance.ParticipantName, *Utterance.Text);
+			Location.X, Location.Y, Location.Z, *NearbyBeings, *Context.Source,
+			Context.ParticipantName.IsEmpty() ? TEXT("a correspondent") : *Context.ParticipantName, *Context.Text);
+	}
+	if (Context.bAgentToAgent)
+	{
+		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s %s, another being nearby, said to you: \"%s\" "
+			"You may answer them, remain silent, move, or do something else; no relationship or response is assumed."),
+			Location.X, Location.Y, Location.Z, *NearbyBeings,
+			Context.ParticipantName.IsEmpty() ? TEXT("Someone") : *Context.ParticipantName, *Context.Text);
 	}
 	return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s someone just said to you: \"%s\""),
-		Location.X, Location.Y, Location.Z, *NearbyBeings, *Utterance.Text);
+		Location.X, Location.Y, Location.Z, *NearbyBeings, *Context.Text);
 }
 
 FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const
@@ -71,6 +80,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		{
 			const FString Identity = MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd();
 			const FString Personality = MemoryComp->LoadAgentDocument(TEXT("personality.md")).TrimStartAndEnd();
+			const FString EvolvingPersonality = MemoryComp->LoadAgentDocument(TEXT("personality_evolution.json")).TrimStartAndEnd();
 			if (!Identity.IsEmpty())
 			{
 				Prompt += TEXT("Identity:\n") + Identity;
@@ -82,6 +92,11 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 					Prompt += TEXT("\n\n");
 				}
 				Prompt += TEXT("Personality:\n") + Personality;
+			}
+			if (!EvolvingPersonality.IsEmpty())
+			{
+				Prompt += TEXT("\n\nEvolving evidence-bound tendencies (subordinate to foundational identity/personality; strengths are gradual, not commands):\n");
+				Prompt += EvolvingPersonality;
 			}
 		}
 	}
@@ -103,6 +118,15 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		}
 	}
 
+	if (const AActor* Owner = GetOwner())
+	{
+		if (const UAgentRelationshipComponent* Relationships = Owner->FindComponentByClass<UAgentRelationshipComponent>())
+		{
+			Prompt += TEXT("\nKnown relationships (familiarity records exposure, not trust or affection):\n");
+			Prompt += Relationships->BuildPromptSummary();
+		}
+	}
+
 	Prompt += TEXT(
 		"\nYou will be shown your current first-person view as an image (if available) and a short "
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
@@ -118,15 +142,22 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 
 void UAgentBrainComponent::RequestDecision(const FString& PlayerUtterance)
 {
-	FAgentExternalUtterance Utterance;
-	Utterance.Text = PlayerUtterance;
-	Utterance.ParticipantName = TEXT("a visitor");
-	RequestDecisionWithContext(Utterance);
+	FAgentConversationContext Context;
+	Context.Text = PlayerUtterance;
+	Context.Source = TEXT("in_world");
+	Context.ParticipantId = TEXT("local_player");
+	Context.ParticipantName = TEXT("a visitor");
+	RequestDecisionWithContext(Context);
 }
 
 void UAgentBrainComponent::RequestExternalDecision(const FAgentExternalUtterance& Utterance)
 {
-	RequestDecisionWithContext(Utterance);
+	RequestDecisionWithContext(Utterance.ToConversationContext());
+}
+
+void UAgentBrainComponent::RequestContextualDecision(const FAgentConversationContext& Context)
+{
+	RequestDecisionWithContext(Context);
 }
 
 static FString SanitizeMemoryTag(FString Tag)
@@ -143,7 +174,7 @@ static FString SanitizeMemoryTag(FString Tag)
 	return Result;
 }
 
-void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUtterance& Utterance)
+void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationContext& Context)
 {
 	if (bRequestInFlight)
 	{
@@ -158,6 +189,17 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUttera
 
 	AActor* Owner = GetOwner();
 	UAgentMemoryComponent* MemoryComp = Owner ? Owner->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	if (const UAgentConsolidationComponent* Consolidation = Owner ? Owner->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
+		Consolidation && !Consolidation->IsAwake())
+	{
+		UE_LOG(LogAgentBrain, Verbose, TEXT("Decision deferred while the agent is sleeping."));
+		FAgentDecision DeferredDecision;
+		LastDecision = DeferredDecision;
+		LastConversationContext = Context;
+		OnDecisionReady.Broadcast(DeferredDecision);
+		OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
+		return;
+	}
 	if (Owner)
 	{
 		if (const UAgentExternalBridgeComponent* ExternalBridge = Owner->FindComponentByClass<UAgentExternalBridgeComponent>();
@@ -166,28 +208,36 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUttera
 			UE_LOG(LogAgentBrain, Log, TEXT("Embodied decision deferred while a headless external turn owns this agent."));
 			FAgentDecision DeferredDecision;
 			LastDecision = DeferredDecision;
+			LastConversationContext = Context;
 			OnDecisionReady.Broadcast(DeferredDecision);
 			OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
 			return;
 		}
 	}
-	if (MemoryComp && !Utterance.Text.IsEmpty())
+	if (MemoryComp && !Context.Text.IsEmpty())
 	{
 		TArray<FString> Tags = { TEXT("conversation"), TEXT("visitor") };
-		FString MemoryText = FString::Printf(TEXT("A visitor said to me: \"%s\""), *Utterance.Text);
-		if (!Utterance.Source.IsEmpty())
+		FString MemoryText = FString::Printf(TEXT("A visitor said to me: \"%s\""), *Context.Text);
+		if (Context.bExternal)
 		{
-			Tags = { TEXT("conversation"), TEXT("external"), SanitizeMemoryTag(Utterance.Source),
-				TEXT("visitor"), TEXT("participant:") + SanitizeMemoryTag(Utterance.ParticipantId) };
+			Tags = { TEXT("conversation"), TEXT("external"), SanitizeMemoryTag(Context.Source),
+				TEXT("visitor"), TEXT("participant:") + SanitizeMemoryTag(Context.ParticipantId) };
 			MemoryText = FString::Printf(TEXT("%s wrote to me via %s: \"%s\""),
-				Utterance.ParticipantName.IsEmpty() ? TEXT("A correspondent") : *Utterance.ParticipantName,
-				*Utterance.Source, *Utterance.Text);
+				Context.ParticipantName.IsEmpty() ? TEXT("A correspondent") : *Context.ParticipantName,
+				*Context.Source, *Context.Text);
+		}
+		else if (Context.bAgentToAgent)
+		{
+			Tags = { TEXT("conversation"), TEXT("agent-to-agent"), TEXT("in-world"),
+				TEXT("participant:") + SanitizeMemoryTag(Context.ParticipantId) };
+			MemoryText = FString::Printf(TEXT("%s said to me nearby: \"%s\""),
+				Context.ParticipantName.IsEmpty() ? TEXT("Another being") : *Context.ParticipantName, *Context.Text);
 		}
 		MemoryComp->AppendMemory(MemoryComp->MakeMemory(EAgentMemoryType::Conversation,
 			MemoryText, 0.5f, Tags));
 	}
 
-	const FString Situation = BuildSituationSummary(Utterance);
+	const FString Situation = BuildSituationSummary(Context);
 
 	TArray<FAgentMemoryRecord> RelevantMemories;
 	if (MemoryComp)
@@ -215,7 +265,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUttera
 	TWeakObjectPtr<UAgentBrainComponent> WeakThis(this);
 	TWeakObjectPtr<UAgentMemoryComponent> WeakMemory(MemoryComp);
 
-	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Utterance](const FAgentLLMResult& Result)
+	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Context](const FAgentLLMResult& Result)
 	{
 		UAgentBrainComponent* StrongThis = WeakThis.Get();
 		if (!StrongThis)
@@ -232,13 +282,21 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUttera
 			{
 				TArray<FString> Tags = { TEXT("conversation"), TEXT("speech") };
 				FString MemoryText = FString::Printf(TEXT("I replied: \"%s\""), *Decision.Speech);
-				if (!Utterance.Source.IsEmpty())
+				if (Context.bExternal)
 				{
-					Tags = { TEXT("conversation"), TEXT("external"), SanitizeMemoryTag(Utterance.Source),
-						TEXT("speech"), TEXT("participant:") + SanitizeMemoryTag(Utterance.ParticipantId) };
+					Tags = { TEXT("conversation"), TEXT("external"), SanitizeMemoryTag(Context.Source),
+						TEXT("speech"), TEXT("participant:") + SanitizeMemoryTag(Context.ParticipantId) };
 					MemoryText = FString::Printf(TEXT("I replied to %s via %s: \"%s\""),
-						Utterance.ParticipantName.IsEmpty() ? TEXT("a correspondent") : *Utterance.ParticipantName,
-						*Utterance.Source, *Decision.Speech);
+						Context.ParticipantName.IsEmpty() ? TEXT("a correspondent") : *Context.ParticipantName,
+						*Context.Source, *Decision.Speech);
+				}
+				else if (Context.bAgentToAgent)
+				{
+					Tags = { TEXT("conversation"), TEXT("agent-to-agent"), TEXT("in-world"), TEXT("speech"),
+						TEXT("participant:") + SanitizeMemoryTag(Context.ParticipantId) };
+					MemoryText = FString::Printf(TEXT("I replied to %s nearby: \"%s\""),
+						Context.ParticipantName.IsEmpty() ? TEXT("another being") : *Context.ParticipantName,
+						*Decision.Speech);
 				}
 				WeakMemory->AppendMemory(WeakMemory->MakeMemory(EAgentMemoryType::Conversation,
 					MemoryText, 0.5f, Tags));
@@ -254,6 +312,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentExternalUttera
 		}
 
 		StrongThis->LastDecision = Decision;
+		StrongThis->LastConversationContext = Context;
 		StrongThis->OnDecisionReady.Broadcast(Decision);
 		StrongThis->OnDecisionCompleteForStateTree.ExecuteIfBound(Decision);
 	}));

@@ -27,6 +27,12 @@ public sealed partial class AgentHome
         return File.ReadAllText(path).Trim();
     }
 
+    public string LoadOptionalPersonalityEvolution()
+    {
+        var path = Path.Combine(DirectoryPath, "personality_evolution.json");
+        return File.Exists(path) ? File.ReadAllText(path).Trim() : string.Empty;
+    }
+
     public static void ValidateAgentId(string agentId)
     {
         if (string.IsNullOrWhiteSpace(agentId) || !SafeAgentId().IsMatch(agentId))

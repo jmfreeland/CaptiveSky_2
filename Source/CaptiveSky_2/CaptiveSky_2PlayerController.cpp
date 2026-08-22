@@ -9,8 +9,10 @@
 #include "CaptiveSky_2.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "CaptiveSkyConversationWidget.h"
+#include "CaptiveSkyAmbientSpeechWidget.h"
 #include "Agent/AutonomousAgentCharacter.h"
 #include "Agent/AgentBrainComponent.h"
+#include "Agent/AgentSocialSubsystem.h"
 #include "EngineUtils.h"
 #include "InputCoreTypes.h"
 #include "TimerManager.h"
@@ -46,6 +48,51 @@ void ACaptiveSky_2PlayerController::BeginPlay()
 			ConversationWidget->AddToPlayerScreen(20);
 			ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
 		}
+
+		AmbientSpeechWidget = CreateWidget<UCaptiveSkyAmbientSpeechWidget>(this, UCaptiveSkyAmbientSpeechWidget::StaticClass());
+		if (AmbientSpeechWidget)
+		{
+			AmbientSpeechWidget->AddToPlayerScreen(10);
+			AmbientSpeechWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		if (UAgentSocialSubsystem* SocialSubsystem = GetWorld()->GetSubsystem<UAgentSocialSubsystem>())
+		{
+			SocialSubsystem->OnAmbientSpeech.AddDynamic(this, &ACaptiveSky_2PlayerController::HandleAmbientAgentSpeech);
+		}
+	}
+}
+
+void ACaptiveSky_2PlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (GetWorld())
+	{
+		if (UAgentSocialSubsystem* SocialSubsystem = GetWorld()->GetSubsystem<UAgentSocialSubsystem>())
+		{
+			SocialSubsystem->OnAmbientSpeech.RemoveDynamic(this, &ACaptiveSky_2PlayerController::HandleAmbientAgentSpeech);
+		}
+		GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void ACaptiveSky_2PlayerController::HandleAmbientAgentSpeech(AAutonomousAgentCharacter* Speaker, const FString& Speech)
+{
+	if (!AmbientSpeechWidget || !Speaker || !GetPawn() ||
+		FVector::DistSquared(Speaker->GetActorLocation(), GetPawn()->GetActorLocation()) > FMath::Square(AmbientSpeechRadius))
+	{
+		return;
+	}
+	AmbientSpeechWidget->ShowSpeech(Speaker->GetActorNameOrLabel(), Speech);
+	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+	GetWorldTimerManager().SetTimer(AmbientSpeechHideTimer, this,
+		&ACaptiveSky_2PlayerController::HideAmbientSpeech, AmbientSpeechDurationSeconds, false);
+}
+
+void ACaptiveSky_2PlayerController::HideAmbientSpeech()
+{
+	if (AmbientSpeechWidget)
+	{
+		AmbientSpeechWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AgentConversationTypes.h"
 #include "AgentExternalTypes.generated.h"
 
 /** Channel-neutral correspondence delivered by the standalone agent gateway. */
@@ -39,6 +40,7 @@ struct FAgentExternalUtterance
 	FDateTime ReceivedAt;
 
 	static bool FromJson(const FString& Json, FAgentExternalUtterance& OutUtterance);
+	FAgentConversationContext ToConversationContext() const;
 };
 
 /** Result returned through the gateway outbox after an embodied turn. */

@@ -14,6 +14,9 @@ try
     await File.WriteAllTextAsync(Path.Combine(home.DirectoryPath, "personality.md"), "Careful and concise.");
 
     Assert(home.LoadRequiredDocument("identity.md") == "A test being.", "agent documents load");
+    Assert(home.LoadOptionalPersonalityEvolution() == string.Empty, "missing personality evolution is harmless");
+    await File.WriteAllTextAsync(Path.Combine(home.DirectoryPath, "personality_evolution.json"), "{\"revision\":1}");
+    Assert(home.LoadOptionalPersonalityEvolution() == "{\"revision\":1}", "headless gateway reads evolving personality state");
     AssertThrows<ArgumentException>(() => new AgentHome(root, "../escape"), "agent ids cannot escape the project");
 
     var memories = new AgentMemoryStore(home);
