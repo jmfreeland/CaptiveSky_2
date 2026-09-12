@@ -3,6 +3,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EngineUtils.h"
+#include "IslandWeather.h"
 
 ARavenAgentAIController::ARavenAgentAIController()
 {
@@ -112,9 +113,29 @@ bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
 	if (Delta.SizeSquared() < FMath::Square(35.f)) return true;
 	const FVector Direction = Delta.GetSafeNormal();
 	FHitResult Hit;
-	Raven->SetActorLocation(Raven->GetActorLocation() + Direction * FlightSpeed * DeltaSeconds, true, &Hit);
+	FVector Wind = FVector::ZeroVector;
+	if (LocomotionState == ERavenLocomotionState::Flying)
+	{
+		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+		{
+			Wind = It->GetLocalWind(Raven->GetActorLocation(), Raven);
+			break;
+		}
+	}
+	// Fade drift near arrival and clamp steps so low frame rates cannot overshoot a target.
+	const FVector Velocity = Direction * FMath::Max(0.f, FlightSpeed) + Wind * FMath::Clamp(Delta.Size() / 300.f, 0.f, 1.f);
+	const FVector Step = (Velocity * FMath::Max(0.f, DeltaSeconds)).GetClampedToMaxSize(Delta.Size());
+	Raven->SetActorLocation(Raven->GetActorLocation() + Step, true, &Hit);
 	Raven->SetActorRotation(Direction.Rotation());
-	return Hit.bBlockingHit;
+	if (Hit.bBlockingHit)
+	{
+		// Obstruction is not a successful landing/perch. Stop and allow another decision.
+		bHasMovementTarget = false;
+		bTargetIsPerch = false;
+		LocomotionState = ERavenLocomotionState::Flying;
+		return false;
+	}
+	return FVector::DistSquared(Raven->GetActorLocation(), MovementTarget) < FMath::Square(35.f);
 }
 
 void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
@@ -147,6 +168,15 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (!It->ActorHasTag(TargetTag)) continue;
+			if (It->ActorHasTag(TEXT("RavenPerch")))
+			{
+				MovementTarget = It->GetActorLocation();
+				bHasMovementTarget = true;
+				bTargetIsPerch = true;
+				LocomotionState = ERavenLocomotionState::Landing;
+				SetFlyingMovement(true);
+				return;
+			}
 			const FVector Destination = It->GetActorLocation() + FVector(0.f, 0.f, 180.f);
 			if (LocomotionState == ERavenLocomotionState::Grounded || LocomotionState == ERavenLocomotionState::Perched)
 				BeginTakeoff(Destination);

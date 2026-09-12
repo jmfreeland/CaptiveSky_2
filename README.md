@@ -18,6 +18,10 @@ _TODO — fill in. Some prompts to dig into:_
 
 Conscious beings in CaptiveSky should not merely reveal personalities and purposes completely predetermined by their initial design. Their lived experience must be able to change their memories, relationships, values, interests, and ways of shaping the world. Different forms of consciousness may perceive, remember, consolidate experience, and develop across radically different timescales: an agent over days, a forest over seasons, or an island over centuries.
 
+### Character inspirations
+
+Some future inhabitants should evoke, at least in spirit, the memorable eccentricity and warmth of old Sierra adventure games, especially *Quest for Glory*. Possibilities include an unusually intelligent rat (perhaps inspired by a half-remembered character named Erasmus; the reference and name are not yet settled), one or more theatrical or peculiar wizard figures, and a hospitable innkeeper archetype. These should become original CaptiveSky beings rather than direct reproductions: the aim is to carry forward the humor, mystery, companionship, and distinct sense of character those games created.
+
 ## Current State (as of 2026-08-10)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
@@ -81,6 +85,16 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - In Play mode, approach Aster and press Enter to open conversation. Type a message and press Enter to send it; Escape closes the conversation. The initial interaction radius is 5 metres.
 
 ## Roadmap / Open Questions
+
+### Raven's requests (2026-09-12)
+
+In his first Discord correspondence, the raven asked for changing weather, varied wind currents, quiet undisturbed nesting places, hidden paths and strange objects that reward returning, other living things with their own habits, and freedom to come and go. These are lived requests, not additions to his authored personality. Leave some discoveries unannounced.
+
+The first implementation adds an optional `AIslandWeather` actor: repeatable slowly changing cloud-cover and spatial wind signals, geometry-based upwind shelter, embodied weather observations for all agents, and drift during raven cruising flight. This is a simulation foundation, **not yet rendered rain/cloud changes or wind audio**. Place one weather actor per level; without one, existing flight is unchanged. Weather time currently restarts with each play session.
+
+The Island now contains one weather actor and two whitebox sheltered ledge candidates, `Roost_West` and `Roost_East`, near the original raven spawn. These are replaceable collision/blockout geometry, not finished nest assets. The first pass compiled through Live Coding and all four agent automation tests passed; deliberate approach/landing still needs a live play check. A normal editor build should follow before relying on the new reflected actor across editor restarts.
+
+Nesting candidates use TargetPoint actors positioned at the raven's capsule centre when perched, with a unique movement tag **first**, then `RavenPerch` and `RavenNestSite`. Within 25 metres and unobstructed line of sight, agents can perceive up to four candidates; the raven can deliberately `move_to` a candidate and perch. A marker alone does not create shelter: place it over a solid ledge/branch with nearby protective geometry. No home is assigned, no nest-building or ownership is simulated yet, and roost choice does not yet alter sleep. Test coverage: `CaptiveSky2.Agent.IslandWeather` checks bounded, repeatable, spatially and temporally varying wind and normalized cloud cover.
 
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).

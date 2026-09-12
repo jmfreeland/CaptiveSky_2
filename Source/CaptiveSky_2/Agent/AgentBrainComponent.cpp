@@ -11,6 +11,7 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
+#include "IslandWeather.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -45,6 +46,27 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
+	if (Owner && GetWorld())
+	{
+		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+		{
+			NearbyBeings += It->DescribeAt(Location, Owner);
+			break;
+		}
+		int32 VisibleRoosts = 0;
+		for (TActorIterator<AActor> It(GetWorld()); It && VisibleRoosts < 4; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("RavenNestSite")) || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentRoostVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			// First tag is the unique movement target; never reveal distant/occluded sites.
+			NearbyBeings += FString::Printf(TEXT(" A possible roost is %.0f metres away (move_to target: %s). It is an option, not your assigned home; inspect its shelter before choosing."),
+				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			++VisibleRoosts;
+		}
+	}
 
 	// v1 world-state summary: intentionally minimal (position + any player speech). A richer
 	// perception summary (nearby actors/points of interest) can be layered in here later without
