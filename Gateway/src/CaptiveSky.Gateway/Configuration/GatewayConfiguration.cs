@@ -85,6 +85,8 @@ public sealed class DiscordConfiguration
     public string TokenEnvironmentVariable { get; set; } = string.Empty;
     public bool AllowDirectMessages { get; set; } = true;
     public bool RespondToMentions { get; set; } = true;
+    /// <summary>Optional display names accepted when a pasted @name has no Discord mention metadata.</summary>
+    public List<string> TextualMentionAliases { get; set; } = [];
     public List<ulong> AllowedUserIds { get; set; } = [];
     public List<ulong> AllowedGuildIds { get; set; } = [];
     public List<ulong> AllowedChannelIds { get; set; } = [];

@@ -4,6 +4,7 @@ using CaptiveSky.Gateway.Configuration;
 using CaptiveSky.Gateway.Domain;
 using CaptiveSky.Gateway.Infrastructure;
 using CaptiveSky.Gateway.Routing;
+using CaptiveSky.Gateway.Channels;
 
 var root = Path.Combine(Path.GetTempPath(), $"CaptiveSkyGatewayChecks-{Guid.NewGuid():N}");
 try
@@ -95,6 +96,8 @@ try
     Assert(embodiedResponder.CallCount == 0, "headless responder stays silent while embodied");
     Assert((await embodiedMemories.ReadRecentAsync(20, CancellationToken.None)).Count == 0,
         "gateway does not duplicate memory owned by the embodiment");
+    Assert(DiscordChannelAdapter.HasTextualMention("@Raven hello", "Raven"), "pasted bot mentions are accepted");
+    Assert(!DiscordChannelAdapter.HasTextualMention("@Ravenous hello", "Raven"), "partial aliases are rejected");
 
     var vanishedHome = new AgentHome(root, "Agent_Vanished_01");
     Directory.CreateDirectory(vanishedHome.DirectoryPath);

@@ -33,7 +33,7 @@ Untouched turns fall back to the headless responder if a body disappears before 
 
 5. Open a new terminal after `setx`. Put your Discord user ID in `allowedUserIds` in `gateway.json` before inviting the bot to a shared server. An empty list permits any user who can reach the bot.
 
-The raven responds to DMs and direct mentions. It ignores bots and unaddressed guild conversation.
+The raven responds to DMs and direct mentions. It ignores bots and unaddressed guild conversation. If a client pastes `@Raven` as plain text instead of creating a Discord mention entity, configure `textualMentionAliases` (for example `["Raven"]`) in the agent's Discord block; the alias is accepted only at the start of a message and the existing user, guild, and channel allow-lists still apply.
 
 ## Run locally
 

@@ -22,6 +22,7 @@
         "tokenEnvironmentVariable": "CAPTIVESKY_RAVEN_DISCORD_TOKEN",
         "allowDirectMessages": true,
         "respondToMentions": true,
+        "textualMentionAliases": ["Raven"],
         "allowedUserIds": [581910149002821665],
         "allowedGuildIds": [],
         "allowedChannelIds": []

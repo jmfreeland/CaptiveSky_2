@@ -135,12 +135,48 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             return false;
         if (_agent.Discord.AllowedChannelIds.Count > 0 && !_agent.Discord.AllowedChannelIds.Contains(message.Channel.Id))
             return false;
-        return _agent.Discord.RespondToMentions && message.MentionedUsers.Any(user => user.Id == _client.CurrentUser.Id);
+        if (!_agent.Discord.RespondToMentions)
+            return false;
+
+        if (message.MentionedUsers.Any(user => user.Id == _client.CurrentUser.Id))
+            return true;
+
+        // Pasted mentions render like @Raven but contain no Discord mention entity.
+        // Keep this opt-in per agent and retain the user/guild/channel allow-lists above.
+        var aliases = _agent.Discord.TextualMentionAliases.Count > 0
+            ? _agent.Discord.TextualMentionAliases
+            : [_client.CurrentUser.Username];
+        return aliases.Any(alias => HasTextualMention(message.Content, alias));
     }
 
-    private string RemoveBotMention(string content) => content
+    private string RemoveBotMention(string content)
+    {
+        var cleaned = content
         .Replace($"<@{_client.CurrentUser.Id}>", string.Empty, StringComparison.Ordinal)
         .Replace($"<@!{_client.CurrentUser.Id}>", string.Empty, StringComparison.Ordinal);
+        var aliases = _agent.Discord.TextualMentionAliases.Count > 0
+            ? _agent.Discord.TextualMentionAliases
+            : [_client.CurrentUser.Username];
+        foreach (var alias in aliases)
+        {
+            if (HasTextualMention(cleaned, alias))
+            {
+                var trimmed = cleaned.TrimStart();
+                cleaned = trimmed[(alias.TrimStart('@').Length + 1)..];
+                break;
+            }
+        }
+        return cleaned;
+    }
+
+    public static bool HasTextualMention(string content, string alias)
+    {
+        if (string.IsNullOrWhiteSpace(alias)) return false;
+        var trimmed = content.TrimStart();
+        var prefix = "@" + alias.TrimStart('@');
+        if (!trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        return trimmed.Length == prefix.Length || char.IsWhiteSpace(trimmed[prefix.Length]) || char.IsPunctuation(trimmed[prefix.Length]);
+    }
 
     internal static IEnumerable<string> SplitMessage(string message, int maximumLength)
     {
