@@ -94,6 +94,8 @@ The first implementation adds an optional `AIslandWeather` actor: repeatable slo
 
 The Island now contains one weather actor and two whitebox sheltered ledge candidates, `Roost_West` and `Roost_East`, near the original raven spawn. These are replaceable collision/blockout geometry, not finished nest assets. The first pass compiled through Live Coding and all four agent automation tests passed; deliberate approach/landing still needs a live play check. A normal editor build should follow before relying on the new reflected actor across editor restarts.
 
+Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art, sound, and interaction.
+
 Nesting candidates use TargetPoint actors positioned at the raven's capsule centre when perched, with a unique movement tag **first**, then `RavenPerch` and `RavenNestSite`. Within 25 metres and unobstructed line of sight, agents can perceive up to four candidates; the raven can deliberately `move_to` a candidate and perch. A marker alone does not create shelter: place it over a solid ledge/branch with nearby protective geometry. No home is assigned, no nest-building or ownership is simulated yet, and roost choice does not yet alter sleep. Test coverage: `CaptiveSky2.Agent.IslandWeather` checks bounded, repeatable, spatially and temporally varying wind and normalized cloud cover.
 
 - _TODO — prioritize against the Vision section above._

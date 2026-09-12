@@ -66,6 +66,18 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
 			++VisibleRoosts;
 		}
+		int32 VisibleLandmarks = 0;
+		for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks < 6; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentLandmarkVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			NearbyBeings += FString::Printf(TEXT(" A point of interest is %.0f metres away (move_to target: %s). It may be worth investigating at your own pace."),
+				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			++VisibleLandmarks;
+		}
 	}
 
 	// v1 world-state summary: intentionally minimal (position + any player speech). A richer
