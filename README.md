@@ -96,6 +96,14 @@ The Island now contains one weather actor and two whitebox sheltered ledge candi
 
 Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art, sound, and interaction.
 
+### Landscape material (2026-09-13)
+
+The Island uses `/Game/Materials/MI_Island_Landscape`, adapted from the original `CaptiveSky` project's `/Game/Materals/MI_MountainRange`. Its mossy grass, rocky ground and cliff textures replace the flat placeholder. The original source project is unchanged, and `/Game/Materials/M_Island_Auto` remains available to restore the previous look.
+
+The new local parent `/Game/Materials/M_Island_Textured_Auto` connects the source graph's automatic slope blend directly to Material Attributes because this Island has no painted landscape layers. Painted Path/Road layers are therefore not active in this variant. Snow, puddles, ground displacement and the old RVT preview switch are disabled on the instance for this first pass. Existing landscape shape and collision are unchanged.
+
+`Scripts/Import-LandscapeMaterial.ps1` provides a conservative dependency preflight and optional `-Copy` from the original project. The first import copied 82 assets (about 837 MiB), including the source material's foliage and RVT dependencies; copying those dependencies alone does not configure foliage placement or RVT volumes. After copying, validate package references in Unreal. Content and the saved map remain outside Git and use the existing external backup workflow.
+
 Nesting candidates use TargetPoint actors positioned at the raven's capsule centre when perched, with a unique movement tag **first**, then `RavenPerch` and `RavenNestSite`. Within 25 metres and unobstructed line of sight, agents can perceive up to four candidates; the raven can deliberately `move_to` a candidate and perch. A marker alone does not create shelter: place it over a solid ledge/branch with nearby protective geometry. No home is assigned, no nest-building or ownership is simulated yet, and roost choice does not yet alter sleep. Test coverage: `CaptiveSky2.Agent.IslandWeather` checks bounded, repeatable, spatially and temporally varying wind and normalized cloud cover.
 
 - _TODO — prioritize against the Vision section above._
