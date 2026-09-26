@@ -197,6 +197,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		bool bHasVolumetricCloud = false;
 		bool bHasCloudCoverageParameter = false;
 		bool bHasCloudDensityParameter = false;
+		bool bHasStormCloudsParameter = false;
 		AActor* HabitatMarker = nullptr;
 		AIslandWeather* MapWeather = nullptr;
 		UVolumetricCloudComponent* MapCloud = nullptr;
@@ -219,6 +220,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 					Material->GetAllScalarParameterInfo(ScalarParameters, ParameterIds);
 					bHasCloudCoverageParameter = ScalarParameters.ContainsByPredicate([](const FMaterialParameterInfo& Parameter) { return Parameter.Name == FName(TEXT("Cloud_GlobalCoverage")); });
 					bHasCloudDensityParameter = ScalarParameters.ContainsByPredicate([](const FMaterialParameterInfo& Parameter) { return Parameter.Name == FName(TEXT("Cloud_GlobalDensity")); });
+					bHasStormCloudsParameter = ScalarParameters.ContainsByPredicate([](const FMaterialParameterInfo& Parameter) { return Parameter.Name == FName(TEXT("StormClouds")); });
 				}
 			}
 		}
@@ -227,20 +229,29 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Saved Island contains the TideglassPool habitat tag"), bHasTideglassHabitat);
 		TestTrue(TEXT("Saved Island contains its authored volumetric cloud layer"), bHasVolumetricCloud);
 		TestTrue(TEXT("Saved Island cloud material exposes coverage and density controls"), bHasCloudCoverageParameter && bHasCloudDensityParameter);
-		if (MapWeather && MapCloud && AuthoredCloudMaterial && bHasCloudCoverageParameter && bHasCloudDensityParameter)
+		TestTrue(TEXT("Saved Island cloud material exposes its storm-cloud control"), bHasStormCloudsParameter);
+		if (MapWeather && MapCloud && AuthoredCloudMaterial && bHasCloudCoverageParameter && bHasCloudDensityParameter && bHasStormCloudsParameter)
 		{
 			const int32 SavedWeatherSeed = MapWeather->WeatherSeed;
 			float MinimumCover = 2.f;
 			float MaximumCover = -1.f;
 			int32 ClearSeed = 0;
 			int32 OvercastSeed = 0;
+			float MinimumRain = 2.f;
+			float MaximumRain = -1.f;
+			int32 DrySeed = 0;
+			int32 RainySeed = 0;
 			for (int32 Seed = -1000; Seed <= 1000; ++Seed)
 			{
 				MapWeather->WeatherSeed = Seed;
 				const float Cover = MapWeather->SampleCloudCover(Island->GetTimeSeconds());
+				const float Rain = MapWeather->SampleRainIntensity(Island->GetTimeSeconds());
 				if (Cover < MinimumCover) { MinimumCover = Cover; ClearSeed = Seed; }
 				if (Cover > MaximumCover) { MaximumCover = Cover; OvercastSeed = Seed; }
+				if (Rain < MinimumRain) { MinimumRain = Rain; DrySeed = Seed; }
+				if (Rain > MaximumRain) { MaximumRain = Rain; RainySeed = Seed; }
 			}
+			TestTrue(TEXT("Saved weather seed space includes both dry and rainy cloud states"), MinimumRain < 0.01f && MaximumRain > 0.25f);
 			MapWeather->WeatherSeed = ClearSeed;
 			MapWeather->UpdateCloudRendering();
 			UMaterialInstanceDynamic* WeatherCloudMID = Cast<UMaterialInstanceDynamic>(MapCloud->GetMaterial());
@@ -249,6 +260,12 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			{
 				const float ClearCoverage = WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage"));
 				const float ClearDensity = WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalDensity"));
+				MapWeather->WeatherSeed = DrySeed;
+				MapWeather->UpdateCloudRendering();
+				const float DryStorm = WeatherCloudMID->K2_GetScalarParameterValue(TEXT("StormClouds"));
+				MapWeather->WeatherSeed = RainySeed;
+				MapWeather->UpdateCloudRendering();
+				TestTrue(TEXT("Passing rain front activates the authored storm-cloud material"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("StormClouds")) > DryStorm);
 				MapWeather->WeatherSeed = OvercastSeed;
 				MapWeather->UpdateCloudRendering();
 				TestTrue(TEXT("Overcast changes authored cloud coverage"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage")) > ClearCoverage);
@@ -261,6 +278,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			MapWeather->OriginalCloudMaterial = nullptr;
 			MapWeather->bHasCloudCoverageParameter = false;
 			MapWeather->bHasCloudDensityParameter = false;
+			MapWeather->bHasStormCloudsParameter = false;
 			MapWeather->WeatherSeed = SavedWeatherSeed;
 		}
 		if (HabitatMarker)

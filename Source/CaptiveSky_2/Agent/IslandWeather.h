@@ -20,7 +20,7 @@ struct FIslandTransientGust
 	double ExpiresAt = 0.0;
 };
 
-/** First-pass physical weather signal. Rendering/audio may consume the same sample later. */
+/** Repeatable island-scale wind/cloud/rain signals with a transient volumetric-cloud rendering consumer. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandWeather : public AActor
 {
@@ -37,10 +37,15 @@ public:
 	FName CloudCoverageParameter = TEXT("Cloud_GlobalCoverage");
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Clouds")
 	FName CloudDensityParameter = TEXT("Cloud_GlobalDensity");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Clouds")
+	FName StormCloudsParameter = TEXT("StormClouds");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="1", ClampMax="8"))
+	float RainCycleMultiplier = 2.4f;
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
 	float SampleCloudCover(double Seconds) const;
+	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Add a bounded, temporary local wind response; it naturally fades in space and time. */
@@ -64,8 +69,10 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> WeatherCloudMaterial;
 	float OriginalCloudCoverage = 0.f;
 	float OriginalCloudDensity = 0.f;
+	float OriginalStormClouds = 0.f;
 	bool bHasCloudCoverageParameter = false;
 	bool bHasCloudDensityParameter = false;
+	bool bHasStormCloudsParameter = false;
 	bool bCloudParameterWarningLogged = false;
 	double NextCloudDiscoveryTime = 0.0;
 	void RefreshNightEcology();

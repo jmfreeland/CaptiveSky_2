@@ -65,7 +65,8 @@ bool AIslandWeather::InitializeCloudRendering()
 		BaseMaterial->GetAllScalarParameterInfo(ScalarParameters, ParameterIds);
 		bHasCloudCoverageParameter = ScalarParameters.ContainsByPredicate([this](const FMaterialParameterInfo& Parameter) { return Parameter.Name == CloudCoverageParameter; });
 		bHasCloudDensityParameter = ScalarParameters.ContainsByPredicate([this](const FMaterialParameterInfo& Parameter) { return Parameter.Name == CloudDensityParameter; });
-		if (!bHasCloudCoverageParameter && !bHasCloudDensityParameter)
+		bHasStormCloudsParameter = ScalarParameters.ContainsByPredicate([this](const FMaterialParameterInfo& Parameter) { return Parameter.Name == StormCloudsParameter; });
+		if (!bHasCloudCoverageParameter && !bHasCloudDensityParameter && !bHasStormCloudsParameter)
 		{
 			if (!bCloudParameterWarningLogged)
 			{
@@ -82,8 +83,9 @@ bool AIslandWeather::InitializeCloudRendering()
 		WeatherCloudMaterial = DynamicMaterial;
 		if (bHasCloudCoverageParameter) OriginalCloudCoverage = DynamicMaterial->K2_GetScalarParameterValue(CloudCoverageParameter);
 		if (bHasCloudDensityParameter) OriginalCloudDensity = DynamicMaterial->K2_GetScalarParameterValue(CloudDensityParameter);
+		if (bHasStormCloudsParameter) OriginalStormClouds = DynamicMaterial->K2_GetScalarParameterValue(StormCloudsParameter);
 		Cloud->SetMaterial(DynamicMaterial);
-		UE_LOG(LogIslandWeather, Log, TEXT("Weather linked cloud material %s (coverage %s, density %s)."), *BaseMaterial->GetName(), bHasCloudCoverageParameter ? TEXT("enabled") : TEXT("unavailable"), bHasCloudDensityParameter ? TEXT("enabled") : TEXT("unavailable"));
+		UE_LOG(LogIslandWeather, Log, TEXT("Weather linked cloud material %s (coverage %s, density %s, storm %s)."), *BaseMaterial->GetName(), bHasCloudCoverageParameter ? TEXT("enabled") : TEXT("unavailable"), bHasCloudDensityParameter ? TEXT("enabled") : TEXT("unavailable"), bHasStormCloudsParameter ? TEXT("enabled") : TEXT("unavailable"));
 		return true;
 	}
 	return false;
@@ -98,6 +100,8 @@ void AIslandWeather::UpdateCloudRendering()
 		WeatherCloudMaterial->SetScalarParameterValue(CloudCoverageParameter, OriginalCloudCoverage + (Cover - 0.5f) * 0.08f);
 	if (bHasCloudDensityParameter)
 		WeatherCloudMaterial->SetScalarParameterValue(CloudDensityParameter, OriginalCloudDensity * FMath::Lerp(0.82f, 1.18f, Cover));
+	if (bHasStormCloudsParameter)
+		WeatherCloudMaterial->SetScalarParameterValue(StormCloudsParameter, OriginalStormClouds + 0.45f * SampleRainIntensity(GetWorld()->GetTimeSeconds()));
 }
 
 void AIslandWeather::RefreshNightEcology()
@@ -147,6 +151,16 @@ float AIslandWeather::SampleCloudCover(double Seconds) const
 {
 	const double Phase = Seconds / FMath::Max(30.f, CycleSeconds) * 2.0 * PI + WeatherSeed * 0.37;
 	return static_cast<float>(0.5 + 0.5 * FMath::Sin(Phase));
+}
+
+float AIslandWeather::SampleRainIntensity(double Seconds) const
+{
+	const double RainPeriod = FMath::Max(30.f, CycleSeconds) * FMath::Clamp(RainCycleMultiplier, 1.f, 8.f);
+	const double FrontPhase = Seconds / RainPeriod * 2.0 * PI + WeatherSeed * 0.13 + 2.1;
+	const float FrontStrength = static_cast<float>(0.5 + 0.5 * FMath::Sin(FrontPhase));
+	const float RainFront = FMath::SmoothStep(0.62f, 0.90f, FrontStrength);
+	const float CloudGate = FMath::SmoothStep(0.48f, 0.78f, SampleCloudCover(Seconds));
+	return FMath::Clamp(RainFront * CloudGate, 0.f, 1.f);
 }
 
 FVector AIslandWeather::SampleWind(const FVector& Position, double Seconds) const
@@ -208,13 +222,15 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	if (!GetWorld()) return FString();
 	const double Now = GetWorld()->GetTimeSeconds();
 	const float Cloud = SampleCloudCover(Now);
+	const float Rain = SampleRainIntensity(Now);
 	const FVector Wind = GetLocalWind(Position, Observer);
 	const bool bFeelingLocalGust = TransientGusts.ContainsByPredicate([&Position, Now](const FIslandTransientGust& Gust)
 	{
 		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
 	});
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage and density shift with the simulation and gently soften sunlight and skylight; rain and weather sounds are not yet rendered."),
-		Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast"),
+	const TCHAR* Conditions = Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Rain has a bounded simulated intensity (%.0f%%), but raindrop effects and weather sounds are not yet rendered."),
+		Conditions,
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
-		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""));
+		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f);
 }

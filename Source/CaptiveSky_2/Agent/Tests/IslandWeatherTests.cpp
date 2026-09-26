@@ -7,6 +7,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWe
 bool FIslandWeatherTest::RunTest(const FString& Parameters)
 {
 	const AIslandWeather* Weather = GetDefault<AIslandWeather>();
+	float MinimumRain = 2.f;
+	float MaximumRain = -1.f;
+	double MinimumRainTime = 0.0;
+	double MaximumRainTime = 0.0;
 	for (int32 I = 0; I < 1000; ++I)
 	{
 		const FVector Position(I * 50.0, -I * 30.0, 700.0);
@@ -15,7 +19,20 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		const float Cloud = Weather->SampleCloudCover(I);
 		TestTrue(TEXT("Cloud cover is normalized"), Cloud >= 0.f && Cloud <= 1.f);
 		TestTrue(TEXT("Sampling is repeatable"), Wind.Equals(Weather->SampleWind(Position, I)));
+		const float Rain = Weather->SampleRainIntensity(I);
+		TestTrue(TEXT("Rain intensity is normalized"), Rain >= 0.f && Rain <= 1.f);
+		TestTrue(TEXT("Rain intensity is repeatable"), FMath::IsNearlyEqual(Rain, Weather->SampleRainIntensity(I)));
 	}
+	for (int32 Seconds = 0; Seconds <= 14400; Seconds += 15)
+	{
+		const float Rain = Weather->SampleRainIntensity(Seconds);
+		if (Rain < MinimumRain) { MinimumRain = Rain; MinimumRainTime = Seconds; }
+		if (Rain > MaximumRain) { MaximumRain = Rain; MaximumRainTime = Seconds; }
+	}
+	TestTrue(TEXT("Independent rain-front cycle includes dry periods"), MinimumRain < 0.01f);
+	TestTrue(TEXT("Cloud-gated rain-front cycle includes gentle showers"), MaximumRain > 0.45f);
+	TestTrue(TEXT("Rain-free sample remains stable"), FMath::IsNearlyEqual(Weather->SampleRainIntensity(MinimumRainTime), MinimumRain));
+	TestTrue(TEXT("Shower sample remains stable"), FMath::IsNearlyEqual(Weather->SampleRainIntensity(MaximumRainTime), MaximumRain));
 	TestFalse(TEXT("Weather changes over time"), Weather->SampleWind(FVector::ZeroVector, 0).Equals(Weather->SampleWind(FVector::ZeroVector, 100)));
 	TestFalse(TEXT("Currents vary across the Island"), Weather->SampleWind(FVector::ZeroVector, 0).Equals(Weather->SampleWind(FVector(1000, 1000, 0), 0)));
 
