@@ -9,6 +9,7 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "IslandDayNight.h"
+#include "IslandWeather.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -140,6 +141,21 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite"))) Fact = TEXT("You inspected a candidate resting site. This visual inspection alone does not prove support or shelter: a successful perch result confirms support, and shelter varies with solid geometry and wind direction. No nest, ownership, or assigned home has been created.");
+		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
+		{
+			bool bWindResponded = false;
+			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
+			{
+				const FVector ExistingWind = WeatherIt->GetLocalWind(It->GetActorLocation(), *It);
+				const FVector GustDirection = ExistingWind.IsNearlyZero() ? It->GetActorForwardVector() : ExistingWind.GetSafeNormal();
+				WeatherIt->AddTransientGust(It->GetActorLocation(), GustDirection, 220.f, 1400.f, 18.f);
+				bWindResponded = true;
+				break;
+			}
+			Fact = bWindResponded
+				? TEXT("You passed through or attended to the WindArch. A short-lived gust now changes the simulated local wind around it, fading out over eighteen seconds and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound or visible wind effect is implemented yet.")
+				: TEXT("You inspected the WindArch, but no IslandWeather actor is active, so no gust was created. This landmark has no visible wind effect or sound yet.");
+		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark"))) Fact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");
 		else { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		InspectedUntil.Add(Target, FPlatformTime::Seconds() + 300);

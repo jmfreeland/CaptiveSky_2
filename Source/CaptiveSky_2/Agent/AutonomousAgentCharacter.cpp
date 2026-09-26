@@ -35,6 +35,17 @@ AAutonomousAgentCharacter::AAutonomousAgentCharacter()
 void AAutonomousAgentCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	// Give other residents a stable, body-independent movement target. Movement
+	// brings an agent within conversational range but never initiates speech by itself.
+	if (Memory)
+	{
+		const FString AgentId = Memory->GetResolvedAgentId();
+		if (!AgentId.IsEmpty())
+		{
+			const FName ApproachTag(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId));
+			Tags.AddUnique(ApproachTag);
+		}
+	}
 
 	// Re-parent onto the actual assigned mesh's socket now that the Blueprint CDO's mesh is in effect.
 	if (USkeletalMeshComponent* MeshComp = GetMesh())

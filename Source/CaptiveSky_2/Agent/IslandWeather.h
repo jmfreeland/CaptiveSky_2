@@ -4,6 +4,16 @@
 #include "GameFramework/Actor.h"
 #include "IslandWeather.generated.h"
 
+struct FIslandTransientGust
+{
+	FVector Center = FVector::ZeroVector;
+	FVector Direction = FVector::ForwardVector;
+	float PeakSpeed = 0.f;
+	float Radius = 0.f;
+	double StartedAt = 0.0;
+	double ExpiresAt = 0.0;
+};
+
 /** First-pass physical weather signal. Rendering/audio may consume the same sample later. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandWeather : public AActor
@@ -23,4 +33,10 @@ public:
 	float SampleCloudCover(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
+	/** Add a bounded, temporary local wind response; it naturally fades in space and time. */
+	void AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds);
+	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
+
+private:
+	TArray<FIslandTransientGust> TransientGusts;
 };

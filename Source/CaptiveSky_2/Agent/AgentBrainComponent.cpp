@@ -54,7 +54,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const float Distance = FVector::Dist(Location, It->GetActorLocation());
 			if (Distance <= 2500.f)
 			{
-				NearbyBeings += FString::Printf(TEXT(" %s is %.0f metres away;"), *It->GetActorLabel(), Distance / 100.f);
+				const FString OtherAgentId = It->Memory ? It->Memory->GetResolvedAgentId() : It->GetActorNameOrLabel();
+				NearbyBeings += FString::Printf(TEXT(" %s is %.0f metres away (move_to target: ApproachAgent_%s). You may approach them, but moving closer does not begin a conversation; speaking remains optional for both of you."),
+					*OtherAgentId, Distance / 100.f, *OtherAgentId);
 			}
 		}
 	}
@@ -94,15 +96,23 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
-			NearbyBeings += FString::Printf(TEXT(" A static prototype landmark is %.0f metres away (move_to/interact target: %s). Interact performs one factual inspection, not a puzzle, reward, or environmental change. Respect recent inspection results."),
-				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			const bool bResponsiveWindArch = It->ActorHasTag(TEXT("WindArch"));
+			if (bResponsiveWindArch)
+			{
+				NearbyBeings += FString::Printf(TEXT(" The WindArch is %.0f metres away (move_to/interact target: %s). At close range, Interact can create one brief local gust in the weather simulation if IslandWeather is active; it fades naturally and is not a reward or discovery. Respect recent interaction results."),
+					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			}
+			else
+			{
+				NearbyBeings += FString::Printf(TEXT(" A static prototype landmark is %.0f metres away (move_to/interact target: %s). Interact performs one factual inspection, not a puzzle, reward, or environmental change. Respect recent inspection results."),
+					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			}
 			++VisibleLandmarks;
 		}
 	}
 
-	// v1 world-state summary: intentionally minimal (position + any player speech). A richer
-	// perception summary (nearby actors/points of interest) can be layered in here later without
-	// changing anything downstream, since callers only ever see the resulting FString.
+	// Keep perception as plain text at the provider boundary so more body-agnostic
+	// observations and social opportunities can be added without changing callers.
 	if (Context.Text.IsEmpty())
 	{
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
@@ -191,6 +201,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
+		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Do not repeatedly inspect unchanged scenery or announce that you will inspect a place after already arriving. "
 		"Write at most two new memories about new experienced events, not repeated plans or merely changing clock/weather descriptions. "
 		"Omit new_memories (empty array) if nothing new is worth remembering long-term from this moment.");

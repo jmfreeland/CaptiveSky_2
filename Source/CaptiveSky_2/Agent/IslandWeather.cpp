@@ -27,7 +27,12 @@ FVector AIslandWeather::SampleWind(const FVector& Position, double Seconds) cons
 FVector AIslandWeather::GetLocalWind(const FVector& Position, const AActor* Observer) const
 {
 	if (!GetWorld()) return FVector::ZeroVector;
-	FVector Wind = SampleWind(Position, GetWorld()->GetTimeSeconds());
+	const double Now = GetWorld()->GetTimeSeconds();
+	FVector Wind = SampleWind(Position, Now);
+	for (const FIslandTransientGust& Gust : TransientGusts)
+	{
+		Wind += EvaluateTransientGust(Gust, Position, Now);
+	}
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(IslandWindShelter), false);
 	if (Observer) Params.AddIgnoredActor(Observer);
 	FHitResult Hit;
@@ -35,6 +40,32 @@ FVector AIslandWeather::GetLocalWind(const FVector& Position, const AActor* Obse
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Position, Position - Wind.GetSafeNormal() * 600.f, ECC_Visibility, Params))
 		Wind *= 0.15f;
 	return Wind;
+}
+
+FVector AIslandWeather::EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime)
+{
+	const double Duration = Gust.ExpiresAt - Gust.StartedAt;
+	if (Duration <= 0.0 || CurrentTime < Gust.StartedAt || CurrentTime >= Gust.ExpiresAt || Gust.Radius <= 0.f) return FVector::ZeroVector;
+	const float SpatialWeight = 1.f - FMath::Clamp(FVector::Dist(Position, Gust.Center) / Gust.Radius, 0.f, 1.f);
+	const float TemporalWeight = FMath::Clamp(static_cast<float>((Gust.ExpiresAt - CurrentTime) / Duration), 0.f, 1.f);
+	return Gust.Direction * Gust.PeakSpeed * SpatialWeight * TemporalWeight;
+}
+
+void AIslandWeather::AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds)
+{
+	if (!GetWorld() || Direction.IsNearlyZero()) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	TransientGusts.RemoveAll([Now](const FIslandTransientGust& Gust) { return Gust.ExpiresAt <= Now; });
+	// Keep the signal lightweight even if several residents act in quick succession.
+	if (TransientGusts.Num() >= 16) TransientGusts.RemoveAt(0);
+
+	FIslandTransientGust& Gust = TransientGusts.AddDefaulted_GetRef();
+	Gust.Center = Center;
+	Gust.Direction = Direction.GetSafeNormal();
+	Gust.PeakSpeed = FMath::Clamp(PeakSpeed, 0.f, 300.f);
+	Gust.Radius = FMath::Clamp(Radius, 100.f, 3000.f);
+	Gust.StartedAt = Now;
+	Gust.ExpiresAt = Now + FMath::Clamp(DurationSeconds, 1.f, 18.f);
 }
 
 FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observer) const

@@ -22,7 +22,7 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 
 Some future inhabitants should evoke, at least in spirit, the memorable eccentricity and warmth of old Sierra adventure games, especially *Quest for Glory*. Possibilities include an unusually intelligent rat (perhaps inspired by a half-remembered character named Erasmus; the reference and name are not yet settled), one or more theatrical or peculiar wizard figures, and a hospitable innkeeper archetype. These should become original CaptiveSky beings rather than direct reproductions: the aim is to carry forward the humor, mystery, companionship, and distinct sense of character those games created.
 
-## Current State (as of 2026-09-14)
+## Current State (as of 2026-09-26)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
 - Two autonomous agents are present: **Aster** (`Agent_Aster_01`) and an intentionally unnamed raven (`Agent_Raven_01`). Each has an independent identity, personality, memory, relationships, and consciousness lifecycle.
@@ -32,7 +32,7 @@ Some future inhabitants should evoke, at least in spirit, the memorable eccentri
 - A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
 - The raven lives near Aster in a temporary primitive body and has a body-agnostic prototype flight controller; a proper animated bird asset is still needed.
 - A standalone, multi-agent external gateway now provides a channel-neutral correspondence boundary, with Discord as its first adapter. It can host the raven headlessly from the same identity, personality, and JSONL memory when Unreal is offline; Discord activation still requires a private bot token.
-- Nearby agents can initiate bounded, reciprocal conversations. Speech appears as ambient subtitles, and both participants retain neutral factual relationship evidence; familiarity measures exposure only, never assumed trust or affection.
+- Nearby agents can initiate bounded, reciprocal conversations or choose to approach one another first using stable, body-independent movement targets. Approaching never forces a conversation. Speech appears as ambient subtitles, and both participants retain neutral factual relationship evidence; familiarity measures exposure only, never assumed trust or affection.
 - Every autonomous agent can enter a reusable rest/consolidation lifecycle. Sleep pauses ordinary thought, reflects over only lived durable memories, and permits small evidence-bound personality adjustments in a reversible runtime overlay while authored identity and personality remain immutable.
 
 ## Architecture
@@ -51,6 +51,7 @@ Some future inhabitants should evoke, at least in spirit, the memorable eccentri
   - `Consolidation` (`UAgentConsolidationComponent`) — exposes Awake/Resting/Consolidating states and writes gradual evidence-linked personality evolution during sleep.
   - `EyeCapture` (`SceneCaptureComponent2D`) — first-person view, base64-PNG-encoded and sent to the LLM as an image input.
 - `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — schedules background decisions no faster than once per real minute, pauses while moving/asleep, and backs off repeated choices. Physical action outcomes are supplied to the next decision. Nearby targeted speech enters the social layer; `Interact` performs a bounded factual inspection of supported landmarks/roost candidates.
+- Each embodied resident advertises a temporary movement tag derived from its stable `AgentId`. Nearby beings are presented as optional `move_to` targets; pathfinding agents approach walkable ground near the resident, while the raven can fly toward them. Neither movement nor proximity assumes trust, permission, or a conversation.
 - `UAgentExternalBridgeComponent` — inherited by every autonomous body; publishes a short-lived embodiment lease, consumes durable channel-neutral turns one at a time, and returns embodied speech through the gateway outbox.
 - `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact/Sleep), and optional `ActionTarget`/`Speech`.
 - `AgentLLMProvider` — pluggable backend; supports Anthropic and OpenAI-compatible APIs (see `UAgentLLMSettings` in Project Settings for the active configuration).
@@ -104,6 +105,8 @@ Grounded agents project shared elevated landmark markers onto nearby navigation 
 
 In his first Discord correspondence, the raven asked for changing weather, varied wind currents, quiet undisturbed nesting places, hidden paths and strange objects that reward returning, other living things with their own habits, and freedom to come and go. These are lived requests, not additions to his authored personality. Leave some discoveries unannounced.
 
+Residents now see nearby conscious beings as optional `move_to` targets based on stable `AgentId`s, so they can choose to approach each other before speaking. Aster uses walkable ground near the other resident; the raven can fly to them. This changes location only: speaking remains a separate voluntary decision, and proximity assumes no trust or relationship.
+
 The first implementation adds an optional `AIslandWeather` actor: repeatable slowly changing cloud-cover and spatial wind signals, geometry-based upwind shelter, embodied weather observations for all agents, and drift during raven cruising flight. This is a simulation foundation, **not yet rendered rain/cloud changes or wind audio**. Place one weather actor per level; without one, existing flight is unchanged. Weather time currently restarts with each play session.
 
 The Island contains one weather actor and two roost candidates, `Roost_West` and `Roost_East`, near the original raven spawn. The original six white ledge/back/roof blocks have been replaced by a rocky west perch and a spruce-side east fork, with satellite stones, smaller trees, ground plants and fallen wood. The rock and spruce were copied from the original project's StarterContent and PN_interactiveSpruceForest assets; the fork and fallen wood still use simple wood-textured cylinders pending authored branch meshes. Tree foliage is nonblocking, with a separate solid trunk and branch support. Shelter remains dependent on wind direction and actual solid geometry, not the site's name.
@@ -116,7 +119,7 @@ The raven controller now keeps its capsule upright, clears residual CharacterMov
 
 Adjust **Start Hour**, **Day Length Minutes**, **Day Sun Intensity**, and **Moon Intensity** on the actor; **Advance Time** pauses the clock. Editing Start Hour previews lighting outside play. During play, all embodied agents receive the current phase and approximate Island time in their observations. The clock advances with simulation time and resets on a new play session; it is not yet persisted, multiplayer-replicated, or tied to real-world time. Settled agents can rest at night; see the session safeguards below. `CaptiveSky2.Agent.DayNight` checks clock wrapping and the sun's daily arc.
 
-Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art, sound, and interaction.
+Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art and sound; the WindArch has one simulation-backed response, a temporary local gust.
 
 ### Landscape material (2026-09-13)
 
@@ -132,6 +135,9 @@ Nesting candidates use TargetPoint actors positioned at the raven's capsule cent
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
-- `Interact` now completes a factual, proximity/visibility-checked inspection, with a five-real-minute repeat cooldown. Landmarks remain static prototypes, not implemented puzzles or hidden rewards. Ambient agent speech still needs spatial audio, animation, and richer player-facing affordances.
+- `Interact` completes a factual, proximity/visibility-checked action, with a five-real-minute repeat cooldown. At the `WindArch`, an active `AIslandWeather` signal receives a temporary localized gust that fades naturally; nearby residents sense it and the raven's flight responds. The effect currently has no visuals or audio. Other landmarks remain static prototypes, not puzzles or hidden rewards. Ambient agent speech still needs spatial audio, animation, and richer player-facing affordances.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
 - Give sleep a physical expression per body (Aster settling somewhere safe, the raven roosting) and decide what wakes each kind of consciousness.
+- Extend the WindArch's simulation-backed response with restrained visuals/audio, then give TideglassPool a real, reversible ripple response, using evidence-grounded feedback rather than scripted discoveries.
+- Add a few ambient living things with independent, low-cost routines, visible signs, and habitats; let residents notice them without making them props or guaranteed companions.
+- Connect the existing weather signals to restrained cloud, wind, and rain visuals/audio so environmental changes are both sensed and seen.
