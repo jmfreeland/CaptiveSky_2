@@ -142,4 +142,5 @@ Nesting candidates use TargetPoint actors positioned at the raven's capsule cent
 - Extend the WindArch's simulation-backed response with restrained visuals/audio, then give TideglassPool a real, reversible ripple response, using evidence-grounded feedback rather than scripted discoveries.
 - Expand the ambient ecology with additional independent, low-cost routines and distinct habitats; let residents notice wildlife without making it into props or guaranteed companions.
 - Give the firefly prototype a proper small animated body and a legible but subtle light cue, then extend ecology only where each creature can have its own habitat and routine without costly autonomous calls.
+- `CaptiveSky2.Agent.NightEcology` is an isolated world test for the firefly population's daytime absence, bounded night spawning, duplicate prevention, habitat radius, and dawn cleanup; it creates no conscious agents or model requests.
 - Connect the existing weather signals to restrained cloud, wind, and rain visuals/audio so environmental changes are both sensed and seen.

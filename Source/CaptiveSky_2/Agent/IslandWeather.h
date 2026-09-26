@@ -45,6 +45,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend class FIslandNightEcologyTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	FTimerHandle EcologyTimerHandle;
