@@ -6,6 +6,9 @@
 #include "IslandWeather.generated.h"
 
 class AIslandFirefly;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
+class UVolumetricCloudComponent;
 
 struct FIslandTransientGust
 {
@@ -30,6 +33,10 @@ public:
 	float MaximumWindSpeed = 180.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather")
 	int32 WeatherSeed = 71;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Clouds")
+	FName CloudCoverageParameter = TEXT("Cloud_GlobalCoverage");
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Clouds")
+	FName CloudDensityParameter = TEXT("Cloud_GlobalDensity");
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
@@ -42,6 +49,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
@@ -49,5 +57,18 @@ private:
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	FTimerHandle EcologyTimerHandle;
+	TWeakObjectPtr<UVolumetricCloudComponent> CloudComponent;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> OriginalCloudMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> WeatherCloudMaterial;
+	float OriginalCloudCoverage = 0.f;
+	float OriginalCloudDensity = 0.f;
+	bool bHasCloudCoverageParameter = false;
+	bool bHasCloudDensityParameter = false;
+	bool bCloudParameterWarningLogged = false;
+	double NextCloudDiscoveryTime = 0.0;
 	void RefreshNightEcology();
+	bool InitializeCloudRendering();
+	void UpdateCloudRendering();
 };

@@ -1,20 +1,27 @@
 #include "IslandWeather.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "Components/SceneComponent.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
 
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 0.25f;
 }
 
 void AIslandWeather::BeginPlay()
 {
 	Super::BeginPlay();
+	UpdateCloudRendering();
 	RefreshNightEcology();
 	GetWorldTimerManager().SetTimer(EcologyTimerHandle, this, &AIslandWeather::RefreshNightEcology, 30.f, true, 30.f);
 }
@@ -22,10 +29,75 @@ void AIslandWeather::BeginPlay()
 void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(EcologyTimerHandle);
+	if (UVolumetricCloudComponent* Cloud = CloudComponent.Get())
+		if (OriginalCloudMaterial) Cloud->SetMaterial(OriginalCloudMaterial);
+	CloudComponent.Reset();
+	WeatherCloudMaterial = nullptr;
+	OriginalCloudMaterial = nullptr;
 	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 		if (Firefly.IsValid()) Firefly->Destroy();
 	NightFireflies.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+void AIslandWeather::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateCloudRendering();
+}
+
+bool AIslandWeather::InitializeCloudRendering()
+{
+	if (CloudComponent.IsValid() && WeatherCloudMaterial) return true;
+	if (!GetWorld()) return false;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now < NextCloudDiscoveryTime) return false;
+	NextCloudDiscoveryTime = Now + 1.0;
+	for (TActorIterator<AVolumetricCloud> It(GetWorld()); It; ++It)
+	{
+		UVolumetricCloudComponent* Cloud = It->FindComponentByClass<UVolumetricCloudComponent>();
+		if (!Cloud) continue;
+		UMaterialInterface* BaseMaterial = Cloud->GetMaterial();
+		if (!BaseMaterial) continue;
+
+		TArray<FMaterialParameterInfo> ScalarParameters;
+		TArray<FGuid> ParameterIds;
+		BaseMaterial->GetAllScalarParameterInfo(ScalarParameters, ParameterIds);
+		bHasCloudCoverageParameter = ScalarParameters.ContainsByPredicate([this](const FMaterialParameterInfo& Parameter) { return Parameter.Name == CloudCoverageParameter; });
+		bHasCloudDensityParameter = ScalarParameters.ContainsByPredicate([this](const FMaterialParameterInfo& Parameter) { return Parameter.Name == CloudDensityParameter; });
+		if (!bHasCloudCoverageParameter && !bHasCloudDensityParameter)
+		{
+			if (!bCloudParameterWarningLogged)
+			{
+				UE_LOG(LogIslandWeather, Warning, TEXT("Cloud material %s exposes neither configured weather parameter; leaving it unchanged."), *BaseMaterial->GetName());
+				bCloudParameterWarningLogged = true;
+			}
+			continue;
+		}
+
+		UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+		if (!DynamicMaterial) return false;
+		CloudComponent = Cloud;
+		OriginalCloudMaterial = BaseMaterial;
+		WeatherCloudMaterial = DynamicMaterial;
+		if (bHasCloudCoverageParameter) OriginalCloudCoverage = DynamicMaterial->K2_GetScalarParameterValue(CloudCoverageParameter);
+		if (bHasCloudDensityParameter) OriginalCloudDensity = DynamicMaterial->K2_GetScalarParameterValue(CloudDensityParameter);
+		Cloud->SetMaterial(DynamicMaterial);
+		UE_LOG(LogIslandWeather, Log, TEXT("Weather linked cloud material %s (coverage %s, density %s)."), *BaseMaterial->GetName(), bHasCloudCoverageParameter ? TEXT("enabled") : TEXT("unavailable"), bHasCloudDensityParameter ? TEXT("enabled") : TEXT("unavailable"));
+		return true;
+	}
+	return false;
+}
+
+void AIslandWeather::UpdateCloudRendering()
+{
+	if (!GetWorld()) return;
+	if (!WeatherCloudMaterial && !InitializeCloudRendering()) return;
+	const float Cover = SampleCloudCover(GetWorld()->GetTimeSeconds());
+	if (bHasCloudCoverageParameter)
+		WeatherCloudMaterial->SetScalarParameterValue(CloudCoverageParameter, OriginalCloudCoverage + (Cover - 0.5f) * 0.08f);
+	if (bHasCloudDensityParameter)
+		WeatherCloudMaterial->SetScalarParameterValue(CloudDensityParameter, OriginalCloudDensity * FMath::Lerp(0.82f, 1.18f, Cover));
 }
 
 void AIslandWeather::RefreshNightEcology()
@@ -141,7 +213,7 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	{
 		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
 	});
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud cover gently softens sunlight and skylight, but cloud-density changes, rain and weather sounds are not yet rendered."),
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage and density shift with the simulation and gently soften sunlight and skylight; rain and weather sounds are not yet rendered."),
 		Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast"),
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
 		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""));

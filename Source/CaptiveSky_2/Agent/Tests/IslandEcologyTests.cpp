@@ -12,10 +12,12 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundWaveProcedural.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.NightEcology",
@@ -192,14 +194,75 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		bool bHasDayNight = false;
 		bool bHasTideglassHabitat = false;
 		bool bHasFlattenedTideglassSurface = false;
+		bool bHasVolumetricCloud = false;
+		bool bHasCloudCoverageParameter = false;
+		bool bHasCloudDensityParameter = false;
 		AActor* HabitatMarker = nullptr;
+		AIslandWeather* MapWeather = nullptr;
+		UVolumetricCloudComponent* MapCloud = nullptr;
+		UMaterialInterface* AuthoredCloudMaterial = nullptr;
 		for (TActorIterator<AIslandWeather> It(Island); It; ++It) bHasWeather = true;
 		for (TActorIterator<AIslandDayNight> It(Island); It; ++It) bHasDayNight = true;
 		for (TActorIterator<AActor> It(Island); It; ++It)
+		{
 			if (It->ActorHasTag(TEXT("TideglassPool"))) { bHasTideglassHabitat = true; HabitatMarker = *It; }
+			if (AIslandWeather* SavedMapWeather = Cast<AIslandWeather>(*It)) MapWeather = SavedMapWeather;
+			if (UVolumetricCloudComponent* Cloud = It->FindComponentByClass<UVolumetricCloudComponent>())
+			{
+				bHasVolumetricCloud = true;
+				if (UMaterialInterface* Material = Cloud->GetMaterial())
+				{
+					MapCloud = Cloud;
+					AuthoredCloudMaterial = Material;
+					TArray<FMaterialParameterInfo> ScalarParameters;
+					TArray<FGuid> ParameterIds;
+					Material->GetAllScalarParameterInfo(ScalarParameters, ParameterIds);
+					bHasCloudCoverageParameter = ScalarParameters.ContainsByPredicate([](const FMaterialParameterInfo& Parameter) { return Parameter.Name == FName(TEXT("Cloud_GlobalCoverage")); });
+					bHasCloudDensityParameter = ScalarParameters.ContainsByPredicate([](const FMaterialParameterInfo& Parameter) { return Parameter.Name == FName(TEXT("Cloud_GlobalDensity")); });
+				}
+			}
+		}
 		TestTrue(TEXT("Saved Island contains the weather actor required by the ecology spawner"), bHasWeather);
 		TestTrue(TEXT("Saved Island contains the day/night clock required by the ecology spawner"), bHasDayNight);
 		TestTrue(TEXT("Saved Island contains the TideglassPool habitat tag"), bHasTideglassHabitat);
+		TestTrue(TEXT("Saved Island contains its authored volumetric cloud layer"), bHasVolumetricCloud);
+		TestTrue(TEXT("Saved Island cloud material exposes coverage and density controls"), bHasCloudCoverageParameter && bHasCloudDensityParameter);
+		if (MapWeather && MapCloud && AuthoredCloudMaterial && bHasCloudCoverageParameter && bHasCloudDensityParameter)
+		{
+			const int32 SavedWeatherSeed = MapWeather->WeatherSeed;
+			float MinimumCover = 2.f;
+			float MaximumCover = -1.f;
+			int32 ClearSeed = 0;
+			int32 OvercastSeed = 0;
+			for (int32 Seed = -1000; Seed <= 1000; ++Seed)
+			{
+				MapWeather->WeatherSeed = Seed;
+				const float Cover = MapWeather->SampleCloudCover(Island->GetTimeSeconds());
+				if (Cover < MinimumCover) { MinimumCover = Cover; ClearSeed = Seed; }
+				if (Cover > MaximumCover) { MaximumCover = Cover; OvercastSeed = Seed; }
+			}
+			MapWeather->WeatherSeed = ClearSeed;
+			MapWeather->UpdateCloudRendering();
+			UMaterialInstanceDynamic* WeatherCloudMID = Cast<UMaterialInstanceDynamic>(MapCloud->GetMaterial());
+			TestNotNull(TEXT("Weather creates a transient dynamic instance of the authored cloud material"), WeatherCloudMID);
+			if (WeatherCloudMID)
+			{
+				const float ClearCoverage = WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage"));
+				const float ClearDensity = WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalDensity"));
+				MapWeather->WeatherSeed = OvercastSeed;
+				MapWeather->UpdateCloudRendering();
+				TestTrue(TEXT("Overcast changes authored cloud coverage"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage")) > ClearCoverage);
+				TestTrue(TEXT("Overcast changes authored cloud density"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalDensity")) > ClearDensity);
+			}
+			MapCloud->SetMaterial(AuthoredCloudMaterial);
+			TestTrue(TEXT("Automation restores the authored cloud material after probing"), MapCloud->GetMaterial() == AuthoredCloudMaterial);
+			MapWeather->CloudComponent.Reset();
+			MapWeather->WeatherCloudMaterial = nullptr;
+			MapWeather->OriginalCloudMaterial = nullptr;
+			MapWeather->bHasCloudCoverageParameter = false;
+			MapWeather->bHasCloudDensityParameter = false;
+			MapWeather->WeatherSeed = SavedWeatherSeed;
+		}
 		if (HabitatMarker)
 		{
 			for (TActorIterator<AActor> It(Island); It && !bHasFlattenedTideglassSurface; ++It)
