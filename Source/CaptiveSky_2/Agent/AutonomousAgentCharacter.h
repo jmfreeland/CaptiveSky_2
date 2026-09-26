@@ -12,6 +12,7 @@ class UAgentExternalBridgeComponent;
 class UAgentRelationshipComponent;
 class UAgentSocialComponent;
 class UAgentConsolidationComponent;
+class UAgentRestPresentationComponent;
 class USceneCaptureComponent2D;
 class UTextureRenderTarget2D;
 
@@ -49,6 +50,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAgentConsolidationComponent> Consolidation;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UAgentRestPresentationComponent> RestPresentation;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneCaptureComponent2D> EyeCapture;

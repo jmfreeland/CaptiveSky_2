@@ -1,4 +1,6 @@
 #include "RavenAgentAIController.h"
+#include "AutonomousAgentCharacter.h"
+#include "AgentRestPresentationComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -23,6 +25,8 @@ bool ARavenAgentAIController::CanRest() const
 void ARavenAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(InPawn))
+		if (Agent->RestPresentation) Agent->RestPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
 	HomeAltitude = InPawn ? InPawn->GetActorLocation().Z + TakeoffHeight : 0.f;
 	SetGrounded();
 }

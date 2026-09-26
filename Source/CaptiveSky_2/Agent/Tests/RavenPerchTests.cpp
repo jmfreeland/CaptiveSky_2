@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
 #include "AgentConsolidationComponent.h"
+#include "AgentRestPresentationComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/TargetPoint.h"
@@ -8,6 +9,7 @@
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "NavigationSystem.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch",
@@ -19,6 +21,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	// CreateWorld already initializes the world; do not initialize WorldSettings twice.
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0, 0, 100), FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
 	ATargetPoint* Perch = World->SpawnActor<ATargetPoint>(FVector(600, 0, 302), FRotator::ZeroRotator);
@@ -30,7 +33,17 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	Box->SetCollisionProfileName(TEXT("BlockAll"));
 	Box->RegisterComponent();
 	Support->SetActorLocation(FVector(600, 0, 302 - Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 22));
+	World->BeginPlay();
 	Controller->Possess(Raven);
+	UAgentConsolidationComponent* RavenRest = NewObject<UAgentConsolidationComponent>(Raven);
+	Raven->AddInstanceComponent(RavenRest);
+	RavenRest->RegisterComponent();
+	UAgentRestPresentationComponent* RavenPresentation = NewObject<UAgentRestPresentationComponent>(Raven);
+	Raven->AddInstanceComponent(RavenPresentation);
+	RavenPresentation->RegisterComponent();
+	RavenPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
+	RavenPresentation->BindToConsciousness(RavenRest);
+	const FTransform RavenAwakeMeshPose = Raven->GetMesh()->GetRelativeTransform();
 	TestFalse(TEXT("Unknown marker rejected"), Controller->RequestPerch(TEXT("Missing")));
 	TestTrue(TEXT("Known marker accepted"), Controller->RequestPerch(TEXT("TestRoost")));
 	for (int32 I = 0; I < 600; ++I) Controller->Tick(1.f / 60.f);
@@ -51,14 +64,14 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Repeated inspection reports cooldown"), Controller->DescribeActionState().Contains(TEXT("Already inspected")));
 	Controller->HandleDecisionReady(Inspect);
 	TestTrue(TEXT("Third identical autonomous choice is suppressed"), Controller->DescribeActionState().Contains(TEXT("Repeated action suppressed")));
-	UAgentConsolidationComponent* Rest = NewObject<UAgentConsolidationComponent>(Raven);
-	Raven->AddInstanceComponent(Rest);
-	Rest->RegisterComponent();
 	FAgentDecision Sleep;
 	Sleep.bValid = true;
 	Sleep.ActionType = EAgentActionType::Sleep;
 	Controller->ActOnDecision(Sleep);
-	TestFalse(TEXT("Perched raven can sleep"), Rest->IsAwake());
+	TestFalse(TEXT("Perched raven can sleep"), RavenRest->IsAwake());
+	TestFalse(TEXT("Raven sleep keeps the flight capsule un-crouched"), Raven->bIsCrouched);
+	RavenPresentation->TickComponent(0.5f, LEVELTICK_All, nullptr);
+	TestFalse(TEXT("Raven adopts its distinctive tucked resting posture"), Raven->GetMesh()->GetRelativeTransform().Equals(RavenAwakeMeshPose));
 	FAgentDecision Wander;
 	Wander.bValid = true;
 	Wander.ActionType = EAgentActionType::Wander;
@@ -66,10 +79,31 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	Controller->ActOnDecision(Wander);
 	Controller->Tick(1.f);
 	TestTrue(TEXT("Sleep prevents movement and new actions"), Raven->GetActorLocation().Equals(SleepingLocation));
-	Rest->WakeUp();
-	TestTrue(TEXT("Wake restores awake state"), Rest->IsAwake());
-	Rest->BeginSleep(0.f);
-	TestTrue(TEXT("No-memory consolidation completes without a model call"), Rest->IsAwake());
+	RavenRest->WakeUp();
+	RavenPresentation->TickComponent(0.5f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Wake restores awake state and original raven posture"), RavenRest->IsAwake() && Raven->GetMesh()->GetRelativeTransform().Equals(RavenAwakeMeshPose));
+	RavenRest->BeginSleep(0.f);
+	TestTrue(TEXT("No-memory consolidation completes without a model call"), RavenRest->IsAwake());
+
+	ACharacter* AsterBody = World->SpawnActor<ACharacter>(FVector(2000.f, 0.f, 100.f), FRotator::ZeroRotator);
+	AsterBody->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	UAgentConsolidationComponent* AsterRest = NewObject<UAgentConsolidationComponent>(AsterBody);
+	AsterBody->AddInstanceComponent(AsterRest);
+	AsterRest->RegisterComponent();
+	UAgentRestPresentationComponent* AsterPresentation = NewObject<UAgentRestPresentationComponent>(AsterBody);
+	AsterBody->AddInstanceComponent(AsterPresentation);
+	AsterPresentation->RegisterComponent();
+	AsterPresentation->BindToConsciousness(AsterRest);
+	const float AsterAwakeCapsuleHalfHeight = AsterBody->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight();
+	TestTrue(TEXT("Aster placeholder enters its sleep state"), AsterRest->BeginSleep(10.f));
+	TestTrue(TEXT("Aster sleep requests the native grounded crouch posture"), AsterBody->GetCharacterMovement()->bWantsToCrouch);
+	AsterBody->GetCharacterMovement()->Crouch(true);
+	TestTrue(TEXT("CharacterMovement applies the lower sleeping capsule"), AsterBody->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() < AsterAwakeCapsuleHalfHeight);
+	AsterRest->WakeUp();
+	TestFalse(TEXT("Wake clears the pending crouch request"), AsterBody->GetCharacterMovement()->bWantsToCrouch);
+	AsterBody->GetCharacterMovement()->UnCrouch(true);
+	TestTrue(TEXT("CharacterMovement restores Aster's awake capsule size"), FMath::IsNearlyEqual(AsterBody->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight(), AsterAwakeCapsuleHalfHeight));
+	TestFalse(TEXT("Wake restores Aster's original crouch capability"), AsterBody->GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch);
 	Controller->BeginTakeoff(FVector(1000, 0, 700));
 	for (int32 I = 0; I < 300; ++I) Controller->Tick(1.f / 60.f);
 	TestTrue(TEXT("Departed roost"), Controller->LocomotionState == ERavenLocomotionState::Flying && Raven->GetActorLocation().Z > 650);
@@ -86,6 +120,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Blocked ascent is not a perch"), Controller->LocomotionState != ERavenLocomotionState::Perched);
 	TestTrue(TEXT("Blocking support not crossed"), Raven->GetActorLocation().Z < 200);
 	Controller->UnPossess();
+	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 
 	// When Island is open, exercise its real collision geometry as well. These

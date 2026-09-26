@@ -7,6 +7,7 @@
 #include "AgentRelationshipComponent.h"
 #include "AgentSocialComponent.h"
 #include "AgentConsolidationComponent.h"
+#include "AgentRestPresentationComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "ImageUtils.h"
@@ -23,6 +24,7 @@ AAutonomousAgentCharacter::AAutonomousAgentCharacter()
 	Relationships = CreateDefaultSubobject<UAgentRelationshipComponent>(TEXT("Relationships"));
 	Social = CreateDefaultSubobject<UAgentSocialComponent>(TEXT("Social"));
 	Consolidation = CreateDefaultSubobject<UAgentConsolidationComponent>(TEXT("Consolidation"));
+	RestPresentation = CreateDefaultSubobject<UAgentRestPresentationComponent>(TEXT("RestPresentation"));
 
 	EyeCapture = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("EyeCapture"));
 	EyeCapture->SetupAttachment(GetMesh());
