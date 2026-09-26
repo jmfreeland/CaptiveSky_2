@@ -198,7 +198,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			const FVector SurfaceLocation = It->GetActorLocation() + FVector(0.f, 0.f, 20.f);
 			AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(SurfaceLocation, FRotator::ZeroRotator, SpawnParameters);
 			Fact = Ripple
-				? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands over about one and a half seconds and fades; it changes no permanent level state, and reveals no hidden item or reward.")
+				? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands over about one and a half seconds and fades; it changes no permanent level state, and reveals no hidden item or reward. Separately, stronger showers can create fainter ripples on their own; those are a weather response, not an interaction you caused.")
 				: TEXT("You inspected the TideglassPool, but the temporary surface-light response could not be created. No persistent change occurred.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark"))) Fact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");

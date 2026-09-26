@@ -63,6 +63,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
 	if (const APawn* Body = Cast<APawn>(Owner))
 		if (const AAutonomousAgentAIController* Controller = Cast<AAutonomousAgentAIController>(Body->GetController())) NearbyBeings += Controller->DescribeActionState();
+	const AIslandWeather* LocalWeather = nullptr;
 	if (Owner && GetWorld())
 	{
 		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
@@ -72,6 +73,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 		{
+			LocalWeather = *It;
 			NearbyBeings += It->DescribeAt(Location, Owner);
 			break;
 		}
@@ -101,8 +103,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const bool bResponsiveListeningStones = It->ActorHasTag(TEXT("ListeningStones"));
 			if (bResponsiveTideglassPool)
 			{
-				NearbyBeings += FString::Printf(TEXT(" The TideglassPool is %.0f metres away (move_to/interact target: %s). At close range, Interact sends a brief ring of cool moving highlights across its flattened prototype surface; this fades in about one and a half seconds and leaves no persistent change. Respect recent interaction results."),
-					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+				const bool bHeavyShower = LocalWeather && LocalWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) >= 0.55f;
+				NearbyBeings += FString::Printf(TEXT(" The TideglassPool is %.0f metres away (move_to/interact target: %s). At close range, Interact sends a brief ring of cool moving highlights across its flattened prototype surface; this fades in about one and a half seconds and leaves no persistent change.%s Respect recent interaction results."),
+					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString(), bHeavyShower ? TEXT(" In this stronger shower, faint ripples also appear on the water by themselves; they are a weather response, not a discovery or an interaction you caused.") : TEXT(""));
 			}
 			else if (bResponsiveWindArch)
 			{
