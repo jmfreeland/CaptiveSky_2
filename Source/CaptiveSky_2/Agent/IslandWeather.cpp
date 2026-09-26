@@ -1,11 +1,74 @@
 #include "IslandWeather.h"
+#include "IslandDayNight.h"
+#include "IslandFirefly.h"
 #include "Components/SceneComponent.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	PrimaryActorTick.bCanEverTick = false;
+}
+
+void AIslandWeather::BeginPlay()
+{
+	Super::BeginPlay();
+	RefreshNightEcology();
+	GetWorldTimerManager().SetTimer(EcologyTimerHandle, this, &AIslandWeather::RefreshNightEcology, 30.f, true, 30.f);
+}
+
+void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	GetWorldTimerManager().ClearTimer(EcologyTimerHandle);
+	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
+		if (Firefly.IsValid()) Firefly->Destroy();
+	NightFireflies.Reset();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AIslandWeather::RefreshNightEcology()
+{
+	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
+	if (!GetWorld()) return;
+
+	bool bNight = false;
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		bNight = It->CurrentHour >= 19.f || It->CurrentHour < 5.f;
+		break;
+	}
+
+	AActor* Habitat = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TideglassPool")))
+		{
+			Habitat = *It;
+			break;
+		}
+	}
+
+	constexpr int32 NightPopulation = 3;
+	if (!bNight || !Habitat)
+	{
+		for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
+			if (Firefly.IsValid()) Firefly->Destroy();
+		NightFireflies.Reset();
+		return;
+	}
+
+	while (NightFireflies.Num() < NightPopulation)
+	{
+		const FVector GroundOffset(FMath::FRandRange(-350.f, 350.f), FMath::FRandRange(-350.f, 350.f), FMath::FRandRange(15.f, 35.f));
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(Habitat->GetActorLocation() + GroundOffset, FRotator::ZeroRotator, SpawnParameters))
+			NightFireflies.Add(Firefly);
+		else
+			break;
+	}
 }
 
 float AIslandWeather::SampleCloudCover(double Seconds) const

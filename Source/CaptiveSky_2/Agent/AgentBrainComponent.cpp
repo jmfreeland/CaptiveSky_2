@@ -109,6 +109,19 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 			++VisibleLandmarks;
 		}
+		int32 VisibleWildlife = 0;
+		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 3; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("IslandLife")) || !It->ActorHasTag(TEXT("Firefly")) ||
+				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(1800.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. You may watch it or leave it undisturbed; it is wild, not a companion or a move/interact target."),
+				FVector::Dist(Location, It->GetActorLocation()) / 100.f);
+			++VisibleWildlife;
+		}
 	}
 
 	// Keep perception as plain text at the provider boundary so more body-agnostic
@@ -202,6 +215,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
+		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "
 		"Do not repeatedly inspect unchanged scenery or announce that you will inspect a place after already arriving. "
 		"Write at most two new memories about new experienced events, not repeated plans or merely changing clock/weather descriptions. "
 		"Omit new_memories (empty array) if nothing new is worth remembering long-term from this moment.");

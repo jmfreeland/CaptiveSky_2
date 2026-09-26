@@ -33,6 +33,7 @@ Some future inhabitants should evoke, at least in spirit, the memorable eccentri
 - The raven lives near Aster in a temporary primitive body and has a body-agnostic prototype flight controller; a proper animated bird asset is still needed.
 - A standalone, multi-agent external gateway now provides a channel-neutral correspondence boundary, with Discord as its first adapter. It can host the raven headlessly from the same identity, personality, and JSONL memory when Unreal is offline; Discord activation still requires a private bot token.
 - Nearby agents can initiate bounded, reciprocal conversations or choose to approach one another first using stable, body-independent movement targets. Approaching never forces a conversation. Speech appears as ambient subtitles, and both participants retain neutral factual relationship evidence; familiarity measures exposure only, never assumed trust or affection.
+- When `AIslandWeather`, `AIslandDayNight`, and the `TideglassPool` habitat are present, three independent firefly-light prototypes drift there at night and disappear at dawn. Nearby residents can notice them as wildlife; they do not make model calls, follow residents, or persist as owned companions. Their current bodies are tiny engine-sphere placeholders with a fluctuating local light, not insect meshes or sound.
 - Every autonomous agent can enter a reusable rest/consolidation lifecycle. Sleep pauses ordinary thought, reflects over only lived durable memories, and permits small evidence-bound personality adjustments in a reversible runtime overlay while authored identity and personality remain immutable.
 
 ## Architecture
@@ -119,7 +120,7 @@ The raven controller now keeps its capsule upright, clears residual CharacterMov
 
 Adjust **Start Hour**, **Day Length Minutes**, **Day Sun Intensity**, and **Moon Intensity** on the actor; **Advance Time** pauses the clock. Editing Start Hour previews lighting outside play. During play, all embodied agents receive the current phase and approximate Island time in their observations. The clock advances with simulation time and resets on a new play session; it is not yet persisted, multiplayer-replicated, or tied to real-world time. Settled agents can rest at night; see the session safeguards below. `CaptiveSky2.Agent.DayNight` checks clock wrapping and the sun's daily arc.
 
-Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art and sound; the WindArch has one simulation-backed response, a temporary local gust.
+Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art and sound; the WindArch has one simulation-backed response, a temporary local gust. The TideglassPool also serves as the habitat anchor for a small, night-only prototype firefly population.
 
 ### Landscape material (2026-09-13)
 
@@ -139,5 +140,6 @@ Nesting candidates use TargetPoint actors positioned at the raven's capsule cent
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
 - Give sleep a physical expression per body (Aster settling somewhere safe, the raven roosting) and decide what wakes each kind of consciousness.
 - Extend the WindArch's simulation-backed response with restrained visuals/audio, then give TideglassPool a real, reversible ripple response, using evidence-grounded feedback rather than scripted discoveries.
-- Add a few ambient living things with independent, low-cost routines, visible signs, and habitats; let residents notice them without making them props or guaranteed companions.
+- Expand the ambient ecology with additional independent, low-cost routines and distinct habitats; let residents notice wildlife without making it into props or guaranteed companions.
+- Give the firefly prototype a proper small animated body and a legible but subtle light cue, then extend ecology only where each creature can have its own habitat and routine without costly autonomous calls.
 - Connect the existing weather signals to restrained cloud, wind, and rain visuals/audio so environmental changes are both sensed and seen.

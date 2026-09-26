@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "TimerManager.h"
 #include "IslandWeather.generated.h"
+
+class AIslandFirefly;
 
 struct FIslandTransientGust
 {
@@ -37,6 +40,13 @@ public:
 	void AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds);
 	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
 
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
 private:
 	TArray<FIslandTransientGust> TransientGusts;
+	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
+	FTimerHandle EcologyTimerHandle;
+	void RefreshNightEcology();
 };
