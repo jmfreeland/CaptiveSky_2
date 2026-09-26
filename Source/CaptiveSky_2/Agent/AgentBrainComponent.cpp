@@ -97,7 +97,13 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
 			const bool bResponsiveWindArch = It->ActorHasTag(TEXT("WindArch"));
-			if (bResponsiveWindArch)
+			const bool bResponsiveTideglassPool = It->ActorHasTag(TEXT("TideglassPool"));
+			if (bResponsiveTideglassPool)
+			{
+				NearbyBeings += FString::Printf(TEXT(" The TideglassPool is %.0f metres away (move_to/interact target: %s). At close range, Interact sends a brief ring of cool moving highlights across its flattened prototype surface; this fades in about one and a half seconds and leaves no persistent change. Respect recent interaction results."),
+					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			}
+			else if (bResponsiveWindArch)
 			{
 				NearbyBeings += FString::Printf(TEXT(" The WindArch is %.0f metres away (move_to/interact target: %s). At close range, Interact can create one brief local gust in the weather simulation if IslandWeather is active; it fades naturally and is not a reward or discovery. Respect recent interaction results."),
 					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());

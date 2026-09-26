@@ -9,6 +9,7 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "IslandDayNight.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/PlatformTime.h"
@@ -126,6 +127,8 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 void AAutonomousAgentAIController::InspectTarget(FName Target)
 {
 	if (Target.IsNone()) { ReportAction(TEXT("Inspection failed: no target supplied.")); return; }
+	APawn* Observer = GetPawn();
+	if (!Observer) { ReportAction(TEXT("Inspection failed: no character is currently under your control.")); return; }
 	if (const double* Until = InspectedUntil.Find(Target); Until && *Until > FPlatformTime::Seconds())
 	{
 		ReportAction(TEXT("Already inspected that place recently; no additional interaction is available yet."));
@@ -134,11 +137,14 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
-		if (FVector::DistSquared(It->GetActorLocation(), GetPawn()->GetActorLocation()) > FMath::Square(400.f)) { ReportAction(TEXT("Too far away to inspect; move within four metres first.")); return; }
+		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
+		// Skip them before distance checks so an unrelated habitat cannot mask the actual TideglassPool landmark.
+		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
+		if (FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) { ReportAction(TEXT("Too far away to inspect; move within four metres first.")); return; }
 		FHitResult Hit;
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentInspect), false, GetPawn());
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentInspect), false, Observer);
 		Query.AddIgnoredActor(*It);
-		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite"))) Fact = TEXT("You inspected a candidate resting site. This visual inspection alone does not prove support or shelter: a successful perch result confirms support, and shelter varies with solid geometry and wind direction. No nest, ownership, or assigned home has been created.");
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
@@ -156,11 +162,21 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. It fades over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound or visible wind effect is implemented yet.")
 				: TEXT("You inspected the WindArch, but no IslandWeather actor is active, so no gust was created. This landmark has no visible wind effect or sound yet.");
 		}
+		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("TideglassPool")))
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			const FVector SurfaceLocation = It->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+			AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(SurfaceLocation, FRotator::ZeroRotator, SpawnParameters);
+			Fact = Ripple
+				? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands over about one and a half seconds and fades; it changes no permanent level state, and reveals no hidden item or reward.")
+				: TEXT("You inspected the TideglassPool, but the temporary surface-light response could not be created. No persistent change occurred.");
+		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark"))) Fact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");
 		else { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		InspectedUntil.Add(Target, FPlatformTime::Seconds() + 300);
 		ReportAction(Target.ToString() + TEXT(": ") + Fact);
-		if (UAgentMemoryComponent* Memory = GetPawn()->FindComponentByClass<UAgentMemoryComponent>())
+		if (UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>())
 			Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Target.ToString() + TEXT(": ") + Fact, 0.45f, {TEXT("action-result"), Target.ToString()}));
 		return;
 	}

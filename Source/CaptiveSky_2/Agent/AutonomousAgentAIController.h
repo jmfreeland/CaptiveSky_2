@@ -51,6 +51,7 @@ protected:
 
 private:
 	friend class FRavenPerchTest;
+	friend class FIslandNightEcologyTest;
 	FTimerHandle ThinkTimerHandle;
 	FString LastActionOutcome = TEXT("No completed action yet.");
 	FString LastActionKey;

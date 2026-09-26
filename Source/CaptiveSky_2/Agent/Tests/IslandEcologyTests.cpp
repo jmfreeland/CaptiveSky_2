@@ -1,11 +1,18 @@
 #include "Misc/AutomationTest.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "RavenAgentAIController.h"
+#include "Materials/MaterialInterface.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.NightEcology",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -75,6 +82,36 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("Fireflies leave the habitat in daytime"), Population, 0);
+
+	const FVector TestPoolLocation(4000.f, 5000.f, 600.f);
+	ACharacter* Observer = World->SpawnActor<ACharacter>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>(Spawn);
+	ATargetPoint* PoolTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Interaction observer spawned"), Observer) || !TestNotNull(TEXT("Interaction controller spawned"), Controller) || !TestNotNull(TEXT("Tideglass target spawned"), PoolTarget))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Controller->Possess(Observer);
+	PoolTarget->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
+	Controller->InspectTarget(TEXT("TideglassPool"));
+	AIslandPoolRippleEffect* Ripple = nullptr;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) { Ripple = *It; break; }
+	TestNotNull(TEXT("Interacting with Tideglass spawns a transient optical ripple"), Ripple);
+	if (Ripple)
+	{
+		TestEqual(TEXT("Ripple uses eight overlapping light points"), Ripple->RippleLights.Num(), 8);
+		Ripple->Tick(0.8f);
+		TestTrue(TEXT("Ripple light ring expands across the pool midway through its life"), FMath::IsNearlyEqual(Ripple->RippleLights[0]->GetRelativeLocation().Size2D(), 81.f, 0.5f));
+		Controller->InspectTarget(TEXT("TideglassPool"));
+		int32 RippleCount = 0;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) ++RippleCount;
+		TestEqual(TEXT("Inspection cooldown prevents stacking ripples"), RippleCount, 1);
+		Ripple->Tick(0.9f);
+		TestTrue(TEXT("Ripple destroys itself after fading"), Ripple->IsActorBeingDestroyed());
+	}
+	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 
@@ -87,13 +124,35 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		bool bHasWeather = false;
 		bool bHasDayNight = false;
 		bool bHasTideglassHabitat = false;
+		bool bHasFlattenedTideglassSurface = false;
+		AActor* HabitatMarker = nullptr;
 		for (TActorIterator<AIslandWeather> It(Island); It; ++It) bHasWeather = true;
 		for (TActorIterator<AIslandDayNight> It(Island); It; ++It) bHasDayNight = true;
 		for (TActorIterator<AActor> It(Island); It; ++It)
-			if (It->ActorHasTag(TEXT("TideglassPool"))) bHasTideglassHabitat = true;
+			if (It->ActorHasTag(TEXT("TideglassPool"))) { bHasTideglassHabitat = true; HabitatMarker = *It; }
 		TestTrue(TEXT("Saved Island contains the weather actor required by the ecology spawner"), bHasWeather);
 		TestTrue(TEXT("Saved Island contains the day/night clock required by the ecology spawner"), bHasDayNight);
 		TestTrue(TEXT("Saved Island contains the TideglassPool habitat tag"), bHasTideglassHabitat);
+		if (HabitatMarker)
+		{
+			for (TActorIterator<AActor> It(Island); It && !bHasFlattenedTideglassSurface; ++It)
+			{
+				if (FVector::Dist(It->GetActorLocation(), HabitatMarker->GetActorLocation()) > 25.f) continue;
+				TArray<UStaticMeshComponent*> MeshComponents;
+				It->GetComponents<UStaticMeshComponent>(MeshComponents);
+				for (const UStaticMeshComponent* MeshComponent : MeshComponents)
+				{
+					if (!MeshComponent || !MeshComponent->GetStaticMesh()) continue;
+					const FVector Scale = MeshComponent->GetComponentScale();
+					if (MeshComponent->GetStaticMesh()->GetName() == TEXT("Sphere") && Scale.X > 2.f && Scale.Y > 2.f && Scale.Z < 0.25f)
+					{
+						bHasFlattenedTideglassSurface = true;
+						break;
+					}
+				}
+			}
+		}
+		TestTrue(TEXT("Saved Island TideglassPool landmark sits beside a flattened sphere prototype surface"), bHasFlattenedTideglassSurface);
 		break;
 	}
 	TestTrue(TEXT("Editor automation opened the saved Island map"), bFoundIslandEditorWorld);
