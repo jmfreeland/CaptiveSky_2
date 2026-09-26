@@ -2,18 +2,33 @@
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
 #include "Components/VolumetricCloudComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
 
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RainStreaks = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RainStreaks"));
+	RainStreaks->SetupAttachment(RootComponent);
+	RainStreaks->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RainStreaks->SetCastShadow(false);
+	RainStreaks->bReceivesDecals = false;
+	RainStreaks->SetVisibility(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> RainMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (RainMesh.Succeeded()) RainStreaks->SetStaticMesh(RainMesh.Object);
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
+	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.25f;
 }
@@ -22,6 +37,7 @@ void AIslandWeather::BeginPlay()
 {
 	Super::BeginPlay();
 	UpdateCloudRendering();
+	UpdateRainRendering();
 	RefreshNightEcology();
 	GetWorldTimerManager().SetTimer(EcologyTimerHandle, this, &AIslandWeather::RefreshNightEcology, 30.f, true, 30.f);
 }
@@ -34,6 +50,9 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	CloudComponent.Reset();
 	WeatherCloudMaterial = nullptr;
 	OriginalCloudMaterial = nullptr;
+	if (RainStreaks) RainStreaks->SetVisibility(false, true);
+	RainStreakMaterial = nullptr;
+	ActiveRainStreakCount = 0;
 	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 		if (Firefly.IsValid()) Firefly->Destroy();
 	NightFireflies.Reset();
@@ -44,6 +63,83 @@ void AIslandWeather::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateCloudRendering();
+	UpdateRainRendering();
+}
+
+bool AIslandWeather::InitializeRainRendering()
+{
+	if (bRainPoolInitialized) return true;
+	if (!RainStreaks || !RainStreaks->GetStaticMesh()) return false;
+	UMaterialInterface* BaseMaterial = RainStreaks->GetMaterial(0);
+	if (!BaseMaterial || (BaseMaterial->GetBlendMode() != BLEND_Translucent && BaseMaterial->GetBlendMode() != BLEND_Additive))
+	{
+		UE_LOG(LogIslandWeather, Warning, TEXT("Rain streak rendering requires a translucent particle material; keeping the visual disabled."));
+		return false;
+	}
+	RainStreakMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+	if (!RainStreakMaterial) return false;
+	RainStreaks->SetMaterial(0, RainStreakMaterial);
+	const int32 PoolSize = FMath::Clamp(RainStreakCount, 16, 192);
+	RainStreaks->ClearInstances();
+	for (int32 Index = 0; Index < PoolSize; ++Index)
+	{
+		RainStreaks->AddInstance(FTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector), false);
+	}
+	bRainPoolInitialized = true;
+	return true;
+}
+
+void AIslandWeather::UpdateRainRendering()
+{
+	if (!GetWorld() || !RainStreaks) return;
+	CurrentRainIntensity = SampleRainIntensity(GetWorld()->GetTimeSeconds());
+	if (CurrentRainIntensity <= 0.04f || !InitializeRainRendering())
+	{
+		ActiveRainStreakCount = 0;
+		RainStreaks->SetVisibility(false, true);
+		return;
+	}
+
+	const int32 PoolSize = FMath::Clamp(RainStreakCount, 16, 192);
+	ActiveRainStreakCount = FMath::Clamp(FMath::RoundToInt(PoolSize * CurrentRainIntensity), 1, PoolSize);
+	RainStreaks->SetVisibility(true, true);
+	const double Now = GetWorld()->GetTimeSeconds();
+	FVector VisualizationCenter = GetActorLocation();
+	const AActor* WindObserver = this;
+	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+		if (APawn* PlayerPawn = PlayerController->GetPawn())
+		{
+			VisualizationCenter = PlayerPawn->GetActorLocation();
+			WindObserver = PlayerPawn;
+		}
+	RainStreaks->SetWorldLocation(VisualizationCenter);
+	const FVector Wind = GetLocalWind(VisualizationCenter, WindObserver);
+	const FVector Flow = FVector(Wind.X, Wind.Y, -1800.f).GetSafeNormal();
+	const FQuat StreakRotation = FQuat::FindBetweenNormals(FVector::UpVector, Flow);
+	const float Radius = FMath::Clamp(RainVisualizationRadius, 1000.f, 12000.f);
+	const float Height = FMath::Clamp(RainVisualizationHeight, 1000.f, 5000.f);
+	const float FallSpeed = 1800.f;
+	const float FallPeriod = Height / FallSpeed;
+
+	for (int32 Index = 0; Index < PoolSize; ++Index)
+	{
+		FVector Position = FVector::ZeroVector;
+		FVector Scale = FVector::ZeroVector;
+		if (Index < ActiveRainStreakCount)
+		{
+			const double Seed = WeatherSeed * 0.071 + Index * 0.6180339887498949;
+			const float X = static_cast<float>(FMath::Frac(Seed * 1.37) * 2.0 - 1.0);
+			const float Y = static_cast<float>(FMath::Frac(Seed * 2.11) * 2.0 - 1.0);
+			const float StartHeight = static_cast<float>(FMath::Frac(Seed * 3.17 + Now / FallPeriod) * Height);
+			const float FallAge = (Height - StartHeight) / FallSpeed;
+			const float OffsetX = static_cast<float>(FMath::Fmod(X * Radius + Wind.X * FallAge, Radius * 2.f));
+			const float OffsetY = static_cast<float>(FMath::Fmod(Y * Radius + Wind.Y * FallAge, Radius * 2.f));
+			Position = FVector(OffsetX, OffsetY, StartHeight - Height * 0.5f);
+			Scale = FVector(0.008f, 0.008f, 0.45f);
+		}
+		const FTransform Transform(StreakRotation, Position, Scale);
+		RainStreaks->UpdateInstanceTransform(Index, Transform, false, Index == PoolSize - 1, true);
+	}
 }
 
 bool AIslandWeather::InitializeCloudRendering()

@@ -6,6 +6,7 @@
 #include "IslandWeather.generated.h"
 
 class AIslandFirefly;
+class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UVolumetricCloudComponent;
@@ -20,7 +21,7 @@ struct FIslandTransientGust
 	double ExpiresAt = 0.0;
 };
 
-/** Repeatable island-scale wind/cloud/rain signals with a transient volumetric-cloud rendering consumer. */
+/** Repeatable island-scale wind/cloud/rain signals with lightweight visual weather consumers. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandWeather : public AActor
 {
@@ -41,6 +42,12 @@ public:
 	FName StormCloudsParameter = TEXT("StormClouds");
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="1", ClampMax="8"))
 	float RainCycleMultiplier = 2.4f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="16", ClampMax="192"))
+	int32 RainStreakCount = 96;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="1000", ClampMax="12000"))
+	float RainVisualizationRadius = 2400.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="1000", ClampMax="5000"))
+	float RainVisualizationHeight = 2600.f;
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
@@ -67,6 +74,10 @@ private:
 	TObjectPtr<UMaterialInterface> OriginalCloudMaterial;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> WeatherCloudMaterial;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Rain")
+	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RainStreakMaterial;
 	float OriginalCloudCoverage = 0.f;
 	float OriginalCloudDensity = 0.f;
 	float OriginalStormClouds = 0.f;
@@ -74,8 +85,13 @@ private:
 	bool bHasCloudDensityParameter = false;
 	bool bHasStormCloudsParameter = false;
 	bool bCloudParameterWarningLogged = false;
+	bool bRainPoolInitialized = false;
+	int32 ActiveRainStreakCount = 0;
+	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	void RefreshNightEcology();
 	bool InitializeCloudRendering();
 	void UpdateCloudRendering();
+	bool InitializeRainRendering();
+	void UpdateRainRendering();
 };

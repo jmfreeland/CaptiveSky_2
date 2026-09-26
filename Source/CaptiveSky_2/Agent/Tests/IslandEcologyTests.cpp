@@ -7,6 +7,7 @@
 #include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/AudioComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
@@ -266,6 +267,20 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				MapWeather->WeatherSeed = RainySeed;
 				MapWeather->UpdateCloudRendering();
 				TestTrue(TEXT("Passing rain front activates the authored storm-cloud material"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("StormClouds")) > DryStorm);
+				MapWeather->UpdateRainRendering();
+				TestNotNull(TEXT("Rain uses one instanced component rather than per-drop actors"), MapWeather->RainStreaks.Get());
+				if (MapWeather->RainStreaks)
+				{
+					UMaterialInterface* RainMaterial = MapWeather->RainStreaks->GetMaterial(0);
+					TestTrue(TEXT("Rain uses a translucent or additive material"), RainMaterial && (RainMaterial->GetBlendMode() == BLEND_Translucent || RainMaterial->GetBlendMode() == BLEND_Additive));
+					TestEqual(TEXT("Rain visualization pool stays within its configured bound"), MapWeather->RainStreaks->GetInstanceCount(), FMath::Clamp(MapWeather->RainStreakCount, 16, 192));
+					TestTrue(TEXT("Rain front makes a bounded set of streaks visible"), MapWeather->ActiveRainStreakCount > 0 && MapWeather->ActiveRainStreakCount <= MapWeather->RainStreakCount && MapWeather->RainStreaks->IsVisible());
+					const int32 PoolCount = MapWeather->RainStreaks->GetInstanceCount();
+					MapWeather->WeatherSeed = DrySeed;
+					MapWeather->UpdateRainRendering();
+					TestTrue(TEXT("Streak pool hides when the front passes"), MapWeather->ActiveRainStreakCount == 0 && !MapWeather->RainStreaks->IsVisible());
+					TestEqual(TEXT("Weather reuses the same finite streak pool"), MapWeather->RainStreaks->GetInstanceCount(), PoolCount);
+				}
 				MapWeather->WeatherSeed = OvercastSeed;
 				MapWeather->UpdateCloudRendering();
 				TestTrue(TEXT("Overcast changes authored cloud coverage"), WeatherCloudMID->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage")) > ClearCoverage);
