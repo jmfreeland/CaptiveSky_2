@@ -236,6 +236,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
+		"In rough weather, you may consider a visible nearby roost whose current wind shelter is described, and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "
