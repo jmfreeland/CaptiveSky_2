@@ -167,6 +167,17 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		Chime->Tick(2.9f);
 		TestTrue(TEXT("Generated sound actor cleans itself up after playback"), Chime->IsActorBeingDestroyed());
 	}
+	AIslandFirefly* WatchableFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("Nearby wild firefly spawned for observation interaction"), WatchableFirefly);
+	if (WatchableFirefly)
+	{
+		Controller->InspectTarget(TEXT("Firefly"));
+		TestTrue(TEXT("Quiet observation triggers only a brief glow accent"), WatchableFirefly->ObservationPulseRemaining > 0.f && WatchableFirefly->ObservationPulseRemaining <= 3.f);
+		WatchableFirefly->Tick(1.f);
+		TestTrue(TEXT("Firefly returns naturally toward its usual pulse"), WatchableFirefly->ObservationPulseRemaining > 0.f && WatchableFirefly->ObservationPulseRemaining < 2.1f);
+		WatchableFirefly->Tick(2.f);
+		TestTrue(TEXT("Observation accent expires without persistent state"), FMath::IsNearlyZero(WatchableFirefly->ObservationPulseRemaining));
+	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

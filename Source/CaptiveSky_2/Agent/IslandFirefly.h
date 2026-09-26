@@ -29,11 +29,15 @@ public:
 	/** Bounded displacement response; the base wander remains independent of wind. */
 	static FVector WindDisplacement(const FVector& LocalWind);
 
+	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
+	void RespondToQuietObservation();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
+	friend class FIslandNightEcologyTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> GlowingBody;
 
@@ -51,6 +55,7 @@ private:
 	float MotionRate = 1.f;
 	float PulseRate = 1.f;
 	float WingBeatPhase = 0.f;
+	float ObservationPulseRemaining = 0.f;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	void UpdateGlow(double IslandTimeSeconds);
 	void UpdateWings(double IslandTimeSeconds);

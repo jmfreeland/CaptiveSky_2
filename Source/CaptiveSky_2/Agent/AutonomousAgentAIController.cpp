@@ -11,6 +11,7 @@
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
+#include "IslandFirefly.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -139,6 +140,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
+		if (Target == FName(TEXT("Firefly")) && FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
 		// Skip them before distance checks so an unrelated habitat cannot mask the actual TideglassPool landmark.
 		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
@@ -149,6 +151,11 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite"))) Fact = TEXT("You inspected a candidate resting site. This visual inspection alone does not prove support or shelter: a successful perch result confirms support, and shelter varies with solid geometry and wind direction. No nest, ownership, or assigned home has been created.");
+		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("Firefly")))
+		{
+			if (AIslandFirefly* Firefly = Cast<AIslandFirefly>(*It)) Firefly->RespondToQuietObservation();
+			Fact = TEXT("You quietly watched a nearby firefly. Its glow briefly brightened within its ordinary pulse; it remains wild and independent. You did not touch, catch, or claim it, and it may drift away.");
+		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("ListeningStones")))
 		{
 			FActorSpawnParameters SpawnParameters;
@@ -202,7 +209,8 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Target.ToString() + TEXT(": ") + Fact, 0.45f, {TEXT("action-result"), Target.ToString()}));
 		return;
 	}
-	ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
+	if (Target == FName(TEXT("Firefly"))) ReportAction(TEXT("No firefly is close enough to watch quietly; move within four metres and let it come near."));
+	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
 }
 
 void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Decision)

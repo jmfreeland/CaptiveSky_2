@@ -74,12 +74,18 @@ FVector AIslandFirefly::WindDisplacement(const FVector& LocalWind)
 	return LocalWind.GetClampedToMaxSize(250.f) * 0.12f;
 }
 
+void AIslandFirefly::RespondToQuietObservation()
+{
+	ObservationPulseRemaining = 3.f;
+}
+
 void AIslandFirefly::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!GetWorld()) return;
 
 	const double Time = GetWorld()->GetTimeSeconds();
+	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - FMath::Max(0.f, DeltaSeconds));
 	const float T = static_cast<float>(Time);
 	const float MotionTime = T * MotionRate;
 	const FVector Offset(
@@ -104,5 +110,7 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds)
 	if (!Glow) return;
 	const float T = static_cast<float>(IslandTimeSeconds);
 	const float Pulse = FMath::Max(0.f, FMath::Sin(T * 4.2f * PulseRate + Phase));
-	Glow->SetIntensity(GlowIntensity * (0.12f + 0.88f * FMath::Pow(Pulse, 5.f)));
+	const float NaturalPulse = 0.12f + 0.88f * FMath::Pow(Pulse, 5.f);
+	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
+	Glow->SetIntensity(GlowIntensity * NaturalPulse * ObservationAccent);
 }

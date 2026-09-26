@@ -130,7 +130,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
-			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. You may watch it or leave it undisturbed; it is wild, not a companion or a move/interact target."),
+			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."),
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f);
 			++VisibleWildlife;
 		}
