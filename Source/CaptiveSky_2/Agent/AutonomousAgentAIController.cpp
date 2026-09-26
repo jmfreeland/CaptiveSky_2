@@ -10,6 +10,7 @@
 #include "AgentMemoryComponent.h"
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/PlatformTime.h"
@@ -150,16 +151,26 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
 		{
 			bool bWindResponded = false;
+			bool bVisibleMotesCreated = false;
 			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
 			{
 				const FVector ExistingWind = WeatherIt->GetLocalWind(It->GetActorLocation(), *It);
 				const FVector GustDirection = ExistingWind.IsNearlyZero() ? It->GetActorForwardVector() : ExistingWind.GetSafeNormal();
 				WeatherIt->AddTransientGust(It->GetActorLocation(), GustDirection, 220.f, 1400.f, 18.f);
+				FActorSpawnParameters SpawnParameters;
+				SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				if (AIslandWindMoteEffect* Motes = GetWorld()->SpawnActor<AIslandWindMoteEffect>(It->GetActorLocation() + FVector(0.f, 0.f, 120.f), FRotator::ZeroRotator, SpawnParameters))
+				{
+					Motes->InitializeGust(GustDirection, 1400.f, 18.f);
+					bVisibleMotesCreated = true;
+				}
 				bWindResponded = true;
 				break;
 			}
-			Fact = bWindResponded
-				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. It fades over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound or visible wind effect is implemented yet.")
+			Fact = bWindResponded && bVisibleMotesCreated
+				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. Three small illuminated motes briefly trace its changing airflow; both effects fade over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound is implemented, and no lasting weather change occurred.")
+				: bWindResponded
+				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. It fades over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it, but its temporary visual cue could not be created. No lasting weather change occurred.")
 				: TEXT("You inspected the WindArch, but no IslandWeather actor is active, so no gust was created. This landmark has no visible wind effect or sound yet.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("TideglassPool")))

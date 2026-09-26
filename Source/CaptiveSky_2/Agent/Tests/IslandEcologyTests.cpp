@@ -3,6 +3,7 @@
 #include "IslandFirefly.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
+#include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -99,7 +100,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	ACharacter* Observer = World->SpawnActor<ACharacter>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	ATargetPoint* PoolTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
-	if (!TestNotNull(TEXT("Interaction observer spawned"), Observer) || !TestNotNull(TEXT("Interaction controller spawned"), Controller) || !TestNotNull(TEXT("Tideglass target spawned"), PoolTarget))
+	ATargetPoint* WindTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Interaction observer spawned"), Observer) || !TestNotNull(TEXT("Interaction controller spawned"), Controller) || !TestNotNull(TEXT("Tideglass target spawned"), PoolTarget) || !TestNotNull(TEXT("WindArch target spawned"), WindTarget))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -122,6 +124,22 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Inspection cooldown prevents stacking ripples"), RippleCount, 1);
 		Ripple->Tick(0.9f);
 		TestTrue(TEXT("Ripple destroys itself after fading"), Ripple->IsActorBeingDestroyed());
+	}
+	WindTarget->Tags = {TEXT("WindArch"), TEXT("IslandLandmark")};
+	Controller->InspectTarget(TEXT("WindArch"));
+	AIslandWindMoteEffect* Motes = nullptr;
+	for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) { Motes = *It; break; }
+	TestNotNull(TEXT("Interacting with WindArch creates a transient visible airflow cue"), Motes);
+	if (Motes)
+	{
+		TestEqual(TEXT("WindArch airflow cue uses three non-shadowing motes"), Motes->MoteLights.Num(), 3);
+		TestTrue(TEXT("Wind motes follow the normalized simulated gust direction"), Motes->FlowDirection.IsNormalized());
+		const FVector StartingPosition = Motes->MoteMeshes[0]->GetRelativeLocation();
+		Motes->Tick(2.f);
+		const FVector Displacement = Motes->MoteMeshes[0]->GetRelativeLocation() - StartingPosition;
+		TestTrue(TEXT("Airflow motes advance along the actual gust direction"), FVector::DotProduct(Displacement, Motes->FlowDirection) > 0.f);
+		Motes->Tick(17.f);
+		TestTrue(TEXT("WindArch visual response disappears when the gust expires"), Motes->IsActorBeingDestroyed());
 	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
