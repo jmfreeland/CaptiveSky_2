@@ -13,6 +13,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "TimerManager.h"
+#include "AgentPlaySessionSubsystem.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentConsolidation, Log, All);
 
@@ -95,6 +97,7 @@ void UAgentConsolidationComponent::SetConsciousState(const EAgentConsciousState 
 	}
 	const EAgentConsciousState PreviousState = ConsciousState;
 	ConsciousState = NewState;
+	UE_LOG(LogAgentConsolidation, Log, TEXT("%s consciousness state: %d -> %d"), *GetNameSafe(GetOwner()), static_cast<int32>(PreviousState), static_cast<int32>(NewState));
 	OnConsciousStateChanged.Broadcast(PreviousState, NewState);
 }
 
@@ -165,6 +168,8 @@ void UAgentConsolidationComponent::StartConsolidation()
 	{
 		Provider = CreateAgentLLMProvider();
 	}
+	if (GetWorld() && GetWorld()->GetGameInstance())
+		if (UAgentPlaySessionSubsystem* Session = GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>(); Session && !Session->TryReserveModelRequest()) { FinishSleep(); return; }
 	FAgentLLMRequest Request;
 	Request.SystemPrompt = BuildConsolidationPrompt(Memories);
 	Request.MaxTokens = 1000;

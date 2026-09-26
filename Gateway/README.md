@@ -20,6 +20,8 @@ When no embodiment heartbeat is present, the gateway answers headlessly and publ
 
 Untouched turns fall back to the headless responder if a body disappears before claiming them. A graceful Unreal shutdown returns a claimed turn to the inbox, and a new authoritative embodiment recovers orphaned processing files left by a crash. Discord redelivery IDs remain deduplicated across either route.
 
+Unreal play now ends automatically after at most 30 real minutes or 120 shared embodied model requests. This ends the simulation, not the Discord gateway: headless correspondence remains reactive to incoming permitted messages, with no autonomous overnight play loop. Pending correspondence uses the same graceful handoff described above. The Unreal cap is not a gateway-wide spending quota.
+
 ## Discord setup
 
 1. Create an application and bot in the [Discord Developer Portal](https://discord.com/developers/applications).
@@ -61,7 +63,7 @@ Start-ScheduledTask -TaskName 'CaptiveSky Agent Gateway'
 
 The installer is deliberately not run automatically. It creates only the task definition; secrets remain environment variables and are never copied into the task or logs. This logon task is suitable for a continuously logged-in workstation. A future server deployment can run the same gateway executable under a real service manager without changing its routing or agent model.
 
-The existing `OPENAI_API_KEY` is used for the headless OpenAI-compatible responder. Endpoint, model, context size, and key environment-variable name are configurable in `gateway.json`; credentials are never stored there.
+The existing `OPENAI_API_KEY` is used for the headless OpenAI-compatible responder. It uses `gpt-6-luna` with `reasoning_effort: none` for routine correspondence. Endpoint, model, context size, and key environment-variable name are configurable in `gateway.json`; credentials are never stored there.
 
 Run the integration checks with:
 

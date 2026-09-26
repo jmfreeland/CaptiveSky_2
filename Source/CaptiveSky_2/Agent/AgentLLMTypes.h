@@ -62,7 +62,8 @@ enum class EAgentActionType : uint8
 	MoveTo,
 	Speak,
 	Wander,
-	Interact
+	Interact,
+	Sleep
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */

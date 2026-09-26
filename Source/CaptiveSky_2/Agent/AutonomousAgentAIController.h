@@ -28,20 +28,38 @@ public:
 
 	// How often the agent asks its brain for a new decision while no request is already in flight.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
-	float ThinkIntervalSeconds = 15.f;
+	float ThinkIntervalSeconds = 60.f;
 
 	// Radius used to pick a random reachable point for the Wander action.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
 	float WanderRadius = 2000.f;
+
+	FString DescribeActionState() const;
+	static double BackgroundDelay(int32 Repeats, double BaseSeconds);
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
 	virtual void ActOnDecision(const FAgentDecision& Decision);
+	virtual bool IsActionInProgress() const;
+	virtual bool CanRest() const;
+	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+	void ReportAction(const FString& Outcome);
+	bool IsResting() const;
+	bool TryRest();
 
 private:
+	friend class FRavenPerchTest;
 	FTimerHandle ThinkTimerHandle;
+	FString LastActionOutcome = TEXT("No completed action yet.");
+	FString LastActionKey;
+	int32 RepeatedActions = 0;
+	int32 AutonomousRequests = 0;
+	double NextThinkAt = 0;
+	double NextRestAt = 0;
+	TMap<FName, double> InspectedUntil;
+	void InspectTarget(FName Target);
 
 	// Bound to the possessed character's Brain->OnDecisionReady.
 	UFUNCTION()

@@ -22,11 +22,11 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 
 Some future inhabitants should evoke, at least in spirit, the memorable eccentricity and warmth of old Sierra adventure games, especially *Quest for Glory*. Possibilities include an unusually intelligent rat (perhaps inspired by a half-remembered character named Erasmus; the reference and name are not yet settled), one or more theatrical or peculiar wizard figures, and a hospitable innkeeper archetype. These should become original CaptiveSky beings rather than direct reproductions: the aim is to carry forward the humor, mystery, companionship, and distinct sense of character those games created.
 
-## Current State (as of 2026-08-10)
+## Current State (as of 2026-09-14)
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
 - Two autonomous agents are present: **Aster** (`Agent_Aster_01`) and an intentionally unnamed raven (`Agent_Raven_01`). Each has an independent identity, personality, memory, relationships, and consciousness lifecycle.
-- LLM backend: OpenAI-compatible endpoint, model `gpt-5.6-luna`, key via `OPENAI_API_KEY`. Confirmed working end-to-end in PIE.
+- LLM backend: OpenAI-compatible Chat Completions endpoint, model `gpt-6-luna`, key via `OPENAI_API_KEY`. GPT-6 Luna is configured with no reasoning effort for routine embodied decisions and external correspondence.
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.
 - A source-controlled conversation UI lets the player speak to a nearby autonomous agent; both sides of the exchange are stored as lived conversation memory.
@@ -50,9 +50,9 @@ Some future inhabitants should evoke, at least in spirit, the memorable eccentri
   - `Social` (`UAgentSocialComponent`) — routes nearby speech between autonomous agents, limits reciprocal turn count, applies cooldowns, and leaves replying optional.
   - `Consolidation` (`UAgentConsolidationComponent`) — exposes Awake/Resting/Consolidating states and writes gradual evidence-linked personality evolution during sleep.
   - `EyeCapture` (`SceneCaptureComponent2D`) — first-person view, base64-PNG-encoded and sent to the LLM as an image input.
-- `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — polls the Brain for a decision every `ThinkIntervalSeconds` and turns the result into movement. Nearby targeted speech now enters the social layer; `Interact` remains a future action.
+- `AAutonomousAgentAIController` (abstract) / `BP_AutonomousAgentAIController` (concrete) — schedules background decisions no faster than once per real minute, pauses while moving/asleep, and backs off repeated choices. Physical action outcomes are supplied to the next decision. Nearby targeted speech enters the social layer; `Interact` performs a bounded factual inspection of supported landmarks/roost candidates.
 - `UAgentExternalBridgeComponent` — inherited by every autonomous body; publishes a short-lived embodiment lease, consumes durable channel-neutral turns one at a time, and returns embodied speech through the gateway outbox.
-- `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact), and optional `ActionTarget`/`Speech`.
+- `FAgentDecision` — the LLM's structured output: a `Thought`, an `EAgentActionType` (Idle/MoveTo/Speak/Wander/Interact/Sleep), and optional `ActionTarget`/`Speech`.
 - `AgentLLMProvider` — pluggable backend; supports Anthropic and OpenAI-compatible APIs (see `UAgentLLMSettings` in Project Settings for the active configuration).
 - `AgentStateTreeUtility.h` — a StateTree task (`FStateTreeAgentDecideTask`) that wraps `RequestDecision` for a future StateTree-driven version. Not wired into a graph yet.
 - `ARavenAgentAIController` — an asset-independent locomotion state machine (`Grounded`, `Hopping`, `TakingOff`, `Flying`, `Landing`, `Perched`) that translates the raven's Wander/MoveTo decisions into swept movement while leaving thought, speech, memory, and identity in the shared agent system. Its Blueprint-readable state is ready to drive a future Animation Blueprint.
@@ -86,13 +86,35 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 ## Roadmap / Open Questions
 
+### Bounded play and memory integrity (2026-09-14)
+
+Every game instance owns `UAgentPlaySessionSubsystem`. Its core ticker measures real elapsed time, independent of Island time, time dilation, or pausing the world. Play ends after **30 real minutes**, or earlier at **120 total model request reservations** across all embodied agents (including dialogue and sleep consolidation). PIE returns to the editor; standalone play quits. There is no automatic restart. A stalled game thread can only process the stop on resumption, but ordinary thought requests also check the deadline before dispatch.
+
+`Config/DefaultGame.ini` exposes `MaxRealtimeSeconds=1800` and `MaxModelRequests=120`. Smaller positive values are useful for smoke tests; zero cannot disable the guard and larger values cannot exceed these hard caps. Background thought is additionally limited to 30 calls per agent per possession, spaced by at least one real minute even if an old Blueprint still says 15 seconds. Repeated movement/inspection/idle choices back off to five minutes; a third identical movement or inspection is suppressed. Speech and random wandering are not treated as identical failed choices. Direct conversation is not subject to this background delay, but still shares the session budget. These are request-count safeguards, not a currency or exact token quota.
+
+Agents can choose `sleep` when physically settled. Nighttime (20:00–05:00) also offers rest after ten real minutes awake, with a fifteen-real-minute cooldown. Rest lasts two simulation minutes before existing evidence-bound consolidation; the raven can rest while perched and cannot act or move during sleep. This is a behavioral lifecycle, not a new sleeping animation. Inspection and movement now report completed physical outcomes so plans are not mistaken for discoveries. Inspections of static prototype landmarks explicitly report that no puzzle/reward interaction is implemented.
+
+Memory appends now always use UTF-8 without BOM. The earlier mixed ASCII/UTF-16 append defect was repaired without deleting or rewriting experiences: 864 Aster records and 772 raven records were preserved. Byte-exact originals are backed up under `Saved/MemoryRecovery/20260914T045153399Z/` and copied into each agent's ignored `journal/memory-recovery/` directory. To diagnose another affected file with PIE stopped, run `Scripts/Repair-AgentMemoryEncoding.ps1`; use `-SelfTest` to test its decoder and `-Repair` only after reviewing the dry-run. Repair obtains the gateway's per-agent file lock, validates every JSON record, verifies unchanged source hashes, and performs an atomic replacement with an original backup. Already well-formed historical repetition is deliberately retained.
+
+Regression coverage includes wall-clock/request bounds (`SessionSafety`), UTF-8 persistence (`MemoryComponent`), inspection feedback/repeat suppression and sleep immobilization (`RavenPerch`), real Island roost collision, weather, day/night, and external-message types. A short live deadline test verifies automatic PIE termination without needing another overnight run.
+
+Grounded agents project shared elevated landmark markers onto nearby navigation before moving, and reject partial paths rather than reporting their endpoints as arrival. Live checks confirmed Aster reaching the WindArch and the raven landing at both roosts. The three-minute autonomous smoke test ended itself at 180.3 real seconds with six total requests: the raven perched, visited the ListeningStones, then waited quietly. The normal 1800-second cap is restored after testing; the forty-minute Island day remains unchanged.
+
 ### Raven's requests (2026-09-12)
 
 In his first Discord correspondence, the raven asked for changing weather, varied wind currents, quiet undisturbed nesting places, hidden paths and strange objects that reward returning, other living things with their own habits, and freedom to come and go. These are lived requests, not additions to his authored personality. Leave some discoveries unannounced.
 
 The first implementation adds an optional `AIslandWeather` actor: repeatable slowly changing cloud-cover and spatial wind signals, geometry-based upwind shelter, embodied weather observations for all agents, and drift during raven cruising flight. This is a simulation foundation, **not yet rendered rain/cloud changes or wind audio**. Place one weather actor per level; without one, existing flight is unchanged. Weather time currently restarts with each play session.
 
-The Island now contains one weather actor and two whitebox sheltered ledge candidates, `Roost_West` and `Roost_East`, near the original raven spawn. These are replaceable collision/blockout geometry, not finished nest assets. The first pass compiled through Live Coding and all four agent automation tests passed; deliberate approach/landing still needs a live play check. A normal editor build should follow before relying on the new reflected actor across editor restarts.
+The Island contains one weather actor and two roost candidates, `Roost_West` and `Roost_East`, near the original raven spawn. The original six white ledge/back/roof blocks have been replaced by a rocky west perch and a spruce-side east fork, with satellite stones, smaller trees, ground plants and fallen wood. The rock and spruce were copied from the original project's StarterContent and PN_interactiveSpruceForest assets; the fork and fallen wood still use simple wood-textured cylinders pending authored branch meshes. Tree foliage is nonblocking, with a separate solid trunk and branch support. Shelter remains dependent on wind direction and actual solid geometry, not the site's name.
+
+The raven controller now keeps its capsule upright, clears residual CharacterMovement velocity, ignores itself in ground traces, and stages roost travel through ascent, overhead approach and descent. It only enters `Perched` after finding nearby upward-facing support; obstructions abort the route. This is still a simple approach, not general flight pathfinding around obstacles. `RequestPerch(Tag)` is available to Blueprint. `CaptiveSky2.Agent.RavenPerch` covers arrival/departure and blocked/unsupported targets in a brain-free fixture; when Island is the open editor map, it also checks both placed roosts against real scene collision without creating agent memories.
+
+### Day and night (2026-09-13)
+
+`AIslandDayNight` provides one shared local clock per level. The Island's `Island_DayNight` actor references the existing DirectionalLight and SkyLight and owns a second atmosphere light for the moon. Defaults are a 40-minute full day, beginning at 09:00; sunlight moves across the sky, warms near dawn/dusk and fades below the horizon, while cool moonlight and reduced skylight illuminate the night. The existing atmosphere and volumetric clouds respond to the moving lights. This does not yet add stars, lunar phases, seasonal changes, or rendered weather variation.
+
+Adjust **Start Hour**, **Day Length Minutes**, **Day Sun Intensity**, and **Moon Intensity** on the actor; **Advance Time** pauses the clock. Editing Start Hour previews lighting outside play. During play, all embodied agents receive the current phase and approximate Island time in their observations. The clock advances with simulation time and resets on a new play session; it is not yet persisted, multiplayer-replicated, or tied to real-world time. Settled agents can rest at night; see the session safeguards below. `CaptiveSky2.Agent.DayNight` checks clock wrapping and the sun's daily arc.
 
 Three additional whitebox points of interest are now placed near the spawn: `ListeningStones`, `TideglassPool`, and `WindArch`. Their center markers carry `IslandLandmark` and `RavenInterest` tags, so nearby agents can perceive and approach them without being told what they are. They are intentionally simple prototypes awaiting authored art, sound, and interaction.
 
@@ -110,6 +132,6 @@ Nesting candidates use TargetPoint actors positioned at the raven's capsule cent
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
-- `Interact` actions are currently just logged. Ambient agent speech has subtitle presentation but still needs spatial audio, animation, and richer player-facing affordances.
+- `Interact` now completes a factual, proximity/visibility-checked inspection, with a five-real-minute repeat cooldown. Landmarks remain static prototypes, not implemented puzzles or hidden rewards. Ambient agent speech still needs spatial audio, animation, and richer player-facing affordances.
 - Nav mesh only covers a small area around the current spawn point; wandering can walk the agent down steep terrain.
 - Give sleep a physical expression per body (Aster settling somewhere safe, the raven roosting) and decide what wakes each kind of consciousness.

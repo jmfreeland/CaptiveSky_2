@@ -7,6 +7,7 @@ public class CaptiveSky_2 : ModuleRules
 	public CaptiveSky_2(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		if (Target.bBuildEditor) PrivateDependencyModuleNames.Add("UnrealEd");
 
 		PublicDependencyModuleNames.AddRange(new string[] {
 			"Core",

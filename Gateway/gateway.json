@@ -2,7 +2,8 @@
   "projectRoot": "..",
   "llm": {
     "endpoint": "https://api.openai.com/v1/chat/completions",
-    "model": "gpt-5.6-luna",
+    "model": "gpt-6-luna",
+    "reasoningEffort": "none",
     "apiKeyEnvironmentVariable": "OPENAI_API_KEY",
     "requireApiKey": true,
     "maxCompletionTokens": 900,

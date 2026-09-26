@@ -35,6 +35,10 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
 	FString Model = TEXT("claude-sonnet-5");
 
+	// OpenAI reasoning effort. Luna supports "none" for lower-latency, lower-token routine turns.
+	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
+	FString ReasoningEffort = TEXT("none");
+
 	// Empty = provider's default public endpoint. Set this to target a local server (e.g. Ollama/LM Studio) for OpenAICompatible.
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
 	FString EndpointOverride;
@@ -42,7 +46,7 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
 	int32 DefaultMaxTokens = 1024;
 
-	// Newer OpenAI reasoning-class models (o1, gpt-5 family) reject 'max_tokens' and require
+	// Newer OpenAI reasoning-class models (o1, GPT-5 and GPT-6 families) reject 'max_tokens' and require
 	// 'max_completion_tokens' instead. Local OpenAI-compatible servers (Ollama, LM Studio) usually
 	// still expect 'max_tokens'. Only used by the OpenAICompatible provider.
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")

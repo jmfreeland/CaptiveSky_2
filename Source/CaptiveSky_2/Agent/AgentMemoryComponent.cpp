@@ -132,7 +132,7 @@ void UAgentMemoryComponent::AppendMemory(const FAgentMemoryRecord& Record)
 
 	const FString Line = Record.ToJsonLine() + LINE_TERMINATOR;
 	if (!FFileHelper::SaveStringToFile(Line, *GetMemoryFilePath(),
-		FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_Append))
+		FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_Append))
 	{
 		UE_LOG(LogAgentMemory, Error, TEXT("Failed to append memory record to %s"), *GetMemoryFilePath());
 		return;

@@ -45,6 +45,7 @@ public sealed class OpenAICompatibleAgentResponder(
         {
             model = configuration.Model,
             max_completion_tokens = configuration.MaxCompletionTokens,
+            reasoning_effort = configuration.ReasoningEffort,
             temperature = configuration.Temperature,
             messages = new object[]
             {

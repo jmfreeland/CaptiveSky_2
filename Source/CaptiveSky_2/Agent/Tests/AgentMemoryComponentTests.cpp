@@ -86,7 +86,19 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		}
 	}
 
-	// Clean up after ourselves.
+	// Mixed ASCII and Unicode appends must remain a single UTF-8 JSONL stream.
+	const FString UnicodeText = TEXT("I\u2019m here \u2014 caf\u00e9 \u98a8");
+	Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Conversation, UnicodeText, 0.5f, {}));
+	Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Observation, TEXT("ASCII after Unicode"), 0.4f, {}));
+	UAgentMemoryComponent* UnicodeReader = NewObject<UAgentMemoryComponent>(GetTransientPackage());
+	UnicodeReader->AgentId = TestAgentId;
+	const auto UnicodeRecords = UnicodeReader->GetMemoriesSince(FDateTime::MinValue());
+	if (TestEqual(TEXT("Mixed character sets reload all five records"), UnicodeRecords.Num(), 5))
+	{
+		// Appends can share a serialized timestamp; retrieval tie order is not a file-order contract.
+		TestTrue(TEXT("Unicode text preserved exactly"), UnicodeRecords.ContainsByPredicate([&](const FAgentMemoryRecord& Record) { return Record.Text == UnicodeText; }));
+		TestTrue(TEXT("ASCII after Unicode preserved"), UnicodeRecords.ContainsByPredicate([](const FAgentMemoryRecord& Record) { return Record.Text == TEXT("ASCII after Unicode"); }));
+	}
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
 
 	return true;

@@ -42,13 +42,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Raven|Locomotion")
 	float HopHeight = 55.f;
 
+	/** Tagged markers specify the centre of the upright raven capsule at rest. */
+	UFUNCTION(BlueprintCallable, Category = "Raven|Locomotion")
+	bool RequestPerch(FName PerchTag);
+
 protected:
+	virtual bool IsActionInProgress() const override;
+	virtual bool CanRest() const override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void ActOnDecision(const FAgentDecision& Decision) override;
 
 private:
+	friend class FRavenPerchTest;
 	FVector MovementTarget = FVector::ZeroVector;
+	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;
 	FVector HopStart = FVector::ZeroVector;
 	FVector HopEnd = FVector::ZeroVector;
@@ -57,12 +65,14 @@ private:
 	float HopDuration = 0.55f;
 	bool bHasMovementTarget = false;
 	bool bTargetIsPerch = false;
+	bool bApproachingPerch = false;
 
 	void SetFlyingMovement(bool bFlying) const;
 	void BeginTakeoff(const FVector& Destination);
 	void BeginLanding(const FVector& DesiredLocation);
 	void BeginHop();
 	bool BeginPerch();
+	bool BeginPerchAt(AActor* Perch);
 	void SetGrounded();
 	FVector MakeCruiseTarget() const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;

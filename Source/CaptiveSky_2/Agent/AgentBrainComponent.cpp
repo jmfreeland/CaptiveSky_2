@@ -12,6 +12,10 @@
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
 #include "IslandWeather.h"
+#include "IslandDayNight.h"
+#include "AutonomousAgentAIController.h"
+#include "AgentPlaySessionSubsystem.h"
+#include "Engine/GameInstance.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -25,7 +29,16 @@ UAgentBrainComponent::~UAgentBrainComponent() = default;
 void UAgentBrainComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	bEndedPlay = false;
 	Provider = CreateAgentLLMProvider();
+}
+
+void UAgentBrainComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	bEndedPlay = true;
+	bRequestInFlight = false;
+	Provider.Reset();
+	Super::EndPlay(EndPlayReason);
 }
 
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
@@ -46,8 +59,15 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
+	if (const APawn* Body = Cast<APawn>(Owner))
+		if (const AAutonomousAgentAIController* Controller = Cast<AAutonomousAgentAIController>(Body->GetController())) NearbyBeings += Controller->DescribeActionState();
 	if (Owner && GetWorld())
 	{
+		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+		{
+			NearbyBeings += It->DescribeTime();
+			break;
+		}
 		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 		{
 			NearbyBeings += It->DescribeAt(Location, Owner);
@@ -62,7 +82,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
 			// First tag is the unique movement target; never reveal distant/occluded sites.
-			NearbyBeings += FString::Printf(TEXT(" A possible roost is %.0f metres away (move_to target: %s). It is an option, not your assigned home; inspect its shelter before choosing."),
+			NearbyBeings += FString::Printf(TEXT(" A possible roost is %.0f metres away (move_to target: %s). It is an option, not your assigned home. If already arrived, you may rest; repeated movement to it is unnecessary."),
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
 			++VisibleRoosts;
 		}
@@ -74,7 +94,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
-			NearbyBeings += FString::Printf(TEXT(" A point of interest is %.0f metres away (move_to target: %s). It may be worth investigating at your own pace."),
+			NearbyBeings += FString::Printf(TEXT(" A static prototype landmark is %.0f metres away (move_to/interact target: %s). Interact performs one factual inspection, not a puzzle, reward, or environmental change. Respect recent inspection results."),
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
 			++VisibleLandmarks;
 		}
@@ -166,10 +186,14 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
-		"Omit new_memories (empty array) if nothing is worth remembering long-term from this moment.");
+		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
+		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
+		"Do not repeatedly inspect unchanged scenery or announce that you will inspect a place after already arriving. "
+		"Write at most two new memories about new experienced events, not repeated plans or merely changing clock/weather descriptions. "
+		"Omit new_memories (empty array) if nothing new is worth remembering long-term from this moment.");
 
 	return Prompt;
 }
@@ -210,6 +234,7 @@ static FString SanitizeMemoryTag(FString Tag)
 
 void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationContext& Context)
 {
+	if (bEndedPlay) return;
 	if (bRequestInFlight)
 	{
 		UE_LOG(LogAgentBrain, Warning, TEXT("RequestDecision called while a request is already in flight; ignoring."));
@@ -247,6 +272,15 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
 			return;
 		}
+	}
+	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
+	if (Session && !Session->TryReserveModelRequest())
+	{
+		LastDecision = FAgentDecision();
+		LastConversationContext = Context;
+		OnDecisionReady.Broadcast(LastDecision);
+		OnDecisionCompleteForStateTree.ExecuteIfBound(LastDecision);
+		return;
 	}
 	if (MemoryComp && !Context.Text.IsEmpty())
 	{
@@ -286,6 +320,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	}
 
 	FAgentLLMRequest Request;
+	Request.MaxTokens = Context.Text.IsEmpty() ? 400 : 700;
 	Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
 
 	FAgentLLMMessage UserMessage;
@@ -302,7 +337,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Context](const FAgentLLMResult& Result)
 	{
 		UAgentBrainComponent* StrongThis = WeakThis.Get();
-		if (!StrongThis)
+		if (!StrongThis || StrongThis->bEndedPlay)
 		{
 			return;
 		}
@@ -380,6 +415,7 @@ static EAgentActionType ActionTypeFromString(const FString& InString)
 	if (InString == TEXT("speak")) return EAgentActionType::Speak;
 	if (InString == TEXT("wander")) return EAgentActionType::Wander;
 	if (InString == TEXT("interact")) return EAgentActionType::Interact;
+	if (InString == TEXT("sleep")) return EAgentActionType::Sleep;
 	return EAgentActionType::Idle;
 }
 
@@ -415,8 +451,10 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		const TArray<TSharedPtr<FJsonValue>>* NewMemoriesArray = nullptr;
 		if (Root->TryGetArrayField(TEXT("new_memories"), NewMemoriesArray) && NewMemoriesArray)
 		{
+			int32 AddedMemories = 0;
 			for (const TSharedPtr<FJsonValue>& Value : *NewMemoriesArray)
 			{
+				if (AddedMemories >= 2) break;
 				const TSharedPtr<FJsonObject>* MemObj = nullptr;
 				if (!Value.IsValid() || !Value->TryGetObject(MemObj) || !MemObj || !MemObj->IsValid())
 				{
@@ -448,6 +486,7 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 				}
 
 				MemoryComp->AppendMemory(MemoryComp->MakeMemory(EAgentMemoryType::Reflection, Text, static_cast<float>(Importance), Tags));
+				++AddedMemories;
 			}
 		}
 	}
