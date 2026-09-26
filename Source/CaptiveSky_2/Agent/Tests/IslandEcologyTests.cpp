@@ -70,6 +70,18 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly remains untargeted wildlife"), !It->ActorHasTag(TEXT("IslandLandmark")) && !It->ActorHasTag(TEXT("RavenNestSite")));
 		TestTrue(TEXT("Firefly stays near its Tideglass habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 700.f);
 		TestNotNull(TEXT("Firefly has a fluctuating glow component"), It->FindComponentByClass<UPointLightComponent>());
+		TestNotNull(TEXT("Firefly has its segmented body mesh"), It->FindComponentByClass<UStaticMeshComponent>());
+		TArray<UStaticMeshComponent*> BodyParts;
+		It->GetComponents<UStaticMeshComponent>(BodyParts);
+		bool bHasLeftWing = false;
+		bool bHasRightWing = false;
+		for (const UStaticMeshComponent* Part : BodyParts)
+		{
+			if (!Part) continue;
+			bHasLeftWing |= Part->GetFName() == FName(TEXT("LeftWing"));
+			bHasRightWing |= Part->GetFName() == FName(TEXT("RightWing"));
+		}
+		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
 	Weather->RefreshNightEcology();

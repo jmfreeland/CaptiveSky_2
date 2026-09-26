@@ -12,11 +12,31 @@ AIslandFirefly::AIslandFirefly()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	GlowingBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GlowingBody"));
 	GlowingBody->SetupAttachment(RootComponent);
-	GlowingBody->SetRelativeScale3D(FVector(0.05f));
+	GlowingBody->SetRelativeLocation(FVector(-1.8f, 0.f, 0.f));
+	GlowingBody->SetRelativeScale3D(FVector(0.028f, 0.018f, 0.018f));
 	GlowingBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GlowingBody->SetCastShadow(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FireflySphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (FireflySphere.Succeeded()) GlowingBody->SetStaticMesh(FireflySphere.Object);
+	if (FireflySphere.Succeeded())
+	{
+		GlowingBody->SetStaticMesh(FireflySphere.Object);
+		// Thin ellipsoids are a placeholder for wings until a proper insect mesh is chosen.
+		LeftWing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftWing"));
+		LeftWing->SetupAttachment(RootComponent);
+		LeftWing->SetStaticMesh(FireflySphere.Object);
+		LeftWing->SetRelativeLocation(FVector(0.f, -1.25f, 1.1f));
+		LeftWing->SetRelativeScale3D(FVector(0.018f, 0.024f, 0.003f));
+		LeftWing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		LeftWing->SetCastShadow(false);
+
+		RightWing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightWing"));
+		RightWing->SetupAttachment(RootComponent);
+		RightWing->SetStaticMesh(FireflySphere.Object);
+		RightWing->SetRelativeLocation(FVector(0.f, 1.25f, 1.1f));
+		RightWing->SetRelativeScale3D(FVector(0.018f, 0.024f, 0.003f));
+		RightWing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		RightWing->SetCastShadow(false);
+	}
 
 	Glow = CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
 	Glow->SetupAttachment(RootComponent);
@@ -25,8 +45,9 @@ AIslandFirefly::AIslandFirefly()
 	Glow->SetAttenuationRadius(260.f);
 	Glow->SetCastShadows(false);
 	Glow->SetIntensity(0.f);
+	Glow->SetRelativeLocation(FVector(-1.8f, 0.f, 0.f));
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.TickInterval = 0.2f;
+	PrimaryActorTick.TickInterval = 0.05f;
 	Tags.AddUnique(TEXT("IslandLife"));
 	Tags.AddUnique(TEXT("Firefly"));
 }
@@ -38,12 +59,14 @@ void AIslandFirefly::BeginPlay()
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.78f, 1.24f);
 	PulseRate = FMath::FRandRange(0.82f, 1.18f);
+	WingBeatPhase = FMath::FRandRange(0.f, 2.f * PI);
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
 		Weather = *It;
 		break;
 	}
 	UpdateGlow(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
+	UpdateWings(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
 }
 
 FVector AIslandFirefly::WindDisplacement(const FVector& LocalWind)
@@ -66,6 +89,14 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	SetActorLocation(HomeLocation + Offset + WindDisplacement(Wind), false);
 	UpdateGlow(Time);
+	UpdateWings(Time);
+}
+
+void AIslandFirefly::UpdateWings(double IslandTimeSeconds)
+{
+	const float Beat = FMath::Sin(static_cast<float>(IslandTimeSeconds) * 38.f + WingBeatPhase) * 42.f;
+	if (LeftWing) LeftWing->SetRelativeRotation(FRotator(0.f, 0.f, 18.f + Beat));
+	if (RightWing) RightWing->SetRelativeRotation(FRotator(0.f, 0.f, -18.f - Beat));
 }
 
 void AIslandFirefly::UpdateGlow(double IslandTimeSeconds)

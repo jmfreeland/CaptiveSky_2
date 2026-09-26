@@ -38,12 +38,20 @@ private:
 	TObjectPtr<UStaticMeshComponent> GlowingBody;
 
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> LeftWing;
+
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> RightWing;
+
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UPointLightComponent> Glow;
 
 	FVector HomeLocation = FVector::ZeroVector;
 	float Phase = 0.f;
 	float MotionRate = 1.f;
 	float PulseRate = 1.f;
+	float WingBeatPhase = 0.f;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	void UpdateGlow(double IslandTimeSeconds);
+	void UpdateWings(double IslandTimeSeconds);
 };
