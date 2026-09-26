@@ -88,6 +88,14 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			// First tag is the unique movement target; never reveal distant/occluded sites.
 			NearbyBeings += FString::Printf(TEXT(" A possible roost is %.0f metres away (move_to target: %s). It is an option, not your assigned home. If already arrived, you may rest; repeated movement to it is unnecessary."),
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			if (LocalWeather)
+			{
+				NearbyBeings += TEXT(" ") + LocalWeather->DescribeWindShelterAt(It->GetActorLocation(), Owner);
+				if (LocalWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) >= 0.55f)
+					NearbyBeings += TEXT(" A strong shower is passing, but overhead rain cover is not measured by this wind check.");
+			}
+			else NearbyBeings += TEXT(" No IslandWeather actor is active, so local wind shelter cannot be assessed.");
+			NearbyBeings += TEXT(" A successful perch still requires a later physical support check.");
 			++VisibleRoosts;
 		}
 		int32 VisibleLandmarks = 0;

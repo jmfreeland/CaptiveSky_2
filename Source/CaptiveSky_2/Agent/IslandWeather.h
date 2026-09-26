@@ -56,6 +56,8 @@ public:
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
+	/** Describe only current upwind line-of-sight shelter; this does not claim roof cover or perch support. */
+	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Add a bounded, temporary local wind response; it naturally fades in space and time. */
 	void AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds);
 	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
@@ -98,4 +100,5 @@ private:
 	bool InitializeRainRendering();
 	void UpdateRainRendering();
 	void UpdateRainPoolResponse();
+	bool HasUpwindObstruction(const FVector& Position, const FVector& Wind, const AActor* Observer) const;
 };

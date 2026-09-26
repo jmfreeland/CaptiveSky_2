@@ -1,5 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "IslandWeather.h"
+#include "Components/BoxComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -47,5 +50,41 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Gust fades with distance and time"), AIslandWeather::EvaluateTransientGust(Gust, FVector(500.f, 0.f, 0.f), 15.0).Equals(FVector(50.f, 0.f, 0.f)));
 	TestTrue(TEXT("Gust has no effect beyond its radius"), AIslandWeather::EvaluateTransientGust(Gust, FVector(1001.f, 0.f, 0.f), 15.0).IsNearlyZero());
 	TestTrue(TEXT("Gust expires cleanly"), AIslandWeather::EvaluateTransientGust(Gust, FVector::ZeroVector, 20.0).IsNearlyZero());
+
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Shelter-trace fixture world created"), World) || !TestNotNull(TEXT("Engine is available for shelter fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	AIslandWeather* WorldWeather = World->SpawnActor<AIslandWeather>();
+	if (!TestNotNull(TEXT("Weather actor spawned for shelter trace"), WorldWeather))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->BeginPlay();
+	const FVector ShelterPoint(10000.f, 10000.f, 1000.f);
+	const FVector AmbientWind = WorldWeather->SampleWind(ShelterPoint, World->GetTimeSeconds());
+	TestTrue(TEXT("Shelter fixture has enough ambient wind to assess"), AmbientWind.Size() >= 35.f);
+	TestTrue(TEXT("Open point is reported as exposed to current wind"), WorldWeather->DescribeWindShelterAt(ShelterPoint).Contains(TEXT("exposed to the present horizontal wind")));
+	AActor* WindBlocker = World->SpawnActor<AActor>();
+	UBoxComponent* BlockerBox = NewObject<UBoxComponent>(WindBlocker);
+	WindBlocker->SetRootComponent(BlockerBox);
+	BlockerBox->SetBoxExtent(FVector(120.f, 120.f, 150.f));
+	BlockerBox->SetCollisionProfileName(TEXT("BlockAll"));
+	BlockerBox->RegisterComponent();
+	WindBlocker->SetActorLocation(ShelterPoint - AmbientWind.GetSafeNormal() * 300.f);
+	const FString ShelteredReport = WorldWeather->DescribeWindShelterAt(ShelterPoint);
+	TestTrue(TEXT("Solid upwind obstruction is reported as wind shelter"), ShelteredReport.Contains(TEXT("blocks the upwind visibility trace")));
+	TestTrue(TEXT("Sheltered description does not claim roof cover or safe support"), ShelteredReport.Contains(TEXT("does not establish overhead rain cover or safe perch support")));
+	TestTrue(TEXT("Same upwind obstruction attenuates the actual local-wind signal"), WorldWeather->GetLocalWind(ShelterPoint).Size() < AmbientWind.Size() * 0.2f);
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }

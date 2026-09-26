@@ -304,13 +304,28 @@ FVector AIslandWeather::GetLocalWind(const FVector& Position, const AActor* Obse
 	{
 		Wind += EvaluateTransientGust(Gust, Position, Now);
 	}
+	if (HasUpwindObstruction(Position, Wind, Observer)) Wind *= 0.15f;
+	return Wind;
+}
+
+bool AIslandWeather::HasUpwindObstruction(const FVector& Position, const FVector& Wind, const AActor* Observer) const
+{
+	if (!GetWorld() || Wind.IsNearlyZero()) return false;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(IslandWindShelter), false);
 	if (Observer) Params.AddIgnoredActor(Observer);
 	FHitResult Hit;
-	// Nearby upwind geometry attenuates the actual movement signal, not just its description.
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Position, Position - Wind.GetSafeNormal() * 600.f, ECC_Visibility, Params))
-		Wind *= 0.15f;
-	return Wind;
+	return GetWorld()->LineTraceSingleByChannel(Hit, Position, Position - Wind.GetSafeNormal() * 600.f, ECC_Visibility, Params);
+}
+
+FString AIslandWeather::DescribeWindShelterAt(const FVector& Position, const AActor* Observer) const
+{
+	if (!GetWorld()) return TEXT("Wind shelter cannot be assessed because no world weather is active.");
+	const FVector AmbientWind = SampleWind(Position, GetWorld()->GetTimeSeconds());
+	if (AmbientWind.Size() < 35.f)
+		return TEXT("The ambient wind is currently too light to judge this site's wind shelter. This check does not assess overhead rain cover or perch support.");
+	if (HasUpwindObstruction(Position, AmbientWind, Observer))
+		return TEXT("Solid geometry currently blocks the upwind visibility trace within six metres, so this point is sheltered from the present horizontal wind. This does not establish overhead rain cover or safe perch support.");
+	return TEXT("No solid geometry blocks the current six-metre upwind trace, so this point is exposed to the present horizontal wind. This does not assess overhead rain cover or perch support.");
 }
 
 FVector AIslandWeather::EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime)
