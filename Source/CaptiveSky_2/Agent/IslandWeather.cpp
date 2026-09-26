@@ -1,6 +1,7 @@
 #include "IslandWeather.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -113,6 +114,7 @@ void AIslandWeather::UpdateRainRendering()
 			WindObserver = PlayerPawn;
 		}
 	RainStreaks->SetWorldLocation(VisualizationCenter);
+	if (CurrentRainIntensity >= 0.55f) UpdateRainPoolResponse();
 	const FVector Wind = GetLocalWind(VisualizationCenter, WindObserver);
 	const FVector Flow = FVector(Wind.X, Wind.Y, -1800.f).GetSafeNormal();
 	const FQuat StreakRotation = FQuat::FindBetweenNormals(FVector::UpVector, Flow);
@@ -139,6 +141,30 @@ void AIslandWeather::UpdateRainRendering()
 		}
 		const FTransform Transform(StreakRotation, Position, Scale);
 		RainStreaks->UpdateInstanceTransform(Index, Transform, false, Index == PoolSize - 1, true);
+	}
+}
+
+void AIslandWeather::UpdateRainPoolResponse()
+{
+	if (!GetWorld() || RainPoolRipple.IsValid() || GetWorld()->GetTimeSeconds() < NextRainPoolRippleTime) return;
+	AActor* Pool = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("TideglassPool"))) continue;
+		Pool = *It;
+		break;
+	}
+	if (!Pool) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	const double Phase = Now * 1.7 + WeatherSeed * 0.37;
+	const FVector Offset(FMath::Cos(Phase) * 38.f, FMath::Sin(Phase * 1.13) * 38.f, 0.f);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(Pool->GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParameters))
+	{
+		Ripple->ConfigureAsRainImpact();
+		RainPoolRipple = Ripple;
+		NextRainPoolRippleTime = Now + 4.5;
 	}
 }
 

@@ -14,6 +14,8 @@ class CAPTIVESKY_2_API AIslandPoolRippleEffect : public AActor
 
 public:
 	AIslandPoolRippleEffect();
+	/** Reduce the size and brightness for a subtle weather-driven water impact. */
+	void ConfigureAsRainImpact();
 
 protected:
 	virtual void BeginPlay() override;
@@ -27,5 +29,6 @@ private:
 	float ElapsedSeconds = 0.f;
 	float DurationSeconds = 1.6f;
 	float SurfaceRadius = 150.f;
+	float PeakLightIntensity = 55.f;
 	void UpdateRipple(float Alpha);
 };

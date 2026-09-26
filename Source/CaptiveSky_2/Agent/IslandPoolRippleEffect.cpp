@@ -31,6 +31,14 @@ void AIslandPoolRippleEffect::BeginPlay()
 	UpdateRipple(0.f);
 }
 
+void AIslandPoolRippleEffect::ConfigureAsRainImpact()
+{
+	DurationSeconds = 1.15f;
+	SurfaceRadius = 68.f;
+	PeakLightIntensity = 18.f;
+	Tags.AddUnique(TEXT("RainImpact"));
+}
+
 void AIslandPoolRippleEffect::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -49,6 +57,6 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		const float Angle = (2.f * PI * Index) / RippleLights.Num();
 		UPointLightComponent* Light = RippleLights[Index];
 		Light->SetRelativeLocation(FVector(FMath::Cos(Angle) * RingRadius, FMath::Sin(Angle) * RingRadius, 24.f));
-		Light->SetIntensity(55.f * Pulse);
+		Light->SetIntensity(PeakLightIntensity * Pulse);
 	}
 }

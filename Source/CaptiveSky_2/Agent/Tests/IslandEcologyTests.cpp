@@ -56,6 +56,44 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	Habitat->Tags.Add(TEXT("TideglassPool"));
+	const int32 OriginalWeatherSeed = Weather->WeatherSeed;
+	float PeakRain = -1.f;
+	float LowestRain = 2.f;
+	int32 StormSeed = 0;
+	int32 DryWeatherSeed = 0;
+	for (int32 Seed = -1000; Seed <= 1000; ++Seed)
+	{
+		Weather->WeatherSeed = Seed;
+		const float Rain = Weather->SampleRainIntensity(World->GetTimeSeconds());
+		if (Rain > PeakRain) { PeakRain = Rain; StormSeed = Seed; }
+		if (Rain < LowestRain) { LowestRain = Rain; DryWeatherSeed = Seed; }
+	}
+	TestTrue(TEXT("Weather seed space includes heavy rain and dry conditions"), PeakRain > 0.55f && LowestRain < 0.01f);
+	Weather->WeatherSeed = StormSeed;
+	Weather->UpdateRainRendering();
+	AIslandPoolRippleEffect* RainRipple = nullptr;
+	int32 RainRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("RainImpact"))) continue;
+		RainRipple = *It;
+		++RainRippleCount;
+	}
+	TestEqual(TEXT("A strong shower creates one Tideglass water impact"), RainRippleCount, 1);
+	if (RainRipple)
+	{
+		TestTrue(TEXT("Rain water response is subtler than a deliberate pool interaction"), RainRipple->PeakLightIntensity < 55.f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
+		Weather->UpdateRainRendering();
+		RainRippleCount = 0;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("RainImpact"))) ++RainRippleCount;
+		TestEqual(TEXT("Repeated weather updates do not stack pool impacts"), RainRippleCount, 1);
+	}
+	Weather->WeatherSeed = DryWeatherSeed;
+	Weather->UpdateRainRendering();
+	RainRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("RainImpact"))) ++RainRippleCount;
+	TestEqual(TEXT("Dry conditions do not create additional water impacts"), RainRippleCount, 1);
+	Weather->WeatherSeed = OriginalWeatherSeed;
 	
 	Clock->CurrentHour = 12.f;
 	Weather->RefreshNightEcology();
@@ -118,7 +156,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	PoolTarget->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
 	Controller->InspectTarget(TEXT("TideglassPool"));
 	AIslandPoolRippleEffect* Ripple = nullptr;
-	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) { Ripple = *It; break; }
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) { if (!It->ActorHasTag(TEXT("RainImpact"))) { Ripple = *It; break; } }
 	TestNotNull(TEXT("Interacting with Tideglass spawns a transient optical ripple"), Ripple);
 	if (Ripple)
 	{
@@ -127,7 +165,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Ripple light ring expands across the pool midway through its life"), FMath::IsNearlyEqual(Ripple->RippleLights[0]->GetRelativeLocation().Size2D(), 81.f, 0.5f));
 		Controller->InspectTarget(TEXT("TideglassPool"));
 		int32 RippleCount = 0;
-		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) ++RippleCount;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (!It->ActorHasTag(TEXT("RainImpact"))) ++RippleCount;
 		TestEqual(TEXT("Inspection cooldown prevents stacking ripples"), RippleCount, 1);
 		Ripple->Tick(0.9f);
 		TestTrue(TEXT("Ripple destroys itself after fading"), Ripple->IsActorBeingDestroyed());

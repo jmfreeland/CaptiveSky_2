@@ -6,6 +6,7 @@
 #include "IslandWeather.generated.h"
 
 class AIslandFirefly;
+class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -68,6 +69,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
+	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	FTimerHandle EcologyTimerHandle;
 	TWeakObjectPtr<UVolumetricCloudComponent> CloudComponent;
 	UPROPERTY(Transient)
@@ -89,9 +91,11 @@ private:
 	int32 ActiveRainStreakCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
+	double NextRainPoolRippleTime = 0.0;
 	void RefreshNightEcology();
 	bool InitializeCloudRendering();
 	void UpdateCloudRendering();
 	bool InitializeRainRendering();
 	void UpdateRainRendering();
+	void UpdateRainPoolResponse();
 };
