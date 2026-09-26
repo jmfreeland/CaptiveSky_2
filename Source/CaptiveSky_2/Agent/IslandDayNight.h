@@ -36,6 +36,8 @@ public:
 
 	static float WrapHour(double Hour);
 	static float SunHeight(float Hour);
+	static float CloudSunlightTransmission(float CloudCover);
+	static float CloudSkylightTransmission(float CloudCover);
 	FString DescribeTime() const;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -45,5 +47,6 @@ public:
 protected:
 	virtual void BeginPlay() override;
 private:
+	friend class FIslandClockTest;
 	void UpdateLighting();
 };

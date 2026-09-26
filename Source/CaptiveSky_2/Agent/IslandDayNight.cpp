@@ -1,9 +1,11 @@
 #include "IslandDayNight.h"
+#include "IslandWeather.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/SkyLight.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 
 AIslandDayNight::AIslandDayNight()
 {
@@ -26,6 +28,16 @@ float AIslandDayNight::WrapHour(double Hour)
 float AIslandDayNight::SunHeight(float Hour)
 {
 	return FMath::Sin((WrapHour(Hour) - 6.f) * PI / 12.f);
+}
+
+float AIslandDayNight::CloudSunlightTransmission(float CloudCover)
+{
+	return FMath::Lerp(1.f, 0.76f, FMath::Clamp(CloudCover, 0.f, 1.f));
+}
+
+float AIslandDayNight::CloudSkylightTransmission(float CloudCover)
+{
+	return FMath::Lerp(1.f, 0.70f, FMath::Clamp(CloudCover, 0.f, 1.f));
 }
 
 void AIslandDayNight::OnConstruction(const FTransform& Transform)
@@ -65,16 +77,25 @@ void AIslandDayNight::UpdateLighting()
 	const float Height = SunHeight(CurrentHour);
 	const float Daylight = FMath::SmoothStep(-0.04f, 0.18f, Height);
 	const float Angle = (CurrentHour - 6.f) * 15.f;
+	float CloudCover = 0.f;
+	if (GetWorld())
+	{
+		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+		{
+			CloudCover = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
+			break;
+		}
+	}
 	if (Sun)
 	{
 		Sun->SetActorRotation(FRotator(-Angle, 35.f, 0.f));
 		ULightComponent* Light = Sun->GetLightComponent();
-		Light->SetIntensity(FMath::Max(0.f, DaySunIntensity) * Daylight);
+		Light->SetIntensity(FMath::Max(0.f, DaySunIntensity) * Daylight * CloudSunlightTransmission(CloudCover));
 		Light->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.32f, 0.12f), FLinearColor(1.f, 0.96f, 0.88f), FMath::SmoothStep(0.f, 0.4f, Height)));
 	}
 	Moon->SetWorldRotation(FRotator(-Angle + 180.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * FMath::SmoothStep(0.02f, 0.25f, -Height));
-	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(0.12f, 1.f, Daylight));
+	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(0.12f, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
 }
 
 FString AIslandDayNight::DescribeTime() const
@@ -82,6 +103,6 @@ FString AIslandDayNight::DescribeTime() const
 	const TCHAR* Phase = CurrentHour < 5.f || CurrentHour >= 20.f ? TEXT("night") :
 		CurrentHour < 7.f ? TEXT("dawn") : CurrentHour < 12.f ? TEXT("morning") :
 		CurrentHour < 17.f ? TEXT("afternoon") : TEXT("dusk");
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The sun and moon move as time passes."),
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The sun and moon move as time passes; cloud cover gently softens direct and ambient daylight."),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f));
 }

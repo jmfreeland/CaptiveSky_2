@@ -141,7 +141,7 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	{
 		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
 	});
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud cover is a simulation signal; cloud/rain visuals and sounds are not yet connected."),
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud cover gently softens sunlight and skylight, but cloud-density changes, rain and weather sounds are not yet rendered."),
 		Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast"),
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
 		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""));
