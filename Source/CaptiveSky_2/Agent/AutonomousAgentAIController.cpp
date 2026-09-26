@@ -153,7 +153,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 				break;
 			}
 			Fact = bWindResponded
-				? TEXT("You passed through or attended to the WindArch. A short-lived gust now changes the simulated local wind around it, fading out over eighteen seconds and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound or visible wind effect is implemented yet.")
+				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. It fades over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound or visible wind effect is implemented yet.")
 				: TEXT("You inspected the WindArch, but no IslandWeather actor is active, so no gust was created. This landmark has no visible wind effect or sound yet.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark"))) Fact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");

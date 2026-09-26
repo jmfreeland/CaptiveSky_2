@@ -71,9 +71,15 @@ void AIslandWeather::AddTransientGust(const FVector& Center, const FVector& Dire
 FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observer) const
 {
 	if (!GetWorld()) return FString();
-	const float Cloud = SampleCloudCover(GetWorld()->GetTimeSeconds());
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float Cloud = SampleCloudCover(Now);
 	const FVector Wind = GetLocalWind(Position, Observer);
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second. Cloud cover is a simulation signal; cloud/rain visuals and sounds are not yet connected."),
+	const bool bFeelingLocalGust = TransientGusts.ContainsByPredicate([&Position, Now](const FIslandTransientGust& Gust)
+	{
+		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
+	});
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud cover is a simulation signal; cloud/rain visuals and sounds are not yet connected."),
 		Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast"),
-		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f);
+		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
+		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""));
 }
