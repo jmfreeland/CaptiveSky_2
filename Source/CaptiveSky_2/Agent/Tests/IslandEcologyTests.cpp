@@ -13,6 +13,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.Nig
 bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 {
 	// Isolated world: no Island agents, brains, memory files, or model requests.
+	TestTrue(TEXT("Local wind gently nudges the firefly drift"), AIslandFirefly::WindDisplacement(FVector(100.f, 0.f, 0.f)).Equals(FVector(12.f, 0.f, 0.f)));
+	TestTrue(TEXT("Strong gust displacement stays bounded"), AIslandFirefly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(30.f, 0.f, 0.f)));
+	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
+
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
 		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
@@ -73,5 +77,25 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fireflies leave the habitat in daytime"), Population, 0);
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+
+	bool bFoundIslandEditorWorld = false;
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		UWorld* Island = Context.World();
+		if (Context.WorldType != EWorldType::Editor || !Island || Island->GetMapName() != TEXT("Island")) continue;
+		bFoundIslandEditorWorld = true;
+		bool bHasWeather = false;
+		bool bHasDayNight = false;
+		bool bHasTideglassHabitat = false;
+		for (TActorIterator<AIslandWeather> It(Island); It; ++It) bHasWeather = true;
+		for (TActorIterator<AIslandDayNight> It(Island); It; ++It) bHasDayNight = true;
+		for (TActorIterator<AActor> It(Island); It; ++It)
+			if (It->ActorHasTag(TEXT("TideglassPool"))) bHasTideglassHabitat = true;
+		TestTrue(TEXT("Saved Island contains the weather actor required by the ecology spawner"), bHasWeather);
+		TestTrue(TEXT("Saved Island contains the day/night clock required by the ecology spawner"), bHasDayNight);
+		TestTrue(TEXT("Saved Island contains the TideglassPool habitat tag"), bHasTideglassHabitat);
+		break;
+	}
+	TestTrue(TEXT("Editor automation opened the saved Island map"), bFoundIslandEditorWorld);
 	return true;
 }

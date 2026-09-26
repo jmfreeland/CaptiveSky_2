@@ -1,6 +1,8 @@
 #include "IslandFirefly.h"
+#include "IslandWeather.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -36,7 +38,17 @@ void AIslandFirefly::BeginPlay()
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.78f, 1.24f);
 	PulseRate = FMath::FRandRange(0.82f, 1.18f);
+	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+	{
+		Weather = *It;
+		break;
+	}
 	UpdateGlow(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
+}
+
+FVector AIslandFirefly::WindDisplacement(const FVector& LocalWind)
+{
+	return LocalWind.GetClampedToMaxSize(250.f) * 0.12f;
 }
 
 void AIslandFirefly::Tick(float DeltaSeconds)
@@ -51,7 +63,8 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 		WanderRadius * (0.72f * FMath::Sin(MotionTime * 0.31f + Phase) + 0.28f * FMath::Sin(MotionTime * 0.17f + Phase * 1.7f)),
 		WanderRadius * 0.65f * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
 		HoverHeight + 34.f * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
-	SetActorLocation(HomeLocation + Offset, false);
+	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
+	SetActorLocation(HomeLocation + Offset + WindDisplacement(Wind), false);
 	UpdateGlow(Time);
 }
 

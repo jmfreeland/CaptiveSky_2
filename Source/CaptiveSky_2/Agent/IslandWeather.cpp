@@ -61,7 +61,7 @@ void AIslandWeather::RefreshNightEcology()
 
 	while (NightFireflies.Num() < NightPopulation)
 	{
-		const FVector GroundOffset(FMath::FRandRange(-350.f, 350.f), FMath::FRandRange(-350.f, 350.f), FMath::FRandRange(15.f, 35.f));
+		const FVector GroundOffset(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(Habitat->GetActorLocation() + GroundOffset, FRotator::ZeroRotator, SpawnParameters))
