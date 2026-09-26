@@ -98,6 +98,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
 			const bool bResponsiveWindArch = It->ActorHasTag(TEXT("WindArch"));
 			const bool bResponsiveTideglassPool = It->ActorHasTag(TEXT("TideglassPool"));
+			const bool bResponsiveListeningStones = It->ActorHasTag(TEXT("ListeningStones"));
 			if (bResponsiveTideglassPool)
 			{
 				NearbyBeings += FString::Printf(TEXT(" The TideglassPool is %.0f metres away (move_to/interact target: %s). At close range, Interact sends a brief ring of cool moving highlights across its flattened prototype surface; this fades in about one and a half seconds and leaves no persistent change. Respect recent interaction results."),
@@ -106,6 +107,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			else if (bResponsiveWindArch)
 			{
 				NearbyBeings += FString::Printf(TEXT(" The WindArch is %.0f metres away (move_to/interact target: %s). At close range, Interact can create one brief local gust with three small moving light motes tracing its airflow; both fade naturally and the wind affects nearby residents. This is not a reward or discovery. Respect recent interaction results."),
+					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			}
+			else if (bResponsiveListeningStones)
+			{
+				NearbyBeings += FString::Printf(TEXT(" The ListeningStones are %.0f metres away (move_to/interact target: %s). At close range, Interact produces one quiet, locally synthesized layered tone that fades after a few seconds. It creates no persistent effect or discovery. Respect recent interaction results."),
 					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
 			}
 			else

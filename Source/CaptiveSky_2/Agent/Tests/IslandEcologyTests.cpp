@@ -2,10 +2,12 @@
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/AudioComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
@@ -14,6 +16,7 @@
 #include "GameFramework/Character.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInterface.h"
+#include "Sound/SoundWaveProcedural.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.NightEcology",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -101,7 +104,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	ATargetPoint* PoolTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
 	ATargetPoint* WindTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
-	if (!TestNotNull(TEXT("Interaction observer spawned"), Observer) || !TestNotNull(TEXT("Interaction controller spawned"), Controller) || !TestNotNull(TEXT("Tideglass target spawned"), PoolTarget) || !TestNotNull(TEXT("WindArch target spawned"), WindTarget))
+	ATargetPoint* StonesTarget = World->SpawnActor<ATargetPoint>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Interaction observer spawned"), Observer) || !TestNotNull(TEXT("Interaction controller spawned"), Controller) || !TestNotNull(TEXT("Tideglass target spawned"), PoolTarget) || !TestNotNull(TEXT("WindArch target spawned"), WindTarget) || !TestNotNull(TEXT("ListeningStones target spawned"), StonesTarget))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -140,6 +144,28 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Airflow motes advance along the actual gust direction"), FVector::DotProduct(Displacement, Motes->FlowDirection) > 0.f);
 		Motes->Tick(17.f);
 		TestTrue(TEXT("WindArch visual response disappears when the gust expires"), Motes->IsActorBeingDestroyed());
+	}
+	StonesTarget->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+	Controller->InspectTarget(TEXT("ListeningStones"));
+	AIslandListeningStonesChime* Chime = nullptr;
+	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) { Chime = *It; break; }
+	TestNotNull(TEXT("ListeningStones interaction creates a transient chime actor"), Chime);
+	if (Chime)
+	{
+		TestNotNull(TEXT("Chime uses a procedural sound wave without external assets"), Chime->ChimeWave.Get());
+		if (Chime->ChimeWave)
+		{
+			TestEqual(TEXT("Chime uses mono audio"), Chime->ChimeWave->NumChannels, 1);
+			TestTrue(TEXT("Chime declares a finite playback duration"), FMath::IsNearlyEqual(Chime->ChimeWave->GetDuration(), 2.8f));
+			TestTrue(TEXT("Chime queues a finite PCM signal"), Chime->ChimeWave->GetAvailableAudioByteCount() >= 24000 * 2);
+		}
+		TestTrue(TEXT("Chime is spatially attenuated around the landmark"), Chime->AudioComponent->bOverrideAttenuation && Chime->AudioComponent->AttenuationOverrides.bSpatialize);
+		Controller->InspectTarget(TEXT("ListeningStones"));
+		int32 ChimeCount = 0;
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCount;
+		TestEqual(TEXT("Inspection cooldown prevents stacking chimes"), ChimeCount, 1);
+		Chime->Tick(2.9f);
+		TestTrue(TEXT("Generated sound actor cleans itself up after playback"), Chime->IsActorBeingDestroyed());
 	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);

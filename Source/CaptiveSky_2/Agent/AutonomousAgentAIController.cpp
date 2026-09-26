@@ -10,6 +10,7 @@
 #include "AgentMemoryComponent.h"
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -148,6 +149,16 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite"))) Fact = TEXT("You inspected a candidate resting site. This visual inspection alone does not prove support or shelter: a successful perch result confirms support, and shelter varies with solid geometry and wind direction. No nest, ownership, or assigned home has been created.");
+		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("ListeningStones")))
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AIslandListeningStonesChime* Chime = GetWorld()->SpawnActor<AIslandListeningStonesChime>(It->GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
+			if (Chime) Chime->BeginChime();
+			Fact = Chime
+				? TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. It rings softly nearby and fades within a few seconds; the sound is synthesized locally, reveals nothing, and leaves no lasting change.")
+				: TEXT("You inspected the ListeningStones, but their short-lived resonance could not be created. No persistent change occurred.");
+		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
 		{
 			bool bWindResponded = false;
