@@ -22,9 +22,15 @@ void UCaptiveSkyAmbientSpeechWidget::ShowSpeech(const FString& SpeakerName, cons
 
 void UCaptiveSkyAmbientSpeechWidget::ShowCaption(const FString& Caption)
 {
+	DisplayedCaption = Caption;
 	if (SpeechText.IsValid())
 	{
 		SpeechText->SetText(FText::FromString(Caption));
 	}
 	SetVisibility(ESlateVisibility::HitTestInvisible);
+}
+
+FText UCaptiveSkyAmbientSpeechWidget::GetDisplayedCaption() const
+{
+	return SpeechText.IsValid() ? SpeechText->GetText() : FText::FromString(DisplayedCaption);
 }

@@ -1,4 +1,7 @@
 #include "Misc/AutomationTest.h"
+#include "CaptiveSky_2PlayerController.h"
+#include "CaptiveSkyAmbientSpeechWidget.h"
+#include "IslandInteractionTestPlayerController.h"
 #include "IslandDayNight.h"
 #include "IslandInteractionUtility.h"
 #include "IslandFirefly.h"
@@ -16,6 +19,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "Components/InputComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
@@ -455,6 +459,31 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableCrab->SetActorHiddenInGame(false);
 		TestTrue(TEXT("The shared landmark response accepts a human visitor without agent components"), IslandInteractionUtility::Perform(Visitor, PoolTarget, VisitorFact));
 		TestTrue(TEXT("The visitor receives an honest transient-effect description"), VisitorFact.Contains(TEXT("no permanent level state")));
+
+		WatchableCrab->SetActorHiddenInGame(true);
+		UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+		if (TestNotNull(TEXT("Caption widget created for bound visitor input"), Caption))
+		{
+			Caption->SetVisibility(ESlateVisibility::Collapsed);
+			AIslandInteractionTestPlayerController* VisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>(Spawn);
+			if (TestNotNull(TEXT("Local visitor controller spawned without a game session"), VisitorController))
+			{
+				VisitorController->SetFixturePawn(Visitor);
+				VisitorController->SetCaptionWidget(Caption);
+				VisitorController->BindFixtureInput();
+				TestTrue(TEXT("Fixture controller satisfies the production local-player guard"), VisitorController->IsLocalPlayerController());
+				TestTrue(TEXT("Fixture controller has the visitor pawn"), VisitorController->GetPawn() == Visitor);
+				TestTrue(TEXT("E is bound to the local visitor interaction handler"), VisitorController->PressBoundE());
+				const FString BoundCaption = Caption->GetDisplayedCaption().ToString();
+				TestTrue(*FString::Printf(TEXT("Bound E displays the selected landmark's factual transient response; caption was: %s"), *BoundCaption),
+					BoundCaption.Contains(TEXT("TideglassPool: Your interaction sent")) &&
+					BoundCaption.Contains(TEXT("changes no permanent level state")));
+				TestTrue(TEXT("Visitor interaction caption becomes visible"), Caption->GetVisibility() == ESlateVisibility::HitTestInvisible);
+				TestTrue(TEXT("A repeated E press produces a cooldown caption instead of another effect"), VisitorController->PressBoundE() &&
+					Caption->GetDisplayedCaption().ToString().Contains(TEXT("has already answered your attention")));
+				VisitorController->Destroy();
+			}
+		}
 	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
