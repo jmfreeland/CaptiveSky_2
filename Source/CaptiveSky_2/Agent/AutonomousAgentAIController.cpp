@@ -241,7 +241,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 	{
 		const FString Key = FString::FromInt(static_cast<int32>(Decision.ActionType)) + TEXT(":") + Decision.ActionTarget.ToLower();
 		// Different speech and random wandering are not identical failed actions.
-		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle;
+		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build;
 		RepeatedActions = bRepeatSensitive ? (Key == LastActionKey ? RepeatedActions + 1 : 1) : 0;
 		LastActionKey = Key;
 		NextThinkAt = FPlatformTime::Seconds() + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
@@ -321,6 +321,9 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		break;
 	case EAgentActionType::Interact:
 		InspectTarget(FName(*Decision.ActionTarget));
+		break;
+	case EAgentActionType::Build:
+		ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
 		break;
 	case EAgentActionType::Sleep:
 		if (!TryRest()) ReportAction(TEXT("Cannot sleep here yet: finish moving and settle on the ground or a solid perch first."));

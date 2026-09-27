@@ -21,6 +21,8 @@ Assets/**/*.png
 /Agents/*/personality_history.jsonl
 /Agents/*/journal/
 /Agents/*/.gateway/
+# Lasting resident-made world changes (nests, ...) are runtime state, backed up like agent memory.
+/WorldState/
 
 # Standalone agent gateway build/runtime output
 /Gateway/**/bin/

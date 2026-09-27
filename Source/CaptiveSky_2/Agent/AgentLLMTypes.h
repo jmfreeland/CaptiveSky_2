@@ -63,7 +63,9 @@ enum class EAgentActionType : uint8
 	Speak,
 	Wander,
 	Interact,
-	Sleep
+	Sleep,
+	// Makes a small lasting change to the world, only at targets the situation explicitly offers.
+	Build
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */

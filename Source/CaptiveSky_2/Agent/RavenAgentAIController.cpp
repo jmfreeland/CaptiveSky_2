@@ -6,6 +6,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EngineUtils.h"
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
+#include "AgentMemoryComponent.h"
+#include "HAL/PlatformTime.h"
 
 ARavenAgentAIController::ARavenAgentAIController()
 {
@@ -157,6 +160,86 @@ FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 		OverheadBlockCount);
 }
 
+AActor* ARavenAgentAIController::FindPerchedNestSite() const
+{
+	if (LocomotionState != ERavenLocomotionState::Perched || !GetPawn()) return nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		if (It->ActorHasTag(TEXT("RavenNestSite")) && It->Tags.Num() > 0 &&
+			FVector::DistSquared(It->GetActorLocation(), GetPawn()->GetActorLocation()) < FMath::Square(30.f))
+			return *It;
+	return nullptr;
+}
+
+FString ARavenAgentAIController::DescribeBuildOptions() const
+{
+	if (!GetPawn() || !GetWorld()) return FString();
+	if (LocomotionState == ERavenLocomotionState::Grounded && !bCarryingTwigs)
+		return TEXT(" Fallen twigs lie on the ground around you; you may gather a small bundle in your beak (build target: GatherTwigs). Carrying them does not oblige you to build anything.");
+	FString Result = bCarryingTwigs ? TEXT(" You are carrying a small bundle of fallen twigs.") : FString();
+	const AActor* Site = FindPerchedNestSite();
+	if (!Site) return Result;
+	const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
+	const FIslandNestRecord* Nest = WorldState ? WorldState->FindNest(Site->Tags[0]) : nullptr;
+	if (!WorldState) return Result;
+	if (Nest && Nest->Layers >= UIslandWorldStateSubsystem::MaxNestLayers)
+		return Result + TEXT(" The nest at this roost is complete; there is no room to weave in more.");
+	if (const double* Until = WovenUntil.Find(Site->Tags[0]); Until && *Until > FPlatformTime::Seconds())
+		return Result + TEXT(" The layer you just wove here is still settling; more weaving is not possible yet.");
+	if (!bCarryingTwigs)
+		return Result + TEXT(" To weave a nest here you would first need twigs gathered from the ground.");
+	return Result + FString::Printf(TEXT(" While perched here you may weave them into %s (build target: %s). This is a small lasting change that stays after this session."),
+		Nest ? TEXT("the nest at this roost") : TEXT("the start of a nest"), *Site->Tags[0].ToString());
+}
+
+void ARavenAgentAIController::Build(FName Target)
+{
+	if (Target == FName(TEXT("GatherTwigs")))
+	{
+		if (LocomotionState != ERavenLocomotionState::Grounded) { ReportAction(TEXT("Twigs can only be gathered while standing on the ground. Nothing was gathered.")); return; }
+		if (bCarryingTwigs) { ReportAction(TEXT("You are already carrying a bundle of twigs; there is no room in your beak for more.")); return; }
+		bCarryingTwigs = true;
+		ReportAction(TEXT("GatherTwigs: You picked up a small bundle of fallen twigs in your beak. Nothing else was found, and nothing has been built yet."));
+		return;
+	}
+	AActor* Site = FindPerchedNestSite();
+	if (!Site || !Site->ActorHasTag(Target))
+	{
+		ReportAction(TEXT("Weaving is only possible while perched at a roost site offered as a build target; move_to that roost first. Nothing changed."));
+		return;
+	}
+	if (!bCarryingTwigs) { ReportAction(TEXT("You have no twigs to weave; gather some from the ground first. Nothing changed.")); return; }
+	if (const double* Until = WovenUntil.Find(Target); Until && *Until > FPlatformTime::Seconds())
+	{
+		ReportAction(TEXT("The last layer here is still settling; weaving again is not possible yet. Nothing changed."));
+		return;
+	}
+	UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
+	if (!WorldState) { ReportAction(TEXT("Nothing lasting can be built in this world. Nothing changed.")); return; }
+	if (const FIslandNestRecord* Existing = WorldState->FindNest(Target); Existing && Existing->Layers >= UIslandWorldStateSubsystem::MaxNestLayers)
+	{
+		ReportAction(TEXT("The nest here is already complete; there is no room to weave in more. You are still carrying your twigs."));
+		return;
+	}
+	// The woven material rests on the support beneath the perched body, not on the marker in the air.
+	const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn());
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	FVector SupportLocation = GetPawn()->GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+	FHitResult Support;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenNestSupport), false, GetPawn());
+	if (GetWorld()->LineTraceSingleByChannel(Support, GetPawn()->GetActorLocation(), SupportLocation - FVector(0.f, 0.f, 12.f), ECC_Visibility, Query))
+		SupportLocation = Support.ImpactPoint;
+	const UAgentMemoryComponent* Memory = GetPawn()->FindComponentByClass<UAgentMemoryComponent>();
+	const int32 NewLayers = WorldState->AddNestLayer(Target, SupportLocation, Memory ? Memory->GetResolvedAgentId() : GetPawn()->GetName());
+	if (NewLayers == 0) { ReportAction(TEXT("Weaving failed: the change could not be kept, so nothing lasting occurred. You are still carrying your twigs.")); return; }
+	bCarryingTwigs = false;
+	WovenUntil.Add(Target, FPlatformTime::Seconds() + 240);
+	const FString Fact = FString::Printf(TEXT("%s: You wove your twigs into %s; it now has %d of %d layers. This change stays in the world after this session. It is a nest you made, not an assigned home, and it does not change how you rest."),
+		*Target.ToString(), NewLayers == 1 ? TEXT("the first ring of a new nest") : TEXT("the nest"), NewLayers, UIslandWorldStateSubsystem::MaxNestLayers);
+	ReportAction(Fact);
+	if (UAgentMemoryComponent* Writable = GetPawn()->FindComponentByClass<UAgentMemoryComponent>())
+		Writable->AppendMemory(Writable->MakeMemory(EAgentMemoryType::Observation, Fact, 0.6f, {TEXT("action-result"), TEXT("nest"), Target.ToString()}));
+}
+
 bool ARavenAgentAIController::BeginPerchAt(AActor* Perch)
 {
 	if (!Perch || !GetPawn()) return false;
@@ -235,6 +318,12 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			LocomotionState = ERavenLocomotionState::Flying;
 			SetFlyingMovement(true);
 		}
+	}
+
+	if (Decision.ActionType == EAgentActionType::Build)
+	{
+		Build(FName(*Decision.ActionTarget));
+		return;
 	}
 
 	if (Decision.ActionType == EAgentActionType::Wander)

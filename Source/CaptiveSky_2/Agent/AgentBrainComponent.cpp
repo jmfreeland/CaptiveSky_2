@@ -17,6 +17,7 @@
 #include "RavenAgentAIController.h"
 #include "AgentPlaySessionSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "IslandWorldStateSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -102,6 +103,26 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 			else NearbyBeings += TEXT(" No IslandWeather actor is active, so local wind shelter cannot be assessed.");
 			++VisibleRoosts;
+		}
+		if (RavenRoostController) NearbyBeings += RavenRoostController->DescribeBuildOptions();
+		if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		{
+			const UAgentMemoryComponent* OwnMemory = Owner->FindComponentByClass<UAgentMemoryComponent>();
+			const FString OwnId = OwnMemory ? OwnMemory->GetResolvedAgentId() : FString();
+			for (const FIslandNestRecord& Nest : WorldState->GetNests())
+			{
+				const FVector NestView = Nest.Location + FVector(0.f, 0.f, 15.f);
+				if (FVector::DistSquared(Location, NestView) > FMath::Square(2500.f)) continue;
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentNestVisibility), false, Owner);
+				FHitResult Hit;
+				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, NestView, ECC_Visibility, Params)) continue;
+				// Lasting changes are perceived as they are; who made one is known only to its makers.
+				NearbyBeings += !OwnId.IsEmpty() && Nest.Builders.Contains(OwnId)
+					? FString::Printf(TEXT(" The nest you have been weaving at %s is %.0f metres away, %d of %d layers woven. It has stayed where you left it."),
+						*Nest.SiteTag.ToString(), FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers)
+					: FString::Printf(TEXT(" A small nest of woven twigs rests on a perch about %.0f metres away, %d of %d layers woven. You did not see who made it."),
+						FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers);
+			}
 		}
 		int32 VisibleLandmarks = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks < 6; ++It)
@@ -237,10 +258,11 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
+		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"If your body can use a visible nearby roost, in rough weather you may consider its described current wind shelter and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
@@ -470,6 +492,7 @@ static EAgentActionType ActionTypeFromString(const FString& InString)
 	if (InString == TEXT("wander")) return EAgentActionType::Wander;
 	if (InString == TEXT("interact")) return EAgentActionType::Interact;
 	if (InString == TEXT("sleep")) return EAgentActionType::Sleep;
+	if (InString == TEXT("build")) return EAgentActionType::Build;
 	return EAgentActionType::Idle;
 }
 

@@ -49,6 +49,12 @@ public:
 	/** Read-only collision assessment for a tagged roost marker; does not begin movement or claim ownership. */
 	FString AssessRoostSite(const AActor* Site) const;
 
+	/** Build options this body has right now (gathering twigs, weaving at the roost it is perched on). */
+	FString DescribeBuildOptions() const;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Raven|Nest")
+	bool bCarryingTwigs = false;
+
 protected:
 	virtual bool IsActionInProgress() const override;
 	virtual bool CanRest() const override;
@@ -58,6 +64,7 @@ protected:
 
 private:
 	friend class FRavenPerchTest;
+	friend class FIslandNestTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;
@@ -69,6 +76,10 @@ private:
 	bool bHasMovementTarget = false;
 	bool bTargetIsPerch = false;
 	bool bApproachingPerch = false;
+	TMap<FName, double> WovenUntil;
+
+	AActor* FindPerchedNestSite() const;
+	void Build(FName Target);
 
 	void SetFlyingMovement(bool bFlying) const;
 	void BeginTakeoff(const FVector& Destination);
