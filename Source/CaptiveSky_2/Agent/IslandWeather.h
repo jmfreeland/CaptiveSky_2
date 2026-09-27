@@ -7,6 +7,7 @@
 
 class AIslandFirefly;
 class AIslandTidepoolCrab;
+class AIslandTidepoolMinnows;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
@@ -75,9 +76,11 @@ protected:
 private:
 	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
+	friend class FIslandMinnowTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
+	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
 	FTimerHandle EcologyTimerHandle;

@@ -2,6 +2,7 @@
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -88,6 +89,8 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 		if (Crab.IsValid()) Crab->Destroy();
 	DayCrabs.Reset();
+	if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
+	DayMinnowSchool.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -469,6 +472,7 @@ void AIslandWeather::RefreshNightEcology()
 {
 	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
 	DayCrabs.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolCrab>& Crab) { return !Crab.IsValid(); });
+	if (!DayMinnowSchool.IsValid()) DayMinnowSchool.Reset();
 	if (!GetWorld()) return;
 
 	float CurrentHour = -1.f;
@@ -499,6 +503,8 @@ void AIslandWeather::RefreshNightEcology()
 		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 			if (Crab.IsValid()) Crab->Destroy();
 		DayCrabs.Reset();
+		if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
+		DayMinnowSchool.Reset();
 		return;
 	}
 
@@ -524,6 +530,21 @@ void AIslandWeather::RefreshNightEcology()
 
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 		if (Crab.IsValid()) Crab->SetSheltered(!bDay);
+
+	if (bDay)
+	{
+		if (!DayMinnowSchool.IsValid())
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			DayMinnowSchool = GetWorld()->SpawnActor<AIslandTidepoolMinnows>(Habitat->GetActorLocation() + FVector(0.f, 0.f, 24.f), FRotator::ZeroRotator, SpawnParameters);
+		}
+	}
+	else if (DayMinnowSchool.IsValid())
+	{
+		DayMinnowSchool->Destroy();
+		DayMinnowSchool.Reset();
+	}
 
 	if (!bDay)
 		return;

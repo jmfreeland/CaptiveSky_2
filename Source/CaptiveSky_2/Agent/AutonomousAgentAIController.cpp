@@ -141,7 +141,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
-		const bool bWildlifeTarget = Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab"));
+		const bool bWildlifeTarget = Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab")) || Target == FName(TEXT("MinnowSchool"));
 		if (bWildlifeTarget && It->IsHidden()) continue;
 		if (bWildlifeTarget && FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
@@ -185,6 +185,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	}
 	if (Target == FName(TEXT("Firefly"))) ReportAction(TEXT("No firefly is close enough to watch quietly; move within four metres and let it come near."));
 	else if (Target == FName(TEXT("TidepoolCrab"))) ReportAction(TEXT("No shore crab is close enough to watch quietly; return to the TideglassPool and look near its edge."));
+	else if (Target == FName(TEXT("MinnowSchool"))) ReportAction(TEXT("No minnow school is close enough to watch; return to TideglassPool and look into the shallows."));
 	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
 }
 
