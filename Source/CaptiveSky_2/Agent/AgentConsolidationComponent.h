@@ -89,16 +89,21 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend class AAutonomousAgentAIController;
+	friend class FIslandInnRestTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	FTimerHandle RestTimer;
 	int32 SleepGeneration = 0;
 	FDateTime LastConsolidatedAt = FDateTime::MinValue();
 	int32 Revision = 0;
 	TArray<FAgentPersonalityTendency> Tendencies;
+	FString PendingSleepExperience;
 	bool bStateLoaded = false;
 
 	void SetConsciousState(EAgentConsciousState NewState);
 	void StartConsolidation();
+	void QueueSleepExperience(const FString& Experience);
+	void AppendPendingSleepExperience();
 	void FinishSleep();
 	void EnsureStateLoaded();
 	bool ApplyConsolidationResponse(const FString& ResponseText, const TArray<FAgentMemoryRecord>& Memories);

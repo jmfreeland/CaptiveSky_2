@@ -13,6 +13,7 @@
 #include "IslandInteractionUtility.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "IslandEnvironmentSubsystem.h"
 #include "IslandWorldStateSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -98,15 +99,83 @@ bool AAutonomousAgentAIController::IsResting() const
 	const UAgentConsolidationComponent* Rest = GetPawn() ? GetPawn()->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
 	return Rest && !Rest->IsAwake();
 }
-bool AAutonomousAgentAIController::TryRest()
+bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 {
-	UAgentConsolidationComponent* Rest = GetPawn() ? GetPawn()->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
-	if (!CanRest() || !Rest || !Rest->BeginSleep(120.f)) return false;
+	APawn* Body = GetPawn();
+	UAgentConsolidationComponent* Rest = Body ? Body->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
+	if (!CanRest() || !Rest)
+	{
+		ReportAction(TEXT("Cannot sleep here yet: finish moving and settle on the ground or a solid perch first."));
+		return false;
+	}
+
+	AActor* RequestedBed = nullptr;
+	if (!RequestedRestSite.IsNone())
+	{
+		if (!RequestedRestSite.ToString().StartsWith(TEXT("InnBed_")))
+		{
+			ReportAction(TEXT("That is not a supported inn bed. Nothing changed."));
+			return false;
+		}
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(RequestedRestSite)) { RequestedBed = *It; break; }
+		if (!RequestedBed)
+		{
+			ReportAction(TEXT("That tagged inn bed is not present here. Nothing changed."));
+			return false;
+		}
+		if (FVector::Dist2D(Body->GetActorLocation(), RequestedBed->GetActorLocation()) > 250.f ||
+			FMath::Abs(Body->GetActorLocation().Z - RequestedBed->GetActorLocation().Z) > 250.f)
+		{
+			ReportAction(FString::Printf(TEXT("You are not at %s yet. Move there first; sleep does not teleport you."), *RequestedRestSite.ToString()));
+			return false;
+		}
+	}
+
+	if (!Rest->BeginSleep(120.f))
+	{
+		ReportAction(TEXT("Sleep could not begin; an ordinary thought may still be in progress."));
+		return false;
+	}
 	StopMovement();
 	NextRestAt = FPlatformTime::Seconds() + 900;
 	NextThinkAt = FPlatformTime::Seconds() + 180;
 	RepeatedActions = 0;
-	ReportAction(TEXT("Settled safely to rest. Ordinary thoughts pause during sleep; new lived memories may be consolidated."));
+
+	AActor* BedAtRest = RequestedBed;
+	if (!BedAtRest)
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			if (It->ActorHasTag(TEXT("IslandInn")) && It->Tags.ContainsByPredicate([](FName Tag) { return Tag.ToString().StartsWith(TEXT("InnBed_")); }) &&
+				FVector::Dist2D(Body->GetActorLocation(), It->GetActorLocation()) <= 250.f &&
+				FMath::Abs(Body->GetActorLocation().Z - It->GetActorLocation().Z) <= 250.f)
+			{
+				BedAtRest = *It;
+				break;
+			}
+	const bool bShelteredInnRest = BedAtRest && UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), Body->GetActorLocation(), Body);
+	if (bShelteredInnRest)
+	{
+		const bool bMemoryWillBeRecorded = Body->FindComponentByClass<UAgentMemoryComponent>() != nullptr;
+		if (bMemoryWillBeRecorded)
+		{
+			FString BedName = TEXT("a tagged bed");
+			for (const FName Tag : BedAtRest->Tags)
+				if (Tag.ToString().StartsWith(TEXT("InnBed_"))) { BedName = Tag.ToString(); break; }
+			const FString MemoryText = FString::Printf(TEXT("I rested near %s at the Island inn. Its tagged roof was overhead and its walls met the current geometric enclosure check."), *BedName);
+			Rest->QueueSleepExperience(MemoryText);
+		}
+		ReportAction(bMemoryWillBeRecorded
+			? TEXT("Settled to sleep beside the tagged inn bed. A roof was overhead and the enclosing walls passed the current indoor-geometry check; the lived rest will be added to your memory when the rest interval completes. Waking early will cancel that note. That evidence does not promise warmth, complete dryness, comfort, or recovery; ordinary thoughts pause during sleep.")
+			: TEXT("Settled to sleep beside the tagged inn bed. A roof was overhead and the enclosing walls passed the current indoor-geometry check, but no memory store is attached to this body. That evidence does not promise warmth, complete dryness, comfort, or recovery; ordinary thoughts pause during sleep."));
+	}
+	else if (BedAtRest)
+	{
+		ReportAction(TEXT("Settled to sleep near the tagged inn bed, but the roof-and-wall enclosure did not pass the current check. This will not be recorded as sheltered inn rest; ordinary thoughts pause during sleep."));
+	}
+	else
+	{
+		ReportAction(TEXT("Settled to sleep. Ordinary thoughts pause during sleep; no sheltered inn rest was verified."));
+	}
 	return true;
 }
 void AAutonomousAgentAIController::ReportAction(const FString& Outcome)
@@ -323,7 +392,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		else ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
 		break;
 	case EAgentActionType::Sleep:
-		if (!TryRest()) ReportAction(TEXT("Cannot sleep here yet: finish moving and settle on the ground or a solid perch first."));
+		TryRest(FName(*Decision.ActionTarget));
 		break;
 	case EAgentActionType::Idle:
 	default:

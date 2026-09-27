@@ -50,13 +50,14 @@ protected:
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 	void ReportAction(const FString& Outcome);
 	bool IsResting() const;
-	bool TryRest();
+	bool TryRest(FName RequestedRestSite = NAME_None);
 
 private:
 	friend class FRavenPerchTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandMinnowTest;
 	friend class FIslandInnHearthTest;
+	friend class FIslandInnRestTest;
 	FTimerHandle ThinkTimerHandle;
 	FString LastActionOutcome = TEXT("No completed action yet.");
 	FString LastActionKey;

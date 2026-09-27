@@ -281,6 +281,22 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			if (Hearth) NearbyBeings += Hearth->DescribeWarmthAt(Location);
 			break;
 		}
+		int32 VisibleInnBeds = 0;
+		for (TActorIterator<AActor> It(GetWorld()); It && VisibleInnBeds < 2; ++It)
+		{
+			FName BedTag = NAME_None;
+			for (const FName Tag : It->Tags)
+				if (Tag.ToString().StartsWith(TEXT("InnBed_"))) { BedTag = Tag; break; }
+			if (!It->ActorHasTag(TEXT("IslandInn")) || BedTag.IsNone() ||
+				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentInnBedVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			NearbyBeings += FString::Printf(TEXT(" A tagged bed at the Island inn is %.0f metres away (optional move_to target: %s). It is a blockout resting place, not a promise of comfort or recovery. After arriving, you may choose sleep; a lived rest is recorded as sheltered only if the roof-overhead and enclosing-wall geometry checks pass. Rest is optional and does not restore health."),
+				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *BedTag.ToString());
+			++VisibleInnBeds;
+		}
 		int32 VisibleWildlife = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 4; ++It)
 		{
@@ -416,7 +432,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
-		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
+		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. "
 		"If your body can use a visible nearby roost, in rough weather you may consider its described current wind shelter and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "

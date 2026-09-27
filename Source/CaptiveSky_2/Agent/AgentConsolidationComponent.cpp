@@ -115,6 +115,7 @@ bool UAgentConsolidationComponent::BeginSleep(float RestDurationSeconds)
 
 	EnsureStateLoaded();
 	++SleepGeneration;
+	PendingSleepExperience.Reset();
 	SetConsciousState(EAgentConsciousState::Resting);
 	const float Duration = RestDurationSeconds < 0.f ? DefaultRestDurationSeconds : RestDurationSeconds;
 	if (Duration <= 0.f)
@@ -132,6 +133,7 @@ bool UAgentConsolidationComponent::BeginSleep(float RestDurationSeconds)
 void UAgentConsolidationComponent::WakeUp()
 {
 	++SleepGeneration;
+	PendingSleepExperience.Reset();
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(RestTimer);
@@ -146,6 +148,7 @@ void UAgentConsolidationComponent::StartConsolidation()
 		return;
 	}
 	SetConsciousState(EAgentConsciousState::Consolidating);
+	AppendPendingSleepExperience();
 
 	UAgentMemoryComponent* Memory = GetOwner() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
 	if (!Memory)
@@ -198,6 +201,21 @@ void UAgentConsolidationComponent::StartConsolidation()
 			}
 			StrongThis->FinishSleep();
 		}));
+}
+
+void UAgentConsolidationComponent::QueueSleepExperience(const FString& Experience)
+{
+	PendingSleepExperience = Experience;
+}
+
+void UAgentConsolidationComponent::AppendPendingSleepExperience()
+{
+	if (PendingSleepExperience.IsEmpty()) return;
+	const FString Experience = MoveTemp(PendingSleepExperience);
+	PendingSleepExperience.Reset();
+	if (UAgentMemoryComponent* Memory = GetOwner() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr)
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Experience, 0.62f,
+			{ TEXT("sleep"), TEXT("rest"), TEXT("inn"), TEXT("shelter-geometry") }));
 }
 
 void UAgentConsolidationComponent::FinishSleep()

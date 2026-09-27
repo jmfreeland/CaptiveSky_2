@@ -102,14 +102,16 @@ namespace
 		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 		AActor* Marker = nullptr;
 		AActor* Door = nullptr;
+		AActor* Bed = nullptr;
 		FVector Stones = FVector::ZeroVector;
 		for (TActorIterator<AActor> It(World); It; ++It)
 		{
 			if (It->ActorHasTag(TEXT("Inn")) && It->ActorHasTag(TEXT("IslandLandmark"))) Marker = *It;
 			if (It->GetActorLabel() == TEXT("Inn_DoorStep_0")) Door = *It;
+			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnBed_1"))) Bed = *It;
 			if (It->ActorHasTag(TEXT("ListeningStones")) && It->ActorHasTag(TEXT("IslandLandmark"))) Stones = It->GetActorLocation();
 		}
-		if (!Navigation || !Marker) { Test.AddError(TEXT("No navigation system or inn marker to check access with.")); return false; }
+		if (!Navigation || !Marker || !Bed) { Test.AddError(TEXT("No navigation system, inn marker, or tagged bed to check access with.")); return false; }
 		// The Island's navmesh is statically generated: use the editor's own "Build Paths" so stored tiles regenerate.
 		FEditorBuildUtils::EditorBuild(World, FBuildOptions::BuildAIPaths);
 		Test.AddInfo(FString::Printf(TEXT("Navigation build %s."), Navigation->IsNavigationBuildInProgress() ? TEXT("still in progress") : TEXT("finished")));
@@ -127,6 +129,11 @@ namespace
 		};
 		if (Door) Walk(TEXT("Door step"), Door->GetActorLocation(), FVector(150, 150, 300));
 		const bool bInside = Walk(TEXT("Common room"), Marker->GetActorLocation() - FVector(0, 0, 80), FVector(60, 60, 120));
+		const bool bBedReachable = Walk(TEXT("Inn bed"), Bed->GetActorLocation(), FVector(250, 250, 450));
+		FNavLocation BedNavGoal;
+		const bool bBedTargetIsNearItsNavGoal = Navigation->ProjectPointToNavigation(Bed->GetActorLocation(), BedNavGoal, FVector(250, 250, 450)) &&
+			FVector::Dist2D(Bed->GetActorLocation(), BedNavGoal.Location) <= 100.f && FMath::Abs(Bed->GetActorLocation().Z - BedNavGoal.Location.Z) <= 100.f;
+		Test.TestTrue(TEXT("The tagged rest marker lies on the upstairs navmesh, not metres away from it"), bBedTargetIsNearItsNavGoal);
 		// Spot checks in the inn's own frame, relative to the marker.
 		const FTransform Frame = Marker->GetActorTransform();
 		const FVector MarkerLocal(150, -130, 100);
@@ -144,7 +151,8 @@ namespace
 				Navigation->ProjectPointToNavigation(At, Near, FVector(40, 40, 80)) ? *FString::Printf(TEXT("at %.0f"), Near.Location.Z) : TEXT("none")));
 		}
 		Test.TestTrue(TEXT("Grounded residents can walk into the inn"), bInside);
-		return bInside;
+		Test.TestTrue(TEXT("Grounded residents can reach the tagged inn bed"), bBedReachable);
+		return bInside && bBedReachable && bBedTargetIsNearItsNavGoal;
 	}
 
 	class FInnBuilder
@@ -370,12 +378,12 @@ bool FBuildInnBlockoutTool::RunTest(const FString& Parameters)
 	Inn.Marker(TEXT("Hearth"), FVector(HearthX + 10, 0, 70), { TEXT("InnHearth") });
 	Inn.Box(TEXT("HearthMantel"), FVector(-L / 2 + T + 55, 0, 140), FVector(60, 280, 18), Oak);
 
-	// Upper floor over the back two thirds, open to the common room at the front, reached by a stair.
+	// Upper floor over the back two thirds, open to the common room at the front.
 	Inn.Box(TEXT("UpperFloor"), FVector(-160, 0, H1 + 8), FVector(620, W - 2 * T, 16), Oak);
 	for (int32 Step = 0; Step < 12; ++Step)
 	{
 		const float Top = (Step + 1) * H1 / 12.f;
-		Inn.Box(FString::Printf(TEXT("Stair_%02d"), Step), FVector(150 + (12 - Step - 0.5f) * 26.f, W / 2 - T - 55, Top / 2), FVector(26, 100, Top), Oak);
+		Inn.Box(FString::Printf(TEXT("Stair_%02d"), Step), FVector(150 + (12 - Step - 0.5f) * 26.f, W / 2 - T - 55, Top * 0.5f), FVector(26, 100, Top), Oak);
 	}
 	Inn.Box(TEXT("GalleryRail"), FVector(150, -50, H1 + 60), FVector(8, W - 2 * T - 120, 90), Timber);
 
@@ -386,12 +394,15 @@ bool FBuildInnBlockoutTool::RunTest(const FString& Parameters)
 	for (const float X : { 250.f, -40.f })
 	{
 		const FString Name = FString::Printf(TEXT("Table_%s"), X > 100 ? TEXT("Front") : TEXT("Back"));
-		Inn.Box(Name, FVector(X, 70, 38), FVector(190, 90, 76), Oak);
-		Inn.Box(Name + TEXT("_BenchL"), FVector(X, 70 - 90, 23), FVector(190, 34, 46), Oak);
-		Inn.Box(Name + TEXT("_BenchR"), FVector(X, 70 + 90, 23), FVector(190, 34, 46), Oak);
+		const float TableY = 70.f;
+		Inn.Box(Name, FVector(X, TableY, 38), FVector(190, 90, 76), Oak);
+		Inn.Box(Name + TEXT("_BenchL"), FVector(X, TableY - 90, 23), FVector(190, 34, 46), Oak);
+		Inn.Box(Name + TEXT("_BenchR"), FVector(X, TableY + 90, 23), FVector(190, 34, 46), Oak);
 	}
-	AStaticMeshActor* Bed = Inn.Box(TEXT("Bed_1"), FVector(-330, -200, H1 + 16 + 25), FVector(200, 100, 50), Oak);
-	Bed->Tags.Insert(TEXT("InnBed_1"), 0);
+	AStaticMeshActor* Bed = Inn.Box(TEXT("Bed_1"), FVector(-250, 200, 25), FVector(200, 100, 50), Oak);
+	Bed->Tags.Add(TEXT("InnBedFurniture_1"));
+	// A reachable, sheltered common-room cot keeps the optional rest action on connected navmesh.
+	Inn.Marker(TEXT("BedRestSpot_1"), FVector(-250, 90, 8), { TEXT("InnBed_1") });
 
 	// Steps up to the door if the plinth stands proud of the ground there.
 	const float DoorRise = (Best.HighestGround + 25.f) - Best.GroundAtDoor;
