@@ -5,6 +5,7 @@
 #include "IslandEnvironmentSubsystem.generated.h"
 
 class UMaterialParameterCollection;
+class AExponentialHeightFog;
 class ULandscapeComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
@@ -30,7 +31,8 @@ struct FIslandLandscapeMaterialBackup
  * Published parameters (all 0..1 unless noted):
  *   RainIntensity, Wetness (builds in rain, dries with sun and wind), CloudCover, WindSpeed (cm/s),
  *   WindDirection (vector: xyz unit direction, w = speed in cm/s), Daylight, SunHeight (-1..1),
- *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24), Storm, LightningFlash.
+ *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24), Storm, LightningFlash, Mist.
+ * Mist also thickens the level's exponential height fog (one is added for the session if the level has none).
  * CaptiveSky2.Tools.CreateEnvironmentCollection creates or updates the asset.
  */
 UCLASS()
@@ -60,6 +62,17 @@ public:
 	static float GoldenHourFor(float SunHeight);
 	/** What a resident notices underfoot: lingering wetness after rain has stopped. Empty when dry or still raining. */
 	static FString DescribeGround(float Wetness, float Rain);
+	/**
+	 * How misty the air is, 0..1: low fog on calm dawns after wet nights, a lighter haze in rain and storms,
+	 * nothing in dry wind. Wind speed is cm/s; hour is Island time.
+	 */
+	static float MistFor(float Wetness, float Hour, float WindSpeed, float Rain, float Storm);
+	/** What a resident notices about the air when mist is present. Empty when clear. */
+	static FString DescribeAir(float Mist);
+	float GetMist() const { return Mist; }
+	/** Developer override (Island.Mist): hold this mist amount until the given world time. Not saved. */
+	float ForcedMist = -1.f;
+	double ForcedMistUntil = -1.0;
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
@@ -90,6 +103,10 @@ private:
 	float IslandHour = 12.f;
 	float Storm = 0.f;
 	float LightningFlash = 0.f;
+	float Mist = 0.f;
+	TWeakObjectPtr<AExponentialHeightFog> Fog;
+	float BaseFogDensity = 0.f;
+	float BaseFogFalloff = 0.f;
 	FVector Wind = FVector::ZeroVector;
 	bool bWetnessInitialized = false;
 	bool bLandscapeMaterialsInitialized = false;

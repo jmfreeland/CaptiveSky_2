@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/Package.h"
@@ -64,6 +67,13 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Soaked ground lingers after rain"), UIslandEnvironmentSubsystem::DescribeGround(0.9f, 0.f).Contains(TEXT("still soaked")));
 	TestTrue(TEXT("Damp ground is noticed while drying"), UIslandEnvironmentSubsystem::DescribeGround(0.3f, 0.f).Contains(TEXT("damp")));
 	TestTrue(TEXT("Dry ground goes unmentioned"), UIslandEnvironmentSubsystem::DescribeGround(0.05f, 0.f).IsEmpty());
+	TestTrue(TEXT("A calm dawn after a wet night brings thick low mist"), UIslandEnvironmentSubsystem::MistFor(0.9f, 6.5f, 30.f, 0.f, 0.f) > 0.8f);
+	TestTrue(TEXT("Wind keeps the mist from forming"), UIslandEnvironmentSubsystem::MistFor(0.9f, 6.5f, 400.f, 0.f, 0.f) < 0.05f);
+	TestEqual(TEXT("A dry afternoon is clear"), UIslandEnvironmentSubsystem::MistFor(0.f, 15.f, 30.f, 0.f, 0.f), 0.f);
+	TestTrue(TEXT("Mist burns off by late morning"), UIslandEnvironmentSubsystem::MistFor(0.9f, 11.f, 30.f, 0.f, 0.f) < 0.05f);
+	TestTrue(TEXT("Rain and storms leave a haze"), UIslandEnvironmentSubsystem::MistFor(0.f, 15.f, 400.f, 1.f, 1.f) > 0.5f);
+	TestTrue(TEXT("Residents notice thick mist"), UIslandEnvironmentSubsystem::DescribeAir(0.8f).Contains(TEXT("thick, low mist")));
+	TestTrue(TEXT("Clear air goes unmentioned"), UIslandEnvironmentSubsystem::DescribeAir(0.1f).IsEmpty());
 	UMaterialInterface* IslandLandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/MI_Island_Landscape.MI_Island_Landscape"));
 	TestNotNull(TEXT("Island landscape uses a material with an environment wetness control"), IslandLandscapeMaterial);
 	if (IslandLandscapeMaterial)
@@ -107,6 +117,19 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	FLinearColor WindValue;
 	TestTrue(TEXT("Wind direction is published as a unit vector with speed"), Instance->GetVectorParameterValue(UIslandEnvironmentSubsystem::WindDirectionParameter, WindValue) &&
 		(FMath::IsNearlyZero(WindValue.A) || FMath::IsNearlyEqual(FVector(WindValue.R, WindValue.G, WindValue.B).Size(), 1.f, 0.01f)));
+	// Mist drives the height fog: a fixture level without fog gets one, and forced mist thickens it.
+	TArray<AActor*> Fogs;
+	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It) Fogs.Add(*It);
+	if (TestEqual(TEXT("A level without height fog gets one for the session"), Fogs.Num(), 1))
+	{
+		UExponentialHeightFogComponent* FogComponent = CastChecked<AExponentialHeightFog>(Fogs[0])->GetComponent();
+		const float ClearDensity = FogComponent->FogDensity;
+		Environment->ForcedMist = 1.f;
+		Environment->ForcedMistUntil = World->GetTimeSeconds() + 60.0;
+		for (int32 Step = 0; Step < 20; ++Step) Environment->Tick(0.5f);
+		TestTrue(TEXT("Mist thickens the fog"), Environment->GetMist() > 0.9f && FogComponent->FogDensity > ClearDensity * 5.f);
+		TestTrue(TEXT("Mist is published to materials"), Instance->GetScalarParameterValue(TEXT("Mist"), Published) && Published > 0.9f);
+	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;

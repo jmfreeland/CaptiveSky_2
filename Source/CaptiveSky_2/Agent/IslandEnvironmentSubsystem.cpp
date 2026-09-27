@@ -9,6 +9,9 @@
 #include "LandscapeProxy.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -20,7 +23,7 @@ const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
 	static const TArray<FName> Names = {
 		TEXT("RainIntensity"), TEXT("Wetness"), TEXT("CloudCover"), TEXT("WindSpeed"),
-		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour"), TEXT("Storm"), TEXT("LightningFlash") };
+		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour"), TEXT("Storm"), TEXT("LightningFlash"), TEXT("Mist") };
 	return Names;
 }
 
@@ -34,6 +37,45 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	Collection = CollectionOverride ? CollectionOverride.Get() : LoadObject<UMaterialParameterCollection>(nullptr, CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 	InitializeLandscapeMaterials();
+	// Mist works through the level's height fog; a level without one gets a faint one for the session.
+	for (TActorIterator<AExponentialHeightFog> It(&InWorld); It; ++It) { Fog = *It; break; }
+	if (!Fog.IsValid())
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Fog = InWorld.SpawnActor<AExponentialHeightFog>(FVector(0.f, 0.f, 2500.f), FRotator::ZeroRotator, Spawn);
+		if (Fog.IsValid())
+		{
+			Fog->GetComponent()->SetFogDensity(0.004f);
+			Fog->GetComponent()->SetFogHeightFalloff(0.2f);
+		}
+	}
+	if (Fog.IsValid())
+	{
+		Fog->GetComponent()->SetMobility(EComponentMobility::Movable);
+		BaseFogDensity = Fog->GetComponent()->FogDensity;
+		BaseFogFalloff = Fog->GetComponent()->FogHeightFalloff;
+	}
+}
+
+float UIslandEnvironmentSubsystem::MistFor(float InWetness, float Hour, float WindSpeed, float Rain, float InStorm)
+{
+	// Radiation fog: strongest around dawn, a little through the night, burning off by mid-morning.
+	const float H = FMath::Fmod(FMath::Fmod(Hour, 24.f) + 24.f, 24.f);
+	const float Dawn = H < 4.f ? 0.45f : H < 6.5f ? FMath::Lerp(0.45f, 1.f, (H - 4.f) / 2.5f) : H < 10.f ? FMath::Lerp(1.f, 0.f, (H - 6.5f) / 3.5f) : H >= 21.f ? 0.35f : 0.f;
+	const float Calm = 1.f - FMath::SmoothStep(80.f, 320.f, WindSpeed);
+	const float Ground = FMath::Clamp(InWetness, 0.f, 1.f) * Dawn * Calm;
+	// Falling rain and storms leave a lighter haze whatever the hour.
+	const float Haze = 0.3f * FMath::Clamp(Rain, 0.f, 1.f) + 0.25f * FMath::Clamp(InStorm, 0.f, 1.f);
+	return FMath::Clamp(FMath::Max(Ground, Haze), 0.f, 1.f);
+}
+
+FString UIslandEnvironmentSubsystem::DescribeAir(float InMist)
+{
+	if (InMist < 0.3f) return FString();
+	return InMist > 0.65f
+		? TEXT(" A thick, low mist lies over the ground; distant things fade into it.")
+		: TEXT(" A thin mist hangs in the air, softening distant shapes.");
 }
 
 TStatId UIslandEnvironmentSubsystem::GetStatId() const
@@ -105,6 +147,11 @@ void UIslandEnvironmentSubsystem::Deinitialize()
 	LandscapeMaterialInstances.Reset();
 	LandscapeOriginalMaterials.Reset();
 	LandscapeWetnessBaselines.Reset();
+	if (Fog.IsValid())
+	{
+		Fog->GetComponent()->SetFogDensity(BaseFogDensity);
+		Fog->GetComponent()->SetFogHeightFalloff(BaseFogFalloff);
+	}
 	Super::Deinitialize();
 }
 
@@ -171,14 +218,37 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	Daylight = FMath::SmoothStep(-0.04f, 0.18f, SunHeight);
 	GoldenHour = GoldenHourFor(SunHeight);
 	Wetness = StepWetness(Wetness, RainIntensity, Daylight, Wind.Size2D(), DeltaTime);
+	// Mist eases toward its target rather than snapping, so fog rolls in and lifts.
+	const float TargetMist = Now < ForcedMistUntil ? FMath::Clamp(ForcedMist, 0.f, 1.f) : MistFor(Wetness, IslandHour, Wind.Size2D(), RainIntensity, Storm);
+	Mist = FMath::FInterpTo(Mist, TargetMist, DeltaTime, Now < ForcedMistUntil ? 2.f : 0.05f);
+	if (Fog.IsValid())
+	{
+		// Denser and lower-lying as the mist thickens.
+		Fog->GetComponent()->SetFogDensity(BaseFogDensity * (1.f + 9.f * Mist) + 0.02f * Mist);
+		Fog->GetComponent()->SetFogHeightFalloff(BaseFogFalloff * (1.f + 2.f * Mist));
+		// In thick mist, lamps and lightning glow through the air instead of simply fading with distance.
+		const bool bVolumetric = Mist > 0.25f;
+		if (Fog->GetComponent()->bEnableVolumetricFog != bVolumetric) Fog->GetComponent()->SetVolumetricFog(bVolumetric);
+	}
 	ApplyLandscapeWetness();
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
 	if (!Instance) return;
-	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour, Storm, LightningFlash };
-	static_assert(UE_ARRAY_COUNT(Values) == 10, "Keep values in the order of ScalarParameterNames.");
+	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour, Storm, LightningFlash, Mist };
+	static_assert(UE_ARRAY_COUNT(Values) == 11, "Keep values in the order of ScalarParameterNames.");
 	const TArray<FName>& Names = ScalarParameterNames();
 	for (int32 Index = 0; Index < Names.Num(); ++Index) Instance->SetScalarParameterValue(Names[Index], Values[Index]);
 	const FVector Direction = Wind.GetSafeNormal();
 	Instance->SetVectorParameterValue(WindDirectionParameter, FLinearColor(Direction.X, Direction.Y, Direction.Z, Wind.Size()));
 }
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandMistCommand(
+	TEXT("Island.Mist"),
+	TEXT("Developer override: hold the mist at an amount (0..1) for some seconds of play (default 0.8 for 120). Not saved. Usage: Island.Mist [amount] [seconds]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		UIslandEnvironmentSubsystem* Environment = World ? World->GetSubsystem<UIslandEnvironmentSubsystem>() : nullptr;
+		if (!Environment) return;
+		Environment->ForcedMist = Args.Num() > 0 ? FCString::Atof(*Args[0]) : 0.8f;
+		Environment->ForcedMistUntil = World->GetTimeSeconds() + (Args.Num() > 1 ? FCString::Atod(*Args[1]) : 120.0);
+	}));

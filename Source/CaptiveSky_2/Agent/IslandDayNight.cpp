@@ -8,6 +8,7 @@
 #include "Engine/SkyLight.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 
 AIslandDayNight::AIslandDayNight()
 {
@@ -137,3 +138,12 @@ FString AIslandDayNight::DescribeTime() const
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The sun and moon move as time passes; cloud cover gently softens direct and ambient daylight."),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f));
 }
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(
+	TEXT("Island.Hour"),
+	TEXT("Developer override for testing and filming: jump the Island clock to an hour (0..24). The day number is unchanged. Usage: Island.Hour <hour>"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || Args.Num() < 1) return;
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It) It->CurrentHour = AIslandDayNight::WrapHour(FCString::Atof(*Args[0]));
+	}));

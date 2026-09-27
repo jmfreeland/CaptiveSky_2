@@ -98,7 +98,10 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			LocalWeather = *It;
 			NearbyBeings += It->DescribeAt(Location, Owner);
 			if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
+			{
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeGround(Environment->GetWetness(), Environment->GetRainIntensity());
+				NearbyBeings += UIslandEnvironmentSubsystem::DescribeAir(Environment->GetMist());
+			}
 			break;
 		}
 		int32 VisibleRoosts = 0;

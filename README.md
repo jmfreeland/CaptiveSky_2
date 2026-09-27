@@ -314,6 +314,36 @@ Still to do before the screen can run unattended for days:
 - **Packaging:** `Config/IslandViewpoints.json` must be staged in a packaged build, or the director falls back to circling landmarks.
 - **Speech cuts in live play:** no resident happened to speak during the test run, so these have only been checked by the automated test.
 
+### Weather that lasts: spells, storms and mist (2026-09-27)
+
+**It carries on.** Weather time is saved in `WorldState/<Map>.json` (every minute and at the end of play) and resumed. The weather therefore continues from where the Island was left, instead of restarting each session.
+
+**Spells.** A slow two-swell signal (`AIslandWeather::SampleSpell`) moves the weather through settled dry spells and unsettled wet spells lasting a few Island days each:
+- wet spells hold more cloud and let weaker fronts bring rain;
+- dry spells clear the sky;
+- residents are told when the last few days have been wet or dry.
+
+**Storms** are rare by construction: they need the peak of a wet spell and the heart of a rain front at the same time, which the tests confirm is under one sample in twelve.
+- **Weather:** up to 90% more wind, quicker gusts and heavy rain.
+- **Lightning:** strikes come more often as the storm deepens. Each `AIslandLightning` strike flashes in three quick pulses, and draws a jagged bolt when it lands within 4 km.
+- **Thunder:** a generated rumble arrives after the time sound takes to travel, about 3 seconds per kilometre, with a crack first when the strike is close.
+- **Residents:** they're told about the storm and about recent strikes. In a live run the raven left an exposed perch for the more sheltered east roost, and Aster stayed close to it, listening.
+
+**Mist.** `UIslandEnvironmentSubsystem::MistFor` drives the level's exponential height fog, adding a faint one for the session if the level has none:
+- thick, low mist on calm dawns after wet nights, burning off by mid-morning;
+- a lighter haze in rain and storms, and none on dry or windy days;
+- volumetric fog switches on in thick mist, so lamps and lightning glow through it.
+
+Residents notice the mist, and wet ground after rain. On a misty dawn Aster remarked that "the rain has passed, but everything is still dripping".
+
+**Environment values.** The collection now also carries `Storm`, `LightningFlash` and `Mist`; run `CaptiveSky2.Tools.CreateEnvironmentCollection` to add new parameters to the asset.
+
+**Developer overrides** for testing and filming, none of which are saved: `Island.Storm [seconds]`, `Island.Mist [amount] [seconds]` and `Island.Hour <hour>`.
+
+**Tests:**
+- `CaptiveSky2.Agent.IslandWeather`: spells, storm rarity, storms bringing rain, storm wind limits, saved weather continuing the same timeline, strike scheduling, thunder delay, bolt visibility, and what residents are told.
+- `CaptiveSky2.Agent.IslandEnvironment`: the mist rules, and fog thickening through a real height-fog component.
+
 ### Open work, prioritized (2026-09-27)
 
 1. **Balance memory retrieval.** Recall currently fills the prompt with the latest small talk, and most reflections are near-duplicates (`docs/findings/2026-09-27-memory-review.md`). The gateway side is fixed; the in-game side needs a build and a live check.
