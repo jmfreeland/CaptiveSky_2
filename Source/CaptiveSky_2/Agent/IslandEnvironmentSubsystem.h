@@ -31,7 +31,8 @@ struct FIslandLandscapeMaterialBackup
  * Published parameters (all 0..1 unless noted):
  *   RainIntensity, Wetness (builds in rain, dries with sun and wind), CloudCover, WindSpeed (cm/s),
  *   WindDirection (vector: xyz unit direction, w = speed in cm/s), Daylight, SunHeight (-1..1),
- *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24), Storm, LightningFlash, Mist.
+ *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24), Storm, LightningFlash, Mist,
+ *   Indoors (1 only when an IslandInn roof is overhead and its tagged walls enclose the viewer).
  * Mist also thickens the level's exponential height fog (one is added for the session if the level has none).
  * CaptiveSky2.Tools.CreateEnvironmentCollection creates or updates the asset.
  */
@@ -54,6 +55,7 @@ public:
 	float GetWetness() const { return Wetness; }
 	float GetGoldenHour() const { return GoldenHour; }
 	float GetDaylight() const { return Daylight; }
+	float GetIndoors() const { return Indoors; }
 
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
@@ -108,6 +110,7 @@ private:
 	float Storm = 0.f;
 	float LightningFlash = 0.f;
 	float Mist = 0.f;
+	float Indoors = 0.f;
 	TWeakObjectPtr<AExponentialHeightFog> Fog;
 	float BaseFogDensity = 0.f;
 	float BaseFogFalloff = 0.f;

@@ -23,7 +23,7 @@ const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
 	static const TArray<FName> Names = {
 		TEXT("RainIntensity"), TEXT("Wetness"), TEXT("CloudCover"), TEXT("WindSpeed"),
-		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour"), TEXT("Storm"), TEXT("LightningFlash"), TEXT("Mist") };
+		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour"), TEXT("Storm"), TEXT("LightningFlash"), TEXT("Mist"), TEXT("Indoors") };
 	return Names;
 }
 
@@ -241,12 +241,24 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 
 	// Sample where it matters for presentation: the viewer, else the weather actor itself.
 	FVector Viewpoint = FVector::ZeroVector;
-	if (const APlayerController* Player = World->GetFirstPlayerController(); Player && Player->GetPawn()) Viewpoint = Player->GetPawn()->GetActorLocation();
+	const AActor* ViewpointActor = nullptr;
+	bool bHasViewpoint = false;
+	if (const APlayerController* Player = World->GetFirstPlayerController(); Player && Player->GetPawn())
+	{
+		ViewpointActor = Player->GetPawn();
+		Viewpoint = ViewpointActor->GetActorLocation();
+		bHasViewpoint = true;
+	}
 	RainIntensity = CloudCover = Storm = LightningFlash = 0.f;
 	Wind = FVector::ZeroVector;
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
-		if (Viewpoint.IsZero()) Viewpoint = It->GetActorLocation();
+		if (!bHasViewpoint)
+		{
+			Viewpoint = It->GetActorLocation();
+			ViewpointActor = *It;
+			bHasViewpoint = true;
+		}
 		RainIntensity = FMath::Clamp(It->SampleRainIntensity(Now), 0.f, 1.f);
 		CloudCover = FMath::Clamp(It->SampleCloudCover(Now), 0.f, 1.f);
 		Wind = It->GetLocalWind(Viewpoint);
@@ -254,6 +266,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 		LightningFlash = It->GetLightningFlash();
 		break;
 	}
+	Indoors = IsInsideInnAt(World, Viewpoint, ViewpointActor) ? 1.f : 0.f;
 	IslandHour = 12.f;
 	for (TActorIterator<AIslandDayNight> It(World); It; ++It) { IslandHour = It->CurrentHour; break; }
 	SunHeight = AIslandDayNight::SunHeight(IslandHour);
@@ -276,8 +289,8 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
 	if (!Instance) return;
-	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour, Storm, LightningFlash, Mist };
-	static_assert(UE_ARRAY_COUNT(Values) == 11, "Keep values in the order of ScalarParameterNames.");
+	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour, Storm, LightningFlash, Mist, Indoors };
+	static_assert(UE_ARRAY_COUNT(Values) == 12, "Keep values in the order of ScalarParameterNames.");
 	const TArray<FName>& Names = ScalarParameterNames();
 	for (int32 Index = 0; Index < Names.Num(); ++Index) Instance->SetScalarParameterValue(Names[Index], Values[Index]);
 	const FVector Direction = Wind.GetSafeNormal();

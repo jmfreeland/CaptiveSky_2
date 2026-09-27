@@ -51,6 +51,14 @@ namespace
 
 bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 {
+	UMaterialParameterCollection* IslandCollection = LoadObject<UMaterialParameterCollection>(nullptr, UIslandEnvironmentSubsystem::CollectionPath);
+	TestNotNull(TEXT("The shared Island environment collection loads"), IslandCollection);
+	if (IslandCollection)
+	{
+		TestTrue(TEXT("The saved shared collection now exposes the Indoors scalar"),
+			IslandCollection->ScalarParameters.ContainsByPredicate([](const FCollectionScalarParameter& Parameter) { return Parameter.ParameterName == TEXT("Indoors"); }));
+	}
+
 	// Pure rules first.
 	float Wet = 0.f;
 	for (int32 Second = 0; Second < 60; ++Second) Wet = UIslandEnvironmentSubsystem::StepWetness(Wet, 1.f, 0.5f, 0.f, 1.f);
@@ -142,17 +150,22 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The resident's actual perception summary receives the interior evidence"), ResidentBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("inside the Island inn")));
 	}
 	TestFalse(TEXT("A point outside the roof is not perceived as indoors"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector(900.f, 0.f, 0.f)));
+	Clock->CurrentHour = 17.f;
+	Environment->Tick(0.5f);
+	UMaterialParameterCollectionInstance* Instance = World->GetParameterCollectionInstance(Collection);
+	float Published = -1.f;
+	TestTrue(TEXT("The environment collection publishes Indoors for the enclosed viewer"),
+		Instance && Instance->GetScalarParameterValue(TEXT("Indoors"), Published) && FMath::IsNearlyEqual(Published, 1.f));
 	if (InnRoof)
 	{
 		InnRoof->SetActorEnableCollision(false);
 		if (UPrimitiveComponent* RoofPrimitive = Cast<UPrimitiveComponent>(InnRoof->GetRootComponent()))
 			RoofPrimitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Walls without a tagged roof are not enough to claim an inn interior"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector::ZeroVector));
+		Environment->Tick(0.5f);
+		TestTrue(TEXT("The environment collection clears Indoors when the roof is absent"),
+			Instance && Instance->GetScalarParameterValue(TEXT("Indoors"), Published) && FMath::IsNearlyEqual(Published, 0.f));
 	}
-	Clock->CurrentHour = 17.f;
-	Environment->Tick(0.5f);
-	UMaterialParameterCollectionInstance* Instance = World->GetParameterCollectionInstance(Collection);
-	float Published = -1.f;
 	TestTrue(TEXT("The Island hour reaches materials"), Instance && Instance->GetScalarParameterValue(TEXT("IslandHour"), Published) && FMath::IsNearlyEqual(Published, 17.f));
 	TestTrue(TEXT("Golden hour is published at 17:00"), Instance->GetScalarParameterValue(TEXT("GoldenHour"), Published) && Published > 0.5f);
 	TestTrue(TEXT("Rain intensity matches the weather simulation"), Instance->GetScalarParameterValue(TEXT("RainIntensity"), Published) &&
