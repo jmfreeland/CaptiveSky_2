@@ -89,6 +89,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend class FAgentMemoryComponentTest;
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
 	friend class FIslandCurioTest;
@@ -100,6 +101,7 @@ private:
 	FString BuildSituationSummary(const FAgentConversationContext& Context) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;
 	void RequestDecisionWithContext(const FAgentConversationContext& Context);
+	static float GetConversationMemoryImportance(const FAgentConversationContext& Context);
 
 	// Parses the model's raw response text into a decision, appending any "new_memories" entries via MemoryComp along the way.
 	static FAgentDecision ParseDecisionAndStoreMemories(const FString& ResponseText, UAgentMemoryComponent* MemoryComp);

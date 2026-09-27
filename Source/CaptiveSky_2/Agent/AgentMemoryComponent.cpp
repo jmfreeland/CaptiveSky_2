@@ -9,6 +9,8 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentMemory, Log, All);
 
+static void TokenizeLower(const FString& In, TArray<FString>& OutWords);
+
 UAgentMemoryComponent::UAgentMemoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -165,6 +167,39 @@ TArray<FAgentMemoryRecord> UAgentMemoryComponent::GetMemoriesSince(const FDateTi
 	return Result;
 }
 
+bool UAgentMemoryComponent::HasSimilarMemorySince(EAgentMemoryType Type, const FString& Text, const FDateTime& SinceUtc, float MinimumSimilarity) const
+{
+	if (Text.IsEmpty()) return false;
+	EnsureLoaded();
+	const TSet<FString> CandidateWords = [&Text]()
+	{
+		TArray<FString> Words;
+		TokenizeLower(Text, Words);
+		TSet<FString> Unique;
+		for (const FString& Word : Words) Unique.Add(Word);
+		return Unique;
+	}();
+	if (CandidateWords.IsEmpty()) return false;
+
+	for (const FAgentMemoryRecord& Record : Cache)
+	{
+		if (Record.Type != Type || Record.Timestamp < SinceUtc) continue;
+		TArray<FString> Words;
+		TokenizeLower(Record.Text, Words);
+		TSet<FString> RecordWords;
+		for (const FString& Word : Words) RecordWords.Add(Word);
+		if (RecordWords.IsEmpty()) continue;
+
+		int32 Intersection = 0;
+		for (const FString& Word : CandidateWords)
+			if (RecordWords.Contains(Word)) ++Intersection;
+		const int32 Union = CandidateWords.Num() + RecordWords.Num() - Intersection;
+		const float Similarity = Union > 0 ? static_cast<float>(Intersection) / Union : 0.f;
+		if (Similarity >= FMath::Clamp(MinimumSimilarity, 0.f, 1.f)) return true;
+	}
+	return false;
+}
+
 static void TokenizeLower(const FString& In, TArray<FString>& OutWords)
 {
 	FString Cleaned = In.ToLower();
@@ -228,20 +263,71 @@ TArray<FAgentMemoryRecord> UAgentMemoryComponent::GetRelevantContext(int32 MaxTo
 		return A.RelevanceScore > B.RelevanceScore;
 	});
 
-	TArray<FAgentMemoryRecord> Result;
-	int32 RunningChars = 0;
-	const int32 CharBudget = MaxTokens * 4; // rough chars-per-token heuristic, no tokenizer dependency
-
+	TArray<FAgentMemoryRecord> NonConversation;
+	TArray<FAgentMemoryRecord> Conversations;
 	for (const FAgentMemoryRecord& Record : Scored)
 	{
-		const int32 RecordChars = Record.Text.Len() + 16;
-		if (Result.Num() > 0 && RunningChars + RecordChars > CharBudget)
-		{
-			break;
-		}
-		Result.Add(Record);
-		RunningChars += RecordChars;
+		(Record.Type == EAgentMemoryType::Conversation ? Conversations : NonConversation).Add(Record);
 	}
 
+	TArray<FAgentMemoryRecord> Result;
+	TArray<TSet<FString>> ChosenWordSets;
+	int32 RunningChars = 0;
+	int32 NonConversationCount = 0;
+	int32 ConversationCount = 0;
+	const int32 CharBudget = MaxTokens * 4; // rough chars-per-token heuristic, no tokenizer dependency
+	const int32 NonConversationBudget = CharBudget - CharBudget / 3; // leave room for a small amount of dialogue
+
+	auto TryAdd = [&](const FAgentMemoryRecord& Record, int32 CharacterLimit)
+	{
+		TArray<FString> Words;
+		TokenizeLower(Record.Text, Words);
+		TSet<FString> UniqueWords;
+		for (const FString& Word : Words) UniqueWords.Add(Word);
+		if (!UniqueWords.IsEmpty())
+		{
+			for (const TSet<FString>& ExistingWords : ChosenWordSets)
+			{
+				int32 Intersection = 0;
+				for (const FString& Word : UniqueWords)
+					if (ExistingWords.Contains(Word)) ++Intersection;
+				const int32 Union = UniqueWords.Num() + ExistingWords.Num() - Intersection;
+				if (Union > 0 && static_cast<float>(Intersection) / Union >= 0.6f) return false;
+			}
+		}
+
+		const int32 RecordChars = Record.Text.Len() + 16;
+		if (Result.Num() > 0 && RunningChars + RecordChars > CharacterLimit) return false;
+		Result.Add(Record);
+		ChosenWordSets.Add(MoveTemp(UniqueWords));
+		RunningChars += RecordChars;
+		return true;
+	};
+
+	// Prioritize distinct lived experience, then reserve no more than one dialogue line per two other records.
+	for (const FAgentMemoryRecord& Record : NonConversation)
+		if (TryAdd(Record, NonConversationBudget)) ++NonConversationCount;
+
+	const int32 ConversationLimit = NonConversationCount / 2;
+	for (const FAgentMemoryRecord& Record : Conversations)
+	{
+		if (ConversationCount >= ConversationLimit) break;
+		if (TryAdd(Record, CharBudget)) ++ConversationCount;
+	}
+
+	// Reuse spare budget for additional non-dialogue memories when dialogue was sparse or did not fit.
+	for (const FAgentMemoryRecord& Record : NonConversation)
+	{
+		if (RunningChars >= CharBudget) break;
+		if (TryAdd(Record, CharBudget)) ++NonConversationCount;
+	}
+
+	// Conversation-only histories still need a usable context when no other kind is available.
+	if (Result.IsEmpty() && !Conversations.IsEmpty()) TryAdd(Conversations[0], CharBudget);
+
+	Result.Sort([](const FAgentMemoryRecord& A, const FAgentMemoryRecord& B)
+	{
+		return A.RelevanceScore > B.RelevanceScore;
+	});
 	return Result;
 }

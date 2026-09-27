@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+#include "AgentBrainComponent.h"
 #include "AgentMemoryComponent.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
@@ -62,6 +63,93 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A tiny token budget still returns at least one record"), Tiny.Num() >= 1);
 	}
 
+	// --- Retrieval keeps dialogue from crowding out varied lived experience ---
+	{
+		const TArray<FString> ConversationLines = {
+			TEXT("Aster told the raven about a copper leaf drifting beside the western path."),
+			TEXT("The raven asked whether moonlight reaches the north ridge after midnight."),
+			TEXT("They remembered low thunder rolling across the sea shortly before dawn."),
+			TEXT("Aster spoke of warm stone beneath the sunlit arch and salt on the wind."),
+			TEXT("The raven shared a quiet thought about shadows crossing the pale dunes."),
+			TEXT("They wondered where small boats travel when the far horizon turns grey.")
+		};
+		const TArray<FString> ObservationLines = {
+			TEXT("I found a green feather near the old stone bridge."),
+			TEXT("A red flower opened beside the eastern path at midday."),
+			TEXT("Rain left a silver trail across the northern window."),
+			TEXT("The western shore held a smooth hooked piece of driftwood."),
+			TEXT("Two sandpipers ran over the black rocks near sunset."),
+			TEXT("Warm air rose from the shallow pool when sunlight touched the ridge.")
+		};
+		for (const FString& Line : ConversationLines)
+			Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Conversation, Line, 0.5f, { TEXT("conversation"), TEXT("agent-to-agent") }));
+		for (const FString& Line : ObservationLines)
+			Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Observation, Line, 0.65f, { TEXT("action-result") }));
+
+		const FString NearDuplicateA = TEXT("I watched the small silver raven circle the shallow tidepool just before sunrise.");
+		const FString NearDuplicateB = TEXT("I watched a small silver raven circle the shallow tidepool before sunrise.");
+		Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Observation, NearDuplicateA, 0.8f, { TEXT("raven"), TEXT("tidepool") }));
+		Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Observation, NearDuplicateB, 0.9f, { TEXT("raven"), TEXT("tidepool") }));
+
+		const TArray<FAgentMemoryRecord> Diverse = Writer->GetRelevantContext(10000, TEXT("unrelated afternoon weather"));
+		int32 ConversationCount = 0;
+		int32 NearDuplicateObservationCount = 0;
+		for (const FAgentMemoryRecord& Record : Diverse)
+		{
+			if (Record.Type == EAgentMemoryType::Conversation) ++ConversationCount;
+			if (Record.Text.Contains(TEXT("silver raven circle"))) ++NearDuplicateObservationCount;
+		}
+		TestTrue(TEXT("A large query budget returns substantial context"), Diverse.Num() >= 12);
+		TestTrue(TEXT("Dialogue uses no more than about one third of the selected records"), ConversationCount * 3 <= Diverse.Num());
+		TestEqual(TEXT("Near-duplicate observations contribute only one recalled record"), NearDuplicateObservationCount, 1);
+	}
+	{
+		FAgentConversationContext InWorldConversation;
+		InWorldConversation.bAgentToAgent = true;
+		TestEqual(TEXT("In-world small talk receives lower importance than distinctive experience"),
+			UAgentBrainComponent::GetConversationMemoryImportance(InWorldConversation), 0.3f);
+		TestEqual(TEXT("Visitor and external conversation importance remains unchanged"),
+			UAgentBrainComponent::GetConversationMemoryImportance(FAgentConversationContext()), 0.5f);
+	}
+	{
+		const FString ConversationOnlyId = TEXT("AutomationTest_MemoryConversationOnly");
+		const FString ConversationOnlyDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / ConversationOnlyId);
+		IFileManager::Get().DeleteDirectory(*ConversationOnlyDir, false, true);
+		UAgentMemoryComponent* ConversationOnly = NewObject<UAgentMemoryComponent>(GetTransientPackage());
+		ConversationOnly->AgentId = ConversationOnlyId;
+		ConversationOnly->AppendMemory(ConversationOnly->MakeMemory(EAgentMemoryType::Conversation, TEXT("Aster told the raven about the quiet western shore."), 0.5f, {}));
+		ConversationOnly->AppendMemory(ConversationOnly->MakeMemory(EAgentMemoryType::Conversation, TEXT("The raven asked about the distant moonlit ridge."), 0.5f, {}));
+		const TArray<FAgentMemoryRecord> ConversationFallback = ConversationOnly->GetRelevantContext(1000, TEXT("silent evening"));
+		TestTrue(TEXT("A conversation-only history retains one usable memory"), ConversationFallback.Num() == 1 && ConversationFallback[0].Type == EAgentMemoryType::Conversation);
+		IFileManager::Get().DeleteDirectory(*ConversationOnlyDir, false, true);
+	}
+
+	// --- Near-duplicate reflections are suppressed at write time without deleting history ---
+	{
+		const FString ExistingReflection = TEXT("I watched the small silver raven circle the shallow tidepool just before sunrise.");
+		const FString DuplicateReflection = TEXT("I watched a small silver raven circle the shallow tidepool before sunrise.");
+		FAgentMemoryRecord OldReflection = Writer->MakeMemory(EAgentMemoryType::Reflection, ExistingReflection, 0.8f, { TEXT("raven"), TEXT("tidepool") });
+		OldReflection.Timestamp = FDateTime::UtcNow() - FTimespan::FromHours(5.0);
+		Writer->AppendMemory(OldReflection);
+		TestFalse(TEXT("A similar reflection outside the four-hour window does not suppress new reflection"),
+			Writer->HasSimilarMemorySince(EAgentMemoryType::Reflection, DuplicateReflection, FDateTime::UtcNow() - FTimespan::FromHours(4.0), 0.6f));
+		Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Reflection, ExistingReflection, 0.8f, { TEXT("raven"), TEXT("tidepool") }));
+		TestTrue(TEXT("The memory component detects recent near-duplicate reflections"),
+			Writer->HasSimilarMemorySince(EAgentMemoryType::Reflection, DuplicateReflection, FDateTime::UtcNow() - FTimespan::FromHours(4.0), 0.6f));
+		TestFalse(TEXT("The duplicate detector does not match the same words across unrelated memory kinds"),
+			Writer->HasSimilarMemorySince(EAgentMemoryType::Conversation, DuplicateReflection, FDateTime::UtcNow() - FTimespan::FromHours(4.0), 0.6f));
+
+		const FString DuplicateResponse = TEXT("{\"thought\":\"I remember this\",\"action\":{\"type\":\"idle\"},\"new_memories\":[{\"text\":\"I watched a small silver raven circle the shallow tidepool before sunrise.\",\"importance\":0.8,\"tags\":[\"raven\",\"tidepool\"]}]}");
+		const int32 CountBeforeDuplicate = Writer->GetMemoryCount();
+		const FAgentDecision DuplicateDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(DuplicateResponse, Writer);
+		TestTrue(TEXT("The duplicate-reflection response still yields a valid decision"), DuplicateDecision.bValid);
+		TestEqual(TEXT("A repeated reflection is not appended again"), Writer->GetMemoryCount(), CountBeforeDuplicate);
+
+		const FString DistinctResponse = TEXT("{\"thought\":\"A new day\",\"action\":{\"type\":\"idle\"},\"new_memories\":[{\"text\":\"Today I met a fox by the old stone bridge during the storm.\",\"importance\":0.7,\"tags\":[\"fox\",\"bridge\"]}]}");
+		UAgentBrainComponent::ParseDecisionAndStoreMemories(DistinctResponse, Writer);
+		TestEqual(TEXT("A distinct reflection remains eligible for storage"), Writer->GetMemoryCount(), CountBeforeDuplicate + 1);
+	}
+
 	// --- JSON line round trip is exact for the fields that matter ---
 	{
 		FAgentMemoryRecord Original;
@@ -88,12 +176,13 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 
 	// Mixed ASCII and Unicode appends must remain a single UTF-8 JSONL stream.
 	const FString UnicodeText = TEXT("I\u2019m here \u2014 caf\u00e9 \u98a8");
+	const int32 CountBeforeUnicode = Writer->GetMemoryCount();
 	Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Conversation, UnicodeText, 0.5f, {}));
 	Writer->AppendMemory(Writer->MakeMemory(EAgentMemoryType::Observation, TEXT("ASCII after Unicode"), 0.4f, {}));
 	UAgentMemoryComponent* UnicodeReader = NewObject<UAgentMemoryComponent>(GetTransientPackage());
 	UnicodeReader->AgentId = TestAgentId;
 	const auto UnicodeRecords = UnicodeReader->GetMemoriesSince(FDateTime::MinValue());
-	if (TestEqual(TEXT("Mixed character sets reload all five records"), UnicodeRecords.Num(), 5))
+	if (TestEqual(TEXT("Mixed character sets reload every record"), UnicodeRecords.Num(), CountBeforeUnicode + 2))
 	{
 		// Appends can share a serialized timestamp; retrieval tie order is not a file-order contract.
 		TestTrue(TEXT("Unicode text preserved exactly"), UnicodeRecords.ContainsByPredicate([&](const FAgentMemoryRecord& Record) { return Record.Text == UnicodeText; }));

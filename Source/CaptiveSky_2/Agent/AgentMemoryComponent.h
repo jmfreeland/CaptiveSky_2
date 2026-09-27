@@ -46,8 +46,8 @@ public:
 	void AppendMemory(const FAgentMemoryRecord& Record);
 
 	/**
-	 * Returns memories most relevant to Situation, greedily selected by
-	 * score until an approximate token budget is reached (~4 chars/token).
+	 * Returns score-ranked memories within an approximate token budget (~4 chars/token),
+	 * with near-duplicates filtered and conversation records limited to about one third.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	TArray<FAgentMemoryRecord> GetRelevantContext(int32 MaxTokens, const FString& Situation) const;
@@ -71,6 +71,9 @@ public:
 	/** Returns every durable memory at or after the supplied UTC timestamp, in chronological order. */
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	TArray<FAgentMemoryRecord> GetMemoriesSince(const FDateTime& SinceUtc) const;
+
+	/** True when a memory of this kind since SinceUtc has at least the requested word-set Jaccard similarity. */
+	bool HasSimilarMemorySince(EAgentMemoryType Type, const FString& Text, const FDateTime& SinceUtc, float MinimumSimilarity = 0.6f) const;
 
 protected:
 	virtual void BeginPlay() override;

@@ -444,6 +444,11 @@ static FString SanitizeMemoryTag(FString Tag)
 	return Result;
 }
 
+float UAgentBrainComponent::GetConversationMemoryImportance(const FAgentConversationContext& Context)
+{
+	return Context.bAgentToAgent ? 0.3f : 0.5f;
+}
+
 void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationContext& Context)
 {
 	if (bEndedPlay) return;
@@ -513,8 +518,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			MemoryText = FString::Printf(TEXT("%s said to me nearby: \"%s\""),
 				Context.ParticipantName.IsEmpty() ? TEXT("Another being") : *Context.ParticipantName, *Context.Text);
 		}
+		const float Importance = GetConversationMemoryImportance(Context);
 		MemoryComp->AppendMemory(MemoryComp->MakeMemory(EAgentMemoryType::Conversation,
-			MemoryText, 0.5f, Tags));
+			MemoryText, Importance, Tags));
 	}
 
 	const FString Situation = BuildSituationSummary(Context);
@@ -579,8 +585,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 						Context.ParticipantName.IsEmpty() ? TEXT("another being") : *Context.ParticipantName,
 						*Decision.Speech);
 				}
+				const float Importance = GetConversationMemoryImportance(Context);
 				WeakMemory->AppendMemory(WeakMemory->MakeMemory(EAgentMemoryType::Conversation,
-					MemoryText, 0.5f, Tags));
+					MemoryText, Importance, Tags));
 			}
 			if (!Decision.bValid)
 			{
@@ -699,6 +706,13 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 							Tags.Add(Tag);
 						}
 					}
+				}
+
+				const FDateTime RecentReflectionCutoff = FDateTime::UtcNow() - FTimespan::FromHours(4.0);
+				if (MemoryComp->HasSimilarMemorySince(EAgentMemoryType::Reflection, Text, RecentReflectionCutoff, 0.6f))
+				{
+					UE_LOG(LogAgentBrain, Verbose, TEXT("Skipped near-duplicate reflection written within the last four hours."));
+					continue;
 				}
 
 				MemoryComp->AppendMemory(MemoryComp->MakeMemory(EAgentMemoryType::Reflection, Text, static_cast<float>(Importance), Tags));

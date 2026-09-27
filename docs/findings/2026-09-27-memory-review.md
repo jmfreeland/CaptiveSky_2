@@ -32,3 +32,9 @@ The model sees nothing but the current conversation and continues it. This is on
 4. **Measure before and after.** Rerun the script after a live session and compare the duplicate rates and the mix of retrieved memories.
 
 None of this deletes or rewrites existing memories. The history stays as it is, and retrieval simply chooses better from it.
+
+## Implementation status (2026-09-27)
+
+The in-game path now filters a candidate when its word-set Jaccard similarity to an already selected record is at least 0.6. It fills most of the character budget from non-conversation records first, reserves the remainder for dialogue, and allows at most one recalled conversation line per two other selected memories. If only conversation memories exist, one remains available as a fallback. In-world agent-to-agent lines now carry importance 0.3; visitor and external correspondence retain 0.5. New reflections are not appended when a reflection from the previous four hours is at least 0.6 similar. Existing memory files are unchanged.
+
+The UE 5.8.3 editor build and `CaptiveSky2.Agent.MemoryComponent` automation test pass, including coverage for the dialogue share, near-duplicate retrieval, reflection write suppression, and Unicode persistence. The bounded live check and post-session `Scripts/Analyze-AgentMemory.py` comparison remain open: automated selection coverage is not evidence that residents will retrieve more varied memories during real play.
