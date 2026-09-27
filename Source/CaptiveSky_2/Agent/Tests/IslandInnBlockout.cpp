@@ -359,10 +359,15 @@ bool FBuildInnBlockoutTool::RunTest(const FString& Parameters)
 		Inn.Box(FString::Printf(TEXT("GableBack_%d"), Step), FVector(-L / 2 + T / 2, 0, Z), FVector(T, Width, Rise / 4), Plaster);
 	}
 
-	// Stone chimney through the back wall, and the hearth inside it.
+	// Stone chimney through the back wall, with a masonry hearth frame around an open firebox.
 	Inn.Box(TEXT("Chimney"), FVector(-L / 2 - 40, 0, (H + Rise + 150) / 2), FVector(130, 200, H + Rise + 150), Stone);
-	AStaticMeshActor* Hearth = Inn.Box(TEXT("Hearth"), FVector(-L / 2 + T + 40, 0, 65), FVector(80, 240, 130), Stone);
-	Hearth->Tags.Insert(TEXT("InnHearth"), 0);
+	const float HearthX = -L / 2 + T + 40;
+	Inn.Box(TEXT("HearthBase"), FVector(HearthX, 0, 15), FVector(80, 240, 30), Stone);
+	Inn.Box(TEXT("HearthPier_Left"), FVector(HearthX, -100, 76), FVector(80, 40, 92), Stone);
+	Inn.Box(TEXT("HearthPier_Right"), FVector(HearthX, 100, 76), FVector(80, 40, 92), Stone);
+	Inn.Box(TEXT("HearthBack"), FVector(HearthX - 30, 0, 70.5f), FVector(20, 160, 81), Stone);
+	Inn.Box(TEXT("HearthLintel"), FVector(HearthX, 0, 121), FVector(80, 240, 20), Stone);
+	Inn.Marker(TEXT("Hearth"), FVector(HearthX + 10, 0, 70), { TEXT("InnHearth") });
 	Inn.Box(TEXT("HearthMantel"), FVector(-L / 2 + T + 55, 0, 140), FVector(60, 280, 18), Oak);
 
 	// Upper floor over the back two thirds, open to the common room at the front, reached by a stair.

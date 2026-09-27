@@ -29,7 +29,7 @@ if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `
-	-unattended -RenderOffscreen -nosplash -nosound -NoZen "-abslog=$log" @extra | Out-Null
+	-unattended -RenderOffscreen -nosplash -nosound -NoZen -DDC-ForceMemoryCache "-abslog=$log" @extra | Out-Null
 
 $lines = Select-String -Path $log -Pattern "Test Completed|Viewpoint captures saved|LogAutomationController: Error" | ForEach-Object { $_.Line }
 $lines

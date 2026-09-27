@@ -82,13 +82,24 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("The hearth begins banked"), Hearth->IsLit());
 	TestEqual(TEXT("A banked hearth has no remaining burn time"), Hearth->GetSecondsRemaining(), 0.f);
 	TestEqual(TEXT("The saved light starts off for this play session"), LightActor->PointLightComponent->Intensity, 0.f);
+	TestEqual(TEXT("Three session-only flame meshes are prepared at the tagged hearth"), Hearth->FlameMeshes.Num(), 3);
+	for (const TWeakObjectPtr<UStaticMeshComponent>& Flame : Hearth->FlameMeshes)
+		TestTrue(TEXT("A banked stylized flame is invisible and has no collision"), Flame.IsValid() && !Flame->IsVisible() && Flame->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 	TestTrue(TEXT("Perception offers an optional, accurately described tending choice"), Hearth->DescribeHearth().Contains(TEXT("dark and banked")) && Hearth->DescribeHearth().Contains(TEXT("if you choose")));
 
 	FString Fact;
 	TestTrue(TEXT("A close interaction kindles the hearth"), IslandInteractionUtility::Perform(Visitor, HearthMarker, Fact));
-	TestTrue(TEXT("Kindling is described as light, not heat or visible fire"), Fact.Contains(TEXT("warm light")) && Fact.Contains(TEXT("not simulated heat or a visible flame")) && Fact.Contains(TEXT("no persistent hearth change was saved")));
+	TestTrue(TEXT("Kindling truthfully distinguishes its local warmth cue from body temperature, shelter, and persistent state"),
+		Fact.Contains(TEXT("warmth cue")) && Fact.Contains(TEXT("does not model body temperature")) && Fact.Contains(TEXT("shelter")) && Fact.Contains(TEXT("lasting change")));
 	TestTrue(TEXT("Kindling enables only the tagged light for five minutes of play"), Hearth->IsLit() && Hearth->GetSecondsRemaining() == UIslandInnHearthSubsystem::BurnDurationSeconds && LightActor->PointLightComponent->Intensity > 0.f);
+	for (const TWeakObjectPtr<UStaticMeshComponent>& Flame : Hearth->FlameMeshes)
+		TestTrue(TEXT("Kindling shows the visible, nonblocking flame mesh"), Flame.IsValid() && Flame->IsVisible() && Flame->GetStaticMesh() && Flame->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 	TestTrue(TEXT("A lit hearth is honestly perceived with its remaining time and bank option"), Hearth->DescribeHearth().Contains(TEXT("is lit")) && Hearth->DescribeHearth().Contains(TEXT("bank it early")));
+	TestTrue(TEXT("Simulated hearth warmth falls with distance and stops at its explicit local radius"),
+		Hearth->GetWarmthFactorAt(HearthMarker->GetActorLocation() + FVector(100.f, 0.f, 0.f)) > 0.f &&
+		Hearth->GetWarmthFactorAt(HearthMarker->GetActorLocation() + FVector(UIslandInnHearthSubsystem::WarmthCueRadius, 0.f, 0.f)) == 0.f &&
+		Hearth->DescribeWarmthAt(HearthMarker->GetActorLocation()).Contains(TEXT("simulated warmth cue")) &&
+		Hearth->DescribeWarmthAt(HearthMarker->GetActorLocation() + FVector(UIslandInnHearthSubsystem::WarmthCueRadius, 0.f, 0.f)).IsEmpty());
 	ACharacter* ObserverBody = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
 	if (TestNotNull(TEXT("Resident perception body spawned without a controller"), ObserverBody))
 	{
@@ -100,13 +111,16 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 		if (IsValid(Occluder)) Occluder->Destroy();
 		const FString Situation = Brain->BuildSituationSummary(FAgentConversationContext());
 		TestTrue(TEXT("A resident sees the nearby optional hearth target again when its view clears"),
-			Situation.Contains(TEXT("move_to/interact target: InnHearth")) && Situation.Contains(TEXT("is lit")) && Situation.Contains(TEXT("bank it early")));
+			Situation.Contains(TEXT("move_to/interact target: InnHearth")) && Situation.Contains(TEXT("is lit")) && Situation.Contains(TEXT("bank it early")) && Situation.Contains(TEXT("simulated warmth cue")));
 	}
 	Hearth->Tick(0.17f);
 	const float FlickeredIntensity = LightActor->PointLightComponent->Intensity;
 	TestTrue(TEXT("The light flickers gently within its authored baseline"), FlickeredIntensity > BaseIntensity * 0.77f && FlickeredIntensity < BaseIntensity * 1.09f);
 	TestTrue(TEXT("The reversible interaction banks the hearth again"), IslandInteractionUtility::Perform(Visitor, HearthMarker, Fact));
 	TestTrue(TEXT("Banking switches it off without saving a permanent change"), !Hearth->IsLit() && LightActor->PointLightComponent->Intensity == 0.f && Fact.Contains(TEXT("No permanent change")));
+	for (const TWeakObjectPtr<UStaticMeshComponent>& Flame : Hearth->FlameMeshes)
+		TestTrue(TEXT("Banking hides all three transient flame meshes"), Flame.IsValid() && !Flame->IsVisible());
+	TestEqual(TEXT("Banking immediately removes the local warmth cue"), Hearth->GetWarmthFactorAt(HearthMarker->GetActorLocation()), 0.f);
 	TestTrue(TEXT("Someone can kindle it again after banking"), IslandInteractionUtility::Perform(Visitor, HearthMarker, Fact) && Hearth->IsLit());
 	Hearth->Tick(UIslandInnHearthSubsystem::BurnDurationSeconds);
 	TestTrue(TEXT("The light naturally banks when its short burn ends"), !Hearth->IsLit() && Hearth->GetSecondsRemaining() == 0.f && LightActor->PointLightComponent->Intensity == 0.f);
@@ -118,7 +132,7 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 		Controller->Possess(Resident);
 		Controller->InspectTarget(TEXT("InnHearth"));
 		TestTrue(TEXT("A resident can choose the same hearth interaction and receives its factual result"),
-			Hearth->IsLit() && Controller->DescribeActionState().Contains(TEXT("kindled the inn hearth")));
+			Hearth->IsLit() && Controller->DescribeActionState().Contains(TEXT("kindled three small, stylized flames")));
 		const double* HearthCooldown = Controller->InspectedUntil.Find(FName(TEXT("InnHearth")));
 		TestTrue(TEXT("The reversible hearth can be tended again well before its five-minute burn ends"),
 			HearthCooldown && *HearthCooldown - FPlatformTime::Seconds() > 0.0 && *HearthCooldown - FPlatformTime::Seconds() <= 60.0);

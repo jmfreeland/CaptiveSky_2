@@ -278,6 +278,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const UIslandInnHearthSubsystem* Hearth = GetWorld()->GetSubsystem<UIslandInnHearthSubsystem>();
 			NearbyBeings += FString::Printf(TEXT(" The inn hearth is %.0f metres away (move_to/interact target: InnHearth).%s Respect recent interaction results."),
 				Metres, Hearth ? *Hearth->DescribeHearth() : TEXT(" Its current light state is unknown; no active hearth response is available."));
+			if (Hearth) NearbyBeings += Hearth->DescribeWarmthAt(Location);
 			break;
 		}
 		int32 VisibleWildlife = 0;
