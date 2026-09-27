@@ -62,6 +62,8 @@ private:
 	float WingBeatPhase = 0.f;
 	float ObservationPulseRemaining = 0.f;
 	TWeakObjectPtr<AIslandWeather> Weather;
+	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */
+	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
 	void UpdateWings(double IslandTimeSeconds, float RainIntensity);
 };

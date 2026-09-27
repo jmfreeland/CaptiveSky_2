@@ -5,6 +5,8 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIslandFirefly::AIslandFirefly()
@@ -96,6 +98,31 @@ float AIslandFirefly::RainWingBeatScale(float RainIntensity)
 	return FMath::Lerp(1.f, 0.65f, RainActivity(RainIntensity));
 }
 
+FVector AIslandFirefly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
+{
+	UWorld* World = GetWorld();
+	if (!World || Start.Equals(Desired)) return Desired;
+
+	constexpr float FlightClearance = 8.f;
+	const FCollisionShape Shape = FCollisionShape::MakeSphere(FlightClearance);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandFireflyFlight), false, this);
+	FHitResult Hit;
+	if (!World->SweepSingleByChannel(Hit, Start, Desired, FQuat::Identity, ECC_WorldStatic, Shape, Query))
+		return Desired;
+	if (Hit.bStartPenetrating) return Start;
+
+	// Step just clear of contact, then spend the remaining movement along the blocking surface.
+	const FVector Contact = Hit.Location + Hit.Normal * 2.f;
+	const FVector Remaining = Desired - Contact;
+	const FVector Slide = Remaining - Hit.Normal * FVector::DotProduct(Remaining, Hit.Normal);
+	if (Slide.IsNearlyZero()) return Contact;
+
+	FHitResult SlideHit;
+	if (World->SweepSingleByChannel(SlideHit, Contact, Contact + Slide, FQuat::Identity, ECC_WorldStatic, Shape, Query))
+		return SlideHit.bStartPenetrating ? Contact : SlideHit.Location;
+	return Contact + Slide;
+}
+
 void AIslandFirefly::RespondToQuietObservation()
 {
 	ObservationPulseRemaining = 3.f;
@@ -117,7 +144,8 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 		WanderRadius * 0.65f * RainMovementScale(Rain) * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
 		FMath::Lerp(HoverHeight, 22.f, RainActivityFactor) + FMath::Lerp(34.f, 10.f, RainActivityFactor) * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
 	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
-	SetActorLocation(HomeLocation + Offset + WindDisplacement(Wind), false);
+	const FVector DesiredLocation = HomeLocation + Offset + WindDisplacement(Wind);
+	SetActorLocation(ResolveFlightPath(GetActorLocation(), DesiredLocation), false);
 	UpdateGlow(Time, Rain);
 	UpdateWings(Time, Rain);
 }

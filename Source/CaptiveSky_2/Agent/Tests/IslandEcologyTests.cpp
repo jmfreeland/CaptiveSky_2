@@ -55,10 +55,29 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* FlightBlocker = World->SpawnActor<AActor>(FVector(2000.f, 2000.f, 250.f), FRotator::ZeroRotator, Spawn);
+	AIslandFirefly* FlightTester = World->SpawnActor<AIslandFirefly>(FVector(1800.f, 2000.f, 250.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Firefly obstacle fixture spawned"), FlightBlocker) || !TestNotNull(TEXT("Firefly path tester spawned"), FlightTester))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	UBoxComponent* FlightBlockerBox = NewObject<UBoxComponent>(FlightBlocker);
+	FlightBlocker->SetRootComponent(FlightBlockerBox);
+	FlightBlockerBox->SetBoxExtent(FVector(10.f, 300.f, 300.f));
+	FlightBlockerBox->SetCollisionProfileName(TEXT("BlockAll"));
+	FlightBlockerBox->RegisterComponent();
+	FlightBlocker->SetActorLocation(FVector(2000.f, 2000.f, 250.f));
+	const FVector DeflectedFlight = FlightTester->ResolveFlightPath(FVector(1800.f, 2000.f, 250.f), FVector(2200.f, 2300.f, 250.f));
+	TestTrue(TEXT("Firefly flight never sweeps through a solid obstacle"), DeflectedFlight.X < 1990.f);
+	TestTrue(TEXT("Firefly uses the open tangent path around the obstacle"), DeflectedFlight.Y > 2100.f && DeflectedFlight.Y <= 2300.f);
+	FlightTester->Destroy();
+	FlightBlocker->Destroy();
+
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(Spawn);
 	AActor* Habitat = World->SpawnActor<AActor>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
