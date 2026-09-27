@@ -2,11 +2,11 @@
 """Read-only review of residents' long-term memory (Agents/<AgentId>/memory.jsonl).
 
 Reports what each resident's memory is made of, how much of it is near-duplicate
-reflection, and which memories the game's retrieval would actually put in front of the
-model for a typical situation. The retrieval simulation mirrors
-UAgentMemoryComponent::GetRelevantContext / ScoreRecord (tokenizer, 24 h recency
-half-life, 0.4 recency + 0.4 importance + 0.2 keyword overlap, 800-token ~ 3200-char
-budget); keep it in step if those change.
+reflection, and which memories retrieval would put in front of the model for a typical
+situation. The simulation mirrors UAgentMemoryComponent::GetRelevantContext / ScoreRecord
+(24 h recency half-life, 0.4 recency + 0.4 importance + 0.2 keyword overlap, Jaccard
+near-duplicate filtering, dialogue share, and the 800-token ~ 3200-char budget); keep it
+in step if those change.
 
 Nothing is modified. The report can quote private memories, so it is written under the
 git-ignored Saved/ directory by default.
@@ -76,13 +76,51 @@ def score(record: dict, situation: list[str], now: dt.datetime) -> float:
 def retrieve(records: list[dict], situation: str, now: dt.datetime) -> list[tuple[float, dict]]:
     words = tokens(situation)
     ranked = sorted(((score(r, words, now), r) for r in records), key=lambda pair: pair[0], reverse=True)
-    chosen, used = [], 0
-    for value, record in ranked:
+    non_conversation = [item for item in ranked if item[1].get("type") != "conversation"]
+    conversations = [item for item in ranked if item[1].get("type") == "conversation"]
+    chosen: list[tuple[float, dict]] = []
+    chosen_words: list[set[str]] = []
+    used = non_conversation_count = conversation_count = 0
+    non_conversation_budget = CHAR_BUDGET - CHAR_BUDGET // 3
+
+    def try_add(item: tuple[float, dict], character_limit: int) -> bool:
+        nonlocal used
+        value, record = item
+        candidate_words = set(tokens(record.get("text", "")))
+        if candidate_words and any(
+            len(candidate_words & existing) / len(candidate_words | existing) >= SIMILAR
+            for existing in chosen_words if existing
+        ):
+            return False
         size = len(record.get("text", "")) + 16
-        if chosen and used + size > CHAR_BUDGET:
-            break
-        chosen.append((value, record))
+        if chosen and used + size > character_limit:
+            return False
+        chosen.append(item)
+        chosen_words.append(candidate_words)
         used += size
+        return True
+
+    for item in non_conversation:
+        if try_add(item, non_conversation_budget):
+            non_conversation_count += 1
+
+    conversation_limit = non_conversation_count // 2
+    for item in conversations:
+        if conversation_count >= conversation_limit:
+            break
+        if try_add(item, CHAR_BUDGET):
+            conversation_count += 1
+
+    for item in non_conversation:
+        if used >= CHAR_BUDGET:
+            break
+        if try_add(item, CHAR_BUDGET):
+            non_conversation_count += 1
+
+    if not chosen and conversations:
+        try_add(conversations[0], CHAR_BUDGET)
+
+    chosen.sort(key=lambda pair: pair[0], reverse=True)
     return chosen
 
 
@@ -161,6 +199,7 @@ def main() -> None:
     parser.add_argument("--agent", action="append", help="AgentId (repeatable); default: every Agents/*/memory.jsonl")
     parser.add_argument("--situation", default=DEFAULT_SITUATION, help="situation text to simulate retrieval against")
     parser.add_argument("--out", type=Path, help="report path (default Saved/MemoryReports/<date>.md)")
+    parser.add_argument("--quiet", action="store_true", help="write the report without printing quoted memory text")
     args = parser.parse_args()
 
     agents = args.agent or sorted(p.parent.name for p in (ROOT / "Agents").glob("*/memory.jsonl"))
@@ -170,8 +209,11 @@ def main() -> None:
     out = args.out or ROOT / "Saved" / "MemoryReports" / f"{now:%Y-%m-%d}.md"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
-    print(text)
-    print(f"\nWritten to {out}")
+    if args.quiet:
+        print(f"Written to {out}")
+    else:
+        print(text)
+        print(f"\nWritten to {out}")
 
 
 if __name__ == "__main__":
