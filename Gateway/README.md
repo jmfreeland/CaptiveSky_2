@@ -9,6 +9,11 @@ Discord is the first channel adapter, not part of the agent model. Routing, iden
 - Each route names an agent by its stable `AgentId`.
 - The gateway reads `Agents/<AgentId>/identity.md` and `personality.md`.
 - Correspondence is appended to the same `memory.jsonl` Unreal reads.
+- Headless replies draw on a balanced selection of memories rather than just the newest records:
+  - **This conversation:** the recent thread with this correspondent.
+  - **In-world talk:** at most three recent conversation lines, so one long exchange can't crowd everything else out.
+  - **Everything else:** recent distinct reflections and observations; near-duplicates of anything already chosen are skipped.
+  - **Privacy:** other correspondents' threads are never included.
 - Headless replies are also told about lasting things the agent itself made, read from Unreal's `WorldState/<Map>.json` files: its nests, cairn stones, and stone arrangements or responses, with its own titles and intents. Other residents' makers, titles, and intents are never included. The agent is reminded that it can't see those things from Discord and that they may have changed.
 - External memories are tagged with their channel and stable participant ID. Headless correspondence uses a zero location; embodied correspondence records the body's actual location and first-person context.
 - Discord delivery IDs are remembered under `Agents/<AgentId>/.gateway/` so reconnects cannot create duplicate experiences.

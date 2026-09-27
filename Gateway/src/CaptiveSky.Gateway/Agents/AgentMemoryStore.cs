@@ -58,7 +58,14 @@ public sealed class AgentMemoryStore(AgentHome home)
 
     public async Task<IReadOnlyList<MemoryRecord>> ReadRecentAsync(int maximumRecords, CancellationToken cancellationToken)
     {
-        if (!File.Exists(home.MemoryPath) || maximumRecords <= 0)
+        if (maximumRecords <= 0)
+            return [];
+        return (await ReadAllAsync(cancellationToken)).TakeLast(maximumRecords).ToArray();
+    }
+
+    public async Task<IReadOnlyList<MemoryRecord>> ReadAllAsync(CancellationToken cancellationToken)
+    {
+        if (!File.Exists(home.MemoryPath))
             return [];
 
         var records = new List<MemoryRecord>();
@@ -78,7 +85,7 @@ public sealed class AgentMemoryStore(AgentHome home)
             }
         }
 
-        return records.TakeLast(maximumRecords).ToArray();
+        return records;
     }
 
     private async Task AppendAsync(MemoryRecord record, CancellationToken cancellationToken)

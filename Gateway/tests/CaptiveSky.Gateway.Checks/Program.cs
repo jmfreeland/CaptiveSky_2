@@ -42,6 +42,28 @@ try
     Assert(!worldFacts.Contains("Secret", StringComparison.Ordinal) && !worldFacts.Contains("secret", StringComparison.Ordinal) && !worldFacts.Contains("Someone_Else", StringComparison.Ordinal), "others' makers, titles, and intents stay private");
     Assert(WorldStateSummary.Describe(root, "Agent_Nobody").Length == 0, "agents who made nothing get no facts");
 
+    static MemoryRecord Memory(int minute, string type, string text, params string[] tags) => new()
+    {
+        Timestamp = DateTimeOffset.Parse("2026-09-27T12:00:00Z").AddMinutes(minute), Type = type, Text = text, Tags = tags
+    };
+    var history = new List<MemoryRecord>
+    {
+        Memory(0, "reflection", "I wove the first ring of a nest at the west roost.", "nest"),
+        Memory(1, "conversation", "Visitor wrote to me via discord: \"Did you build anything?\"", "conversation", "external", "discord", "participant:42"),
+        Memory(2, "conversation", "Stranger wrote to me via discord: \"private thread\"", "conversation", "external", "discord", "participant:99"),
+    };
+    for (var minute = 3; minute < 40; ++minute)
+        history.Add(Memory(minute, "conversation", $"I replied to Aster nearby: \"The clouds frame the deep blue opening, number {minute}.\"", "conversation", "agent-to-agent"));
+    for (var minute = 40; minute < 50; ++minute)
+        history.Add(Memory(minute, "reflection", "At dusk I watched the clouds frame a deep blue opening above the pool.", "sky"));
+    var selected = MemoryContextSelector.Select(history, "42", 20);
+    Assert(selected.Any(record => record.Text.Contains("wove the first ring", StringComparison.Ordinal)), "an older distinct experience survives a burst of chatter");
+    Assert(selected.Any(record => record.Text.Contains("Did you build anything", StringComparison.Ordinal)), "the thread with this correspondent is kept");
+    Assert(!selected.Any(record => record.Text.Contains("private thread", StringComparison.Ordinal)), "other correspondents' threads are not shown");
+    Assert(selected.Count(record => record.Tags.Contains("agent-to-agent")) <= MemoryContextSelector.MaxInWorldConversation, "in-world chatter is capped");
+    Assert(selected.Count(record => record.Text.Contains("At dusk I watched", StringComparison.Ordinal)) == 1, "near-identical reflections appear once");
+    Assert(selected.SequenceEqual(selected.OrderBy(record => record.Timestamp)), "context stays chronological");
+
     var memories = new AgentMemoryStore(home);
     var responder = new FakeResponder(home);
     var bridgeConfiguration = new EmbodimentConfiguration { PollIntervalMilliseconds = 10, ResponseTimeoutSeconds = 2 };

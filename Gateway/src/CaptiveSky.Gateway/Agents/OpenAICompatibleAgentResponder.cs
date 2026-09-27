@@ -17,7 +17,7 @@ public sealed class OpenAICompatibleAgentResponder(
         var identity = home.LoadRequiredDocument("identity.md");
         var personality = home.LoadRequiredDocument("personality.md");
         var personalityEvolution = home.LoadOptionalPersonalityEvolution();
-        var context = await memories.ReadRecentAsync(configuration.MemoryContextRecords, cancellationToken);
+        var context = MemoryContextSelector.Select(await memories.ReadAllAsync(cancellationToken), message.Sender.Id, configuration.MemoryContextRecords);
 
         var worldFacts = WorldStateSummary.Describe(home.ProjectRoot, home.AgentId);
         var memoryText = context.Count == 0
