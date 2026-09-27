@@ -94,6 +94,12 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 ## Roadmap / Open Questions
 
+### Visitor landmark interactions (2026-09-27)
+
+Visitors can use **E** within four metres of a clearly visible landmark or wild creature. A per-actor five-real-minute cooldown keeps repeated input from stacking transient effects. Visitor visibility uses the body eye point; resident inspection retains its actor-to-target perception so hidden nest markers remain inspectable. Both paths use the same reversible landmark/wildlife response implementation. No interaction creates ownership or permanent level state.
+
+Next validation: in rendered Play/PIE, confirm E-key routing, caption timing, and nearest-target selection around the WindArch, TideglassPool, ListeningStones, and wildlife. The current automated coverage proves shared responses and resident behavior, but not the full controller-to-screen input path.
+
 ### Bounded play and memory integrity (2026-09-14)
 
 Every game instance owns `UAgentPlaySessionSubsystem`. Its core ticker measures real elapsed time, independent of Island time, time dilation, or pausing the world. Play ends after **30 real minutes**, or earlier at **120 total model request reservations** across all embodied agents (including dialogue and sleep consolidation). PIE returns to the editor; standalone play quits. There is no automatic restart. A stalled game thread can only process the stop on resumption, but ordinary thought requests also check the deadline before dispatch.
