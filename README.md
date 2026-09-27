@@ -4,13 +4,15 @@
 
 ## Vision
 
-_TODO — fill in. Some prompts to dig into:_
+Captive Sky begins as a world inside a world: an enclosed place under glass, small enough to learn and care about, yet open to new places and other worlds over time. Its “elevators” between levels should make that growing setting feel like one connected cosmos rather than a collection of unrelated demos.
 
-- **Premise / theme.** Captive Sky is just a play on an enclosed world like a snow globe. 
-- **Genre & core loop.** For now, its about exploring, interacting, communicating (human/nonhuman), and creating. 
-- **Why the LLM-driven agents matter.** They're here to build the world along with anyone involved. It's for them as much as anyone. 
-- **Setting.** Myriad worlds over time.
-- **Target feel.** Snow Crash, Ready Player One, Bobiverse, Terry Pratchett, Dune, Scalzi, Robert Jordan, etc. 
+The immediate loop is to arrive, explore, notice, approach, interact, talk, and sometimes make something. Human visitors and nonhuman residents share that loop, but not the same senses, bodies, memories, or timescales. Quiet observation and choosing not to act are valid outcomes; a mystery does not need to resolve just because it has been noticed.
+
+LLM-driven residents are participants in the world, not quest dispensers. They should act from what they can actually perceive and remember, receive honest reports about what happened, and be free to form their own interests and relationships. Their memories and slowly changing selves matter as much as their ability to alter a place. Creation should be available to residents as well as visitors, with small, legible changes that can be inspected and reversed while the world is still a prototype.
+
+The tone aims for speculative wonder, companionship, humane humor, and occasional strangeness—the feeling of a place that can surprise its makers without becoming arbitrary. Its inspirations include the curiosity of *Snow Crash*, *Ready Player One*, and the *Bobiverse*, the warmth and wit of Terry Pratchett, and the expansive worlds of Dune, John Scalzi, and Robert Jordan. Future Sierra-inspired characters should carry forward memorable eccentricity and kindness, not reproduce existing characters.
+
+These commitments guide implementation: distinguish observation from fact, movement from social consent, a temporary effect from a lasting change, and a resident’s chosen history from authored backstory. Prefer bounded, observable prototypes over promises the world cannot yet keep, while leaving room for the inhabitants to become more than their creators anticipated.
 
 ### Governing principle
 
