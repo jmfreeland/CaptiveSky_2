@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "AgentBrainComponent.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
@@ -11,6 +12,7 @@
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Components/BoxComponent.h"
 #include "UObject/Package.h"
 
 #if WITH_EDITOR
@@ -106,6 +108,46 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(Spawn);
 	World->BeginPlay();
+	// A small collision fixture exercises the inn's actual tagged roof/wall evidence. It never
+	// starts a play session or calls an agent model.
+	auto SpawnInnBox = [World](const FVector& Centre, const FVector& Extent)
+	{
+		AActor* Part = World->SpawnActor<AActor>(Centre, FRotator::ZeroRotator);
+		if (!Part) return static_cast<AActor*>(nullptr);
+		Part->Tags.Add(TEXT("IslandInn"));
+		UBoxComponent* Box = NewObject<UBoxComponent>(Part);
+		Part->SetRootComponent(Box);
+		Box->SetBoxExtent(Extent);
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		Part->SetActorLocation(Centre, false, nullptr, ETeleportType::TeleportPhysics);
+		return Part;
+	};
+	SpawnInnBox(FVector(450.f, 0.f, 200.f), FVector(20.f, 500.f, 200.f));
+	SpawnInnBox(FVector(-450.f, 0.f, 200.f), FVector(20.f, 500.f, 200.f));
+	SpawnInnBox(FVector(0.f, 450.f, 200.f), FVector(500.f, 20.f, 200.f));
+	SpawnInnBox(FVector(0.f, -450.f, 200.f), FVector(500.f, 20.f, 200.f));
+	AActor* InnRoof = SpawnInnBox(FVector(0.f, 0.f, 500.f), FVector(500.f, 500.f, 20.f));
+	TestTrue(TEXT("Tagged walls and an overhead roof establish an enclosed inn interior"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector::ZeroVector));
+	const FString Interior = UIslandEnvironmentSubsystem::DescribeInnInteriorAt(World, FVector::ZeroVector);
+	TestTrue(TEXT("Resident interior report states only structural shelter and its weather-simulation limits"), Interior.Contains(TEXT("beneath its roof")) && Interior.Contains(TEXT("not yet simulated differently")));
+	AActor* Resident = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator);
+	UAgentBrainComponent* ResidentBrain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
+	TestNotNull(TEXT("A resident brain is available for the perception check"), ResidentBrain);
+	if (Resident && ResidentBrain)
+	{
+		Resident->AddInstanceComponent(ResidentBrain);
+		ResidentBrain->RegisterComponent();
+		TestTrue(TEXT("The resident's actual perception summary receives the interior evidence"), ResidentBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("inside the Island inn")));
+	}
+	TestFalse(TEXT("A point outside the roof is not perceived as indoors"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector(900.f, 0.f, 0.f)));
+	if (InnRoof)
+	{
+		InnRoof->SetActorEnableCollision(false);
+		if (UPrimitiveComponent* RoofPrimitive = Cast<UPrimitiveComponent>(InnRoof->GetRootComponent()))
+			RoofPrimitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Walls without a tagged roof are not enough to claim an inn interior"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector::ZeroVector));
+	}
 	Clock->CurrentHour = 17.f;
 	Environment->Tick(0.5f);
 	UMaterialParameterCollectionInstance* Instance = World->GetParameterCollectionInstance(Collection);

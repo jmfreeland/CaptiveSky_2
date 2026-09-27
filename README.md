@@ -289,6 +289,10 @@ The colours are plain material instances created under `/Game/Inn/Materials/` (p
 
 `Config/IslandViewpoints.json` adds `02b_InnFromPath`, the lit doorway from the path, and `02c_InnCommonRoom`, an interior view. Interior viewpoints set a negative `min_height`, so the ground clamp doesn't lift them onto the roof. The prop grounding audit skips `IslandInn` parts, since the lantern and trim are wall-mounted by design.
 
+### Inn interior sensing (2026-09-27)
+
+The first step of phase 2 gives each resident a local geometric check: an `IslandInn` roof must be overhead, and tagged inn collision must enclose at least six of eight horizontal sightlines. Only then does the resident's own situation report say they are inside. The wording is deliberately limited to structure; rain streaks, indoor temperature and sound have not yet been made different indoors, so the report does not claim those effects work. The check is read-only and makes no model call. Remaining phase-2 work is to verify and improve actual rain/wind presentation under the roof and publish an indoor environment value if the shared material collection can be updated with the Island assets.
+
 ### Spectator mode (2026-09-27)
 
 This is the first step toward running the Island on a dedicated screen. Start it with `Scripts/Start-Spectator.ps1` (add `-Windowed`, or `-Shots` to save one frame per shot), or pass `-Spectator` to any game launch. During play, the `Island.Spectate` console command toggles it.
@@ -350,7 +354,7 @@ Residents notice the mist, and wet ground after rain. On a misty dawn Aster rema
 
 1. **Check memory retrieval in live play.** The in-game selector now prioritizes distinct non-dialogue memories, filters near-duplicates and limits recalled conversation lines. The UE 5.8.3 build and `CaptiveSky2.Agent.MemoryComponent` test pass; the analyzer mirrors those rules, with three local synthetic tests. A bounded before/after run remains unverified. Gameplay may send residents' stored memories, conversation context and first-person snapshots to `api.openai.com`, so run it only after explicit authorization for that data and destination. See `docs/findings/2026-09-27-memory-review.md`.
 2. **Watch residents use the lasting affordances.** A bounded live session placed curios and arranging grounds, but the residents never reached the ListeningStones, leaving the trail, seed pod, cairn and arrangements behaviorally unverified. Nests have likewise only been exercised in automation so far. A focused bounded run should watch whether residents discover and choose these optional actions, and whether the social cooldown leaves room for exploration; it carries the same data-transfer requirement described above.
-3. **Inn, phases 2–5** (`docs/plans/inn.md`): indoor shelter awareness, a hearth someone keeps, beds that mean safety, and the guest book. Then an innkeeper resident.
+3. **Inn, finish phase 2 then phases 3–5** (`docs/plans/inn.md`): confirm rain/wind presentation under the roof and connect an indoor environment value; then a hearth someone keeps, beds that mean safety, and the guest book. Then an innkeeper resident.
 4. **Bodies.** An animated bird for the raven, a real body for Aster, and a small grounded body if the rat (Fenrus) comes to life.
 5. **Environment art.** Materials and VFX that read `MPC_IslandEnvironment` (wet rock, puddles, mist) starting at the Tideglass Pool, and authored replacements for the placeholder landmarks, inn and curios. Keep the journey viewpoints stable to track progress.
 6. **Sound.** Authored ambience and chimes to replace the procedural signals, which have never been auditioned on speakers.

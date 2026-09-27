@@ -78,6 +78,48 @@ FString UIslandEnvironmentSubsystem::DescribeAir(float InMist)
 		: TEXT(" A thin mist hangs in the air, softening distant shapes.");
 }
 
+bool UIslandEnvironmentSubsystem::IsInsideInnAt(UWorld* World, const FVector& Position, const AActor* Observer)
+{
+	if (!IsValid(World)) return false;
+
+	// Require both a tagged roof overhead and enclosure in most horizontal directions. A single
+	// wall, overhang, or the outdoor side of the inn must not be mistaken for an interior.
+	const FVector Sample = Position + FVector(0.f, 0.f, 110.f);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(IslandInnInterior), false);
+	if (Observer) Params.AddIgnoredActor(Observer);
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(Hit, Sample, Sample + FVector(0.f, 0.f, 700.f), ECC_Visibility, Params) ||
+		!Hit.GetActor() || !Hit.GetActor()->ActorHasTag(TEXT("IslandInn")))
+	{
+		return false;
+	}
+
+	static const FVector2D Directions[] = {
+		FVector2D(1.f, 0.f), FVector2D(0.70710678f, 0.70710678f), FVector2D(0.f, 1.f),
+		FVector2D(-0.70710678f, 0.70710678f), FVector2D(-1.f, 0.f),
+		FVector2D(-0.70710678f, -0.70710678f), FVector2D(0.f, -1.f),
+		FVector2D(0.70710678f, -0.70710678f)
+	};
+	int32 EnclosedDirections = 0;
+	for (const FVector2D& Direction : Directions)
+	{
+		Hit = FHitResult();
+		const FVector End = Sample + FVector(Direction.X, Direction.Y, 0.f) * 700.f;
+		if (World->LineTraceSingleByChannel(Hit, Sample, End, ECC_Visibility, Params) &&
+			Hit.GetActor() && Hit.GetActor()->ActorHasTag(TEXT("IslandInn")))
+		{
+			++EnclosedDirections;
+		}
+	}
+	return EnclosedDirections >= 6;
+}
+
+FString UIslandEnvironmentSubsystem::DescribeInnInteriorAt(UWorld* World, const FVector& Position, const AActor* Observer)
+{
+	if (!IsInsideInnAt(World, Position, Observer)) return FString();
+	return TEXT(" You are inside the Island inn, beneath its roof and enclosed by its walls. This is evidence of structural shelter only; rain particles, indoor temperature, and sound are not yet simulated differently here.");
+}
+
 TStatId UIslandEnvironmentSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UIslandEnvironmentSubsystem, STATGROUP_Tickables);

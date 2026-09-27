@@ -88,6 +88,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 	const AIslandWeather* LocalWeather = nullptr;
 	if (Owner && GetWorld())
 	{
+		NearbyBeings += UIslandEnvironmentSubsystem::DescribeInnInteriorAt(GetWorld(), Location, Owner);
 		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 		{
 			NearbyBeings += It->DescribeTime();

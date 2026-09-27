@@ -69,6 +69,10 @@ public:
 	static float MistFor(float Wetness, float Hour, float WindSpeed, float Rain, float Storm);
 	/** What a resident notices about the air when mist is present. Empty when clear. */
 	static FString DescribeAir(float Mist);
+	/** True only when a point is horizontally enclosed by the inn and has its tagged roof overhead. */
+	static bool IsInsideInnAt(UWorld* World, const FVector& Position, const AActor* Observer = nullptr);
+	/** Factual, deliberately bounded report of geometric shelter at a position; empty outdoors. */
+	static FString DescribeInnInteriorAt(UWorld* World, const FVector& Position, const AActor* Observer = nullptr);
 	float GetMist() const { return Mist; }
 	/** Developer override (Island.Mist): hold this mist amount until the given world time. Not saved. */
 	float ForcedMist = -1.f;
