@@ -31,7 +31,8 @@ public class CaptiveSky_2 : ModuleRules
 			"RenderCore",
 			"RHI",
 			"DeveloperSettings",
-			"ImageCore"
+			"ImageCore",
+			"Landscape"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

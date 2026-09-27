@@ -5,11 +5,16 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "LandscapeComponent.h"
+#include "LandscapeProxy.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 const TCHAR* UIslandEnvironmentSubsystem::CollectionPath = TEXT("/Game/Environment/MPC_IslandEnvironment.MPC_IslandEnvironment");
 const FName UIslandEnvironmentSubsystem::WindDirectionParameter(TEXT("WindDirection"));
+const FName UIslandEnvironmentSubsystem::LandscapeWetnessParameter(TEXT("Ground Wetness"));
 
 const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
@@ -28,11 +33,79 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	Collection = CollectionOverride ? CollectionOverride.Get() : LoadObject<UMaterialParameterCollection>(nullptr, CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	InitializeLandscapeMaterials();
 }
 
 TStatId UIslandEnvironmentSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UIslandEnvironmentSubsystem, STATGROUP_Tickables);
+}
+
+void UIslandEnvironmentSubsystem::InitializeLandscapeMaterials()
+{
+	if (bLandscapeMaterialsInitialized || !GetWorld()) return;
+	bLandscapeMaterialsInitialized = true;
+	for (TActorIterator<ALandscapeProxy> It(GetWorld()); It; ++It)
+	{
+		TArray<ULandscapeComponent*> Components;
+		It->GetComponents<ULandscapeComponent>(Components);
+		for (ULandscapeComponent* Component : Components)
+		{
+			if (!Component) continue;
+			FIslandLandscapeMaterialBackup& Backup = LandscapeMaterialBackups.AddDefaulted_GetRef();
+			Backup.Component = Component;
+			const int32 MaterialCount = Component->GetNumMaterials();
+			Backup.Materials.Reserve(MaterialCount);
+			for (int32 Index = 0; Index < MaterialCount; ++Index)
+			{
+				UMaterialInterface* Original = Component->GetMaterial(Index);
+				Backup.Materials.Add(Original);
+				if (!Original) continue;
+				float AuthoredWetness = 0.f;
+				if (!Original->GetScalarParameterValue(LandscapeWetnessParameter, AuthoredWetness)) continue;
+
+				int32 MaterialIndex = LandscapeOriginalMaterials.IndexOfByKey(Original);
+				if (MaterialIndex == INDEX_NONE)
+				{
+					UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Original, this);
+					if (!Dynamic) continue;
+					MaterialIndex = LandscapeOriginalMaterials.Add(Original);
+					LandscapeMaterialInstances.Add(Dynamic);
+					LandscapeWetnessBaselines.Add(FMath::Clamp(AuthoredWetness, 0.f, 1.f));
+				}
+				if (LandscapeMaterialInstances.IsValidIndex(MaterialIndex))
+					Component->SetMaterial(Index, LandscapeMaterialInstances[MaterialIndex]);
+			}
+		}
+	}
+	ApplyLandscapeWetness();
+}
+
+void UIslandEnvironmentSubsystem::ApplyLandscapeWetness()
+{
+	if (FMath::IsNearlyEqual(Wetness, LastAppliedLandscapeWetness, 0.002f)) return;
+	for (int32 Index = 0; Index < LandscapeMaterialInstances.Num(); ++Index)
+		if (UMaterialInstanceDynamic* Material = LandscapeMaterialInstances[Index])
+		{
+			const float AuthoredWetness = LandscapeWetnessBaselines.IsValidIndex(Index) ? LandscapeWetnessBaselines[Index] : 0.f;
+			Material->SetScalarParameterValue(LandscapeWetnessParameter, LandscapeWetnessValue(AuthoredWetness, Wetness));
+		}
+	LastAppliedLandscapeWetness = Wetness;
+}
+
+void UIslandEnvironmentSubsystem::Deinitialize()
+{
+	for (const FIslandLandscapeMaterialBackup& Backup : LandscapeMaterialBackups)
+	{
+		if (!IsValid(Backup.Component.Get())) continue;
+		for (int32 Index = 0; Index < Backup.Materials.Num(); ++Index)
+			Backup.Component->SetMaterial(Index, Backup.Materials[Index]);
+	}
+	LandscapeMaterialBackups.Reset();
+	LandscapeMaterialInstances.Reset();
+	LandscapeOriginalMaterials.Reset();
+	LandscapeWetnessBaselines.Reset();
+	Super::Deinitialize();
 }
 
 float UIslandEnvironmentSubsystem::StepWetness(float InWetness, float Rain, float InDaylight, float WindSpeed, float Seconds)
@@ -43,6 +116,11 @@ float UIslandEnvironmentSubsystem::StepWetness(float InWetness, float Rain, floa
 	if (Rain > 0.05f) return FMath::Min(1.f, InWetness + Rain * Dt / 45.f);
 	const float DryingRate = (0.3f + 0.7f * FMath::Clamp(InDaylight, 0.f, 1.f)) * (1.f + FMath::Clamp(WindSpeed / 600.f, 0.f, 1.f)) / 600.f;
 	return FMath::Max(0.f, InWetness - DryingRate * Dt);
+}
+
+float UIslandEnvironmentSubsystem::LandscapeWetnessValue(float AuthoredWetness, float EnvironmentWetness)
+{
+	return FMath::Lerp(FMath::Clamp(AuthoredWetness, 0.f, 1.f), 1.f, FMath::Clamp(EnvironmentWetness, 0.f, 1.f));
 }
 
 float UIslandEnvironmentSubsystem::GoldenHourFor(float InSunHeight)
@@ -91,6 +169,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	Daylight = FMath::SmoothStep(-0.04f, 0.18f, SunHeight);
 	GoldenHour = GoldenHourFor(SunHeight);
 	Wetness = StepWetness(Wetness, RainIntensity, Daylight, Wind.Size2D(), DeltaTime);
+	ApplyLandscapeWetness();
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
 	if (!Instance) return;

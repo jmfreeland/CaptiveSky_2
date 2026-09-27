@@ -6,6 +6,8 @@
 #include "Engine/World.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "UObject/Package.h"
 
 #if WITH_EDITOR
@@ -52,6 +54,9 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	const float AfterNight = UIslandEnvironmentSubsystem::StepWetness(1.f, 0.f, 0.f, 0.f, 120.f);
 	TestTrue(TEXT("Sun and wind dry the ground faster than a calm night"), AfterSun < AfterNight && AfterNight < 1.f);
 	TestTrue(TEXT("Wetness never goes negative"), UIslandEnvironmentSubsystem::StepWetness(0.1f, 0.f, 1.f, 600.f, 10000.f) == 0.f);
+	TestTrue(TEXT("Dry weather preserves the material's authored landscape value"), FMath::IsNearlyEqual(UIslandEnvironmentSubsystem::LandscapeWetnessValue(0.15f, 0.f), 0.15f));
+	TestTrue(TEXT("A fully soaked environment drives the landscape to fully wet"), FMath::IsNearlyEqual(UIslandEnvironmentSubsystem::LandscapeWetnessValue(0.15f, 1.f), 1.f));
+	TestTrue(TEXT("Partial environment wetness blends from the authored baseline"), FMath::IsNearlyEqual(UIslandEnvironmentSubsystem::LandscapeWetnessValue(0.15f, 0.5f), 0.575f, 0.001f));
 	TestTrue(TEXT("Golden hour peaks with the sun low but up"), UIslandEnvironmentSubsystem::GoldenHourFor(0.15f) > 0.99f);
 	TestEqual(TEXT("No golden hour at noon"), UIslandEnvironmentSubsystem::GoldenHourFor(1.f), 0.f);
 	TestEqual(TEXT("No golden hour after sunset"), UIslandEnvironmentSubsystem::GoldenHourFor(-0.3f), 0.f);
@@ -59,6 +64,20 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Soaked ground lingers after rain"), UIslandEnvironmentSubsystem::DescribeGround(0.9f, 0.f).Contains(TEXT("still soaked")));
 	TestTrue(TEXT("Damp ground is noticed while drying"), UIslandEnvironmentSubsystem::DescribeGround(0.3f, 0.f).Contains(TEXT("damp")));
 	TestTrue(TEXT("Dry ground goes unmentioned"), UIslandEnvironmentSubsystem::DescribeGround(0.05f, 0.f).IsEmpty());
+	UMaterialInterface* IslandLandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/MI_Island_Landscape.MI_Island_Landscape"));
+	TestNotNull(TEXT("Island landscape uses a material with an environment wetness control"), IslandLandscapeMaterial);
+	if (IslandLandscapeMaterial)
+	{
+		UMaterialInstanceDynamic* WetLandscape = UMaterialInstanceDynamic::Create(IslandLandscapeMaterial, GetTransientPackage());
+		TestNotNull(TEXT("Landscape wetness can be driven through a reversible dynamic material instance"), WetLandscape);
+		if (WetLandscape)
+		{
+			WetLandscape->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, 0.73f);
+			float MaterialWetness = -1.f;
+			TestTrue(TEXT("Landscape material accepts the simulated wetness value"),
+				WetLandscape->GetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, MaterialWetness) && FMath::IsNearlyEqual(MaterialWetness, 0.73f));
+		}
+	}
 
 	// Then the published collection values, in a fixture world with its own transient collection.
 	UMaterialParameterCollection* Collection = NewObject<UMaterialParameterCollection>(GetTransientPackage());

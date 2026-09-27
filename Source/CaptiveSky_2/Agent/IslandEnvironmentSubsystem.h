@@ -5,6 +5,21 @@
 #include "IslandEnvironmentSubsystem.generated.h"
 
 class UMaterialParameterCollection;
+class ULandscapeComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+
+USTRUCT()
+struct FIslandLandscapeMaterialBackup
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient)
+	TObjectPtr<ULandscapeComponent> Component;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> Materials;
+};
 
 /**
  * Environment-presentation layer: turns the simulation (IslandWeather, IslandDayNight) into a few
@@ -27,6 +42,7 @@ public:
 	static const TCHAR* CollectionPath;
 	static const TArray<FName>& ScalarParameterNames();
 	static const FName WindDirectionParameter;
+	static const FName LandscapeWetnessParameter;
 
 	/** Tests supply a transient collection here; empty uses CollectionPath. */
 	UPROPERTY(Transient)
@@ -39,12 +55,15 @@ public:
 
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
+	/** Preserves a material's authored dry baseline, rising smoothly to fully wet. */
+	static float LandscapeWetnessValue(float AuthoredWetness, float EnvironmentWetness);
 	static float GoldenHourFor(float SunHeight);
 	/** What a resident notices underfoot: lingering wetness after rain has stopped. Empty when dry or still raining. */
 	static FString DescribeGround(float Wetness, float Rain);
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
+	virtual void Deinitialize() override;
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
@@ -53,6 +72,14 @@ protected:
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> Collection;
+	UPROPERTY(Transient)
+	TArray<FIslandLandscapeMaterialBackup> LandscapeMaterialBackups;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> LandscapeOriginalMaterials;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> LandscapeMaterialInstances;
+	UPROPERTY(Transient)
+	TArray<float> LandscapeWetnessBaselines;
 
 	float RainIntensity = 0.f;
 	float Wetness = 0.f;
@@ -63,4 +90,9 @@ private:
 	float IslandHour = 12.f;
 	FVector Wind = FVector::ZeroVector;
 	bool bWetnessInitialized = false;
+	bool bLandscapeMaterialsInitialized = false;
+	float LastAppliedLandscapeWetness = -1.f;
+
+	void InitializeLandscapeMaterials();
+	void ApplyLandscapeWetness();
 };
