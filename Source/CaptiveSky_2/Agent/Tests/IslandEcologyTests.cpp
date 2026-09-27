@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandDayNight.h"
+#include "IslandInteractionUtility.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandPoolRippleEffect.h"
@@ -427,6 +428,12 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableCrab->Tick(2.f);
 		TestTrue(TEXT("Crab resumes its local idle path without a persistent state change"), FMath::IsNearlyZero(WatchableCrab->ScurryRemaining) && FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart) < 100.f);
 	}
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(TestPoolLocation + FVector(80.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	PoolTarget->SetActorHiddenInGame(false);
+	FString VisitorFact;
+	TestTrue(TEXT("A non-agent visitor can clearly reach the Tideglass landmark"), IslandInteractionUtility::CanInteract(Visitor, PoolTarget));
+	TestTrue(TEXT("The shared landmark response accepts a human visitor without agent components"), IslandInteractionUtility::Perform(Visitor, PoolTarget, VisitorFact));
+	TestTrue(TEXT("The visitor receives an honest transient-effect description"), VisitorFact.Contains(TEXT("no permanent level state")));
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

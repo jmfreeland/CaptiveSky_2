@@ -13,6 +13,7 @@ class CAPTIVESKY_2_API UCaptiveSkyAmbientSpeechWidget : public UUserWidget
 
 public:
 	void ShowSpeech(const FString& SpeakerName, const FString& Speech);
+	void ShowCaption(const FString& Caption);
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;

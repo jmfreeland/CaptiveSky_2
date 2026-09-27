@@ -89,7 +89,8 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Requires `OPENAI_API_KEY` set as a permanent environment variable (`setx`, not just `set`) — and the Editor must be (re)launched after setting it to pick it up.
 - LLM provider/model/timeout config: Project Settings → "Agent LLM Settings" (backed by `Config/DefaultGame.ini`).
 - Open `/Game/Maps/Island`, press Simulate (or Play) — Aster (`Agent_Aster_01`) starts thinking within ~2–17 seconds.
-- In Play mode, approach Aster and press Enter to open conversation. Type a message and press Enter to send it; Escape closes the conversation. The initial interaction radius is 5 metres.
+- In Play mode, approach Aster and press Enter to open conversation. Type a message and press Enter to send it; Escape closes the conversation. The initial conversation radius is 5 metres.
+- Approach a visible Island landmark or wild creature and press **E** to trigger its existing close-range response and read a brief caption. The visitor can ring the ListeningStones, stir a temporary Tideglass ripple or WindArch gust, or quietly watch a nearby firefly/crab. These responses are transient, do not create persistent state, and use a five-real-minute per-target pause to prevent spamming; autonomous residents share the same response implementation.
 
 ## Roadmap / Open Questions
 

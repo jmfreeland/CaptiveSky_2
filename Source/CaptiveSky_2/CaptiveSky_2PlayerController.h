@@ -11,6 +11,7 @@ class UUserWidget;
 class UCaptiveSkyConversationWidget;
 class UCaptiveSkyAmbientSpeechWidget;
 class AAutonomousAgentCharacter;
+class AActor;
 struct FAgentDecision;
 
 /**
@@ -61,6 +62,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Conversation")
 	float ConversationRadius = 500.f;
 
+	/** World interactions require a visible responsive target this close. */
+	UPROPERTY(EditAnywhere, Category = "Island Interaction", meta = (ClampMin = "100", ClampMax = "600"))
+	float IslandInteractionRadius = 400.f;
+
+	/** Real-time pause between visitor-triggered responses at the same target. */
+	UPROPERTY(EditAnywhere, Category = "Island Interaction", meta = (ClampMin = "30", ClampMax = "900"))
+	float IslandInteractionCooldownSeconds = 300.f;
+
 	UPROPERTY()
 	TObjectPtr<AAutonomousAgentCharacter> ConversationTarget;
 
@@ -81,6 +90,9 @@ protected:
 	bool ShouldUseTouchControls() const;
 	void ToggleConversation();
 	AAutonomousAgentCharacter* FindNearestConversationAgent() const;
+	void InteractWithNearestWorldObject();
+	AActor* FindNearestWorldInteraction() const;
+	void ShowWorldInteractionCaption(const FString& Caption);
 
 	UFUNCTION()
 	void HandleConversationDecision(const FAgentDecision& Decision);
@@ -89,5 +101,6 @@ protected:
 	void HandleAmbientAgentSpeech(AAutonomousAgentCharacter* Speaker, const FString& Speech);
 
 	void HideAmbientSpeech();
+	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;
 
 };

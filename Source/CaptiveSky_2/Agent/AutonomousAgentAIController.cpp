@@ -10,12 +10,8 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "AgentSocialComponent.h"
+#include "IslandInteractionUtility.h"
 #include "IslandDayNight.h"
-#include "IslandPoolRippleEffect.h"
-#include "IslandListeningStonesChime.h"
-#include "IslandFirefly.h"
-#include "IslandTidepoolCrab.h"
-#include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
 #include "GameFramework/Character.h"
@@ -145,17 +141,14 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
-		if (It->IsHidden() && (Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab")))) continue;
-		if ((Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab"))) &&
-			FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
+		const bool bWildlifeTarget = Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab"));
+		if (bWildlifeTarget && It->IsHidden()) continue;
+		if (bWildlifeTarget && FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
 		// Skip them before distance checks so an unrelated habitat cannot mask the actual TideglassPool landmark.
 		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
 		if (FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) { ReportAction(TEXT("Too far away to inspect; move within four metres first.")); return; }
-		FHitResult Hit;
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentInspect), false, Observer);
-		Query.AddIgnoredActor(*It);
-		if (GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
+		if (!IslandInteractionUtility::CanInspect(Observer, *It)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite")))
 		{
@@ -179,72 +172,10 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			const FString ContributorAgentId = Memory ? Memory->GetResolvedAgentId() : Observer->GetName();
 			Fact = WorldState ? WorldState->ExamineCurio(Target, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), ContributorAgentId) : TEXT("You examined it, but nothing about it can change here.");
 		}
-		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("Firefly")))
+		else if (It->ActorHasTag(TEXT("IslandLife")) || It->ActorHasTag(TEXT("IslandLandmark")))
 		{
-			if (AIslandFirefly* Firefly = Cast<AIslandFirefly>(*It)) Firefly->RespondToQuietObservation();
-			Fact = TEXT("You quietly watched a nearby firefly. Its glow briefly brightened within its ordinary pulse; it remains wild and independent. You did not touch, catch, or claim it, and it may drift away.");
+			if (!IslandInteractionUtility::Perform(Observer, *It, Fact)) { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		}
-		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("TidepoolCrab")))
-		{
-			if (AIslandTidepoolCrab* Crab = Cast<AIslandTidepoolCrab>(*It)) Crab->RespondToQuietObservation(Observer->GetActorLocation());
-			Fact = TEXT("You quietly watched a small shore crab. It scuttled a short way toward cover, paused, then resumed its usual Tideglass path. It remains wild and independent; you did not touch, catch, or claim it, and nothing persistent changed.");
-		}
-		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("ListeningStones")))
-		{
-			FVector LocalWind = FVector::ZeroVector;
-			bool bWeatherSampled = false;
-			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
-			{
-				LocalWind = WeatherIt->GetLocalWind(It->GetActorLocation(), *It);
-				bWeatherSampled = true;
-				break;
-			}
-			FActorSpawnParameters SpawnParameters;
-			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			AIslandListeningStonesChime* Chime = GetWorld()->SpawnActor<AIslandListeningStonesChime>(It->GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
-			if (Chime) Chime->BeginChime(LocalWind.Size2D());
-			Fact = Chime
-				? bWeatherSampled
-					? TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. Its pitch is tuned to the present local wind; it rings softly nearby and fades within a few seconds. The sound is synthesized locally, reveals nothing, and leaves no lasting change.")
-					: TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. No IslandWeather signal was present, so it used its calm-air pitch; it rings softly nearby and fades within a few seconds. The sound is synthesized locally, reveals nothing, and leaves no lasting change.")
-				: TEXT("You inspected the ListeningStones, but their short-lived resonance could not be created. No persistent change occurred.");
-		}
-		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
-		{
-			bool bWindResponded = false;
-			bool bVisibleMotesCreated = false;
-			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
-			{
-				const FVector ExistingWind = WeatherIt->GetLocalWind(It->GetActorLocation(), *It);
-				const FVector GustDirection = ExistingWind.IsNearlyZero() ? It->GetActorForwardVector() : ExistingWind.GetSafeNormal();
-				WeatherIt->AddTransientGust(It->GetActorLocation(), GustDirection, 220.f, 1400.f, 18.f);
-				FActorSpawnParameters SpawnParameters;
-				SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				if (AIslandWindMoteEffect* Motes = GetWorld()->SpawnActor<AIslandWindMoteEffect>(It->GetActorLocation() + FVector(0.f, 0.f, 120.f), FRotator::ZeroRotator, SpawnParameters))
-				{
-					Motes->InitializeGust(GustDirection, 1400.f, 18.f);
-					bVisibleMotesCreated = true;
-				}
-				bWindResponded = true;
-				break;
-			}
-			Fact = bWindResponded && bVisibleMotesCreated
-				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. Three small illuminated motes briefly trace its changing airflow; both effects fade over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it. No sound is implemented, and no lasting weather change occurred.")
-				: bWindResponded
-				? TEXT("Your interaction with the WindArch created a short-lived gust in the simulated local wind. It fades over eighteen seconds of Island time and across fourteen metres. Nearby residents can sense the changed wind, and the raven's flight responds to it, but its temporary visual cue could not be created. No lasting weather change occurred.")
-				: TEXT("You inspected the WindArch, but no IslandWeather actor is active, so no gust was created. This landmark has no visible wind effect or sound yet.");
-		}
-		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("TideglassPool")))
-		{
-			FActorSpawnParameters SpawnParameters;
-			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			const FVector SurfaceLocation = It->GetActorLocation() + FVector(0.f, 0.f, 20.f);
-			AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(SurfaceLocation, FRotator::ZeroRotator, SpawnParameters);
-			Fact = Ripple
-				? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands over about one and a half seconds and fades; it changes no permanent level state, and reveals no hidden item or reward. Separately, stronger showers can create fainter ripples on their own; those are a weather response, not an interaction you caused.")
-				: TEXT("You inspected the TideglassPool, but the temporary surface-light response could not be created. No persistent change occurred.");
-		}
-		else if (It->ActorHasTag(TEXT("IslandLandmark"))) Fact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");
 		else { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		InspectedUntil.Add(Target, FPlatformTime::Seconds() + 300);
 		ReportAction(Target.ToString() + TEXT(": ") + Fact);

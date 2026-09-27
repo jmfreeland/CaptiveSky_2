@@ -17,9 +17,14 @@ TSharedRef<SWidget> UCaptiveSkyAmbientSpeechWidget::RebuildWidget()
 
 void UCaptiveSkyAmbientSpeechWidget::ShowSpeech(const FString& SpeakerName, const FString& Speech)
 {
+	ShowCaption(FString::Printf(TEXT("%s: %s"), *SpeakerName, *Speech));
+}
+
+void UCaptiveSkyAmbientSpeechWidget::ShowCaption(const FString& Caption)
+{
 	if (SpeechText.IsValid())
 	{
-		SpeechText->SetText(FText::FromString(FString::Printf(TEXT("%s: %s"), *SpeakerName, *Speech)));
+		SpeechText->SetText(FText::FromString(Caption));
 	}
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 }

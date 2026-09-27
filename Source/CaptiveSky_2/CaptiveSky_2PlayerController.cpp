@@ -14,7 +14,9 @@
 #include "Agent/AgentMemoryComponent.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Agent/AgentSocialSubsystem.h"
+#include "Agent/IslandInteractionUtility.h"
 #include "EngineUtils.h"
+#include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
 #include "TimerManager.h"
 
@@ -105,6 +107,7 @@ void ACaptiveSky_2PlayerController::SetupInputComponent()
 	if (IsLocalPlayerController())
 	{
 		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACaptiveSky_2PlayerController::ToggleConversation);
+		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACaptiveSky_2PlayerController::InteractWithNearestWorldObject);
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACaptiveSky_2PlayerController::CloseConversation);
 
 		// Add Input Mapping Contexts
@@ -125,6 +128,66 @@ void ACaptiveSky_2PlayerController::SetupInputComponent()
 			}
 		}
 	}
+}
+
+AActor* ACaptiveSky_2PlayerController::FindNearestWorldInteraction() const
+{
+	const APawn* PlayerPawn = GetPawn();
+	if (!PlayerPawn || !GetWorld()) return nullptr;
+	AActor* Nearest = nullptr;
+	float BestDistanceSquared = FMath::Square(IslandInteractionRadius);
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (IslandInteractionUtility::GetTargetTag(*It).IsNone() ||
+			!IslandInteractionUtility::CanInteract(PlayerPawn, *It, IslandInteractionRadius)) continue;
+		const float DistanceSquared = FVector::DistSquared(PlayerPawn->GetActorLocation(), It->GetActorLocation());
+		if (DistanceSquared <= BestDistanceSquared)
+		{
+			Nearest = *It;
+			BestDistanceSquared = DistanceSquared;
+		}
+	}
+	return Nearest;
+}
+
+void ACaptiveSky_2PlayerController::ShowWorldInteractionCaption(const FString& Caption)
+{
+	if (!AmbientSpeechWidget || !GetWorld()) return;
+	AmbientSpeechWidget->ShowCaption(Caption);
+	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+	GetWorldTimerManager().SetTimer(AmbientSpeechHideTimer, this,
+		&ACaptiveSky_2PlayerController::HideAmbientSpeech, AmbientSpeechDurationSeconds, false);
+}
+
+void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
+{
+	if (!IsLocalPlayerController() || (ConversationWidget && ConversationWidget->IsVisible())) return;
+	AActor* Target = FindNearestWorldInteraction();
+	if (!Target)
+	{
+		ShowWorldInteractionCaption(TEXT("Nothing nearby catches your eye. Move closer to a landmark or wild creature and try E again."));
+		return;
+	}
+
+	const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
+	const double Now = FPlatformTime::Seconds();
+	for (auto CooldownIt = WorldInteractionCooldowns.CreateIterator(); CooldownIt; ++CooldownIt)
+		if (!CooldownIt.Key().IsValid() || CooldownIt.Value() <= Now) CooldownIt.RemoveCurrent();
+	const TWeakObjectPtr<AActor> TargetKey(Target);
+	if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey); CooldownUntil && *CooldownUntil > Now)
+	{
+		ShowWorldInteractionCaption(FString::Printf(TEXT("%s has already answered your attention; let the moment settle."), *TargetTag.ToString()));
+		return;
+	}
+
+	FString Fact;
+	if (!IslandInteractionUtility::Perform(GetPawn(), Target, Fact))
+	{
+		ShowWorldInteractionCaption(TEXT("You cannot reach or clearly see that from here."));
+		return;
+	}
+	WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
+	ShowWorldInteractionCaption(TargetTag.ToString() + TEXT(": ") + Fact);
 }
 
 AAutonomousAgentCharacter* ACaptiveSky_2PlayerController::FindNearestConversationAgent() const
