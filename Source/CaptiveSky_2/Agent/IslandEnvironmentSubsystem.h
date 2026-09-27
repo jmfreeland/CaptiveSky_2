@@ -30,7 +30,7 @@ struct FIslandLandscapeMaterialBackup
  * Published parameters (all 0..1 unless noted):
  *   RainIntensity, Wetness (builds in rain, dries with sun and wind), CloudCover, WindSpeed (cm/s),
  *   WindDirection (vector: xyz unit direction, w = speed in cm/s), Daylight, SunHeight (-1..1),
- *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24).
+ *   GoldenHour (peaks while the sun is low but up), IslandHour (0..24), Storm, LightningFlash.
  * CaptiveSky2.Tools.CreateEnvironmentCollection creates or updates the asset.
  */
 UCLASS()
@@ -88,6 +88,8 @@ private:
 	float SunHeight = 1.f;
 	float GoldenHour = 0.f;
 	float IslandHour = 12.f;
+	float Storm = 0.f;
+	float LightningFlash = 0.f;
 	FVector Wind = FVector::ZeroVector;
 	bool bWetnessInitialized = false;
 	bool bLandscapeMaterialsInitialized = false;

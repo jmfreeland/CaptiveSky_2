@@ -2,6 +2,7 @@
 #include "AgentBrainComponent.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandLightning.h"
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
@@ -193,6 +194,32 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	WorldWeather->NextWindPoolRippleTime = 0.0;
 	WorldWeather->UpdateWindPoolResponse();
 	TestFalse(TEXT("Strong rain remains the pool's water response instead of stacking wind ripples"), WorldWeather->WindPoolRipple.IsValid());
+
+	// Storms bring lightning: flashes, a bolt when near, and thunder after the time sound takes to arrive.
+	TestTrue(TEXT("Lightning flashes in quick pulses and then goes dark"), AIslandLightning::FlashAt(0.15f) > 0.8f && AIslandLightning::FlashAt(1.f) == 0.f);
+	const double StormStart = World->GetTimeSeconds();
+	WorldWeather->UpdateStorm(StormStart);
+	TestEqual(TEXT("Calm weather brings no lightning"), WorldWeather->StrikeCount, 0);
+	WorldWeather->ForcedStormUntil = StormStart + 300.0;
+	TestEqual(TEXT("A forced storm is a full storm"), WorldWeather->SampleStormIntensity(StormStart), 1.f);
+	for (double Now = StormStart; Now < StormStart + 120.0; Now += 0.25) WorldWeather->UpdateStorm(Now);
+	TestTrue(TEXT("A full storm strikes several times in two minutes, but not constantly"), WorldWeather->StrikeCount >= 3 && WorldWeather->StrikeCount <= 25);
+	AIslandLightning* Strike = WorldWeather->LastStrike.Get();
+	if (TestNotNull(TEXT("A strike leaves a lightning effect"), Strike))
+	{
+		const float Distance = FVector::Dist2D(WorldWeather->LastStrikeGround, WorldWeather->GetActorLocation());
+		TestTrue(TEXT("Strikes land away from the viewer"), Distance >= 30000.f && Distance <= 720000.f);
+		TestTrue(TEXT("Thunder waits for the sound to travel"), FMath::IsNearlyEqual(Strike->GetThunderDelay(), Distance / AIslandLightning::SoundSpeed, 0.01f));
+		TestEqual(TEXT("A bolt is drawn only for strikes near enough to see"), Strike->HasBolt(), Distance <= AIslandLightning::BoltVisibleWithin);
+		Strike->Tick(0.15f);
+		TestTrue(TEXT("The flash is published while it lasts"), WorldWeather->GetLightningFlash() > 0.5f);
+		TestFalse(TEXT("Thunder has not arrived during the flash"), Strike->HasThundered());
+		Strike->Tick(Strike->GetThunderDelay());
+		TestTrue(TEXT("Thunder follows"), Strike->HasThundered());
+	}
+	WorldWeather->LastStrikeTime = World->GetTimeSeconds();
+	TestTrue(TEXT("Residents hear about the lightning"), WorldWeather->DescribeAt(WorldWeather->GetActorLocation()).Contains(TEXT("Lightning flashed")));
+	TestTrue(TEXT("Residents are told a storm is overhead"), WorldWeather->DescribeAt(WorldWeather->GetActorLocation()).Contains(TEXT("a storm")));
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;

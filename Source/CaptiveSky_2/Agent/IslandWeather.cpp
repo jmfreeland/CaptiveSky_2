@@ -1,5 +1,7 @@
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandLightning.h"
+#include "HAL/IConsoleManager.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
@@ -112,6 +114,7 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	SecondsSinceWeatherSave += FMath::Max(0.f, DeltaSeconds);
 	if (SecondsSinceWeatherSave >= 60.f) PersistWeatherTime();
+	UpdateStorm(GetWorld()->GetTimeSeconds());
 	UpdateCloudRendering();
 	UpdateRainRendering();
 	UpdateWindPoolResponse();
@@ -613,6 +616,7 @@ float AIslandWeather::SampleFrontStrength(double Seconds) const
 float AIslandWeather::SampleStormIntensity(double Seconds) const
 {
 	// Rare by construction: the peak of a wet spell and the heart of a front at the same time.
+	if (Seconds < ForcedStormUntil) return 1.f;
 	const float Wet = FMath::SmoothStep(0.74f, 0.92f, SampleSpell(Seconds));
 	const float Front = FMath::SmoothStep(0.80f, 0.97f, SampleFrontStrength(Seconds));
 	return FMath::Clamp(Wet * Front, 0.f, 1.f);
@@ -625,6 +629,54 @@ float AIslandWeather::SampleRainIntensity(double Seconds) const
 	const float RainFront = FMath::SmoothStep(0.62f - Wetness * 0.4f, 0.90f - Wetness * 0.2f, SampleFrontStrength(Seconds));
 	const float CloudGate = FMath::SmoothStep(0.48f, 0.78f, SampleCloudCover(Seconds));
 	return FMath::Clamp(FMath::Max(RainFront * CloudGate, SampleStormIntensity(Seconds)), 0.f, 1.f);
+}
+
+float AIslandWeather::GetLightningFlash() const
+{
+	return LastStrike.IsValid() ? LastStrike->GetFlash() : 0.f;
+}
+
+void AIslandWeather::UpdateStorm(double Now)
+{
+	const float Storm = SampleStormIntensity(Now);
+	if (Storm < 0.3f) { NextStrikeAt = 0.0; return; }
+	if (NextStrikeAt <= 0.0)
+	{
+		StrikeStream.Initialize(WeatherSeed * 7919 + FMath::FloorToInt(Now + WeatherTimeOffset));
+		NextStrikeAt = Now + StrikeStream.FRandRange(2.f, 8.f);
+		return;
+	}
+	if (Now < NextStrikeAt) return;
+	FVector Listener = GetActorLocation();
+	if (APlayerController* Player = GetWorld()->GetFirstPlayerController())
+		if (const APawn* Pawn = Player->GetPawn()) Listener = Pawn->GetActorLocation();
+	StrikeNear(Listener, Storm);
+	// Deeper storms strike more often.
+	NextStrikeAt = Now + FMath::Lerp(24.f, 7.f, Storm) * StrikeStream.FRandRange(0.6f, 1.4f);
+}
+
+void AIslandWeather::StrikeNear(const FVector& Listener, float Storm)
+{
+	const float Angle = StrikeStream.FRandRange(0.f, 2.f * PI);
+	const float Distance = StrikeStream.FRandRange(100000.f, 600000.f) * (1.2f - 0.5f * Storm);
+	FVector Ground = Listener + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance;
+	FHitResult Hit;
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Ground + FVector(0.f, 0.f, 200000.f), Ground - FVector(0.f, 0.f, 200000.f), ECC_Visibility))
+		Ground = Hit.ImpactPoint;
+	else
+		Ground.Z = Listener.Z;
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandLightning* Lightning = GetWorld()->SpawnActor<AIslandLightning>(Ground, FRotator::ZeroRotator, Spawn))
+	{
+		Lightning->Strike(Ground, Listener, StrikeStream.RandHelper(INT32_MAX));
+		LastStrike = Lightning;
+		LastStrikeGround = Ground;
+		LastThunderDelay = Lightning->GetThunderDelay();
+		LastStrikeTime = GetWorld()->GetTimeSeconds();
+		++StrikeCount;
+	}
 }
 
 FVector AIslandWeather::SampleWind(const FVector& Position, double Seconds) const
@@ -717,5 +769,19 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 		Conditions,
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
 		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f)
+		+ (Now - LastStrikeTime < 25.0
+			? FString::Printf(TEXT(" Lightning flashed about %.1f kilometres away moments ago%s"), FVector::Dist2D(Position, LastStrikeGround) / 100000.f,
+				Now - LastStrikeTime >= LastThunderDelay ? TEXT(", and its thunder rolled across the Island.") : TEXT("; its thunder has not reached here yet."))
+			: FString())
 		+ (Spell > 0.72f ? TEXT(" The weather has turned unsettled and wet over the last few days.") : Spell < 0.28f ? TEXT(" The weather has been settled and dry over the last few days.") : TEXT(""));
 }
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandStormCommand(
+	TEXT("Island.Storm"),
+	TEXT("Developer override: a full storm with lightning for the given seconds of play (default 120). Not saved. Usage: Island.Storm [seconds]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		const double Seconds = Args.Num() > 0 ? FCString::Atod(*Args[0]) : 120.0;
+		for (TActorIterator<AIslandWeather> It(World); It; ++It)
+			It->ForcedStormUntil = World->GetTimeSeconds() + FMath::Clamp(Seconds, 0.0, 3600.0);
+	}));

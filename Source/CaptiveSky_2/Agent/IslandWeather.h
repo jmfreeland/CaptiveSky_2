@@ -6,6 +6,7 @@
 #include "IslandWeather.generated.h"
 
 class AIslandFirefly;
+class AIslandLightning;
 class AIslandTidepoolCrab;
 class AIslandTidepoolMinnows;
 class AIslandPoolRippleEffect;
@@ -68,6 +69,10 @@ public:
 	float SampleSpell(double Seconds) const;
 	/** 0 calm, up to 1 a full storm: only when a wet spell peaks and a heavy front arrives. */
 	float SampleStormIntensity(double Seconds) const;
+	/** Brightness of the current lightning flash, 0..1 (for materials and presentation). */
+	float GetLightningFlash() const;
+	/** Developer override (Island.Storm): a full storm until this session time. Not saved. */
+	double ForcedStormUntil = -1.0;
 	float SampleCloudCover(double Seconds) const;
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
@@ -142,6 +147,16 @@ private:
 	FVector LastRainGroundImpactLocation = FVector::ZeroVector;
 	uint32 RainGroundImpactSequence = 0;
 	float SecondsSinceWeatherSave = 0.f;
+	FRandomStream StrikeStream;
+	double NextStrikeAt = 0.0;
+	double LastStrikeTime = -1.0e9;
+	FVector LastStrikeGround = FVector::ZeroVector;
+	float LastThunderDelay = 0.f;
+	int32 StrikeCount = 0;
+	TWeakObjectPtr<AIslandLightning> LastStrike;
+	/** Schedules and triggers lightning while a storm is overhead; Now is session time. */
+	void UpdateStorm(double Now);
+	void StrikeNear(const FVector& Listener, float Storm);
 	void PersistWeatherTime();
 	/** 0..1 strength of the passing rain front, before clouds gate it. */
 	float SampleFrontStrength(double Seconds) const;

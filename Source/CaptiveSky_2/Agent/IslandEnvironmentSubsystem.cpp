@@ -20,7 +20,7 @@ const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
 	static const TArray<FName> Names = {
 		TEXT("RainIntensity"), TEXT("Wetness"), TEXT("CloudCover"), TEXT("WindSpeed"),
-		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour") };
+		TEXT("Daylight"), TEXT("SunHeight"), TEXT("GoldenHour"), TEXT("IslandHour"), TEXT("Storm"), TEXT("LightningFlash") };
 	return Names;
 }
 
@@ -153,7 +153,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	// Sample where it matters for presentation: the viewer, else the weather actor itself.
 	FVector Viewpoint = FVector::ZeroVector;
 	if (const APlayerController* Player = World->GetFirstPlayerController(); Player && Player->GetPawn()) Viewpoint = Player->GetPawn()->GetActorLocation();
-	RainIntensity = CloudCover = 0.f;
+	RainIntensity = CloudCover = Storm = LightningFlash = 0.f;
 	Wind = FVector::ZeroVector;
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
@@ -161,6 +161,8 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 		RainIntensity = FMath::Clamp(It->SampleRainIntensity(Now), 0.f, 1.f);
 		CloudCover = FMath::Clamp(It->SampleCloudCover(Now), 0.f, 1.f);
 		Wind = It->GetLocalWind(Viewpoint);
+		Storm = FMath::Clamp(It->SampleStormIntensity(Now), 0.f, 1.f);
+		LightningFlash = It->GetLightningFlash();
 		break;
 	}
 	IslandHour = 12.f;
@@ -173,7 +175,8 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
 	if (!Instance) return;
-	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour };
+	const float Values[] = { RainIntensity, Wetness, CloudCover, static_cast<float>(Wind.Size2D()), Daylight, SunHeight, GoldenHour, IslandHour, Storm, LightningFlash };
+	static_assert(UE_ARRAY_COUNT(Values) == 10, "Keep values in the order of ScalarParameterNames.");
 	const TArray<FName>& Names = ScalarParameterNames();
 	for (int32 Index = 0; Index < Names.Num(); ++Index) Instance->SetScalarParameterValue(Names[Index], Values[Index]);
 	const FVector Direction = Wind.GetSafeNormal();
