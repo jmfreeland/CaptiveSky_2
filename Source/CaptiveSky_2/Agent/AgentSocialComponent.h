@@ -58,6 +58,8 @@ public:
 	int32 MaximumPendingUtterances = 4;
 
 	void ReceiveUtterance(const FAgentSocialUtterance& Utterance);
+	/** Remaining real-time pause before an automatic conversation with this resident can begin. */
+	float GetConversationCooldownRemainingWith(const FString& OtherAgentId) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -65,6 +67,8 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	friend class FAgentSocialPacingTest;
+
 	TArray<FAgentSocialUtterance> PendingUtterances;
 	FAgentSocialUtterance ActiveUtterance;
 	bool bHandlingUtterance = false;

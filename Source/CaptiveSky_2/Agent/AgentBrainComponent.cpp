@@ -5,6 +5,7 @@
 #include "AgentExternalBridgeComponent.h"
 #include "AgentRelationshipComponent.h"
 #include "AgentConsolidationComponent.h"
+#include "AgentSocialComponent.h"
 #include "AgentLLMProvider.h"
 #include "AutonomousAgentCharacter.h"
 #include "Dom/JsonObject.h"
@@ -49,6 +50,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 	const AActor* Owner = GetOwner();
 	const FVector Location = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
 	FString NearbyBeings;
+	const UAgentSocialComponent* OwnSocial = Owner ? Owner->FindComponentByClass<UAgentSocialComponent>() : nullptr;
 	if (Owner && GetWorld())
 	{
 		for (TActorIterator<AAutonomousAgentCharacter> It(GetWorld()); It; ++It)
@@ -60,6 +62,18 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				const FString OtherAgentId = It->Memory ? It->Memory->GetResolvedAgentId() : It->GetActorNameOrLabel();
 				NearbyBeings += FString::Printf(TEXT(" %s is %.0f metres away (move_to target: ApproachAgent_%s). You may approach them, but moving closer does not begin a conversation; speaking remains optional for both of you."),
 					*OtherAgentId, Distance / 100.f, *OtherAgentId);
+				if (OwnSocial)
+				{
+					const float CooldownSeconds = OwnSocial->GetConversationCooldownRemainingWith(OtherAgentId);
+					if (CooldownSeconds > 0.f)
+					{
+						const FString Remaining = CooldownSeconds < 60.f
+							? TEXT("less than a minute")
+							: FString::Printf(TEXT("about %d minutes"), FMath::CeilToInt(CooldownSeconds / 60.f));
+						NearbyBeings += FString::Printf(TEXT(" Your automatic conversation with %s is resting for %s of real time; do not target Speak at them yet, because the automatic exchange is paused. Their silence during this pause is not evidence of rejection. You can still observe, move, rest, or choose another activity."),
+							*OtherAgentId, *Remaining);
+					}
+				}
 			}
 		}
 	}

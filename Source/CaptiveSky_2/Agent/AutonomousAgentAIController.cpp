@@ -9,6 +9,7 @@
 #include "EngineUtils.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
+#include "AgentSocialComponent.h"
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
@@ -373,7 +374,13 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		break;
 	}
 	case EAgentActionType::Speak:
-		UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s says: \"%s\""), *GetName(), *Decision.Speech);
+		if (UAgentSocialComponent* Social = ControlledPawn->FindComponentByClass<UAgentSocialComponent>();
+			Social && !Decision.ActionTarget.IsEmpty() && Social->GetConversationCooldownRemainingWith(Decision.ActionTarget) > 0.f)
+		{
+			ReportAction(FString::Printf(TEXT("Your automatic conversation with %s is still resting; the other resident did not hear that speech. Choose another activity and wait for the pause to end."), *Decision.ActionTarget));
+			break;
+		}
+		UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s chose speech: \"%s\""), *GetName(), *Decision.Speech);
 		break;
 	case EAgentActionType::Interact:
 		InspectTarget(FName(*Decision.ActionTarget));

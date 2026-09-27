@@ -85,11 +85,16 @@ bool UAgentSocialComponent::IsWithinSpeakingRange(const AAutonomousAgentCharacte
 
 bool UAgentSocialComponent::IsCoolingDownWith(const FString& OtherAgentId) const
 {
+	return GetConversationCooldownRemainingWith(OtherAgentId) > 0.f;
+}
+
+float UAgentSocialComponent::GetConversationCooldownRemainingWith(const FString& OtherAgentId) const
+{
 	if (const double* Until = CooldownUntilByAgentId.Find(OtherAgentId))
 	{
-		return FPlatformTime::Seconds() < *Until;
+		return static_cast<float>(FMath::Max(0.0, *Until - FPlatformTime::Seconds()));
 	}
-	return false;
+	return 0.f;
 }
 
 float UAgentSocialComponent::EffectiveConversationCooldownSeconds(float ConfiguredSeconds)
