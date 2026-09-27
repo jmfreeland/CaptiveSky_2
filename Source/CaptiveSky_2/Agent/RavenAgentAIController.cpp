@@ -121,6 +121,42 @@ bool ARavenAgentAIController::RequestPerch(FName PerchTag)
 	return false;
 }
 
+FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
+{
+	if (!Site || !GetWorld() || !GetPawn()) return TEXT("Roost conditions cannot be assessed without a visible site and embodied raven.");
+	const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn());
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	const float CapsuleRadius = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 30.f;
+	const FVector SiteLocation = Site->GetActorLocation();
+
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenRoostAssessment), false, GetPawn());
+	Query.AddIgnoredActor(Site);
+	FHitResult Support;
+	const bool bSupportHit = GetWorld()->LineTraceSingleByChannel(Support, SiteLocation,
+		SiteLocation - FVector(0.f, 0.f, HalfHeight + 12.f), ECC_Visibility, Query);
+	const bool bHasSuitableSupport = bSupportHit && Support.ImpactNormal.Z >= 0.5f;
+
+	const float ProbeSpread = FMath::Min(CapsuleRadius * 0.65f, 30.f);
+	const FVector HeadHeight = SiteLocation + FVector(0.f, 0.f, HalfHeight + 5.f);
+	const FVector ProbeOffsets[] = {
+		FVector::ZeroVector,
+		FVector(ProbeSpread, 0.f, 0.f), FVector(-ProbeSpread, 0.f, 0.f),
+		FVector(0.f, ProbeSpread, 0.f), FVector(0.f, -ProbeSpread, 0.f)
+	};
+	int32 OverheadBlockCount = 0;
+	for (const FVector& Offset : ProbeOffsets)
+	{
+		FHitResult Overhead;
+		if (GetWorld()->LineTraceSingleByChannel(Overhead, HeadHeight + Offset,
+			HeadHeight + Offset + FVector(0.f, 0.f, 300.f), ECC_Visibility, Query))
+			++OverheadBlockCount;
+	}
+
+	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry; this is only a local rain-cover clue, not proof of waterproof shelter. The probe does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
+		bHasSuitableSupport ? TEXT("an upward-facing support surface is currently beneath the marker") : TEXT("suitable upward-facing support was not confirmed beneath the marker"),
+		OverheadBlockCount);
+}
+
 bool ARavenAgentAIController::BeginPerchAt(AActor* Perch)
 {
 	if (!Perch || !GetPawn()) return false;

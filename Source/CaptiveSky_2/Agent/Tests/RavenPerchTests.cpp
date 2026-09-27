@@ -54,6 +54,24 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Repeat perch request is accepted without takeoff"), Controller->RequestPerch(TEXT("TestRoost")));
 	TestTrue(TEXT("Repeat request remains perched"), Controller->LocomotionState == ERavenLocomotionState::Perched);
 	Perch->Tags.Add(TEXT("RavenNestSite"));
+	const FVector BeforeReadOnlyAssessment = Raven->GetActorLocation();
+	const FString SiteAssessment = Controller->AssessRoostSite(Perch);
+	TestTrue(TEXT("Read-only roost assessment confirms the same upward-facing support used at arrival"), SiteAssessment.Contains(TEXT("an upward-facing support surface is currently beneath the marker")));
+	TestTrue(TEXT("Open fixture has no nearby overhead collision in the sampled probes"), SiteAssessment.Contains(TEXT("0 of 5 short vertical visibility probes")));
+	TestTrue(TEXT("Site assessment disclaims branch strength, waterproofing, and ownership"), SiteAssessment.Contains(TEXT("not proof of waterproof shelter")) && SiteAssessment.Contains(TEXT("does not establish branch strength")));
+	TestTrue(TEXT("Read-only assessment does not move the perched raven"), Raven->GetActorLocation().Equals(BeforeReadOnlyAssessment) && Controller->LocomotionState == ERavenLocomotionState::Perched);
+	AActor* OverheadCover = World->SpawnActor<AActor>();
+	if (TestNotNull(TEXT("Overhead cover fixture actor spawned"), OverheadCover))
+	{
+		UBoxComponent* CoverBox = NewObject<UBoxComponent>(OverheadCover);
+		OverheadCover->SetRootComponent(CoverBox);
+		CoverBox->SetBoxExtent(FVector(80.f, 80.f, 20.f));
+		CoverBox->SetCollisionProfileName(TEXT("BlockAll"));
+		CoverBox->RegisterComponent();
+		OverheadCover->SetActorLocation(Perch->GetActorLocation() + FVector(0.f, 0.f, Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 35.f));
+		TestTrue(TEXT("Solid overhead fixture is found by the cover probes"), Controller->AssessRoostSite(Perch).Contains(TEXT("5 of 5 short vertical visibility probes")));
+		OverheadCover->Destroy();
+	}
 	FAgentDecision Inspect;
 	Inspect.bValid = true;
 	Inspect.ActionType = EAgentActionType::Interact;
@@ -109,6 +127,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Departed roost"), Controller->LocomotionState == ERavenLocomotionState::Flying && Raven->GetActorLocation().Z > 650);
 	// An unsupported marker must never be reported as a successful perch.
 	Perch->SetActorLocation(FVector(1200, 0, 500));
+	TestTrue(TEXT("Unsupported candidate is reported before attempting another arrival"), Controller->AssessRoostSite(Perch).Contains(TEXT("suitable upward-facing support was not confirmed")));
 	Controller->RequestPerch(TEXT("TestRoost"));
 	for (int32 I = 0; I < 600; ++I) Controller->Tick(1.f / 60.f);
 	TestTrue(TEXT("Unsupported marker rejected at arrival"), Controller->LocomotionState != ERavenLocomotionState::Perched);
@@ -149,6 +168,9 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				if (*It != Probe) Probe->GetCapsuleComponent()->IgnoreActorWhenMoving(*It, true);
 			ARavenAgentAIController* Pilot = Island->SpawnActor<ARavenAgentAIController>(Spawn);
 			Pilot->Possess(Probe);
+			const FString SavedSiteAssessment = Pilot->AssessRoostSite(Marker);
+			AddInfo(FString::Printf(TEXT("%s read-only site assessment: %s"), *Tag.ToString(), *SavedSiteAssessment));
+			TestTrue(*FString::Printf(TEXT("Actual %s marker reports the support that the landing gate will require"), *Tag.ToString()), SavedSiteAssessment.Contains(TEXT("an upward-facing support surface is currently beneath the marker")));
 			Pilot->RequestPerch(Tag);
 			for (int32 I = 0; I < 1200; ++I) Pilot->Tick(1.f / 60.f);
 			FHitResult GroundHit;

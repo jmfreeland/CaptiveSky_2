@@ -46,6 +46,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Raven|Locomotion")
 	bool RequestPerch(FName PerchTag);
 
+	/** Read-only collision assessment for a tagged roost marker; does not begin movement or claim ownership. */
+	FString AssessRoostSite(const AActor* Site) const;
+
 protected:
 	virtual bool IsActionInProgress() const override;
 	virtual bool CanRest() const override;

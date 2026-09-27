@@ -2,6 +2,7 @@
 
 #include "AutonomousAgentAIController.h"
 #include "AutonomousAgentCharacter.h"
+#include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -150,7 +151,21 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		Query.AddIgnoredActor(*It);
 		if (GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), It->GetActorLocation(), ECC_Visibility, Query)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
 		FString Fact;
-		if (It->ActorHasTag(TEXT("RavenNestSite"))) Fact = TEXT("You inspected a candidate resting site. This visual inspection alone does not prove support or shelter: a successful perch result confirms support, and shelter varies with solid geometry and wind direction. No nest, ownership, or assigned home has been created.");
+		if (It->ActorHasTag(TEXT("RavenNestSite")))
+		{
+			if (const ARavenAgentAIController* RavenController = Cast<ARavenAgentAIController>(this))
+				Fact = RavenController->AssessRoostSite(*It);
+			else
+				Fact = TEXT("You inspected a candidate bird roost, but this body cannot perch there; no movement or persistent change was made.");
+			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
+			{
+				Fact += TEXT(" ") + WeatherIt->DescribeWindShelterAt(It->GetActorLocation(), Observer);
+				if (WeatherIt->SampleRainIntensity(GetWorld()->GetTimeSeconds()) >= 0.55f)
+					Fact += TEXT(" A stronger shower is currently passing; the geometry probes do not guarantee that this site stays dry.");
+				break;
+			}
+			Fact += TEXT(" No nest, ownership, or assigned home has been created.");
+		}
 		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("Firefly")))
 		{
 			if (AIslandFirefly* Firefly = Cast<AIslandFirefly>(*It)) Firefly->RespondToQuietObservation();
