@@ -11,6 +11,7 @@
 #include "CaptiveSkyConversationWidget.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
 #include "Agent/AutonomousAgentCharacter.h"
+#include "Agent/AgentMemoryComponent.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Agent/AgentSocialSubsystem.h"
 #include "EngineUtils.h"
@@ -156,7 +157,13 @@ void ACaptiveSky_2PlayerController::ToggleConversation()
 		GetWorldTimerManager().SetTimer(HideHandle, this, &ACaptiveSky_2PlayerController::CloseConversation, 2.f, false);
 		return;
 	}
+	#if WITH_EDITOR
 	ConversationTargetDisplayName = ConversationTarget->GetActorLabel();
+	#else
+	ConversationTargetDisplayName = ConversationTarget->Memory
+		? ConversationTarget->Memory->GetResolvedAgentId()
+		: ConversationTarget->GetName();
+	#endif
 	ConversationWidget->OpenFor(ConversationTargetDisplayName);
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(ConversationWidget->TakeWidget());
