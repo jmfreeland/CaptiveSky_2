@@ -30,7 +30,8 @@ public class CaptiveSky_2 : ModuleRules
 			"JsonUtilities",
 			"RenderCore",
 			"RHI",
-			"DeveloperSettings"
+			"DeveloperSettings",
+			"ImageCore"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

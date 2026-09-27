@@ -192,6 +192,22 @@ Evidence and privacy follow the rest of the world model:
 - reloading in a new session, and the developer reset;
 - on the open Island map, walking paths from the ListeningStones to every arranging ground.
 
+### Journey viewpoints (2026-09-27)
+
+This implements the weekly idea "author one extraordinary journey" as fixed visual-regression targets for the route **shore → Tideglass Pool → ListeningStones → WindArch / roost overlook**. `Config/IslandViewpoints.json` defines the cameras: an overhead `00_Survey`, then `01_ShoreApproach` (from just offshore), `02_Tideglass`, `03_ListeningStones` and `04_WindArchOverlook`. Each camera is placed relative to a tagged landmark or at a fixed point, and is kept a minimum height above the ground beneath it.
+
+To capture them, run `powershell -ExecutionPolicy Bypass -File Scripts/Capture-Viewpoints.ps1 [-Hour 12] [-Only Tideglass]` with the editor closed. It starts a headless editor that renders offscreen (a real graphics backend, not `-nullrhi`) and runs `CaptiveSky2.Visual.Viewpoints`. That test renders each view with an offscreen scene capture over 60 frames, so exposure and texture streaming can settle, then writes PNGs to `Saved/Viewpoints/<timestamp>_h<hour>/`.
+
+Captures use the editor world only: no play session, agents, gateway turns, or world-state writes. For the same reason, runtime-spawned nests, curios and stone arrangements don't appear in them. Lighting is previewed through the Island clock's Start Hour and then restored; the map is never saved.
+
+The default hour is **17:00**, which is golden hour on this Island: the clock's sun sets at 18:00, so the concept brief's "18:30" would already be dark here. Keep the camera definitions stable once art work starts, so captures can be compared over time.
+
+The first baselines (2026-09-27) show where things stand:
+- **Placeholders:** the landmarks are still primitive shapes (blue/white boxes, a white disc, spheres).
+- **Floating props:** several of them hover slightly above the ground; their shadows are detached.
+- **No forest here:** none of the PCG forest appears near the route.
+- **Leftover objects:** a stray floating block and mannequin-like figures hang in the air above the roost area.
+
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
