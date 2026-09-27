@@ -79,9 +79,13 @@ public:
 	TOptional<float> GetSavedHour() const { return SavedHour; }
 	/** Island day number (starting at 1) saved alongside the hour. */
 	TOptional<int32> GetSavedDay() const { return SavedDay; }
+	/** Environmental wetness (0..1) at the end of the previous session, if one was recorded. */
+	TOptional<float> GetSavedWetness() const { return SavedWetness; }
 
 	/** Records the current Island hour and day so the next session can resume from them. */
 	bool SaveClock(float Hour, int32 Day);
+	/** Records lingering ground wetness independently of whether the Island clock resumes. */
+	bool SaveWetness(float Wetness);
 
 	/** The running clock's day number, or 1 when the level has no clock. */
 	static int32 CurrentIslandDay(const UWorld* World);
@@ -143,6 +147,7 @@ private:
 	TArray<FIslandNestRecord> Nests;
 	TOptional<float> SavedHour;
 	TOptional<int32> SavedDay;
+	TOptional<float> SavedWetness;
 	TArray<FIslandCurioRecord> Curios;
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
 	TArray<FIslandArrangementSite> ArrangementSites;

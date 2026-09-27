@@ -65,6 +65,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	Curios.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
+	SavedWetness.Reset();
 	bStorageUnreadable = false;
 	const FString Path = GetStorageFilePath();
 	if (Path.IsEmpty()) return;
@@ -91,6 +92,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	ArrangementSites.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
+	SavedWetness.Reset();
 	FString Contents;
 	TSharedPtr<FJsonObject> Root;
 	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
@@ -103,6 +105,11 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 		int32 Day = 1;
 		if ((*Clock)->TryGetNumberField(TEXT("day"), Day) && Day >= 1) SavedDay = Day;
 	}
+	const TSharedPtr<FJsonObject>* Environment = nullptr;
+	double Wetness = 0.0;
+	if (Root->TryGetObjectField(TEXT("environment"), Environment) &&
+		(*Environment)->TryGetNumberField(TEXT("wetness"), Wetness) && FMath::IsFinite(Wetness) && Wetness >= 0.0 && Wetness <= 1.0)
+		SavedWetness = static_cast<float>(Wetness);
 	const TArray<TSharedPtr<FJsonValue>>* CurioValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("curios"), CurioValues))
 	{
@@ -272,6 +279,12 @@ bool UIslandWorldStateSubsystem::Save() const
 		Clock->SetStringField(TEXT("saved_utc"), FDateTime::UtcNow().ToIso8601());
 		Root->SetObjectField(TEXT("clock"), Clock);
 	}
+	if (SavedWetness.IsSet())
+	{
+		const TSharedRef<FJsonObject> Environment = MakeShared<FJsonObject>();
+		Environment->SetNumberField(TEXT("wetness"), SavedWetness.GetValue());
+		Root->SetObjectField(TEXT("environment"), Environment);
+	}
 
 	FString Json;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Json);
@@ -327,6 +340,16 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 	if (Save()) return true;
 	SavedHour = PreviousHour;
 	SavedDay = PreviousDay;
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::SaveWetness(float Wetness)
+{
+	if (!FMath::IsFinite(Wetness)) return false;
+	const TOptional<float> PreviousWetness = SavedWetness;
+	SavedWetness = FMath::Clamp(Wetness, 0.f, 1.f);
+	if (Save()) return true;
+	SavedWetness = PreviousWetness;
 	return false;
 }
 

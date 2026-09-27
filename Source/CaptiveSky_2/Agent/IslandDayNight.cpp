@@ -1,5 +1,6 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "IslandEnvironmentSubsystem.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
@@ -94,8 +95,12 @@ void AIslandDayNight::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AIslandDayNight::PersistHour()
 {
 	SecondsSinceSave = 0.f;
-	if (!bResumeSavedTime || !GetWorld()) return;
-	if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>()) WorldState->SaveClock(CurrentHour, DayNumber);
+	if (!GetWorld()) return;
+	UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
+	if (!WorldState) return;
+	if (bResumeSavedTime) WorldState->SaveClock(CurrentHour, DayNumber);
+	if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
+		WorldState->SaveWetness(Environment->GetWetness());
 }
 
 void AIslandDayNight::UpdateLighting()

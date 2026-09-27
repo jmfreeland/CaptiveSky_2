@@ -1,6 +1,7 @@
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -63,6 +64,12 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
+	if (!bWetnessInitialized)
+	{
+		bWetnessInitialized = true;
+		if (const UIslandWorldStateSubsystem* WorldState = World->GetSubsystem<UIslandWorldStateSubsystem>())
+			if (const TOptional<float> SavedWetness = WorldState->GetSavedWetness(); SavedWetness.IsSet()) Wetness = SavedWetness.GetValue();
+	}
 	const double Now = World->GetTimeSeconds();
 
 	// Sample where it matters for presentation: the viewer, else the weather actor itself.

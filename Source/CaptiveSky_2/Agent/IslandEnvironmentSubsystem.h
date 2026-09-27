@@ -62,4 +62,5 @@ private:
 	float GoldenHour = 0.f;
 	float IslandHour = 12.f;
 	FVector Wind = FVector::ZeroVector;
+	bool bWetnessInitialized = false;
 };

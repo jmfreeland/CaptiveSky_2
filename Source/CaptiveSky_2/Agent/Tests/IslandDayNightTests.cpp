@@ -5,6 +5,7 @@
 #include "Engine/Engine.h"
 #include "Engine/SkyLight.h"
 #include "IslandDayNight.h"
+#include "IslandEnvironmentSubsystem.h"
 #include "IslandWeather.h"
 #include "Engine/World.h"
 #include "IslandWorldStateSubsystem.h"
@@ -121,6 +122,11 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 
 	Clock = StartSession(World, StateFile, true);
 	TestEqual(TEXT("First session starts at Start Hour"), Clock->CurrentHour, 9.f);
+	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
+	TestTrue(TEXT("The first session records lingering wetness"), State && State->SaveWetness(0.74f));
+	if (Environment) Environment->Tick(0.f);
+	TestTrue(TEXT("The environment starts from its saved wetness"), Environment && FMath::IsNearlyEqual(Environment->GetWetness(), 0.74f));
 	Clock->CurrentHour = 21.5f;
 	Clock->DayNumber = 4;
 	EndSession(World, Clock);
@@ -129,6 +135,9 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock = StartSession(World, StateFile, true);
 	TestTrue(TEXT("Next session resumes where the last one ended"), FMath::IsNearlyEqual(Clock->CurrentHour, 21.5f, 0.01f));
 	TestEqual(TEXT("Next session resumes on the same Island day"), Clock->DayNumber, 4);
+	Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
+	if (Environment) Environment->Tick(0.f);
+	TestTrue(TEXT("Lingering wet ground survives the session boundary"), Environment && FMath::IsNearlyEqual(Environment->GetWetness(), 0.74f));
 	Clock->CurrentHour = 23.99f;
 	Clock->Tick(10.f);
 	TestEqual(TEXT("Midnight begins a new Island day"), Clock->DayNumber, 5);
@@ -136,9 +145,9 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock->Tick(61.f);
 	const float AfterTick = Clock->CurrentHour;
 	Clock->CurrentHour = 3.f;
-	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	State->LoadAndSpawn();
 	TestTrue(TEXT("Clock saves periodically during play, not only at the end"), State->GetSavedHour().IsSet() && FMath::IsNearlyEqual(State->GetSavedHour().GetValue(), AfterTick, 0.01f));
+	TestTrue(TEXT("Wetness remains available in the shared world-state file"), State->GetSavedWetness().IsSet() && FMath::IsNearlyEqual(State->GetSavedWetness().GetValue(), 0.74f));
 	Clock->bResumeSavedTime = false;
 	EndSession(World, Clock);
 
