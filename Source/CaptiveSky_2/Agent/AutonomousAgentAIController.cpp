@@ -15,6 +15,7 @@
 #include "IslandFirefly.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -165,6 +166,11 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 				break;
 			}
 			Fact += TEXT(" No nest, ownership, or assigned home has been created.");
+		}
+		else if (It->ActorHasTag(TEXT("IslandCurio")))
+		{
+			UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
+			Fact = WorldState ? WorldState->ExamineCurio(Target, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld())) : TEXT("You examined it, but nothing about it can change here.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("Firefly")))
 		{

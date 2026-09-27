@@ -26,6 +26,9 @@ public:
 	bool bResumeSavedTime = true;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Time")
 	float CurrentHour = 9.f;
+	/** Counts Island days from 1, advancing at midnight; persisted with the hour. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Time")
+	int32 DayNumber = 1;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting")
 	TObjectPtr<ADirectionalLight> Sun;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting")

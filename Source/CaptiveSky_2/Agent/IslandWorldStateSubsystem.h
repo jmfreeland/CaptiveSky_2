@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "IslandCurio.h"
 #include "IslandWorldStateSubsystem.generated.h"
 
 class AIslandNest;
@@ -43,7 +44,7 @@ struct FIslandNestRecord
  * tracked in git. Every change is bounded (fixed layer cap per site) and reversible by a
  * developer through Island.RemoveNest or by editing/deleting the file with play stopped.
  *
- * Nests and the Island clock are stored today; the file keeps a top-level version so other
+ * Nests, curios (hidden stones, the seed pod, the cairn) and the Island clock are stored today; the file keeps a top-level version so other
  * kinds of lasting change can be added beside them later.
  */
 UCLASS()
@@ -75,9 +76,32 @@ public:
 
 	/** Island hour at the end of the previous session, if one was recorded. */
 	TOptional<float> GetSavedHour() const { return SavedHour; }
+	/** Island day number (starting at 1) saved alongside the hour. */
+	TOptional<int32> GetSavedDay() const { return SavedDay; }
 
-	/** Records the current Island hour so the next session can resume from it. */
-	bool SaveHour(float Hour);
+	/** Records the current Island hour and day so the next session can resume from them. */
+	bool SaveClock(float Hour, int32 Day);
+
+	/** The running clock's day number, or 1 when the level has no clock. */
+	static int32 CurrentIslandDay(const UWorld* World);
+
+	const TArray<FIslandCurioRecord>& GetCurios() const { return Curios; }
+	const FIslandCurioRecord* FindCurio(FName Id) const;
+
+	/**
+	 * A resident examines a curio on Island day Today. Applies any lasting change (pod opening,
+	 * cairn stone) and returns a factual description of what happened.
+	 */
+	FString ExamineCurio(FName Id, int32 Today);
+
+	/**
+	 * Computes where curios would go in World (near its ListeningStones landmark) without saving or
+	 * spawning anything. All-or-nothing: false leaves OutLayout empty.
+	 */
+	static bool BuildCurioLayout(UWorld* World, TArray<FIslandCurioRecord>& OutLayout);
+
+	/** Developer reset: forgets every curio so fresh ones are placed next time play begins. */
+	bool ForgetCurios();
 
 	/** Re-reads the storage file and respawns visible nests. Called automatically when play begins. */
 	void LoadAndSpawn();
@@ -90,6 +114,9 @@ protected:
 private:
 	TArray<FIslandNestRecord> Nests;
 	TOptional<float> SavedHour;
+	TOptional<int32> SavedDay;
+	TArray<FIslandCurioRecord> Curios;
+	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
 	TMap<FName, TWeakObjectPtr<AIslandNest>> NestActors;
 	// Set when an existing file cannot be parsed, so a save never overwrites what it may still hold.
 	bool bStorageUnreadable = false;
@@ -97,4 +124,7 @@ private:
 	bool Save() const;
 	void RefreshNestActor(const FIslandNestRecord& Record);
 	void DestroyNestActors();
+	/** First-time placement near the ListeningStones; all-or-nothing, then saved so it never moves. */
+	bool PlaceCurios();
+	void RefreshCurioActor(const FIslandCurioRecord& Record);
 };

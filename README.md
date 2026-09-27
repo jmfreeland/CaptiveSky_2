@@ -141,6 +141,25 @@ The raven now has a `build` action with two steps. While standing on the ground 
 
 `AIslandNest` is visual only: a seeded, no-collision bowl of instanced cylinders using the Island's oak material, sitting on the support surface under the roost marker. It looks the same every session and never affects the perch-support check. To undo a nest, run `Island.RemoveNest <SiteTag>` during play, or edit/delete the JSON with play stopped. `CaptiveSky2.Agent.IslandNest` covers gathering and weaving rules, cooldown, the layer cap, what bystanders perceive, reloading in a new world, developer removal, and refusing to overwrite an unreadable file. It uses a scratch file under `Saved/Automation/` and never touches the real map state.
 
+### Hidden trail, seed pod and cairn (2026-09-27)
+
+The raven asked for hidden paths and strange objects that reward returning. The first time the Island is played with writable world state, `UIslandWorldStateSubsystem` places eight curios near the ListeningStones and saves their exact positions in `WorldState/<MapName>.json`, so they never move afterwards. No `Content/` or map edits are involved. The placement is seeded and all-or-nothing, and only uses gentle open ground that grounded residents can walk to.
+
+- **A trail of six pale stones** (`PaleStone_1`..`PaleStone_6`) curves away from the ListeningStones, 7 to 32 metres out. They never change.
+- **A seed pod** (`Seedpod`) sits just past the last stone. Each examination on a new Island day opens it one step. After three different days it stands open and a small seed glows faintly inside. Nothing more happens after that, and what the seed is stays unexplained.
+- **A small cairn** (`Cairn`) sits apart, beyond the WindArch. It starts at three stones ("someone began it before you came"), and any resident, including Aster, can add one stone per Island day, up to twelve.
+
+Nothing is announced from afar. A resident is only told about a curio within 8 metres with line of sight (15 metres for the cairn), and up to three at a time. Each pale stone mentions only the next one, so the pod is discovered by following the trail. Curios use the ordinary `move_to`/`interact` targets; examining one goes through the existing four-metre `Interact` path, and its factual result becomes an action-result memory. Pod and cairn changes happen at most once per Island day, whoever visits, so a same-day return is told that nothing has changed. `AIslandDayNight` now keeps a day number, starting at 1 and advancing at midnight, which is saved with the hour.
+
+The visuals are placeholder engine shapes with tinted materials and no collision. To start the curios over, run `Island.ForgetCurios` during play; fresh ones are placed the next time play begins. `CaptiveSky2.Agent.IslandCurio` covers:
+
+- placement, and levels without the landmarks getting none;
+- close-range discovery and the stone-to-stone hints;
+- once-per-day pod and cairn changes, including through a real `Interact`;
+- reloading in a new session, and the developer reset.
+
+When Island is the open editor map, the test also computes the real layout without saving anything and confirms that a grounded walking path exists from the ListeningStones to every curio. `DayNightPersistence` now also covers the saved day and the midnight rollover.
+
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.

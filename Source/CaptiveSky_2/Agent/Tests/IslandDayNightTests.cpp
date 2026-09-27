@@ -122,11 +122,17 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock = StartSession(World, StateFile, true);
 	TestEqual(TEXT("First session starts at Start Hour"), Clock->CurrentHour, 9.f);
 	Clock->CurrentHour = 21.5f;
+	Clock->DayNumber = 4;
 	EndSession(World, Clock);
 	TestTrue(TEXT("Ending play saves the Island hour"), FPaths::FileExists(StateFile));
 
 	Clock = StartSession(World, StateFile, true);
 	TestTrue(TEXT("Next session resumes where the last one ended"), FMath::IsNearlyEqual(Clock->CurrentHour, 21.5f, 0.01f));
+	TestEqual(TEXT("Next session resumes on the same Island day"), Clock->DayNumber, 4);
+	Clock->CurrentHour = 23.99f;
+	Clock->Tick(10.f);
+	TestEqual(TEXT("Midnight begins a new Island day"), Clock->DayNumber, 5);
+	Clock->CurrentHour = 21.5f;
 	Clock->Tick(61.f);
 	const float AfterTick = Clock->CurrentHour;
 	Clock->CurrentHour = 3.f;

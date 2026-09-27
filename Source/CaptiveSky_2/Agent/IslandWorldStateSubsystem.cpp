@@ -1,5 +1,9 @@
 #include "IslandWorldStateSubsystem.h"
 #include "IslandNest.h"
+#include "IslandDayNight.h"
+#include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "NavigationSystem.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/World.h"
@@ -41,20 +45,27 @@ void UIslandWorldStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UIslandWorldStateSubsystem::Deinitialize()
 {
-	// Nest actors are transient and are torn down with the world itself.
+	// Nest and curio actors are transient and are torn down with the world itself.
 	NestActors.Reset();
+	CurioActors.Reset();
 	Super::Deinitialize();
 }
 
 void UIslandWorldStateSubsystem::LoadAndSpawn()
 {
 	DestroyNestActors();
+	for (const TPair<FName, TWeakObjectPtr<AIslandCurio>>& Pair : CurioActors)
+		if (Pair.Value.IsValid()) Pair.Value->Destroy();
+	CurioActors.Reset();
 	Nests.Reset();
+	Curios.Reset();
 	SavedHour.Reset();
+	SavedDay.Reset();
 	bStorageUnreadable = false;
 	FString Contents;
 	const FString Path = GetStorageFilePath();
-	if (Path.IsEmpty() || !FPaths::FileExists(Path)) return;
+	if (Path.IsEmpty()) return;
+	if (!FPaths::FileExists(Path)) { PlaceCurios(); return; }
 	TSharedPtr<FJsonObject> Root;
 	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
 	{
@@ -66,7 +77,36 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	const TSharedPtr<FJsonObject>* Clock = nullptr;
 	double Hour = 0.0;
 	if (Root->TryGetObjectField(TEXT("clock"), Clock) && (*Clock)->TryGetNumberField(TEXT("hour"), Hour) && Hour >= 0.0 && Hour < 24.0)
+	{
 		SavedHour = static_cast<float>(Hour);
+		int32 Day = 1;
+		if ((*Clock)->TryGetNumberField(TEXT("day"), Day) && Day >= 1) SavedDay = Day;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* CurioValues = nullptr;
+	if (Root->TryGetArrayField(TEXT("curios"), CurioValues))
+	{
+		const UEnum* KindEnum = StaticEnum<EIslandCurioKind>();
+		for (const TSharedPtr<FJsonValue>& Value : *CurioValues)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			if (!Value.IsValid() || !Value->TryGetObject(Object)) continue;
+			FIslandCurioRecord Record;
+			FString Id, Kind;
+			(*Object)->TryGetStringField(TEXT("id"), Id);
+			(*Object)->TryGetStringField(TEXT("kind"), Kind);
+			const int64 KindValue = KindEnum->GetValueByNameString(Kind);
+			const TArray<TSharedPtr<FJsonValue>>* Where = nullptr;
+			if (Id.IsEmpty() || KindValue == INDEX_NONE || !(*Object)->TryGetArrayField(TEXT("location"), Where) || Where->Num() != 3 || FindCurio(FName(*Id))) continue;
+			Record.Id = FName(*Id);
+			Record.Kind = static_cast<EIslandCurioKind>(KindValue);
+			Record.Location = FVector((*Where)[0]->AsNumber(), (*Where)[1]->AsNumber(), (*Where)[2]->AsNumber());
+			(*Object)->TryGetNumberField(TEXT("state"), Record.State);
+			(*Object)->TryGetNumberField(TEXT("last_changed_day"), Record.LastChangedDay);
+			Record.State = FMath::Clamp(Record.State, 0, Record.Kind == EIslandCurioKind::Cairn ? AIslandCurio::CairnMaxStones : AIslandCurio::PodOpenState);
+			Curios.Add(Record);
+			RefreshCurioActor(Record);
+		}
+	}
 	const TArray<TSharedPtr<FJsonValue>>* NestValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("nests"), NestValues))
 	{
@@ -91,7 +131,8 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 			RefreshNestActor(Record);
 		}
 	}
-	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) from %s"), Nests.Num(), *Path);
+	if (Curios.Num() == 0) PlaceCurios();
+	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
 }
 
 bool UIslandWorldStateSubsystem::Save() const
@@ -115,10 +156,24 @@ bool UIslandWorldStateSubsystem::Save() const
 		NestValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("nests"), NestValues);
+	TArray<TSharedPtr<FJsonValue>> CurioValues;
+	for (const FIslandCurioRecord& Record : Curios)
+	{
+		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+		Object->SetStringField(TEXT("id"), Record.Id.ToString());
+		Object->SetStringField(TEXT("kind"), StaticEnum<EIslandCurioKind>()->GetNameStringByValue(static_cast<int64>(Record.Kind)));
+		Object->SetArrayField(TEXT("location"), {
+			MakeShared<FJsonValueNumber>(Record.Location.X), MakeShared<FJsonValueNumber>(Record.Location.Y), MakeShared<FJsonValueNumber>(Record.Location.Z) });
+		Object->SetNumberField(TEXT("state"), Record.State);
+		Object->SetNumberField(TEXT("last_changed_day"), Record.LastChangedDay);
+		CurioValues.Add(MakeShared<FJsonValueObject>(Object));
+	}
+	Root->SetArrayField(TEXT("curios"), CurioValues);
 	if (SavedHour.IsSet())
 	{
 		const TSharedRef<FJsonObject> Clock = MakeShared<FJsonObject>();
 		Clock->SetNumberField(TEXT("hour"), SavedHour.GetValue());
+		Clock->SetNumberField(TEXT("day"), SavedDay.Get(1));
 		Clock->SetStringField(TEXT("saved_utc"), FDateTime::UtcNow().ToIso8601());
 		Root->SetObjectField(TEXT("clock"), Clock);
 	}
@@ -165,13 +220,23 @@ int32 UIslandWorldStateSubsystem::AddNestLayer(FName SiteTag, const FVector& Sup
 	return Updated.Layers;
 }
 
-bool UIslandWorldStateSubsystem::SaveHour(float Hour)
+bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 {
-	const TOptional<float> Previous = SavedHour;
+	const TOptional<float> PreviousHour = SavedHour;
+	const TOptional<int32> PreviousDay = SavedDay;
 	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
+	SavedDay = FMath::Max(1, Day);
 	if (Save()) return true;
-	SavedHour = Previous;
+	SavedHour = PreviousHour;
+	SavedDay = PreviousDay;
 	return false;
+}
+
+int32 UIslandWorldStateSubsystem::CurrentIslandDay(const UWorld* World)
+{
+	if (World)
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It) return It->DayNumber;
+	return 1;
 }
 
 bool UIslandWorldStateSubsystem::RemoveNest(FName SiteTag)
@@ -224,4 +289,184 @@ static FAutoConsoleCommandWithWorldAndArgs GIslandRemoveNestCommand(
 			return;
 		}
 		UE_LOG(LogIslandWorldState, Log, TEXT("Island.RemoveNest %s: %s"), *Args[0], State->RemoveNest(FName(*Args[0])) ? TEXT("removed") : TEXT("no nest found"));
+	}));
+
+const FIslandCurioRecord* UIslandWorldStateSubsystem::FindCurio(FName Id) const
+{
+	return Curios.FindByPredicate([Id](const FIslandCurioRecord& Record) { return Record.Id == Id; });
+}
+
+namespace
+{
+	/** Finds open, walkable-looking ground near Desired, trying a few nearby points. */
+	bool FindCurioGround(UWorld* World, const FVector& Desired, FRandomStream& Random, float Jitter, FVector& OutGround)
+	{
+		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+		for (int32 Attempt = 0; Attempt < 10; ++Attempt)
+		{
+			const FVector2D Offset = Attempt == 0 ? FVector2D::ZeroVector : FVector2D(Random.FRandRange(-1.f, 1.f), Random.FRandRange(-1.f, 1.f)) * Jitter;
+			const FVector Probe = Desired + FVector(Offset.X, Offset.Y, 0.f);
+			FHitResult Hit;
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandCurioGround), false);
+			if (!World->LineTraceSingleByChannel(Hit, Probe + FVector(0.f, 0.f, 3000.f), Probe - FVector(0.f, 0.f, 5000.f), ECC_Visibility, Query)) continue;
+			// Reject roofs, trunks, rocks, and residents: curios sit on gentle open ground.
+			if (Hit.ImpactNormal.Z < 0.75f || Cast<APawn>(Hit.GetActor()) || Hit.ImpactPoint.Z > Desired.Z + 600.f) continue;
+			FNavLocation Walkable;
+			// Grounded residents must be able to walk up to it when the level has navigation.
+			if (Navigation && Navigation->GetDefaultNavDataInstance() &&
+				(!Navigation->ProjectPointToNavigation(Hit.ImpactPoint, Walkable, FVector(80.f, 80.f, 150.f)) || FVector::Dist2D(Walkable.Location, Hit.ImpactPoint) > 80.f))
+				continue;
+			OutGround = Hit.ImpactPoint;
+			return true;
+		}
+		return false;
+	}
+}
+
+bool UIslandWorldStateSubsystem::BuildCurioLayout(UWorld* World, TArray<FIslandCurioRecord>& OutLayout)
+{
+	OutLayout.Reset();
+	if (!World) return false;
+	const AActor* ListeningStones = nullptr;
+	const AActor* WindArch = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("IslandLandmark"))) continue;
+		if (It->ActorHasTag(TEXT("ListeningStones"))) ListeningStones = *It;
+		if (It->ActorHasTag(TEXT("WindArch"))) WindArch = *It;
+	}
+	// Only levels with the Island's landmarks get curios.
+	if (!ListeningStones) return false;
+
+	const FVector Anchor = ListeningStones->GetActorLocation();
+	FRandomStream Random(7331);
+	for (int32 Heading = 0; Heading < 8; ++Heading)
+	{
+		// A gently curving trail leading away from the stones, ending at the pod.
+		const float Base = Random.FRandRange(0.f, 2.f * PI);
+		TArray<FIslandCurioRecord> Layout;
+		bool bPlaced = true;
+		for (int32 Index = 0; Index <= 6 && bPlaced; ++Index)
+		{
+			const float Distance = 700.f + Index * 500.f + (Index == 6 ? 150.f : 0.f);
+			const float Angle = Base + 0.18f * FMath::Sin(Index * 0.9f);
+			FVector Ground;
+			bPlaced = FindCurioGround(World, Anchor + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance, Random, 120.f, Ground);
+			FIslandCurioRecord& Record = Layout.AddDefaulted_GetRef();
+			Record.Id = Index < 6 ? FName(*FString::Printf(TEXT("PaleStone_%d"), Index + 1)) : FName(TEXT("Seedpod"));
+			Record.Kind = Index < 6 ? EIslandCurioKind::PaleStone : EIslandCurioKind::SeedPod;
+			Record.Location = Ground;
+		}
+		// The cairn stands apart, on the far side of the WindArch (or the stones if there is no arch).
+		const FVector CairnAnchor = WindArch ? WindArch->GetActorLocation() : Anchor;
+		FVector CairnGround;
+		if (!bPlaced || !FindCurioGround(World, CairnAnchor + FVector(FMath::Cos(Base + PI), FMath::Sin(Base + PI), 0.f) * 900.f, Random, 250.f, CairnGround)) continue;
+		FIslandCurioRecord& Cairn = Layout.AddDefaulted_GetRef();
+		Cairn.Id = TEXT("Cairn");
+		Cairn.Kind = EIslandCurioKind::Cairn;
+		Cairn.Location = CairnGround;
+		Cairn.State = 3; // Someone began it long ago; who is not recorded anywhere.
+		OutLayout = Layout;
+		return true;
+	}
+	UE_LOG(LogIslandWorldState, Warning, TEXT("Could not find open walkable ground for the Island curios; none were placed."));
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::PlaceCurios()
+{
+	if (bStorageUnreadable || GetStorageFilePath().IsEmpty() || Curios.Num() > 0 || !BuildCurioLayout(GetWorld(), Curios)) return false;
+	if (!Save())
+	{
+		Curios.Reset();
+		return false;
+	}
+	for (const FIslandCurioRecord& Record : Curios) RefreshCurioActor(Record);
+	UE_LOG(LogIslandWorldState, Log, TEXT("Placed %d curios near the ListeningStones."), Curios.Num());
+	return true;
+}
+
+FString UIslandWorldStateSubsystem::ExamineCurio(FName Id, int32 Today)
+{
+	FIslandCurioRecord* Record = Curios.FindByPredicate([Id](const FIslandCurioRecord& Existing) { return Existing.Id == Id; });
+	if (!Record) return TEXT("There is nothing here to examine.");
+	const FIslandCurioRecord Before = *Record;
+	FString Fact;
+	switch (Record->Kind)
+	{
+	case EIslandCurioKind::PaleStone:
+		return TEXT("A small, smooth pale stone, set deliberately into the ground. It is cool and unmarked; nothing lies beneath it. You leave it as it was.");
+	case EIslandCurioKind::SeedPod:
+		if (Record->State >= AIslandCurio::PodOpenState)
+			return TEXT("The pod stands open. The small seed inside glows faintly and steadily; it does not respond to touch, and what it is remains unknown.");
+		if (Record->LastChangedDay == Today)
+			return TEXT("The pod feels faintly warm, but nothing about it has changed since earlier today.");
+		++Record->State;
+		Record->LastChangedDay = Today;
+		Fact = Record->State == 1
+			? TEXT("As you examine the closed pod, two of its husk-leaves slowly peel back, as though it had been waiting for a visitor. Inside is only darkness for now.")
+			: Record->State == 2
+			? TEXT("Two more husk-leaves curl open. A pale light shows through the gap; it was not there on the last day anyone came.")
+			: TEXT("The last husk-leaves fold back. A small seed rests inside, glowing faintly and steadily. It stays where it is.");
+		Fact += TEXT(" This change remains after this session.");
+		break;
+	case EIslandCurioKind::Cairn:
+		if (Record->State >= AIslandCurio::CairnMaxStones)
+			return FString::Printf(TEXT("The cairn stands %d stones high; the top is too narrow to hold another."), Record->State);
+		if (Record->LastChangedDay == Today)
+			return FString::Printf(TEXT("The cairn stands %d stones high. Its top stone was set there today and still sits a little unsteadily; another would topple it."), Record->State);
+		++Record->State;
+		Record->LastChangedDay = Today;
+		Fact = FString::Printf(TEXT("You find a flat stone nearby and set it on the small cairn; it now stands %d stones high. Someone began it before you came. It will still be here later."), Record->State);
+		break;
+	}
+	if (!Save())
+	{
+		*Record = Before;
+		return TEXT("You examined it, but the change could not be kept, so nothing lasting happened.");
+	}
+	RefreshCurioActor(*Record);
+	return Fact;
+}
+
+bool UIslandWorldStateSubsystem::ForgetCurios()
+{
+	const TArray<FIslandCurioRecord> Previous = Curios;
+	Curios.Reset();
+	if (!Save())
+	{
+		Curios = Previous;
+		return false;
+	}
+	for (const TPair<FName, TWeakObjectPtr<AIslandCurio>>& Pair : CurioActors)
+		if (Pair.Value.IsValid()) Pair.Value->Destroy();
+	CurioActors.Reset();
+	return true;
+}
+
+void UIslandWorldStateSubsystem::RefreshCurioActor(const FIslandCurioRecord& Record)
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+	TWeakObjectPtr<AIslandCurio>& Actor = CurioActors.FindOrAdd(Record.Id);
+	if (!Actor.IsValid())
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Actor = World->SpawnActor<AIslandCurio>(Record.Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance), FRotator::ZeroRotator, Spawn);
+		if (!Actor.IsValid()) return;
+		// First tag is the unique move_to/interact target, matching the landmark convention.
+		Actor->Tags.Insert(Record.Id, 0);
+	}
+	Actor->ShowRecord(Record);
+}
+
+static FAutoConsoleCommandWithWorld GIslandForgetCuriosCommand(
+	TEXT("Island.ForgetCurios"),
+	TEXT("Forgets every Island curio (stones, pod, cairn) and its state; fresh ones are placed the next time play begins."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		UE_LOG(LogIslandWorldState, Log, TEXT("Island.ForgetCurios: %s"), State && State->ForgetCurios() ? TEXT("forgotten") : TEXT("nothing changed (needs a running play world with writable state)"));
 	}));

@@ -52,9 +52,13 @@ void AIslandDayNight::BeginPlay()
 {
 	Super::BeginPlay();
 	CurrentHour = WrapHour(StartHour);
+	DayNumber = 1;
 	SecondsSinceSave = 0.f;
 	if (const UIslandWorldStateSubsystem* WorldState = bResumeSavedTime ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr)
+	{
 		if (const TOptional<float> Saved = WorldState->GetSavedHour(); Saved.IsSet()) CurrentHour = WrapHour(Saved.GetValue());
+		DayNumber = WorldState->GetSavedDay().Get(1);
+	}
 	if (Sun) Sun->GetLightComponent()->SetMobility(EComponentMobility::Movable);
 	if (Sky) Sky->GetLightComponent()->SetMobility(EComponentMobility::Movable);
 	UpdateLighting();
@@ -72,7 +76,9 @@ void AIslandDayNight::PostEditChangeProperty(FPropertyChangedEvent& Event)
 void AIslandDayNight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	const float PreviousHour = CurrentHour;
 	if (bAdvanceTime) CurrentHour = WrapHour(CurrentHour + FMath::Max(0.f, DeltaSeconds) * 24.0 / (FMath::Max(1.f, DayLengthMinutes) * 60.0));
+	if (CurrentHour < PreviousHour) ++DayNumber;
 	UpdateLighting();
 	// Save occasionally too, so a crash or forced stop loses at most a minute of Island time.
 	SecondsSinceSave += FMath::Max(0.f, DeltaSeconds);
@@ -89,7 +95,7 @@ void AIslandDayNight::PersistHour()
 {
 	SecondsSinceSave = 0.f;
 	if (!bResumeSavedTime || !GetWorld()) return;
-	if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>()) WorldState->SaveHour(CurrentHour);
+	if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>()) WorldState->SaveClock(CurrentHour, DayNumber);
 }
 
 void AIslandDayNight::UpdateLighting()

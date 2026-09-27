@@ -123,6 +123,43 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					: FString::Printf(TEXT(" A small nest of woven twigs rests on a perch about %.0f metres away, %d of %d layers woven. You did not see who made it."),
 						FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers);
 			}
+			// Curios are only noticed up close; nothing announces them from afar.
+			const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+			int32 NoticedCurios = 0;
+			for (const FIslandCurioRecord& Curio : WorldState->GetCurios())
+			{
+				if (NoticedCurios >= 3) break;
+				const FVector View = Curio.Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance);
+				const float NoticeRange = Curio.Kind == EIslandCurioKind::Cairn ? 1500.f : 800.f;
+				if (FVector::DistSquared(Location, View) > FMath::Square(NoticeRange)) continue;
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentCurioVisibility), false, Owner);
+				FHitResult Hit;
+				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, View, ECC_Visibility, Params)) continue;
+				const float Metres = FVector::Dist(Location, View) / 100.f;
+				const FString Target = Curio.Id.ToString();
+				if (Curio.Kind == EIslandCurioKind::PaleStone)
+				{
+					NearbyBeings += FString::Printf(TEXT(" Half-hidden in the ground about %.0f metres away, a small pale stone looks deliberately set there (move_to/interact target: %s)."), Metres, *Target);
+					int32 Number = 0;
+					if (Target.RightChop(10).IsNumeric()) Number = FCString::Atoi(*Target.RightChop(10));
+					if (const FIslandCurioRecord* Next = WorldState->FindCurio(FName(*FString::Printf(TEXT("PaleStone_%d"), Number + 1))))
+						NearbyBeings += FString::Printf(TEXT(" About %.0f metres beyond it, another pale stone is faintly visible (move_to target: %s)."), FVector::Dist(Curio.Location, Next->Location) / 100.f, *Next->Id.ToString());
+				}
+				else if (Curio.Kind == EIslandCurioKind::SeedPod)
+				{
+					const TCHAR* Look = Curio.State <= 0 ? TEXT("a strange closed pod, about knee height, its husk-leaves folded tight")
+						: Curio.State == 1 ? TEXT("a strange pod with two husk-leaves peeled back; it is dark inside")
+						: Curio.State == 2 ? TEXT("a strange half-open pod; pale light shows between its husk-leaves")
+						: TEXT("an open pod cradling a small seed that glows faintly and steadily");
+					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away stands %s (move_to/interact target: %s).%s"), Metres, Look, *Target,
+						Curio.State < AIslandCurio::PodOpenState && Curio.LastChangedDay == Today ? TEXT(" It has already changed once today.") : TEXT(""));
+				}
+				else
+				{
+					NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away (move_to/interact target: %s)."), Curio.State, Metres, *Target);
+				}
+				++NoticedCurios;
+			}
 		}
 		int32 VisibleLandmarks = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks < 6; ++It)

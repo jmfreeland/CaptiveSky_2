@@ -91,6 +91,7 @@ protected:
 private:
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
+	friend class FIslandCurioTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 

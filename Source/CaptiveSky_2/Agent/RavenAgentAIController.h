@@ -65,6 +65,7 @@ protected:
 private:
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
+	friend class FIslandCurioTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;
