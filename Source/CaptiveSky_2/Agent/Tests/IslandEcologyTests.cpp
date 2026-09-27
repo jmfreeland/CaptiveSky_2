@@ -76,6 +76,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	const FVector DeflectedFlight = FlightTester->ResolveFlightPath(FVector(1800.f, 2000.f, 250.f), FVector(2200.f, 2300.f, 250.f));
 	TestTrue(TEXT("Firefly flight never sweeps through a solid obstacle"), DeflectedFlight.X < 1990.f);
 	TestTrue(TEXT("Firefly uses the open tangent path around the obstacle"), DeflectedFlight.Y > 2100.f && DeflectedFlight.Y <= 2300.f);
+	AIslandTidepoolCrab* CrabPathTester = World->SpawnActor<AIslandTidepoolCrab>(FVector(1800.f, 2000.f, 250.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("Shore crab obstacle tester spawned"), CrabPathTester))
+	{
+		const FVector DeflectedScurry = CrabPathTester->ResolveGroundPath(FVector(1800.f, 2000.f, 250.f), FVector(2200.f, 2300.f, 250.f));
+		TestTrue(TEXT("Shore crab scurry never sweeps through solid geometry"), DeflectedScurry.X < 1990.f);
+		TestTrue(TEXT("Shore crab tries the open tangent path around the obstacle"), DeflectedScurry.Y > 2100.f && DeflectedScurry.Y <= 2300.f);
+		CrabPathTester->Destroy();
+	}
 	FlightTester->Destroy();
 	FlightBlocker->Destroy();
 
