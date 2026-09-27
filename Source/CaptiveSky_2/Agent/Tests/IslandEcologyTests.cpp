@@ -6,6 +6,7 @@
 #include "IslandWeather.h"
 #include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/AudioComponent.h"
@@ -61,12 +62,25 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(Spawn);
 	AActor* Habitat = World->SpawnActor<AActor>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
+	AActor* Ground = World->SpawnActor<AActor>(Spawn);
 	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Clock actor spawned"), Clock) || !TestNotNull(TEXT("Habitat marker spawned"), Habitat))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 		return false;
 	}
+	if (!TestNotNull(TEXT("Ground fixture actor spawned"), Ground))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	UBoxComponent* GroundBox = NewObject<UBoxComponent>(Ground);
+	Ground->SetRootComponent(GroundBox);
+	GroundBox->SetBoxExtent(FVector(1500.f, 1500.f, 10.f));
+	GroundBox->SetCollisionProfileName(TEXT("BlockAll"));
+	GroundBox->RegisterComponent();
+	Ground->SetActorLocation(FVector(0.f, 0.f, -20.f));
 	Habitat->Tags.Add(TEXT("TideglassPool"));
 	const int32 OriginalWeatherSeed = Weather->WeatherSeed;
 	float PeakRain = -1.f;
@@ -83,6 +97,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Weather seed space includes heavy rain and dry conditions"), PeakRain > 0.55f && LowestRain < 0.01f);
 	Weather->WeatherSeed = StormSeed;
 	Weather->UpdateRainRendering();
+	TestNotNull(TEXT("Ground rain effects use a bounded instanced component"), Weather->RainGroundImpactStreaks.Get());
+	TestEqual(TEXT("Ground rain effect pool has exactly three reusable splash streaks"), Weather->RainGroundImpactStreaks->GetInstanceCount(), 3);
+	TestEqual(TEXT("A strong shower creates one small ground splash from a blocking surface"), Weather->ActiveRainGroundImpactCount, 3);
+	TestTrue(TEXT("The ground splash is placed on the collision surface"), FMath::IsNearlyEqual(Weather->LastRainGroundImpactLocation.Z, -10.f, 1.f));
+	Weather->UpdateRainGroundResponse(Weather->GetActorLocation(), nullptr, World->GetTimeSeconds() + 0.2);
+	FTransform SplashTransform;
+	Weather->RainGroundImpactStreaks->GetInstanceTransform(0, SplashTransform, false);
+	TestTrue(TEXT("Ground splash streaks animate above the collision surface during their brief lifetime"), Weather->RainGroundImpactStreaks->IsVisible() && SplashTransform.GetScale3D().Z > 0.f);
 	AIslandPoolRippleEffect* RainRipple = nullptr;
 	int32 RainRippleCount = 0;
 	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
@@ -95,13 +117,20 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (RainRipple)
 	{
 		TestTrue(TEXT("Rain water response is subtler than a deliberate pool interaction"), RainRipple->PeakLightIntensity < 55.f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
+		int32 ActorsBeforeRepeat = 0;
+		for (TActorIterator<AActor> It(World); It; ++It) ++ActorsBeforeRepeat;
 		Weather->UpdateRainRendering();
+		int32 ActorsAfterRepeat = 0;
+		for (TActorIterator<AActor> It(World); It; ++It) ++ActorsAfterRepeat;
+		TestEqual(TEXT("Repeated rain updates reuse the bounded instance pool without spawning per-drop actors"), ActorsAfterRepeat, ActorsBeforeRepeat);
 		RainRippleCount = 0;
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("RainImpact"))) ++RainRippleCount;
 		TestEqual(TEXT("Repeated weather updates do not stack pool impacts"), RainRippleCount, 1);
 	}
 	Weather->WeatherSeed = DryWeatherSeed;
 	Weather->UpdateRainRendering();
+	TestTrue(TEXT("Dry weather hides and clears the transient ground splash"), Weather->ActiveRainGroundImpactCount == 0 && !Weather->RainGroundImpactStreaks->IsVisible());
+	TestEqual(TEXT("Rain reuses the same fixed-size ground splash pool"), Weather->RainGroundImpactStreaks->GetInstanceCount(), 3);
 	RainRippleCount = 0;
 	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("RainImpact"))) ++RainRippleCount;
 	TestEqual(TEXT("Dry conditions do not create additional water impacts"), RainRippleCount, 1);

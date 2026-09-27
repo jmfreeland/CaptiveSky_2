@@ -26,8 +26,18 @@ AIslandWeather::AIslandWeather()
 	RainStreaks->SetCastShadow(false);
 	RainStreaks->bReceivesDecals = false;
 	RainStreaks->SetVisibility(false);
+	RainGroundImpactStreaks = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RainGroundImpactStreaks"));
+	RainGroundImpactStreaks->SetupAttachment(RootComponent);
+	RainGroundImpactStreaks->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RainGroundImpactStreaks->SetCastShadow(false);
+	RainGroundImpactStreaks->bReceivesDecals = false;
+	RainGroundImpactStreaks->SetVisibility(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RainMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (RainMesh.Succeeded()) RainStreaks->SetStaticMesh(RainMesh.Object);
+	if (RainMesh.Succeeded())
+	{
+		RainStreaks->SetStaticMesh(RainMesh.Object);
+		RainGroundImpactStreaks->SetStaticMesh(RainMesh.Object);
+	}
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -52,8 +62,10 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	WeatherCloudMaterial = nullptr;
 	OriginalCloudMaterial = nullptr;
 	if (RainStreaks) RainStreaks->SetVisibility(false, true);
+	if (RainGroundImpactStreaks) RainGroundImpactStreaks->SetVisibility(false, true);
 	RainStreakMaterial = nullptr;
 	ActiveRainStreakCount = 0;
+	ActiveRainGroundImpactCount = 0;
 	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 		if (Firefly.IsValid()) Firefly->Destroy();
 	NightFireflies.Reset();
@@ -98,6 +110,7 @@ void AIslandWeather::UpdateRainRendering()
 	{
 		ActiveRainStreakCount = 0;
 		RainStreaks->SetVisibility(false, true);
+		ClearRainGroundResponse();
 		return;
 	}
 
@@ -114,7 +127,9 @@ void AIslandWeather::UpdateRainRendering()
 			WindObserver = PlayerPawn;
 		}
 	RainStreaks->SetWorldLocation(VisualizationCenter);
+	RainGroundImpactStreaks->SetWorldLocation(VisualizationCenter);
 	if (CurrentRainIntensity >= 0.55f) UpdateRainPoolResponse();
+	UpdateRainGroundResponse(VisualizationCenter, WindObserver, Now);
 	const FVector Wind = GetLocalWind(VisualizationCenter, WindObserver);
 	const FVector Flow = FVector(Wind.X, Wind.Y, -1800.f).GetSafeNormal();
 	const FQuat StreakRotation = FQuat::FindBetweenNormals(FVector::UpVector, Flow);
@@ -142,6 +157,76 @@ void AIslandWeather::UpdateRainRendering()
 		const FTransform Transform(StreakRotation, Position, Scale);
 		RainStreaks->UpdateInstanceTransform(Index, Transform, false, Index == PoolSize - 1, true);
 	}
+}
+
+void AIslandWeather::UpdateRainGroundResponse(const FVector& Center, const AActor* Observer, double Now)
+{
+	if (!RainGroundImpactStreaks || !RainStreakMaterial || CurrentRainIntensity < 0.35f)
+	{
+		ClearRainGroundResponse();
+		return;
+	}
+
+	if (!bRainGroundImpactPoolInitialized)
+	{
+		RainGroundImpactStreaks->SetMaterial(0, RainStreakMaterial);
+		RainGroundImpactStreaks->ClearInstances();
+		for (int32 Index = 0; Index < 3; ++Index)
+			RainGroundImpactStreaks->AddInstance(FTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector), false);
+		bRainGroundImpactPoolInitialized = true;
+	}
+
+	if (Now >= NextRainGroundImpactTime)
+	{
+		const double Seed = WeatherSeed * 0.071 + (++RainGroundImpactSequence) * 0.6180339887498949;
+		const double Angle = FMath::Frac(Seed * 1.37) * 2.0 * PI;
+		const float Radius = FMath::Sqrt(static_cast<float>(FMath::Frac(Seed * 2.11))) * FMath::Min(900.f, FMath::Max(250.f, RainVisualizationRadius * 0.35f));
+		const FVector Candidate = Center + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+		const float TraceHeight = FMath::Clamp(RainVisualizationHeight, 1000.f, 5000.f);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(IslandRainGroundImpact), false, this);
+		if (Observer) Params.AddIgnoredActor(Observer);
+		FHitResult Hit;
+		const FVector TraceStart = Candidate + FVector(0.f, 0.f, TraceHeight * 0.5f);
+		const FVector TraceEnd = Candidate - FVector(0.f, 0.f, TraceHeight * 1.5f);
+		if (GetWorld() && GetWorld()->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params) &&
+			Hit.GetActor() && !Hit.GetActor()->ActorHasTag(TEXT("TideglassPool")))
+		{
+			LastRainGroundImpactLocation = Hit.ImpactPoint;
+			RainGroundImpactStartedAt = Now;
+			ActiveRainGroundImpactCount = 3;
+		}
+		const float RainAlpha = FMath::Clamp((CurrentRainIntensity - 0.35f) / 0.65f, 0.f, 1.f);
+		NextRainGroundImpactTime = Now + FMath::Lerp(3.0f, 0.75f, RainAlpha);
+	}
+
+	const float Age = static_cast<float>(Now - RainGroundImpactStartedAt);
+	const float Alpha = FMath::Clamp(Age / 0.8f, 0.f, 1.f);
+	const float Envelope = FMath::Sin(PI * Alpha);
+	if (ActiveRainGroundImpactCount == 0 || Alpha >= 1.f)
+	{
+		ActiveRainGroundImpactCount = 0;
+		RainGroundImpactStreaks->SetVisibility(false, true);
+		return;
+	}
+
+	RainGroundImpactStreaks->SetVisibility(true, true);
+	const FVector LocalImpact = RainGroundImpactStreaks->GetComponentTransform().InverseTransformPosition(LastRainGroundImpactLocation);
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		const float Angle = Index * (2.f * PI / 3.f) + RainGroundImpactSequence * 0.41f;
+		const FVector Direction = FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.85f).GetSafeNormal();
+		const FVector Position = LocalImpact + FVector(Direction.X, Direction.Y, 0.f) * (4.f + 22.f * Alpha) + FVector(0.f, 0.f, 18.f * Alpha);
+		const FQuat Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Direction);
+		const FVector Scale(0.004f * Envelope, 0.004f * Envelope, 0.16f * Envelope);
+		RainGroundImpactStreaks->UpdateInstanceTransform(Index, FTransform(Rotation, Position, Scale), false, Index == 2, true);
+	}
+}
+
+void AIslandWeather::ClearRainGroundResponse()
+{
+	ActiveRainGroundImpactCount = 0;
+	NextRainGroundImpactTime = 0.0;
+	if (RainGroundImpactStreaks) RainGroundImpactStreaks->SetVisibility(false, true);
 }
 
 void AIslandWeather::UpdateRainPoolResponse()
@@ -366,7 +451,7 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
 	});
 	const TCHAR* Conditions = Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible during showers. Strong rain also creates sparse Tideglass ripples and makes nearby fireflies fly lower and dim their natural pulse. General ground impacts and weather sounds are not yet implemented."),
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible during showers. Strong rain also creates sparse Tideglass ripples and small collision-sampled ground splashes, while nearby fireflies fly lower and dim their natural pulse. Weather sounds are not yet implemented."),
 		Conditions,
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
 		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f);

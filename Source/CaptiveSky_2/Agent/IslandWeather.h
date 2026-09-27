@@ -80,6 +80,8 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> WeatherCloudMaterial;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Rain")
 	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Rain")
+	TObjectPtr<UInstancedStaticMeshComponent> RainGroundImpactStreaks;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> RainStreakMaterial;
 	float OriginalCloudCoverage = 0.f;
@@ -90,15 +92,23 @@ private:
 	bool bHasStormCloudsParameter = false;
 	bool bCloudParameterWarningLogged = false;
 	bool bRainPoolInitialized = false;
+	bool bRainGroundImpactPoolInitialized = false;
 	int32 ActiveRainStreakCount = 0;
+	int32 ActiveRainGroundImpactCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;
+	double NextRainGroundImpactTime = 0.0;
+	double RainGroundImpactStartedAt = 0.0;
+	FVector LastRainGroundImpactLocation = FVector::ZeroVector;
+	uint32 RainGroundImpactSequence = 0;
 	void RefreshNightEcology();
 	bool InitializeCloudRendering();
 	void UpdateCloudRendering();
 	bool InitializeRainRendering();
 	void UpdateRainRendering();
 	void UpdateRainPoolResponse();
+	void UpdateRainGroundResponse(const FVector& Center, const AActor* Observer, double Now);
+	void ClearRainGroundResponse();
 	bool HasUpwindObstruction(const FVector& Position, const FVector& Wind, const AActor* Observer) const;
 };
