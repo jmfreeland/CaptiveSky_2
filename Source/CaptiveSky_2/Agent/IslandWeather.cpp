@@ -1,4 +1,5 @@
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
@@ -59,6 +60,10 @@ AIslandWeather::AIslandWeather()
 void AIslandWeather::BeginPlay()
 {
 	Super::BeginPlay();
+	// Carry on from the weather the Island was having when it was last left.
+	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		WeatherTimeOffset = WorldState->GetSavedWeatherSeconds().Get(0.0);
+	SecondsSinceWeatherSave = 0.f;
 	InitializeWeatherAmbience();
 	UpdateCloudRendering();
 	UpdateRainRendering();
@@ -66,8 +71,16 @@ void AIslandWeather::BeginPlay()
 	GetWorldTimerManager().SetTimer(EcologyTimerHandle, this, &AIslandWeather::RefreshNightEcology, 30.f, true, 30.f);
 }
 
+void AIslandWeather::PersistWeatherTime()
+{
+	SecondsSinceWeatherSave = 0.f;
+	if (UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr)
+		WorldState->SaveWeatherSeconds(WeatherTimeOffset + GetWorld()->GetTimeSeconds());
+}
+
 void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	PersistWeatherTime();
 	GetWorldTimerManager().ClearTimer(EcologyTimerHandle);
 	if (UVolumetricCloudComponent* Cloud = CloudComponent.Get())
 		if (OriginalCloudMaterial) Cloud->SetMaterial(OriginalCloudMaterial);
@@ -97,6 +110,8 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AIslandWeather::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	SecondsSinceWeatherSave += FMath::Max(0.f, DeltaSeconds);
+	if (SecondsSinceWeatherSave >= 60.f) PersistWeatherTime();
 	UpdateCloudRendering();
 	UpdateRainRendering();
 	UpdateWindPoolResponse();
@@ -569,30 +584,60 @@ void AIslandWeather::RefreshNightEcology()
 	}
 }
 
+float AIslandWeather::SampleSpell(double Seconds) const
+{
+	// Two slow, incommensurate swells: spells last a few Island days and never quite repeat.
+	const double Time = Seconds + WeatherTimeOffset;
+	const double Period = FMath::Max(30.f, CycleSeconds) * 14.0;
+	const double Spell = 0.5 + 0.32 * FMath::Sin(Time / Period * 2.0 * PI + WeatherSeed * 0.71)
+		+ 0.18 * FMath::Sin(Time / (Period * 2.3) * 2.0 * PI + WeatherSeed * 1.9);
+	return FMath::Clamp(static_cast<float>(Spell), 0.f, 1.f);
+}
+
 float AIslandWeather::SampleCloudCover(double Seconds) const
 {
-	const double Phase = Seconds / FMath::Max(30.f, CycleSeconds) * 2.0 * PI + WeatherSeed * 0.37;
-	return static_cast<float>(0.5 + 0.5 * FMath::Sin(Phase));
+	const double Time = Seconds + WeatherTimeOffset;
+	const double Phase = Time / FMath::Max(30.f, CycleSeconds) * 2.0 * PI + WeatherSeed * 0.37;
+	// Wet spells hold the sky cloudier; dry spells clear it.
+	return FMath::Clamp(static_cast<float>(0.5 + 0.5 * FMath::Sin(Phase)) + (SampleSpell(Seconds) - 0.5f) * 0.7f, 0.f, 1.f);
+}
+
+float AIslandWeather::SampleFrontStrength(double Seconds) const
+{
+	const double Time = Seconds + WeatherTimeOffset;
+	const double RainPeriod = FMath::Max(30.f, CycleSeconds) * FMath::Clamp(RainCycleMultiplier, 1.f, 8.f);
+	const double FrontPhase = Time / RainPeriod * 2.0 * PI + WeatherSeed * 0.13 + 2.1;
+	return static_cast<float>(0.5 + 0.5 * FMath::Sin(FrontPhase));
+}
+
+float AIslandWeather::SampleStormIntensity(double Seconds) const
+{
+	// Rare by construction: the peak of a wet spell and the heart of a front at the same time.
+	const float Wet = FMath::SmoothStep(0.74f, 0.92f, SampleSpell(Seconds));
+	const float Front = FMath::SmoothStep(0.80f, 0.97f, SampleFrontStrength(Seconds));
+	return FMath::Clamp(Wet * Front, 0.f, 1.f);
 }
 
 float AIslandWeather::SampleRainIntensity(double Seconds) const
 {
-	const double RainPeriod = FMath::Max(30.f, CycleSeconds) * FMath::Clamp(RainCycleMultiplier, 1.f, 8.f);
-	const double FrontPhase = Seconds / RainPeriod * 2.0 * PI + WeatherSeed * 0.13 + 2.1;
-	const float FrontStrength = static_cast<float>(0.5 + 0.5 * FMath::Sin(FrontPhase));
-	const float RainFront = FMath::SmoothStep(0.62f, 0.90f, FrontStrength);
+	// Wet spells let weaker fronts bring rain; dry spells need a strong one.
+	const float Wetness = SampleSpell(Seconds) - 0.5f;
+	const float RainFront = FMath::SmoothStep(0.62f - Wetness * 0.4f, 0.90f - Wetness * 0.2f, SampleFrontStrength(Seconds));
 	const float CloudGate = FMath::SmoothStep(0.48f, 0.78f, SampleCloudCover(Seconds));
-	return FMath::Clamp(RainFront * CloudGate, 0.f, 1.f);
+	return FMath::Clamp(FMath::Max(RainFront * CloudGate, SampleStormIntensity(Seconds)), 0.f, 1.f);
 }
 
 FVector AIslandWeather::SampleWind(const FVector& Position, double Seconds) const
 {
-	const double Phase = Seconds / FMath::Max(30.f, CycleSeconds) * 2.0 * PI + WeatherSeed * 0.37;
-	const double Heading = Phase * 0.3 + FMath::Sin(Seconds / 43.0) * 0.25;
-	const double Gust = 0.65 + 0.35 * FMath::Sin(Seconds / 7.0 + Position.X / 1700.0 + Position.Y / 2300.0);
-	const double Speed = FMath::Clamp(MaximumWindSpeed, 0.f, 300.f) * (0.25 + 0.75 * SampleCloudCover(Seconds)) * Gust;
+	const double Time = Seconds + WeatherTimeOffset;
+	const double Phase = Time / FMath::Max(30.f, CycleSeconds) * 2.0 * PI + WeatherSeed * 0.37;
+	const double Heading = Phase * 0.3 + FMath::Sin(Time / 43.0) * 0.25;
+	const float Storm = SampleStormIntensity(Seconds);
+	// Storm gusts are quicker and harder than ordinary ones.
+	const double Gust = 0.65 + 0.35 * FMath::Sin(Time / (7.0 - 3.5 * Storm) + Position.X / 1700.0 + Position.Y / 2300.0);
+	const double Speed = FMath::Clamp(MaximumWindSpeed, 0.f, 300.f) * (0.25 + 0.75 * SampleCloudCover(Seconds)) * Gust * (1.0 + StormWindBoost * Storm);
 	return FVector(FMath::Cos(Heading), FMath::Sin(Heading),
-		0.18 * FMath::Sin(Position.X / 2100.0 + Seconds / 19.0)) .GetSafeNormal() * Speed;
+		0.18 * FMath::Sin(Position.X / 2100.0 + Time / 19.0)) .GetSafeNormal() * Speed;
 }
 
 FVector AIslandWeather::GetLocalWind(const FVector& Position, const AActor* Observer) const
@@ -665,9 +710,12 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	{
 		return !EvaluateTransientGust(Gust, Position, Now).IsNearlyZero(5.f);
 	});
-	const TCHAR* Conditions = Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
+	const float Storm = SampleStormIntensity(Now);
+	const float Spell = SampleSpell(Now);
+	const TCHAR* Conditions = Storm > 0.35f ? TEXT("a storm: heavy rain driven by strong, gusting wind") : Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
 	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible during showers. Strong rain also creates sparse Tideglass ripples and small collision-sampled ground splashes, while nearby fireflies fly lower and dim their natural pulse. Quiet local wind and distant rain ambience follow the weather when a player listener is present."),
 		Conditions,
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
-		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f);
+		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f)
+		+ (Spell > 0.72f ? TEXT(" The weather has turned unsettled and wet over the last few days.") : Spell < 0.28f ? TEXT(" The weather has been settled and dry over the last few days.") : TEXT(""));
 }

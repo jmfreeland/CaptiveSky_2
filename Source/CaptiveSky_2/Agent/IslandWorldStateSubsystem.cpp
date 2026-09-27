@@ -65,6 +65,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	Curios.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
+	SavedWeatherSeconds.Reset();
 	SavedWetness.Reset();
 	bStorageUnreadable = false;
 	const FString Path = GetStorageFilePath();
@@ -92,6 +93,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	ArrangementSites.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
+	SavedWeatherSeconds.Reset();
 	SavedWetness.Reset();
 	FString Contents;
 	TSharedPtr<FJsonObject> Root;
@@ -110,6 +112,10 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	if (Root->TryGetObjectField(TEXT("environment"), Environment) &&
 		(*Environment)->TryGetNumberField(TEXT("wetness"), Wetness) && FMath::IsFinite(Wetness) && Wetness >= 0.0 && Wetness <= 1.0)
 		SavedWetness = static_cast<float>(Wetness);
+	const TSharedPtr<FJsonObject>* Weather = nullptr;
+	double WeatherSeconds = 0.0;
+	if (Root->TryGetObjectField(TEXT("weather"), Weather) && (*Weather)->TryGetNumberField(TEXT("seconds"), WeatherSeconds) && WeatherSeconds >= 0.0)
+		SavedWeatherSeconds = WeatherSeconds;
 	const TArray<TSharedPtr<FJsonValue>>* CurioValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("curios"), CurioValues))
 	{
@@ -279,6 +285,12 @@ bool UIslandWorldStateSubsystem::Save() const
 		Clock->SetStringField(TEXT("saved_utc"), FDateTime::UtcNow().ToIso8601());
 		Root->SetObjectField(TEXT("clock"), Clock);
 	}
+	if (SavedWeatherSeconds.IsSet())
+	{
+		const TSharedRef<FJsonObject> Weather = MakeShared<FJsonObject>();
+		Weather->SetNumberField(TEXT("seconds"), SavedWeatherSeconds.GetValue());
+		Root->SetObjectField(TEXT("weather"), Weather);
+	}
 	if (SavedWetness.IsSet())
 	{
 		const TSharedRef<FJsonObject> Environment = MakeShared<FJsonObject>();
@@ -350,6 +362,15 @@ bool UIslandWorldStateSubsystem::SaveWetness(float Wetness)
 	SavedWetness = FMath::Clamp(Wetness, 0.f, 1.f);
 	if (Save()) return true;
 	SavedWetness = PreviousWetness;
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::SaveWeatherSeconds(double Seconds)
+{
+	const TOptional<double> Previous = SavedWeatherSeconds;
+	SavedWeatherSeconds = FMath::Max(0.0, Seconds);
+	if (Save()) return true;
+	SavedWeatherSeconds = Previous;
 	return false;
 }
 

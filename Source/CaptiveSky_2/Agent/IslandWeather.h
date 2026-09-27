@@ -54,8 +54,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Weather|Rain", meta=(ClampMin="1000", ClampMax="5000"))
 	float RainVisualizationHeight = 2600.f;
 
+	/**
+	 * Weather already lived through in earlier sessions, in seconds. Every sample adds it to the session
+	 * time it is given, so the weather carries on where it left off (saved in the world state).
+	 */
+	double WeatherTimeOffset = 0.0;
+	/** Storms add up to this fraction on top of the usual wind. */
+	static constexpr float StormWindBoost = 0.9f;
+
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
+	/** Slow multi-day tendency: 0 is a settled dry spell, 1 an unsettled wet spell (a few Island days each). */
+	float SampleSpell(double Seconds) const;
+	/** 0 calm, up to 1 a full storm: only when a wet spell peaks and a heavy front arrives. */
+	float SampleStormIntensity(double Seconds) const;
 	float SampleCloudCover(double Seconds) const;
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
@@ -129,6 +141,10 @@ private:
 	double RainGroundImpactStartedAt = 0.0;
 	FVector LastRainGroundImpactLocation = FVector::ZeroVector;
 	uint32 RainGroundImpactSequence = 0;
+	float SecondsSinceWeatherSave = 0.f;
+	void PersistWeatherTime();
+	/** 0..1 strength of the passing rain front, before clouds gate it. */
+	float SampleFrontStrength(double Seconds) const;
 	void RefreshNightEcology();
 	bool InitializeCloudRendering();
 	void UpdateCloudRendering();

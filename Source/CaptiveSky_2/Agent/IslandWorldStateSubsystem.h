@@ -82,6 +82,10 @@ public:
 	/** Environmental wetness (0..1) at the end of the previous session, if one was recorded. */
 	TOptional<float> GetSavedWetness() const { return SavedWetness; }
 
+	/** Total weather time lived so far (seconds), so the next session's weather carries on. */
+	TOptional<double> GetSavedWeatherSeconds() const { return SavedWeatherSeconds; }
+	bool SaveWeatherSeconds(double Seconds);
+
 	/** Records the current Island hour and day so the next session can resume from them. */
 	bool SaveClock(float Hour, int32 Day);
 	/** Records lingering ground wetness independently of whether the Island clock resumes. */
@@ -147,6 +151,7 @@ private:
 	TArray<FIslandNestRecord> Nests;
 	TOptional<float> SavedHour;
 	TOptional<int32> SavedDay;
+	TOptional<double> SavedWeatherSeconds;
 	TOptional<float> SavedWetness;
 	TArray<FIslandCurioRecord> Curios;
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;

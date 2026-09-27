@@ -24,7 +24,7 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	{
 		const FVector Position(I * 50.0, -I * 30.0, 700.0);
 		const FVector Wind = Weather->SampleWind(Position, I);
-		TestTrue(TEXT("Wind remains finite and bounded"), !Wind.ContainsNaN() && Wind.Size() <= Weather->MaximumWindSpeed + 0.01f);
+		TestTrue(TEXT("Wind remains finite and bounded, even in a storm"), !Wind.ContainsNaN() && Wind.Size() <= Weather->MaximumWindSpeed * (1.f + AIslandWeather::StormWindBoost) + 0.01f);
 		const float Cloud = Weather->SampleCloudCover(I);
 		TestTrue(TEXT("Cloud cover is normalized"), Cloud >= 0.f && Cloud <= 1.f);
 		TestTrue(TEXT("Sampling is repeatable"), Wind.Equals(Weather->SampleWind(Position, I)));
@@ -32,12 +32,39 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Rain intensity is normalized"), Rain >= 0.f && Rain <= 1.f);
 		TestTrue(TEXT("Rain intensity is repeatable"), FMath::IsNearlyEqual(Rain, Weather->SampleRainIntensity(I)));
 	}
-	for (int32 Seconds = 0; Seconds <= 14400; Seconds += 15)
+	// Long enough to cross several multi-day spells.
+	float DriestSpell = 2.f, WettestSpell = -1.f, StrongestStorm = 0.f;
+	double StormTime = 0.0;
+	int32 StormSamples = 0, Samples = 0;
+	for (int32 Seconds = 0; Seconds <= 120000; Seconds += 15)
 	{
 		const float Rain = Weather->SampleRainIntensity(Seconds);
 		if (Rain < MinimumRain) { MinimumRain = Rain; MinimumRainTime = Seconds; }
 		if (Rain > MaximumRain) { MaximumRain = Rain; MaximumRainTime = Seconds; }
+		const float Spell = Weather->SampleSpell(Seconds);
+		DriestSpell = FMath::Min(DriestSpell, Spell);
+		WettestSpell = FMath::Max(WettestSpell, Spell);
+		const float Storm = Weather->SampleStormIntensity(Seconds);
+		TestTrue(TEXT("Storm intensity is normalized"), Storm >= 0.f && Storm <= 1.f);
+		if (Storm > StrongestStorm) { StrongestStorm = Storm; StormTime = Seconds; }
+		if (Storm > 0.35f) ++StormSamples;
+		++Samples;
 	}
+	TestTrue(TEXT("The weather runs in both dry and wet spells"), DriestSpell < 0.25f && WettestSpell > 0.75f);
+	TestTrue(TEXT("Full storms happen"), StrongestStorm > 0.8f);
+	TestTrue(TEXT("Storms are rare"), StormSamples > 0 && StormSamples < Samples / 12);
+	TestTrue(TEXT("A storm always brings heavy rain"), Weather->SampleRainIntensity(StormTime) >= StrongestStorm - 0.001f);
+	TestTrue(TEXT("Storms only come in wet spells"), Weather->SampleSpell(StormTime) > 0.74f);
+	TestTrue(TEXT("A storm's wind is stronger than the same sky without it"),
+		Weather->SampleWind(FVector::ZeroVector, StormTime).Size() > Weather->MaximumWindSpeed * 0.25f);
+
+	// Weather carries on across sessions: an offset continues the same timeline.
+	AIslandWeather* Continuing = NewObject<AIslandWeather>();
+	Continuing->WeatherTimeOffset = 5000.0;
+	TestTrue(TEXT("Saved weather time continues the same weather"),
+		FMath::IsNearlyEqual(Continuing->SampleRainIntensity(120.0), Weather->SampleRainIntensity(5120.0)) &&
+		FMath::IsNearlyEqual(Continuing->SampleCloudCover(120.0), Weather->SampleCloudCover(5120.0)) &&
+		Continuing->SampleWind(FVector(100, 200, 0), 120.0).Equals(Weather->SampleWind(FVector(100, 200, 0), 5120.0), 0.01f));
 	TestTrue(TEXT("Independent rain-front cycle includes dry periods"), MinimumRain < 0.01f);
 	TestTrue(TEXT("Cloud-gated rain-front cycle includes gentle showers"), MaximumRain > 0.45f);
 	TestTrue(TEXT("Rain-free sample remains stable"), FMath::IsNearlyEqual(Weather->SampleRainIntensity(MinimumRainTime), MinimumRain));
