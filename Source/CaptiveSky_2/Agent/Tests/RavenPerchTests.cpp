@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
+#include "AgentBrainComponent.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentRestPresentationComponent.h"
 #include "Components/BoxComponent.h"
@@ -17,7 +18,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch"
 
 bool FRavenPerchTest::RunTest(const FString& Parameters)
 {
-	// No agent brain, gateway, model calls, or autobiographical memory in this fixture.
+	// No gateway, model requests, or autobiographical memory in this fixture.
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	// CreateWorld already initializes the world; do not initialize WorldSettings twice.
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
@@ -72,6 +73,11 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Solid overhead fixture is found by the cover probes"), Controller->AssessRoostSite(Perch).Contains(TEXT("5 of 5 short vertical visibility probes")));
 		OverheadCover->Destroy();
 	}
+	UAgentBrainComponent* RavenBrain = NewObject<UAgentBrainComponent>(Raven);
+	Raven->AddInstanceComponent(RavenBrain);
+	RavenBrain->RegisterComponent();
+	const FString RavenSituation = RavenBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Raven perception includes nearby roost support and overhead evidence before an interaction"), RavenSituation.Contains(TEXT("Read-only site check")) && RavenSituation.Contains(TEXT("0 of 5 short vertical visibility probes")));
 	FAgentDecision Inspect;
 	Inspect.bValid = true;
 	Inspect.ActionType = EAgentActionType::Interact;
@@ -105,6 +111,12 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 
 	ACharacter* AsterBody = World->SpawnActor<ACharacter>(FVector(2000.f, 0.f, 100.f), FRotator::ZeroRotator);
 	AsterBody->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	AsterBody->SetActorLocation(FVector(0.f, 400.f, 302.f));
+	UAgentBrainComponent* AsterBrain = NewObject<UAgentBrainComponent>(AsterBody);
+	AsterBody->AddInstanceComponent(AsterBrain);
+	AsterBrain->RegisterComponent();
+	const FString AsterSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("Aster is not offered bird-sized roosts as movement targets"), AsterSituation.Contains(TEXT("move_to target: TestRoost")));
 	UAgentConsolidationComponent* AsterRest = NewObject<UAgentConsolidationComponent>(AsterBody);
 	AsterBody->AddInstanceComponent(AsterRest);
 	AsterRest->RegisterComponent();

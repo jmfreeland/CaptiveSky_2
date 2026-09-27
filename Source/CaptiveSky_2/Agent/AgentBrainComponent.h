@@ -89,6 +89,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend class FRavenPerchTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 

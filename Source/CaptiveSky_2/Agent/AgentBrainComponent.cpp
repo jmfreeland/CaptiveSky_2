@@ -62,11 +62,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
-	bool bCanUseRavenRoosts = false;
+	const ARavenAgentAIController* RavenRoostController = nullptr;
 	if (const APawn* Body = Cast<APawn>(Owner))
 	{
 		if (const AAutonomousAgentAIController* Controller = Cast<AAutonomousAgentAIController>(Body->GetController())) NearbyBeings += Controller->DescribeActionState();
-		bCanUseRavenRoosts = Cast<ARavenAgentAIController>(Body->GetController()) != nullptr;
+		RavenRoostController = Cast<ARavenAgentAIController>(Body->GetController());
 	}
 	const AIslandWeather* LocalWeather = nullptr;
 	if (Owner && GetWorld())
@@ -85,7 +85,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		int32 VisibleRoosts = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleRoosts < 4; ++It)
 		{
-			if (!bCanUseRavenRoosts || !It->ActorHasTag(TEXT("RavenNestSite")) || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
+			if (!RavenRoostController || !It->ActorHasTag(TEXT("RavenNestSite")) || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentRoostVisibility), false, Owner);
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
@@ -93,6 +93,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			// First tag is the unique movement target; never reveal distant/occluded sites.
 			NearbyBeings += FString::Printf(TEXT(" A possible roost is %.0f metres away (move_to target: %s). It is an option, not your assigned home. If already arrived, you may rest; repeated movement to it is unnecessary."),
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+			NearbyBeings += TEXT(" ") + RavenRoostController->AssessRoostSite(*It);
 			if (LocalWeather)
 			{
 				NearbyBeings += TEXT(" ") + LocalWeather->DescribeWindShelterAt(It->GetActorLocation(), Owner);
@@ -100,7 +101,6 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					NearbyBeings += TEXT(" A strong shower is passing, but overhead rain cover is not measured by this wind check.");
 			}
 			else NearbyBeings += TEXT(" No IslandWeather actor is active, so local wind shelter cannot be assessed.");
-			NearbyBeings += TEXT(" A successful perch still requires a later physical support check.");
 			++VisibleRoosts;
 		}
 		int32 VisibleLandmarks = 0;
