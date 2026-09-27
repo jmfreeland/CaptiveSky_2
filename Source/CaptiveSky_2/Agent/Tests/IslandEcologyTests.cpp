@@ -172,6 +172,43 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("RainImpact"))) ++RainRippleCount;
 	TestEqual(TEXT("Dry conditions do not create additional water impacts"), RainRippleCount, 1);
 	Weather->WeatherSeed = OriginalWeatherSeed;
+
+	// Camera-centred rain should not render at a point proven to be inside a tagged roofed room.
+	const FVector WeatherHome = Weather->GetActorLocation();
+	const FVector InnCentre(4000.f, 4000.f, 0.f);
+	auto SpawnInnPart = [World, &Spawn, &InnCentre](const FVector& Relative, const FVector& Extent)
+	{
+		AActor* Part = World->SpawnActor<AActor>(InnCentre + Relative, FRotator::ZeroRotator, Spawn);
+		if (!Part) return static_cast<AActor*>(nullptr);
+		Part->Tags.Add(TEXT("IslandInn"));
+		UBoxComponent* Box = NewObject<UBoxComponent>(Part);
+		Part->SetRootComponent(Box);
+		Box->SetBoxExtent(Extent);
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		Part->SetActorLocation(InnCentre + Relative, false, nullptr, ETeleportType::TeleportPhysics);
+		return Part;
+	};
+	SpawnInnPart(FVector(450.f, 0.f, 200.f), FVector(20.f, 500.f, 200.f));
+	SpawnInnPart(FVector(-450.f, 0.f, 200.f), FVector(20.f, 500.f, 200.f));
+	SpawnInnPart(FVector(0.f, 450.f, 200.f), FVector(500.f, 20.f, 200.f));
+	SpawnInnPart(FVector(0.f, -450.f, 200.f), FVector(500.f, 20.f, 200.f));
+	SpawnInnPart(FVector(0.f, 0.f, 500.f), FVector(500.f, 500.f, 20.f));
+	Weather->SetActorLocation(InnCentre);
+	Weather->WeatherSeed = StormSeed;
+	if (Weather->RainPoolRipple.IsValid()) Weather->RainPoolRipple->Destroy();
+	Weather->RainPoolRipple.Reset();
+	Weather->NextRainPoolRippleTime = 0.0;
+	Weather->UpdateRainRendering();
+	TestTrue(TEXT("A heavy shower is still active under the inn roof"), Weather->CurrentRainIntensity > 0.55f);
+	TestTrue(TEXT("A verified indoor point suppresses its camera-centred rain streaks"), Weather->ActiveRainStreakCount == 0 && !Weather->RainStreaks->IsVisible());
+	TestTrue(TEXT("A verified indoor point suppresses roof-local ground splash visuals"), Weather->ActiveRainGroundImpactCount == 0 && !Weather->RainGroundImpactStreaks->IsVisible());
+	TestTrue(TEXT("Island-wide rain still creates a Tideglass ripple while the listener is sheltered"),
+		Weather->RainPoolRipple.IsValid() && FVector::Dist2D(Weather->RainPoolRipple->GetActorLocation(), Habitat->GetActorLocation()) < 60.f);
+	Weather->SetActorLocation(WeatherHome);
+	Weather->UpdateRainRendering();
+	TestTrue(TEXT("Moving back outdoors restores the local rain field during the same shower"), Weather->ActiveRainStreakCount > 0 && Weather->RainStreaks->IsVisible());
+	Weather->WeatherSeed = OriginalWeatherSeed;
 	
 	Clock->CurrentHour = 12.f;
 	Weather->RefreshNightEcology();

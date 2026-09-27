@@ -1,5 +1,6 @@
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandEnvironmentSubsystem.h"
 #include "IslandLightning.h"
 #include "HAL/IConsoleManager.h"
 #include "IslandDayNight.h"
@@ -158,7 +159,6 @@ void AIslandWeather::UpdateRainRendering()
 
 	const int32 PoolSize = FMath::Clamp(RainStreakCount, 16, 192);
 	ActiveRainStreakCount = FMath::Clamp(FMath::RoundToInt(PoolSize * CurrentRainIntensity), 1, PoolSize);
-	RainStreaks->SetVisibility(true, true);
 	const double Now = GetWorld()->GetTimeSeconds();
 	FVector VisualizationCenter = GetActorLocation();
 	const AActor* WindObserver = this;
@@ -168,6 +168,17 @@ void AIslandWeather::UpdateRainRendering()
 			VisualizationCenter = PlayerPawn->GetActorLocation();
 			WindObserver = PlayerPawn;
 		}
+	// The Island-wide weather and Tideglass response continue, but local streaks and roof impacts
+	// must not appear inside a verified room merely because their instances are camera-centred.
+	if (UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), VisualizationCenter, WindObserver))
+	{
+		ActiveRainStreakCount = 0;
+		RainStreaks->SetVisibility(false, true);
+		ClearRainGroundResponse();
+		if (CurrentRainIntensity >= 0.55f) UpdateRainPoolResponse();
+		return;
+	}
+	RainStreaks->SetVisibility(true, true);
 	RainStreaks->SetWorldLocation(VisualizationCenter);
 	RainGroundImpactStreaks->SetWorldLocation(VisualizationCenter);
 	if (CurrentRainIntensity >= 0.55f) UpdateRainPoolResponse();
@@ -271,12 +282,13 @@ void AIslandWeather::ClearRainGroundResponse()
 	if (RainGroundImpactStreaks) RainGroundImpactStreaks->SetVisibility(false, true);
 }
 
-FVector2D AIslandWeather::CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity)
+FVector2D AIslandWeather::CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity, bool bIndoors)
 {
 	const float WindStrength = FMath::SmoothStep(18.f, 150.f, FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f));
 	const float RainStrength = FMath::SmoothStep(0.06f, 0.72f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 	// Deliberately low ceilings: these are a quiet environmental bed, not foreground effects.
-	return FVector2D(0.055f * WindStrength, 0.035f * RainStrength);
+	const float ShelterScale = bIndoors ? 0.2f : 1.f;
+	return FVector2D(0.055f * WindStrength * ShelterScale, 0.035f * RainStrength * ShelterScale);
 }
 
 void AIslandWeather::InitializeWeatherAmbience()
@@ -350,7 +362,9 @@ void AIslandWeather::UpdateWeatherAmbience(float DeltaSeconds)
 		return;
 	}
 	const double Now = GetWorld()->GetTimeSeconds();
-	const FVector2D Gains = CalculateAmbienceGains(GetLocalWind(Listener->GetActorLocation(), Listener).Size(), SampleRainIntensity(Now));
+	const FVector ListenerLocation = Listener->GetActorLocation();
+	const bool bIndoors = UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), ListenerLocation, Listener);
+	const FVector2D Gains = CalculateAmbienceGains(GetLocalWind(ListenerLocation, Listener).Size(), SampleRainIntensity(Now), bIndoors);
 	WindAmbienceAudio->SetVolumeMultiplier(Gains.X);
 	RainAmbienceAudio->SetVolumeMultiplier(Gains.Y);
 	if (Gains.X > 0.0001f)
@@ -765,7 +779,7 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	const float Storm = SampleStormIntensity(Now);
 	const float Spell = SampleSpell(Now);
 	const TCHAR* Conditions = Storm > 0.35f ? TEXT("a storm: heavy rain driven by strong, gusting wind") : Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible during showers. Strong rain also creates sparse Tideglass ripples and small collision-sampled ground splashes, while nearby fireflies fly lower and dim their natural pulse. Quiet local wind and distant rain ambience follow the weather when a player listener is present."),
+	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible in outdoor views during showers. Strong rain also creates sparse Tideglass ripples and local collision-sampled ground splashes outdoors, while nearby fireflies fly lower and dim their natural pulse. Quiet local wind and distant rain ambience follow the weather when a player listener is present, softened beneath a verified inn roof."),
 		Conditions,
 		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
 		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f)

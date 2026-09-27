@@ -76,10 +76,14 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	const FVector2D WindGains = AIslandWeather::CalculateAmbienceGains(120.f, 0.f);
 	const FVector2D RainGains = AIslandWeather::CalculateAmbienceGains(0.f, 0.9f);
 	const FVector2D StormGains = AIslandWeather::CalculateAmbienceGains(300.f, 1.f);
+	const FVector2D IndoorGains = AIslandWeather::CalculateAmbienceGains(120.f, 0.9f, true);
+	const FVector2D OutdoorGains = AIslandWeather::CalculateAmbienceGains(120.f, 0.9f);
 	TestTrue(TEXT("Dry calm weather stays silent"), CalmGains.IsNearlyZero());
 	TestTrue(TEXT("Wind ambience grows with measured wind and has a quiet ceiling"), WindGains.X > 0.f && WindGains.X <= 0.055f && WindGains.Y == 0.f);
 	TestTrue(TEXT("Rain ambience follows rain independently of wind"), RainGains.Y > 0.f && RainGains.Y <= 0.035f && RainGains.X == 0.f);
 	TestTrue(TEXT("Combined storm ambience remains strictly bounded"), StormGains.X <= 0.055f && StormGains.Y <= 0.035f);
+	TestTrue(TEXT("A verified indoor listener hears both weather beds at one fifth their outdoor level"),
+		FMath::IsNearlyEqual(IndoorGains.X, OutdoorGains.X * 0.2f) && FMath::IsNearlyEqual(IndoorGains.Y, OutdoorGains.Y * 0.2f));
 	TestEqual(TEXT("Calm air creates no wind-driven pool ripple"), AIslandPoolRippleEffect::WindRippleActivity(0.f), 0.f);
 	TestTrue(TEXT("A strong breeze gives Tideglass a measurable but bounded ripple"),
 		AIslandPoolRippleEffect::WindRippleActivity(90.f) > 0.f && AIslandPoolRippleEffect::WindRippleActivity(300.f) == 1.f);

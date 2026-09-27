@@ -291,7 +291,7 @@ The colours are plain material instances created under `/Game/Inn/Materials/` (p
 
 ### Inn interior sensing (2026-09-27)
 
-The first step of phase 2 gives each resident a local geometric check: an `IslandInn` roof must be overhead, and tagged inn collision must enclose at least six of eight horizontal sightlines. Only then does the resident's own situation report say they are inside. The wording is deliberately limited to structure; rain streaks, indoor temperature and sound have not yet been made different indoors, so the report does not claim those effects work. The check is read-only and makes no model call. Remaining phase-2 work is to verify and improve actual rain/wind presentation under the roof and publish an indoor environment value if the shared material collection can be updated with the Island assets.
+The first step of phase 2 gives each resident a local geometric check: an `IslandInn` roof must be overhead, and tagged inn collision must enclose at least six of eight horizontal sightlines. Only then does the resident's own situation report say they are inside. At that verified point, camera-centred rain streaks and roof-local splash visuals are hidden, and the generated wind/rain ambience is softened to one fifth; Island-wide weather and Tideglass rain ripples continue. Residents still are not promised complete rainproofing or warmth. The checks are read-only, make no model calls, and are covered by isolated fixtures. Rendered play should still verify the visual result. Remaining phase-2 work is to publish an indoor environment value if the shared material collection can be updated with the Island assets.
 
 ### Spectator mode (2026-09-27)
 

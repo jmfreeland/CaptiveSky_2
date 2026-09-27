@@ -117,7 +117,7 @@ bool UIslandEnvironmentSubsystem::IsInsideInnAt(UWorld* World, const FVector& Po
 FString UIslandEnvironmentSubsystem::DescribeInnInteriorAt(UWorld* World, const FVector& Position, const AActor* Observer)
 {
 	if (!IsInsideInnAt(World, Position, Observer)) return FString();
-	return TEXT(" You are inside the Island inn, beneath its roof and enclosed by its walls. This is evidence of structural shelter only; rain particles, indoor temperature, and sound are not yet simulated differently here.");
+	return TEXT(" You are inside the Island inn, beneath its roof and enclosed by its walls. Local rain streaks and roof splashes are suppressed here, and the generated wind/rain ambience is softened. This does not establish complete rainproofing or a different indoor temperature.");
 }
 
 TStatId UIslandEnvironmentSubsystem::GetStatId() const

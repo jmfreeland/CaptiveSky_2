@@ -76,8 +76,8 @@ public:
 	float SampleCloudCover(double Seconds) const;
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
-	/** Bounded, low-level gains for the ambient wind and rain beds, normalized to sampled conditions. */
-	static FVector2D CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity);
+	/** Bounded ambient wind/rain bed gains; an enclosed inn listener hears a softened version. */
+	static FVector2D CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity, bool bIndoors = false);
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Describe only current upwind line-of-sight shelter; this does not claim roof cover or perch support. */
 	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;

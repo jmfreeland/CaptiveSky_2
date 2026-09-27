@@ -130,7 +130,8 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	AActor* InnRoof = SpawnInnBox(FVector(0.f, 0.f, 500.f), FVector(500.f, 500.f, 20.f));
 	TestTrue(TEXT("Tagged walls and an overhead roof establish an enclosed inn interior"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector::ZeroVector));
 	const FString Interior = UIslandEnvironmentSubsystem::DescribeInnInteriorAt(World, FVector::ZeroVector);
-	TestTrue(TEXT("Resident interior report states only structural shelter and its weather-simulation limits"), Interior.Contains(TEXT("beneath its roof")) && Interior.Contains(TEXT("not yet simulated differently")));
+	TestTrue(TEXT("Resident interior report states the visual response and does not promise warmth or complete rainproofing"),
+		Interior.Contains(TEXT("beneath its roof")) && Interior.Contains(TEXT("Local rain streaks")) && Interior.Contains(TEXT("different indoor temperature")));
 	AActor* Resident = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	UAgentBrainComponent* ResidentBrain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
 	TestNotNull(TEXT("A resident brain is available for the perception check"), ResidentBrain);
