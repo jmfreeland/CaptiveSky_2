@@ -143,6 +143,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
+		if (It->IsHidden() && (Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab")))) continue;
 		if ((Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab"))) &&
 			FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.

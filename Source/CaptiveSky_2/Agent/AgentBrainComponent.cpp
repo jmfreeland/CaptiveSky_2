@@ -207,6 +207,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		int32 VisibleWildlife = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 3; ++It)
 		{
+			if (It->IsHidden()) continue;
 			const bool bFirefly = It->ActorHasTag(TEXT("Firefly"));
 			const bool bTidepoolCrab = It->ActorHasTag(TEXT("TidepoolCrab"));
 			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab) ||

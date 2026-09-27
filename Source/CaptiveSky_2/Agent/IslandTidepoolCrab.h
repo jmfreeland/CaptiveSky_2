@@ -19,6 +19,9 @@ public:
 
 	/** Briefly scuttle away from a quiet observer; never changes ownership or saved state. */
 	void RespondToQuietObservation(const FVector& ObserverLocation);
+	/** Conceal at night without destroying this resident; restores its visible local routine at dawn. */
+	void SetSheltered(bool bSheltered);
+	bool IsSheltered() const { return bIsSheltered; }
 	/** Strong showers gently reduce exposed roaming without stopping escape or changing habitat. */
 	static float RainMovementScale(float RainIntensity);
 
@@ -44,5 +47,6 @@ private:
 	TWeakObjectPtr<AIslandWeather> Weather;
 	float Phase = 0.f;
 	float ScurryRemaining = 0.f;
+	bool bIsSheltered = false;
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;
 };

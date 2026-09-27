@@ -92,9 +92,19 @@ void AIslandTidepoolCrab::BeginPlay()
 
 void AIslandTidepoolCrab::RespondToQuietObservation(const FVector& ObserverLocation)
 {
+	if (bIsSheltered) return;
 	ScurryDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScurryDirection.IsNearlyZero()) ScurryDirection = GetActorRightVector();
 	ScurryRemaining = 2.4f;
+}
+
+void AIslandTidepoolCrab::SetSheltered(bool bSheltered)
+{
+	if (bIsSheltered == bSheltered) return;
+	bIsSheltered = bSheltered;
+	SetActorLocation(bIsSheltered ? HomeLocation - FVector(0.f, 0.f, 55.f) : HomeLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	SetActorHiddenInGame(bIsSheltered);
+	SetActorTickEnabled(!bIsSheltered);
 }
 
 float AIslandTidepoolCrab::RainMovementScale(float RainIntensity)

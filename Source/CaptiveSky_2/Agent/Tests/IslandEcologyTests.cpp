@@ -173,9 +173,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("No fireflies are active at midday"), Population, 0);
 	int32 CrabPopulation = 0;
+	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabResidents;
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
 	{
 		++CrabPopulation;
+		DayCrabResidents.Add(*It);
 		TestTrue(TEXT("Tidepool crab advertises as untargeted ambient life"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TidepoolCrab")) && !It->ActorHasTag(TEXT("IslandLandmark")));
 		TestTrue(TEXT("Tidepool crab remains at the shoreline of its habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
 		TestEqual(TEXT("Tidepool crab has six visible leg placeholders"), It->Legs.Num(), 6);
@@ -237,8 +239,27 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
 	CrabPopulation = 0;
-	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
-	TestEqual(TEXT("Day-active shore crabs shelter after nightfall"), CrabPopulation, 0);
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
+	{
+		++CrabPopulation;
+		TestTrue(TEXT("Night-sheltered crabs remain as hidden residents"), It->IsSheltered() && It->IsHidden());
+		TestFalse(TEXT("Night-sheltered crabs pause their local routine"), It->IsActorTickEnabled());
+	}
+	TestEqual(TEXT("The same two shore-crab residents persist through nightfall"), CrabPopulation, 2);
+	if (DayCrabResidents.Num() > 0 && DayCrabResidents[0].IsValid())
+	{
+		ACharacter* NightObserver = World->SpawnActor<ACharacter>(DayCrabResidents[0]->GetActorLocation() + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator, Spawn);
+		ARavenAgentAIController* NightController = World->SpawnActor<ARavenAgentAIController>(Spawn);
+		if (TestNotNull(TEXT("Night observer spawned to check concealed wildlife"), NightObserver) && TestNotNull(TEXT("Night inspection controller spawned"), NightController))
+		{
+			NightController->Possess(NightObserver);
+			NightController->InspectTarget(TEXT("TidepoolCrab"));
+			TestTrue(TEXT("Residents cannot target a sheltered crab"), NightController->DescribeActionState().Contains(TEXT("No shore crab is close enough")));
+			NightController->UnPossess();
+		}
+		if (NightObserver) NightObserver->Destroy();
+		if (NightController) NightController->Destroy();
+	}
 	if (Population > 0)
 	{
 		AIslandFirefly* RainSensitiveFirefly = nullptr;
@@ -279,8 +300,27 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("Fireflies leave the habitat in daytime"), Population, 0);
 	CrabPopulation = 0;
-	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
-	TestEqual(TEXT("Shore crab population is restored at midday"), CrabPopulation, 2);
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
+	{
+		++CrabPopulation;
+		TestFalse(TEXT("Daylight reveals each resident from shelter"), It->IsSheltered() || It->IsHidden());
+		TestTrue(TEXT("Daylight resumes each resident's local routine"), It->IsActorTickEnabled());
+	}
+	TestEqual(TEXT("The same shore-crab residents re-emerge at midday"), CrabPopulation, 2);
+	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabResidents)
+		TestTrue(TEXT("Each original crab actor survives and resumes in place"), Crab.IsValid() && !Crab->IsSheltered());
+
+	Clock->CurrentHour = 5.5f;
+	Weather->RefreshNightEcology();
+	Population = 0;
+	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
+	TestEqual(TEXT("Fireflies leave during the twilight transition"), Population, 0);
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
+		TestTrue(TEXT("Crabs remain concealed before their 06:00 emergence"), It->IsSheltered());
+	Clock->CurrentHour = 6.f;
+	Weather->RefreshNightEcology();
+	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabResidents)
+		TestTrue(TEXT("Crabs re-emerge at 06:00 as their original residents"), Crab.IsValid() && !Crab->IsSheltered());
 
 	const FVector TestPoolLocation(4000.f, 5000.f, 600.f);
 	ACharacter* Observer = World->SpawnActor<ACharacter>(TestPoolLocation, FRotator::ZeroRotator, Spawn);

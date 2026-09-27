@@ -456,7 +456,7 @@ void AIslandWeather::RefreshNightEcology()
 	}
 
 	constexpr int32 NightPopulation = 3;
-	if ((!bNight && !bDay) || !Habitat)
+	if (CurrentHour < 0.f || !Habitat)
 	{
 		for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 			if (Firefly.IsValid()) Firefly->Destroy();
@@ -475,9 +475,6 @@ void AIslandWeather::RefreshNightEcology()
 	}
 	else
 	{
-		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
-			if (Crab.IsValid()) Crab->Destroy();
-		DayCrabs.Reset();
 		while (NightFireflies.Num() < NightPopulation)
 		{
 			const FVector GroundOffset(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
@@ -490,13 +487,11 @@ void AIslandWeather::RefreshNightEcology()
 		}
 	}
 
+	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
+		if (Crab.IsValid()) Crab->SetSheltered(!bDay);
+
 	if (!bDay)
-	{
-		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
-			if (Crab.IsValid()) Crab->Destroy();
-		DayCrabs.Reset();
 		return;
-	}
 	constexpr int32 DayPopulation = 2;
 	while (DayCrabs.Num() < DayPopulation)
 	{
