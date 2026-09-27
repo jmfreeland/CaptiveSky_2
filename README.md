@@ -98,7 +98,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 Visitors can use **E** within four metres of a clearly visible landmark or wild creature. A per-actor five-real-minute cooldown keeps repeated input from stacking transient effects. Visitor visibility uses the body eye point; resident inspection retains its actor-to-target perception so hidden nest markers remain inspectable. Both paths use the same reversible landmark/wildlife response implementation. No interaction creates ownership or permanent level state.
 
-Next validation: in rendered Play/PIE, confirm E-key routing, caption timing, and nearest-target selection around the WindArch, TideglassPool, ListeningStones, and wildlife. The current automated coverage proves shared responses and resident behavior, but not the full controller-to-screen input path.
+Next validation: in rendered Play/PIE, confirm E-key routing, caption timing, and target response around the WindArch, TideglassPool, ListeningStones, and wildlife. Automated coverage now checks nearest-visible selection and fallback when the nearest landmark is hidden; it still does not prove the full controller-to-screen input path.
 
 ### Bounded play and memory integrity (2026-09-14)
 

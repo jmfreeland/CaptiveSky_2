@@ -134,20 +134,7 @@ AActor* ACaptiveSky_2PlayerController::FindNearestWorldInteraction() const
 {
 	const APawn* PlayerPawn = GetPawn();
 	if (!PlayerPawn || !GetWorld()) return nullptr;
-	AActor* Nearest = nullptr;
-	float BestDistanceSquared = FMath::Square(IslandInteractionRadius);
-	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-	{
-		if (IslandInteractionUtility::GetTargetTag(*It).IsNone() ||
-			!IslandInteractionUtility::CanInteract(PlayerPawn, *It, IslandInteractionRadius)) continue;
-		const float DistanceSquared = FVector::DistSquared(PlayerPawn->GetActorLocation(), It->GetActorLocation());
-		if (DistanceSquared <= BestDistanceSquared)
-		{
-			Nearest = *It;
-			BestDistanceSquared = DistanceSquared;
-		}
-	}
-	return Nearest;
+	return IslandInteractionUtility::FindNearestVisibleTarget(PlayerPawn, GetWorld(), IslandInteractionRadius);
 }
 
 void ACaptiveSky_2PlayerController::ShowWorldInteractionCaption(const FString& Caption)

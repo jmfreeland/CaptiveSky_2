@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 
 class AActor;
+class UWorld;
 
 /** Shared, perception-checked responses for visitors and autonomous residents. */
 namespace IslandInteractionUtility
@@ -12,6 +13,9 @@ namespace IslandInteractionUtility
 
 	/** Require a close, visible target in the same world. */
 	CAPTIVESKY_2_API bool CanInteract(const AActor* Observer, const AActor* Target, float MaxRange = 400.f);
+
+	/** Select the nearest supported visible target, using the same bounds and perception rule as visitor input. */
+	CAPTIVESKY_2_API AActor* FindNearestVisibleTarget(const AActor* Observer, UWorld* World, float MaxRange = 400.f);
 
 	/** Resident inspection perception: actor-to-actor visibility, retaining hidden landmark markers. */
 	CAPTIVESKY_2_API bool CanInspect(const AActor* Observer, const AActor* Target, float MaxRange = 400.f);

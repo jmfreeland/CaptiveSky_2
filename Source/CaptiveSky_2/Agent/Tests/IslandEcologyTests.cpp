@@ -429,11 +429,33 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Crab resumes its local idle path without a persistent state change"), FMath::IsNearlyZero(WatchableCrab->ScurryRemaining) && FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart) < 100.f);
 	}
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(TestPoolLocation + FVector(80.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	WindTarget->SetActorLocation(TestPoolLocation + FVector(220.f, 0.f, 0.f));
+	StonesTarget->SetActorLocation(TestPoolLocation + FVector(300.f, 0.f, 0.f));
 	PoolTarget->SetActorHiddenInGame(false);
-	FString VisitorFact;
-	TestTrue(TEXT("A non-agent visitor can clearly reach the Tideglass landmark"), IslandInteractionUtility::CanInteract(Visitor, PoolTarget));
-	TestTrue(TEXT("The shared landmark response accepts a human visitor without agent components"), IslandInteractionUtility::Perform(Visitor, PoolTarget, VisitorFact));
-	TestTrue(TEXT("The visitor receives an honest transient-effect description"), VisitorFact.Contains(TEXT("no permanent level state")));
+	WindTarget->SetActorHiddenInGame(false);
+	StonesTarget->SetActorHiddenInGame(false);
+	if (TestNotNull(TEXT("Visitor spawned for target-selection checks"), Visitor) && WatchableCrab && WatchableFirefly)
+	{
+		FString VisitorFact;
+		TestTrue(TEXT("A non-agent visitor can clearly reach the Tideglass landmark"), IslandInteractionUtility::CanInteract(Visitor, PoolTarget));
+		TestTrue(TEXT("A non-agent visitor can clearly reach a nearby wild crab"), IslandInteractionUtility::CanInteract(Visitor, WatchableCrab));
+		// Quiet observation may leave the crab anywhere within its short scurry radius. Put the test
+		// candidates at controlled distances so this checks selection rather than random creature drift.
+		WatchableCrab->SetActorLocation(TestPoolLocation + FVector(60.f, 0.f, 0.f));
+		WatchableFirefly->SetActorLocation(TestPoolLocation + FVector(900.f, 0.f, 0.f));
+		AActor* FirstTarget = IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World);
+		TestTrue(*FString::Printf(TEXT("Visitor input selects the nearest wild crab; selected %s (%s)"),
+			FirstTarget ? *FirstTarget->GetName() : TEXT("none"), FirstTarget ? *IslandInteractionUtility::GetTargetTag(FirstTarget).ToString() : TEXT("no tag")),
+			FirstTarget == WatchableCrab);
+		WatchableCrab->SetActorHiddenInGame(true);
+		TestTrue(TEXT("Hiding the nearest creature exposes the nearest visible landmark"), IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World) == PoolTarget);
+		PoolTarget->SetActorHiddenInGame(true);
+		TestTrue(TEXT("Hiding the nearest landmark exposes the next visible choice"), IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World) == WindTarget);
+		PoolTarget->SetActorHiddenInGame(false);
+		WatchableCrab->SetActorHiddenInGame(false);
+		TestTrue(TEXT("The shared landmark response accepts a human visitor without agent components"), IslandInteractionUtility::Perform(Visitor, PoolTarget, VisitorFact));
+		TestTrue(TEXT("The visitor receives an honest transient-effect description"), VisitorFact.Contains(TEXT("no permanent level state")));
+	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

@@ -49,6 +49,24 @@ bool IslandInteractionUtility::CanInteract(const AActor* Observer, const AActor*
 	return !Observer->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query);
 }
 
+AActor* IslandInteractionUtility::FindNearestVisibleTarget(const AActor* Observer, UWorld* World, float MaxRange)
+{
+	if (!IsValid(Observer) || !IsValid(World) || Observer->GetWorld() != World) return nullptr;
+	AActor* Nearest = nullptr;
+	float BestDistanceSquared = FMath::Square(FMath::Max(0.f, MaxRange));
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (GetTargetTag(*It).IsNone() || !CanInteract(Observer, *It, MaxRange)) continue;
+		const float DistanceSquared = FVector::DistSquared(Observer->GetActorLocation(), It->GetActorLocation());
+		if (DistanceSquared <= BestDistanceSquared)
+		{
+			Nearest = *It;
+			BestDistanceSquared = DistanceSquared;
+		}
+	}
+	return Nearest;
+}
+
 bool IslandInteractionUtility::CanInspect(const AActor* Observer, const AActor* Target, float MaxRange)
 {
 	if (!IsValid(Observer) || !IsValid(Target) || Observer == Target || !Observer->GetWorld() ||
