@@ -6,6 +6,7 @@
 
 class UStaticMeshComponent;
 class UMaterialInterface;
+class AIslandWeather;
 
 /** Small, untargetable shore life: independently scuttles near its Tideglass habitat. */
 UCLASS()
@@ -18,6 +19,8 @@ public:
 
 	/** Briefly scuttle away from a quiet observer; never changes ownership or saved state. */
 	void RespondToQuietObservation(const FVector& ObserverLocation);
+	/** Strong showers gently reduce exposed roaming without stopping escape or changing habitat. */
+	static float RainMovementScale(float RainIntensity);
 
 protected:
 	virtual void BeginPlay() override;
@@ -38,6 +41,7 @@ private:
 
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector ScurryDirection = FVector::ZeroVector;
+	TWeakObjectPtr<AIslandWeather> Weather;
 	float Phase = 0.f;
 	float ScurryRemaining = 0.f;
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;

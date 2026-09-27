@@ -1,8 +1,10 @@
 #include "IslandTidepoolCrab.h"
+#include "IslandWeather.h"
 #include "Components/StaticMeshComponent.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -70,6 +72,11 @@ void AIslandTidepoolCrab::BeginPlay()
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
+	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+	{
+		Weather = *It;
+		break;
+	}
 	if (BaseShapeMaterial)
 	{
 		UMaterialInstanceDynamic* ShellTint = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
@@ -88,6 +95,12 @@ void AIslandTidepoolCrab::RespondToQuietObservation(const FVector& ObserverLocat
 	ScurryDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScurryDirection.IsNearlyZero()) ScurryDirection = GetActorRightVector();
 	ScurryRemaining = 2.4f;
+}
+
+float AIslandTidepoolCrab::RainMovementScale(float RainIntensity)
+{
+	const float RainActivity = FMath::SmoothStep(0.3f, 0.8f, FMath::Clamp(RainIntensity, 0.f, 1.f));
+	return FMath::Lerp(1.f, 0.38f, RainActivity);
 }
 
 FVector AIslandTidepoolCrab::ResolveGroundPath(const FVector& Start, const FVector& Desired) const
@@ -116,7 +129,9 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	const float Time = GetWorld()->GetTimeSeconds();
 	ScurryRemaining = FMath::Max(0.f, ScurryRemaining - FMath::Max(0.f, DeltaSeconds));
 	const float Angle = Time * 0.12f + Phase;
-	const FVector IdleDrift(FMath::Sin(Angle) * 90.f, FMath::Cos(Angle * 0.73f) * 80.f, 0.f);
+	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
+	const float RainScale = RainMovementScale(Rain);
+	const FVector IdleDrift(FMath::Sin(Angle) * 90.f * RainScale, FMath::Cos(Angle * 0.73f) * 80.f * RainScale, 0.f);
 	const float ScurryAlpha = ScurryRemaining > 1.7f
 		? FMath::SmoothStep(0.f, 0.7f, 2.4f - ScurryRemaining)
 		: FMath::SmoothStep(0.f, 1.7f, ScurryRemaining);
@@ -131,7 +146,7 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 		{
 			const int32 Side = Index < 3 ? -1 : 1;
 			const int32 LegIndex = Index % 3;
-			const float Swing = FMath::Sin(Time * 11.f + Index * PI * 0.5f) * (1.5f + ScurryAlpha * 5.f);
+			const float Swing = FMath::Sin(Time * 11.f * RainScale + Index * PI * 0.5f) * (1.5f + ScurryAlpha * 5.f) * RainScale;
 			Legs[Index]->SetRelativeRotation(FRotator(0.f, Side * (28.f + LegIndex * 5.f) + Swing, 0.f));
 		}
 }

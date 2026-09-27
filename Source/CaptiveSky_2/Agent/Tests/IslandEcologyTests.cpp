@@ -32,6 +32,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Local wind gently nudges the firefly drift"), AIslandFirefly::WindDisplacement(FVector(100.f, 0.f, 0.f)).Equals(FVector(12.f, 0.f, 0.f)));
 	TestTrue(TEXT("Strong gust displacement stays bounded"), AIslandFirefly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(30.f, 0.f, 0.f)));
 	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
+	TestTrue(TEXT("Dry conditions leave crab roaming unchanged"), FMath::IsNearlyEqual(AIslandTidepoolCrab::RainMovementScale(0.f), 1.f));
+	TestTrue(TEXT("Heavy rain reduces but does not stop crab roaming"), AIslandTidepoolCrab::RainMovementScale(1.f) > 0.f && AIslandTidepoolCrab::RainMovementScale(1.f) < 1.f);
+	TestTrue(TEXT("Crab rain response changes smoothly and monotonically"), AIslandTidepoolCrab::RainMovementScale(0.75f) < AIslandTidepoolCrab::RainMovementScale(0.45f));
 	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
 		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
 		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
@@ -180,6 +183,27 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Tidepool crab geometry cannot block the world"), It->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
+	AIslandTidepoolCrab* RainSensitiveCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(3500.f, 5000.f, 600.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("Shore crab weather-response tester spawned"), RainSensitiveCrab))
+	{
+		RainSensitiveCrab->Weather = Weather;
+		RainSensitiveCrab->HomeLocation = RainSensitiveCrab->GetActorLocation();
+		RainSensitiveCrab->Phase = 1.1f;
+		const FVector CrabHome = RainSensitiveCrab->HomeLocation;
+		const float CrabOriginalWindSpeed = Weather->MaximumWindSpeed;
+		Weather->MaximumWindSpeed = 0.f;
+		Weather->WeatherSeed = DryWeatherSeed;
+		RainSensitiveCrab->Tick(0.f);
+		const float DryRoamingDistance = FVector::Dist2D(CrabHome, RainSensitiveCrab->GetActorLocation());
+		RainSensitiveCrab->SetActorLocation(CrabHome);
+		Weather->WeatherSeed = StormSeed;
+		RainSensitiveCrab->Tick(0.f);
+		const float RainRoamingDistance = FVector::Dist2D(CrabHome, RainSensitiveCrab->GetActorLocation());
+		TestTrue(TEXT("The same crab contracts its idle roaming during a strong shower"), RainRoamingDistance < DryRoamingDistance);
+		Weather->MaximumWindSpeed = CrabOriginalWindSpeed;
+		Weather->WeatherSeed = OriginalWeatherSeed;
+		RainSensitiveCrab->Destroy();
+	}
 	Clock->CurrentHour = 18.f;
 	Weather->RefreshNightEcology();
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
