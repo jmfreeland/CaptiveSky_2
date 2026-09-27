@@ -22,6 +22,9 @@ public:
 	bool TryReserveModelRequest();
 	bool IsExpired() const;
 	static double ClampDuration(double Requested);
+	static int32 ClampRequestLimit(int32 Requested);
+	/** Applies command-line smoke-test limits without permitting either active cap to increase. */
+	static void ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests);
 private:
 	friend class FAgentSafetyTest;
 	double StartedAt = 0;
