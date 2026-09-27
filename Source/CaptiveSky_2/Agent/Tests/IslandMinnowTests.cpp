@@ -95,6 +95,35 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	RegroupedCenter /= School->Fish.Num();
 	TestTrue(TEXT("Minnows naturally regroup within their small local habitat"), RegroupedCenter.Size2D() < 180.f && FMath::IsNearlyZero(School->ScatterRemaining));
 
+	ARavenAgentAIController* FlybyController = World->SpawnActor<ARavenAgentAIController>(Spawn);
+	ACharacter* RavenBody = World->SpawnActor<ACharacter>(School->GetActorLocation() + FVector(-300.f, 0.f, 1000.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("Raven controller spawned for overhead ecology"), FlybyController) && TestNotNull(TEXT("Raven body spawned for overhead ecology"), RavenBody))
+	{
+		FlybyController->Possess(RavenBody);
+		FlybyController->LocomotionState = ERavenLocomotionState::Flying;
+		School->Tick(0.4f);
+		TestTrue(TEXT("High flight remains outside the fish school's disturbance height"), FMath::IsNearlyZero(School->ScatterRemaining));
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-3000.f, 0.f, 400.f));
+		School->Tick(0.4f);
+		TestTrue(TEXT("Distant flight remains outside the Tideglass disturbance radius"), FMath::IsNearlyZero(School->ScatterRemaining));
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 400.f));
+		FVector BeforeFlyby = FVector::ZeroVector;
+		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) BeforeFlyby += Minnow->GetRelativeLocation();
+		BeforeFlyby /= School->Fish.Num();
+		School->Tick(0.4f);
+		TestTrue(TEXT("A low raven glide over the shallows briefly startles the school"), School->ScatterRemaining > 1.9f && School->ScatterRemaining <= 2.4f);
+		School->Tick(0.7f);
+		FVector DuringFlyby = FVector::ZeroVector;
+		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) DuringFlyby += Minnow->GetRelativeLocation();
+		DuringFlyby /= School->Fish.Num();
+		TestTrue(TEXT("Minnows fan away from the low overhead approach"), DuringFlyby.X > BeforeFlyby.X + 80.f);
+		School->Tick(3.f);
+		TestTrue(TEXT("The school regroups without being repeatedly startled during one close pass"),
+			FMath::IsNearlyZero(School->ScatterRemaining) && School->RavenFlybyCooldownRemaining > 0.f);
+		FlybyController->LocomotionState = ERavenLocomotionState::Perched;
+		FlybyController->UnPossess();
+	}
+
 	ARavenAgentAIController* ResidentController = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	ACharacter* Resident = World->SpawnActor<ACharacter>(School->GetActorLocation() + FVector(0.f, 100.f, 0.f), FRotator::ZeroRotator, Spawn);
 	if (TestNotNull(TEXT("Resident inspection controller spawned"), ResidentController) && TestNotNull(TEXT("Resident body spawned"), Resident))

@@ -36,8 +36,11 @@ private:
 	FVector ScatterDirection = FVector::ZeroVector;
 	float ScatterRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
+	float RavenCheckRemaining = 0.f;
+	float RavenFlybyCooldownRemaining = 0.f;
 	float Phase = 0.73f;
 
 	float GetScatterAlpha() const;
+	void CheckForLowRavenFlyby();
 	void UpdateSchool(float RainIntensity);
 };

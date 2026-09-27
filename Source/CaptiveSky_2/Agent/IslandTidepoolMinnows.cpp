@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "IslandWeather.h"
+#include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -76,6 +77,31 @@ float AIslandTidepoolMinnows::GetScatterAlpha() const
 	return FMath::SmoothStep(0.f, 1.7f, ScatterRemaining);
 }
 
+void AIslandTidepoolMinnows::CheckForLowRavenFlyby()
+{
+	if (!GetWorld() || ScatterRemaining > 0.f || RavenFlybyCooldownRemaining > 0.f) return;
+
+	constexpr float FlybyRadius = 550.f;
+	constexpr float MinimumHeight = 150.f;
+	constexpr float MaximumHeight = 700.f;
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
+		const APawn* Raven = It->GetPawn();
+		if (!IsValid(Raven)) continue;
+
+		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
+		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight || Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
+			continue;
+
+		// A bird gliding low over the shallows briefly breaks the school's pattern; it is
+		// a visible world response, not a hunt, capture, model call, or lasting change.
+		RespondToQuietObservation(Raven->GetActorLocation());
+		RavenFlybyCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 {
 	const float TuckScale = RainMovementScale(RainIntensity);
@@ -107,6 +133,13 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ElapsedSeconds += SafeDelta;
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
+	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	RavenCheckRemaining -= SafeDelta;
+	if (RavenCheckRemaining <= 0.f)
+	{
+		RavenCheckRemaining = 0.35f;
+		CheckForLowRavenFlyby();
+	}
 	const float Rain = Weather.IsValid() && GetWorld()
 		? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
