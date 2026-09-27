@@ -24,7 +24,28 @@ Conscious beings in CaptiveSky should not merely reveal personalities and purpos
 
 Some future inhabitants should evoke, at least in spirit, the memorable eccentricity and warmth of old Sierra adventure games, especially *Quest for Glory*. Possibilities include an unusually intelligent rat (perhaps inspired by a half-remembered character named Erasmus; the reference and name are not yet settled), one or more theatrical or peculiar wizard figures, and a hospitable innkeeper archetype. These should become original CaptiveSky beings rather than direct reproductions: the aim is to carry forward the humor, mystery, companionship, and distinct sense of character those games created.
 
-## Current State (as of 2026-09-26)
+## Current State (as of 2026-09-27)
+
+**At a glance.** The Island is a small, persistent place. Its clock, weather and ecology run by themselves, and two residents, Aster and an unnamed raven, perceive it, talk, remember and sleep. What residents do can now outlast a session:
+- the raven can weave a nest;
+- anyone can add a stone to the cairn, or arrange stones into a lasting work;
+- a hidden pale-stone trail leads to a seed pod that opens over Island days.
+
+All of that state is saved in `WorldState/<Map>.json`, and the Island clock (hour and day) carries across sessions. A *Quest for Glory*-style inn blockout stands on the route from the shore. Most visuals are still placeholder primitives.
+
+Where to look:
+- **This README:** the dated sections under Roadmap below are the design record for each system, newest last.
+- **`docs/plans/`:** forward plans (the inn).
+- **`docs/residents/`:** proposed future residents (the rat, Fenrus).
+- **`docs/findings/`:** evidence-based reviews, such as the resident memory review.
+- **`COORDINATION.md`:** how Claude Code and Codex share this tree.
+- **Tools:**
+  - `Scripts/Capture-Viewpoints.ps1`: journey captures.
+  - `Scripts/Analyze-AgentMemory.py`: memory review.
+  - `CaptiveSky2.Visual.Grounding`: prop audit.
+  - `CaptiveSky2.Tools.*`: one-off map and asset tools, each backing up what it changes.
+
+Details:
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
 - Two autonomous agents are present: **Aster** (`Agent_Aster_01`) and an intentionally unnamed raven (`Agent_Raven_01`). Each has an independent identity, personality, memory, relationships, and consciousness lifecycle.
@@ -266,7 +287,18 @@ The colours are plain material instances created under `/Game/Inn/Materials/` (p
 
 `Config/IslandViewpoints.json` adds `02b_InnFromPath`, the lit doorway from the path, and `02c_InnCommonRoom`, an interior view. Interior viewpoints set a negative `min_height`, so the ground clamp doesn't lift them onto the roof. The prop grounding audit skips `IslandInn` parts, since the lantern and trim are wall-mounted by design.
 
-- _TODO — prioritize against the Vision section above._
+### Open work, prioritized (2026-09-27)
+
+1. **Balance memory retrieval.** Recall currently fills the prompt with the latest small talk, and most reflections are near-duplicates (`docs/findings/2026-09-27-memory-review.md`). The gateway side is fixed; the in-game side needs a build and a live check.
+2. **Watch residents use the lasting affordances.** Nests, cairn stones, arrangements and the trail have only been exercised in tests. A full bounded live session with enough free memory should show whether residents find and use them, and whether the new social pacing holds.
+3. **Inn, phases 2–5** (`docs/plans/inn.md`): indoor shelter awareness, a hearth someone keeps, beds that mean safety, and the guest book. Then an innkeeper resident.
+4. **Bodies.** An animated bird for the raven, a real body for Aster, and a small grounded body if the rat (Fenrus) comes to life.
+5. **Environment art.** Materials and VFX that read `MPC_IslandEnvironment` (wet rock, puddles, mist) starting at the Tideglass Pool, and authored replacements for the placeholder landmarks, inn and curios. Keep the journey viewpoints stable to track progress.
+6. **Sound.** Authored ambience and chimes to replace the procedural signals, which have never been auditioned on speakers.
+7. **StateTree wiring.** Low priority while the C++ controller serves.
+
+Earlier roadmap notes:
+
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
 - Wire `FStateTreeAgentDecideTask` into an actual StateTree graph (needs building by hand in the StateTree editor — not scriptable via the current tooling).
