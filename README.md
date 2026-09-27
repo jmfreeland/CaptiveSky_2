@@ -247,6 +247,25 @@ That live-session evidence showed contextual replies could use requests much fas
 
 `CaptiveSky2.Tools.CreateEnvironmentCollection` creates or updates the collection asset; it has been created. Residents also sense the wetness: after a shower passes, they're told the ground is still soaked and dripping, or damp and slowly drying, until it dries. The wetness value is saved in the same per-map state file as the Island clock, so the ground does not abruptly become dry across a restart; time and weather still pause while the game is closed. During rain, the weather description already covers it. The environment subsystem now drives the existing landscape instance's `Ground Wetness` control from this value through transient dynamic material instances. It preserves the authored dry baseline, approaches fully wet at maximum soak, and restores the authored material assignments when play ends; no map or material package is edited. This is a global landscape response sampled from local weather, not a spatial puddle simulation. Authored local wet-rock variation, puddle masks, and mist remain future art work. `CaptiveSky2.Agent.IslandEnvironment` covers the wetness and golden-hour rules, the landscape parameter contract, and the values published through a real collection instance; `CaptiveSky2.Agent.DayNightPersistence` covers wetness and clock continuity across fixture sessions.
 
+### The inn blockout (2026-09-27)
+
+This is phase 1 of `docs/plans/inn.md`, an inn in the spirit of *Quest for Glory I*'s. `CaptiveSky2.Tools.BuildInnBlockout` is a headless, explicit tool:
+- **Site:** it chose level, walkable ground on the route from the shore to the Tideglass Pool, about 30 m from the pool, with the door facing arrivals from the shore.
+- **Safety:** it backs up the map to `Saved/MapBackups/` before changing anything, and rerunning it only rechecks access. `-InnRebuild` replaces the inn.
+- **Access check:** it rebuilds navigation with the editor's "Build Paths" and confirms a grounded walker reaches the common room. Currently that's 41 m from the ListeningStones.
+
+The inn is 111 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn`, built from engine cubes:
+- **Structure:** a stone plinth with door steps, and a 10 × 8 m half-timbered plaster house with a gable roof.
+- **Common room:** a stone hearth with an oak mantel against the chimney wall, a counter, and two tables with benches.
+- **Upstairs:** a stair up to a gallery floor with a bed.
+- **Light:** a door lantern, two table lamps and the hearth light, all always on for now.
+
+Parts later phases will use carry tags: `InnHearth`, `InnHearthLight`, `InnCounter`, `InnBed_1` and `InnDoorLantern`. A TargetPoint with tags `Inn` and `IslandLandmark` stands inside, so residents already perceive the inn as a landmark they can walk to.
+
+The colours are plain material instances created under `/Game/Inn/Materials/` (plaster, dark timber, shingle), with the StarterContent oak and rock. The fire, shelter awareness, beds and guest book are later phases.
+
+`Config/IslandViewpoints.json` adds `02b_InnFromPath`, the lit doorway from the path, and `02c_InnCommonRoom`, an interior view. Interior viewpoints set a negative `min_height`, so the ground clamp doesn't lift them onto the roof. The prop grounding audit skips `IslandInn` parts, since the lantern and trim are wall-mounted by design.
+
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.

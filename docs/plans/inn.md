@@ -22,7 +22,7 @@ A level, walkable site on the route from the shore inland, between the shore app
 
 Each phase is small and shippable, and is checked with tests, captures and a bounded live session.
 
-1. **Blockout.** A headless tool, like `CaptiveSky2.Tools.RepairWindArch`, backs up the map and places a blockout inn from `LevelPrototyping` meshes:
+1. **Blockout** (done 2026-09-27; see README, "The inn blockout"). A headless tool, like `CaptiveSky2.Tools.RepairWindArch`, backs up the map and places a blockout inn from `LevelPrototyping` meshes:
    - a timber-framed common room about 8 × 10 m with a chimney, a door facing the path, windows, a counter, two tables, a stair and one upstairs room;
    - Megascans rock for the hearth and footings.
    

@@ -75,6 +75,8 @@ bool FIslandGroundingAuditTest::RunTest(const FString& Parameters)
 	{
 		AActor* Actor = *It;
 		if (Actor->HasAnyFlags(RF_Transient) || Actor->IsEditorOnly() || FVector::Dist2D(Actor->GetActorLocation(), Centre) > AuditRadius) continue;
+		// Built structures carry wall-mounted and overhead parts by design; the inn blockout checks its own access.
+		if (Actor->ActorHasTag(TEXT("IslandInn"))) continue;
 		// Only visible, reasonably sized geometry and bodies; skies, volumes and huge terrain pieces are skipped.
 		TArray<UPrimitiveComponent*> Primitives;
 		Actor->GetComponents(Primitives);

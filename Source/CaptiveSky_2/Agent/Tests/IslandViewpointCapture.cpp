@@ -262,9 +262,10 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				AddError(FString::Printf(TEXT("Viewpoint %s: %s"), *View.Name, Error.IsEmpty() ? TEXT("needs \"from\" and \"look\"") : *Error));
 				continue;
 			}
-			// Keep the camera at eye level or above whatever ground lies beneath it.
+			// Keep the camera at eye level or above whatever ground lies beneath it; a negative min_height
+			// (interior shots) opts out, since the trace from above would land on the roof.
 			FHitResult Ground;
-			if (Island->LineTraceSingleByChannel(Ground, View.From + FVector(0, 0, 5000), View.From - FVector(0, 0, 20000), ECC_Visibility) &&
+			if (MinimumHeight >= 0.0 && Island->LineTraceSingleByChannel(Ground, View.From + FVector(0, 0, 5000), View.From - FVector(0, 0, 20000), ECC_Visibility) &&
 				View.From.Z < Ground.ImpactPoint.Z + MinimumHeight)
 				View.From.Z = Ground.ImpactPoint.Z + MinimumHeight;
 			Viewpoints.Add(View);

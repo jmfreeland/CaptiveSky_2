@@ -1,5 +1,5 @@
 {
-	"_comment": "Fixed visual-regression viewpoints for the shore -> Tideglass -> ListeningStones -> WindArch journey. Points are {tag, offset} relative to a tagged actor or {at: [x,y,z]}. Cameras are kept at least min_height (default 160) above the ground beneath them. Run Scripts/Capture-Viewpoints.ps1. The Island clock sets the sun at 18:00, so 17:00 is golden hour.",
+	"_comment": "Fixed visual-regression viewpoints for the shore -> Tideglass -> ListeningStones -> WindArch journey. Points are {tag, offset} relative to a tagged actor or {at: [x,y,z]}. Cameras are kept at least min_height (default 160) above the ground beneath them; a negative min_height (interior shots) leaves the camera exactly where given. Run Scripts/Capture-Viewpoints.ps1. The Island clock sets the sun at 18:00, so 17:00 is golden hour.",
 	"hour": 17.0,
 	"width": 1600,
 	"height": 900,
@@ -43,6 +43,44 @@
 			},
 			"fov": 55,
 			"min_height": 300
+		},
+		{
+			"name": "02b_InnFromPath",
+			"from": {
+				"at": [
+					-100273,
+					105030,
+					0
+				]
+			},
+			"look": {
+				"at": [
+					-100160,
+					103420,
+					2900
+				]
+			},
+			"fov": 60,
+			"min_height": 170
+		},
+		{
+			"name": "02c_InnCommonRoom",
+			"from": {
+				"at": [
+					-100163,
+					103405,
+					2854
+				]
+			},
+			"look": {
+				"at": [
+					-100352,
+					102649,
+					2760
+				]
+			},
+			"fov": 75,
+			"min_height": -1
 		},
 		{
 			"name": "02_Tideglass",
