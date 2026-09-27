@@ -106,6 +106,33 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Close to the first stone, it is noticed"), AtFirstStone.Contains(TEXT("target: PaleStone_1")));
 	TestTrue(TEXT("The first stone hints at the second"), AtFirstStone.Contains(TEXT("move_to target: PaleStone_2")));
 	TestFalse(TEXT("The pod is not given away at the start of the trail"), AtFirstStone.Contains(TEXT("Seedpod")));
+	const FIslandCurioRecord* Second = State->FindCurio(TEXT("PaleStone_2"));
+	if (TestNotNull(TEXT("Second trail stone exists for the visibility check"), Second))
+	{
+		const FVector TrailObserver = First->Location + (Second->Location - First->Location).GetSafeNormal() * 150.f + FVector(0.f, 0.f, 100.f);
+		const FVector NextView = Second->Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance);
+		AActor* TrailBlocker = World->SpawnActor<AActor>();
+		if (!TestNotNull(TEXT("Occlusion blocker spawned"), TrailBlocker))
+		{
+			DestroyCurioWorld(World);
+			IFileManager::Get().Delete(*StateFile, false, true, true);
+			return false;
+		}
+		UBoxComponent* TrailBlockerBox = NewObject<UBoxComponent>(TrailBlocker);
+		TrailBlocker->SetRootComponent(TrailBlockerBox);
+		TrailBlockerBox->SetBoxExtent(FVector(40.f, 240.f, 150.f));
+		TrailBlockerBox->SetCollisionProfileName(TEXT("BlockAll"));
+		TrailBlockerBox->RegisterComponent();
+		TrailBlocker->SetActorLocation(FMath::Lerp(TrailObserver, NextView, 0.55f));
+		TrailBlocker->SetActorRotation(FRotator(0.f, (NextView - TrailObserver).Rotation().Yaw, 0.f));
+		FCollisionQueryParams VisibilityCheck(SCENE_QUERY_STAT(IslandCurioOcclusionFixture), false);
+		FHitResult BlockedView;
+		TestTrue(TEXT("The fixture wall blocks the view to the next stone"), World->LineTraceSingleByChannel(BlockedView, TrailObserver, NextView, ECC_Visibility, VisibilityCheck));
+		const FString BehindWall = DescribeFrom(World, TrailObserver);
+		TestTrue(TEXT("The first stone remains perceptible before the wall"), BehindWall.Contains(TEXT("target: PaleStone_1")));
+		TestFalse(TEXT("An occluded next stone is not hinted to the resident"), BehindWall.Contains(TEXT("move_to target: PaleStone_2")));
+		TrailBlocker->Destroy();
+	}
 	const FString AtLastStone = DescribeFrom(World, Last->Location + FVector(0, 0, 100));
 	TestFalse(TEXT("The last stone points nowhere further"), AtLastStone.Contains(TEXT("PaleStone_7")));
 	const FString AtPod = DescribeFrom(World, Pod->Location + FVector(200, 0, 100));

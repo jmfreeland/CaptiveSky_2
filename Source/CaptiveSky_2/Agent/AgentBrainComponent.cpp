@@ -143,7 +143,13 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					int32 Number = 0;
 					if (Target.RightChop(10).IsNumeric()) Number = FCString::Atoi(*Target.RightChop(10));
 					if (const FIslandCurioRecord* Next = WorldState->FindCurio(FName(*FString::Printf(TEXT("PaleStone_%d"), Number + 1))))
-						NearbyBeings += FString::Printf(TEXT(" About %.0f metres beyond it, another pale stone is faintly visible (move_to target: %s)."), FVector::Dist(Curio.Location, Next->Location) / 100.f, *Next->Id.ToString());
+					{
+						const FVector NextView = Next->Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance);
+						FCollisionQueryParams NextParams(SCENE_QUERY_STAT(AgentNextCurioVisibility), false, Owner);
+						FHitResult NextHit;
+						if (!GetWorld()->LineTraceSingleByChannel(NextHit, Location, NextView, ECC_Visibility, NextParams))
+							NearbyBeings += FString::Printf(TEXT(" About %.0f metres beyond it, another pale stone is faintly visible (move_to target: %s)."), FVector::Dist(Curio.Location, Next->Location) / 100.f, *Next->Id.ToString());
+					}
 				}
 				else if (Curio.Kind == EIslandCurioKind::SeedPod)
 				{
