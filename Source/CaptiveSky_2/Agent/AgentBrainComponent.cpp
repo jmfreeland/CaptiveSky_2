@@ -14,6 +14,7 @@
 #include "IslandWeather.h"
 #include "IslandDayNight.h"
 #include "AutonomousAgentAIController.h"
+#include "RavenAgentAIController.h"
 #include "AgentPlaySessionSubsystem.h"
 #include "Engine/GameInstance.h"
 
@@ -61,8 +62,12 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
+	bool bCanUseRavenRoosts = false;
 	if (const APawn* Body = Cast<APawn>(Owner))
+	{
 		if (const AAutonomousAgentAIController* Controller = Cast<AAutonomousAgentAIController>(Body->GetController())) NearbyBeings += Controller->DescribeActionState();
+		bCanUseRavenRoosts = Cast<ARavenAgentAIController>(Body->GetController()) != nullptr;
+	}
 	const AIslandWeather* LocalWeather = nullptr;
 	if (Owner && GetWorld())
 	{
@@ -80,7 +85,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		int32 VisibleRoosts = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleRoosts < 4; ++It)
 		{
-			if (!It->ActorHasTag(TEXT("RavenNestSite")) || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
+			if (!bCanUseRavenRoosts || !It->ActorHasTag(TEXT("RavenNestSite")) || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(2500.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentRoostVisibility), false, Owner);
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
@@ -236,7 +241,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
-		"In rough weather, you may consider a visible nearby roost whose current wind shelter is described, and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
+		"If your body can use a visible nearby roost, in rough weather you may consider its described current wind shelter and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "
