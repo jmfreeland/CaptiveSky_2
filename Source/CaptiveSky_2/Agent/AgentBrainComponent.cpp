@@ -18,6 +18,7 @@
 #include "AgentPlaySessionSubsystem.h"
 #include "Engine/GameInstance.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandEnvironmentSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -81,6 +82,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		{
 			LocalWeather = *It;
 			NearbyBeings += It->DescribeAt(Location, Owner);
+			if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
+				NearbyBeings += UIslandEnvironmentSubsystem::DescribeGround(Environment->GetWetness(), Environment->GetRainIntensity());
 			break;
 		}
 		int32 VisibleRoosts = 0;

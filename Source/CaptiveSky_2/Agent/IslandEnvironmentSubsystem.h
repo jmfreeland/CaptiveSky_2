@@ -40,6 +40,8 @@ public:
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
 	static float GoldenHourFor(float SunHeight);
+	/** What a resident notices underfoot: lingering wetness after rain has stopped. Empty when dry or still raining. */
+	static FString DescribeGround(float Wetness, float Rain);
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;

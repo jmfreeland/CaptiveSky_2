@@ -50,6 +50,15 @@ float UIslandEnvironmentSubsystem::GoldenHourFor(float InSunHeight)
 	return InSunHeight < -0.03f ? 0.f : FMath::Clamp(1.f - FMath::Abs(InSunHeight - 0.15f) / 0.3f, 0.f, 1.f);
 }
 
+FString UIslandEnvironmentSubsystem::DescribeGround(float InWetness, float Rain)
+{
+	// While it rains, the weather description already covers it; afterwards the evidence lingers.
+	if (Rain > 0.05f || InWetness < 0.15f) return FString();
+	return InWetness > 0.6f
+		? TEXT(" The rain has passed, but the ground is still soaked and the grass and stones are dripping; it will take a while to dry.")
+		: TEXT(" The ground is damp from earlier rain and slowly drying.");
+}
+
 void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 {
 	UWorld* World = GetWorld();

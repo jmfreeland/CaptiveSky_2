@@ -214,7 +214,11 @@ Captures also show what residents have left behind. While capturing, transient c
 
 `CaptiveSky2.Visual.Grounding` checks visible props within 60 metres of the landmarks. For each prop it traces down from just above, and reports it as **hovering** if it sits up to 1.5 m above whatever is beneath it, or as **mid-air** if higher. It only warns; it never fails. `-GroundingFix` lowers hovering props onto their support, then saves the map after copying the original to `Saved/MapBackups/`. Mid-air props are left for a person to decide.
 
-The first fix lowered seven props (two ListeningStones, two Tideglass stones, both WindArch pillars, and the east roost's fallen wood) by 16–98 cm. Two mid-air items remain on purpose: the WindArch beam floats above pillars 7 m apart and needs re-authoring, and the east roost's main branch is attached to the side of its trunk. The floating cube and figures visible in captures are editor-only helper visuals that don't appear in the game.
+The first fix lowered seven props (two ListeningStones, two Tideglass stones, both WindArch pillars, and the east roost's fallen wood) by 16–98 cm. The audit also measures down to any audited prop directly beneath each prop's outline, so a beam can find the pillars under it. `CaptiveSky2.Tools.RepairWindArch` (a one-off that backs up the map first and is safe to rerun) fixed the placeholder WindArch, whose short 4 m beam floated between pillars 7 m apart:
+- **Pillars:** both were stretched upward from their grounded bases to one level top, 3.5 m above the landmark marker, so the raven's hover point 1.8 m above it stays clear.
+- **Beam:** it was lengthened to span both pillars and set down onto their tops.
+
+The only remaining mid-air prop is the east roost's main branch, which is attached to the side of its trunk on purpose. The floating cube and figures visible in captures are editor-only helper visuals that don't appear in the game.
 
 A bounded live session (12 real minutes, 40 requests; it ended itself at 587 seconds) placed the curios and arranging grounds on the real Island and carried the clock through. Aster and the raven stayed honest ("I haven't checked the pool yet"), noticed rain and the pool's rain ripples, and watched a crab without claiming it. However, about 30 of 39 decisions were back-and-forth agent-to-agent replies, which skip the background think delay, so pleasant but repetitive small talk used most of the request budget. Neither resident walked to the ListeningStones, so the trail, cairn and arranging grounds weren't encountered.
 
@@ -231,7 +235,7 @@ That live-session evidence showed contextual replies could use requests much fas
 - `Daylight`, `SunHeight` and `IslandHour`, from `AIslandDayNight`;
 - `GoldenHour`, strongest while the sun is low but still up, which is around 17:00 on this Island.
 
-`CaptiveSky2.Tools.CreateEnvironmentCollection` creates or updates the collection asset; it has been created. No material reads it yet: that's the art step for the Tideglass microclimate (wet-rock darkening, puddle masks, mist and so on). `CaptiveSky2.Agent.IslandEnvironment` covers the wetness and golden-hour rules and the values published through a real collection instance.
+`CaptiveSky2.Tools.CreateEnvironmentCollection` creates or updates the collection asset; it has been created. Residents also sense the wetness: after a shower passes, they're told the ground is still soaked and dripping, or damp and slowly drying, until it dries. During rain, the weather description already covers it. No material reads it yet: that's the art step for the Tideglass microclimate (wet-rock darkening, puddle masks, mist and so on). `CaptiveSky2.Agent.IslandEnvironment` covers the wetness and golden-hour rules and the values published through a real collection instance.
 
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).

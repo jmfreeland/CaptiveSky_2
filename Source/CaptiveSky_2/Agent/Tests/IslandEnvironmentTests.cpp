@@ -55,6 +55,10 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Golden hour peaks with the sun low but up"), UIslandEnvironmentSubsystem::GoldenHourFor(0.15f) > 0.99f);
 	TestEqual(TEXT("No golden hour at noon"), UIslandEnvironmentSubsystem::GoldenHourFor(1.f), 0.f);
 	TestEqual(TEXT("No golden hour after sunset"), UIslandEnvironmentSubsystem::GoldenHourFor(-0.3f), 0.f);
+	TestTrue(TEXT("Residents are not told about wet ground during rain"), UIslandEnvironmentSubsystem::DescribeGround(1.f, 0.8f).IsEmpty());
+	TestTrue(TEXT("Soaked ground lingers after rain"), UIslandEnvironmentSubsystem::DescribeGround(0.9f, 0.f).Contains(TEXT("still soaked")));
+	TestTrue(TEXT("Damp ground is noticed while drying"), UIslandEnvironmentSubsystem::DescribeGround(0.3f, 0.f).Contains(TEXT("damp")));
+	TestTrue(TEXT("Dry ground goes unmentioned"), UIslandEnvironmentSubsystem::DescribeGround(0.05f, 0.f).IsEmpty());
 
 	// Then the published collection values, in a fixture world with its own transient collection.
 	UMaterialParameterCollection* Collection = NewObject<UMaterialParameterCollection>(GetTransientPackage());
