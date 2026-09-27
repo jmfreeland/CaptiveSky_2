@@ -22,6 +22,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundWaveProcedural.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.NightEcology",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -369,6 +370,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("WindArch visual response disappears when the gust expires"), Motes->IsActorBeingDestroyed());
 	}
 	StonesTarget->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+	TestEqual(TEXT("Calm air keeps the original stone pitch"), AIslandListeningStonesChime::CalculateWindPitchRatio(0.f), 1.f);
+	TestTrue(TEXT("A light wind subtly lifts the stone pitch"), AIslandListeningStonesChime::CalculateWindPitchRatio(90.f) > 1.f);
+	TestTrue(TEXT("Stronger wind raises the pitch more than lighter wind"), AIslandListeningStonesChime::CalculateWindPitchRatio(240.f) > AIslandListeningStonesChime::CalculateWindPitchRatio(90.f));
+	TestTrue(TEXT("Even maximum wind keeps the resonance within one and a half semitones"), AIslandListeningStonesChime::CalculateWindPitchRatio(900.f) <= FMath::Pow(2.f, 1.5f / 12.f));
+	TestEqual(TEXT("Non-finite wind falls back to the calm-air pitch"), AIslandListeningStonesChime::CalculateWindPitchRatio(std::numeric_limits<float>::quiet_NaN()), 1.f);
 	Controller->InspectTarget(TEXT("ListeningStones"));
 	AIslandListeningStonesChime* Chime = nullptr;
 	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) { Chime = *It; break; }
@@ -376,6 +382,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (Chime)
 	{
 		TestNotNull(TEXT("Chime uses a procedural sound wave without external assets"), Chime->ChimeWave.Get());
+		const float ExpectedWindSpeed = Weather->GetLocalWind(StonesTarget->GetActorLocation(), StonesTarget).Size2D();
+		TestTrue(TEXT("Active fixture weather supplies a changing local wind sample"), ExpectedWindSpeed > 0.f);
+		TestEqual(TEXT("Chime uses wind sampled at the ListeningStones"), Chime->SampledWindSpeed, ExpectedWindSpeed);
+		TestEqual(TEXT("Chime waveform matches the local wind pitch sample"), Chime->AppliedPitchRatio,
+			AIslandListeningStonesChime::CalculateWindPitchRatio(Chime->SampledWindSpeed));
 		if (Chime->ChimeWave)
 		{
 			TestEqual(TEXT("Chime uses mono audio"), Chime->ChimeWave->NumChannels, 1);

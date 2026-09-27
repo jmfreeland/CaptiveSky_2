@@ -22,9 +22,11 @@ AIslandListeningStonesChime::AIslandListeningStonesChime()
 	AudioComponent->VolumeMultiplier = 0.28f;
 }
 
-void AIslandListeningStonesChime::BeginChime()
+void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed)
 {
-	BuildChimeWave();
+	SampledWindSpeed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
+	AppliedPitchRatio = CalculateWindPitchRatio(SampledWindSpeed);
+	BuildChimeWave(AppliedPitchRatio);
 	if (ChimeWave && AudioComponent)
 	{
 		AudioComponent->SetSound(ChimeWave);
@@ -32,7 +34,14 @@ void AIslandListeningStonesChime::BeginChime()
 	}
 }
 
-void AIslandListeningStonesChime::BuildChimeWave()
+float AIslandListeningStonesChime::CalculateWindPitchRatio(float HorizontalWindSpeed)
+{
+	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
+	const float Semitones = (Speed / 300.f) * 1.5f;
+	return FMath::Pow(2.f, Semitones / 12.f);
+}
+
+void AIslandListeningStonesChime::BuildChimeWave(float PitchRatio)
 {
 	if (ChimeWave) return;
 	constexpr int32 SampleRate = 24000;
@@ -50,9 +59,9 @@ void AIslandListeningStonesChime::BuildChimeWave()
 		const float Time = static_cast<float>(Index) / SampleRate;
 		const float Attack = FMath::Clamp(Time / 0.12f, 0.f, 1.f);
 		const float Envelope = Attack * FMath::Exp(-1.65f * Time);
-		const float Fundamental = FMath::Sin(2.f * PI * 220.f * Time);
-		const float Fifth = FMath::Sin(2.f * PI * 329.63f * Time + 0.18f);
-		const float Octave = FMath::Sin(2.f * PI * 440.7f * Time + 0.35f);
+		const float Fundamental = FMath::Sin(2.f * PI * 220.f * PitchRatio * Time);
+		const float Fifth = FMath::Sin(2.f * PI * 329.63f * PitchRatio * Time + 0.18f);
+		const float Octave = FMath::Sin(2.f * PI * 440.7f * PitchRatio * Time + 0.35f);
 		const float Signal = Envelope * (0.040f * Fundamental + 0.024f * Fifth + 0.010f * Octave);
 		Samples[Index] = static_cast<int16>(FMath::Clamp(Signal, -1.f, 1.f) * 32767.f);
 	}

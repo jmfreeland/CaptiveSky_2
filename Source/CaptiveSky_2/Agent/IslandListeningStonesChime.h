@@ -15,7 +15,7 @@ class CAPTIVESKY_2_API AIslandListeningStonesChime : public AActor
 
 public:
 	AIslandListeningStonesChime();
-	void BeginChime();
+	void BeginChime(float HorizontalWindSpeed = 0.f);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -28,5 +28,8 @@ private:
 	TObjectPtr<USoundWaveProcedural> ChimeWave;
 	float ElapsedSeconds = 0.f;
 	float DurationSeconds = 2.8f;
-	void BuildChimeWave();
+	float SampledWindSpeed = 0.f;
+	float AppliedPitchRatio = 1.f;
+	static float CalculateWindPitchRatio(float HorizontalWindSpeed);
+	void BuildChimeWave(float PitchRatio);
 };

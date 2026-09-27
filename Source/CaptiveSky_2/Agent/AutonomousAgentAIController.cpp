@@ -190,12 +190,22 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("ListeningStones")))
 		{
+			FVector LocalWind = FVector::ZeroVector;
+			bool bWeatherSampled = false;
+			for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
+			{
+				LocalWind = WeatherIt->GetLocalWind(It->GetActorLocation(), *It);
+				bWeatherSampled = true;
+				break;
+			}
 			FActorSpawnParameters SpawnParameters;
 			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			AIslandListeningStonesChime* Chime = GetWorld()->SpawnActor<AIslandListeningStonesChime>(It->GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
-			if (Chime) Chime->BeginChime();
+			if (Chime) Chime->BeginChime(LocalWind.Size2D());
 			Fact = Chime
-				? TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. It rings softly nearby and fades within a few seconds; the sound is synthesized locally, reveals nothing, and leaves no lasting change.")
+				? bWeatherSampled
+					? TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. Its pitch is tuned to the present local wind; it rings softly nearby and fades within a few seconds. The sound is synthesized locally, reveals nothing, and leaves no lasting change.")
+					: TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. No IslandWeather signal was present, so it used its calm-air pitch; it rings softly nearby and fades within a few seconds. The sound is synthesized locally, reveals nothing, and leaves no lasting change.")
 				: TEXT("You inspected the ListeningStones, but their short-lived resonance could not be created. No persistent change occurred.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("WindArch")))
