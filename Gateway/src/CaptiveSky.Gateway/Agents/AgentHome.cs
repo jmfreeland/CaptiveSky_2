@@ -8,8 +8,11 @@ public sealed partial class AgentHome
     {
         ValidateAgentId(agentId);
         AgentId = agentId;
+        ProjectRoot = Path.GetFullPath(projectRoot);
         DirectoryPath = Path.GetFullPath(Path.Combine(projectRoot, "Agents", agentId));
     }
+
+    public string ProjectRoot { get; }
 
     public string AgentId { get; }
     public string DirectoryPath { get; }

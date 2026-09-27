@@ -20,6 +20,28 @@ try
     Assert(home.LoadOptionalPersonalityEvolution() == "{\"revision\":1}", "headless gateway reads evolving personality state");
     AssertThrows<ArgumentException>(() => new AgentHome(root, "../escape"), "agent ids cannot escape the project");
 
+    Assert(WorldStateSummary.Describe(root, home.AgentId) == string.Empty, "no world state means no world facts");
+    Directory.CreateDirectory(Path.Combine(root, "WorldState"));
+    await File.WriteAllTextAsync(Path.Combine(root, "WorldState", "Broken.json"), "{ not json");
+    await File.WriteAllTextAsync(Path.Combine(root, "WorldState", "Island.json"), """
+        {"version":1,"clock":{"hour":10.5,"day":6},
+         "nests":[{"site":"Roost_West","layers":2,"builders":["Agent_Test_01"]},{"site":"Roost_East","layers":4,"builders":["Someone_Else"]}],
+         "curios":[{"id":"Cairn","kind":"Cairn","state":5,"contributors":["Agent_Test_01"]}],
+         "arrangement_sites":[
+           {"id":"ArrangingGround_1","work":{"form":"ring","title":"Tide Watch","intent":"to mark the chime","maker":"Agent_Test_01","day":2,"responses":[]}},
+           {"id":"ArrangingGround_2","work":{"form":"spiral","title":"Secret Title","intent":"secret meaning","maker":"Someone_Else","day":3,
+             "responses":[{"agent":"Agent_Test_01","day":4,"intent":"an answer"}]}},
+           {"id":"ArrangingGround_3"}]}
+        """);
+    var worldFacts = WorldStateSummary.Describe(root, home.AgentId);
+    Assert(worldFacts.Contains("2 of 5 layers of a nest at Roost_West", StringComparison.Ordinal), "own nest is recalled headlessly");
+    Assert(!worldFacts.Contains("Roost_East", StringComparison.Ordinal), "others' nests are not attributed to the agent");
+    Assert(worldFacts.Contains("cairn; it stood 5 stones", StringComparison.Ordinal), "own cairn stones are recalled");
+    Assert(worldFacts.Contains("\"Tide Watch\", made 4 Island day(s)", StringComparison.Ordinal) && worldFacts.Contains("to mark the chime", StringComparison.Ordinal), "own arrangement, age, and intent are recalled");
+    Assert(worldFacts.Contains("answered someone else's stone spiral", StringComparison.Ordinal) && worldFacts.Contains("an answer", StringComparison.Ordinal), "own response is recalled");
+    Assert(!worldFacts.Contains("Secret", StringComparison.Ordinal) && !worldFacts.Contains("secret", StringComparison.Ordinal) && !worldFacts.Contains("Someone_Else", StringComparison.Ordinal), "others' makers, titles, and intents stay private");
+    Assert(WorldStateSummary.Describe(root, "Agent_Nobody").Length == 0, "agents who made nothing get no facts");
+
     var memories = new AgentMemoryStore(home);
     var responder = new FakeResponder(home);
     var bridgeConfiguration = new EmbodimentConfiguration { PollIntervalMilliseconds = 10, ResponseTimeoutSeconds = 2 };

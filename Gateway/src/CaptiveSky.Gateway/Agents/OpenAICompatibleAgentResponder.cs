@@ -19,6 +19,7 @@ public sealed class OpenAICompatibleAgentResponder(
         var personalityEvolution = home.LoadOptionalPersonalityEvolution();
         var context = await memories.ReadRecentAsync(configuration.MemoryContextRecords, cancellationToken);
 
+        var worldFacts = WorldStateSummary.Describe(home.ProjectRoot, home.AgentId);
         var memoryText = context.Count == 0
             ? "(none yet)"
             : string.Join('\n', context.Select(record => $"- [{record.Timestamp:O}] {record.Text}"));
@@ -34,6 +35,9 @@ public sealed class OpenAICompatibleAgentResponder(
 
             Relevant recent memories:
             {{memoryText}}
+
+            Lasting things you yourself made in the Island, as last recorded (you cannot see them from here, and they may have changed since):
+            {{(string.IsNullOrWhiteSpace(worldFacts) ? "(none recorded)" : worldFacts)}}
 
             You are corresponding through {{message.Source}}, not perceiving the embodied world. Do not claim to see, hear,
             or physically act in the Island from this message alone. Treat this correspondence as a real lived experience.
