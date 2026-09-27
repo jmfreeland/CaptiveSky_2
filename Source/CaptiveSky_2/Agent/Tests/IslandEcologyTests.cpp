@@ -30,6 +30,18 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Local wind gently nudges the firefly drift"), AIslandFirefly::WindDisplacement(FVector(100.f, 0.f, 0.f)).Equals(FVector(12.f, 0.f, 0.f)));
 	TestTrue(TEXT("Strong gust displacement stays bounded"), AIslandFirefly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(30.f, 0.f, 0.f)));
 	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
+	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
+		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandFirefly::RainWingBeatScale(0.f), 1.f));
+	TestTrue(TEXT("Strong rain reduces but never removes firefly activity"),
+		AIslandFirefly::RainMovementScale(1.f) > 0.f && AIslandFirefly::RainMovementScale(1.f) < 1.f &&
+		AIslandFirefly::RainGlowScale(1.f) > 0.f && AIslandFirefly::RainGlowScale(1.f) < 1.f &&
+		AIslandFirefly::RainWingBeatScale(1.f) > 0.f && AIslandFirefly::RainWingBeatScale(1.f) < 1.f);
+	TestTrue(TEXT("Firefly rain response changes smoothly and monotonically through a shower"),
+		AIslandFirefly::RainMovementScale(0.75f) < AIslandFirefly::RainMovementScale(0.45f) &&
+		AIslandFirefly::RainGlowScale(0.75f) < AIslandFirefly::RainGlowScale(0.45f) &&
+		AIslandFirefly::RainWingBeatScale(0.75f) < AIslandFirefly::RainWingBeatScale(0.45f));
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
@@ -129,6 +141,35 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
+	if (Population > 0)
+	{
+		AIslandFirefly* RainSensitiveFirefly = nullptr;
+		for (TActorIterator<AIslandFirefly> It(World); It; ++It) { RainSensitiveFirefly = *It; break; }
+		if (RainSensitiveFirefly)
+		{
+			// This isolated fixture calls ecology refresh directly without starting world play.
+			RainSensitiveFirefly->Weather = Weather;
+			RainSensitiveFirefly->HomeLocation = RainSensitiveFirefly->GetActorLocation();
+			RainSensitiveFirefly->Phase = 1.1f;
+			const float OriginalWindSpeed = Weather->MaximumWindSpeed;
+			const int32 RainTestWeatherSeed = Weather->WeatherSeed;
+			Weather->MaximumWindSpeed = 0.f;
+			Weather->WeatherSeed = DryWeatherSeed;
+			RainSensitiveFirefly->Tick(0.f);
+			const float DryWanderRadius = FVector::Dist2D(RainSensitiveFirefly->HomeLocation, RainSensitiveFirefly->GetActorLocation());
+			Weather->WeatherSeed = StormSeed;
+			RainSensitiveFirefly->Tick(0.f);
+			const float RainWanderRadius = FVector::Dist2D(RainSensitiveFirefly->HomeLocation, RainSensitiveFirefly->GetActorLocation());
+			TestTrue(TEXT("A lived firefly contracts its lateral drift during a strong shower"), RainWanderRadius < DryWanderRadius);
+			RainSensitiveFirefly->UpdateGlow(1.37, 0.f);
+			const float ClearGlowAtFixedPhase = RainSensitiveFirefly->Glow->Intensity;
+			RainSensitiveFirefly->UpdateGlow(1.37, 1.f);
+			TestTrue(TEXT("The same natural pulse is visibly dimmer in heavy rain"), RainSensitiveFirefly->Glow->Intensity < ClearGlowAtFixedPhase);
+			RainSensitiveFirefly->UpdateGlow(World->GetTimeSeconds(), Weather->SampleRainIntensity(World->GetTimeSeconds()));
+			Weather->MaximumWindSpeed = OriginalWindSpeed;
+			Weather->WeatherSeed = RainTestWeatherSeed;
+		}
+	}
 	Weather->RefreshNightEcology();
 	Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;

@@ -28,6 +28,11 @@ public:
 
 	/** Bounded displacement response; the base wander remains independent of wind. */
 	static FVector WindDisplacement(const FVector& LocalWind);
+	/** Smooth response to strong rain without removing or owning the wild firefly. */
+	static float RainActivity(float RainIntensity);
+	static float RainMovementScale(float RainIntensity);
+	static float RainGlowScale(float RainIntensity);
+	static float RainWingBeatScale(float RainIntensity);
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
@@ -57,6 +62,6 @@ private:
 	float WingBeatPhase = 0.f;
 	float ObservationPulseRemaining = 0.f;
 	TWeakObjectPtr<AIslandWeather> Weather;
-	void UpdateGlow(double IslandTimeSeconds);
-	void UpdateWings(double IslandTimeSeconds);
+	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
+	void UpdateWings(double IslandTimeSeconds, float RainIntensity);
 };

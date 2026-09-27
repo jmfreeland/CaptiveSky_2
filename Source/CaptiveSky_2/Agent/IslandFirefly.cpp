@@ -65,13 +65,35 @@ void AIslandFirefly::BeginPlay()
 		Weather = *It;
 		break;
 	}
-	UpdateGlow(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
-	UpdateWings(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0);
+	const double IslandTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(IslandTime) : 0.f;
+	UpdateGlow(IslandTime, Rain);
+	UpdateWings(IslandTime, Rain);
 }
 
 FVector AIslandFirefly::WindDisplacement(const FVector& LocalWind)
 {
 	return LocalWind.GetClampedToMaxSize(250.f) * 0.12f;
+}
+
+float AIslandFirefly::RainActivity(float RainIntensity)
+{
+	return FMath::SmoothStep(0.35f, 0.8f, FMath::Clamp(RainIntensity, 0.f, 1.f));
+}
+
+float AIslandFirefly::RainMovementScale(float RainIntensity)
+{
+	return FMath::Lerp(1.f, 0.38f, RainActivity(RainIntensity));
+}
+
+float AIslandFirefly::RainGlowScale(float RainIntensity)
+{
+	return FMath::Lerp(1.f, 0.45f, RainActivity(RainIntensity));
+}
+
+float AIslandFirefly::RainWingBeatScale(float RainIntensity)
+{
+	return FMath::Lerp(1.f, 0.65f, RainActivity(RainIntensity));
 }
 
 void AIslandFirefly::RespondToQuietObservation()
@@ -87,30 +109,32 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	const double Time = GetWorld()->GetTimeSeconds();
 	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - FMath::Max(0.f, DeltaSeconds));
 	const float T = static_cast<float>(Time);
+	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
+	const float RainActivityFactor = RainActivity(Rain);
 	const float MotionTime = T * MotionRate;
 	const FVector Offset(
-		WanderRadius * (0.72f * FMath::Sin(MotionTime * 0.31f + Phase) + 0.28f * FMath::Sin(MotionTime * 0.17f + Phase * 1.7f)),
-		WanderRadius * 0.65f * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
-		HoverHeight + 34.f * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
+		WanderRadius * RainMovementScale(Rain) * (0.72f * FMath::Sin(MotionTime * 0.31f + Phase) + 0.28f * FMath::Sin(MotionTime * 0.17f + Phase * 1.7f)),
+		WanderRadius * 0.65f * RainMovementScale(Rain) * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
+		FMath::Lerp(HoverHeight, 22.f, RainActivityFactor) + FMath::Lerp(34.f, 10.f, RainActivityFactor) * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
 	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	SetActorLocation(HomeLocation + Offset + WindDisplacement(Wind), false);
-	UpdateGlow(Time);
-	UpdateWings(Time);
+	UpdateGlow(Time, Rain);
+	UpdateWings(Time, Rain);
 }
 
-void AIslandFirefly::UpdateWings(double IslandTimeSeconds)
+void AIslandFirefly::UpdateWings(double IslandTimeSeconds, float RainIntensity)
 {
-	const float Beat = FMath::Sin(static_cast<float>(IslandTimeSeconds) * 38.f + WingBeatPhase) * 42.f;
+	const float Beat = FMath::Sin(static_cast<float>(IslandTimeSeconds) * 38.f * RainWingBeatScale(RainIntensity) + WingBeatPhase) * 42.f * RainWingBeatScale(RainIntensity);
 	if (LeftWing) LeftWing->SetRelativeRotation(FRotator(0.f, 0.f, 18.f + Beat));
 	if (RightWing) RightWing->SetRelativeRotation(FRotator(0.f, 0.f, -18.f - Beat));
 }
 
-void AIslandFirefly::UpdateGlow(double IslandTimeSeconds)
+void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 {
 	if (!Glow) return;
 	const float T = static_cast<float>(IslandTimeSeconds);
 	const float Pulse = FMath::Max(0.f, FMath::Sin(T * 4.2f * PulseRate + Phase));
 	const float NaturalPulse = 0.12f + 0.88f * FMath::Pow(Pulse, 5.f);
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
-	Glow->SetIntensity(GlowIntensity * NaturalPulse * ObservationAccent);
+	Glow->SetIntensity(GlowIntensity * RainGlowScale(RainIntensity) * NaturalPulse * ObservationAccent);
 }
