@@ -162,7 +162,10 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 				else
 				{
-					NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away (move_to/interact target: %s)."), Curio.State, Metres, *Target);
+					if (!OwnId.IsEmpty() && Curio.Contributors.Contains(OwnId))
+						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away, including stones you set there. The shared record does not identify who placed the other stones (move_to/interact target: %s)."), Curio.State, Metres, *Target);
+					else
+						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away. Its shared record does not identify you as a contributor or say who placed the other stones; your own memories may know more (move_to/interact target: %s)."), Curio.State, Metres, *Target);
 				}
 				++NoticedCurios;
 			}

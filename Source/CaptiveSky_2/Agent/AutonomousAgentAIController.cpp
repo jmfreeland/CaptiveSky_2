@@ -172,7 +172,9 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		else if (It->ActorHasTag(TEXT("IslandCurio")))
 		{
 			UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
-			Fact = WorldState ? WorldState->ExamineCurio(Target, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld())) : TEXT("You examined it, but nothing about it can change here.");
+			const UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>();
+			const FString ContributorAgentId = Memory ? Memory->GetResolvedAgentId() : Observer->GetName();
+			Fact = WorldState ? WorldState->ExamineCurio(Target, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), ContributorAgentId) : TEXT("You examined it, but nothing about it can change here.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("Firefly")))
 		{

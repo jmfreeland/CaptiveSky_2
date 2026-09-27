@@ -43,6 +43,10 @@ struct FIslandCurioRecord
 	/** Island day of the most recent change, so some changes happen at most once a day. */
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Curio")
 	int32 LastChangedDay = -1;
+
+	/** Stable residents who knowingly added a cairn stone; an empty list also means authorship is unknown. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Curio")
+	TArray<FString> Contributors;
 };
 
 /**

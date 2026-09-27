@@ -92,7 +92,7 @@ public:
 	 * A resident examines a curio on Island day Today. Applies any lasting change (pod opening,
 	 * cairn stone) and returns a factual description of what happened.
 	 */
-	FString ExamineCurio(FName Id, int32 Today);
+	FString ExamineCurio(FName Id, int32 Today, const FString& ContributorAgentId = FString());
 
 	/**
 	 * Computes where curios would go in World (near its ListeningStones landmark) without saving or

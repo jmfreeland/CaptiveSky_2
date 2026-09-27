@@ -154,7 +154,7 @@ The raven asked for hidden paths and strange objects that reward returning. The 
 
 - **A trail of six pale stones** (`PaleStone_1`..`PaleStone_6`) curves away from the ListeningStones, 7 to 32 metres out. They never change.
 - **A seed pod** (`Seedpod`) sits just past the last stone. Each examination on a new Island day opens it one step. After three different days it stands open and a small seed glows faintly inside. Nothing more happens after that, and what the seed is stays unexplained.
-- **A small cairn** (`Cairn`) sits apart, beyond the WindArch. It starts at three stones ("someone began it before you came"), and any resident, including Aster, can add one stone per Island day, up to twelve.
+- **A small cairn** (`Cairn`) sits apart, beyond the WindArch. It starts at three stones ("someone began it before you came"), and any resident, including Aster, can add one stone per Island day, up to twelve. Its lasting record lets each resident recognize their own contribution after reload, but never attributes the other stones without evidence.
 
 Nothing is announced from afar. A resident is only told about a curio within 8 metres with line of sight (15 metres for the cairn), and up to three at a time. Each pale stone mentions the next one only when it is also in clear view, so the pod is discovered by following the trail without terrain revealing a hidden section. Curios use the ordinary `move_to`/`interact` targets; examining one goes through the existing four-metre `Interact` path, and its factual result becomes an action-result memory. Pod and cairn changes happen at most once per Island day, whoever visits, so a same-day return is told that nothing has changed. `AIslandDayNight` now keeps a day number, starting at 1 and advancing at midnight, which is saved with the hour.
 
@@ -163,7 +163,7 @@ The visuals are placeholder engine shapes with tinted materials and no collision
 - placement, and levels without the landmarks getting none;
 - close-range discovery, stone-to-stone hints, and terrain occlusion of hidden stones;
 - once-per-day pod and cairn changes, including through a real `Interact`;
-- reloading in a new session, and the developer reset.
+- reloading in a new session, resident-specific cairn recognition, and the developer reset.
 
 When Island is the open editor map, the test also computes the real layout without saving anything and confirms that a grounded walking path exists from the ListeningStones to every curio. `DayNightPersistence` now also covers the saved day and the midnight rollover.
 

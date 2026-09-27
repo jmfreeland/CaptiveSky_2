@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
+#include "AgentMemoryComponent.h"
 #include "IslandCurio.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
@@ -61,12 +62,19 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 {
 	// No gateway, model requests, or autobiographical memory in this fixture.
 	// What a brain-only resident standing at Where would be told (a lambda so it shares this test's access).
-	auto DescribeFrom = [](UWorld* World, const FVector& Where)
+	auto DescribeFrom = [](UWorld* World, const FVector& Where, const FString& AgentId = FString())
 	{
 		ACharacter* Body = World->SpawnActor<ACharacter>(Where, FRotator::ZeroRotator);
 		UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Body);
 		Body->AddInstanceComponent(Brain);
 		Brain->RegisterComponent();
+		if (!AgentId.IsEmpty())
+		{
+			UAgentMemoryComponent* Memory = NewObject<UAgentMemoryComponent>(Body);
+			Memory->AgentId = AgentId;
+			Body->AddInstanceComponent(Memory);
+			Memory->RegisterComponent();
+		}
 		const FString View = Brain->BuildSituationSummary(FAgentConversationContext());
 		Body->Destroy();
 		return View;
@@ -162,7 +170,17 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	Controller->ActOnDecision(Examine);
 	TestTrue(TEXT("A resident adds a stone"), Controller->DescribeActionState().Contains(TEXT("now stands 4 stones high")));
 	TestEqual(TEXT("The cairn's new height is shown"), FindCurioActor(World, TEXT("Cairn"))->GetVisibleStoneCount(), 4);
-	TestTrue(TEXT("Only one stone per day"), State->ExamineCurio(TEXT("Cairn"), 1).Contains(TEXT("another would topple it")) && State->FindCurio(TEXT("Cairn"))->State == 4);
+	const FString CairnContributorId = Visitor->GetName();
+	TestTrue(TEXT("The cairn records the resident who added the stone"), State->FindCurio(TEXT("Cairn"))->Contributors.Contains(CairnContributorId));
+	const FString ContributorView = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100), CairnContributorId);
+	TestTrue(TEXT("A maker recognizes their own contribution in perception"), ContributorView.Contains(TEXT("including stones you set there")));
+	TestTrue(TEXT("A maker is not told who placed the other stones"), ContributorView.Contains(TEXT("does not identify who placed the other stones")));
+	TestTrue(TEXT("Only one stone per day, with no false contributor record"), State->ExamineCurio(TEXT("Cairn"), 1, TEXT("AnotherResident")).Contains(TEXT("another would topple it")) && State->FindCurio(TEXT("Cairn"))->State == 4 && !State->FindCurio(TEXT("Cairn"))->Contributors.Contains(TEXT("AnotherResident")));
+	TestTrue(TEXT("A second resident can contribute on a later day"), State->ExamineCurio(TEXT("Cairn"), 2, TEXT("AnotherResident")).Contains(TEXT("now stands 5 stones high")) && State->FindCurio(TEXT("Cairn"))->Contributors.Contains(TEXT("AnotherResident")));
+	const FString OtherMakerView = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100), TEXT("AnotherResident"));
+	TestTrue(TEXT("A second maker recognizes their own contribution"), OtherMakerView.Contains(TEXT("including stones you set there")));
+	const FString UninvolvedView = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100), TEXT("UninvolvedResident"));
+	TestTrue(TEXT("An uninvolved resident receives no invented authorship"), UninvolvedView.Contains(TEXT("does not identify you as a contributor")));
 	Controller->UnPossess();
 	DestroyCurioWorld(World);
 
@@ -175,7 +193,8 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	for (int32 Index = 0; bSamePlaces && Index < Placed.Num(); ++Index) bSamePlaces = State->GetCurios()[Index].Location.Equals(Placed[Index], 0.5f);
 	TestTrue(TEXT("Curios stay exactly where they were"), bSamePlaces);
 	TestEqual(TEXT("The open pod stays open next session"), State->FindCurio(TEXT("Seedpod"))->State, AIslandCurio::PodOpenState);
-	TestEqual(TEXT("The cairn keeps its added stone"), State->FindCurio(TEXT("Cairn"))->State, 4);
+	TestEqual(TEXT("The cairn keeps its added stones"), State->FindCurio(TEXT("Cairn"))->State, 5);
+	TestTrue(TEXT("Cairn contributors remain recognizable after reload"), State->FindCurio(TEXT("Cairn"))->Contributors.Contains(CairnContributorId) && State->FindCurio(TEXT("Cairn"))->Contributors.Contains(TEXT("AnotherResident")));
 	TestTrue(TEXT("The open pod is restored glowing"), FindCurioActor(World, TEXT("Seedpod")) && FindCurioActor(World, TEXT("Seedpod"))->IsGlowing());
 	TestTrue(TEXT("Developer reset forgets the curios"), State->ForgetCurios() && State->GetCurios().Num() == 0 && !FindCurioActor(World, TEXT("Cairn")));
 	DestroyCurioWorld(World);

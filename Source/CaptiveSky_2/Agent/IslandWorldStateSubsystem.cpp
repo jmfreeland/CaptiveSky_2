@@ -102,6 +102,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 			Record.Location = FVector((*Where)[0]->AsNumber(), (*Where)[1]->AsNumber(), (*Where)[2]->AsNumber());
 			(*Object)->TryGetNumberField(TEXT("state"), Record.State);
 			(*Object)->TryGetNumberField(TEXT("last_changed_day"), Record.LastChangedDay);
+			(*Object)->TryGetStringArrayField(TEXT("contributors"), Record.Contributors);
 			Record.State = FMath::Clamp(Record.State, 0, Record.Kind == EIslandCurioKind::Cairn ? AIslandCurio::CairnMaxStones : AIslandCurio::PodOpenState);
 			Curios.Add(Record);
 			RefreshCurioActor(Record);
@@ -166,6 +167,9 @@ bool UIslandWorldStateSubsystem::Save() const
 			MakeShared<FJsonValueNumber>(Record.Location.X), MakeShared<FJsonValueNumber>(Record.Location.Y), MakeShared<FJsonValueNumber>(Record.Location.Z) });
 		Object->SetNumberField(TEXT("state"), Record.State);
 		Object->SetNumberField(TEXT("last_changed_day"), Record.LastChangedDay);
+		TArray<TSharedPtr<FJsonValue>> Contributors;
+		for (const FString& Contributor : Record.Contributors) Contributors.Add(MakeShared<FJsonValueString>(Contributor));
+		Object->SetArrayField(TEXT("contributors"), Contributors);
 		CurioValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("curios"), CurioValues);
@@ -386,7 +390,7 @@ bool UIslandWorldStateSubsystem::PlaceCurios()
 	return true;
 }
 
-FString UIslandWorldStateSubsystem::ExamineCurio(FName Id, int32 Today)
+FString UIslandWorldStateSubsystem::ExamineCurio(FName Id, int32 Today, const FString& ContributorAgentId)
 {
 	FIslandCurioRecord* Record = Curios.FindByPredicate([Id](const FIslandCurioRecord& Existing) { return Existing.Id == Id; });
 	if (!Record) return TEXT("There is nothing here to examine.");
@@ -417,7 +421,8 @@ FString UIslandWorldStateSubsystem::ExamineCurio(FName Id, int32 Today)
 			return FString::Printf(TEXT("The cairn stands %d stones high. Its top stone was set there today and still sits a little unsteadily; another would topple it."), Record->State);
 		++Record->State;
 		Record->LastChangedDay = Today;
-		Fact = FString::Printf(TEXT("You find a flat stone nearby and set it on the small cairn; it now stands %d stones high. Someone began it before you came. It will still be here later."), Record->State);
+		if (!ContributorAgentId.IsEmpty() && !Record->Contributors.Contains(ContributorAgentId)) Record->Contributors.Add(ContributorAgentId);
+		Fact = FString::Printf(TEXT("You find a flat stone nearby and set it on the small cairn; it now stands %d stones high. Someone began it before you came. The shared record will let you recognize this contribution later, but does not identify who set the other stones."), Record->State);
 		break;
 	}
 	if (!Save())
