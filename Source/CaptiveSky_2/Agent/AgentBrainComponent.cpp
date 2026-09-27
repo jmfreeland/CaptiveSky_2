@@ -21,6 +21,7 @@
 #include "Engine/GameInstance.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandInnHearthSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -264,6 +265,20 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
 			}
 			++VisibleLandmarks;
+		}
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("IslandInn")) || !It->ActorHasTag(TEXT("InnHearth")) ||
+				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentHearthVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			const float Metres = FVector::Dist(Location, It->GetActorLocation()) / 100.f;
+			const UIslandInnHearthSubsystem* Hearth = GetWorld()->GetSubsystem<UIslandInnHearthSubsystem>();
+			NearbyBeings += FString::Printf(TEXT(" The inn hearth is %.0f metres away (move_to/interact target: InnHearth).%s Respect recent interaction results."),
+				Metres, Hearth ? *Hearth->DescribeHearth() : TEXT(" Its current light state is unknown; no active hearth response is available."));
+			break;
 		}
 		int32 VisibleWildlife = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 4; ++It)

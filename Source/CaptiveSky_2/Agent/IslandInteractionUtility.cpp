@@ -2,6 +2,7 @@
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "IslandInnHearthSubsystem.h"
 #include "IslandFirefly.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
@@ -20,6 +21,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 		if (Target->ActorHasTag(TEXT("MinnowSchool"))) return FName(TEXT("MinnowSchool"));
 		return NAME_None;
 	}
+	if (Target->ActorHasTag(TEXT("IslandInn")) && Target->ActorHasTag(TEXT("InnHearth"))) return FName(TEXT("InnHearth"));
 	if (!Target->ActorHasTag(TEXT("IslandLandmark"))) return NAME_None;
 	for (const FName Tag : Target->Tags)
 		if (Tag != FName(TEXT("IslandLandmark")) && Tag != FName(TEXT("IslandLife"))) return Tag;
@@ -91,6 +93,14 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	if (!IsValid(Observer) || !IsValid(Target) || !Observer->GetWorld() || Observer->GetWorld() != Target->GetWorld()) return false;
 	const FName TargetTag = GetTargetTag(Target);
 	UWorld* World = Observer->GetWorld();
+
+	if (TargetTag == FName(TEXT("InnHearth")) && Target->ActorHasTag(TEXT("IslandInn")))
+	{
+		if (UIslandInnHearthSubsystem* Hearth = World->GetSubsystem<UIslandInnHearthSubsystem>())
+			return Hearth->TendHearth(OutFact);
+		OutFact = TEXT("You inspected the inn hearth, but no hearth response is active. Nothing changed.");
+		return false;
+	}
 
 	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("Firefly")))
 	{

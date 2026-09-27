@@ -96,6 +96,7 @@ private:
 	friend class FIslandArrangementTest;
 	friend class FIslandWeatherTest;
 	friend class FIslandEnvironmentTest;
+	friend class FIslandInnHearthTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 

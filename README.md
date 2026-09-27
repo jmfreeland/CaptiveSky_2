@@ -282,7 +282,7 @@ The inn is 111 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn
 - **Structure:** a stone plinth with door steps, and a 10 × 8 m half-timbered plaster house with a gable roof.
 - **Common room:** a stone hearth with an oak mantel against the chimney wall, a counter, and two tables with benches.
 - **Upstairs:** a stair up to a gallery floor with a bed.
-- **Light:** a door lantern, two table lamps and the hearth light, all always on for now.
+- **Light:** the door lantern and two table lamps remain on; the hearth's tagged point light starts banked. Residents and visitors may choose `InnHearth` to kindle its gently flickering light for five minutes of play (about three Island hours at the current clock rate), bank it early, or leave it alone. The light then banks itself. This is a reversible, session-only response: no visible flame, heat, or saved hearth state exists yet.
 
 Parts later phases will use carry tags: `InnHearth`, `InnHearthLight`, `InnCounter`, `InnBed_1` and `InnDoorLantern`. A TargetPoint with tags `Inn` and `IslandLandmark` stands inside, so residents already perceive the inn as a landmark they can walk to.
 
@@ -293,6 +293,8 @@ The colours are plain material instances created under `/Game/Inn/Materials/` (p
 ### Inn interior sensing (2026-09-27)
 
 The first step of phase 2 gives each resident a local geometric check: an `IslandInn` roof must be overhead, and tagged inn collision must enclose at least six of eight horizontal sightlines. Only then does the resident's own situation report say they are inside. The environment collection publishes `Indoors` (0/1) from the same check for the player/viewpoint. At that verified point, camera-centred rain streaks and roof-local splash visuals are hidden, and the generated wind/rain ambience is softened to one fifth; Island-wide weather and Tideglass rain ripples continue. Residents still are not promised complete rainproofing or warmth. The checks are read-only, make no model calls, and are covered by isolated fixtures. The scalar is available for future material and ambience responses; rendered play should still verify those effects.
+
+The first hearth interaction is also in place: in Game/PIE, only the tagged `InnHearthLight` point light is toggled, gently flickered while lit, and automatically banked after five minutes of play (about three Island hours at the current clock rate). Any visitor or resident can tend it; residents can see the option only when the tagged hearth marker is nearby and unobstructed. It is intentionally just colored light—no fire geometry, heat, saved state, or innkeeper routine yet. `CaptiveSky2.Agent.IslandInnHearth` checks visibility/targeting, both toggles, gentle flicker bounds, natural expiry, resident perception, and factual wording in an isolated world with no decision request.
 
 ### Spectator mode (2026-09-27)
 

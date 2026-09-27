@@ -172,12 +172,13 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			const FString ContributorAgentId = Memory ? Memory->GetResolvedAgentId() : Observer->GetName();
 			Fact = WorldState ? WorldState->ExamineCurio(Target, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), ContributorAgentId) : TEXT("You examined it, but nothing about it can change here.");
 		}
-		else if (It->ActorHasTag(TEXT("IslandLife")) || It->ActorHasTag(TEXT("IslandLandmark")))
+		else if (It->ActorHasTag(TEXT("IslandLife")) || It->ActorHasTag(TEXT("IslandLandmark")) || IslandInteractionUtility::GetTargetTag(*It) == Target)
 		{
 			if (!IslandInteractionUtility::Perform(Observer, *It, Fact)) { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		}
 		else { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
-		InspectedUntil.Add(Target, FPlatformTime::Seconds() + 300);
+		// The hearth is deliberately reversible: residents may tend it again before its light expires.
+		InspectedUntil.Add(Target, FPlatformTime::Seconds() + (Target == FName(TEXT("InnHearth")) ? 60.0 : 300.0));
 		ReportAction(Target.ToString() + TEXT(": ") + Fact);
 		if (UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>())
 			Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Target.ToString() + TEXT(": ") + Fact, 0.45f, {TEXT("action-result"), Target.ToString()}));
