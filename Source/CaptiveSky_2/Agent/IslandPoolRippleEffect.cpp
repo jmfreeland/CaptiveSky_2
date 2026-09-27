@@ -39,6 +39,22 @@ void AIslandPoolRippleEffect::ConfigureAsRainImpact()
 	Tags.AddUnique(TEXT("RainImpact"));
 }
 
+void AIslandPoolRippleEffect::ConfigureAsWindImpact(float HorizontalWindSpeed)
+{
+	const float Activity = WindRippleActivity(HorizontalWindSpeed);
+	DurationSeconds = FMath::Lerp(1.25f, 2.2f, Activity);
+	SurfaceRadius = FMath::Lerp(58.f, 112.f, Activity);
+	PeakLightIntensity = FMath::Lerp(5.f, 14.f, Activity);
+	Tags.AddUnique(TEXT("WindImpact"));
+	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
+}
+
+float AIslandPoolRippleEffect::WindRippleActivity(float HorizontalWindSpeed)
+{
+	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Max(0.f, HorizontalWindSpeed) : 0.f;
+	return FMath::SmoothStep(45.f, 150.f, Speed);
+}
+
 void AIslandPoolRippleEffect::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);

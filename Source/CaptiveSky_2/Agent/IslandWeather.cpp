@@ -96,6 +96,7 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UpdateCloudRendering();
 	UpdateRainRendering();
+	UpdateWindPoolResponse();
 	UpdateWeatherAmbience(DeltaSeconds);
 }
 
@@ -369,6 +370,40 @@ void AIslandWeather::UpdateRainPoolResponse()
 		Ripple->ConfigureAsRainImpact();
 		RainPoolRipple = Ripple;
 		NextRainPoolRippleTime = Now + 4.5;
+	}
+}
+
+void AIslandWeather::UpdateWindPoolResponse()
+{
+	if (!GetWorld() || CurrentRainIntensity >= 0.55f || RainPoolRipple.IsValid() || WindPoolRipple.IsValid()) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now < NextWindPoolRippleTime) return;
+
+	AActor* Pool = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("TideglassPool"))) continue;
+		Pool = *It;
+		break;
+	}
+	if (!Pool) return;
+
+	const FVector LocalWind = GetLocalWind(Pool->GetActorLocation(), Pool);
+	const float Speed = LocalWind.Size2D();
+	const float Activity = AIslandPoolRippleEffect::WindRippleActivity(Speed);
+	if (Activity <= 0.f) return;
+
+	const FVector Flow = LocalWind.GetSafeNormal2D();
+	const FVector Side(-Flow.Y, Flow.X, 0.f);
+	const double Phase = Now * 0.41 + WeatherSeed * 0.19;
+	const FVector Offset = Flow * 28.f + Side * static_cast<float>(FMath::Sin(Phase) * 28.0);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(Pool->GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParameters))
+	{
+		Ripple->ConfigureAsWindImpact(Speed);
+		WindPoolRipple = Ripple;
+		NextWindPoolRippleTime = Now + FMath::Lerp(12.0, 5.0, static_cast<double>(Activity));
 	}
 }
 

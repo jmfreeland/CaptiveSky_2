@@ -79,6 +79,7 @@ private:
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
+	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
 	FTimerHandle EcologyTimerHandle;
 	TWeakObjectPtr<UVolumetricCloudComponent> CloudComponent;
 	UPROPERTY(Transient)
@@ -120,6 +121,7 @@ private:
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;
+	double NextWindPoolRippleTime = 0.0;
 	double NextRainGroundImpactTime = 0.0;
 	double RainGroundImpactStartedAt = 0.0;
 	FVector LastRainGroundImpactLocation = FVector::ZeroVector;
@@ -130,6 +132,7 @@ private:
 	bool InitializeRainRendering();
 	void UpdateRainRendering();
 	void UpdateRainPoolResponse();
+	void UpdateWindPoolResponse();
 	void UpdateRainGroundResponse(const FVector& Center, const AActor* Observer, double Now);
 	void ClearRainGroundResponse();
 	void InitializeWeatherAmbience();

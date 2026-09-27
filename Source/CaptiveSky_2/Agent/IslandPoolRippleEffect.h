@@ -16,6 +16,9 @@ public:
 	AIslandPoolRippleEffect();
 	/** Reduce the size and brightness for a subtle weather-driven water impact. */
 	void ConfigureAsRainImpact();
+	/** Size a gentle wind ripple from the measured local wind speed (cm/s). */
+	void ConfigureAsWindImpact(float HorizontalWindSpeed);
+	static float WindRippleActivity(float HorizontalWindSpeed);
 
 protected:
 	virtual void BeginPlay() override;
@@ -23,6 +26,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandWeatherTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TArray<TObjectPtr<UPointLightComponent>> RippleLights;
 

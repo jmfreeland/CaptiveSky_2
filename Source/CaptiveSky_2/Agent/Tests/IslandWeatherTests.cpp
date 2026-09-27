@@ -1,9 +1,11 @@
 #include "Misc/AutomationTest.h"
 #include "IslandWeather.h"
+#include "IslandPoolRippleEffect.h"
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Sound/SoundWaveProcedural.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
@@ -48,6 +50,11 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wind ambience grows with measured wind and has a quiet ceiling"), WindGains.X > 0.f && WindGains.X <= 0.055f && WindGains.Y == 0.f);
 	TestTrue(TEXT("Rain ambience follows rain independently of wind"), RainGains.Y > 0.f && RainGains.Y <= 0.035f && RainGains.X == 0.f);
 	TestTrue(TEXT("Combined storm ambience remains strictly bounded"), StormGains.X <= 0.055f && StormGains.Y <= 0.035f);
+	TestEqual(TEXT("Calm air creates no wind-driven pool ripple"), AIslandPoolRippleEffect::WindRippleActivity(0.f), 0.f);
+	TestTrue(TEXT("A strong breeze gives Tideglass a measurable but bounded ripple"),
+		AIslandPoolRippleEffect::WindRippleActivity(90.f) > 0.f && AIslandPoolRippleEffect::WindRippleActivity(300.f) == 1.f);
+	TestEqual(TEXT("Invalid wind cannot create a water response"),
+		AIslandPoolRippleEffect::WindRippleActivity(std::numeric_limits<float>::quiet_NaN()), 0.f);
 
 	FIslandTransientGust Gust;
 	Gust.Center = FVector::ZeroVector;
@@ -100,6 +107,38 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Solid upwind obstruction is reported as wind shelter"), ShelteredReport.Contains(TEXT("blocks the upwind visibility trace")));
 	TestTrue(TEXT("Sheltered description does not claim roof cover or safe support"), ShelteredReport.Contains(TEXT("does not establish overhead rain cover or safe perch support")));
 	TestTrue(TEXT("Same upwind obstruction attenuates the actual local-wind signal"), WorldWeather->GetLocalWind(ShelterPoint).Size() < AmbientWind.Size() * 0.2f);
+	AActor* Pool = World->SpawnActor<AActor>(FVector(-10000.f, -10000.f, 1000.f), FRotator::ZeroRotator);
+	Pool->Tags.Add(TEXT("TideglassPool"));
+	FIslandTransientGust PoolGust;
+	PoolGust.Center = Pool->GetActorLocation();
+	PoolGust.Direction = FVector::ForwardVector;
+	PoolGust.PeakSpeed = 120.f;
+	PoolGust.Radius = 800.f;
+	PoolGust.StartedAt = World->GetTimeSeconds();
+	PoolGust.ExpiresAt = PoolGust.StartedAt + 20.0;
+	WorldWeather->TransientGusts.Add(PoolGust);
+	WorldWeather->CurrentRainIntensity = 0.f;
+	WorldWeather->UpdateWindPoolResponse();
+	TestTrue(TEXT("A measured dry-weather local gust creates a Tideglass wind ripple"), WorldWeather->WindPoolRipple.IsValid());
+	int32 WindRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("WindImpact")))
+		{
+			++WindRippleCount;
+			TestTrue(TEXT("Wind ripple is quieter than a deliberate pool interaction"), It->PeakLightIntensity < 18.f);
+			TestTrue(TEXT("Wind ripple lifetime is bounded"), It->DurationSeconds > 0.f && It->DurationSeconds <= 2.2f);
+		}
+	TestEqual(TEXT("One local gust creates one finite pool response"), WindRippleCount, 1);
+	WorldWeather->UpdateWindPoolResponse();
+	WindRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("WindImpact"))) ++WindRippleCount;
+	TestEqual(TEXT("Repeated weather ticks do not stack wind ripples"), WindRippleCount, 1);
+	WorldWeather->CurrentRainIntensity = 0.8f;
+	WorldWeather->WindPoolRipple->Destroy();
+	WorldWeather->WindPoolRipple.Reset();
+	WorldWeather->NextWindPoolRippleTime = 0.0;
+	WorldWeather->UpdateWindPoolResponse();
+	TestFalse(TEXT("Strong rain remains the pool's water response instead of stacking wind ripples"), WorldWeather->WindPoolRipple.IsValid());
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;
