@@ -22,7 +22,9 @@ bool UIslandWorldStateSubsystem::DoesSupportWorldType(const EWorldType::Type Wor
 FString UIslandWorldStateSubsystem::GetStorageFilePath() const
 {
 	if (!StorageFileOverride.IsEmpty()) return StorageFileOverride;
-	const FString MapName = GetWorld() ? UWorld::RemovePIEPrefix(GetWorld()->GetMapName()) : FString(TEXT("Unknown"));
+	// Worlds created in code (test fixtures) have no saved map, so they get no lasting state.
+	if (!GetWorld() || GetWorld()->GetOutermost()->GetName().StartsWith(TEXT("/Temp/"))) return FString();
+	const FString MapName = UWorld::RemovePIEPrefix(GetWorld()->GetMapName());
 	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / (MapName + TEXT(".json")));
 }
 
@@ -48,10 +50,11 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 {
 	DestroyNestActors();
 	Nests.Reset();
+	SavedHour.Reset();
 	bStorageUnreadable = false;
 	FString Contents;
 	const FString Path = GetStorageFilePath();
-	if (!FPaths::FileExists(Path)) return;
+	if (Path.IsEmpty() || !FPaths::FileExists(Path)) return;
 	TSharedPtr<FJsonObject> Root;
 	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
 	{
@@ -60,6 +63,10 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 		bStorageUnreadable = true;
 		return;
 	}
+	const TSharedPtr<FJsonObject>* Clock = nullptr;
+	double Hour = 0.0;
+	if (Root->TryGetObjectField(TEXT("clock"), Clock) && (*Clock)->TryGetNumberField(TEXT("hour"), Hour) && Hour >= 0.0 && Hour < 24.0)
+		SavedHour = static_cast<float>(Hour);
 	const TArray<TSharedPtr<FJsonValue>>* NestValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("nests"), NestValues))
 	{
@@ -89,7 +96,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 
 bool UIslandWorldStateSubsystem::Save() const
 {
-	if (bStorageUnreadable) return false;
+	if (bStorageUnreadable || GetStorageFilePath().IsEmpty()) return false;
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), 1);
 	TArray<TSharedPtr<FJsonValue>> NestValues;
@@ -108,6 +115,13 @@ bool UIslandWorldStateSubsystem::Save() const
 		NestValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("nests"), NestValues);
+	if (SavedHour.IsSet())
+	{
+		const TSharedRef<FJsonObject> Clock = MakeShared<FJsonObject>();
+		Clock->SetNumberField(TEXT("hour"), SavedHour.GetValue());
+		Clock->SetStringField(TEXT("saved_utc"), FDateTime::UtcNow().ToIso8601());
+		Root->SetObjectField(TEXT("clock"), Clock);
+	}
 
 	FString Json;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Json);
@@ -149,6 +163,15 @@ int32 UIslandWorldStateSubsystem::AddNestLayer(FName SiteTag, const FVector& Sup
 	}
 	RefreshNestActor(Updated);
 	return Updated.Layers;
+}
+
+bool UIslandWorldStateSubsystem::SaveHour(float Hour)
+{
+	const TOptional<float> Previous = SavedHour;
+	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
+	if (Save()) return true;
+	SavedHour = Previous;
+	return false;
 }
 
 bool UIslandWorldStateSubsystem::RemoveNest(FName SiteTag)

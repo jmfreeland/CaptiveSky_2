@@ -7,6 +7,9 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
 #include "Engine/World.h"
+#include "IslandWorldStateSubsystem.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandClockTest, "CaptiveSky2.Agent.DayNight",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -70,5 +73,72 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Overcast cloud signal dims the actual skylight"), Sky->GetLightComponent()->Intensity < ClearSky * 0.75f);
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandClockPersistenceTest, "CaptiveSky2.Agent.DayNightPersistence",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
+{
+	if (!TestNotNull(TEXT("Engine is available for the clock fixture"), GEngine)) return false;
+	const FString StateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("IslandClock") / TEXT("WorldState.json"));
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	// An empty File leaves the fixture world on its default storage, which should be none.
+	auto StartSession = [](UWorld*& OutWorld, const FString& File, bool bResume) -> AIslandDayNight*
+	{
+		const UWorld::InitializationValues Init = UWorld::InitializationValues()
+			.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false)
+			.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+		OutWorld = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+		GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(OutWorld);
+		UIslandWorldStateSubsystem* State = OutWorld->GetSubsystem<UIslandWorldStateSubsystem>();
+		if (State) State->StorageFileOverride = File;
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		AIslandDayNight* Clock = OutWorld->SpawnActor<AIslandDayNight>(Spawn);
+		Clock->StartHour = 9.f;
+		Clock->bResumeSavedTime = bResume;
+		OutWorld->BeginPlay();
+		// Fixture worlds have no game mode to begin play for actors, so start the clock directly.
+		Clock->DispatchBeginPlay();
+		return Clock;
+	};
+	auto EndSession = [](UWorld* World, AIslandDayNight* Clock)
+	{
+		// Fixture actors are never initialized for play, so the engine skips EndPlay; run its save directly.
+		Clock->PersistHour();
+		Clock->Destroy();
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+
+	UWorld* World = nullptr;
+	AIslandDayNight* Clock = StartSession(World, FString(), true);
+	const UIslandWorldStateSubsystem* FixtureState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	TestTrue(TEXT("Code-created worlds have no lasting storage"), FixtureState && FixtureState->GetStorageFilePath().IsEmpty());
+	TestEqual(TEXT("Without saved time the clock uses Start Hour"), Clock->CurrentHour, 9.f);
+	EndSession(World, Clock);
+
+	Clock = StartSession(World, StateFile, true);
+	TestEqual(TEXT("First session starts at Start Hour"), Clock->CurrentHour, 9.f);
+	Clock->CurrentHour = 21.5f;
+	EndSession(World, Clock);
+	TestTrue(TEXT("Ending play saves the Island hour"), FPaths::FileExists(StateFile));
+
+	Clock = StartSession(World, StateFile, true);
+	TestTrue(TEXT("Next session resumes where the last one ended"), FMath::IsNearlyEqual(Clock->CurrentHour, 21.5f, 0.01f));
+	Clock->Tick(61.f);
+	const float AfterTick = Clock->CurrentHour;
+	Clock->CurrentHour = 3.f;
+	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	State->LoadAndSpawn();
+	TestTrue(TEXT("Clock saves periodically during play, not only at the end"), State->GetSavedHour().IsSet() && FMath::IsNearlyEqual(State->GetSavedHour().GetValue(), AfterTick, 0.01f));
+	Clock->bResumeSavedTime = false;
+	EndSession(World, Clock);
+
+	Clock = StartSession(World, StateFile, false);
+	TestEqual(TEXT("Opting out of resume starts at Start Hour"), Clock->CurrentHour, 9.f);
+	EndSession(World, Clock);
+	IFileManager::Get().Delete(*StateFile, false, true, true);
 	return true;
 }

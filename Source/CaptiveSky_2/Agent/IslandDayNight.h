@@ -21,6 +21,9 @@ public:
 	float StartHour = 9.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Time")
 	bool bAdvanceTime = true;
+	/** Resume play at the hour the previous session ended. Start Hour then applies only when no time has been saved. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Time")
+	bool bResumeSavedTime = true;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Time")
 	float CurrentHour = 9.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting")
@@ -46,7 +49,11 @@ public:
 #endif
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 private:
+	float SecondsSinceSave = 0.f;
+	void PersistHour();
 	friend class FIslandClockTest;
+	friend class FIslandClockPersistenceTest;
 	void UpdateLighting();
 };

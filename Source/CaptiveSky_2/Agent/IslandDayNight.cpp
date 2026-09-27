@@ -1,5 +1,6 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
@@ -51,6 +52,9 @@ void AIslandDayNight::BeginPlay()
 {
 	Super::BeginPlay();
 	CurrentHour = WrapHour(StartHour);
+	SecondsSinceSave = 0.f;
+	if (const UIslandWorldStateSubsystem* WorldState = bResumeSavedTime ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr)
+		if (const TOptional<float> Saved = WorldState->GetSavedHour(); Saved.IsSet()) CurrentHour = WrapHour(Saved.GetValue());
 	if (Sun) Sun->GetLightComponent()->SetMobility(EComponentMobility::Movable);
 	if (Sky) Sky->GetLightComponent()->SetMobility(EComponentMobility::Movable);
 	UpdateLighting();
@@ -70,6 +74,22 @@ void AIslandDayNight::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (bAdvanceTime) CurrentHour = WrapHour(CurrentHour + FMath::Max(0.f, DeltaSeconds) * 24.0 / (FMath::Max(1.f, DayLengthMinutes) * 60.0));
 	UpdateLighting();
+	// Save occasionally too, so a crash or forced stop loses at most a minute of Island time.
+	SecondsSinceSave += FMath::Max(0.f, DeltaSeconds);
+	if (SecondsSinceSave >= 60.f) PersistHour();
+}
+
+void AIslandDayNight::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	PersistHour();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AIslandDayNight::PersistHour()
+{
+	SecondsSinceSave = 0.f;
+	if (!bResumeSavedTime || !GetWorld()) return;
+	if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>()) WorldState->SaveHour(CurrentHour);
 }
 
 void AIslandDayNight::UpdateLighting()
