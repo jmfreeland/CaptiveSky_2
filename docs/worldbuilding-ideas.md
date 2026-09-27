@@ -41,3 +41,20 @@ The target is not ornate fantasy. It is **beauty produced by care accumulated ov
 ### Reproducible image prompt
 
 Cinematic 16:9 Unreal Engine 5 environmental concept art for a persistent island world, eye-level view from a weathered stone-and-timber cultural terrace above sheltered coastal water just after rain at golden-hour dusk. Human-scale foreground with a small painter/maker stall, resident-made stone arrangements of different ages, woven objects and residents actively creating, talking and observing; a raven perched overhead. The path leads diagonally through a modest lived-in gathering place to small docks and then toward a dramatic distant cliff landmark and layered mountainous island terrain. Wet stone and dark timber reflect restrained warm light; rainwater drips from awnings; wind moves cloth and foliage; cool mist hangs over reflective water; practical lamps begin to glow; fireflies emerge in sheltered plants. Architecture is sparse, local, weathered and integrated into rock and forest, not a huge ornate fantasy city. Warm grey stone, deep natural green, dark wet wood, muted ochre/rust fabric, cool blue-grey water and amber lamps. Strong layered composition, atmospheric perspective, physically plausible materials, high-end game-environment realism, quiet speculative wonder, no HUD, no text, no generic fantasy excess. The scene should feel beautiful because a persistent culture has accumulated there over time.
+
+
+## Major Roadmap Direction — Emergent Architectural History
+
+Captive Sky should eventually allow residents to transform the physical world through accumulated decisions, so settlements and cities can grow rather than being spawned as finished procedural objects.
+
+LLM residents should express **intent**, not directly manipulate landscape vertices. Deterministic simulation systems should translate intentions such as “we need a sheltered route to Tideglass Pool” into safe, persistent world operations: paths, vegetation clearing or planting, limited grading, foundations, retaining walls, excavation, utilities, structures and public spaces.
+
+Keep the underlying geology largely immutable. Store construction and terrain interventions as layered, persistent modifications that navigation, materials, ecology and PCG can react to. This makes changes inspectable, reversible and historically meaningful. Early terrain alteration can often be represented with meshes—cuts, embankments, foundations and retaining structures—before introducing runtime heightfield deformation.
+
+The long-term emergence loop is:
+
+**individual decisions → paths → clusters → infrastructure → neighborhoods → architecture → city**
+
+The goal is not merely procedural city generation, but **procedurally generated architectural history**: geography, needs, resources, available technology, individual taste and cultural inheritance gradually producing places with identities of their own.
+
+Technology remains era-agnostic throughout. A settlement may combine sophisticated power generation, locally quarried masonry, autonomous transport, handmade furniture and simple footpaths when each is the most appropriate solution.
