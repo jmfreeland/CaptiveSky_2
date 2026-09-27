@@ -5,6 +5,7 @@
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/AudioComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -12,6 +13,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Sound/SoundWaveProcedural.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -32,6 +34,14 @@ AIslandWeather::AIslandWeather()
 	RainGroundImpactStreaks->SetCastShadow(false);
 	RainGroundImpactStreaks->bReceivesDecals = false;
 	RainGroundImpactStreaks->SetVisibility(false);
+	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
+	WindAmbienceAudio->SetupAttachment(RootComponent);
+	WindAmbienceAudio->bAutoActivate = false;
+	WindAmbienceAudio->bAllowSpatialization = false;
+	RainAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("RainAmbience"));
+	RainAmbienceAudio->SetupAttachment(RootComponent);
+	RainAmbienceAudio->bAutoActivate = false;
+	RainAmbienceAudio->bAllowSpatialization = false;
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RainMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (RainMesh.Succeeded())
 	{
@@ -47,6 +57,7 @@ AIslandWeather::AIslandWeather()
 void AIslandWeather::BeginPlay()
 {
 	Super::BeginPlay();
+	InitializeWeatherAmbience();
 	UpdateCloudRendering();
 	UpdateRainRendering();
 	RefreshNightEcology();
@@ -63,6 +74,10 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OriginalCloudMaterial = nullptr;
 	if (RainStreaks) RainStreaks->SetVisibility(false, true);
 	if (RainGroundImpactStreaks) RainGroundImpactStreaks->SetVisibility(false, true);
+	if (WindAmbienceAudio) WindAmbienceAudio->Stop();
+	if (RainAmbienceAudio) RainAmbienceAudio->Stop();
+	WindAmbienceWave = nullptr;
+	RainAmbienceWave = nullptr;
 	RainStreakMaterial = nullptr;
 	ActiveRainStreakCount = 0;
 	ActiveRainGroundImpactCount = 0;
@@ -77,6 +92,7 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UpdateCloudRendering();
 	UpdateRainRendering();
+	UpdateWeatherAmbience(DeltaSeconds);
 }
 
 bool AIslandWeather::InitializeRainRendering()
@@ -227,6 +243,105 @@ void AIslandWeather::ClearRainGroundResponse()
 	ActiveRainGroundImpactCount = 0;
 	NextRainGroundImpactTime = 0.0;
 	if (RainGroundImpactStreaks) RainGroundImpactStreaks->SetVisibility(false, true);
+}
+
+FVector2D AIslandWeather::CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity)
+{
+	const float WindStrength = FMath::SmoothStep(18.f, 150.f, FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f));
+	const float RainStrength = FMath::SmoothStep(0.06f, 0.72f, FMath::Clamp(RainIntensity, 0.f, 1.f));
+	// Deliberately low ceilings: these are a quiet environmental bed, not foreground effects.
+	return FVector2D(0.055f * WindStrength, 0.035f * RainStrength);
+}
+
+void AIslandWeather::InitializeWeatherAmbience()
+{
+	if (!WindAmbienceAudio || !RainAmbienceAudio || (WindAmbienceWave && RainAmbienceWave)) return;
+	constexpr int32 SampleRate = 24000;
+	auto MakeWave = [this](const TCHAR* Name)
+	{
+		USoundWaveProcedural* Wave = NewObject<USoundWaveProcedural>(this, Name);
+		if (!Wave) return static_cast<USoundWaveProcedural*>(nullptr);
+		Wave->SetSampleRate(24000);
+		Wave->NumChannels = 2;
+		Wave->Duration = 10000.f;
+		Wave->bLooping = false;
+		Wave->SoundGroup = SOUNDGROUP_Effects;
+		return Wave;
+	};
+	WindNoiseStream.Initialize(0x49A31);
+	RainNoiseStream.Initialize(0x67C21);
+	WindAmbienceWave = MakeWave(TEXT("GeneratedWindAmbience"));
+	RainAmbienceWave = MakeWave(TEXT("GeneratedRainAmbience"));
+	WindAmbienceAudio->SetSound(WindAmbienceWave);
+	RainAmbienceAudio->SetSound(RainAmbienceWave);
+	WindAmbienceAudio->VolumeMultiplier = 0.f;
+	RainAmbienceAudio->VolumeMultiplier = 0.f;
+	QueueAmbienceSamples(WindAmbienceWave, WindNoiseStream, WindNoiseFilterLeft, WindNoiseFilterRight, false);
+	QueueAmbienceSamples(RainAmbienceWave, RainNoiseStream, RainNoiseFilterLeft, RainNoiseFilterRight, true);
+	QueueAmbienceSamples(WindAmbienceWave, WindNoiseStream, WindNoiseFilterLeft, WindNoiseFilterRight, false);
+	QueueAmbienceSamples(RainAmbienceWave, RainNoiseStream, RainNoiseFilterLeft, RainNoiseFilterRight, true);
+	static_assert(SampleRate == 24000, "Keep weather PCM and procedural-wave sample rates aligned.");
+}
+
+void AIslandWeather::QueueAmbienceSamples(USoundWaveProcedural* Wave, FRandomStream& Random,
+	float& FilterLeft, float& FilterRight, bool bHighPass)
+{
+	if (!Wave) return;
+	constexpr int32 SampleRate = 24000;
+	constexpr int32 Frames = SampleRate / 2;
+	TArray<int16> Samples;
+	Samples.SetNumUninitialized(Frames * 2);
+	for (int32 Frame = 0; Frame < Frames; ++Frame)
+	{
+		const float WhiteLeft = Random.FRandRange(-1.f, 1.f);
+		const float WhiteRight = Random.FRandRange(-1.f, 1.f);
+		// Low-pass noise gives wind a soft body; the complementary high-pass is a distant rain hiss.
+		FilterLeft += (WhiteLeft - FilterLeft) * (bHighPass ? 0.10f : 0.018f);
+		FilterRight += (WhiteRight - FilterRight) * (bHighPass ? 0.10f : 0.018f);
+		const float SignalLeft = bHighPass ? WhiteLeft - FilterLeft : FilterLeft;
+		const float SignalRight = bHighPass ? WhiteRight - FilterRight : FilterRight;
+		const float Amplitude = bHighPass ? 0.10f : 0.20f;
+		Samples[Frame * 2] = static_cast<int16>(FMath::Clamp(SignalLeft * Amplitude, -1.f, 1.f) * 32767.f);
+		Samples[Frame * 2 + 1] = static_cast<int16>(FMath::Clamp(SignalRight * Amplitude, -1.f, 1.f) * 32767.f);
+	}
+	Wave->QueueAudio(reinterpret_cast<const uint8*>(Samples.GetData()), Samples.Num() * sizeof(int16));
+}
+
+void AIslandWeather::UpdateWeatherAmbience(float DeltaSeconds)
+{
+	if (!GetWorld() || !WindAmbienceWave || !RainAmbienceWave || !WindAmbienceAudio || !RainAmbienceAudio) return;
+	AmbienceUpdateAccumulator += FMath::Max(0.f, DeltaSeconds);
+	if (AmbienceUpdateAccumulator < 0.25f) return;
+	AmbienceUpdateAccumulator = 0.f;
+	APawn* Listener = nullptr;
+	if (APlayerController* Player = GetWorld()->GetFirstPlayerController()) Listener = Player->GetPawn();
+	if (!Listener)
+	{
+		WindAmbienceAudio->SetVolumeMultiplier(0.f);
+		RainAmbienceAudio->SetVolumeMultiplier(0.f);
+		WindAmbienceAudio->Stop();
+		RainAmbienceAudio->Stop();
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	const FVector2D Gains = CalculateAmbienceGains(GetLocalWind(Listener->GetActorLocation(), Listener).Size(), SampleRainIntensity(Now));
+	WindAmbienceAudio->SetVolumeMultiplier(Gains.X);
+	RainAmbienceAudio->SetVolumeMultiplier(Gains.Y);
+	if (Gains.X > 0.0001f)
+	{
+		if (!WindAmbienceAudio->IsPlaying()) WindAmbienceAudio->Play();
+	}
+	else WindAmbienceAudio->Stop();
+	if (Gains.Y > 0.0001f)
+	{
+		if (!RainAmbienceAudio->IsPlaying()) RainAmbienceAudio->Play();
+	}
+	else RainAmbienceAudio->Stop();
+	constexpr int32 BytesPerSecond = 24000 * 2 * sizeof(int16);
+	if (WindAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
+		QueueAmbienceSamples(WindAmbienceWave, WindNoiseStream, WindNoiseFilterLeft, WindNoiseFilterRight, false);
+	if (RainAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
+		QueueAmbienceSamples(RainAmbienceWave, RainNoiseStream, RainNoiseFilterLeft, RainNoiseFilterRight, true);
 }
 
 void AIslandWeather::UpdateRainPoolResponse()

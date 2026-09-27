@@ -10,7 +10,9 @@ class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
+class UAudioComponent;
 class UVolumetricCloudComponent;
+class USoundWaveProcedural;
 
 struct FIslandTransientGust
 {
@@ -55,6 +57,8 @@ public:
 	float SampleCloudCover(double Seconds) const;
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
+	/** Bounded, low-level gains for the ambient wind and rain beds, normalized to sampled conditions. */
+	static FVector2D CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity);
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Describe only current upwind line-of-sight shelter; this does not claim roof cover or perch support. */
 	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;
@@ -68,6 +72,7 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
@@ -82,8 +87,23 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Rain")
 	TObjectPtr<UInstancedStaticMeshComponent> RainGroundImpactStreaks;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
+	TObjectPtr<UAudioComponent> WindAmbienceAudio;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
+	TObjectPtr<UAudioComponent> RainAmbienceAudio;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundWaveProcedural> WindAmbienceWave;
+	UPROPERTY(Transient)
+	TObjectPtr<USoundWaveProcedural> RainAmbienceWave;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> RainStreakMaterial;
+	FRandomStream WindNoiseStream;
+	FRandomStream RainNoiseStream;
+	float WindNoiseFilterLeft = 0.f;
+	float WindNoiseFilterRight = 0.f;
+	float RainNoiseFilterLeft = 0.f;
+	float RainNoiseFilterRight = 0.f;
+	float AmbienceUpdateAccumulator = 0.f;
 	float OriginalCloudCoverage = 0.f;
 	float OriginalCloudDensity = 0.f;
 	float OriginalStormClouds = 0.f;
@@ -110,5 +130,8 @@ private:
 	void UpdateRainPoolResponse();
 	void UpdateRainGroundResponse(const FVector& Center, const AActor* Observer, double Now);
 	void ClearRainGroundResponse();
+	void InitializeWeatherAmbience();
+	void UpdateWeatherAmbience(float DeltaSeconds);
+	void QueueAmbienceSamples(USoundWaveProcedural* Wave, FRandomStream& Random, float& FilterLeft, float& FilterRight, bool bHighPass);
 	bool HasUpwindObstruction(const FVector& Position, const FVector& Wind, const AActor* Observer) const;
 };
