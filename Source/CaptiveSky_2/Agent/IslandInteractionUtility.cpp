@@ -167,8 +167,22 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		const FVector SurfaceLocation = Target->GetActorLocation() + FVector(0.f, 0.f, 20.f);
 		AIslandPoolRippleEffect* Ripple = World->SpawnActor<AIslandPoolRippleEffect>(SurfaceLocation, FRotator::ZeroRotator, SpawnParameters);
+		bool bNearbyMinnowsResponded = false;
+		if (Ripple)
+		{
+			for (TActorIterator<AIslandTidepoolMinnows> It(World); It; ++It)
+			{
+				if (FVector::DistSquared(It->GetActorLocation(), Target->GetActorLocation()) > FMath::Square(800.f) ||
+					!CanInspect(Observer, *It, 800.f))
+					continue;
+				bNearbyMinnowsResponded = It->RespondToSurfaceRipple();
+				break;
+			}
+		}
 		OutFact = Ripple
-			? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands and fades; it changes no permanent level state, and reveals no hidden item or reward. Stronger showers can create fainter ripples on their own; those are weather, not an effect you caused.")
+			? bNearbyMinnowsResponded
+				? TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. The nearby minnow school briefly widened its circle of motion, then returned to its usual path. Both responses fade; the fish remain wild and uncaught, no permanent level state changes, and no hidden item or reward is revealed. Stronger showers can create fainter ripples on their own; those are weather, not an effect you caused.")
+				: TEXT("Your interaction sent a short ring of cool highlights across the flattened TideglassPool prototype surface. It expands and fades; it changes no permanent level state, and reveals no hidden item or reward. Stronger showers can create fainter ripples on their own; those are weather, not an effect you caused.")
 			: TEXT("You inspected the TideglassPool, but the temporary surface-light response could not be created. No persistent change occurred.");
 		return true;
 	}

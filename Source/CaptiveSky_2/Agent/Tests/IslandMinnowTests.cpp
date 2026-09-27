@@ -95,6 +95,43 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	RegroupedCenter /= School->Fish.Num();
 	TestTrue(TEXT("Minnows naturally regroup within their small local habitat"), RegroupedCenter.Size2D() < 180.f && FMath::IsNearlyZero(School->ScatterRemaining));
 
+	Habitat->Tags.Add(TEXT("IslandLandmark"));
+	FVector CircleCenter = FVector::ZeroVector;
+	float OriginalCircleRadius = 0.f;
+	for (UStaticMeshComponent* Minnow : School->Fish)
+	{
+		if (!Minnow) continue;
+		CircleCenter += Minnow->GetRelativeLocation();
+	}
+	CircleCenter /= School->Fish.Num();
+	for (UStaticMeshComponent* Minnow : School->Fish)
+		if (Minnow) OriginalCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
+	OriginalCircleRadius /= School->Fish.Num();
+	TestTrue(TEXT("The close observer has a clear view of the minnow school"), IslandInteractionUtility::CanInspect(Visitor, School, 800.f));
+	FString PoolFact;
+	TestTrue(TEXT("A visible Tideglass landmark interaction reaches its nearby school"), IslandInteractionUtility::Perform(Visitor, Habitat, PoolFact));
+	TestTrue(TEXT("The pool truthfully reports a brief, uncapturable wildlife response"),
+		PoolFact.Contains(TEXT("widened its circle of motion")) && PoolFact.Contains(TEXT("wild and uncaught")) && PoolFact.Contains(TEXT("no permanent level state changes")));
+	TestTrue(TEXT("The school accepts one short water-ripple response"), School->SurfacePulseRemaining > 0.f && School->SurfacePulseRemaining <= 1.2f);
+	School->Tick(0.3f);
+	CircleCenter = FVector::ZeroVector;
+	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+	CircleCenter /= School->Fish.Num();
+	float ExpandedCircleRadius = 0.f;
+	for (UStaticMeshComponent* Minnow : School->Fish)
+		if (Minnow) ExpandedCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
+	ExpandedCircleRadius /= School->Fish.Num();
+	TestTrue(TEXT("The school visibly widens rather than fleeing the pool"), ExpandedCircleRadius > OriginalCircleRadius * 1.4f);
+	School->Tick(0.9f);
+	TestTrue(*FString::Printf(TEXT("The surface response decays back to the normal orbit (%.4f seconds remain)"), School->SurfacePulseRemaining),
+		FMath::IsNearlyZero(School->SurfacePulseRemaining, 0.01f));
+	TestFalse(TEXT("The brief response cooldown prevents immediate retriggering"), School->RespondToSurfaceRipple());
+	School->Tick(1.8f);
+	Visitor->SetActorLocation(Habitat->GetActorLocation() + FVector(1000.f, 0.f, 0.f));
+	FString DistantPoolFact;
+	TestTrue(TEXT("The pool itself still responds independently of who can see its fish"), IslandInteractionUtility::Perform(Visitor, Habitat, DistantPoolFact));
+	TestFalse(TEXT("A distant observer is not told the minnow school reacted to their interaction"), DistantPoolFact.Contains(TEXT("widened its circle of motion")));
+
 	ARavenAgentAIController* FlybyController = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	ACharacter* RavenBody = World->SpawnActor<ACharacter>(School->GetActorLocation() + FVector(-300.f, 0.f, 1000.f), FRotator::ZeroRotator, Spawn);
 	if (TestNotNull(TEXT("Raven controller spawned for overhead ecology"), FlybyController) && TestNotNull(TEXT("Raven body spawned for overhead ecology"), RavenBody))

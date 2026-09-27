@@ -63,6 +63,14 @@ void AIslandTidepoolMinnows::RespondToQuietObservation(const FVector& ObserverLo
 	ScatterRemaining = 2.4f;
 }
 
+bool AIslandTidepoolMinnows::RespondToSurfaceRipple()
+{
+	if (SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f) return false;
+	SurfacePulseRemaining = 1.2f;
+	SurfacePulseCooldownRemaining = 3.f;
+	return true;
+}
+
 float AIslandTidepoolMinnows::RainMovementScale(float RainIntensity)
 {
 	const float RainActivity = FMath::SmoothStep(0.35f, 0.85f, FMath::Clamp(RainIntensity, 0.f, 1.f));
@@ -75,6 +83,13 @@ float AIslandTidepoolMinnows::GetScatterAlpha() const
 	if (ScatterRemaining > 1.7f)
 		return FMath::SmoothStep(0.f, 0.7f, 2.4f - ScatterRemaining);
 	return FMath::SmoothStep(0.f, 1.7f, ScatterRemaining);
+}
+
+float AIslandTidepoolMinnows::GetSurfacePulseAlpha() const
+{
+	if (SurfacePulseRemaining <= 0.f) return 0.f;
+	const float Elapsed = 1.2f - SurfacePulseRemaining;
+	return FMath::SmoothStep(0.f, 0.18f, Elapsed) * (1.f - FMath::SmoothStep(0.45f, 1.2f, Elapsed));
 }
 
 void AIslandTidepoolMinnows::CheckForLowRavenFlyby()
@@ -106,6 +121,7 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 {
 	const float TuckScale = RainMovementScale(RainIntensity);
 	const float ScatterAlpha = GetScatterAlpha();
+	const float CircleScale = 1.f + 0.65f * GetSurfacePulseAlpha();
 	const FVector Side(-ScatterDirection.Y, ScatterDirection.X, 0.f);
 	for (int32 Index = 0; Index < Fish.Num(); ++Index)
 	{
@@ -113,8 +129,8 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 		if (!Minnow) continue;
 		const float Angle = Phase + ElapsedSeconds * 0.62f + Index * 2.f * PI / FishCount;
 		const FVector IdleOffset(
-			FMath::Cos(Angle) * 135.f * TuckScale,
-			FMath::Sin(Angle) * 82.f * TuckScale,
+			FMath::Cos(Angle) * 135.f * TuckScale * CircleScale,
+			FMath::Sin(Angle) * 82.f * TuckScale * CircleScale,
 			17.f + FMath::Sin(Angle * 1.7f) * 7.f);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
@@ -133,6 +149,8 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ElapsedSeconds += SafeDelta;
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
+	SurfacePulseRemaining = FMath::Max(0.f, SurfacePulseRemaining - SafeDelta);
+	SurfacePulseCooldownRemaining = FMath::Max(0.f, SurfacePulseCooldownRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
