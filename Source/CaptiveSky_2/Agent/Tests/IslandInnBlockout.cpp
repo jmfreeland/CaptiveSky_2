@@ -403,10 +403,11 @@ bool FBuildInnBlockoutTool::RunTest(const FString& Parameters)
 	{
 		const FString Name = FString::Printf(TEXT("TableLamp_%s"), X > 100 ? TEXT("Front") : TEXT("Back"));
 		const float Z = X > 100 ? 280.f : H1 - 50.f; // the back lamp hangs under the upper floor
-		Inn.Box(Name, FVector(X, 70, Z + 12), FVector(20, 20, 24), Timber);
+		// Lamp housings sit right against their lights; letting them cast shadows would black out the walls.
+		Inn.Box(Name, FVector(X, 70, Z + 12), FVector(20, 20, 24), Timber)->GetStaticMeshComponent()->SetCastShadow(false);
 		Inn.Light(Name + TEXT("Light"), FVector(X, 70, Z - 8), 25.f, 900.f, FLinearColor(1.f, 0.6f, 0.3f));
 	}
-	Inn.Box(TEXT("Lantern"), FVector(L / 2 + 30, 120, 250), FVector(22, 22, 30), Timber);
+	Inn.Box(TEXT("Lantern"), FVector(L / 2 + 30, 120, 250), FVector(22, 22, 30), Timber)->GetStaticMeshComponent()->SetCastShadow(false);
 	Inn.Light(TEXT("DoorLantern"), FVector(L / 2 + 45, 120, 245), 12.f, 700.f, FLinearColor(1.f, 0.62f, 0.3f))->Tags.Insert(TEXT("InnDoorLantern"), 0);
 
 	// A landmark marker inside the common room, so residents can perceive and walk to the inn.

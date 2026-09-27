@@ -287,6 +287,33 @@ The colours are plain material instances created under `/Game/Inn/Materials/` (p
 
 `Config/IslandViewpoints.json` adds `02b_InnFromPath`, the lit doorway from the path, and `02c_InnCommonRoom`, an interior view. Interior viewpoints set a negative `min_height`, so the ground clamp doesn't lift them onto the roof. The prop grounding audit skips `IslandInn` parts, since the lantern and trim are wall-mounted by design.
 
+### Spectator mode (2026-09-27)
+
+This is the first step toward running the Island on a dedicated screen. Start it with `Scripts/Start-Spectator.ps1` (add `-Windowed`, or `-Shots` to save one frame per shot), or pass `-Spectator` to any game launch. During play, the `Island.Spectate` console command toggles it.
+
+`AIslandSpectatorDirector` takes over the local player's view:
+- **Views:** it drifts slowly, 24 seconds per view, through the journey viewpoints in `Config/IslandViewpoints.json`, skipping the overhead survey. Without that file, it circles the landmarks instead.
+- **Speech:** when a resident speaks, it cuts to them. It uses a two-shot when another resident is within 8 m, and picks an angle with a clear line of sight to the speaker.
+- **Lasting changes:** it checks the world state every 5 seconds and cuts to anything newly made or changed: a nest layer, a cairn stone, the seed pod opening, a stone arrangement or a response to one.
+- **Night:** every other view goes to the inn, whose lit door and windows are the warmest thing on the Island after dark.
+- **Caption:** a small caption in the lower-left corner names the view and the Island day and time.
+
+The player's body stays in the world, hidden, without collision or input, and moves to each shot's subject. That way the existing ambient subtitles, the rain around the player and the local wind all follow what is on screen, with no changes to the player controller. Leaving spectator mode puts the body back where it was and returns control.
+
+`CaptiveSky2.Agent.Spectator` covers:
+- loading views (skipping the survey), drift, and rotation;
+- the hidden, inert body and the view hand-over;
+- speech cuts that avoid a blocking wall;
+- a cut to a new nest, and no repeat cut when nothing has changed;
+- full restoration on exit.
+
+A three-minute live run in the game showed the night rotation and the caption working.
+
+Still to do before the screen can run unattended for days:
+- **Session limits:** the 30-minute and 120-request caps still end play. The running budget discussed for an always-on world would replace them.
+- **Packaging:** `Config/IslandViewpoints.json` must be staged in a packaged build, or the director falls back to circling landmarks.
+- **Speech cuts in live play:** no resident happened to speak during the test run, so these have only been checked by the automated test.
+
 ### Open work, prioritized (2026-09-27)
 
 1. **Balance memory retrieval.** Recall currently fills the prompt with the latest small talk, and most reflections are near-duplicates (`docs/findings/2026-09-27-memory-review.md`). The gateway side is fixed; the in-game side needs a build and a live check.
