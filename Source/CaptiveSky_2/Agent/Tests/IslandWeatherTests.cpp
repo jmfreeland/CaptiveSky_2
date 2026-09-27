@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "AgentBrainComponent.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/AudioComponent.h"
@@ -6,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Character.h"
 #include "Sound/SoundWaveProcedural.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
@@ -129,6 +131,31 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Wind ripple lifetime is bounded"), It->DurationSeconds > 0.f && It->DurationSeconds <= 2.2f);
 		}
 	TestEqual(TEXT("One local gust creates one finite pool response"), WindRippleCount, 1);
+	if (AIslandPoolRippleEffect* RainRippleProbe = World->SpawnActor<AIslandPoolRippleEffect>(Pool->GetActorLocation(), FRotator::ZeroRotator))
+		RainRippleProbe->ConfigureAsRainImpact();
+	ACharacter* Observer = World->SpawnActor<ACharacter>(Pool->GetActorLocation() + FVector(400.f, 0.f, 100.f), FRotator::ZeroRotator);
+	UAgentBrainComponent* ObserverBrain = NewObject<UAgentBrainComponent>(Observer);
+	Observer->AddInstanceComponent(ObserverBrain);
+	ObserverBrain->RegisterComponent();
+	const FString VisibleRippleObservation = ObserverBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby unobstructed resident notices the transient wind-made pool ripple"),
+		VisibleRippleObservation.Contains(TEXT("stirred by the local wind")) && VisibleRippleObservation.Contains(TEXT("not a discovery")));
+	TestTrue(TEXT("A nearby resident also notices faint weather-made rain rings"),
+		VisibleRippleObservation.Contains(TEXT("Faint rain rings")));
+	AActor* RippleOccluder = World->SpawnActor<AActor>(Pool->GetActorLocation() + FVector(220.f, 0.f, 50.f), FRotator::ZeroRotator);
+	UBoxComponent* RippleOccluderBox = NewObject<UBoxComponent>(RippleOccluder);
+	RippleOccluder->SetRootComponent(RippleOccluderBox);
+	RippleOccluderBox->SetBoxExtent(FVector(80.f, 80.f, 80.f));
+	RippleOccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
+	RippleOccluderBox->RegisterComponent();
+	const FString OccludedRippleObservation = ObserverBrain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("A resident does not claim to see a ripple hidden behind solid geometry"),
+		OccludedRippleObservation.Contains(TEXT("stirred by the local wind")));
+	RippleOccluder->Destroy();
+	Observer->SetActorLocation(Pool->GetActorLocation() + FVector(2200.f, 0.f, 100.f));
+	const FString DistantRippleObservation = ObserverBrain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("A resident outside the short weather-effect radius does not notice the ripple"),
+		DistantRippleObservation.Contains(TEXT("stirred by the local wind")));
 	WorldWeather->UpdateWindPoolResponse();
 	WindRippleCount = 0;
 	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) if (It->ActorHasTag(TEXT("WindImpact"))) ++WindRippleCount;

@@ -13,6 +13,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
 #include "IslandWeather.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandDayNight.h"
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.h"
@@ -278,6 +279,29 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			else
 				NearbyBeings += FString::Printf(TEXT(" A small shore crab is scuttling independently near TideglassPool, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TidepoolCrab to watch quietly; it may scuttle away, and should not be touched, caught, or claimed."), Metres);
 			++VisibleWildlife;
+		}
+		bool bSawWindRipple = false;
+		bool bSawRainRipple = false;
+		for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It && !(bSawWindRipple && bSawRainRipple); ++It)
+		{
+			const bool bWindRipple = It->ActorHasTag(TEXT("WindImpact"));
+			const bool bRainRipple = It->ActorHasTag(TEXT("RainImpact"));
+			if ((!bWindRipple && !bRainRipple) || (bWindRipple && bSawWindRipple) || (bRainRipple && bSawRainRipple) ||
+				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(1800.f)) continue;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWeatherEffectVisibility), false, Owner);
+			Params.AddIgnoredActor(*It);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
+			if (bWindRipple)
+			{
+				NearbyBeings += TEXT(" A brief ring of light is moving across TideglassPool, stirred by the local wind. It fades on its own; it is part of the weather, not a discovery or an interaction you caused.");
+				bSawWindRipple = true;
+			}
+			else
+			{
+				NearbyBeings += TEXT(" Faint rain rings are crossing TideglassPool nearby. They fade on their own; they are part of the weather, not a discovery or an interaction you caused.");
+				bSawRainRipple = true;
+			}
 		}
 	}
 
