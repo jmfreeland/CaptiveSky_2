@@ -90,4 +90,15 @@ struct FAgentDecision
 	// What to say, when ActionType == Speak.
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString Speech;
+
+	// Optional build details for stone arrangements: a form (ring|line|spiral|pair), the maker's
+	// own short title, and what they mean by it. Ignored by every other action.
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString Form;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString Title;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString Intent;
 };

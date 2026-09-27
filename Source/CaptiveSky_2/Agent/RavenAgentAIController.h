@@ -58,6 +58,7 @@ public:
 protected:
 	virtual bool IsActionInProgress() const override;
 	virtual bool CanRest() const override;
+	virtual bool CanArrangeStones() const override { return LocomotionState == ERavenLocomotionState::Grounded && !IsActionInProgress(); }
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void ActOnDecision(const FAgentDecision& Decision) override;
@@ -66,6 +67,7 @@ private:
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
 	friend class FIslandCurioTest;
+	friend class FIslandArrangementTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;

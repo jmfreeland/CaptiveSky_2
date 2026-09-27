@@ -17,6 +17,7 @@
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -245,6 +246,34 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
 }
 
+bool AAutonomousAgentAIController::CanArrangeStones() const
+{
+	const ACharacter* Body = Cast<ACharacter>(GetPawn());
+	return Body && Body->GetCharacterMovement()->IsMovingOnGround() && !IsActionInProgress();
+}
+
+void AAutonomousAgentAIController::ArrangeStones(const FAgentDecision& Decision)
+{
+	APawn* Body = GetPawn();
+	UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	const FName SiteId(*Decision.ActionTarget);
+	const FIslandArrangementSite* Site = WorldState ? WorldState->FindArrangementSite(SiteId) : nullptr;
+	if (!Body || !Site) { ReportAction(TEXT("There is no arranging ground by that name here. Nothing changed.")); return; }
+	if (FVector::Dist2D(Body->GetActorLocation(), Site->Location) > 300.f || FMath::Abs(Body->GetActorLocation().Z - Site->Location.Z) > 250.f)
+	{
+		ReportAction(TEXT("You are too far from that arranging ground; move_to it and stand within three metres first. Nothing changed."));
+		return;
+	}
+	if (!CanArrangeStones()) { ReportAction(TEXT("Stones can only be arranged while settled on the ground. Nothing changed.")); return; }
+	UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
+	bool bChanged = false;
+	const FString Fact = WorldState->ArrangeStones(SiteId, Decision.Form, Decision.Title, Decision.Intent,
+		Memory ? Memory->GetResolvedAgentId() : Body->GetName(), UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), bChanged);
+	ReportAction(SiteId.ToString() + TEXT(": ") + Fact);
+	if (bChanged && Memory)
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, SiteId.ToString() + TEXT(": ") + Fact, 0.65f, {TEXT("action-result"), TEXT("arrangement"), SiteId.ToString()}));
+}
+
 void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Decision)
 {
 	if (!Decision.bValid)
@@ -340,7 +369,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		InspectTarget(FName(*Decision.ActionTarget));
 		break;
 	case EAgentActionType::Build:
-		ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
+		if (Decision.ActionTarget.StartsWith(TEXT("ArrangingGround"))) ArrangeStones(Decision);
+		else ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
 		break;
 	case EAgentActionType::Sleep:
 		if (!TryRest()) ReportAction(TEXT("Cannot sleep here yet: finish moving and settle on the ground or a solid perch first."));

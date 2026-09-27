@@ -320,7 +320,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		}
 	}
 
-	if (Decision.ActionType == EAgentActionType::Build)
+	if (Decision.ActionType == EAgentActionType::Build && !Decision.ActionTarget.StartsWith(TEXT("ArrangingGround")))
 	{
 		Build(FName(*Decision.ActionTarget));
 		return;

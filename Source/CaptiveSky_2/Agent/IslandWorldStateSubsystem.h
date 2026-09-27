@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "IslandCurio.h"
+#include "IslandArrangement.h"
 #include "IslandWorldStateSubsystem.generated.h"
 
 class AIslandNest;
@@ -44,7 +45,7 @@ struct FIslandNestRecord
  * tracked in git. Every change is bounded (fixed layer cap per site) and reversible by a
  * developer through Island.RemoveNest or by editing/deleting the file with play stopped.
  *
- * Nests, curios (hidden stones, the seed pod, the cairn) and the Island clock are stored today; the file keeps a top-level version so other
+ * Nests, curios (hidden stones, the seed pod, the cairn), resident stone arrangements and the Island clock are stored today; the file keeps a top-level version so other
  * kinds of lasting change can be added beside them later.
  */
 UCLASS()
@@ -103,6 +104,26 @@ public:
 	/** Developer reset: forgets every curio so fresh ones are placed next time play begins. */
 	bool ForgetCurios();
 
+	const TArray<FIslandArrangementSite>& GetArrangementSites() const { return ArrangementSites; }
+	const FIslandArrangementSite* FindArrangementSite(FName Id) const;
+	static bool ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm);
+	static FString FormName(EIslandArrangementForm Form);
+
+	/**
+	 * A resident arranges stones at an arranging site on Island day Today: a new work on empty
+	 * ground, or a small response beside someone else's work. Bounded to one arrangement per
+	 * resident per Island day. Returns a factual outcome; bOutChanged is true only when the
+	 * lasting change was saved.
+	 */
+	FString ArrangeStones(FName SiteId, const FString& Form, const FString& Title, const FString& Intent,
+		const FString& AgentId, int32 Today, bool& bOutChanged);
+
+	/** Where arranging sites would go around the ListeningStones, clear of Avoid points. No saving or spawning. */
+	static bool BuildArrangementSiteLayout(UWorld* World, const TArray<FVector>& Avoid, TArray<FIslandArrangementSite>& OutSites);
+
+	/** Developer reset: forgets every arranging site and work; fresh empty sites are placed next play. */
+	bool ForgetArrangements();
+
 	/** Re-reads the storage file and respawns visible nests. Called automatically when play begins. */
 	void LoadAndSpawn();
 
@@ -117,6 +138,9 @@ private:
 	TOptional<int32> SavedDay;
 	TArray<FIslandCurioRecord> Curios;
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
+	TArray<FIslandArrangementSite> ArrangementSites;
+	TMap<FName, TWeakObjectPtr<AIslandArrangement>> ArrangementActors;
+	int32 ShownArrangementDay = 0;
 	TMap<FName, TWeakObjectPtr<AIslandNest>> NestActors;
 	// Set when an existing file cannot be parsed, so a save never overwrites what it may still hold.
 	bool bStorageUnreadable = false;
@@ -127,4 +151,8 @@ private:
 	/** First-time placement near the ListeningStones; all-or-nothing, then saved so it never moves. */
 	bool PlaceCurios();
 	void RefreshCurioActor(const FIslandCurioRecord& Record);
+	bool PlaceArrangementSites();
+	void RefreshArrangementActor(const FIslandArrangementSite& Site);
+	/** Island day used for weathering: the running clock once it has begun, else the saved day. */
+	int32 DisplayDay() const;
 };

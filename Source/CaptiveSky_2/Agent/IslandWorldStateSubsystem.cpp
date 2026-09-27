@@ -57,6 +57,10 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	for (const TPair<FName, TWeakObjectPtr<AIslandCurio>>& Pair : CurioActors)
 		if (Pair.Value.IsValid()) Pair.Value->Destroy();
 	CurioActors.Reset();
+	for (const TPair<FName, TWeakObjectPtr<AIslandArrangement>>& Pair : ArrangementActors)
+		if (Pair.Value.IsValid()) Pair.Value->Destroy();
+	ArrangementActors.Reset();
+	ArrangementSites.Reset();
 	Nests.Reset();
 	Curios.Reset();
 	SavedHour.Reset();
@@ -65,7 +69,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	FString Contents;
 	const FString Path = GetStorageFilePath();
 	if (Path.IsEmpty()) return;
-	if (!FPaths::FileExists(Path)) { PlaceCurios(); return; }
+	if (!FPaths::FileExists(Path)) { PlaceCurios(); PlaceArrangementSites(); return; }
 	TSharedPtr<FJsonObject> Root;
 	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
 	{
@@ -132,7 +136,50 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 			RefreshNestActor(Record);
 		}
 	}
+	const TArray<TSharedPtr<FJsonValue>>* SiteValues = nullptr;
+	if (Root->TryGetArrayField(TEXT("arrangement_sites"), SiteValues))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *SiteValues)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			if (!Value.IsValid() || !Value->TryGetObject(Object)) continue;
+			FIslandArrangementSite Site;
+			FString Id, Form, Created;
+			const TArray<TSharedPtr<FJsonValue>>* Where = nullptr;
+			if (!(*Object)->TryGetStringField(TEXT("id"), Id) || Id.IsEmpty() || FindArrangementSite(FName(*Id)) ||
+				!(*Object)->TryGetArrayField(TEXT("location"), Where) || Where->Num() != 3) continue;
+			Site.Id = FName(*Id);
+			Site.Location = FVector((*Where)[0]->AsNumber(), (*Where)[1]->AsNumber(), (*Where)[2]->AsNumber());
+			const TSharedPtr<FJsonObject>* Work = nullptr;
+			if ((*Object)->TryGetObjectField(TEXT("work"), Work) && (*Work)->TryGetStringField(TEXT("form"), Form) && ParseArrangementForm(Form, Site.Form))
+			{
+				Site.bHasWork = true;
+				(*Work)->TryGetNumberField(TEXT("seed"), Site.Seed);
+				(*Work)->TryGetStringField(TEXT("title"), Site.Title);
+				(*Work)->TryGetStringField(TEXT("intent"), Site.Intent);
+				(*Work)->TryGetStringField(TEXT("maker"), Site.MakerAgentId);
+				(*Work)->TryGetNumberField(TEXT("day"), Site.Day);
+				if ((*Work)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Site.CreatedUtc);
+				const TArray<TSharedPtr<FJsonValue>>* Responses = nullptr;
+				if ((*Work)->TryGetArrayField(TEXT("responses"), Responses))
+				{
+					for (const TSharedPtr<FJsonValue>& ResponseValue : *Responses)
+					{
+						const TSharedPtr<FJsonObject>* ResponseObject = nullptr;
+						if (Site.Responses.Num() >= AIslandArrangement::MaxResponses || !ResponseValue.IsValid() || !ResponseValue->TryGetObject(ResponseObject)) continue;
+						FIslandArrangementResponse& Response = Site.Responses.AddDefaulted_GetRef();
+						(*ResponseObject)->TryGetStringField(TEXT("agent"), Response.AgentId);
+						(*ResponseObject)->TryGetNumberField(TEXT("day"), Response.Day);
+						(*ResponseObject)->TryGetStringField(TEXT("intent"), Response.Intent);
+					}
+				}
+			}
+			ArrangementSites.Add(Site);
+			RefreshArrangementActor(Site);
+		}
+	}
 	if (Curios.Num() == 0) PlaceCurios();
+	if (ArrangementSites.Num() == 0) PlaceArrangementSites();
 	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
 }
 
@@ -173,6 +220,38 @@ bool UIslandWorldStateSubsystem::Save() const
 		CurioValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("curios"), CurioValues);
+	TArray<TSharedPtr<FJsonValue>> SiteValues;
+	for (const FIslandArrangementSite& Site : ArrangementSites)
+	{
+		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+		Object->SetStringField(TEXT("id"), Site.Id.ToString());
+		Object->SetArrayField(TEXT("location"), {
+			MakeShared<FJsonValueNumber>(Site.Location.X), MakeShared<FJsonValueNumber>(Site.Location.Y), MakeShared<FJsonValueNumber>(Site.Location.Z) });
+		if (Site.bHasWork)
+		{
+			const TSharedRef<FJsonObject> Work = MakeShared<FJsonObject>();
+			Work->SetStringField(TEXT("form"), FormName(Site.Form));
+			Work->SetNumberField(TEXT("seed"), Site.Seed);
+			Work->SetStringField(TEXT("title"), Site.Title);
+			Work->SetStringField(TEXT("intent"), Site.Intent);
+			Work->SetStringField(TEXT("maker"), Site.MakerAgentId);
+			Work->SetNumberField(TEXT("day"), Site.Day);
+			Work->SetStringField(TEXT("created_utc"), Site.CreatedUtc.ToIso8601());
+			TArray<TSharedPtr<FJsonValue>> Responses;
+			for (const FIslandArrangementResponse& Response : Site.Responses)
+			{
+				const TSharedRef<FJsonObject> ResponseObject = MakeShared<FJsonObject>();
+				ResponseObject->SetStringField(TEXT("agent"), Response.AgentId);
+				ResponseObject->SetNumberField(TEXT("day"), Response.Day);
+				ResponseObject->SetStringField(TEXT("intent"), Response.Intent);
+				Responses.Add(MakeShared<FJsonValueObject>(ResponseObject));
+			}
+			Work->SetArrayField(TEXT("responses"), Responses);
+			Object->SetObjectField(TEXT("work"), Work);
+		}
+		SiteValues.Add(MakeShared<FJsonValueObject>(Object));
+	}
+	Root->SetArrayField(TEXT("arrangement_sites"), SiteValues);
 	if (SavedHour.IsSet())
 	{
 		const TSharedRef<FJsonObject> Clock = MakeShared<FJsonObject>();
@@ -230,6 +309,9 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 	const TOptional<int32> PreviousDay = SavedDay;
 	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
 	SavedDay = FMath::Max(1, Day);
+	// A new Island day ages every arrangement a little.
+	if (SavedDay.GetValue() != ShownArrangementDay)
+		for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 	if (Save()) return true;
 	SavedHour = PreviousHour;
 	SavedDay = PreviousDay;
@@ -474,4 +556,233 @@ static FAutoConsoleCommandWithWorld GIslandForgetCuriosCommand(
 	{
 		UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
 		UE_LOG(LogIslandWorldState, Log, TEXT("Island.ForgetCurios: %s"), State && State->ForgetCurios() ? TEXT("forgotten") : TEXT("nothing changed (needs a running play world with writable state)"));
+	}));
+
+const FIslandArrangementSite* UIslandWorldStateSubsystem::FindArrangementSite(FName Id) const
+{
+	return ArrangementSites.FindByPredicate([Id](const FIslandArrangementSite& Site) { return Site.Id == Id; });
+}
+
+bool UIslandWorldStateSubsystem::ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm)
+{
+	const FString Form = Text.TrimStartAndEnd().ToLower();
+	if (Form == TEXT("ring")) { OutForm = EIslandArrangementForm::Ring; return true; }
+	if (Form == TEXT("line")) { OutForm = EIslandArrangementForm::Line; return true; }
+	if (Form == TEXT("spiral")) { OutForm = EIslandArrangementForm::Spiral; return true; }
+	if (Form == TEXT("pair")) { OutForm = EIslandArrangementForm::Pair; return true; }
+	return false;
+}
+
+FString UIslandWorldStateSubsystem::FormName(EIslandArrangementForm Form)
+{
+	switch (Form)
+	{
+	case EIslandArrangementForm::Line: return TEXT("line");
+	case EIslandArrangementForm::Spiral: return TEXT("spiral");
+	case EIslandArrangementForm::Pair: return TEXT("pair");
+	case EIslandArrangementForm::Ring:
+	default: return TEXT("ring");
+	}
+}
+
+namespace
+{
+	/** Single-line, printable, bounded text for model-written titles and intents. */
+	FString CleanArrangementText(const FString& Text, int32 MaxLength)
+	{
+		FString Clean;
+		for (const TCHAR Character : Text)
+			Clean.AppendChar(FChar::IsPrint(Character) && Character != TEXT('"') ? Character : TEXT(' '));
+		while (Clean.ReplaceInline(TEXT("  "), TEXT(" ")) > 0) {}
+		Clean = Clean.Left(MaxLength).TrimStartAndEnd();
+		// Sentences built around this text add their own full stop.
+		while (Clean.EndsWith(TEXT("."))) Clean.LeftChopInline(1);
+		return Clean.TrimEnd();
+	}
+
+	bool FindOpenGround(UWorld* World, const FVector& Desired, FVector& OutGround)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandArrangementGround), false);
+		if (!World->LineTraceSingleByChannel(Hit, Desired + FVector(0.f, 0.f, 3000.f), Desired - FVector(0.f, 0.f, 5000.f), ECC_Visibility, Query)) return false;
+		if (Hit.ImpactNormal.Z < 0.9f || Cast<APawn>(Hit.GetActor()) || Hit.ImpactPoint.Z > Desired.Z + 600.f) return false;
+		// Level, clear of anything a stone circle would sit on or under: probe a 1.3 m disc for obstacles.
+		for (int32 Index = 0; Index < 8; ++Index)
+		{
+			const float Angle = 2.f * PI * Index / 8.f;
+			const FVector Edge = Hit.ImpactPoint + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * 130.f;
+			FHitResult EdgeHit;
+			if (!World->LineTraceSingleByChannel(EdgeHit, Edge + FVector(0.f, 0.f, 250.f), Edge - FVector(0.f, 0.f, 120.f), ECC_Visibility, Query)) return false;
+			if (FMath::Abs(EdgeHit.ImpactPoint.Z - Hit.ImpactPoint.Z) > 30.f) return false;
+		}
+		if (UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World); Navigation && Navigation->GetDefaultNavDataInstance())
+		{
+			FNavLocation Walkable;
+			if (!Navigation->ProjectPointToNavigation(Hit.ImpactPoint, Walkable, FVector(80.f, 80.f, 150.f)) || FVector::Dist2D(Walkable.Location, Hit.ImpactPoint) > 80.f) return false;
+		}
+		OutGround = Hit.ImpactPoint;
+		return true;
+	}
+}
+
+bool UIslandWorldStateSubsystem::BuildArrangementSiteLayout(UWorld* World, const TArray<FVector>& Avoid, TArray<FIslandArrangementSite>& OutSites)
+{
+	OutSites.Reset();
+	if (!World) return false;
+	const AActor* ListeningStones = nullptr;
+	for (TActorIterator<AActor> It(World); It && !ListeningStones; ++It)
+		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("ListeningStones"))) ListeningStones = *It;
+	if (!ListeningStones) return false;
+
+	// A loose terrace of arranging grounds within a short walk of the stones.
+	constexpr int32 SiteCount = 4;
+	const FVector Anchor = ListeningStones->GetActorLocation();
+	FRandomStream Random(4219);
+	TArray<FVector> Taken = Avoid;
+	for (int32 Attempt = 0; Attempt < 160 && OutSites.Num() < SiteCount; ++Attempt)
+	{
+		const float Angle = Random.FRandRange(0.f, 2.f * PI);
+		const float Distance = Random.FRandRange(450.f, 1200.f);
+		FVector Ground;
+		if (!FindOpenGround(World, Anchor + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance, Ground)) continue;
+		if (Taken.ContainsByPredicate([&Ground](const FVector& Other) { return FVector::Dist2D(Other, Ground) < 400.f; })) continue;
+		Taken.Add(Ground);
+		FIslandArrangementSite& Site = OutSites.AddDefaulted_GetRef();
+		Site.Id = FName(*FString::Printf(TEXT("ArrangingGround_%d"), OutSites.Num()));
+		Site.Location = Ground;
+	}
+	if (OutSites.Num() == SiteCount) return true;
+	OutSites.Reset();
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::PlaceArrangementSites()
+{
+	if (bStorageUnreadable || GetStorageFilePath().IsEmpty() || ArrangementSites.Num() > 0) return false;
+	TArray<FVector> Avoid;
+	for (const FIslandCurioRecord& Curio : Curios) Avoid.Add(Curio.Location);
+	if (!BuildArrangementSiteLayout(GetWorld(), Avoid, ArrangementSites))
+	{
+		// Levels without the ListeningStones simply have no arranging grounds; only warn when they should.
+		bool bHasListeningStones = false;
+		for (TActorIterator<AActor> It(GetWorld()); It && !bHasListeningStones; ++It)
+			bHasListeningStones = It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("ListeningStones"));
+		if (bHasListeningStones) UE_LOG(LogIslandWorldState, Warning, TEXT("Could not find level open ground for arranging sites near the ListeningStones."));
+		return false;
+	}
+	if (!Save())
+	{
+		ArrangementSites.Reset();
+		return false;
+	}
+	UE_LOG(LogIslandWorldState, Log, TEXT("Placed %d arranging sites near the ListeningStones."), ArrangementSites.Num());
+	return true;
+}
+
+FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& Form, const FString& Title, const FString& Intent,
+	const FString& AgentId, int32 Today, bool& bOutChanged)
+{
+	bOutChanged = false;
+	FIslandArrangementSite* Site = ArrangementSites.FindByPredicate([SiteId](const FIslandArrangementSite& Existing) { return Existing.Id == SiteId; });
+	if (!Site) return TEXT("There is no arranging ground by that name here. Nothing changed.");
+	for (const FIslandArrangementSite& Other : ArrangementSites)
+	{
+		const bool bMadeToday = Other.bHasWork && Other.MakerAgentId == AgentId && Other.Day == Today;
+		const bool bAnsweredToday = Other.Responses.ContainsByPredicate([&AgentId, Today](const FIslandArrangementResponse& Response) { return Response.AgentId == AgentId && Response.Day == Today; });
+		if (bMadeToday || bAnsweredToday) return TEXT("You have already arranged stones today; another arrangement will have to wait for a new Island day. Nothing changed.");
+	}
+	const FString CleanIntent = CleanArrangementText(Intent, 200);
+	const FIslandArrangementSite Before = *Site;
+	FString Fact;
+	if (!Site->bHasWork)
+	{
+		EIslandArrangementForm Chosen;
+		if (!ParseArrangementForm(Form, Chosen)) return TEXT("Choose one form for the stones: ring, line, spiral, or pair. Nothing changed.");
+		const FString CleanTitle = CleanArrangementText(Title, 60);
+		Site->bHasWork = true;
+		Site->Form = Chosen;
+		Site->Seed = static_cast<int32>(HashCombine(GetTypeHash(SiteId), HashCombine(GetTypeHash(AgentId), GetTypeHash(Today))));
+		Site->Title = CleanTitle.IsEmpty() ? TEXT("Untitled") : CleanTitle;
+		Site->Intent = CleanIntent;
+		Site->MakerAgentId = AgentId;
+		Site->Day = Today;
+		Site->CreatedUtc = FDateTime::UtcNow();
+		Site->Responses.Reset();
+		Fact = FString::Printf(TEXT("You gathered stones from around the ListeningStones and arranged %d of them into a %s at %s. You call it \"%s\"%s. It stays in the world after this session. Others who come here will see its shape and age, but not your title or intent unless you tell them."),
+			AIslandArrangement::StoneCountFor(Chosen), *FormName(Chosen), *SiteId.ToString(), *Site->Title,
+			CleanIntent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *CleanIntent));
+	}
+	else
+	{
+		if (Site->MakerAgentId == AgentId) return FString::Printf(TEXT("This is your own arrangement, \"%s\"; you leave it as it is. To make something new, choose empty arranging ground. Nothing changed."), *Site->Title);
+		if (Site->Responses.ContainsByPredicate([&AgentId](const FIslandArrangementResponse& Response) { return Response.AgentId == AgentId; }))
+			return TEXT("You have already added your response beside this arrangement. Nothing changed.");
+		if (Site->Responses.Num() >= AIslandArrangement::MaxResponses)
+			return TEXT("The ground around this arrangement has no room for more stones. Nothing changed.");
+		FIslandArrangementResponse& Response = Site->Responses.AddDefaulted_GetRef();
+		Response.AgentId = AgentId;
+		Response.Day = Today;
+		Response.Intent = CleanIntent;
+		Fact = FString::Printf(TEXT("Beside the %s someone else arranged here, you set %d small stones in an arc as your response%s. It stays in the world after this session. You still do not know who made the original or what they meant."),
+			*FormName(Site->Form), AIslandArrangement::StonesPerResponse,
+			CleanIntent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *CleanIntent));
+	}
+	if (!Save())
+	{
+		*Site = Before;
+		return TEXT("You began to arrange the stones, but the change could not be kept, so nothing lasting happened.");
+	}
+	bOutChanged = true;
+	RefreshArrangementActor(*Site);
+	return Fact;
+}
+
+bool UIslandWorldStateSubsystem::ForgetArrangements()
+{
+	const TArray<FIslandArrangementSite> Previous = ArrangementSites;
+	ArrangementSites.Reset();
+	if (!Save())
+	{
+		ArrangementSites = Previous;
+		return false;
+	}
+	for (const TPair<FName, TWeakObjectPtr<AIslandArrangement>>& Pair : ArrangementActors)
+		if (Pair.Value.IsValid()) Pair.Value->Destroy();
+	ArrangementActors.Reset();
+	return true;
+}
+
+int32 UIslandWorldStateSubsystem::DisplayDay() const
+{
+	if (const UWorld* World = GetWorld())
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+			if (It->HasActorBegunPlay()) return It->DayNumber;
+	return SavedDay.Get(1);
+}
+
+void UIslandWorldStateSubsystem::RefreshArrangementActor(const FIslandArrangementSite& Site)
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+	TWeakObjectPtr<AIslandArrangement>& Actor = ArrangementActors.FindOrAdd(Site.Id);
+	if (!Actor.IsValid())
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Actor = World->SpawnActor<AIslandArrangement>(Site.Location, FRotator::ZeroRotator, Spawn);
+		if (!Actor.IsValid()) return;
+		Actor->Tags.Insert(Site.Id, 0);
+	}
+	ShownArrangementDay = DisplayDay();
+	Actor->ShowSite(Site, ShownArrangementDay);
+}
+
+static FAutoConsoleCommandWithWorld GIslandForgetArrangementsCommand(
+	TEXT("Island.ForgetArrangements"),
+	TEXT("Forgets every arranging site and resident stone arrangement; fresh empty sites are placed the next time play begins."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		UE_LOG(LogIslandWorldState, Log, TEXT("Island.ForgetArrangements: %s"), State && State->ForgetArrangements() ? TEXT("forgotten") : TEXT("nothing changed (needs a running play world with writable state)"));
 	}));

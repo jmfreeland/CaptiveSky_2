@@ -169,6 +169,45 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 				++NoticedCurios;
 			}
+			// Arranging grounds and the works on them are human-scale: noticed within about twelve metres.
+			int32 NoticedSites = 0;
+			for (const FIslandArrangementSite& Site : WorldState->GetArrangementSites())
+			{
+				if (NoticedSites >= 3) break;
+				const FVector View = Site.Location + FVector(0.f, 0.f, 30.f);
+				if (FVector::DistSquared(Location, View) > FMath::Square(1200.f)) continue;
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentArrangementVisibility), false, Owner);
+				FHitResult Hit;
+				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, View, ECC_Visibility, Params)) continue;
+				const float Metres = FVector::Dist(Location, View) / 100.f;
+				const FString SiteName = Site.Id.ToString();
+				++NoticedSites;
+				if (!Site.bHasWork)
+				{
+					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is a level patch of open ground near the ListeningStones where loose stones could be arranged (build target: %s). ")
+						TEXT("To arrange there, stand within three metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
+						Metres, *SiteName);
+					continue;
+				}
+				const int32 Age = Today - Site.Day;
+				const TCHAR* Weathering = Age <= 0 ? TEXT("freshly placed") : Age < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
+				if (!OwnId.IsEmpty() && Site.MakerAgentId == OwnId)
+				{
+					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is your own stone %s, \"%s\", made %d Island day%s ago and now %s.%s%s"),
+						Metres, *UIslandWorldStateSubsystem::FormName(Site.Form), *Site.Title, Age, Age == 1 ? TEXT("") : TEXT("s"), Weathering,
+						Site.Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" You meant it as: %s."), *Site.Intent),
+						Site.Responses.Num() > 0 ? *FString::Printf(TEXT(" Others have since set %d small arc%s of stones beside it."), Site.Responses.Num(), Site.Responses.Num() == 1 ? TEXT("") : TEXT("s")) : TEXT(""));
+					continue;
+				}
+				const FIslandArrangementResponse* Own = Site.Responses.FindByPredicate([&OwnId](const FIslandArrangementResponse& Response) { return !OwnId.IsEmpty() && Response.AgentId == OwnId; });
+				NearbyBeings += FString::Printf(TEXT(" About %.0f metres away, someone has arranged %d %s stones into a %s. You do not know who made it or what they meant."),
+					Metres, AIslandArrangement::StoneCountFor(Site.Form), Weathering, *UIslandWorldStateSubsystem::FormName(Site.Form));
+				if (Own)
+					NearbyBeings += FString::Printf(TEXT(" The small arc of stones beside it is your response%s."), Own->Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (you meant: %s)"), *Own->Intent));
+				else if (Site.Responses.Num() < AIslandArrangement::MaxResponses)
+					NearbyBeings += FString::Printf(TEXT("%s You may respond by setting a few small stones beside it (build target: %s, with your \"intent\"), or simply leave it be."),
+						Site.Responses.Num() > 0 ? *FString::Printf(TEXT(" %d small arc%s of stones already answer it."), Site.Responses.Num(), Site.Responses.Num() == 1 ? TEXT("") : TEXT("s")) : TEXT(""), *SiteName);
+			}
 		}
 		int32 VisibleLandmarks = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks < 6; ++It)
@@ -315,6 +354,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
+		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. "
 		"If your body can use a visible nearby roost, in rough weather you may consider its described current wind shelter and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
@@ -571,6 +611,9 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		Decision.ActionType = ActionTypeFromString(TypeStr);
 		(*ActionObj)->TryGetStringField(TEXT("target"), Decision.ActionTarget);
 		(*ActionObj)->TryGetStringField(TEXT("speech"), Decision.Speech);
+		(*ActionObj)->TryGetStringField(TEXT("form"), Decision.Form);
+		(*ActionObj)->TryGetStringField(TEXT("title"), Decision.Title);
+		(*ActionObj)->TryGetStringField(TEXT("intent"), Decision.Intent);
 	}
 
 	Decision.bValid = true;

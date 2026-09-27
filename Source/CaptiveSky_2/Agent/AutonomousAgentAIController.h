@@ -44,6 +44,9 @@ protected:
 	virtual void ActOnDecision(const FAgentDecision& Decision);
 	virtual bool IsActionInProgress() const;
 	virtual bool CanRest() const;
+	/** Whether this body is settled enough to arrange stones by hand, beak, or otherwise. */
+	virtual bool CanArrangeStones() const;
+	void ArrangeStones(const FAgentDecision& Decision);
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 	void ReportAction(const FString& Outcome);
 	bool IsResting() const;

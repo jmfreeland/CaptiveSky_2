@@ -167,6 +167,31 @@ The visuals are placeholder engine shapes with tinted materials and no collision
 
 When Island is the open editor map, the test also computes the real layout without saving anything and confirms that a grounded walking path exists from the ListeningStones to every curio. `DayNightPersistence` now also covers the saved day and the midnight rollover.
 
+### Resident stone arrangements (2026-09-27)
+
+This builds on the 2026-09-27 weekly worldbuilding idea "let culture physically accumulate". On first play with writable world state, `UIslandWorldStateSubsystem` also saves four **arranging grounds** (`ArrangingGround_1`..`_4`). These are level, open, walkable patches 4.5–12 metres from the ListeningStones, kept at least 4 metres from each other and from the curios. On the current Island they sit 8–11 metres out.
+
+Any resident settled on the ground within three metres can use `build` on an empty ground. The action object carries a `form` (`ring`, `line`, `spiral`, or `pair`), their own short `title` (at most 60 characters), and an `intent` (at most 200 characters). The model only picks from that small vocabulary; the actual stone layout comes from a saved seed. Model-written text is cleaned to a single printable line before it's stored.
+
+A work already made by someone else can be answered once per resident with a small arc of three stones plus a private intent, up to three responses per work. Each resident may make or answer at most one arrangement per Island day. Makers don't respond to their own work.
+
+Evidence and privacy follow the rest of the world model:
+- **Others:** anyone nearby sees the form, stone count and age: freshly placed, a little weathered, or mossy and settled after four days. They are never told who made it, its title or its meaning.
+- **Makers and responders:** they recognize their own contribution and are reminded of their own words. A successful arrangement also becomes an action-result memory.
+- **Sharing:** a title or intent reaches another resident only if its maker speaks it.
+
+`AIslandArrangement` draws the work with flattened engine spheres, no collision, tinted from pale fresh stone toward moss over seven Island days; this is a code-only stand-in for proper weathering materials. To start over, run `Island.ForgetArrangements` during play; fresh empty grounds are placed the next time play begins.
+
+`CaptiveSky2.Agent.IslandArrangement` covers:
+- site placement;
+- how close a resident must be, and form validation;
+- text cleanup;
+- the daily and response limits;
+- privacy in perception, and makers recognizing their own work;
+- weathering;
+- reloading in a new session, and the developer reset;
+- on the open Island map, walking paths from the ListeningStones to every arranging ground.
+
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
