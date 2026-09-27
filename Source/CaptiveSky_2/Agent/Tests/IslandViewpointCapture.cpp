@@ -8,6 +8,10 @@
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
 #include "IslandDayNight.h"
+#include "IslandWorldStateSubsystem.h"
+#include "IslandNest.h"
+#include "IslandCurio.h"
+#include "IslandArrangement.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "ContentStreaming.h"
 #include "Dom/JsonObject.h"
@@ -83,6 +87,7 @@ namespace
 					It->OnConstruction(It->GetActorTransform());
 					break;
 				}
+				SpawnLastingChanges();
 				Target.Reset(NewObject<UTextureRenderTarget2D>());
 				Target->RenderTargetFormat = RTF_RGBA8_SRGB;
 				Target->InitAutoFormat(Size.X, Size.Y);
@@ -95,6 +100,9 @@ namespace
 					Clock->StartHour = OriginalStartHour;
 					Clock->OnConstruction(Clock->GetActorTransform());
 				}
+				for (const TWeakObjectPtr<AActor>& Preview : PreviewActors)
+					if (Preview.IsValid()) Preview->Destroy();
+				PreviewActors.Reset();
 				Test->AddInfo(FString::Printf(TEXT("Viewpoint captures saved in %s"), *Directory));
 				return true;
 			}
@@ -136,6 +144,48 @@ namespace
 		}
 
 	private:
+		/**
+		 * Shows what residents have left behind (nests, curios, stone arrangements) by spawning transient
+		 * copies from WorldState/<Map>.json into the editor world for the duration of the capture.
+		 * Reading the file changes nothing; -ViewpointNoWorldState captures the bare map instead.
+		 */
+		void SpawnLastingChanges()
+		{
+			if (FParse::Param(FCommandLine::Get(), TEXT("ViewpointNoWorldState"))) return;
+			const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / (World->GetMapName() + TEXT(".json")));
+			UIslandWorldStateSubsystem* Reader = NewObject<UIslandWorldStateSubsystem>(GetTransientPackage());
+			if (!FPaths::FileExists(Path) || !Reader->ReadStateFile(Path))
+			{
+				Test->AddInfo(FString::Printf(TEXT("No readable world state at %s; capturing the bare map."), *Path));
+				return;
+			}
+			const int32 Today = Reader->GetSavedDay().Get(1);
+			FActorSpawnParameters Spawn;
+			Spawn.ObjectFlags |= RF_Transient;
+			Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			for (const FIslandNestRecord& Nest : Reader->GetNests())
+				if (AIslandNest* Actor = World->SpawnActor<AIslandNest>(Nest.Location, FRotator::ZeroRotator, Spawn))
+				{
+					Actor->SetWoven(Nest.SiteTag, Nest.Layers);
+					PreviewActors.Add(Actor);
+				}
+			for (const FIslandCurioRecord& Curio : Reader->GetCurios())
+				if (AIslandCurio* Actor = World->SpawnActor<AIslandCurio>(Curio.Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance), FRotator::ZeroRotator, Spawn))
+				{
+					Actor->ShowRecord(Curio);
+					PreviewActors.Add(Actor);
+				}
+			for (const FIslandArrangementSite& Site : Reader->GetArrangementSites())
+				if (AIslandArrangement* Actor = World->SpawnActor<AIslandArrangement>(Site.Location, FRotator::ZeroRotator, Spawn))
+				{
+					Actor->ShowSite(Site, Today);
+					PreviewActors.Add(Actor);
+				}
+			Test->AddInfo(FString::Printf(TEXT("Showing %d nest(s), %d curio(s), and %d arranging ground(s) from %s (Island day %d)."),
+				Reader->GetNests().Num(), Reader->GetCurios().Num(), Reader->GetArrangementSites().Num(), *Path, Today));
+		}
+
+		TArray<TWeakObjectPtr<AActor>> PreviewActors;
 		TWeakObjectPtr<UWorld> World;
 		TArray<FIslandViewpoint> Viewpoints;
 		float Hour;

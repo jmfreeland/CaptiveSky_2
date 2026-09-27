@@ -124,6 +124,13 @@ public:
 	/** Developer reset: forgets every arranging site and work; fresh empty sites are placed next play. */
 	bool ForgetArrangements();
 
+	/**
+	 * Parses a world-state file into this object's records without spawning, saving, or placing
+	 * anything; usable on a bare instance (e.g. to preview lasting changes in the editor world).
+	 * Returns false if the file is missing or unreadable.
+	 */
+	bool ReadStateFile(const FString& Path);
+
 	/** Re-reads the storage file and respawns visible nests. Called automatically when play begins. */
 	void LoadAndSpawn();
 

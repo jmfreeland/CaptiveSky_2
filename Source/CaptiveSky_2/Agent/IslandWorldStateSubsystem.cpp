@@ -66,18 +66,35 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	SavedHour.Reset();
 	SavedDay.Reset();
 	bStorageUnreadable = false;
-	FString Contents;
 	const FString Path = GetStorageFilePath();
 	if (Path.IsEmpty()) return;
 	if (!FPaths::FileExists(Path)) { PlaceCurios(); PlaceArrangementSites(); return; }
-	TSharedPtr<FJsonObject> Root;
-	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
+	if (!ReadStateFile(Path))
 	{
 		// Leave the unreadable file untouched; a later save would otherwise erase whatever it holds.
 		UE_LOG(LogIslandWorldState, Error, TEXT("Could not read world state %s; no lasting changes were loaded and none will be saved this session."), *Path);
 		bStorageUnreadable = true;
 		return;
 	}
+	for (const FIslandNestRecord& Record : Nests) RefreshNestActor(Record);
+	for (const FIslandCurioRecord& Record : Curios) RefreshCurioActor(Record);
+	for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
+	if (Curios.Num() == 0) PlaceCurios();
+	if (ArrangementSites.Num() == 0) PlaceArrangementSites();
+	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
+}
+
+bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
+{
+	Nests.Reset();
+	Curios.Reset();
+	ArrangementSites.Reset();
+	SavedHour.Reset();
+	SavedDay.Reset();
+	FString Contents;
+	TSharedPtr<FJsonObject> Root;
+	if (!FFileHelper::LoadFileToString(Contents, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Contents), Root) || !Root.IsValid())
+		return false;
 	const TSharedPtr<FJsonObject>* Clock = nullptr;
 	double Hour = 0.0;
 	if (Root->TryGetObjectField(TEXT("clock"), Clock) && (*Clock)->TryGetNumberField(TEXT("hour"), Hour) && Hour >= 0.0 && Hour < 24.0)
@@ -109,7 +126,6 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 			(*Object)->TryGetStringArrayField(TEXT("contributors"), Record.Contributors);
 			Record.State = FMath::Clamp(Record.State, 0, Record.Kind == EIslandCurioKind::Cairn ? AIslandCurio::CairnMaxStones : AIslandCurio::PodOpenState);
 			Curios.Add(Record);
-			RefreshCurioActor(Record);
 		}
 	}
 	const TArray<TSharedPtr<FJsonValue>>* NestValues = nullptr;
@@ -133,7 +149,6 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 			if ((*Object)->TryGetStringField(TEXT("updated_utc"), Updated)) FDateTime::ParseIso8601(*Updated, Record.UpdatedUtc);
 			if (Record.SiteTag.IsNone() || Record.Layers <= 0 || FindNest(Record.SiteTag)) continue;
 			Nests.Add(Record);
-			RefreshNestActor(Record);
 		}
 	}
 	const TArray<TSharedPtr<FJsonValue>>* SiteValues = nullptr;
@@ -175,12 +190,9 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 				}
 			}
 			ArrangementSites.Add(Site);
-			RefreshArrangementActor(Site);
 		}
 	}
-	if (Curios.Num() == 0) PlaceCurios();
-	if (ArrangementSites.Num() == 0) PlaceArrangementSites();
-	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
+	return true;
 }
 
 bool UIslandWorldStateSubsystem::Save() const

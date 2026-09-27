@@ -208,6 +208,27 @@ The first baselines (2026-09-27) show where things stand:
 - **No forest here:** none of the PCG forest appears near the route.
 - **Leftover objects:** a stray floating block and mannequin-like figures hang in the air above the roost area.
 
+Captures also show what residents have left behind. While capturing, transient copies of the nests, curios and stone arrangements are spawned from `WorldState/<Map>.json` (the file is only read, never written); pass `-ViewpointNoWorldState` to capture the bare map instead.
+
+### Grounding audit and the first live session (2026-09-27)
+
+`CaptiveSky2.Visual.Grounding` checks visible props within 60 metres of the landmarks. For each prop it traces down from just above, and reports it as **hovering** if it sits up to 1.5 m above whatever is beneath it, or as **mid-air** if higher. It only warns; it never fails. `-GroundingFix` lowers hovering props onto their support, then saves the map after copying the original to `Saved/MapBackups/`. Mid-air props are left for a person to decide.
+
+The first fix lowered seven props (two ListeningStones, two Tideglass stones, both WindArch pillars, and the east roost's fallen wood) by 16–98 cm. Two mid-air items remain on purpose: the WindArch beam floats above pillars 7 m apart and needs re-authoring, and the east roost's main branch is attached to the side of its trunk. The floating cube and figures visible in captures are editor-only helper visuals that don't appear in the game.
+
+A bounded live session (12 real minutes, 40 requests; it ended itself at 587 seconds) placed the curios and arranging grounds on the real Island and carried the clock through. Aster and the raven stayed honest ("I haven't checked the pool yet"), noticed rain and the pool's rain ripples, and watched a crab without claiming it. However, about 30 of 39 decisions were back-and-forth agent-to-agent replies, which skip the background think delay, so pleasant but repetitive small talk used most of the request budget. Neither resident walked to the ListeningStones, so the trail, cairn and arranging grounds weren't encountered.
+
+### Environment presentation layer (2026-09-27)
+
+`UIslandEnvironmentSubsystem` (game/PIE worlds only) turns the simulation into values materials and VFX can read from one Material Parameter Collection, `/Game/Environment/MPC_IslandEnvironment`:
+- `RainIntensity` and `CloudCover`, from `AIslandWeather`;
+- `Wetness`, which soaks in under a minute of heavy rain and dries over roughly three minutes of sunny, windy day to ten of calm night;
+- `WindSpeed`, plus a `WindDirection` vector whose w component is the speed, sampled at the player;
+- `Daylight`, `SunHeight` and `IslandHour`, from `AIslandDayNight`;
+- `GoldenHour`, strongest while the sun is low but still up, which is around 17:00 on this Island.
+
+`CaptiveSky2.Tools.CreateEnvironmentCollection` creates or updates the collection asset; it has been created. No material reads it yet: that's the art step for the Tideglass microclimate (wet-rock darkening, puddle masks, mist and so on). `CaptiveSky2.Agent.IslandEnvironment` covers the wetness and golden-hour rules and the values published through a real collection instance.
+
 - _TODO — prioritize against the Vision section above._
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).
 - Replace the unnamed raven's primitive placeholder with a proper animated bird body and map its animation clips to the existing locomotion states. The raven already belongs to the Island rather than to Aster and has its own identity and interests; their relationship and any personal name remain emergent.
