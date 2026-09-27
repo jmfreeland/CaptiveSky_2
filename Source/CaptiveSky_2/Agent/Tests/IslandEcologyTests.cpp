@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
@@ -96,7 +97,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	}
 	UBoxComponent* GroundBox = NewObject<UBoxComponent>(Ground);
 	Ground->SetRootComponent(GroundBox);
-	GroundBox->SetBoxExtent(FVector(1500.f, 1500.f, 10.f));
+	GroundBox->SetBoxExtent(FVector(1800.f, 2500.f, 10.f));
 	GroundBox->SetCollisionProfileName(TEXT("BlockAll"));
 	GroundBox->RegisterComponent();
 	Ground->SetActorLocation(FVector(0.f, 0.f, -20.f));
@@ -160,10 +161,24 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	int32 Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("No fireflies are active at midday"), Population, 0);
+	int32 CrabPopulation = 0;
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
+	{
+		++CrabPopulation;
+		TestTrue(TEXT("Tidepool crab advertises as untargeted ambient life"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TidepoolCrab")) && !It->ActorHasTag(TEXT("IslandLandmark")));
+		TestTrue(TEXT("Tidepool crab remains at the shoreline of its habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
+		TestEqual(TEXT("Tidepool crab has six visible leg placeholders"), It->Legs.Num(), 6);
+		TestEqual(TEXT("Tidepool crab has two claws and two eye stalks"), It->Claws.Num(), 2);
+		TestEqual(TEXT("Tidepool crab geometry cannot block the world"), It->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+	}
+	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
 	Clock->CurrentHour = 18.f;
 	Weather->RefreshNightEcology();
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("Fireflies wait until nightfall"), Population, 0);
+	CrabPopulation = 0;
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
+	TestEqual(TEXT("Shore crabs remain active in the late afternoon"), CrabPopulation, 2);
 
 	Clock->CurrentHour = 20.f;
 	Weather->RefreshNightEcology();
@@ -189,6 +204,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
+	CrabPopulation = 0;
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
+	TestEqual(TEXT("Day-active shore crabs shelter after nightfall"), CrabPopulation, 0);
 	if (Population > 0)
 	{
 		AIslandFirefly* RainSensitiveFirefly = nullptr;
@@ -228,6 +246,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("Fireflies leave the habitat in daytime"), Population, 0);
+	CrabPopulation = 0;
+	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
+	TestEqual(TEXT("Shore crab population is restored at midday"), CrabPopulation, 2);
 
 	const FVector TestPoolLocation(4000.f, 5000.f, 600.f);
 	ACharacter* Observer = World->SpawnActor<ACharacter>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
@@ -307,6 +328,21 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly returns naturally toward its usual pulse"), WatchableFirefly->ObservationPulseRemaining > 0.f && WatchableFirefly->ObservationPulseRemaining < 2.1f);
 		WatchableFirefly->Tick(2.f);
 		TestTrue(TEXT("Observation accent expires without persistent state"), FMath::IsNearlyZero(WatchableFirefly->ObservationPulseRemaining));
+	}
+	const FVector CrabStart = TestPoolLocation + FVector(100.f, 0.f, 0.f);
+	AIslandTidepoolCrab* WatchableCrab = World->SpawnActor<AIslandTidepoolCrab>(CrabStart, FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("Nearby independent shore crab spawned for a quiet observation"), WatchableCrab);
+	if (WatchableCrab)
+	{
+		WatchableCrab->HomeLocation = CrabStart;
+		Controller->InspectTarget(TEXT("TidepoolCrab"));
+		TestTrue(TEXT("Quiet observation prompts a brief scurry, not capture"), WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+		TestTrue(*FString::Printf(TEXT("Crab scurry direction is set (%s)"), *WatchableCrab->ScurryDirection.ToString()), !WatchableCrab->ScurryDirection.IsNearlyZero());
+		WatchableCrab->Tick(0.7f);
+		const float ScurryDistance = FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart);
+		TestTrue(*FString::Printf(TEXT("Crab moves only a short distance toward cover (%.1f cm at %s)"), ScurryDistance, *WatchableCrab->GetActorLocation().ToString()), ScurryDistance > 1.f && ScurryDistance < 140.f);
+		WatchableCrab->Tick(2.f);
+		TestTrue(TEXT("Crab resumes its local idle path without a persistent state change"), FMath::IsNearlyZero(WatchableCrab->ScurryRemaining) && FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart) < 100.f);
 	}
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);

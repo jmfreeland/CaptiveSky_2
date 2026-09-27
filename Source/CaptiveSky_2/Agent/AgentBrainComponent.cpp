@@ -204,14 +204,19 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		int32 VisibleWildlife = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 3; ++It)
 		{
-			if (!It->ActorHasTag(TEXT("IslandLife")) || !It->ActorHasTag(TEXT("Firefly")) ||
+			const bool bFirefly = It->ActorHasTag(TEXT("Firefly"));
+			const bool bTidepoolCrab = It->ActorHasTag(TEXT("TidepoolCrab"));
+			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab) ||
 				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(1800.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeVisibility), false, Owner);
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
-			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."),
-				FVector::Dist(Location, It->GetActorLocation()) / 100.f);
+			const float Metres = FVector::Dist(Location, It->GetActorLocation()) / 100.f;
+			if (bFirefly)
+				NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."), Metres);
+			else
+				NearbyBeings += FString::Printf(TEXT(" A small shore crab is scuttling independently near TideglassPool, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TidepoolCrab to watch quietly; it may scuttle away, and should not be touched, caught, or claimed."), Metres);
 			++VisibleWildlife;
 		}
 	}

@@ -6,6 +6,7 @@
 #include "IslandWeather.generated.h"
 
 class AIslandFirefly;
+class AIslandTidepoolCrab;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
@@ -76,6 +77,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
+	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	FTimerHandle EcologyTimerHandle;
 	TWeakObjectPtr<UVolumetricCloudComponent> CloudComponent;

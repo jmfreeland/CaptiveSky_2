@@ -13,6 +13,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandFirefly.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
@@ -142,7 +143,8 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
-		if (Target == FName(TEXT("Firefly")) && FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
+		if ((Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab"))) &&
+			FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
 		// Skip them before distance checks so an unrelated habitat cannot mask the actual TideglassPool landmark.
 		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
@@ -176,6 +178,11 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		{
 			if (AIslandFirefly* Firefly = Cast<AIslandFirefly>(*It)) Firefly->RespondToQuietObservation();
 			Fact = TEXT("You quietly watched a nearby firefly. Its glow briefly brightened within its ordinary pulse; it remains wild and independent. You did not touch, catch, or claim it, and it may drift away.");
+		}
+		else if (It->ActorHasTag(TEXT("IslandLife")) && Target == FName(TEXT("TidepoolCrab")))
+		{
+			if (AIslandTidepoolCrab* Crab = Cast<AIslandTidepoolCrab>(*It)) Crab->RespondToQuietObservation(Observer->GetActorLocation());
+			Fact = TEXT("You quietly watched a small shore crab. It scuttled a short way toward cover, paused, then resumed its usual Tideglass path. It remains wild and independent; you did not touch, catch, or claim it, and nothing persistent changed.");
 		}
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) && Target == FName(TEXT("ListeningStones")))
 		{
@@ -231,6 +238,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		return;
 	}
 	if (Target == FName(TEXT("Firefly"))) ReportAction(TEXT("No firefly is close enough to watch quietly; move within four metres and let it come near."));
+	else if (Target == FName(TEXT("TidepoolCrab"))) ReportAction(TEXT("No shore crab is close enough to watch quietly; return to the TideglassPool and look near its edge."));
 	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
 }
 

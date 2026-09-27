@@ -1,6 +1,7 @@
 #include "IslandWeather.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -84,6 +85,9 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 		if (Firefly.IsValid()) Firefly->Destroy();
 	NightFireflies.Reset();
+	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
+		if (Crab.IsValid()) Crab->Destroy();
+	DayCrabs.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -429,14 +433,17 @@ void AIslandWeather::UpdateCloudRendering()
 void AIslandWeather::RefreshNightEcology()
 {
 	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
+	DayCrabs.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolCrab>& Crab) { return !Crab.IsValid(); });
 	if (!GetWorld()) return;
 
-	bool bNight = false;
+	float CurrentHour = -1.f;
 	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 	{
-		bNight = It->CurrentHour >= 19.f || It->CurrentHour < 5.f;
+		CurrentHour = It->CurrentHour;
 		break;
 	}
+	const bool bNight = CurrentHour >= 19.f || (CurrentHour >= 0.f && CurrentHour < 5.f);
+	const bool bDay = CurrentHour >= 6.f && CurrentHour < 19.f;
 
 	AActor* Habitat = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
@@ -449,21 +456,63 @@ void AIslandWeather::RefreshNightEcology()
 	}
 
 	constexpr int32 NightPopulation = 3;
-	if (!bNight || !Habitat)
+	if ((!bNight && !bDay) || !Habitat)
 	{
 		for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
 			if (Firefly.IsValid()) Firefly->Destroy();
 		NightFireflies.Reset();
+		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
+			if (Crab.IsValid()) Crab->Destroy();
+		DayCrabs.Reset();
 		return;
 	}
 
-	while (NightFireflies.Num() < NightPopulation)
+	if (!bNight)
 	{
-		const FVector GroundOffset(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
+		for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)
+			if (Firefly.IsValid()) Firefly->Destroy();
+		NightFireflies.Reset();
+	}
+	else
+	{
+		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
+			if (Crab.IsValid()) Crab->Destroy();
+		DayCrabs.Reset();
+		while (NightFireflies.Num() < NightPopulation)
+		{
+			const FVector GroundOffset(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(Habitat->GetActorLocation() + GroundOffset, FRotator::ZeroRotator, SpawnParameters))
+				NightFireflies.Add(Firefly);
+			else
+				break;
+		}
+	}
+
+	if (!bDay)
+	{
+		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
+			if (Crab.IsValid()) Crab->Destroy();
+		DayCrabs.Reset();
+		return;
+	}
+	constexpr int32 DayPopulation = 2;
+	while (DayCrabs.Num() < DayPopulation)
+	{
+		const int32 Index = DayCrabs.Num();
+		const float Angle = Index * PI;
+		const FVector ShoreOffset(FMath::Cos(Angle) * 720.f, FMath::Sin(Angle) * 720.f, 900.f);
+		const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
+		FHitResult GroundHit;
+		FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolCrabShore), false, this);
+		GroundParams.AddIgnoredActor(Habitat);
+		if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, GroundParams)) break;
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(Habitat->GetActorLocation() + GroundOffset, FRotator::ZeroRotator, SpawnParameters))
-			NightFireflies.Add(Firefly);
+		const FVector Location = GroundHit.Location + FVector(0.f, 0.f, 12.f);
+		if (AIslandTidepoolCrab* Crab = GetWorld()->SpawnActor<AIslandTidepoolCrab>(Location, FRotator::ZeroRotator, SpawnParameters))
+			DayCrabs.Add(Crab);
 		else
 			break;
 	}
