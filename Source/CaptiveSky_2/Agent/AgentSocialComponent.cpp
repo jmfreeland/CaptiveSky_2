@@ -92,6 +92,13 @@ bool UAgentSocialComponent::IsCoolingDownWith(const FString& OtherAgentId) const
 	return false;
 }
 
+float UAgentSocialComponent::EffectiveConversationCooldownSeconds(float ConfiguredSeconds)
+{
+	return FMath::IsFinite(ConfiguredSeconds)
+		? FMath::Max(MinimumConversationCooldownSeconds, ConfiguredSeconds)
+		: MinimumConversationCooldownSeconds;
+}
+
 void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other)
 {
 	if (!Other)
@@ -100,7 +107,7 @@ void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other
 	}
 	const UAgentMemoryComponent* OtherMemory = Other->FindComponentByClass<UAgentMemoryComponent>();
 	const UAgentMemoryComponent* OwnMemory = GetOwner()->FindComponentByClass<UAgentMemoryComponent>();
-	const double Until = FPlatformTime::Seconds() + ConversationCooldownSeconds;
+	const double Until = FPlatformTime::Seconds() + EffectiveConversationCooldownSeconds(ConversationCooldownSeconds);
 	if (OtherMemory)
 	{
 		CooldownUntilByAgentId.Add(OtherMemory->GetResolvedAgentId(), Until);

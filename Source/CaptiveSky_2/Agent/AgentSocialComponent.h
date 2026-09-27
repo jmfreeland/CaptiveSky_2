@@ -40,6 +40,10 @@ class CAPTIVESKY_2_API UAgentSocialComponent : public UActorComponent
 public:
 	UAgentSocialComponent();
 
+	/** Autonomous exchanges cool down for at least five real minutes, even if an older Blueprint overrides the property. */
+	static constexpr float MinimumConversationCooldownSeconds = 300.f;
+	static float EffectiveConversationCooldownSeconds(float ConfiguredSeconds);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "100.0"))
 	float SpeakingRadius = 2500.f;
 
@@ -47,8 +51,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "1", ClampMax = "12"))
 	int32 MaximumConversationTurns = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "0.0"))
-	float ConversationCooldownSeconds = 45.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "300.0"))
+	float ConversationCooldownSeconds = 300.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "1", ClampMax = "16"))
 	int32 MaximumPendingUtterances = 4;
