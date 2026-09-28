@@ -15,6 +15,9 @@ class CAPTIVESKY_2_API AIslandListeningStonesChime : public AActor
 
 public:
 	AIslandListeningStonesChime();
+	static constexpr float AttenuationInnerRadius = 350.f;
+	static constexpr float AttenuationFalloffDistance = 750.f;
+	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
 	void BeginChime(float HorizontalWindSpeed = 0.f);
 
 protected:

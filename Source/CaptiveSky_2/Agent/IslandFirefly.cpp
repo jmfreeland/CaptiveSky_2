@@ -1,4 +1,5 @@
 #include "IslandFirefly.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -128,13 +129,47 @@ void AIslandFirefly::RespondToQuietObservation()
 	ObservationPulseRemaining = 3.f;
 }
 
+void AIslandFirefly::RespondToSoftChime()
+{
+	ChimeResponseRemaining = 1.2f;
+}
+
+void AIslandFirefly::CheckForNearbyStoneChime()
+{
+	if (!GetWorld() || ChimeResponseRemaining > 0.f) return;
+	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& Chime)
+	{
+		return !Chime.IsValid();
+	});
+	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
+	{
+		const TWeakObjectPtr<AIslandListeningStonesChime> Chime(*It);
+		if (RespondedChimes.Contains(Chime) ||
+			FVector::DistSquared(GetActorLocation(), It->GetActorLocation()) > FMath::Square(AIslandListeningStonesChime::AudibleRadius))
+		{
+			continue;
+		}
+		RespondedChimes.Add(Chime);
+		RespondToSoftChime();
+		return;
+	}
+}
+
 void AIslandFirefly::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!GetWorld()) return;
 
 	const double Time = GetWorld()->GetTimeSeconds();
-	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - FMath::Max(0.f, DeltaSeconds));
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - SafeDelta);
+	ChimeResponseRemaining = FMath::Max(0.f, ChimeResponseRemaining - SafeDelta);
+	ChimeCheckRemaining -= SafeDelta;
+	if (ChimeCheckRemaining <= 0.f)
+	{
+		ChimeCheckRemaining = 0.2f;
+		CheckForNearbyStoneChime();
+	}
 	const float T = static_cast<float>(Time);
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float RainActivityFactor = RainActivity(Rain);
@@ -164,5 +199,7 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	const float Pulse = FMath::Max(0.f, FMath::Sin(T * 4.2f * PulseRate + Phase));
 	const float NaturalPulse = 0.12f + 0.88f * FMath::Pow(Pulse, 5.f);
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
-	Glow->SetIntensity(GlowIntensity * RainGlowScale(RainIntensity) * NaturalPulse * ObservationAccent);
+	const float ChimeAccent = FMath::Clamp(ChimeResponseRemaining / 1.2f, 0.f, 1.f);
+	const float ChimePulse = FMath::Lerp(NaturalPulse, FMath::Max(NaturalPulse, 0.32f), ChimeAccent);
+	Glow->SetIntensity(GlowIntensity * RainGlowScale(RainIntensity) * ChimePulse * ObservationAccent);
 }

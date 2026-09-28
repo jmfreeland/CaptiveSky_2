@@ -7,6 +7,7 @@
 class UPointLightComponent;
 class UStaticMeshComponent;
 class AIslandWeather;
+class AIslandListeningStonesChime;
 
 /** Lightweight ambient-life prototype: an independently wandering point of firefly light. */
 UCLASS()
@@ -36,6 +37,8 @@ public:
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
+	/** A nearby ListeningStones tone briefly lifts the natural glow pulse. */
+	void RespondToSoftChime();
 
 protected:
 	virtual void BeginPlay() override;
@@ -61,9 +64,13 @@ private:
 	float PulseRate = 1.f;
 	float WingBeatPhase = 0.f;
 	float ObservationPulseRemaining = 0.f;
+	float ChimeCheckRemaining = 0.f;
+	float ChimeResponseRemaining = 0.f;
 	TWeakObjectPtr<AIslandWeather> Weather;
+	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
 	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
+	void CheckForNearbyStoneChime();
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
 	void UpdateWings(double IslandTimeSeconds, float RainIntensity);
 };

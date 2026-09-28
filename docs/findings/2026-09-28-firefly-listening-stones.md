@@ -1,0 +1,7 @@
+# Fireflies answer the ListeningStones
+
+The transient ListeningStones tone now has a small nearby response from the Tideglass fireflies. Each firefly checks for a currently playing `AIslandListeningStonesChime` about five times per second. Within the audio's 350 cm inner radius plus 750 cm falloff, it gets one subtle 1.2-second lift in its natural glow pulse for that chime. The listener uses the same shared radius constants as the audio attenuation, so those distances cannot drift apart independently.
+
+This is deliberately just a sensory echo: the chime does not summon the insects, alter their path, trigger model calls, write memory/world state, or promise a hidden meaning. Each firefly keeps weak references to transient sound actors only long enough not to respond repeatedly; destroyed chimes are pruned during the next nearby-sound check. The isolated `CaptiveSky2.Agent.NightEcology` fixture checks inside/outside range, one response per chime, visible lift at a dim pulse phase, and decay.
+
+The UE 5.8.3 build and offline automation verify the coupling, but visual readability and speaker audibility have not been assessed in rendered PIE or on speakers. The actual evening placement of the Tideglass fireflies relative to ListeningStones should be checked before widening the sound or response radius.

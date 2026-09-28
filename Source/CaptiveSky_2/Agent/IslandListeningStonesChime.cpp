@@ -17,8 +17,8 @@ AIslandListeningStonesChime::AIslandListeningStonesChime()
 	AudioComponent->AttenuationOverrides.bAttenuate = true;
 	AudioComponent->AttenuationOverrides.bSpatialize = true;
 	AudioComponent->AttenuationOverrides.AttenuationShape = EAttenuationShape::Sphere;
-	AudioComponent->AttenuationOverrides.AttenuationShapeExtents = FVector(350.f, 0.f, 0.f);
-	AudioComponent->AttenuationOverrides.FalloffDistance = 750.f;
+	AudioComponent->AttenuationOverrides.AttenuationShapeExtents = FVector(AttenuationInnerRadius, 0.f, 0.f);
+	AudioComponent->AttenuationOverrides.FalloffDistance = AttenuationFalloffDistance;
 	AudioComponent->VolumeMultiplier = 0.28f;
 }
 
