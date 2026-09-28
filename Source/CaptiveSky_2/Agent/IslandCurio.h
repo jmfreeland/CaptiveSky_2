@@ -47,6 +47,10 @@ struct FIslandCurioRecord
 	/** Stable residents who knowingly added a cairn stone; an empty list also means authorship is unknown. */
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Curio")
 	TArray<FString> Contributors;
+
+	/** Island day a storm last knocked something off it, or -1. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Curio")
+	int32 StormDamagedDay = -1;
 };
 
 /**

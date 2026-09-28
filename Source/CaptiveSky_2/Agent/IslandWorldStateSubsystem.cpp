@@ -77,6 +77,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	SavedHour.Reset();
 	SavedDay.Reset();
 	SavedWeatherSeconds.Reset();
+	LastStormMarkSeconds = -1.0;
 	SavedWetness.Reset();
 	bStorageUnreadable = false;
 	const FString Path = GetStorageFilePath();
@@ -108,6 +109,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	SavedHour.Reset();
 	SavedDay.Reset();
 	SavedWeatherSeconds.Reset();
+	LastStormMarkSeconds = -1.0;
 	SavedWetness.Reset();
 	FString Contents;
 	TSharedPtr<FJsonObject> Root;
@@ -130,6 +132,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	double WeatherSeconds = 0.0;
 	if (Root->TryGetObjectField(TEXT("weather"), Weather) && (*Weather)->TryGetNumberField(TEXT("seconds"), WeatherSeconds) && WeatherSeconds >= 0.0)
 		SavedWeatherSeconds = WeatherSeconds;
+	if (Weather) (*Weather)->TryGetNumberField(TEXT("last_storm_mark"), LastStormMarkSeconds);
 	const TArray<TSharedPtr<FJsonValue>>* CurioValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("curios"), CurioValues))
 	{
@@ -151,6 +154,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			(*Object)->TryGetNumberField(TEXT("state"), Record.State);
 			(*Object)->TryGetNumberField(TEXT("last_changed_day"), Record.LastChangedDay);
 			(*Object)->TryGetStringArrayField(TEXT("contributors"), Record.Contributors);
+			(*Object)->TryGetNumberField(TEXT("storm_damaged_day"), Record.StormDamagedDay);
 			Record.State = FMath::Clamp(Record.State, 0, Record.Kind == EIslandCurioKind::Cairn ? AIslandCurio::CairnMaxStones : AIslandCurio::PodOpenState);
 			Curios.Add(Record);
 		}
@@ -174,6 +178,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			(*Object)->TryGetStringArrayField(TEXT("builders"), Record.Builders);
 			if ((*Object)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Record.CreatedUtc);
 			if ((*Object)->TryGetStringField(TEXT("updated_utc"), Updated)) FDateTime::ParseIso8601(*Updated, Record.UpdatedUtc);
+			(*Object)->TryGetNumberField(TEXT("storm_damaged_day"), Record.StormDamagedDay);
 			if (Record.SiteTag.IsNone() || Record.Layers <= 0 || FindNest(Record.SiteTag)) continue;
 			Nests.Add(Record);
 		}
@@ -258,6 +263,7 @@ bool UIslandWorldStateSubsystem::Save() const
 		Object->SetArrayField(TEXT("builders"), Builders);
 		Object->SetStringField(TEXT("created_utc"), Record.CreatedUtc.ToIso8601());
 		Object->SetStringField(TEXT("updated_utc"), Record.UpdatedUtc.ToIso8601());
+		Object->SetNumberField(TEXT("storm_damaged_day"), Record.StormDamagedDay);
 		NestValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("nests"), NestValues);
@@ -274,6 +280,7 @@ bool UIslandWorldStateSubsystem::Save() const
 		TArray<TSharedPtr<FJsonValue>> Contributors;
 		for (const FString& Contributor : Record.Contributors) Contributors.Add(MakeShared<FJsonValueString>(Contributor));
 		Object->SetArrayField(TEXT("contributors"), Contributors);
+		Object->SetNumberField(TEXT("storm_damaged_day"), Record.StormDamagedDay);
 		CurioValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("curios"), CurioValues);
@@ -328,10 +335,11 @@ bool UIslandWorldStateSubsystem::Save() const
 		Clock->SetStringField(TEXT("saved_utc"), FDateTime::UtcNow().ToIso8601());
 		Root->SetObjectField(TEXT("clock"), Clock);
 	}
-	if (SavedWeatherSeconds.IsSet())
+	if (SavedWeatherSeconds.IsSet() || LastStormMarkSeconds >= 0.0)
 	{
 		const TSharedRef<FJsonObject> Weather = MakeShared<FJsonObject>();
-		Weather->SetNumberField(TEXT("seconds"), SavedWeatherSeconds.GetValue());
+		Weather->SetNumberField(TEXT("seconds"), SavedWeatherSeconds.Get(0.0));
+		Weather->SetNumberField(TEXT("last_storm_mark"), LastStormMarkSeconds);
 		Root->SetObjectField(TEXT("weather"), Weather);
 	}
 	if (SavedWetness.IsSet())
@@ -406,6 +414,43 @@ bool UIslandWorldStateSubsystem::SaveWetness(float Wetness)
 	if (Save()) return true;
 	SavedWetness = PreviousWetness;
 	return false;
+}
+
+bool UIslandWorldStateSubsystem::ApplyStormMarks(double WeatherSeconds, int32 Today, TArray<FString>& OutMarks)
+{
+	OutMarks.Reset();
+	if (LastStormMarkSeconds >= 0.0 && FMath::Abs(WeatherSeconds - LastStormMarkSeconds) < 3600.0) return false;
+	const TArray<FIslandNestRecord> PreviousNests = Nests;
+	const TArray<FIslandCurioRecord> PreviousCurios = Curios;
+	const double PreviousMark = LastStormMarkSeconds;
+	for (FIslandCurioRecord& Curio : Curios)
+	{
+		if (Curio.Kind != EIslandCurioKind::Cairn || Curio.State <= 3) continue;
+		--Curio.State;
+		Curio.StormDamagedDay = Today;
+		OutMarks.Add(FString::Printf(TEXT("The storm knocked the cairn's top stone down; it now stands %d stones high."), Curio.State));
+	}
+	for (FIslandNestRecord& Nest : Nests)
+	{
+		if (Nest.Layers <= 1) continue;
+		--Nest.Layers;
+		Nest.StormDamagedDay = Today;
+		Nest.UpdatedUtc = FDateTime::UtcNow();
+		OutMarks.Add(FString::Printf(TEXT("The storm tore the outer layer from the nest at %s; %d layers remain."), *Nest.SiteTag.ToString(), Nest.Layers));
+	}
+	// Remember the storm even when nothing was damaged, so things made later in it are spared.
+	LastStormMarkSeconds = WeatherSeconds;
+	if (!Save())
+	{
+		Nests = PreviousNests;
+		Curios = PreviousCurios;
+		LastStormMarkSeconds = PreviousMark;
+		OutMarks.Reset();
+		return false;
+	}
+	for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
+	for (const FIslandCurioRecord& Curio : Curios) RefreshCurioActor(Curio);
+	return true;
 }
 
 bool UIslandWorldStateSubsystem::SaveWeatherSeconds(double Seconds)

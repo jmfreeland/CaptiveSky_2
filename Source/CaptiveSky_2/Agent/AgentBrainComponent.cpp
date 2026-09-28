@@ -99,6 +99,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		{
 			LocalWeather = *It;
 			NearbyBeings += It->DescribeAt(Location, Owner);
+			// Reading the sky: in the quarter hour before a storm, its signs arrive first.
+			const double SkyNow = GetWorld()->GetTimeSeconds();
+			if (It->SampleStormIntensity(SkyNow) < 0.2f &&
+				FMath::Max3(It->SampleStormIntensity(SkyNow + 300.0), It->SampleStormIntensity(SkyNow + 600.0), It->SampleStormIntensity(SkyNow + 900.0)) > 0.5f)
+				NearbyBeings += TEXT(" The air has turned heavy and the wind gusty, and dark cloud is building: a storm may be coming.");
 			if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
 			{
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeGround(Environment->GetWetness(), Environment->GetRainIntensity());
@@ -140,11 +145,15 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				FHitResult Hit;
 				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, NestView, ECC_Visibility, Params)) continue;
 				// Lasting changes are perceived as they are; who made one is known only to its makers.
+				const bool bStormTorn = Nest.StormDamagedDay >= 0 && UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()) - Nest.StormDamagedDay <= 2;
 				NearbyBeings += !OwnId.IsEmpty() && Nest.Builders.Contains(OwnId)
-					? FString::Printf(TEXT(" The nest you have been weaving at %s is %.0f metres away, %d of %d layers woven. It has stayed where you left it."),
-						*Nest.SiteTag.ToString(), FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers)
+					? FString::Printf(TEXT(" The nest you have been weaving at %s is %.0f metres away, %d of %d layers woven.%s"),
+						*Nest.SiteTag.ToString(), FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers,
+						bStormTorn ? TEXT("") : TEXT(" It has stayed where you left it."))
 					: FString::Printf(TEXT(" A small nest of woven twigs rests on a perch about %.0f metres away, %d of %d layers woven. You did not see who made it."),
 						FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers);
+				// Storm damage is visible evidence; weaving again repairs it.
+				if (bStormTorn) NearbyBeings += TEXT(" Its outer layer was torn loose in a recent storm; twigs lie scattered beneath it.");
 			}
 			// Curios are only noticed up close; nothing announces them from afar.
 			const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
@@ -189,6 +198,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away, including stones you set there. The shared record does not identify who placed the other stones (move_to/interact target: %s)."), Curio.State, Metres, *Target);
 					else
 						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away. Its shared record does not identify you as a contributor or say who placed the other stones; your own memories may know more (move_to/interact target: %s)."), Curio.State, Metres, *Target);
+					if (Curio.StormDamagedDay >= 0 && Today - Curio.StormDamagedDay <= 2)
+						NearbyBeings += TEXT(" Its top stone was blown down in a recent storm and lies at its foot.");
 				}
 				++NoticedCurios;
 			}
@@ -553,7 +564,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		}
 	}
 	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
-	if (Session && !Session->TryReserveModelRequest())
+	if (Session && !Session->TryReserveModelRequest(MemoryComp ? MemoryComp->GetResolvedAgentId() : FString()))
 	{
 		LastDecision = FAgentDecision();
 		LastConversationContext = Context;

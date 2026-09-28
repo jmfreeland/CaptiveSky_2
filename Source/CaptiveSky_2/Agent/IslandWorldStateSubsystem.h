@@ -36,6 +36,10 @@ struct FIslandNestRecord
 
 	UPROPERTY(BlueprintReadOnly, Category = "Island|World State")
 	FDateTime UpdatedUtc;
+
+	/** Island day a storm last tore its outer layer loose, or -1. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|World State")
+	int32 StormDamagedDay = -1;
 };
 
 /** One short, signed line left in the inn guest book. */
@@ -103,6 +107,13 @@ public:
 	TOptional<int32> GetSavedDay() const { return SavedDay; }
 	/** Environmental wetness (0..1) at the end of the previous session, if one was recorded. */
 	TOptional<float> GetSavedWetness() const { return SavedWetness; }
+
+	/**
+	 * A full storm's marks, applied at most once per storm (storms closer than an hour of weather time
+	 * count as one): the cairn loses its top stone (never below three) and each nest with more than one
+	 * layer loses its outer layer. Saved; returns true when this storm had not yet left its marks.
+	 */
+	bool ApplyStormMarks(double WeatherSeconds, int32 Today, TArray<FString>& OutMarks);
 
 	/** Total weather time lived so far (seconds), so the next session's weather carries on. */
 	TOptional<double> GetSavedWeatherSeconds() const { return SavedWeatherSeconds; }
@@ -184,6 +195,7 @@ private:
 	TOptional<float> SavedHour;
 	TOptional<int32> SavedDay;
 	TOptional<double> SavedWeatherSeconds;
+	double LastStormMarkSeconds = -1.0;
 	TOptional<float> SavedWetness;
 	TArray<FIslandCurioRecord> Curios;
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
