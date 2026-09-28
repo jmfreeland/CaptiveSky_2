@@ -11,6 +11,7 @@ class AIslandTidepoolCrab;
 class AIslandTidepoolMinnows;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
+class UHierarchicalInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UAudioComponent;
@@ -83,6 +84,8 @@ public:
 	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Add a bounded, temporary local wind response; it naturally fades in space and time. */
 	void AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds);
+	/** Clear editor-only ground-cover instances after an offscreen visual preview. */
+	void ClearGroundCoverPreview();
 	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
 
 protected:
@@ -93,6 +96,7 @@ protected:
 private:
 	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
+	friend class FIslandGroundCoverTest;
 	friend class FIslandMinnowTest;
 	friend class FIslandViewpointCaptureTest;
 	TArray<FIslandTransientGust> TransientGusts;
@@ -111,6 +115,10 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> RainStreaks;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Rain")
 	TObjectPtr<UInstancedStaticMeshComponent> RainGroundImpactStreaks;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGrassA;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGrassB;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
@@ -137,8 +145,10 @@ private:
 	bool bCloudParameterWarningLogged = false;
 	bool bRainPoolInitialized = false;
 	bool bRainGroundImpactPoolInitialized = false;
+	bool bGroundCoverInitialized = false;
 	int32 ActiveRainStreakCount = 0;
 	int32 ActiveRainGroundImpactCount = 0;
+	int32 GroundCoverInstanceCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;
@@ -159,6 +169,10 @@ private:
 	void UpdateStorm(double Now);
 	void StrikeNear(const FVector& Listener, float Storm);
 	void PersistWeatherTime();
+	/** Deterministic local offsets, used by the runtime scatter and its editor fixture. */
+	static void BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms);
+	void InitializeGroundCover();
+	void ClearGroundCover();
 	/** 0..1 strength of the passing rain front, before clouds gate it. */
 	float SampleFrontStrength(double Seconds) const;
 	void RefreshNightEcology();

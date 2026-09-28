@@ -14,6 +14,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/AudioComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
@@ -32,9 +33,116 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.NightEcology",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandGroundCoverTest, "CaptiveSky2.Agent.GroundCover",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Ground-cover fixture world created"), World)) return false;
+	if (!TestNotNull(TEXT("Engine is available for the ground-cover fixture"), GEngine))
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
+	ATargetPoint* Tideglass = World->SpawnActor<ATargetPoint>(FVector(0.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
+	ATargetPoint* ListeningStones = World->SpawnActor<ATargetPoint>(FVector(3500.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
+	AActor* TideglassGround = World->SpawnActor<AActor>(FVector(0.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
+	AActor* StonesGround = World->SpawnActor<AActor>(FVector(3500.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Ground-cover weather actor spawned"), Weather) ||
+		!TestNotNull(TEXT("Tideglass ground-cover marker spawned"), Tideglass) ||
+		!TestNotNull(TEXT("ListeningStones ground-cover marker spawned"), ListeningStones) ||
+		!TestNotNull(TEXT("Tideglass collision fixture spawned"), TideglassGround) ||
+		!TestNotNull(TEXT("ListeningStones collision fixture spawned"), StonesGround))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Tideglass->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
+	ListeningStones->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+	auto AddGround = [](AActor* Actor, const FVector& Location, const FVector& Extent)
+	{
+		UBoxComponent* Box = NewObject<UBoxComponent>(Actor);
+		Actor->SetRootComponent(Box);
+		Box->SetBoxExtent(Extent);
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		Actor->SetActorLocation(Location);
+	};
+	AddGround(TideglassGround, FVector(0.f, 0.f, -20.f), FVector(1800.f, 1800.f, 10.f));
+	AddGround(StonesGround, FVector(3500.f, 0.f, -20.f), FVector(1000.f, 1000.f, 10.f));
+	int32 TideglassLandmarkCount = 0;
+	int32 ListeningStonesLandmarkCount = 0;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		TideglassLandmarkCount += It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("TideglassPool")) ? 1 : 0;
+		ListeningStonesLandmarkCount += It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("ListeningStones")) ? 1 : 0;
+	}
+	TestEqual(TEXT("Both intended ground-cover landmarks are visible to the world iterator"), TideglassLandmarkCount, 1);
+	TestEqual(TEXT("ListeningStones ground-cover landmark is visible to the world iterator"), ListeningStonesLandmarkCount, 1);
+	const TPair<const TCHAR*, AActor*> Samples[] = { { TEXT("Tideglass"), Tideglass }, { TEXT("ListeningStones"), ListeningStones } };
+	for (const TPair<const TCHAR*, AActor*>& Sample : Samples)
+	{
+		const FVector Probe = Sample.Value->GetActorLocation() + FVector(500.f, 0.f, 1400.f);
+		FHitResult Hit;
+		const bool bFoundGround = World->LineTraceSingleByChannel(Hit, Probe, Probe - FVector(0.f, 0.f, 6400.f), ECC_WorldStatic);
+		TestTrue(FString::Printf(TEXT("%s fixture ring has world-static ground beneath a sample point"), Sample.Key), bFoundGround);
+		AddInfo(FString::Printf(TEXT("%s probe hit %s at %s."), Sample.Key,
+			bFoundGround && Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("nothing"),
+			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
+	}
+	Weather->InitializeGroundCover();
+	TestEqual(TEXT("Ground cover places one 48-clump ring around each landmark"), Weather->GroundCoverInstanceCount, 96);
+	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
+		Weather->ShoreGrassA->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		Weather->ShoreGrassB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		!Weather->ShoreGrassA->CanEverAffectNavigation() && !Weather->ShoreGrassB->CanEverAffectNavigation());
+	TestTrue(TEXT("Placed grass is visible around both landmarks"), Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible());
+	Weather->InitializeGroundCover();
+	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, 96);
+	Weather->ClearGroundCover();
+	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
+	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible());
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
 bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 {
 	// Isolated world: no Island agents, brains, memory files, or model requests.
+	TArray<FTransform> GrassOffsetsA;
+	TArray<FTransform> GrassOffsetsB;
+	TArray<FTransform> GrassOffsetsOtherSeed;
+	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsA);
+	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsB);
+	AIslandWeather::BuildGroundCoverOffsets(27182, GrassOffsetsOtherSeed);
+	TestEqual(TEXT("Shore ground-cover scatter has a small fixed instance budget"), GrassOffsetsA.Num(), 48);
+	bool bSameSeedMatches = GrassOffsetsA.Num() == GrassOffsetsB.Num();
+	bool bOtherSeedDiffers = GrassOffsetsA.Num() == GrassOffsetsOtherSeed.Num();
+	for (int32 Index = 0; Index < GrassOffsetsA.Num(); ++Index)
+	{
+		const FVector Offset = GrassOffsetsA[Index].GetLocation();
+		const float Radius = Offset.Size2D();
+		TestTrue(TEXT("Each grass clump stays in the 2.6–7.2 metre landmark ring"), Radius >= 259.f && Radius <= 721.f);
+		TestTrue(TEXT("Grass scatter scale stays within its authored variation bounds"), GrassOffsetsA[Index].GetScale3D().X >= 0.8f && GrassOffsetsA[Index].GetScale3D().X <= 1.2f);
+		bSameSeedMatches &= GrassOffsetsA[Index].GetLocation().Equals(GrassOffsetsB[Index].GetLocation(), 0.001f) &&
+			GrassOffsetsA[Index].GetRotation().Equals(GrassOffsetsB[Index].GetRotation(), 0.001f);
+		bOtherSeedDiffers &= !GrassOffsetsA[Index].GetLocation().Equals(GrassOffsetsOtherSeed[Index].GetLocation(), 0.001f);
+	}
+	TestTrue(TEXT("The same weather seed reproduces identical grass placement"), bSameSeedMatches);
+	TestTrue(TEXT("A different weather seed changes the grass placement"), bOtherSeedDiffers);
+	TestNotNull(TEXT("First native shore grass mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_02_mesh.grass_01_02_mesh")));
+	TestNotNull(TEXT("Second native shore grass mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_03_mesh.grass_01_03_mesh")));
 	TestTrue(TEXT("Local wind gently nudges the firefly drift"), AIslandFirefly::WindDisplacement(FVector(100.f, 0.f, 0.f)).Equals(FVector(12.f, 0.f, 0.f)));
 	TestTrue(TEXT("Strong gust displacement stays bounded"), AIslandFirefly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(30.f, 0.f, 0.f)));
 	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());

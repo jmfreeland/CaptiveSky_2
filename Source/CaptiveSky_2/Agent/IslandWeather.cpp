@@ -11,6 +11,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/AudioComponent.h"
 #include "Engine/StaticMesh.h"
@@ -41,6 +42,22 @@ AIslandWeather::AIslandWeather()
 	RainGroundImpactStreaks->SetCastShadow(false);
 	RainGroundImpactStreaks->bReceivesDecals = false;
 	RainGroundImpactStreaks->SetVisibility(false);
+	ShoreGrassA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGrassA"));
+	ShoreGrassA->SetupAttachment(RootComponent);
+	ShoreGrassA->SetMobility(EComponentMobility::Movable);
+	ShoreGrassA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGrassA->SetCanEverAffectNavigation(false);
+	ShoreGrassA->SetCastShadow(false);
+	ShoreGrassA->bReceivesDecals = false;
+	ShoreGrassA->SetVisibility(false);
+	ShoreGrassB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGrassB"));
+	ShoreGrassB->SetupAttachment(RootComponent);
+	ShoreGrassB->SetMobility(EComponentMobility::Movable);
+	ShoreGrassB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGrassB->SetCanEverAffectNavigation(false);
+	ShoreGrassB->SetCastShadow(false);
+	ShoreGrassB->bReceivesDecals = false;
+	ShoreGrassB->SetVisibility(false);
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
 	WindAmbienceAudio->bAutoActivate = false;
@@ -55,6 +72,10 @@ AIslandWeather::AIslandWeather()
 		RainStreaks->SetStaticMesh(RainMesh.Object);
 		RainGroundImpactStreaks->SetStaticMesh(RainMesh.Object);
 	}
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GrassMeshA(TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_02_mesh.grass_01_02_mesh"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GrassMeshB(TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_03_mesh.grass_01_03_mesh"));
+	if (GrassMeshA.Succeeded()) ShoreGrassA->SetStaticMesh(GrassMeshA.Object);
+	if (GrassMeshB.Succeeded()) ShoreGrassB->SetStaticMesh(GrassMeshB.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -68,6 +89,7 @@ void AIslandWeather::BeginPlay()
 	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
 		WeatherTimeOffset = WorldState->GetSavedWeatherSeconds().Get(0.0);
 	SecondsSinceWeatherSave = 0.f;
+	InitializeGroundCover();
 	InitializeWeatherAmbience();
 	UpdateCloudRendering();
 	UpdateRainRendering();
@@ -80,6 +102,86 @@ void AIslandWeather::PersistWeatherTime()
 	SecondsSinceWeatherSave = 0.f;
 	if (UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr)
 		WorldState->SaveWeatherSeconds(WeatherTimeOffset + GetWorld()->GetTimeSeconds());
+}
+
+void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms)
+{
+	constexpr int32 ClumpCount = 48;
+	constexpr float InnerRadius = 260.f;
+	constexpr float OuterRadius = 720.f;
+	OutTransforms.Reset(ClumpCount);
+	FRandomStream Random(Seed);
+	for (int32 Index = 0; Index < ClumpCount; ++Index)
+	{
+		const float Angle = Random.FRandRange(0.f, 2.f * PI);
+		// Uniform-in-area annulus leaves a little breathing room around each landmark.
+		const float Radius = FMath::Sqrt(FMath::Lerp(FMath::Square(InnerRadius), FMath::Square(OuterRadius), Random.FRand()));
+		const FVector Offset(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+		const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(Random.FRandRange(0.f, 360.f)));
+		const float Scale = Random.FRandRange(0.8f, 1.2f);
+		OutTransforms.Emplace(Rotation, Offset, FVector(Scale));
+	}
+}
+
+void AIslandWeather::InitializeGroundCover()
+{
+	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB ||
+		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh()) return;
+	bGroundCoverInitialized = true;
+	ShoreGrassA->ClearInstances();
+	ShoreGrassB->ClearInstances();
+	GroundCoverInstanceCount = 0;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
+	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
+		if ((*IgnoreIt)->ActorHasTag(TEXT("IslandLandmark")) || (*IgnoreIt)->GetName().Contains(TEXT("Ocean"))) Query.AddIgnoredActor(*IgnoreIt);
+
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		const AActor* Landmark = *It;
+		const bool bTideglass = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("TideglassPool"));
+		const bool bListeningStones = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("ListeningStones"));
+		if (!bTideglass && !bListeningStones) continue;
+
+		TArray<FTransform> Offsets;
+		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^ (bTideglass ? 0x2f6e2b1u : 0x6d2b79f5u);
+		BuildGroundCoverOffsets(static_cast<int32>(Seed), Offsets);
+		for (int32 Index = 0; Index < Offsets.Num(); ++Index)
+		{
+			const FTransform& Offset = Offsets[Index];
+			const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
+			const FVector TraceStart = Candidate + FVector(0.f, 0.f, 1400.f);
+			const FVector TraceEnd = Candidate - FVector(0.f, 0.f, 5000.f);
+			FHitResult GroundHit;
+			if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, Query) ||
+				GroundHit.ImpactNormal.Z < 0.72f) continue;
+
+			const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
+			const FQuat Rotation = AlignToGround * Offset.GetRotation();
+			const FVector Scale = FVector(Offset.GetScale3D().X * 1.7f);
+			UHierarchicalInstancedStaticMeshComponent* Species = (Index % 2 == 0) ? ShoreGrassA : ShoreGrassB;
+			Species->AddInstance(FTransform(Rotation, GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f, Scale), true);
+			++GroundCoverInstanceCount;
+		}
+	}
+
+	const bool bVisible = GroundCoverInstanceCount > 0;
+	ShoreGrassA->SetVisibility(bVisible, true);
+	ShoreGrassB->SetVisibility(bVisible, true);
+	if (GroundCoverInstanceCount == 0)
+		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check the Tideglass and ListeningStones tags and ground collision."));
+}
+
+void AIslandWeather::ClearGroundCover()
+{
+	if (ShoreGrassA) { ShoreGrassA->ClearInstances(); ShoreGrassA->SetVisibility(false, true); }
+	if (ShoreGrassB) { ShoreGrassB->ClearInstances(); ShoreGrassB->SetVisibility(false, true); }
+	GroundCoverInstanceCount = 0;
+	bGroundCoverInitialized = false;
+}
+
+void AIslandWeather::ClearGroundCoverPreview()
+{
+	ClearGroundCover();
 }
 
 void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -98,6 +200,7 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	WindAmbienceWave = nullptr;
 	RainAmbienceWave = nullptr;
 	RainStreakMaterial = nullptr;
+	ClearGroundCover();
 	ActiveRainStreakCount = 0;
 	ActiveRainGroundImpactCount = 0;
 	for (const TWeakObjectPtr<AIslandFirefly>& Firefly : NightFireflies)

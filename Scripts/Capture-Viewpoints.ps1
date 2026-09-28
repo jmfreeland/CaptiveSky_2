@@ -11,12 +11,14 @@ The editor must be built first. Close any running editor on this project before 
 .EXAMPLE
 ./Scripts/Capture-Viewpoints.ps1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 7.5 -Only Tideglass
+./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCover
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
 #>
 param(
 	[double]$Hour = -1,
 	[string]$Only = "",
 	[switch]$NightFireflies,
+	[switch]$GroundCover,
 	[switch]$NoWorldState,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
@@ -26,16 +28,19 @@ $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 if (-not (Test-Path $editor)) { throw "UnrealEditor-Cmd.exe not found under $EngineDir; pass -EngineDir." }
 $log = Join-Path $env:TEMP "CaptiveSky_Viewpoints.log"
+$shaderWorkingDir = Join-Path (Split-Path $project) "Saved\ShaderWorking"
+New-Item -ItemType Directory -Force -Path $shaderWorkingDir | Out-Null
 
 $extra = @()
 if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
 if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
+if ($GroundCover) { $extra += "-ViewpointGroundCover" }
 if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `
-	-unattended -RenderOffscreen -nosplash -nosound -NoZen -DDC-ForceMemoryCache "-abslog=$log" @extra | Out-Null
+	-unattended -RenderOffscreen -nosplash -nosound -NoZen -DDC-ForceMemoryCache "-shaderworkingdir=$shaderWorkingDir" "-abslog=$log" @extra | Out-Null
 
 $lines = Select-String -Path $log -Pattern "Test Completed|Viewpoint captures saved|LogAutomationController: Error" | ForEach-Object { $_.Line }
 $lines
