@@ -100,8 +100,14 @@ private:
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
 	friend class FIslandGuestBookTest;
+	friend class FAgentLingeringTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
+	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.
+	TArray<FVector> RecentDecisionSpots;
+
+	// How many of the most recent spots lie within Radius of Location, counting back until one does not.
+	static int32 CountLingeringDecisions(const TArray<FVector>& Spots, const FVector& Location, float Radius);
 
 	FString BuildSituationSummary(const FAgentConversationContext& Context) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;

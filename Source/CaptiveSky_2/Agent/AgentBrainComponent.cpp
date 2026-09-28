@@ -48,6 +48,13 @@ void UAgentBrainComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+int32 UAgentBrainComponent::CountLingeringDecisions(const TArray<FVector>& Spots, const FVector& Location, float Radius)
+{
+	int32 Count = 0;
+	for (int32 Index = Spots.Num() - 1; Index >= 0 && FVector::DistSquared2D(Spots[Index], Location) <= FMath::Square(Radius); --Index) ++Count;
+	return Count;
+}
+
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
 {
 	const AActor* Owner = GetOwner();
@@ -385,6 +392,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 	// observations and social opportunities can be added without changing callers.
 	if (Context.Text.IsEmpty())
 	{
+		// Small lasting things are only noticed up close, so a resident that never moves on never meets them.
+		if (const int32 Lingered = CountLingeringDecisions(RecentDecisionSpots, Location, 1200.f); Lingered >= 6)
+			NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
 			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
@@ -477,6 +487,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "
+		"Wander takes you on a short walk (or flight) to a nearby place you have not chosen precisely; it is the easiest way to come across things you cannot yet see. "
 		"Do not repeatedly inspect unchanged scenery or announce that you will inspect a place after already arriving. "
 		"Write at most two new memories about new experienced events, not repeated plans or merely changing clock/weather descriptions. "
 		"Omit new_memories (empty array) if nothing new is worth remembering long-term from this moment.");
@@ -598,6 +609,11 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	}
 
 	const FString Situation = BuildSituationSummary(Context);
+	if (Context.Text.IsEmpty() && GetOwner())
+	{
+		RecentDecisionSpots.Add(GetOwner()->GetActorLocation());
+		if (RecentDecisionSpots.Num() > 12) RecentDecisionSpots.RemoveAt(0);
+	}
 
 	TArray<FAgentMemoryRecord> RelevantMemories;
 	if (MemoryComp)
