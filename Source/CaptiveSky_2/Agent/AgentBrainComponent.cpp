@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AgentBrainComponent.h"
+#include "Misc/CommandLine.h"
 #include "AgentMemoryComponent.h"
 #include "AgentExternalBridgeComponent.h"
 #include "AgentRelationshipComponent.h"
@@ -613,6 +614,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	FAgentLLMRequest Request;
 	Request.MaxTokens = Context.Text.IsEmpty() ? 400 : 700;
 	Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
+	// -CaptiveSkyLogSituations: record exactly what each resident is shown, for reviewing test runs.
+	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyLogSituations")))
+		UE_LOG(LogAgentBrain, Log, TEXT("Situation for %s (%d chars, system prompt %d chars): %s"),
+			MemoryComp ? *MemoryComp->GetResolvedAgentId() : *GetNameSafe(Owner), Situation.Len(), Request.SystemPrompt.Len(), *Situation.Replace(LINE_TERMINATOR, TEXT(" ")));
 
 	FAgentLLMMessage UserMessage;
 	UserMessage.Role = TEXT("user");

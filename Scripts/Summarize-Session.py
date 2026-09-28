@@ -7,6 +7,9 @@ world recorded. Read-only; prints Markdown (or writes it with --out).
 
     python Scripts/Summarize-Session.py Saved/Logs/LiveMorning_2026-09-28.log
     python Scripts/Summarize-Session.py path/to/session.log --out Saved/SessionReports/today.md
+
+Runs launched with -CaptiveSkyLogSituations also report prompt sizes and which lasting things
+(trail, cairn, arranging grounds, nests, guest book, ...) each resident was actually shown.
 """
 from __future__ import annotations
 
@@ -21,6 +24,13 @@ ACTIONS = ["idle", "move_to", "speak", "wander", "interact", "sleep", "build"]
 STAMP = re.compile(r"^\[(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2}):(\d{3})\]")
 DECIDED = re.compile(r"LogAutonomousAgentAI: (\S+) decided: \"(.*)\" \(Action=(\d+)\)")
 OUTCOME = re.compile(r"LogAutonomousAgentAI: (\S+) outcome: (.*)$")
+SITUATION = re.compile(r"Situation for (\S+) \((\d+) chars, system prompt (\d+) chars\): (.*)$")
+# Things a resident can be told about, and the phrase that shows it was in view.
+NOTICEABLE = {
+    "pale-stone trail": "pale stone", "seed pod": "pod", "cairn": "small cairn", "arranging ground": "arranging",
+    "stone arrangement": "stones into a", "nest": "nest", "guest book": "guest book", "inn hearth": "hearth",
+    "firefly": "firefly", "minnows": "minnow", "crab": "crab", "storm signs": "storm may be coming", "mist": "mist",
+}
 FAILURE_MARKERS = ("failed", "did not complete", "blocked", "not found", "cannot", "Cannot", "refused", "too far", "Nothing changed", "rejected")
 
 
@@ -51,7 +61,17 @@ def summarize(path: Path) -> str:
     builds: list[str] = []
     lasting: list[str] = []
     budget: list[str] = []
+    situations: dict[str, list[int]] = collections.defaultdict(list)
+    systems: dict[str, list[int]] = collections.defaultdict(list)
+    noticed: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for line in lines:
+        if match := SITUATION.search(line):
+            agent, length, system, text = match.groups()
+            situations[agent].append(int(length))
+            systems[agent].append(int(system))
+            for thing, phrase in NOTICEABLE.items():
+                if phrase in text: noticed[agent][thing] += 1
+            continue
         if match := DECIDED.search(line):
             controller, thought, action = match.groups()
             index = int(action)
@@ -81,6 +101,12 @@ def summarize(path: Path) -> str:
     out += ["", f"## Decisions ({total})", "", "| Resident | " + " | ".join(ACTIONS) + " | total |", "|---" * (len(ACTIONS) + 2) + "|"]
     for controller, counter in sorted(decisions.items()):
         out.append(f"| {resident_name(controller, thoughts[controller])} | " + " | ".join(str(counter[action]) for action in ACTIONS) + f" | {sum(counter.values())} |")
+    if situations:
+        out += ["", "## What residents were shown", "", "| Resident | situations | median situation chars | median system prompt chars | most often in view |", "|---|---|---|---|---|"]
+        for agent, lengths in sorted(situations.items()):
+            ordered, prompts = sorted(lengths), sorted(systems[agent])
+            seen = ", ".join(f"{thing} {count}/{len(lengths)}" for thing, count in noticed[agent].most_common(6)) or "none of the tracked things"
+            out.append(f"| {agent} | {len(lengths)} | {ordered[len(ordered) // 2]} | {prompts[len(prompts) // 2]} | {seen} |")
     out += ["", "## What they interacted with", ""]
     out += [f"- {target}: {count}" for target, count in interactions.most_common()] or ["- nothing"]
     out += ["", "## Things made or changed by residents", ""]
