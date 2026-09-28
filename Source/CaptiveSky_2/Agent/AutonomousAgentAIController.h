@@ -7,6 +7,8 @@
 #include "AgentLLMTypes.h"
 #include "AutonomousAgentAIController.generated.h"
 
+class UNavigationPath;
+
 /**
  * Drives an AAutonomousAgentCharacter's think/act loop directly in C++: polls
  * UAgentBrainComponent::RequestDecision on a timer and turns the resulting
@@ -38,6 +40,9 @@ public:
 	static constexpr float ResidentApproachStandOffDistance = 350.f;
 	static constexpr float ResidentApproachAltitudeOffset = 180.f;
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
+	static constexpr float WanderMinimumDistance = 100.f;
+	static constexpr float WanderAcceptanceRadius = 50.f;
+	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
 
 	FString DescribeActionState() const;
 	static double BackgroundDelay(int32 Repeats, double BaseSeconds);

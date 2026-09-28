@@ -46,9 +46,12 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 	AActor* Roof = SpawnInnBox(FVector(0.f, 0.f, 500.f), FVector(500.f, 500.f, 20.f));
 	AActor* Bed = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	Bed->Tags = { TEXT("IslandInn"), TEXT("InnBed_1") };
+	AActor* RavenPerch = World->SpawnActor<AActor>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator);
+	if (RavenPerch) RavenPerch->Tags = { TEXT("RavenPerch"), TEXT("Roost_East") };
 	ACharacter* Resident = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
-	if (!TestNotNull(TEXT("Tagged inn bed spawned"), Bed) || !TestNotNull(TEXT("Resident body spawned"), Resident) ||
+	if (!TestNotNull(TEXT("Tagged inn bed spawned"), Bed) || !TestNotNull(TEXT("Tagged raven perch spawned"), RavenPerch) ||
+		!TestNotNull(TEXT("Resident body spawned"), Resident) ||
 		!TestNotNull(TEXT("Resident controller spawned"), Controller))
 	{
 		World->DestroyWorld(false);
@@ -97,6 +100,15 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 	Rest->WakeUp();
 	TestTrue(TEXT("An early wake cancels the pending sheltered-rest memory"),
 		Rest->PendingSleepExperience.IsEmpty() && Memory->GetMemoryCount() == 0);
+	Resident->SetActorLocation(RavenPerch->GetActorLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+	TestTrue(TEXT("A resident may choose sleep after arriving at a tagged raven perch"), Controller->TryRest(TEXT("Roost_East")));
+	TestFalse(TEXT("Perch sleep pauses ordinary thought"), Rest->IsAwake());
+	TestTrue(TEXT("Open-perch sleep is not misreported as a supported inn bed or sheltered rest"),
+		Controller->DescribeActionState().Contains(TEXT("Settled to sleep at the tagged perch")) &&
+		Controller->DescribeActionState().Contains(TEXT("no sheltered inn rest was verified")) &&
+		Rest->PendingSleepExperience.IsEmpty() && Memory->GetMemoryCount() == 0);
+	Rest->WakeUp();
+	Resident->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
 	TestTrue(TEXT("The resident may choose the bed again after waking"), Controller->TryRest(TEXT("InnBed_1")));
 	Rest->AppendPendingSleepExperience(); // This is the same local append path called when the rest timer ends.
 	const TArray<FAgentMemoryRecord> RestMemories = Memory->GetMemoriesSince(FDateTime::MinValue());

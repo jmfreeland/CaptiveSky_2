@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "AutonomousAgentAIController.h"
+#include "NavigationPath.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMovementTest, "CaptiveSky2.Agent.ResidentApproach",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -26,5 +27,36 @@ bool FAgentMovementTest::RunTest(const FString& Parameters)
 	const FVector CoincidentApproach = AAutonomousAgentAIController::BuildResidentApproachPoint(Target, Target);
 	TestTrue(TEXT("Coincident residents receive a deterministic nonzero fallback direction"),
 		FMath::IsNearlyEqual(FVector::Dist2D(CoincidentApproach, Target), StandOff));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentWanderPathTest, "CaptiveSky2.Agent.ResidentWanderPaths",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAgentWanderPathTest::RunTest(const FString& Parameters)
+{
+
+	const FVector WanderOrigin(0.f, 0.f, 0.f);
+	const FVector WanderGoal(500.f, 0.f, 0.f);
+	auto MakePath = [&WanderOrigin, &WanderGoal](bool bPartial)
+	{
+		FNavPathSharedPtr NativePath = MakeShared<FNavigationPath>(TArray<FVector>{ WanderOrigin, WanderGoal });
+		NativePath->MarkReady();
+		NativePath->DoneUpdating(ENavPathUpdateType::Custom);
+		NativePath->SetIsPartial(bPartial);
+		UNavigationPath* Path = NewObject<UNavigationPath>();
+		Path->SetPath(NativePath);
+		return Path;
+	};
+	TestTrue(TEXT("Wander accepts a valid, complete route far enough to constitute a choice"),
+		AAutonomousAgentAIController::IsUsableWanderPath(MakePath(false), WanderOrigin, WanderGoal));
+	TestFalse(TEXT("Wander rejects a partial route instead of entering a likely movement timeout"),
+		AAutonomousAgentAIController::IsUsableWanderPath(MakePath(true), WanderOrigin, WanderGoal));
+	TestFalse(TEXT("Wander rejects a route that only returns to its current position"),
+		AAutonomousAgentAIController::IsUsableWanderPath(MakePath(false), WanderOrigin, WanderOrigin));
+	TestFalse(TEXT("Wander rejects a missing route"),
+		AAutonomousAgentAIController::IsUsableWanderPath(nullptr, WanderOrigin, WanderGoal));
+	TestTrue(TEXT("Wander stop tolerance allows capsule overlap at navigation endpoints"),
+		AAutonomousAgentAIController::WanderAcceptanceRadius > 0.f);
 	return true;
 }

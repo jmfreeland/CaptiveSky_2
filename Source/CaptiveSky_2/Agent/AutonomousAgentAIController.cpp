@@ -5,6 +5,7 @@
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
 #include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
 #include "AgentConsolidationComponent.h"
@@ -101,6 +102,11 @@ FVector AAutonomousAgentAIController::BuildResidentApproachPoint(const FVector& 
 	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
 	return TargetLocation + Direction * ResidentApproachStandOffDistance + FVector(0.f, 0.f, ResidentApproachAltitudeOffset);
 }
+bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal)
+{
+	return Path && Path->IsValid() && !Path->IsPartial() &&
+		FVector::DistSquared2D(Origin, Goal) >= FMath::Square(WanderMinimumDistance);
+}
 bool AAutonomousAgentAIController::CanRest() const
 {
 	const ACharacter* Body = Cast<ACharacter>(GetPawn());
@@ -122,22 +128,32 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	}
 
 	AActor* RequestedBed = nullptr;
+	AActor* RequestedPerch = nullptr;
 	if (!RequestedRestSite.IsNone())
 	{
-		if (!RequestedRestSite.ToString().StartsWith(TEXT("InnBed_")))
+		if (RequestedRestSite.ToString().StartsWith(TEXT("InnBed_")))
 		{
-			ReportAction(TEXT("That is not a supported inn bed. Nothing changed."));
-			return false;
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(RequestedRestSite)) { RequestedBed = *It; break; }
+			if (!RequestedBed)
+			{
+				ReportAction(TEXT("That tagged inn bed is not present here. Nothing changed."));
+				return false;
+			}
 		}
-		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(RequestedRestSite)) { RequestedBed = *It; break; }
-		if (!RequestedBed)
+		else
 		{
-			ReportAction(TEXT("That tagged inn bed is not present here. Nothing changed."));
-			return false;
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				if (It->ActorHasTag(TEXT("RavenPerch")) && It->ActorHasTag(RequestedRestSite)) { RequestedPerch = *It; break; }
+			if (!RequestedPerch)
+			{
+				ReportAction(TEXT("That is not a supported bed or raven perch. Nothing changed."));
+				return false;
+			}
 		}
-		if (FVector::Dist2D(Body->GetActorLocation(), RequestedBed->GetActorLocation()) > 250.f ||
-			FMath::Abs(Body->GetActorLocation().Z - RequestedBed->GetActorLocation().Z) > 250.f)
+		AActor* RequestedLocation = RequestedBed ? RequestedBed : RequestedPerch;
+		if (FVector::Dist2D(Body->GetActorLocation(), RequestedLocation->GetActorLocation()) > 250.f ||
+			FMath::Abs(Body->GetActorLocation().Z - RequestedLocation->GetActorLocation().Z) > 250.f)
 		{
 			ReportAction(FString::Printf(TEXT("You are not at %s yet. Move there first; sleep does not teleport you."), *RequestedRestSite.ToString()));
 			return false;
@@ -155,7 +171,7 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	RepeatedActions = 0;
 
 	AActor* BedAtRest = RequestedBed;
-	if (!BedAtRest)
+	if (!BedAtRest && !RequestedPerch)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 			if (It->ActorHasTag(TEXT("IslandInn")) && It->Tags.ContainsByPredicate([](FName Tag) { return Tag.ToString().StartsWith(TEXT("InnBed_")); }) &&
 				FVector::Dist2D(Body->GetActorLocation(), It->GetActorLocation()) <= 250.f &&
@@ -186,7 +202,9 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	}
 	else
 	{
-		ReportAction(TEXT("Settled to sleep. Ordinary thoughts pause during sleep; no sheltered inn rest was verified."));
+		ReportAction(RequestedPerch
+			? TEXT("Settled to sleep at the tagged perch. Ordinary thoughts pause during sleep; no sheltered inn rest was verified.")
+			: TEXT("Settled to sleep. Ordinary thoughts pause during sleep; no sheltered inn rest was verified."));
 	}
 	return true;
 }
@@ -375,15 +393,32 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	{
 		if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
 		{
-			FNavLocation Result;
-			if (NavSys->GetRandomReachablePointInRadius(ControlledPawn->GetActorLocation(), WanderRadius, Result))
+			const FVector Origin = ControlledPawn->GetActorLocation();
+			const FNavAgentProperties& AgentProperties = ControlledPawn->GetNavAgentPropertiesRef();
+			ANavigationData* NavData = NavSys->GetNavDataForProps(AgentProperties);
+			FNavLocation Destination;
+			bool bFoundFullRoute = false;
+			for (int32 Attempt = 0; Attempt < 8; ++Attempt)
 			{
-				const EPathFollowingRequestResult::Type Request = MoveToLocation(Result.Location);
+				FNavLocation Candidate;
+				if (!NavData || !NavSys->GetRandomReachablePointInRadius(Origin, WanderRadius, Candidate, NavData)) break;
+				const UNavigationPath* Route = NavSys->FindPathToLocationSynchronously(GetWorld(), Origin, Candidate.Location, ControlledPawn);
+				if (!IsUsableWanderPath(Route, Origin, Candidate.Location)) continue;
+				Destination = Candidate;
+				bFoundFullRoute = true;
+				break;
+			}
+			if (bFoundFullRoute)
+			{
+				// A random reachable point is usually not the exact point a capsule can occupy.
+				// Stop with overlap tolerance and reject partial paths instead of timing out at a wall.
+				const EPathFollowingRequestResult::Type Request = MoveToLocation(Destination.Location,
+					WanderAcceptanceRadius, true, true, false, false, nullptr, false);
 				ReportAction(Request == EPathFollowingRequestResult::Failed ? TEXT("Wandering failed: no navigable route.") : Request == EPathFollowingRequestResult::AlreadyAtGoal ? TEXT("Already at the wandering destination; waiting quietly.") : TEXT("Wandering movement started; arrival is not yet complete."));
 				break;
 			}
 		}
-		ReportAction(TEXT("Wandering failed: no reachable ground was found nearby."));
+		ReportAction(TEXT("Wandering failed: no full route to a distinct nearby point was found."));
 		break;
 	}
 	case EAgentActionType::MoveTo:
