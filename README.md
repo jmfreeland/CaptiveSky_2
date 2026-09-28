@@ -276,12 +276,12 @@ That live-session evidence showed contextual replies could use requests much fas
 This is phase 1 of `docs/plans/inn.md`, an inn in the spirit of *Quest for Glory I*'s. `CaptiveSky2.Tools.BuildInnBlockout` is a headless, explicit tool:
 - **Site:** it chose level, walkable ground on the route from the shore to the Tideglass Pool, about 30 m from the pool, with the door facing arrivals from the shore.
 - **Safety:** it backs up the map to `Saved/MapBackups/` before changing anything, and rerunning it only rechecks access. `-InnRebuild` replaces the inn.
-- **Access check:** it rebuilds navigation with the editor's "Build Paths" and confirms a grounded walker reaches the common room. Currently that's 41 m from the ListeningStones.
+- **Access check:** it rebuilds navigation with the editor's "Build Paths" and confirms a grounded walker reaches the common room (42 m from the ListeningStones) and the loft bed (46 m). The bed's target projects within 10 cm of its nav goal; bidirectional links bridge the two small Recast gaps at the stair-foot and loft landing.
 
-The inn is 111 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn`, built from engine cubes:
+The inn is 115 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn`, built from engine cubes:
 - **Structure:** a stone plinth with door steps, and a 10 × 8 m half-timbered plaster house with a gable roof.
 - **Common room:** an open stone firebox with an oak mantel against the chimney wall, a counter, and two tables with benches.
-- **Upstairs:** a stair up to a gallery floor with a bed.
+- **Upstairs:** five broad oak treads rise through a stairwell opening to a small loft landing and bed. Explicit navigation links bridge the two seam gaps; the saved-map access test confirms a complete route from the common room to the bed. Rendered resident movement still needs a PIE check.
 - **Hearth:** its tagged point light and three small procedural cone-flame placeholders start banked. Residents and visitors may choose `InnHearth` to kindle the gently flickering light and flames for five minutes of play (about three Island hours at the current clock rate), bank it early, or leave it alone. A smooth near-field cue gives residents a limited sense of warmth within 3.5 metres while lit; this is not body temperature, room temperature, shelter, or saved hearth state. All hearth effects are transient and bank together.
 
 Parts later phases will use carry tags: `InnHearth`, `InnHearthLight`, `InnCounter`, `InnBed_1` and `InnDoorLantern`. A TargetPoint with tags `Inn` and `IslandLandmark` stands inside, so residents already perceive the inn as a landmark they can walk to.
