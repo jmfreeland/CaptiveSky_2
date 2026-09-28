@@ -287,6 +287,39 @@ void AAutonomousAgentAIController::ArrangeStones(const FAgentDecision& Decision)
 		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, SiteId.ToString() + TEXT(": ") + Fact, 0.65f, {TEXT("action-result"), TEXT("arrangement"), SiteId.ToString()}));
 }
 
+void AAutonomousAgentAIController::WriteGuestBook(const FAgentDecision& Decision)
+{
+	APawn* Body = GetPawn();
+	UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	AActor* Counter = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter"))) { Counter = *It; break; }
+	if (!Body || !WorldState || !Counter)
+	{
+		ReportAction(TEXT("There is no writable inn guest book here. Nothing changed."));
+		return;
+	}
+	if (FVector::Dist2D(Body->GetActorLocation(), Counter->GetActorLocation()) > 250.f ||
+		FMath::Abs(Body->GetActorLocation().Z - Counter->GetActorLocation().Z) > 250.f)
+	{
+		ReportAction(TEXT("The guest book is at the inn counter; come within two and a half metres before writing. Nothing changed."));
+		return;
+	}
+	if (!CanArrangeStones())
+	{
+		ReportAction(TEXT("You need to be settled on the ground beside the counter to write. Nothing changed."));
+		return;
+	}
+	UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
+	const FString AgentId = Memory ? Memory->GetResolvedAgentId() : Body->GetName();
+	bool bChanged = false;
+	const FString Fact = WorldState->WriteGuestBook(AgentId, Decision.Intent,
+		UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), bChanged);
+	ReportAction(TEXT("GuestBook: ") + Fact);
+	if (bChanged && Memory)
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, TEXT("Inn guest book: ") + Fact, 0.65f, {TEXT("action-result"), TEXT("guest-book")}));
+}
+
 void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Decision)
 {
 	if (!Decision.bValid)
@@ -389,6 +422,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		break;
 	case EAgentActionType::Build:
 		if (Decision.ActionTarget.StartsWith(TEXT("ArrangingGround"))) ArrangeStones(Decision);
+		else if (Decision.ActionTarget == TEXT("GuestBook")) WriteGuestBook(Decision);
 		else ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
 		break;
 	case EAgentActionType::Sleep:

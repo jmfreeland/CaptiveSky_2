@@ -17,6 +17,11 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWorldState, Log, All);
 
+namespace
+{
+	FString CleanArrangementText(const FString& Text, int32 MaxLength);
+}
+
 bool UIslandWorldStateSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
 {
 	// Never touch persistent state from editor preview worlds.
@@ -61,6 +66,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 		if (Pair.Value.IsValid()) Pair.Value->Destroy();
 	ArrangementActors.Reset();
 	ArrangementSites.Reset();
+	GuestBookEntries.Reset();
 	Nests.Reset();
 	Curios.Reset();
 	SavedHour.Reset();
@@ -91,6 +97,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	Nests.Reset();
 	Curios.Reset();
 	ArrangementSites.Reset();
+	GuestBookEntries.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
 	SavedWeatherSeconds.Reset();
@@ -205,6 +212,24 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			ArrangementSites.Add(Site);
 		}
 	}
+	const TArray<TSharedPtr<FJsonValue>>* GuestBookValues = nullptr;
+	if (Root->TryGetArrayField(TEXT("guest_book"), GuestBookValues))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *GuestBookValues)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			if (GuestBookEntries.Num() >= MaxGuestBookEntries || !Value.IsValid() || !Value->TryGetObject(Object)) continue;
+			FIslandGuestBookEntry Entry;
+			if (!(*Object)->TryGetStringField(TEXT("agent"), Entry.AgentId) || Entry.AgentId.IsEmpty() ||
+				!(*Object)->TryGetNumberField(TEXT("day"), Entry.Day) || Entry.Day < 1 ||
+				!(*Object)->TryGetStringField(TEXT("line"), Entry.Line)) continue;
+			Entry.Line = CleanArrangementText(Entry.Line, MaxGuestBookLineLength);
+			if (Entry.Line.IsEmpty()) continue;
+			FString Created;
+			if ((*Object)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Entry.CreatedUtc);
+			GuestBookEntries.Add(MoveTemp(Entry));
+		}
+	}
 	return true;
 }
 
@@ -277,6 +302,17 @@ bool UIslandWorldStateSubsystem::Save() const
 		SiteValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("arrangement_sites"), SiteValues);
+	TArray<TSharedPtr<FJsonValue>> GuestBookValues;
+	for (const FIslandGuestBookEntry& Entry : GuestBookEntries)
+	{
+		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+		Object->SetStringField(TEXT("agent"), Entry.AgentId);
+		Object->SetNumberField(TEXT("day"), Entry.Day);
+		Object->SetStringField(TEXT("line"), Entry.Line);
+		Object->SetStringField(TEXT("created_utc"), Entry.CreatedUtc.ToIso8601());
+		GuestBookValues.Add(MakeShared<FJsonValueObject>(Object));
+	}
+	Root->SetArrayField(TEXT("guest_book"), GuestBookValues);
 	if (SavedHour.IsSet())
 	{
 		const TSharedRef<FJsonObject> Clock = MakeShared<FJsonObject>();
@@ -793,6 +829,30 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 	return Fact;
 }
 
+FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const FString& Line, int32 Today, bool& bOutChanged)
+{
+	bOutChanged = false;
+	if (AgentId.IsEmpty() || Today < 1) return TEXT("The guest book cannot record an unsigned or undated line. Nothing changed.");
+	const FString CleanLine = CleanArrangementText(Line, MaxGuestBookLineLength);
+	if (CleanLine.IsEmpty()) return TEXT("A short, non-empty line is needed; the guest book stays open. Nothing changed.");
+	if (GuestBookEntries.ContainsByPredicate([&AgentId, Today](const FIslandGuestBookEntry& Entry) { return Entry.AgentId == AgentId && Entry.Day == Today; }))
+		return TEXT("You have already left a line in the guest book today. You can write again on another Island day. Nothing changed.");
+	const TArray<FIslandGuestBookEntry> Previous = GuestBookEntries;
+	FIslandGuestBookEntry& Entry = GuestBookEntries.AddDefaulted_GetRef();
+	Entry.AgentId = AgentId;
+	Entry.Day = Today;
+	Entry.Line = CleanLine;
+	Entry.CreatedUtc = FDateTime::UtcNow();
+	while (GuestBookEntries.Num() > MaxGuestBookEntries) GuestBookEntries.RemoveAt(0);
+	if (!Save())
+	{
+		GuestBookEntries = Previous;
+		return TEXT("You wrote a line, but it could not be kept, so nothing lasting happened.");
+	}
+	bOutChanged = true;
+	return FString::Printf(TEXT("You leave this line in the inn guest book: \"%s\" The book keeps at most %d recent lines; anyone who reads it can see this one signed with your name."), *CleanLine, MaxGuestBookEntries);
+}
+
 bool UIslandWorldStateSubsystem::ForgetArrangements()
 {
 	const TArray<FIslandArrangementSite> Previous = ArrangementSites;
@@ -805,6 +865,18 @@ bool UIslandWorldStateSubsystem::ForgetArrangements()
 	for (const TPair<FName, TWeakObjectPtr<AIslandArrangement>>& Pair : ArrangementActors)
 		if (Pair.Value.IsValid()) Pair.Value->Destroy();
 	ArrangementActors.Reset();
+	return true;
+}
+
+bool UIslandWorldStateSubsystem::ForgetGuestBook()
+{
+	const TArray<FIslandGuestBookEntry> Previous = GuestBookEntries;
+	GuestBookEntries.Reset();
+	if (!Save())
+	{
+		GuestBookEntries = Previous;
+		return false;
+	}
 	return true;
 }
 
@@ -841,4 +913,13 @@ static FAutoConsoleCommandWithWorld GIslandForgetArrangementsCommand(
 	{
 		UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
 		UE_LOG(LogIslandWorldState, Log, TEXT("Island.ForgetArrangements: %s"), State && State->ForgetArrangements() ? TEXT("forgotten") : TEXT("nothing changed (needs a running play world with writable state)"));
+	}));
+
+static FAutoConsoleCommandWithWorld GIslandForgetGuestBookCommand(
+	TEXT("Island.ForgetGuestBook"),
+	TEXT("Forgets every resident entry in the inn guest book."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		UE_LOG(LogIslandWorldState, Log, TEXT("Island.ForgetGuestBook: %s"), State && State->ForgetGuestBook() ? TEXT("forgotten") : TEXT("nothing changed (needs a running play world with writable state)"));
 	}));

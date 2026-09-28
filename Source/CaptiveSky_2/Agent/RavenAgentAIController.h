@@ -68,6 +68,7 @@ private:
 	friend class FIslandNestTest;
 	friend class FIslandCurioTest;
 	friend class FIslandArrangementTest;
+	friend class FIslandGuestBookTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;

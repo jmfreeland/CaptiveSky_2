@@ -37,6 +37,25 @@ struct FIslandNestRecord
 	FDateTime UpdatedUtc;
 };
 
+/** One short, signed line left in the inn guest book. */
+USTRUCT(BlueprintType)
+struct FIslandGuestBookEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Guest Book")
+	FString AgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Guest Book")
+	int32 Day = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Guest Book")
+	FString Line;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Guest Book")
+	FDateTime CreatedUtc;
+};
+
 /**
  * Persistent, per-level record of lasting changes residents have made to the world.
  *
@@ -45,7 +64,7 @@ struct FIslandNestRecord
  * tracked in git. Every change is bounded (fixed layer cap per site) and reversible by a
  * developer through Island.RemoveNest or by editing/deleting the file with play stopped.
  *
- * Nests, curios (hidden stones, the seed pod, the cairn), resident stone arrangements and the Island clock are stored today; the file keeps a top-level version so other
+ * Nests, curios (hidden stones, the seed pod, the cairn), resident stone arrangements, inn guest-book entries, and the Island clock are stored today; the file keeps a top-level version so other
  * kinds of lasting change can be added beside them later.
  */
 UCLASS()
@@ -55,6 +74,8 @@ class CAPTIVESKY_2_API UIslandWorldStateSubsystem : public UWorldSubsystem
 
 public:
 	static constexpr int32 MaxNestLayers = 5;
+	static constexpr int32 MaxGuestBookEntries = 24;
+	static constexpr int32 MaxGuestBookLineLength = 180;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -132,6 +153,12 @@ public:
 	/** Developer reset: forgets every arranging site and work; fresh empty sites are placed next play. */
 	bool ForgetArrangements();
 
+	const TArray<FIslandGuestBookEntry>& GetGuestBookEntries() const { return GuestBookEntries; }
+	/** Adds one cleaned line per resident per Island day. The oldest line rolls off at the fixed cap. */
+	FString WriteGuestBook(const FString& AgentId, const FString& Line, int32 Today, bool& bOutChanged);
+	/** Developer reversal for all guest-book lines. */
+	bool ForgetGuestBook();
+
 	/**
 	 * Parses a world-state file into this object's records without spawning, saving, or placing
 	 * anything; usable on a bare instance (e.g. to preview lasting changes in the editor world).
@@ -156,6 +183,7 @@ private:
 	TArray<FIslandCurioRecord> Curios;
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
 	TArray<FIslandArrangementSite> ArrangementSites;
+	TArray<FIslandGuestBookEntry> GuestBookEntries;
 	TMap<FName, TWeakObjectPtr<AIslandArrangement>> ArrangementActors;
 	int32 ShownArrangementDay = 0;
 	TMap<FName, TWeakObjectPtr<AIslandNest>> NestActors;

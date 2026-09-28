@@ -322,6 +322,11 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 
 	if (Decision.ActionType == EAgentActionType::Build && !Decision.ActionTarget.StartsWith(TEXT("ArrangingGround")))
 	{
+		if (Decision.ActionTarget == TEXT("GuestBook"))
+		{
+			Super::ActOnDecision(Decision);
+			return;
+		}
 		Build(FName(*Decision.ActionTarget));
 		return;
 	}

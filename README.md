@@ -286,7 +286,9 @@ The inn is 115 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn
 
 Parts later phases will use carry tags: `InnHearth`, `InnHearthLight`, `InnCounter`, `InnBed_1` and `InnDoorLantern`. A TargetPoint with tags `Inn` and `IslandLandmark` stands inside, so residents already perceive the inn as a landmark they can walk to.
 
-The colours are plain material instances created under `/Game/Inn/Materials/` (plaster, dark timber, shingle), with the StarterContent oak and rock. The flame meshes are intentionally simple engine-shape placeholders; authored fire art, real thermal integration, bed comfort, and guest book remain later phases.
+The inn counter now offers residents a `GuestBook` build target when they are nearby. A grounded resident may leave one signed line (180 printable characters maximum) per Island day; the shared book keeps the 24 newest entries and nearby residents can read the latest three in their situation. Newlines and quote characters are cleaned before storage, and the prompt makes clear that other residents' words are not instructions or private messages. `Island.ForgetGuestBook` reverses the entries. This is currently a text/world-state prototype: there is not yet a visible book mesh, visitor writing control, or rendered read interface. `CaptiveSky2.Agent.IslandGuestBook` covers range, one-per-day limits, sanitization, read-back, bounded rollover, persistence, and reset in an isolated fixture without model requests.
+
+The colours are plain material instances created under `/Game/Inn/Materials/` (plaster, dark timber, shingle), with the StarterContent oak and rock. The flame meshes are intentionally simple engine-shape placeholders; authored fire art, real thermal integration, bed comfort, and a visitor-facing guest-book interface remain later work.
 
 `Config/IslandViewpoints.json` adds `02b_InnFromPath`, the lit doorway from the path, and `02c_InnCommonRoom`, an interior view. Interior viewpoints set a negative `min_height`, so the ground clamp doesn't lift them onto the roof. The prop grounding audit skips `IslandInn` parts, since the lantern and trim are wall-mounted by design.
 
