@@ -3,7 +3,12 @@
 #include "AutonomousAgentCharacter.h"
 #include "AgentBrainComponent.h"
 #include "AgentMemoryComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/Engine.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandInnkeeperSpawnTest, "CaptiveSky2.Agent.IslandInnkeeperSpawn",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -86,5 +91,77 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Fixture tests never dispatch an LLM request"), Resident->Brain->bRequestInFlight);
 
 	World->DestroyWorld(false);
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		UWorld* Island = Context.World();
+		if (Context.WorldType != EWorldType::Editor || !Island || Island->GetMapName() != TEXT("Island")) continue;
+
+		AActor* IslandInn = nullptr;
+		AActor* IslandHearth = nullptr;
+		AActor* IslandDoor = nullptr;
+		for (TActorIterator<AActor> It(Island); It; ++It)
+		{
+			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("Inn"))) IslandInn = *It;
+			if (It->ActorHasTag(TEXT("InnHearth"))) IslandHearth = *It;
+			if (It->ActorHasTag(TEXT("InnDoorLantern"))) IslandDoor = *It;
+		}
+		if (!TestNotNull(TEXT("The saved Island has a tagged inn landmark"), IslandInn) ||
+			!TestNotNull(TEXT("The saved Island has a tagged hearth"), IslandHearth) ||
+			!TestNotNull(TEXT("The saved Island has a tagged doorway"), IslandDoor)) continue;
+
+		const AAutonomousAgentCharacter* BodyDefaults = Cast<AAutonomousAgentCharacter>(BodyClass->GetDefaultObject());
+		if (!TestNotNull(TEXT("The configured body has capsule dimensions for the map audit"), BodyDefaults)) continue;
+		const float Radius = BodyDefaults->GetCapsuleComponent()->GetScaledCapsuleRadius();
+		const float HalfHeight = BodyDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		FNavLocation SpawnLocation;
+		int32 CandidateIndex = INDEX_NONE;
+		int32 SelectedExtraClearanceCm = INDEX_NONE;
+		const TArray<FVector> IslandCandidates = UIslandInnkeeperSubsystem::GetSpawnCandidates(IslandInn, IslandHearth);
+		const bool bFoundRealMapStart = UIslandInnkeeperSubsystem::FindSpawnLocation(*Island, IslandCandidates,
+			IslandDoor->GetActorLocation(), Radius, HalfHeight, IslandInn, IslandHearth, SpawnLocation, CandidateIndex, SelectedExtraClearanceCm);
+		TestTrue(TEXT("The production selector finds a capsule-clear, complete-path start in the saved Inn"), bFoundRealMapStart);
+		if (bFoundRealMapStart)
+		{
+			TestTrue(TEXT("The selected start stays in the room-side candidates, not the distant Inn-marker fallback"),
+				CandidateIndex >= 0 && CandidateIndex < IslandCandidates.Num() - 1);
+			TestTrue(TEXT("The selected start remains within five metres of the hearth"),
+				FVector::Dist2D(SpawnLocation.Location, IslandHearth->GetActorLocation()) <= 500.f);
+			TestTrue(TEXT("The selected hearth-side start has the strongest available capsule clearance"), SelectedExtraClearanceCm >= 50);
+			AddInfo(FString::Printf(TEXT("Saved Island innkeeper spawn selector chose candidate %d/%d at %s, %d cm extra capsule clearance, %.0f cm from the hearth."),
+				CandidateIndex, IslandCandidates.Num() - 1, *SpawnLocation.Location.ToCompactString(), SelectedExtraClearanceCm,
+				FVector::Dist2D(SpawnLocation.Location, IslandHearth->GetActorLocation())));
+
+			UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Island);
+			FNavLocation DoorGoal;
+			const bool bHasDoorGoal = Navigation && Navigation->ProjectPointToNavigation(IslandDoor->GetActorLocation(),
+				DoorGoal, FVector(350.f, 350.f, 500.f));
+			TestTrue(TEXT("The production door marker projects to navigation for candidate diagnostics"), bHasDoorGoal);
+			FCollisionQueryParams ClearanceQuery(SCENE_QUERY_STAT(InnkeeperSpawnAudit), false);
+			ClearanceQuery.AddIgnoredActor(IslandInn);
+			ClearanceQuery.AddIgnoredActor(IslandHearth);
+			if (bHasDoorGoal)
+			{
+				for (int32 Index = 0; Index < IslandCandidates.Num(); ++Index)
+				{
+					const TArray<FVector> SingleCandidate = { IslandCandidates[Index] };
+					FNavLocation CandidateLocation;
+					int32 SingleIndex = INDEX_NONE;
+					int32 SingleExtraClearanceCm = INDEX_NONE;
+					const bool bCandidateValid = UIslandInnkeeperSubsystem::FindSpawnLocation(*Island, SingleCandidate,
+						IslandDoor->GetActorLocation(), Radius, HalfHeight, IslandInn, IslandHearth, CandidateLocation, SingleIndex,
+						SingleExtraClearanceCm);
+					if (!bCandidateValid)
+					{
+						AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: blocked, unprojectable, or no complete door route."), Index));
+						continue;
+					}
+					const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Island, CandidateLocation.Location, DoorGoal.Location);
+					AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: complete %.0f cm door path, up to %d cm extra capsule clearance, %.0f cm from hearth."),
+						Index, Path ? Path->GetPathLength() : 0.f, SingleExtraClearanceCm,
+						FVector::Dist2D(CandidateLocation.Location, IslandHearth->GetActorLocation())));
+				}
+			}
+		}
+	}
 	return true;
 }
