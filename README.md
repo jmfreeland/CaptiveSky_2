@@ -37,7 +37,7 @@ Where to look:
 - **This README:** the dated sections under Roadmap below are the design record for each system, newest last.
 - **`docs/plans/`:** forward plans (the inn).
 - **`docs/residents/`:** proposed future residents (the rat and the still-unnamed innkeeper).
-- **`docs/findings/`:** evidence-based reviews, such as the resident memory review.
+- **`docs/findings/`:** evidence-based reviews, such as the resident memory review and [landscape-material audit](docs/findings/2026-09-28-landscape-material-audit.md).
 - **`COORDINATION.md`:** how Claude Code and Codex share this tree.
 - **Tools:**
   - `Scripts/Capture-Viewpoints.ps1`: journey captures.
