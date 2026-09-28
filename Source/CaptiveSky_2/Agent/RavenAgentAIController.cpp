@@ -186,7 +186,7 @@ FString ARavenAgentAIController::DescribeBuildOptions() const
 	if (const double* Until = WovenUntil.Find(Site->Tags[0]); Until && *Until > FPlatformTime::Seconds())
 		return Result + TEXT(" The layer you just wove here is still settling; more weaving is not possible yet.");
 	if (!bCarryingTwigs)
-		return Result + TEXT(" To weave a nest here you would first need twigs gathered from the ground.");
+		return Result + TEXT(" To weave a nest here you would first need twigs gathered from the ground. None lie up on this perch; you would have to land on open ground (for example beside TideglassPool) to gather them, then return.");
 	return Result + FString::Printf(TEXT(" While perched here you may weave them into %s (build target: %s). This is a small lasting change that stays after this session."),
 		Nest ? TEXT("the nest at this roost") : TEXT("the start of a nest"), *Site->Tags[0].ToString());
 }
