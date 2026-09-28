@@ -10,7 +10,9 @@ class UInputMappingContext;
 class UUserWidget;
 class UCaptiveSkyConversationWidget;
 class UCaptiveSkyAmbientSpeechWidget;
+class UCaptiveSkyGuestBookWidget;
 class AAutonomousAgentCharacter;
+class AIslandGuestBook;
 class AActor;
 struct FAgentDecision;
 
@@ -26,6 +28,8 @@ class ACaptiveSky_2PlayerController : public APlayerController
 public:
 	void SubmitConversation(const FString& Utterance);
 	void CloseConversation();
+	void SubmitGuestBookEntry(const FString& Line);
+	void CloseGuestBook();
 	
 protected:
 
@@ -50,6 +54,12 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UCaptiveSkyAmbientSpeechWidget> AmbientSpeechWidget;
+
+	UPROPERTY()
+	TObjectPtr<UCaptiveSkyGuestBookWidget> GuestBookWidget;
+
+	TWeakObjectPtr<AIslandGuestBook> GuestBookTarget;
+	bool bGuestBookPanelOpen = false;
 
 	UPROPERTY(EditAnywhere, Category = "Conversation")
 	float AmbientSpeechRadius = 3000.f;
@@ -89,8 +99,11 @@ protected:
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
 	void ToggleConversation();
+	void HandleEscape();
+	virtual void SetGuestBookInputMode(bool bOpen);
 	AAutonomousAgentCharacter* FindNearestConversationAgent() const;
 	void InteractWithNearestWorldObject();
+	void OpenGuestBook(AActor* Target);
 	AActor* FindNearestWorldInteraction() const;
 	void ShowWorldInteractionCaption(const FString& Caption);
 

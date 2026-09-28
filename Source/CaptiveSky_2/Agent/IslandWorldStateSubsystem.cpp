@@ -861,6 +861,20 @@ FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const
 	return FString::Printf(TEXT("You leave this line in the inn guest book: \"%s\" The book keeps at most %d recent lines; anyone who reads it can see this one signed with your name."), *CleanLine, MaxGuestBookEntries);
 }
 
+FString UIslandWorldStateSubsystem::WriteVisitorGuestBook(const FString& Line, bool& bOutChanged)
+{
+	return WriteGuestBook(TEXT("Visitor"), Line, DisplayDay(), bOutChanged);
+}
+
+bool UIslandWorldStateSubsystem::HasGuestBookEntryToday(const FString& AgentId) const
+{
+	const int32 Today = DisplayDay();
+	return Today > 0 && GuestBookEntries.ContainsByPredicate([&AgentId, Today](const FIslandGuestBookEntry& Entry)
+	{
+		return Entry.AgentId == AgentId && Entry.Day == Today;
+	});
+}
+
 bool UIslandWorldStateSubsystem::ForgetArrangements()
 {
 	const TArray<FIslandArrangementSite> Previous = ArrangementSites;

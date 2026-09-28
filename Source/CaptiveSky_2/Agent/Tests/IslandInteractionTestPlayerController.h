@@ -14,9 +14,12 @@ class AIslandInteractionTestPlayerController final : public ACaptiveSky_2PlayerC
 
 public:
 	virtual bool IsLocalController() const override { return true; }
+	virtual void SetGuestBookInputMode(bool bOpen) override {}
 
 	void SetFixturePawn(APawn* InPawn) { SetPawn(InPawn); }
 	void SetCaptionWidget(UCaptiveSkyAmbientSpeechWidget* InWidget) { AmbientSpeechWidget = InWidget; }
+	void SetGuestBookWidget(UCaptiveSkyGuestBookWidget* InWidget) { GuestBookWidget = InWidget; }
+	bool IsGuestBookPanelOpenForTest() const { return bGuestBookPanelOpen; }
 	void BindFixtureInput() { SetupInputComponent(); }
 
 	bool PressBoundE()
@@ -27,6 +30,20 @@ public:
 			if (Binding.KeyEvent == IE_Pressed && Binding.Chord.Key == EKeys::E && Binding.KeyDelegate.IsBoundToObject(this))
 			{
 				Binding.KeyDelegate.Execute(EKeys::E);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool PressBoundEscape()
+	{
+		if (!InputComponent) return false;
+		for (const FInputKeyBinding& Binding : InputComponent->KeyBindings)
+		{
+			if (Binding.KeyEvent == IE_Pressed && Binding.Chord.Key == EKeys::Escape && Binding.KeyDelegate.IsBoundToObject(this))
+			{
+				Binding.KeyDelegate.Execute(EKeys::Escape);
 				return true;
 			}
 		}

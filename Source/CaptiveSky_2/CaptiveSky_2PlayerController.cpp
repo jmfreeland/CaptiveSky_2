@@ -10,11 +10,14 @@
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "CaptiveSkyConversationWidget.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
+#include "CaptiveSkyGuestBookWidget.h"
 #include "Agent/AutonomousAgentCharacter.h"
 #include "Agent/AgentMemoryComponent.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Agent/AgentSocialSubsystem.h"
+#include "Agent/IslandGuestBook.h"
 #include "Agent/IslandInteractionUtility.h"
+#include "Agent/IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -50,6 +53,13 @@ void ACaptiveSky_2PlayerController::BeginPlay()
 		{
 			ConversationWidget->AddToPlayerScreen(20);
 			ConversationWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		GuestBookWidget = CreateWidget<UCaptiveSkyGuestBookWidget>(this, UCaptiveSkyGuestBookWidget::StaticClass());
+		if (GuestBookWidget)
+		{
+			GuestBookWidget->AddToPlayerScreen(25);
+			GuestBookWidget->SetVisibility(ESlateVisibility::Collapsed);
 		}
 
 		AmbientSpeechWidget = CreateWidget<UCaptiveSkyAmbientSpeechWidget>(this, UCaptiveSkyAmbientSpeechWidget::StaticClass());
@@ -108,7 +118,7 @@ void ACaptiveSky_2PlayerController::SetupInputComponent()
 	{
 		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &ACaptiveSky_2PlayerController::ToggleConversation);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &ACaptiveSky_2PlayerController::InteractWithNearestWorldObject);
-		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACaptiveSky_2PlayerController::CloseConversation);
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ACaptiveSky_2PlayerController::HandleEscape);
 
 		// Add Input Mapping Contexts
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -148,7 +158,7 @@ void ACaptiveSky_2PlayerController::ShowWorldInteractionCaption(const FString& C
 
 void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 {
-	if (!IsLocalPlayerController() || (ConversationWidget && ConversationWidget->IsVisible())) return;
+	if (!IsLocalPlayerController() || (ConversationWidget && ConversationWidget->IsVisible()) || bGuestBookPanelOpen) return;
 	AActor* Target = FindNearestWorldInteraction();
 	if (!Target)
 	{
@@ -157,18 +167,20 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	}
 
 	const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
-	const bool bReadOnlyGuestBook = TargetTag == FName(TEXT("GuestBook"));
+	if (TargetTag == FName(TEXT("GuestBook")))
+	{
+		OpenGuestBook(Target);
+		return;
+	}
+
 	const double Now = FPlatformTime::Seconds();
 	for (auto CooldownIt = WorldInteractionCooldowns.CreateIterator(); CooldownIt; ++CooldownIt)
 		if (!CooldownIt.Key().IsValid() || CooldownIt.Value() <= Now) CooldownIt.RemoveCurrent();
 	const TWeakObjectPtr<AActor> TargetKey(Target);
-	if (!bReadOnlyGuestBook)
+	if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey); CooldownUntil && *CooldownUntil > Now)
 	{
-		if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey); CooldownUntil && *CooldownUntil > Now)
-		{
-			ShowWorldInteractionCaption(FString::Printf(TEXT("%s has already answered your attention; let the moment settle."), *TargetTag.ToString()));
-			return;
-		}
+		ShowWorldInteractionCaption(FString::Printf(TEXT("%s has already answered your attention; let the moment settle."), *TargetTag.ToString()));
+		return;
 	}
 
 	FString Fact;
@@ -177,9 +189,92 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		ShowWorldInteractionCaption(TEXT("You cannot reach or clearly see that from here."));
 		return;
 	}
-	if (!bReadOnlyGuestBook)
-		WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
+	WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
 	ShowWorldInteractionCaption(TargetTag.ToString() + TEXT(": ") + Fact);
+}
+
+void ACaptiveSky_2PlayerController::OpenGuestBook(AActor* Target)
+{
+	APawn* Visitor = GetPawn();
+	UWorld* World = GetWorld();
+	UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (!GuestBookWidget || !IsValid(Visitor) || !IsValid(Target) || !State ||
+		!IslandInteractionUtility::CanInteract(Visitor, Target, IslandInteractionRadius))
+	{
+		ShowWorldInteractionCaption(TEXT("You cannot reach or clearly see the guest book from here."));
+		return;
+	}
+
+	FString LatestEntries;
+	if (!IslandInteractionUtility::Perform(Visitor, Target, LatestEntries))
+	{
+		ShowWorldInteractionCaption(TEXT("The inn guest book cannot be opened here. Nothing changed."));
+		return;
+	}
+
+	GuestBookTarget = Cast<AIslandGuestBook>(Target);
+	if (!GuestBookTarget.IsValid()) return;
+	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+	HideAmbientSpeech();
+	GuestBookWidget->OpenFor(LatestEntries, !State->HasGuestBookEntryToday(TEXT("Visitor")));
+	bGuestBookPanelOpen = true;
+	SetGuestBookInputMode(true);
+}
+
+void ACaptiveSky_2PlayerController::SubmitGuestBookEntry(const FString& Line)
+{
+	if (!GuestBookWidget || !bGuestBookPanelOpen) return;
+	APawn* Visitor = GetPawn();
+	AIslandGuestBook* Book = GuestBookTarget.Get();
+	UWorld* World = GetWorld();
+	UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (!IsValid(Visitor) || !IsValid(Book) || !State ||
+		!IslandInteractionUtility::CanInteract(Visitor, Book, IslandInteractionRadius))
+	{
+		GuestBookWidget->ShowWriteResult(TEXT("The guest book is no longer within reach and view; nothing was recorded."),
+			TEXT("Move back to the counter and open it again."), false, false);
+		return;
+	}
+
+	bool bChanged = false;
+	const FString Result = State->WriteVisitorGuestBook(Line, bChanged);
+	FString LatestEntries;
+	IslandInteractionUtility::Perform(Visitor, Book, LatestEntries);
+	GuestBookWidget->ShowWriteResult(Result, LatestEntries,
+		!State->HasGuestBookEntryToday(TEXT("Visitor")), bChanged);
+}
+
+void ACaptiveSky_2PlayerController::CloseGuestBook()
+{
+	if (GuestBookWidget) GuestBookWidget->SetVisibility(ESlateVisibility::Collapsed);
+	bGuestBookPanelOpen = false;
+	GuestBookTarget.Reset();
+	SetGuestBookInputMode(false);
+}
+
+void ACaptiveSky_2PlayerController::SetGuestBookInputMode(bool bOpen)
+{
+	if (bOpen && GuestBookWidget)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(GuestBookWidget->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+		return;
+	}
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
+}
+
+void ACaptiveSky_2PlayerController::HandleEscape()
+{
+	if (bGuestBookPanelOpen)
+	{
+		CloseGuestBook();
+		return;
+	}
+	CloseConversation();
 }
 
 AAutonomousAgentCharacter* ACaptiveSky_2PlayerController::FindNearestConversationAgent() const
@@ -202,7 +297,7 @@ AAutonomousAgentCharacter* ACaptiveSky_2PlayerController::FindNearestConversatio
 
 void ACaptiveSky_2PlayerController::ToggleConversation()
 {
-	if (!ConversationWidget || ConversationWidget->IsVisible()) return;
+	if (!ConversationWidget || ConversationWidget->IsVisible() || bGuestBookPanelOpen) return;
 	ConversationTarget = FindNearestConversationAgent();
 	if (!ConversationTarget)
 	{

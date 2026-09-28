@@ -2,12 +2,12 @@
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
-#include "CaptiveSkyAmbientSpeechWidget.h"
-#include "CaptiveSky_2PlayerController.h"
+#include "CaptiveSkyGuestBookWidget.h"
 #include "IslandGuestBook.h"
 #include "IslandInteractionTestPlayerController.h"
 #include "IslandInteractionUtility.h"
 #include "IslandWorldStateSubsystem.h"
+#include "Blueprint/UserWidget.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -95,13 +95,58 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 	const int32 BeforeBlankLine = State->GetGuestBookEntries().Num();
 	TestTrue(TEXT("An empty cleaned line changes nothing"),
 		State->WriteGuestBook(TEXT("Empty_Writer"), TEXT(" \n\"\" "), 2, bChanged).Contains(TEXT("non-empty line")) && !bChanged && State->GetGuestBookEntries().Num() == BeforeBlankLine);
+
+	ACharacter* Reader = World->SpawnActor<ACharacter>(FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator);
+	AIslandInteractionTestPlayerController* VisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	UCaptiveSkyGuestBookWidget* BookWidget = VisitorController
+		? NewObject<UCaptiveSkyGuestBookWidget>(World, NAME_None, RF_Transient)
+		: nullptr;
+	if (TestNotNull(TEXT("Visitor pawn created beside the book"), Reader) &&
+		TestNotNull(TEXT("Visitor controller created for the bound E path"), VisitorController) &&
+		TestNotNull(TEXT("Guest-book writing panel created"), BookWidget))
+	{
+		VisitorController->SetFixturePawn(Reader);
+		VisitorController->SetGuestBookWidget(BookWidget);
+		BookWidget->SetVisibility(ESlateVisibility::Collapsed);
+		VisitorController->BindFixtureInput();
+		const bool bVisitorPressedE = VisitorController->PressBoundE();
+		TestTrue(TEXT("E is bound on the test visitor controller"), bVisitorPressedE);
+		TestTrue(*FString::Printf(TEXT("Pressing E opens the guest-book panel (open=%d content=%s)"),
+			VisitorController->IsGuestBookPanelOpenForTest(), *BookWidget->GetDisplayedContent()), VisitorController->IsGuestBookPanelOpenForTest());
+		TestTrue(TEXT("The panel explains that notes are public and signed as Visitor"),
+			BookWidget->GetDisplayedContent().Contains(TEXT("public, signed as Visitor")));
+		VisitorController->SubmitGuestBookEntry(TEXT("The pool is silver this morning."));
+		const FIslandGuestBookEntry* VisitorEntry = State->GetGuestBookEntries().FindByPredicate([](const FIslandGuestBookEntry& Entry)
+		{
+			return Entry.AgentId == TEXT("Visitor");
+		});
+	TestTrue(*FString::Printf(TEXT("The visitor's line is saved as a shared signed entry (count=%d found=%d day=%d line=%s)"),
+			State->GetGuestBookEntries().Num(), VisitorEntry != nullptr, VisitorEntry ? VisitorEntry->Day : 0,
+			VisitorEntry ? *VisitorEntry->Line : TEXT("none")),
+			VisitorEntry && VisitorEntry->Day == 1 && VisitorEntry->Line == TEXT("The pool is silver this morning"));
+	UIslandWorldStateSubsystem* PersistenceProbe = NewObject<UIslandWorldStateSubsystem>(GetTransientPackage());
+	TestTrue(TEXT("Visitor writing is present in the persisted world-state file"),
+		PersistenceProbe && PersistenceProbe->ReadStateFile(StateFile) &&
+		PersistenceProbe->GetGuestBookEntries().ContainsByPredicate([](const FIslandGuestBookEntry& Entry)
+		{
+			return Entry.AgentId == TEXT("Visitor") && Entry.Day == 1 && Entry.Line == TEXT("The pool is silver this morning");
+		}));
+		TestFalse(TEXT("A successful visitor entry closes today's writing input"), BookWidget->CanWriteToday());
+		const int32 AfterVisitorWrite = State->GetGuestBookEntries().Num();
+		VisitorController->SubmitGuestBookEntry(TEXT("A second line today."));
+		TestEqual(TEXT("The visitor cannot write twice on the same Island day"), State->GetGuestBookEntries().Num(), AfterVisitorWrite);
+		TestTrue(TEXT("Escape closes the writing panel"), VisitorController->PressBoundEscape() && !VisitorController->IsGuestBookPanelOpenForTest());
+		TestTrue(TEXT("Reopening the book shows the already-used daily limit"), VisitorController->PressBoundE() &&
+			VisitorController->IsGuestBookPanelOpenForTest() && !BookWidget->CanWriteToday() &&
+			BookWidget->GetDisplayedContent().Contains(TEXT("already left a line today")));
+	}
 	for (int32 Index = 0; Index < UIslandWorldStateSubsystem::MaxGuestBookEntries + 3; ++Index)
 		State->WriteGuestBook(FString::Printf(TEXT("Visitor_%d"), Index), TEXT("A bounded note."), 3 + Index, bChanged);
 	TestEqual(TEXT("The guest book retains only its fixed number of recent entries"), State->GetGuestBookEntries().Num(), UIslandWorldStateSubsystem::MaxGuestBookEntries);
-	ACharacter* Reader = World->SpawnActor<ACharacter>(FVector(0.f, 0.f, 60.f), FRotator::ZeroRotator);
-	TestTrue(TEXT("The visible guest-book prop resolves as a visitor-readable target"),
-		Book && IslandInteractionUtility::GetTargetTag(Book) == FName(TEXT("GuestBook")) &&
-		IslandInteractionUtility::CanInteract(Reader, Book));
+	TestEqual(TEXT("The visible guest-book prop resolves as a visitor-readable target"),
+		IslandInteractionUtility::GetTargetTag(Book), FName(TEXT("GuestBook")));
+	TestTrue(TEXT("Visitor can see the book through the ordinary visibility check"),
+		Reader && Book && IslandInteractionUtility::CanInteract(Reader, Book));
 	if (Book && Reader)
 	{
 		TestTrue(TEXT("The visitor can find the nearby book through ordinary E-target selection"),
@@ -115,24 +160,10 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 			ReadFact.Contains(TEXT("Day 29 - Visitor_26: A bounded note")) &&
 			!ReadFact.Contains(TEXT("Visitor_23")));
 		TestEqual(TEXT("Reading leaves every saved entry unchanged"), State->GetGuestBookEntries().Num(), EntriesBeforeReading);
-
-		UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
-		AIslandInteractionTestPlayerController* VisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>();
-		if (TestNotNull(TEXT("Visitor controller created for the bound E path"), VisitorController) &&
-			TestNotNull(TEXT("Caption created for the visitor read interaction"), Caption))
-		{
-			VisitorController->SetFixturePawn(Reader);
-			VisitorController->SetCaptionWidget(Caption);
-			VisitorController->BindFixtureInput();
-			TestTrue(TEXT("Pressing E presents the latest guest-book entries"), VisitorController->PressBoundE() &&
-				Caption->GetDisplayedCaption().ToString().Contains(TEXT("Day 29 - Visitor_26: A bounded note")));
-			TestTrue(TEXT("Read-only guest-book inspection can be repeated without a change cooldown"), VisitorController->PressBoundE() &&
-				Caption->GetDisplayedCaption().ToString().Contains(TEXT("Day 27 - Visitor_24: A bounded note")));
-			VisitorController->Destroy();
-		}
 	}
 	TestFalse(TEXT("The oldest line rolls off when the book is full"),
 		State->GetGuestBookEntries().ContainsByPredicate([&WriterId](const FIslandGuestBookEntry& Entry) { return Entry.AgentId == WriterId && Entry.Day == 1; }));
+	if (VisitorController) VisitorController->Destroy();
 	Controller->UnPossess();
 	DestroyWorld(World);
 
