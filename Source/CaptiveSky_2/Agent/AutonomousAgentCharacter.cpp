@@ -51,6 +51,10 @@ void AAutonomousAgentCharacter::BeginPlay()
 		{
 			const FName ApproachTag(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId));
 			Tags.AddUnique(ApproachTag);
+			// Models tidy the doubled word in "ApproachAgent_Agent_Aster_01" into "ApproachAgent_Aster_01";
+			// answer to that form too, or the move silently fails as "not found".
+			if (AgentId.StartsWith(TEXT("Agent_")))
+				Tags.AddUnique(FName(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId.RightChop(6))));
 		}
 	}
 

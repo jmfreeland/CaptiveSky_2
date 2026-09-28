@@ -2,6 +2,8 @@
 #include "AgentPlaySessionSubsystem.h"
 #include "AutonomousAgentAIController.h"
 #include "Engine/GameInstance.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentSafetyTest, "CaptiveSky2.Agent.SessionSafety", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAgentSafetyTest::RunTest(const FString& Parameters)
@@ -45,5 +47,37 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	Session->ModelRequests = 0;
 	Session->StartedAt = FPlatformTime::Seconds() - 1801;
 	TestFalse(TEXT("Wall-clock deadline rejects calls"), Session->TryReserveModelRequest());
+
+	// Continuous play: no end time, a refilling allowance, per-resident spacing, and a daily ceiling that survives restarts.
+	const FString Ledger = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("SessionSafety") / TEXT("ModelBudget.json"));
+	IFileManager::Get().Delete(*Ledger, false, true, true);
+	auto MakeContinuous = [&Ledger, Instance](double Now)
+	{
+		UAgentPlaySessionSubsystem* Continuous = NewObject<UAgentPlaySessionSubsystem>(Instance);
+		Continuous->bContinuousPlay = true;
+		Continuous->ContinuousRequestsPerHour = 60.f; // one a minute
+		Continuous->ContinuousBurst = 4;
+		Continuous->ContinuousDailyRequests = 6;
+		Continuous->LedgerPathOverride = Ledger;
+		Continuous->NowOverride = Now;
+		Continuous->StartedAt = FPlatformTime::Seconds() - 100000; // long past any bounded deadline
+		Continuous->BeginContinuous();
+		return Continuous;
+	};
+	UAgentPlaySessionSubsystem* Continuous = MakeContinuous(1000.0);
+	TestFalse(TEXT("Continuous play never expires by time"), Continuous->IsExpired());
+	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));
+	TestFalse(TEXT("One resident cannot fire requests back to back"), Continuous->TryReserveModelRequest(TEXT("Aster")));
+	TestTrue(TEXT("Another resident may still think"), Continuous->TryReserveModelRequest(TEXT("Raven")));
+	TestFalse(TEXT("A spent allowance makes residents wait"), Continuous->TryReserveModelRequest(TEXT("Innkeeper")));
+	Continuous->NowOverride = 1061.0;
+	TestTrue(TEXT("The allowance refills with time"), Continuous->TryReserveModelRequest(TEXT("Innkeeper")));
+	Continuous->NowOverride = 1600.0; // plenty of refill; the burst cap holds it at 4
+	for (const TCHAR* Agent : { TEXT("Aster"), TEXT("Raven"), TEXT("Innkeeper") }) Continuous->TryReserveModelRequest(Agent);
+	TestFalse(TEXT("The daily ceiling holds even with allowance left"), Continuous->TryReserveModelRequest(TEXT("Visitor")));
+	TestFalse(TEXT("A spent day does not end play"), Continuous->IsExpired());
+	UAgentPlaySessionSubsystem* Restarted = MakeContinuous(5000.0);
+	TestFalse(TEXT("The daily ceiling survives a restart"), Restarted->TryReserveModelRequest(TEXT("Aster")));
+	IFileManager::Get().Delete(*Ledger, false, true, true);
 	return true;
 }

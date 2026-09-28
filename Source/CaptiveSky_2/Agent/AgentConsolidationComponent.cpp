@@ -172,7 +172,7 @@ void UAgentConsolidationComponent::StartConsolidation()
 		Provider = CreateAgentLLMProvider();
 	}
 	if (GetWorld() && GetWorld()->GetGameInstance())
-		if (UAgentPlaySessionSubsystem* Session = GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>(); Session && !Session->TryReserveModelRequest()) { FinishSleep(); return; }
+		if (UAgentPlaySessionSubsystem* Session = GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>(); Session && !Session->TryReserveModelRequest(GetOwner() && GetOwner()->FindComponentByClass<UAgentMemoryComponent>() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>()->GetResolvedAgentId() : FString())) { FinishSleep(); return; }
 	FAgentLLMRequest Request;
 	Request.SystemPrompt = BuildConsolidationPrompt(Memories);
 	Request.MaxTokens = 1000;
