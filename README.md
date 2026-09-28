@@ -36,7 +36,7 @@ All of that state is saved in `WorldState/<Map>.json`, and the Island clock (hou
 Where to look:
 - **This README:** the dated sections under Roadmap below are the design record for each system, newest last.
 - **`docs/plans/`:** forward plans (the inn).
-- **`docs/residents/`:** proposed future residents (the rat, Fenrus).
+- **`docs/residents/`:** proposed future residents (the rat and the still-unnamed innkeeper).
 - **`docs/findings/`:** evidence-based reviews, such as the resident memory review.
 - **`COORDINATION.md`:** how Claude Code and Codex share this tree.
 - **Tools:**

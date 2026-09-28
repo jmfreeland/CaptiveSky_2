@@ -2,6 +2,8 @@
 
 Drafts of future residents, kept outside `Agents/` so the game and gateway never load them by accident. To bring one to life, copy its folder into `Agents/`, give it a body, and let it start with an empty memory.
 
+Current drafts: `Agent_Rat_01` (the rat) and `innkeeper` (a still-unnamed resident whose role and home are associated with the inn).
+
 ## Agent_Rat_01: the rat (draft, 2026-09-27)
 
 This answers the README's *Quest for Glory* note about an unusually intelligent rat. A pointer for when the reference is settled: in *Quest for Glory*, Erasmus is the wizard and his talking rat familiar is Fenrus. This rat is deliberately neither. It's an original being with its own home on the Island and no master, in keeping with the Vision: residents are participants rather than quest dispensers, and Sierra-inspired characters should be original beings rather than reproductions.
