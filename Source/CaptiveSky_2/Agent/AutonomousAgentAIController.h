@@ -8,6 +8,9 @@
 #include "AutonomousAgentAIController.generated.h"
 
 class UNavigationPath;
+class UNavigationSystemV1;
+struct FNavAgentProperties;
+struct FNavLocation;
 
 /**
  * Drives an AAutonomousAgentCharacter's think/act loop directly in C++: polls
@@ -46,6 +49,8 @@ public:
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
 	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
+	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
+	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 
 	FString DescribeActionState() const;
 	static double BackgroundDelay(int32 Repeats, double BaseSeconds);

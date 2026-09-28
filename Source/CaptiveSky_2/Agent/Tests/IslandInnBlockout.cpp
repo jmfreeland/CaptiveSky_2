@@ -9,6 +9,8 @@
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
+#include "AutonomousAgentAIController.h"
+#include "AutonomousAgentCharacter.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -30,6 +32,7 @@
 #include "NavigationPath.h"
 #include "Navigation/NavLinkProxy.h"
 #include "NavigationSystem.h"
+#include "IslandInnkeeperSubsystem.h"
 #include "UObject/SavePackage.h"
 
 namespace
@@ -104,6 +107,7 @@ namespace
 		AActor* Marker = nullptr;
 		AActor* Door = nullptr;
 		AActor* Bed = nullptr;
+		AActor* Counter = nullptr;
 		int32 StairNavigationLinks = 0;
 		FVector Stones = FVector::ZeroVector;
 		for (TActorIterator<AActor> It(World); It; ++It)
@@ -111,6 +115,7 @@ namespace
 			if (It->ActorHasTag(TEXT("Inn")) && It->ActorHasTag(TEXT("IslandLandmark"))) Marker = *It;
 			if (It->GetActorLabel() == TEXT("Inn_DoorStep_0")) Door = *It;
 			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnBed_1"))) Bed = *It;
+			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter"))) Counter = *It;
 			if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnStairNavigationLink"))) ++StairNavigationLinks;
 			if (It->ActorHasTag(TEXT("ListeningStones")) && It->ActorHasTag(TEXT("IslandLandmark"))) Stones = It->GetActorLocation();
 		}
@@ -140,6 +145,20 @@ namespace
 			FVector::Dist2D(Bed->GetActorLocation(), BedNavGoal.Location) <= 100.f && FMath::Abs(Bed->GetActorLocation().Z - BedNavGoal.Location.Z) <= 100.f;
 		Test.TestTrue(TEXT("The tagged rest marker lies on the upstairs navmesh, not metres away from it"), bBedTargetIsNearItsNavGoal);
 		Test.TestEqual(TEXT("Both disconnected stair transitions have explicit navigation links"), StairNavigationLinks, 2);
+		const UIslandInnkeeperSubsystem* InnkeeperDefaults = GetDefault<UIslandInnkeeperSubsystem>();
+		UClass* InnkeeperBodyClass = InnkeeperDefaults ? InnkeeperDefaults->BodyClass.LoadSynchronous() : nullptr;
+		const AAutonomousAgentCharacter* InnkeeperBody = InnkeeperBodyClass ? Cast<AAutonomousAgentCharacter>(InnkeeperBodyClass->GetDefaultObject()) : nullptr;
+		FNavLocation CounterGroundGoal;
+		const bool bCounterGroundGoal = Counter && InnkeeperBody &&
+			AAutonomousAgentAIController::ProjectGroundedTarget(Navigation, Counter->GetActorLocation(), InnkeeperBody->GetNavAgentPropertiesRef(), CounterGroundGoal);
+		const bool bCounterUsesNearbyFloor = bCounterGroundGoal &&
+			FMath::Abs(CounterGroundGoal.Location.Z - Counter->GetActorLocation().Z) <= 120.f &&
+			FVector::Dist2D(CounterGroundGoal.Location, Counter->GetActorLocation()) <= 500.f;
+		Test.TestTrue(TEXT("A grounded resident targets the floor-level guest-book counter, not the inn roof"), bCounterUsesNearbyFloor);
+		if (bCounterGroundGoal)
+			Test.AddInfo(FString::Printf(TEXT("Grounded InnCounter goal: %s (%.0f cm vertical offset from marker)."), *CounterGroundGoal.Location.ToString(), FMath::Abs(CounterGroundGoal.Location.Z - Counter->GetActorLocation().Z)));
+		const bool bCounterRoute = bCounterUsesNearbyFloor && Walk(TEXT("Grounded InnCounter target"), CounterGroundGoal.Location, FVector(75.f, 75.f, 120.f));
+		Test.TestTrue(TEXT("The floor-level guest-book counter target has a complete route from ListeningStones"), bCounterRoute);
 		// Spot checks in the inn's own frame, relative to the marker.
 		const TPair<const TCHAR*, FVector> Spots[] = {
 			{TEXT("top door step"), FVector(520, 0, 5)}, {TEXT("just inside the door"), FVector(420, 0, 5)}, {TEXT("room centre"), FVector(150, 0, 5)},
@@ -164,7 +183,7 @@ namespace
 		Walk(TEXT("Guest-book stand"), CounterStand, FVector(40, 40, 120));
 		Test.TestTrue(TEXT("Grounded residents can walk into the inn"), bInside);
 		Test.TestTrue(TEXT("Grounded residents can reach the tagged inn bed"), bBedReachable);
-		return bInside && bBedReachable && bBedTargetIsNearItsNavGoal && StairNavigationLinks == 2;
+		return bInside && bBedReachable && bBedTargetIsNearItsNavGoal && StairNavigationLinks == 2 && bCounterRoute;
 	}
 
 	class FInnBuilder

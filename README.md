@@ -283,6 +283,8 @@ This is phase 1 of `docs/plans/inn.md`, an inn in the spirit of *Quest for Glory
 - **Safety:** it backs up the map to `Saved/MapBackups/` before changing anything, and rerunning it only rechecks access. `-InnRebuild` replaces the inn.
 - **Access check:** it rebuilds navigation with the editor's "Build Paths" and confirms a grounded walker reaches the common room (42 m from the ListeningStones) and the loft bed (46 m). The bed's target projects within 10 cm of its nav goal; bidirectional links bridge the two small Recast gaps at the stair-foot and loft landing.
 
+The access probe also exercises the production projection used by grounded residents for the `InnCounter` marker. A 2026-09-28 investigation reproduced the earlier failure: a 1,000 cm vertical projection selected roof nav at Z 3424 rather than the room floor at Z 2690. Grounded targets now prefer a close floor projection and nearby floor points around blocked fixtures before a tall fallback; the counter probe resolved to Z 2690 with a complete 42 m path from the ListeningStones. This is static navigation evidence; rendered movement and separate live completion failures still need a bounded PIE recheck.
+
 The inn is 115 labelled `Inn_*` actors in an `Inn` folder, all tagged `IslandInn`, built from engine cubes:
 - **Structure:** a stone plinth with door steps, and a 10 × 8 m half-timbered plaster house with a gable roof.
 - **Common room:** an open stone firebox with an oak mantel against the chimney wall, a counter, and two tables with benches.

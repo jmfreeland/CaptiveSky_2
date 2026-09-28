@@ -115,6 +115,48 @@ bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Pat
 	return Path && Path->IsValid() && !Path->IsPartial() &&
 		FVector::DistSquared2D(Origin, Goal) >= FMath::Square(WanderMinimumDistance);
 }
+bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
+{
+	if (!Navigation) return false;
+	// Indoors, a large Z extent can select an upper floor or roof hundreds of
+	// centimetres above a floor-level marker. Keep the first search close to the
+	// marker's height so walkers don't mistake another level for the floor.
+	const FVector FloorExtent(250.f, 250.f, 120.f);
+	if (Navigation->ProjectPointToNavigation(Target, OutLocation, FloorExtent, &AgentProperties)) return true;
+
+	// Furniture may remove the nav polygon directly beneath its marker. Search
+	// outward in small rings for a nearby floor point, choosing the closest clear
+	// surface before considering a deliberately elevated landmark projection.
+	for (const float Radius : { 100.f, 200.f, 300.f, 400.f })
+	{
+		bool bFoundAtRadius = false;
+		float BestDistanceSquared = TNumericLimits<float>::Max();
+		FNavLocation BestLocation;
+		for (int32 AngleDegrees = 0; AngleDegrees < 360; AngleDegrees += 45)
+		{
+			const float Angle = FMath::DegreesToRadians(static_cast<float>(AngleDegrees));
+			const FVector Candidate = Target + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Radius;
+			FNavLocation Projected;
+			if (!Navigation->ProjectPointToNavigation(Candidate, Projected, FVector(75.f, 75.f, 120.f), &AgentProperties)) continue;
+			const float DistanceSquared = FVector::DistSquared2D(Target, Projected.Location);
+			if (DistanceSquared < BestDistanceSquared)
+			{
+				BestDistanceSquared = DistanceSquared;
+				BestLocation = Projected;
+				bFoundAtRadius = true;
+			}
+		}
+		if (bFoundAtRadius)
+		{
+			OutLocation = BestLocation;
+			return true;
+		}
+	}
+
+	// Elevated landmarks without nearby floor nav (for example a raised stone)
+	// still remain usable, but only after all floor-level options were checked.
+	return Navigation->ProjectPointToNavigation(Target, OutLocation, FVector(250.f, 250.f, 1000.f), &AgentProperties);
+}
 bool AAutonomousAgentAIController::CanRest() const
 {
 	const ACharacter* Body = Cast<ACharacter>(GetPawn());
@@ -463,7 +505,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			// nearby walkable goal, not the airborne marker or a partial-path endpoint.
 			UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 			FNavLocation GroundGoal;
-			if (!NavSys || !NavSys->ProjectPointToNavigation(TargetActor->GetActorLocation(), GroundGoal, FVector(250, 250, 1000), &ControlledPawn->GetNavAgentPropertiesRef()))
+			if (!ProjectGroundedTarget(NavSys, TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal))
 			{
 				ReportAction(TEXT("Movement failed: no walkable ground near that marker. Choose another destination."));
 				break;
