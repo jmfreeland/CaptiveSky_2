@@ -392,6 +392,30 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (!It->ActorHasTag(TargetTag)) continue;
+			if (AAutonomousAgentCharacter* OtherResident = Cast<AAutonomousAgentCharacter>(*It); OtherResident && OtherResident != GetPawn())
+			{
+				const FVector RavenLocation = GetPawn()->GetActorLocation();
+				if (FVector::Dist2D(RavenLocation, OtherResident->GetActorLocation()) <= ResidentApproachStandOffDistance)
+				{
+					ReportAction(TEXT("Already near the other resident. Speaking remains optional; perch, observe, or choose another activity."));
+					return;
+				}
+				const FVector Destination = BuildResidentApproachPoint(RavenLocation, OtherResident->GetActorLocation());
+				ReportAction(TEXT("Flight toward the other resident's conversational space started; arriving does not begin a conversation."));
+				if (LocomotionState == ERavenLocomotionState::Grounded || LocomotionState == ERavenLocomotionState::Perched)
+				{
+					BeginTakeoff(Destination);
+				}
+				else
+				{
+					MovementTarget = PlanFlightLeg(RavenLocation, Destination);
+					bHasMovementTarget = true;
+					bApproachingPerch = bTargetIsPerch = false;
+					LocomotionState = ERavenLocomotionState::Flying;
+					SetFlyingMovement(true);
+				}
+				return;
+			}
 			if (It->ActorHasTag(TEXT("RavenPerch")))
 			{
 				BeginPerchAt(*It);

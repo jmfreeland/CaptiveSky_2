@@ -34,6 +34,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
 	float WanderRadius = 2000.f;
 
+	/** A resident approaches another body to conversation distance without seeking its capsule centre. */
+	static constexpr float ResidentApproachStandOffDistance = 350.f;
+	static constexpr float ResidentApproachAltitudeOffset = 180.f;
+	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
+
 	FString DescribeActionState() const;
 	static double BackgroundDelay(int32 Repeats, double BaseSeconds);
 

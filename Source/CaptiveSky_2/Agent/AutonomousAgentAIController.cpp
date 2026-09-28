@@ -94,6 +94,13 @@ double AAutonomousAgentAIController::BackgroundDelay(int32 Repeats, double BaseS
 }
 
 bool AAutonomousAgentAIController::IsActionInProgress() const { return GetMoveStatus() == EPathFollowingStatus::Moving; }
+FVector AAutonomousAgentAIController::BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation)
+{
+	FVector Direction = MoverLocation - TargetLocation;
+	Direction.Z = 0.f;
+	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
+	return TargetLocation + Direction * ResidentApproachStandOffDistance + FVector(0.f, 0.f, ResidentApproachAltitudeOffset);
+}
 bool AAutonomousAgentAIController::CanRest() const
 {
 	const ACharacter* Body = Cast<ACharacter>(GetPawn());
@@ -394,6 +401,21 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 
 		if (TargetActor)
 		{
+			if (Cast<AAutonomousAgentCharacter>(TargetActor) && TargetActor != ControlledPawn)
+			{
+				// Resident movement targets represent a willing approach, not a request to occupy
+				// another body's capsule. Keep a comfortable stand-off; the target may move while
+				// we are travelling, so let path following track the actor rather than a stale point.
+				const EPathFollowingRequestResult::Type Result = MoveToActor(TargetActor,
+					ResidentApproachStandOffDistance, true, true, false, nullptr, false);
+				ReportAction(Result == EPathFollowingRequestResult::Failed
+					? TEXT("Approach failed: no navigable route to the other resident's conversational space.")
+					: Result == EPathFollowingRequestResult::AlreadyAtGoal
+						? TEXT("Already near the other resident. Speaking remains optional; wait, observe, or choose another activity.")
+						: TEXT("Approach started toward the other resident's conversational space; arriving does not begin a conversation."));
+				break;
+			}
+
 			// Shared landmarks can be elevated bird targets. Grounded bodies need a
 			// nearby walkable goal, not the airborne marker or a partial-path endpoint.
 			UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
