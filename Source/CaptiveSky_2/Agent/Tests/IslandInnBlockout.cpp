@@ -154,6 +154,14 @@ namespace
 				bSurface ? *FString::Printf(TEXT("%s at %.0f"), Hit.GetActor() ? *Hit.GetActor()->GetActorLabel() : TEXT("?"), Hit.ImpactPoint.Z) : TEXT("none"),
 				Navigation->ProjectPointToNavigation(At, Near, FVector(40, 40, 80)) ? *FString::Printf(TEXT("at %.0f"), Near.Location.Z) : TEXT("none")));
 		}
+		// Where Aster stood (capsule centre) after signing the guest book, then found no route anywhere for 25 minutes.
+		const FVector CounterStand(-100039.f, 103308.f, 2778.f - 90.f);
+		FNavLocation CounterNav;
+		if (Navigation->ProjectPointToNavigation(CounterStand, CounterNav, FVector(40, 40, 120)))
+			Test.AddInfo(FString::Printf(TEXT("  guest-book stand: nav at %s, %.0f cm away"), *CounterNav.Location.ToString(), FVector::Dist(CounterStand, CounterNav.Location)));
+		else
+			Test.AddInfo(TEXT("  guest-book stand: no navigation within 40 cm sideways"));
+		Walk(TEXT("Guest-book stand"), CounterStand, FVector(40, 40, 120));
 		Test.TestTrue(TEXT("Grounded residents can walk into the inn"), bInside);
 		Test.TestTrue(TEXT("Grounded residents can reach the tagged inn bed"), bBedReachable);
 		return bInside && bBedReachable && bBedTargetIsNearItsNavGoal && StairNavigationLinks == 2;
