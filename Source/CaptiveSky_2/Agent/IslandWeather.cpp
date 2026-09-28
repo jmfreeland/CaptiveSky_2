@@ -906,10 +906,16 @@ FString AIslandWeather::DescribeAt(const FVector& Position, const AActor* Observ
 	const float Storm = SampleStormIntensity(Now);
 	const float Spell = SampleSpell(Now);
 	const TCHAR* Conditions = Storm > 0.35f ? TEXT("a storm: heavy rain driven by strong, gusting wind") : Rain > 0.55f ? TEXT("a passing rain shower") : Rain > 0.08f ? TEXT("light rain beginning or fading") : Cloud < 0.3f ? TEXT("mostly clear") : Cloud < 0.7f ? TEXT("cloud cover gathering or clearing") : TEXT("overcast, but currently dry");
-	return FString::Printf(TEXT(" Local weather simulation: %s; wind towards world XY (%.2f, %.2f), %.1f metres/second, vertical current %.1f metres/second.%s Cloud coverage, density and storm character follow slow deterministic weather cycles and gently soften sunlight/skylight. Current rain intensity is %.0f%%; a finite rain-streak field is visible in outdoor views during showers. Strong rain also creates sparse Tideglass ripples and local collision-sampled ground splashes outdoors, while nearby fireflies fly lower and dim their natural pulse. Quiet local wind and distant rain ambience follow the weather when a player listener is present, softened beneath a verified inn roof."),
-		Conditions,
-		Wind.GetSafeNormal().X, Wind.GetSafeNormal().Y, Wind.Size() / 100.f, Wind.Z / 100.f,
-		bFeelingLocalGust ? TEXT(" A fading local gust is still changing the wind nearby.") : TEXT(""), Rain * 100.f)
+	// Only what a resident would feel; how the weather is rendered is not part of their world.
+	const float WindMetres = Wind.Size2D() / 100.f;
+	const FString WindFelt = WindMetres < 0.5f ? FString(TEXT("The air is still."))
+		: FString::Printf(TEXT("%s blows towards world XY (%.2f, %.2f)."),
+			WindMetres < 3.f ? TEXT("A light breeze") : WindMetres < 7.f ? TEXT("A steady wind") : TEXT("A strong, gusting wind"),
+			Wind.GetSafeNormal2D().X, Wind.GetSafeNormal2D().Y);
+	return FString::Printf(TEXT(" Weather: %s. %s%s%s"),
+		Conditions, *WindFelt,
+		bFeelingLocalGust ? TEXT(" A fading local gust is still stirring the air nearby.") : TEXT(""),
+		Rain > 0.55f ? TEXT(" Rain is falling hard enough to ripple the Tideglass.") : Rain > 0.08f ? TEXT(" A little rain is falling.") : TEXT(""))
 		+ (Now - LastStrikeTime < 25.0
 			? FString::Printf(TEXT(" Lightning flashed about %.1f kilometres away moments ago%s"), FVector::Dist2D(Position, LastStrikeGround) / 100000.f,
 				Now - LastStrikeTime >= LastThunderDelay ? TEXT(", and its thunder rolled across the Island.") : TEXT("; its thunder has not reached here yet."))
