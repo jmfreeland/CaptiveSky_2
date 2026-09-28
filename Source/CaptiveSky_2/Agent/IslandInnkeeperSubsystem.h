@@ -29,5 +29,6 @@ protected:
 private:
 	friend class FIslandInnkeeperSpawnTest;
 	static void InitializeInnkeeper(AAutonomousAgentCharacter* Agent, const FString& InAgentId);
+	static FVector GetSpawnCandidate(const AActor* InnMarker, const AActor* HearthMarker);
 	void SpawnInnkeeper(UWorld& World);
 };

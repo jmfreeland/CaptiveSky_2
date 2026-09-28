@@ -40,6 +40,17 @@ void UIslandInnkeeperSubsystem::InitializeInnkeeper(AAutonomousAgentCharacter* A
 	Agent->Tags.AddUnique(TEXT("IslandInnkeeper"));
 }
 
+FVector UIslandInnkeeperSubsystem::GetSpawnCandidate(const AActor* InnMarker, const AActor* HearthMarker)
+{
+	if (HearthMarker)
+	{
+		// The marker is in the firebox. Stand just inside the room, close enough to tend the hearth
+		// immediately without spawning in its collision or making the resident walk through it.
+		return HearthMarker->GetActorLocation() + HearthMarker->GetActorForwardVector() * 220.f;
+	}
+	return InnMarker ? InnMarker->GetActorLocation() : FVector::ZeroVector;
+}
+
 void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 {
 	if (AgentId.IsEmpty() || BodyClass.IsNull()) return;
@@ -48,13 +59,14 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 		if (It->Memory && It->Memory->GetResolvedAgentId() == AgentId) return;
 
 	AActor* InnMarker = nullptr;
+	AActor* HearthMarker = nullptr;
 	for (TActorIterator<AActor> It(&World); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("Inn")))
 		{
 			InnMarker = *It;
-			break;
 		}
+		if (It->ActorHasTag(TEXT("InnHearth"))) HearthMarker = *It;
 	}
 	if (!InnMarker)
 	{
@@ -64,10 +76,16 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 
 	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
 	FNavLocation NavLocation;
-	if (!Navigation || !Navigation->ProjectPointToNavigation(InnMarker->GetActorLocation(), NavLocation, FVector(250.f, 250.f, 250.f)))
+	const FVector SpawnCandidate = GetSpawnCandidate(InnMarker, HearthMarker);
+	if (!Navigation || !Navigation->ProjectPointToNavigation(SpawnCandidate, NavLocation, FVector(250.f, 250.f, 250.f)))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: no walkable navigation point was found at the Inn landmark."));
-		return;
+		if (!Navigation || SpawnCandidate.Equals(InnMarker->GetActorLocation()) ||
+			!Navigation->ProjectPointToNavigation(InnMarker->GetActorLocation(), NavLocation, FVector(250.f, 250.f, 250.f)))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: no walkable navigation point was found at the Inn landmark or hearth-side start."));
+			return;
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Innkeeper hearth-side start has no navmesh; falling back to the tagged Inn landmark."));
 	}
 
 	UClass* LoadedBodyClass = BodyClass.LoadSynchronous();
@@ -89,5 +107,6 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 	InitializeInnkeeper(Innkeeper, AgentId);
 	Innkeeper->FinishSpawning(SpawnTransform);
 	if (!Innkeeper->GetController()) Innkeeper->SpawnDefaultController();
-	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at the walkable Inn landmark."), *AgentId);
+	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at %s."), *AgentId,
+		HearthMarker && !SpawnCandidate.Equals(InnMarker->GetActorLocation()) ? TEXT("the walkable hearth-side start") : TEXT("the walkable Inn landmark"));
 }

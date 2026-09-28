@@ -26,6 +26,19 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
 	if (!TestNotNull(TEXT("Isolated innkeeper fixture world created"), World)) return false;
+	AActor* InnMarker = World->SpawnActor<AActor>(AActor::StaticClass(), FVector(1000.f, 0.f, 0.f), FRotator::ZeroRotator);
+	AActor* HearthMarker = World->SpawnActor<AActor>(AActor::StaticClass(), FVector::ZeroVector, FRotator(0.f, 30.f, 0.f));
+	if (!TestNotNull(TEXT("Inn landmark fixture created"), InnMarker) || !TestNotNull(TEXT("Hearth landmark fixture created"), HearthMarker))
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	const FVector HearthSideStart = UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, HearthMarker);
+	TestTrue(TEXT("The preferred start is within interaction range of the hearth"), FVector::Dist(HearthSideStart, HearthMarker->GetActorLocation()) < 400.f);
+	TestEqual(TEXT("A missing hearth falls back to the Inn landmark"), UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, nullptr), InnMarker->GetActorLocation());
+	World->DestroyActor(InnMarker);
+	World->DestroyActor(HearthMarker);
+
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
