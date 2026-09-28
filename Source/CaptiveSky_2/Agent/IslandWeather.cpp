@@ -5,6 +5,7 @@
 #include "HAL/IConsoleManager.h"
 #include "IslandDayNight.h"
 #include "IslandFirefly.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
@@ -548,12 +549,35 @@ void AIslandWeather::RefreshNightEcology()
 	}
 	else
 	{
+		AActor* NearbyListeningStones = nullptr;
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("ListeningStones")) || !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
+			const float LandmarkSeparation = FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation());
+			if (LandmarkSeparation > AIslandListeningStonesChime::AudibleRadius * 2.f && LandmarkSeparation <= 3500.f)
+			{
+				NearbyListeningStones = *It;
+				break;
+			}
+		}
 		while (NightFireflies.Num() < NightPopulation)
 		{
-			const FVector GroundOffset(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
+			FVector SpawnLocation = Habitat->GetActorLocation();
+			if (NightFireflies.IsEmpty() && NearbyListeningStones)
+			{
+				const FVector Route = (Habitat->GetActorLocation() - NearbyListeningStones->GetActorLocation()).GetSafeNormal2D();
+				SpawnLocation = NearbyListeningStones->GetActorLocation() + Route * (AIslandListeningStonesChime::AudibleRadius * 0.65f);
+				SpawnLocation.Z = FMath::Lerp(NearbyListeningStones->GetActorLocation().Z, Habitat->GetActorLocation().Z,
+					AIslandListeningStonesChime::AudibleRadius * 0.65f / FVector::Dist2D(NearbyListeningStones->GetActorLocation(), Habitat->GetActorLocation()));
+				SpawnLocation.Z += FMath::FRandRange(15.f, 35.f);
+			}
+			else
+			{
+				SpawnLocation += FVector(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(15.f, 35.f));
+			}
 			FActorSpawnParameters SpawnParameters;
 			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(Habitat->GetActorLocation() + GroundOffset, FRotator::ZeroRotator, SpawnParameters))
+			if (AIslandFirefly* Firefly = GetWorld()->SpawnActor<AIslandFirefly>(SpawnLocation, FRotator::ZeroRotator, SpawnParameters))
 				NightFireflies.Add(Firefly);
 			else
 				break;

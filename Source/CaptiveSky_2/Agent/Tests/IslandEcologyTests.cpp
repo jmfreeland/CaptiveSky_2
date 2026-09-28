@@ -98,9 +98,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(Spawn);
-	AActor* Habitat = World->SpawnActor<AActor>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
+	ATargetPoint* Habitat = World->SpawnActor<ATargetPoint>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
+	ATargetPoint* NightStonesHabitat = World->SpawnActor<ATargetPoint>(FVector(3500.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
 	AActor* Ground = World->SpawnActor<AActor>(Spawn);
-	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Clock actor spawned"), Clock) || !TestNotNull(TEXT("Habitat marker spawned"), Habitat))
+	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Clock actor spawned"), Clock) ||
+		!TestNotNull(TEXT("Habitat marker spawned"), Habitat) || !TestNotNull(TEXT("Nearby ListeningStones habitat marker spawned"), NightStonesHabitat))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -119,6 +121,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	GroundBox->RegisterComponent();
 	Ground->SetActorLocation(FVector(0.f, 0.f, -20.f));
 	Habitat->Tags.Add(TEXT("TideglassPool"));
+	NightStonesHabitat->Tags.Add(TEXT("ListeningStones"));
+	NightStonesHabitat->Tags.Add(TEXT("IslandLandmark"));
 	const int32 OriginalWeatherSeed = Weather->WeatherSeed;
 	float PeakRain = -1.f;
 	float LowestRain = 2.f;
@@ -259,13 +263,19 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 
 	Clock->CurrentHour = 20.f;
 	Weather->RefreshNightEcology();
+	int32 StoneSideFireflies = 0;
 	Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It)
 	{
 		++Population;
 		TestTrue(TEXT("Firefly advertises as ambient life"), It->ActorHasTag(TEXT("IslandLife")));
 		TestTrue(TEXT("Firefly remains untargeted wildlife"), !It->ActorHasTag(TEXT("IslandLandmark")) && !It->ActorHasTag(TEXT("RavenNestSite")));
-		TestTrue(TEXT("Firefly stays near its Tideglass habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 700.f);
+		const float PoolDistance = FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation());
+		const float StonesDistance = FVector::Dist(It->GetActorLocation(), NightStonesHabitat->GetActorLocation());
+		AddInfo(FString::Printf(TEXT("Night firefly %s is %.1f cm from Tideglass and %.1f cm from ListeningStones"), *It->GetName(), PoolDistance, StonesDistance));
+		TestTrue(TEXT("Night fireflies stay at Tideglass or within the stones' existing sound radius"),
+			PoolDistance < 700.f || StonesDistance <= AIslandListeningStonesChime::AudibleRadius);
+		if (StonesDistance <= AIslandListeningStonesChime::AudibleRadius) ++StoneSideFireflies;
 		TestNotNull(TEXT("Firefly has a fluctuating glow component"), It->FindComponentByClass<UPointLightComponent>());
 		TestNotNull(TEXT("Firefly has its segmented body mesh"), It->FindComponentByClass<UStaticMeshComponent>());
 		TArray<UStaticMeshComponent*> BodyParts;
@@ -281,6 +291,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
+	TestEqual(TEXT("One independently spawned night firefly inhabits the route within chime range"), StoneSideFireflies, 1);
+	NightStonesHabitat->Tags.Remove(TEXT("ListeningStones"));
+	NightStonesHabitat->Tags.Remove(TEXT("IslandLandmark"));
 	CrabPopulation = 0;
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
 	{
