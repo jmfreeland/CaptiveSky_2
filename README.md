@@ -384,6 +384,8 @@ The current continuous-thinking-cap fix compiled in UE 5.8.3, and the focused `S
 
 Also on 2026-09-28, `CaptiveSky2.Agent.RavenFlight` passed on UE 5.8.3 with a raven beneath a synthetic low canopy. Takeoff now looks for a capsule-clear sideways exit, favors the intended destination direction, climbs at the first clear edge, then resumes the planned flight. This verifies the collision behavior in an automation fixture; the Island's placed roosts and rendered play still need a live check.
 
+Wandering also now ranks complete, reachable candidates by their distance from the resident's last eight successful wander destinations. This is a lightweight novelty cue, not a landmark-seeking rule: a fresh time-capped continuous run should check whether paths become less repetitive without pushing residents toward places they have not perceived.
+
 Earlier roadmap notes:
 
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).

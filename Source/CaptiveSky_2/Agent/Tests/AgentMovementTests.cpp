@@ -56,6 +56,12 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::IsUsableWanderPath(MakePath(false), WanderOrigin, WanderOrigin));
 	TestFalse(TEXT("Wander rejects a missing route"),
 		AAutonomousAgentAIController::IsUsableWanderPath(nullptr, WanderOrigin, WanderGoal));
+	const TArray<FVector> RecentDestinations = { FVector::ZeroVector, FVector(1000.f, 0.f, 0.f) };
+	TestTrue(TEXT("Wander gives a higher score to a candidate far from recent destinations"),
+		AAutonomousAgentAIController::WanderNoveltyScore(FVector(0.f, 1500.f, 0.f), RecentDestinations) >
+		AAutonomousAgentAIController::WanderNoveltyScore(FVector(0.f, 100.f, 0.f), RecentDestinations));
+	TestEqual(TEXT("A new resident's first wander remains unbiased by nonexistent history"),
+		AAutonomousAgentAIController::WanderNoveltyScore(WanderGoal, {}), 0.f);
 	TestTrue(TEXT("Wander stop tolerance allows capsule overlap at navigation endpoints"),
 		AAutonomousAgentAIController::WanderAcceptanceRadius > 0.f);
 	return true;

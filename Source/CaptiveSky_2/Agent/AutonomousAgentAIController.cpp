@@ -45,6 +45,8 @@ void AAutonomousAgentAIController::OnPossess(APawn* InPawn)
 	NextThinkAt = FPlatformTime::Seconds() + 2;
 	NextRestAt = FPlatformTime::Seconds() + 600;
 	BoundedAutonomousRequests = RepeatedActions = 0;
+	RecentWanderDestinations.Reset();
+	bCurrentMoveIsWander = false;
 	LastActionKey.Empty();
 	InspectedUntil.Reset();
 	GetWorldTimerManager().SetTimer(ThinkTimerHandle, this, &AAutonomousAgentAIController::Think, 1.f, true, 2.f);
@@ -114,6 +116,14 @@ bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Pat
 {
 	return Path && Path->IsValid() && !Path->IsPartial() &&
 		FVector::DistSquared2D(Origin, Goal) >= FMath::Square(WanderMinimumDistance);
+}
+float AAutonomousAgentAIController::WanderNoveltyScore(const FVector& Candidate, const TArray<FVector>& RecentDestinations)
+{
+	if (RecentDestinations.IsEmpty()) return 0.f;
+	float NearestRecentDistanceSquared = TNumericLimits<float>::Max();
+	for (const FVector& Recent : RecentDestinations)
+		NearestRecentDistanceSquared = FMath::Min(NearestRecentDistanceSquared, FVector::DistSquared2D(Candidate, Recent));
+	return NearestRecentDistanceSquared;
 }
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
@@ -275,6 +285,15 @@ FString AAutonomousAgentAIController::DescribeActionState() const
 void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
 	Super::OnMoveCompleted(RequestID, Result);
+	if (bCurrentMoveIsWander && Result.IsSuccess())
+	{
+		if (const APawn* ControlledPawn = GetPawn())
+		{
+			RecentWanderDestinations.Add(ControlledPawn->GetActorLocation());
+			if (RecentWanderDestinations.Num() > 8) RecentWanderDestinations.RemoveAt(0);
+		}
+	}
+	bCurrentMoveIsWander = false;
 	ReportAction(Result.IsSuccess() ? TEXT("Reached the requested destination. Arrival is complete; it does not imply an interaction or a discovery.") : TEXT("Movement did not complete (blocked, cancelled, or unreachable). Choose a reachable destination instead of repeating this route."));
 }
 void AAutonomousAgentAIController::InspectTarget(FName Target)
@@ -441,6 +460,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	{
 	case EAgentActionType::Wander:
 	{
+		bCurrentMoveIsWander = false;
 		if (UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld()))
 		{
 			const FVector Origin = ControlledPawn->GetActorLocation();
@@ -448,15 +468,18 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			ANavigationData* NavData = NavSys->GetNavDataForProps(AgentProperties);
 			FNavLocation Destination;
 			bool bFoundFullRoute = false;
+			float BestNoveltyScore = -1.f;
 			for (int32 Attempt = 0; Attempt < 8; ++Attempt)
 			{
 				FNavLocation Candidate;
 				if (!NavData || !NavSys->GetRandomReachablePointInRadius(Origin, WanderRadius, Candidate, NavData)) break;
 				const UNavigationPath* Route = NavSys->FindPathToLocationSynchronously(GetWorld(), Origin, Candidate.Location, ControlledPawn);
 				if (!IsUsableWanderPath(Route, Origin, Candidate.Location)) continue;
+				const float NoveltyScore = WanderNoveltyScore(Candidate.Location, RecentWanderDestinations);
+				if (bFoundFullRoute && NoveltyScore <= BestNoveltyScore) continue;
 				Destination = Candidate;
 				bFoundFullRoute = true;
-				break;
+				BestNoveltyScore = NoveltyScore;
 			}
 			if (bFoundFullRoute)
 			{
@@ -464,6 +487,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				// Stop with overlap tolerance and reject partial paths instead of timing out at a wall.
 				const EPathFollowingRequestResult::Type Request = MoveToLocation(Destination.Location,
 					WanderAcceptanceRadius, true, true, false, false, nullptr, false);
+				bCurrentMoveIsWander = Request == EPathFollowingRequestResult::RequestSuccessful;
 				ReportAction(Request == EPathFollowingRequestResult::Failed ? TEXT("Wandering failed: no navigable route.") : Request == EPathFollowingRequestResult::AlreadyAtGoal ? TEXT("Already at the wandering destination; waiting quietly.") : TEXT("Wandering movement started; arrival is not yet complete."));
 				break;
 			}
