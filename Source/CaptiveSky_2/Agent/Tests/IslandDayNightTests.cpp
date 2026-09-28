@@ -72,6 +72,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->UpdateLighting();
 	TestTrue(TEXT("Overcast cloud signal dims the actual directional sunlight"), Sun->GetLightComponent()->Intensity < ClearSun * 0.8f);
 	TestTrue(TEXT("Overcast cloud signal dims the actual skylight"), Sky->GetLightComponent()->Intensity < ClearSky * 0.75f);
+	Weather->WeatherSeed = ClearSeed;
+	Clock->CurrentHour = 0.f;
+	Clock->MoonIntensity = 0.24f;
+	Clock->UpdateLighting();
+	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
+	TestTrue(TEXT("A clear midnight keeps the moon light active"), FMath::IsNearlyEqual(Clock->Moon->Intensity, Clock->MoonIntensity, 0.001f));
+	TestTrue(TEXT("The ambient sky retains the tested low-light visibility floor"),
+		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,
+			AIslandDayNight::NightSkylightFloor * AIslandDayNight::CloudSkylightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;

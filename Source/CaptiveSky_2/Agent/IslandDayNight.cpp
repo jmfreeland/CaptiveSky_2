@@ -127,7 +127,7 @@ void AIslandDayNight::UpdateLighting()
 	}
 	Moon->SetWorldRotation(FRotator(-Angle + 180.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * FMath::SmoothStep(0.02f, 0.25f, -Height));
-	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(0.12f, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
+	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
 }
 
 FString AIslandDayNight::DescribeTime() const

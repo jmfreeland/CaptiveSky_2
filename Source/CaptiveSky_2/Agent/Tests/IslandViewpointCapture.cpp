@@ -13,7 +13,10 @@
 #include "IslandCurio.h"
 #include "IslandArrangement.h"
 #include "IslandGuestBook.h"
+#include "IslandFirefly.h"
+#include "IslandWeather.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/PointLightComponent.h"
 #include "ContentStreaming.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
@@ -70,8 +73,10 @@ namespace
 	class FIslandViewpointCaptureCommand : public IAutomationLatentCommand
 	{
 	public:
-		FIslandViewpointCaptureCommand(UWorld* InWorld, TArray<FIslandViewpoint> InViewpoints, float InHour, FIntPoint InSize, FString InDirectory, FAutomationTestBase* InTest)
-			: World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize), Directory(MoveTemp(InDirectory)), Test(InTest) {}
+		FIslandViewpointCaptureCommand(UWorld* InWorld, TArray<FIslandViewpoint> InViewpoints, float InHour, FIntPoint InSize, FString InDirectory,
+			FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, TArray<TWeakObjectPtr<AActor>> InPreviewActors)
+			: PreviewActors(MoveTemp(InPreviewActors)), World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize),
+			  Directory(MoveTemp(InDirectory)), Test(InTest), Clock(InClock), OriginalStartHour(InOriginalStartHour) {}
 
 		virtual bool Update() override
 		{
@@ -82,8 +87,11 @@ namespace
 				for (TActorIterator<AIslandDayNight> It(World.Get()); It; ++It)
 				{
 					// Preview lighting at the requested hour, exactly as editing Start Hour would; restored afterwards.
-					Clock = *It;
-					OriginalStartHour = It->StartHour;
+					if (!Clock.IsValid())
+					{
+						Clock = *It;
+						OriginalStartHour = It->StartHour;
+					}
 					It->StartHour = Hour;
 					It->OnConstruction(It->GetActorTransform());
 					break;
@@ -256,8 +264,75 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	Root->TryGetNumberField(TEXT("width"), Width);
 	Root->TryGetNumberField(TEXT("height"), Height);
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointHour="), Hour);
+	const bool bNightFireflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointNightFireflies"));
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
+	AIslandDayNight* PreviewClock = nullptr;
+	float OriginalStartHour = 9.f;
+	TArray<TWeakObjectPtr<AActor>> PreviewActors;
+	if (bNightFireflyPreview)
+	{
+		if (!(Hour >= 19.0 || Hour < 5.0))
+		{
+			AddError(TEXT("Night firefly preview requires a night hour (19:00–05:00); pass -Hour 20."));
+			return false;
+		}
+		for (TActorIterator<AIslandDayNight> It(Island); It; ++It)
+		{
+			PreviewClock = *It;
+			OriginalStartHour = It->StartHour;
+			It->StartHour = Hour;
+			It->OnConstruction(It->GetActorTransform());
+			break;
+		}
+		AIslandWeather* PreviewWeather = nullptr;
+		for (TActorIterator<AIslandWeather> It(Island); It; ++It) { PreviewWeather = *It; break; }
+		if (!PreviewClock || !PreviewWeather)
+		{
+			if (PreviewClock)
+			{
+				PreviewClock->StartHour = OriginalStartHour;
+				PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
+			}
+			AddError(TEXT("Night firefly preview needs the Island day/night and weather actors."));
+			return false;
+		}
+		TSet<AIslandFirefly*> ExistingFireflies;
+		for (TActorIterator<AIslandFirefly> It(Island); It; ++It) ExistingFireflies.Add(*It);
+		PreviewWeather->RefreshNightEcology();
+		AActor* Stones = nullptr;
+		for (TActorIterator<AActor> It(Island); It; ++It)
+			if (It->ActorHasTag(TEXT("ListeningStones")) && It->ActorHasTag(TEXT("IslandLandmark"))) { Stones = *It; break; }
+		AIslandFirefly* RouteFirefly = nullptr;
+		float NearestStoneDistance = TNumericLimits<float>::Max();
+		for (TActorIterator<AIslandFirefly> It(Island); It; ++It)
+		{
+			if (ExistingFireflies.Contains(*It)) continue;
+			PreviewActors.Add(*It);
+			if (UPointLightComponent* Glow = It->FindComponentByClass<UPointLightComponent>())
+			{
+				Glow->SetIntensity(It->GlowIntensity);
+				Glow->SetVisibility(true);
+			}
+			if (Stones)
+			{
+				const float Distance = FVector::Dist(It->GetActorLocation(), Stones->GetActorLocation());
+				if (Distance < NearestStoneDistance) { NearestStoneDistance = Distance; RouteFirefly = *It; }
+			}
+		}
+		if (!RouteFirefly || PreviewActors.IsEmpty())
+		{
+			for (const TWeakObjectPtr<AActor>& Preview : PreviewActors) if (Preview.IsValid()) Preview->Destroy();
+			PreviewActors.Reset();
+			PreviewClock->StartHour = OriginalStartHour;
+			PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
+			AddError(TEXT("The Island map did not produce a route-side night firefly for capture."));
+			return false;
+		}
+		RouteFirefly->Tags.AddUnique(TEXT("NightPreviewFirefly"));
+		AddInfo(FString::Printf(TEXT("Night ecology preview spawned %d transient firefly actors; route-side light is %.0f cm from ListeningStones."),
+			PreviewActors.Num(), NearestStoneDistance));
+	}
 
 	// Log the landmarks so compositions can be planned against real coordinates.
 	for (TActorIterator<AActor> It(Island); It; ++It)
@@ -275,6 +350,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			FIslandViewpoint View;
 			(*Object)->TryGetStringField(TEXT("name"), View.Name);
 			if (!Only.IsEmpty() && !View.Name.Contains(Only)) continue;
+			bool bRequiresNightFireflies = false;
+			(*Object)->TryGetBoolField(TEXT("night_fireflies"), bRequiresNightFireflies);
+			if (bRequiresNightFireflies && !bNightFireflyPreview) continue;
 			double FieldOfView = 60.0, MinimumHeight = 160.0;
 			(*Object)->TryGetNumberField(TEXT("fov"), FieldOfView);
 			(*Object)->TryGetNumberField(TEXT("min_height"), MinimumHeight);
@@ -297,10 +375,21 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			Viewpoints.Add(View);
 		}
 	}
-	if (!TestTrue(TEXT("At least one viewpoint resolved"), Viewpoints.Num() > 0)) return false;
+	if (!TestTrue(TEXT("At least one viewpoint resolved"), Viewpoints.Num() > 0))
+	{
+		for (const TWeakObjectPtr<AActor>& Preview : PreviewActors) if (Preview.IsValid()) Preview->Destroy();
+		if (PreviewClock)
+		{
+			PreviewClock->StartHour = OriginalStartHour;
+			PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
+		}
+		return false;
+	}
 	const FString Directory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Viewpoints") /
 		FString::Printf(TEXT("%s_h%04.1f"), *FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H%M%S")), Hour));
-	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour), FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this));
+	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
+		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
+		PreviewClock, OriginalStartHour, MoveTemp(PreviewActors)));
 	return true;
 }
 

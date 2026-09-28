@@ -11,10 +11,13 @@ The editor must be built first. Close any running editor on this project before 
 .EXAMPLE
 ./Scripts/Capture-Viewpoints.ps1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 7.5 -Only Tideglass
+./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
 #>
 param(
 	[double]$Hour = -1,
 	[string]$Only = "",
+	[switch]$NightFireflies,
+	[switch]$NoWorldState,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
 
@@ -25,8 +28,11 @@ if (-not (Test-Path $editor)) { throw "UnrealEditor-Cmd.exe not found under $Eng
 $log = Join-Path $env:TEMP "CaptiveSky_Viewpoints.log"
 
 $extra = @()
+if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
 if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
+if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
+if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `
 	-unattended -RenderOffscreen -nosplash -nosound -NoZen -DDC-ForceMemoryCache "-abslog=$log" @extra | Out-Null

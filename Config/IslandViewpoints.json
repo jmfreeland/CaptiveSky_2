@@ -165,6 +165,20 @@
 			},
 			"fov": 60,
 			"min_height": 300
+		},
+		{
+			"name": "05_StonesFirefly",
+			"from": {
+				"tag": "ListeningStones",
+				"offset": [700, -200, 150]
+			},
+			"look": {
+				"tag": "NightPreviewFirefly",
+				"offset": [0, 0, 0]
+			},
+			"fov": 50,
+			"min_height": -1,
+			"night_fireflies": true
 		}
 	]
 }

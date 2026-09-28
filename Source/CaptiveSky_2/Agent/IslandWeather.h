@@ -94,6 +94,7 @@ private:
 	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandMinnowTest;
+	friend class FIslandViewpointCaptureTest;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
