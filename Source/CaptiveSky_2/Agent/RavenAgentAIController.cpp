@@ -264,11 +264,44 @@ bool ARavenAgentAIController::BeginPerchAt(AActor* Perch)
 
 void ARavenAgentAIController::SetGrounded()
 {
+	FlightWaypoints.Reset();
 	bHasMovementTarget = false;
 	bTargetIsPerch = false;
 	bApproachingPerch = false;
 	LocomotionState = ERavenLocomotionState::Grounded;
 	SetFlyingMovement(false);
+}
+
+FVector ARavenAgentAIController::PlanFlightLeg(const FVector& From, const FVector& To)
+{
+	FlightWaypoints.Reset();
+	APawn* Raven = GetPawn();
+	if (!Raven || !GetWorld()) return To;
+	const ACharacter* RavenCharacter = Cast<ACharacter>(Raven);
+	const float Radius = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 30.f;
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	const FCollisionShape Body = FCollisionShape::MakeCapsule(Radius, HalfHeight);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenFlightPlan), false, Raven);
+	FHitResult Hit;
+	if (!GetWorld()->SweepSingleByChannel(Hit, From, To, FQuat::Identity, ECC_WorldStatic, Body, Query)) return To;
+
+	// Something is in the way: find the highest solid surface along the route and cross above it.
+	float Highest = FMath::Max(From.Z, To.Z);
+	const int32 Samples = FMath::Clamp(FMath::CeilToInt(FVector::Dist2D(From, To) / 250.f), 2, 64);
+	for (int32 Index = 0; Index <= Samples; ++Index)
+	{
+		const FVector Probe = FMath::Lerp(From, To, Index / static_cast<float>(Samples));
+		FHitResult Top;
+		if (GetWorld()->LineTraceSingleByChannel(Top, FVector(Probe.X, Probe.Y, Highest + 20000.f), FVector(Probe.X, Probe.Y, Probe.Z - 1000.f), ECC_WorldStatic, Query))
+			Highest = FMath::Max(Highest, static_cast<float>(Top.ImpactPoint.Z));
+	}
+	const float Cruise = Highest + HalfHeight + 250.f;
+	const FVector Up(From.X, From.Y, FMath::Max(Cruise, From.Z));
+	const FVector Over(To.X, To.Y, Up.Z);
+	// If even the climb is blocked (a roof overhead), fly as before and let the obstruction be reported.
+	if (GetWorld()->SweepSingleByChannel(Hit, From, Up, FQuat::Identity, ECC_WorldStatic, Body, Query)) return To;
+	FlightWaypoints = { Over, To };
+	return Up;
 }
 
 bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
@@ -296,6 +329,7 @@ bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
 	if (Hit.bBlockingHit)
 	{
 		// Obstruction is not a successful landing/perch. Stop and allow another decision.
+		FlightWaypoints.Reset();
 		bHasMovementTarget = false;
 		bTargetIsPerch = false;
 		bApproachingPerch = false;
@@ -313,6 +347,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	if (Decision.ActionType == EAgentActionType::Idle)
 	{
 		bHasMovementTarget = bApproachingPerch = bTargetIsPerch = false;
+		FlightWaypoints.Reset();
 		if (LocomotionState == ERavenLocomotionState::TakingOff || LocomotionState == ERavenLocomotionState::Landing || LocomotionState == ERavenLocomotionState::Hopping)
 		{
 			LocomotionState = ERavenLocomotionState::Flying;
@@ -346,7 +381,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			const float Choice = FMath::FRand();
 			if (Choice < 0.18f) BeginLanding(GetPawn()->GetActorLocation());
 			else if (Choice < 0.32f && BeginPerch()) {}
-			else { MovementTarget = MakeCruiseTarget(); bHasMovementTarget = true; bApproachingPerch = bTargetIsPerch = false; }
+			else { MovementTarget = PlanFlightLeg(GetPawn()->GetActorLocation(), MakeCruiseTarget()); bHasMovementTarget = true; bApproachingPerch = bTargetIsPerch = false; }
 		}
 		return;
 	}
@@ -367,7 +402,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			ReportAction(TEXT("Flight to the landmark started; arrival is not yet complete."));
 			if (LocomotionState == ERavenLocomotionState::Grounded || LocomotionState == ERavenLocomotionState::Perched)
 				BeginTakeoff(Destination);
-			else { MovementTarget = Destination; bHasMovementTarget = true; bApproachingPerch = bTargetIsPerch = false; LocomotionState = ERavenLocomotionState::Flying; SetFlyingMovement(true); }
+			else { MovementTarget = PlanFlightLeg(GetPawn()->GetActorLocation(), Destination); bHasMovementTarget = true; bApproachingPerch = bTargetIsPerch = false; LocomotionState = ERavenLocomotionState::Flying; SetFlyingMovement(true); }
 			return;
 		}
 	}
@@ -397,11 +432,19 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	if (!AdvanceTowardsTarget(DeltaSeconds)) return;
 
 	bHasMovementTarget = false;
+	// A planned flight continues leg by leg before any arrival handling.
+	if (LocomotionState == ERavenLocomotionState::Flying && FlightWaypoints.Num() > 0)
+	{
+		MovementTarget = FlightWaypoints[0];
+		FlightWaypoints.RemoveAt(0);
+		bHasMovementTarget = true;
+		return;
+	}
 	if (LocomotionState == ERavenLocomotionState::TakingOff)
 	{
-		MovementTarget = CruiseTarget;
-		bHasMovementTarget = true;
 		LocomotionState = ERavenLocomotionState::Flying;
+		MovementTarget = PlanFlightLeg(Raven->GetActorLocation(), CruiseTarget);
+		bHasMovementTarget = true;
 	}
 	else if (LocomotionState == ERavenLocomotionState::Flying && bApproachingPerch)
 	{

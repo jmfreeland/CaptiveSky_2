@@ -66,6 +66,7 @@ protected:
 private:
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
+	friend class FRavenFlightTest;
 	friend class FIslandCurioTest;
 	friend class FIslandArrangementTest;
 	friend class FIslandGuestBookTest;
@@ -80,6 +81,10 @@ private:
 	bool bHasMovementTarget = false;
 	bool bTargetIsPerch = false;
 	bool bApproachingPerch = false;
+	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
+	TArray<FVector> FlightWaypoints;
+	/** First target for flying From -> To: To itself when the way is clear, else a climb above what blocks it. */
+	FVector PlanFlightLeg(const FVector& From, const FVector& To);
 	TMap<FName, double> WovenUntil;
 
 	AActor* FindPerchedNestSite() const;

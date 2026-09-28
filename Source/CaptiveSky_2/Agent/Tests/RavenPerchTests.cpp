@@ -200,3 +200,57 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	}
 	return true;
 }
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenFlightTest, "CaptiveSky2.Agent.RavenFlight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRavenFlightTest::RunTest(const FString& Parameters)
+{
+	// A wall stands between the raven and a landmark; the raven should climb over it, not stop at it.
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	auto Block = [World](const FVector& Centre, const FVector& Extent)
+	{
+		AActor* Actor = World->SpawnActor<AActor>();
+		UBoxComponent* Box = NewObject<UBoxComponent>(Actor);
+		Actor->SetRootComponent(Box);
+		Box->SetBoxExtent(Extent);
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		Actor->SetActorLocation(Centre);
+		return Actor;
+	};
+	Block(FVector(0, 0, -50), FVector(8000, 8000, 50));    // ground
+	Block(FVector(1500, 0, 400), FVector(40, 1500, 400));  // an 8 m wall across the route
+	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0, 0, 100), FRotator::ZeroRotator);
+	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
+	ATargetPoint* Landmark = World->SpawnActor<ATargetPoint>(FVector(3000, 0, 100), FRotator::ZeroRotator);
+	Landmark->Tags = {TEXT("FarLandmark"), TEXT("IslandLandmark")};
+	World->BeginPlay();
+	Controller->Possess(Raven);
+
+	FAgentDecision Fly;
+	Fly.bValid = true;
+	Fly.ActionType = EAgentActionType::MoveTo;
+	Fly.ActionTarget = TEXT("FarLandmark");
+	Controller->ActOnDecision(Fly);
+	float HighestZ = 0.f;
+	for (int32 Step = 0; Step < 60 * 30 && (Controller->bHasMovementTarget || Controller->FlightWaypoints.Num() > 0); ++Step)
+	{
+		Controller->Tick(1.f / 60.f);
+		HighestZ = FMath::Max(HighestZ, static_cast<float>(Raven->GetActorLocation().Z));
+	}
+	const FVector Destination = Landmark->GetActorLocation() + FVector(0, 0, 180);
+	TestFalse(TEXT("The wall does not stop the flight"), Controller->DescribeActionState().Contains(TEXT("blocked by geometry")));
+	TestTrue(TEXT("The raven arrives at the far landmark"), Raven->GetActorLocation().Equals(Destination, 40.f));
+	TestTrue(TEXT("It crossed above the wall"), HighestZ > 800.f);
+
+	// A clear route stays a straight flight with no detour.
+	TestTrue(TEXT("A clear route is flown directly"), Controller->PlanFlightLeg(FVector(2500, 0, 300), FVector(3500, 0, 300)).Equals(FVector(3500, 0, 300)) && Controller->FlightWaypoints.Num() == 0);
+	Controller->UnPossess();
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
