@@ -47,6 +47,9 @@ private:
 	TWeakObjectPtr<AIslandWeather> Weather;
 	float Phase = 0.f;
 	float ScurryRemaining = 0.f;
+	float RavenFlybyCooldownRemaining = 0.f;
+	float RavenCheckRemaining = 0.f;
 	bool bIsSheltered = false;
+	void CheckForLowRavenFlyby();
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;
 };

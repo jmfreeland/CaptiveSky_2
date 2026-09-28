@@ -1,5 +1,7 @@
 #include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
+#include "RavenAgentAIController.h"
+#include "GameFramework/Pawn.h"
 #include "Components/StaticMeshComponent.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
@@ -98,6 +100,31 @@ void AIslandTidepoolCrab::RespondToQuietObservation(const FVector& ObserverLocat
 	ScurryRemaining = 2.4f;
 }
 
+void AIslandTidepoolCrab::CheckForLowRavenFlyby()
+{
+	if (!GetWorld() || bIsSheltered || ScurryRemaining > 0.f || RavenFlybyCooldownRemaining > 0.f) return;
+
+	constexpr float FlybyRadius = 425.f;
+	constexpr float MinimumHeight = 120.f;
+	constexpr float MaximumHeight = 480.f;
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
+		const APawn* Raven = It->GetPawn();
+		if (!IsValid(Raven)) continue;
+
+		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
+		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight || Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
+			continue;
+
+		// A close, low pass briefly startles the crab away from the bird; it remains
+		// wild and resumes its local routine without becoming a target or changing state.
+		RespondToQuietObservation(Raven->GetActorLocation());
+		RavenFlybyCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 void AIslandTidepoolCrab::SetSheltered(bool bSheltered)
 {
 	if (bIsSheltered == bSheltered) return;
@@ -137,7 +164,15 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (!GetWorld()) return;
 	const float Time = GetWorld()->GetTimeSeconds();
-	ScurryRemaining = FMath::Max(0.f, ScurryRemaining - FMath::Max(0.f, DeltaSeconds));
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	ScurryRemaining = FMath::Max(0.f, ScurryRemaining - SafeDelta);
+	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	RavenCheckRemaining -= SafeDelta;
+	if (RavenCheckRemaining <= 0.f)
+	{
+		RavenCheckRemaining = 0.35f;
+		CheckForLowRavenFlyby();
+	}
 	const float Angle = Time * 0.12f + Phase;
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float RainScale = RainMovementScale(Rain);

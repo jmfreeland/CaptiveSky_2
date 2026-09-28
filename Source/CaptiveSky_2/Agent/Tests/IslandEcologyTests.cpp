@@ -468,6 +468,33 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(*FString::Printf(TEXT("Crab moves only a short distance toward cover (%.1f cm at %s)"), ScurryDistance, *WatchableCrab->GetActorLocation().ToString()), ScurryDistance > 1.f && ScurryDistance < 140.f);
 		WatchableCrab->Tick(2.f);
 		TestTrue(TEXT("Crab resumes its local idle path without a persistent state change"), FMath::IsNearlyZero(WatchableCrab->ScurryRemaining) && FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart) < 100.f);
+
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
+		const FVector LowPassLocation = CrabStart + FVector(200.f, 0.f, 260.f);
+		Observer->SetActorLocation(LowPassLocation);
+		WatchableCrab->SetActorLocation(CrabStart);
+		WatchableCrab->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A nearby low raven pass briefly startles the shore crab"),
+			WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+		const FVector AwayFromRaven = (CrabStart - LowPassLocation).GetSafeNormal2D();
+		TestTrue(TEXT("The shore crab scurries away from the passing raven"),
+			FVector::DotProduct(WatchableCrab->ScurryDirection, AwayFromRaven) > 0.95f);
+		TestEqual(TEXT("One low pass starts a short response cooldown"), WatchableCrab->RavenFlybyCooldownRemaining, 8.f);
+
+		WatchableCrab->ScurryRemaining = 0.f;
+		WatchableCrab->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A hovering raven cannot retrigger the response during cooldown"),
+			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+		WatchableCrab->RavenFlybyCooldownRemaining = 0.f;
+		Observer->SetActorLocation(CrabStart + FVector(0.f, 0.f, 900.f));
+		WatchableCrab->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A high raven flight does not startle a shore crab"),
+			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+		Observer->SetActorLocation(CrabStart + FVector(800.f, 0.f, 260.f));
+		WatchableCrab->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A low but distant flight does not startle a shore crab"),
+			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 	}
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(TestPoolLocation + FVector(80.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	WindTarget->SetActorLocation(TestPoolLocation + FVector(220.f, 0.f, 0.f));
