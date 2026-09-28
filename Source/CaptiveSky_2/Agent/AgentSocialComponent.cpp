@@ -35,6 +35,11 @@ void UAgentSocialComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		Brain->OnDecisionReady.RemoveDynamic(this, &UAgentSocialComponent::HandleDecisionReady);
 	}
+	if (!ActiveAutomaticConversationId.IsEmpty())
+	{
+		FinishAutomaticConversation(FindAgent(ActiveAutomaticConversationPartnerId),
+			ActiveAutomaticConversationId, true);
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -89,6 +94,75 @@ bool UAgentSocialComponent::IsCoolingDownWith(const FString& OtherAgentId) const
 	return GetConversationCooldownRemainingWith(OtherAgentId) > 0.f;
 }
 
+bool UAgentSocialComponent::TryReserveAutomaticConversation(UAgentSocialComponent* OtherSocial,
+	const FString& OwnAgentId, const FString& OtherAgentId, const FString& ConversationId)
+{
+	if (!OtherSocial || OwnAgentId.IsEmpty() || OtherAgentId.IsEmpty() || ConversationId.IsEmpty() ||
+		!ActiveAutomaticConversationId.IsEmpty() || !OtherSocial->ActiveAutomaticConversationId.IsEmpty() ||
+		bHandlingUtterance || OtherSocial->bHandlingUtterance || !PendingUtterances.IsEmpty() ||
+		!OtherSocial->PendingUtterances.IsEmpty() || IsCoolingDownWith(OtherAgentId) ||
+		OtherSocial->IsCoolingDownWith(OwnAgentId))
+	{
+		return false;
+	}
+
+	ActiveAutomaticConversationId = ConversationId;
+	ActiveAutomaticConversationPartnerId = OtherAgentId;
+	OtherSocial->ActiveAutomaticConversationId = ConversationId;
+	OtherSocial->ActiveAutomaticConversationPartnerId = OwnAgentId;
+	return true;
+}
+
+bool UAgentSocialComponent::IsReservedFor(const FString& OtherAgentId, const FString& ConversationId) const
+{
+	return !ConversationId.IsEmpty() && ActiveAutomaticConversationId == ConversationId &&
+		ActiveAutomaticConversationPartnerId == OtherAgentId;
+}
+
+void UAgentSocialComponent::ReleaseAutomaticConversation(UAgentSocialComponent* OtherSocial,
+	const FString& ConversationId)
+{
+	if (ConversationId.IsEmpty() || ActiveAutomaticConversationId != ConversationId)
+	{
+		return;
+	}
+
+	ActiveAutomaticConversationId.Reset();
+	ActiveAutomaticConversationPartnerId.Reset();
+	if (OtherSocial && OtherSocial->ActiveAutomaticConversationId == ConversationId)
+	{
+		OtherSocial->ActiveAutomaticConversationId.Reset();
+		OtherSocial->ActiveAutomaticConversationPartnerId.Reset();
+	}
+
+	PendingUtterances.RemoveAll([&ConversationId](const FAgentSocialUtterance& Utterance)
+	{
+		return Utterance.ConversationId == ConversationId;
+	});
+}
+
+bool UAgentSocialComponent::IsConversationAtTurnLimit(int32 TurnIndex) const
+{
+	return TurnIndex >= FMath::Max(1, MaximumConversationTurns);
+}
+
+void UAgentSocialComponent::FinishAutomaticConversation(AAutonomousAgentCharacter* Other,
+	const FString& ConversationId, bool bApplyCooldown)
+{
+	if (ConversationId.IsEmpty() || ActiveAutomaticConversationId != ConversationId)
+	{
+		return;
+	}
+
+	if (bApplyCooldown)
+	{
+		ApplyMutualCooldown(Other);
+	}
+
+	ReleaseAutomaticConversation(Other ? Other->FindComponentByClass<UAgentSocialComponent>() : nullptr,
+		ConversationId);
+}
+
 float UAgentSocialComponent::GetConversationCooldownRemainingWith(const FString& OtherAgentId) const
 {
 	if (const double* Until = CooldownUntilByAgentId.Find(OtherAgentId))
@@ -126,19 +200,25 @@ void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other
 
 void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Utterance)
 {
-	if (const UAgentConsolidationComponent* Consolidation = GetOwner() ? GetOwner()->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
-		Consolidation && !Consolidation->IsAwake())
-	{
-		return;
-	}
-	if (Utterance.Speech.IsEmpty() || Utterance.SenderAgentId.IsEmpty() ||
-		Utterance.TurnIndex > MaximumConversationTurns || PendingUtterances.Num() >= MaximumPendingUtterances)
-	{
-		return;
-	}
 	AAutonomousAgentCharacter* Sender = FindAgent(Utterance.SenderAgentId);
-	if (!IsWithinSpeakingRange(Sender))
+	const UAgentMemoryComponent* OwnMemory = GetOwner()
+		? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	UAgentSocialComponent* SenderSocial = Sender
+		? Sender->FindComponentByClass<UAgentSocialComponent>() : nullptr;
+	if (!Sender || !OwnMemory || !SenderSocial ||
+		!IsReservedFor(Utterance.SenderAgentId, Utterance.ConversationId) ||
+		!SenderSocial->IsReservedFor(OwnMemory->GetResolvedAgentId(), Utterance.ConversationId))
 	{
+		return;
+	}
+
+	const UAgentConsolidationComponent* Consolidation = GetOwner()->FindComponentByClass<UAgentConsolidationComponent>();
+	if (Utterance.Speech.IsEmpty() || Utterance.SenderAgentId.IsEmpty() ||
+		Utterance.TurnIndex <= 0 || IsConversationAtTurnLimit(Utterance.TurnIndex) ||
+		PendingUtterances.Num() >= MaximumPendingUtterances || !IsWithinSpeakingRange(Sender) ||
+		(Consolidation && !Consolidation->IsAwake()))
+	{
+		FinishAutomaticConversation(Sender, Utterance.ConversationId, true);
 		return;
 	}
 	PendingUtterances.Add(Utterance);
@@ -153,6 +233,20 @@ void UAgentSocialComponent::TryBeginPendingUtterance()
 	}
 	ActiveUtterance = PendingUtterances[0];
 	PendingUtterances.RemoveAt(0);
+	AAutonomousAgentCharacter* Sender = FindAgent(ActiveUtterance.SenderAgentId);
+	const UAgentMemoryComponent* OwnMemory = GetOwner()
+		? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	UAgentSocialComponent* SenderSocial = Sender
+		? Sender->FindComponentByClass<UAgentSocialComponent>() : nullptr;
+	if (!OwnMemory || !SenderSocial ||
+		!IsReservedFor(ActiveUtterance.SenderAgentId, ActiveUtterance.ConversationId) ||
+		!SenderSocial->IsReservedFor(OwnMemory->GetResolvedAgentId(), ActiveUtterance.ConversationId) ||
+		ActiveUtterance.TurnIndex <= 0 || IsConversationAtTurnLimit(ActiveUtterance.TurnIndex))
+	{
+		FinishAutomaticConversation(Sender, ActiveUtterance.ConversationId, true);
+		ActiveUtterance = FAgentSocialUtterance();
+		return;
+	}
 	bHandlingUtterance = true;
 
 	FAgentConversationContext Context;
@@ -183,7 +277,7 @@ void UAgentSocialComponent::HandleDecisionReady(const FAgentDecision& Decision)
 		}
 		else
 		{
-			ApplyMutualCooldown(Sender);
+			FinishAutomaticConversation(Sender, CompletedUtterance.ConversationId, true);
 		}
 		return;
 	}
@@ -210,11 +304,23 @@ void UAgentSocialComponent::TryBeginSpontaneousConversation(const FAgentDecision
 	}
 	AAutonomousAgentCharacter* Recipient = FindAgent(Decision.ActionTarget);
 	const UAgentMemoryComponent* RecipientMemory = Recipient ? Recipient->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
-	if (!IsWithinSpeakingRange(Recipient) || !RecipientMemory || IsCoolingDownWith(RecipientMemory->GetResolvedAgentId()))
+	UAgentMemoryComponent* OwnMemory = GetOwner()
+		? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	UAgentSocialComponent* RecipientSocial = Recipient
+		? Recipient->FindComponentByClass<UAgentSocialComponent>() : nullptr;
+	const UAgentConsolidationComponent* RecipientConsolidation = Recipient
+		? Recipient->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
+	if (!IsWithinSpeakingRange(Recipient) || !RecipientMemory || !OwnMemory || !RecipientSocial ||
+		(RecipientConsolidation && !RecipientConsolidation->IsAwake()))
 	{
 		return;
 	}
-	DeliverSpeech(Recipient, Decision.Speech, FGuid::NewGuid().ToString(EGuidFormats::Digits), 1);
+	const FString ConversationId = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	if (TryReserveAutomaticConversation(RecipientSocial, OwnMemory->GetResolvedAgentId(),
+		RecipientMemory->GetResolvedAgentId(), ConversationId))
+	{
+		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1);
+	}
 }
 
 void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
@@ -235,6 +341,11 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 
 	const FString SpeakerId = SpeakerMemory->GetResolvedAgentId();
 	const FString RecipientId = RecipientMemory->GetResolvedAgentId();
+	if (!IsReservedFor(RecipientId, ConversationId) ||
+		!RecipientSocial->IsReservedFor(SpeakerId, ConversationId))
+	{
+		return;
+	}
 	const FString SpeakerName = Speaker->GetAgentDisplayName();
 	const FString RecipientName = Recipient->GetAgentDisplayName();
 	if (UAgentRelationshipComponent* Relationships = Speaker->FindComponentByClass<UAgentRelationshipComponent>())
@@ -258,9 +369,10 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	Utterance.SenderDisplayName = SpeakerName;
 	Utterance.Speech = Speech;
 	Utterance.TurnIndex = TurnIndex;
-	RecipientSocial->ReceiveUtterance(Utterance);
-	if (TurnIndex >= MaximumConversationTurns)
+	if (IsConversationAtTurnLimit(TurnIndex))
 	{
-		ApplyMutualCooldown(Recipient);
+		FinishAutomaticConversation(Recipient, ConversationId, true);
+		return;
 	}
+	RecipientSocial->ReceiveUtterance(Utterance);
 }

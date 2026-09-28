@@ -60,6 +60,8 @@ public:
 	void ReceiveUtterance(const FAgentSocialUtterance& Utterance);
 	/** Remaining real-time pause before an automatic conversation with this resident can begin. */
 	float GetConversationCooldownRemainingWith(const FString& OtherAgentId) const;
+	/** True while this resident is reserved for one mutual automatic exchange. */
+	bool IsAutomaticConversationActive() const { return !ActiveAutomaticConversationId.IsEmpty(); }
 
 protected:
 	virtual void BeginPlay() override;
@@ -73,12 +75,21 @@ private:
 	FAgentSocialUtterance ActiveUtterance;
 	bool bHandlingUtterance = false;
 	TMap<FString, double> CooldownUntilByAgentId;
+	FString ActiveAutomaticConversationId;
+	FString ActiveAutomaticConversationPartnerId;
 
 	UAgentBrainComponent* GetBrain() const;
 	AAutonomousAgentCharacter* GetAgentOwner() const;
 	AAutonomousAgentCharacter* FindAgent(const FString& IdOrName) const;
 	bool IsWithinSpeakingRange(const AAutonomousAgentCharacter* Other) const;
 	bool IsCoolingDownWith(const FString& OtherAgentId) const;
+	bool TryReserveAutomaticConversation(UAgentSocialComponent* OtherSocial, const FString& OwnAgentId,
+		const FString& OtherAgentId, const FString& ConversationId);
+	bool IsReservedFor(const FString& OtherAgentId, const FString& ConversationId) const;
+	void ReleaseAutomaticConversation(UAgentSocialComponent* OtherSocial, const FString& ConversationId);
+	void FinishAutomaticConversation(AAutonomousAgentCharacter* Other, const FString& ConversationId,
+		bool bApplyCooldown);
+	bool IsConversationAtTurnLimit(int32 TurnIndex) const;
 	void ApplyMutualCooldown(AAutonomousAgentCharacter* Other);
 	void TryBeginPendingUtterance();
 	void TryBeginSpontaneousConversation(const FAgentDecision& Decision);

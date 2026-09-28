@@ -77,6 +77,11 @@ void AAutonomousAgentAIController::Think()
 		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 			if ((It->CurrentHour >= 20 || It->CurrentHour < 5) && TryRest()) return;
 	}
+	if (const UAgentSocialComponent* Social = Agent->FindComponentByClass<UAgentSocialComponent>();
+		Social && Social->IsAutomaticConversationActive())
+	{
+		return;
+	}
 	if (Now < NextThinkAt || AutonomousRequests >= 30) return;
 	++AutonomousRequests;
 	NextThinkAt = Now + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
