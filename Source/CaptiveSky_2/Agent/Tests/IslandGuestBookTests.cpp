@@ -2,9 +2,11 @@
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
+#include "IslandGuestBook.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 #include "GameFramework/Character.h"
@@ -41,6 +43,9 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 	UWorld* World = CreateWorld();
 	if (!TestNotNull(TEXT("Isolated guest-book fixture created"), World)) return false;
 	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	AIslandGuestBook* Book = nullptr;
+	for (TActorIterator<AIslandGuestBook> It(World); It; ++It) { Book = *It; break; }
+	TestTrue(TEXT("A blank, non-colliding open book appears on the inn counter"), Book && !Book->HasCollision() && Book->GetDisplayText().Contains(TEXT("first page is blank")));
 	ACharacter* Writer = World->SpawnActor<ACharacter>(FVector(400.f, 0.f, 0.f), FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
 	if (!TestNotNull(TEXT("Resident body created"), Writer) || !TestNotNull(TEXT("Resident controller created"), Controller))
@@ -63,6 +68,7 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A nearby resident can leave one durable signed line"),
 		State->GetGuestBookEntries().Num() == 1 && State->GetGuestBookEntries()[0].AgentId == WriterId &&
 		State->GetGuestBookEntries()[0].Day == 1 && State->GetGuestBookEntries()[0].Line == TEXT("Hello, Island friends"));
+	TestTrue(TEXT("The open pages update to show the saved line"), Book && Book->GetDisplayText().Contains(TEXT("Hello, Island friends")));
 	Controller->ActOnDecision(Decision);
 	TestEqual(TEXT("The same resident cannot write twice in one Island day"), State->GetGuestBookEntries().Num(), 1);
 
@@ -91,10 +97,14 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 
 	World = CreateWorld();
 	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	Book = nullptr;
+	for (TActorIterator<AIslandGuestBook> It(World); It; ++It) { Book = *It; break; }
 	TestEqual(TEXT("The capped guest book survives a new world session"), State->GetGuestBookEntries().Num(), UIslandWorldStateSubsystem::MaxGuestBookEntries);
 	TestTrue(TEXT("The latest signed line is restored from world state"),
 		State->GetGuestBookEntries().Last().Line == TEXT("A bounded note") && State->GetGuestBookEntries().Last().AgentId == TEXT("Visitor_26"));
+	TestTrue(TEXT("The transient book presentation is rebuilt from the latest saved lines"), Book && Book->GetDisplayText().Contains(TEXT("Visitor_26")));
 	TestTrue(TEXT("The developer reversal clears all guest-book lines"), State->ForgetGuestBook() && State->GetGuestBookEntries().Num() == 0);
+	TestTrue(TEXT("Reset clears the visible pages without removing the book"), Book && Book->GetDisplayText().Contains(TEXT("first page is blank")));
 	DestroyWorld(World);
 	World = CreateWorld();
 	TestEqual(TEXT("Forgotten entries stay gone after a new session"), World->GetSubsystem<UIslandWorldStateSubsystem>()->GetGuestBookEntries().Num(), 0);

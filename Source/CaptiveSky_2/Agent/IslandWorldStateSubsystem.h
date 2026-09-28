@@ -7,6 +7,7 @@
 #include "IslandWorldStateSubsystem.generated.h"
 
 class AIslandNest;
+class AIslandGuestBook;
 
 /** One nest woven by residents at a tagged roost site. Stored outside Saved/ so it outlives play sessions. */
 USTRUCT(BlueprintType)
@@ -185,6 +186,7 @@ private:
 	TArray<FIslandArrangementSite> ArrangementSites;
 	TArray<FIslandGuestBookEntry> GuestBookEntries;
 	TMap<FName, TWeakObjectPtr<AIslandArrangement>> ArrangementActors;
+	TWeakObjectPtr<AIslandGuestBook> GuestBookActor;
 	int32 ShownArrangementDay = 0;
 	TMap<FName, TWeakObjectPtr<AIslandNest>> NestActors;
 	// Set when an existing file cannot be parsed, so a save never overwrites what it may still hold.
@@ -198,6 +200,7 @@ private:
 	void RefreshCurioActor(const FIslandCurioRecord& Record);
 	bool PlaceArrangementSites();
 	void RefreshArrangementActor(const FIslandArrangementSite& Site);
+	void RefreshGuestBookActor();
 	/** Island day used for weathering: the running clock once it has begun, else the saved day. */
 	int32 DisplayDay() const;
 };

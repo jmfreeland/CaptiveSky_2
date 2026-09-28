@@ -83,6 +83,27 @@
 			"min_height": -1
 		},
 		{
+			"name": "02d_InnGuestBook",
+			"from": {
+				"tag": "InnCounter",
+				"offset": [
+					0,
+					0,
+					180
+				]
+			},
+			"look": {
+				"tag": "InnCounter",
+				"offset": [
+					0,
+					0,
+					60
+				]
+			},
+			"fov": 35,
+			"min_height": -1
+		},
+		{
 			"name": "02_Tideglass",
 			"from": {
 				"tag": "TideglassPool",

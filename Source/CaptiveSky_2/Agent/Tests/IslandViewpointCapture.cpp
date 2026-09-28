@@ -12,6 +12,7 @@
 #include "IslandNest.h"
 #include "IslandCurio.h"
 #include "IslandArrangement.h"
+#include "IslandGuestBook.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "ContentStreaming.h"
 #include "Dom/JsonObject.h"
@@ -145,12 +146,24 @@ namespace
 
 	private:
 		/**
-		 * Shows what residents have left behind (nests, curios, stone arrangements) by spawning transient
-		 * copies from WorldState/<Map>.json into the editor world for the duration of the capture.
+		 * Shows what residents have left behind (nests, curios, stone arrangements, and guest-book lines)
+		 * by spawning transient previews from WorldState/<Map>.json into the editor world for the capture.
 		 * Reading the file changes nothing; -ViewpointNoWorldState captures the bare map instead.
 		 */
 		void SpawnLastingChanges()
 		{
+			AIslandGuestBook* Book = nullptr;
+			for (TActorIterator<AActor> It(World.Get()); It; ++It)
+				if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter")))
+				{
+					const FVector Location = It->GetActorTransform().TransformPosition(FVector(0.f, 0.f, 60.f));
+					FActorSpawnParameters BookSpawn;
+					BookSpawn.ObjectFlags |= RF_Transient;
+					BookSpawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					Book = World->SpawnActor<AIslandGuestBook>(AIslandGuestBook::StaticClass(), FTransform(It->GetActorRotation(), Location), BookSpawn);
+					if (Book) PreviewActors.Add(Book);
+					break;
+				}
 			if (FParse::Param(FCommandLine::Get(), TEXT("ViewpointNoWorldState"))) return;
 			const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / (World->GetMapName() + TEXT(".json")));
 			UIslandWorldStateSubsystem* Reader = NewObject<UIslandWorldStateSubsystem>(GetTransientPackage());
@@ -158,6 +171,18 @@ namespace
 			{
 				Test->AddInfo(FString::Printf(TEXT("No readable world state at %s; capturing the bare map."), *Path));
 				return;
+			}
+			if (Book)
+			{
+				FString Display;
+				const TArray<FIslandGuestBookEntry>& Entries = Reader->GetGuestBookEntries();
+				for (int32 EntryIndex = FMath::Max(0, Entries.Num() - 3); EntryIndex < Entries.Num(); ++EntryIndex)
+				{
+					const FIslandGuestBookEntry& Entry = Entries[EntryIndex];
+					if (!Display.IsEmpty()) Display += TEXT("\n");
+					Display += FString::Printf(TEXT("Day %d - %s\n%s"), Entry.Day, *Entry.AgentId.Left(12), *Entry.Line.Left(34));
+				}
+				Book->SetDisplayText(Display);
 			}
 			const int32 Today = Reader->GetSavedDay().Get(1);
 			FActorSpawnParameters Spawn;
@@ -183,6 +208,7 @@ namespace
 				}
 			Test->AddInfo(FString::Printf(TEXT("Showing %d nest(s), %d curio(s), and %d arranging ground(s) from %s (Island day %d)."),
 				Reader->GetNests().Num(), Reader->GetCurios().Num(), Reader->GetArrangementSites().Num(), *Path, Today));
+			if (Book) Test->AddInfo(TEXT("The transient open guest book is showing its latest saved lines at the inn counter."));
 		}
 
 		TArray<TWeakObjectPtr<AActor>> PreviewActors;

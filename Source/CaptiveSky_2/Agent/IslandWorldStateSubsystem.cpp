@@ -1,5 +1,6 @@
 #include "IslandWorldStateSubsystem.h"
 #include "IslandNest.h"
+#include "IslandGuestBook.h"
 #include "IslandDayNight.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
@@ -50,14 +51,18 @@ void UIslandWorldStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UIslandWorldStateSubsystem::Deinitialize()
 {
-	// Nest and curio actors are transient and are torn down with the world itself.
+	// These presentation actors are transient; only their factual records are saved.
 	NestActors.Reset();
 	CurioActors.Reset();
+	if (GuestBookActor.IsValid()) GuestBookActor->Destroy();
+	GuestBookActor.Reset();
 	Super::Deinitialize();
 }
 
 void UIslandWorldStateSubsystem::LoadAndSpawn()
 {
+	if (GuestBookActor.IsValid()) GuestBookActor->Destroy();
+	GuestBookActor.Reset();
 	DestroyNestActors();
 	for (const TPair<FName, TWeakObjectPtr<AIslandCurio>>& Pair : CurioActors)
 		if (Pair.Value.IsValid()) Pair.Value->Destroy();
@@ -75,13 +80,14 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	SavedWetness.Reset();
 	bStorageUnreadable = false;
 	const FString Path = GetStorageFilePath();
-	if (Path.IsEmpty()) return;
-	if (!FPaths::FileExists(Path)) { PlaceCurios(); PlaceArrangementSites(); return; }
+	if (Path.IsEmpty()) { RefreshGuestBookActor(); return; }
+	if (!FPaths::FileExists(Path)) { PlaceCurios(); PlaceArrangementSites(); RefreshGuestBookActor(); return; }
 	if (!ReadStateFile(Path))
 	{
 		// Leave the unreadable file untouched; a later save would otherwise erase whatever it holds.
 		UE_LOG(LogIslandWorldState, Error, TEXT("Could not read world state %s; no lasting changes were loaded and none will be saved this session."), *Path);
 		bStorageUnreadable = true;
+		RefreshGuestBookActor();
 		return;
 	}
 	for (const FIslandNestRecord& Record : Nests) RefreshNestActor(Record);
@@ -89,6 +95,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 	if (Curios.Num() == 0) PlaceCurios();
 	if (ArrangementSites.Num() == 0) PlaceArrangementSites();
+	RefreshGuestBookActor();
 	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
 }
 
@@ -850,6 +857,7 @@ FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const
 		return TEXT("You wrote a line, but it could not be kept, so nothing lasting happened.");
 	}
 	bOutChanged = true;
+	RefreshGuestBookActor();
 	return FString::Printf(TEXT("You leave this line in the inn guest book: \"%s\" The book keeps at most %d recent lines; anyone who reads it can see this one signed with your name."), *CleanLine, MaxGuestBookEntries);
 }
 
@@ -877,6 +885,7 @@ bool UIslandWorldStateSubsystem::ForgetGuestBook()
 		GuestBookEntries = Previous;
 		return false;
 	}
+	RefreshGuestBookActor();
 	return true;
 }
 
@@ -904,6 +913,42 @@ void UIslandWorldStateSubsystem::RefreshArrangementActor(const FIslandArrangemen
 	}
 	ShownArrangementDay = DisplayDay();
 	Actor->ShowSite(Site, ShownArrangementDay);
+}
+
+void UIslandWorldStateSubsystem::RefreshGuestBookActor()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+	AActor* Counter = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter"))) { Counter = *It; break; }
+	if (!Counter)
+	{
+		if (GuestBookActor.IsValid()) GuestBookActor->Destroy();
+		GuestBookActor.Reset();
+		return;
+	}
+	if (!GuestBookActor.IsValid())
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		GuestBookActor = World->SpawnActor<AIslandGuestBook>(AIslandGuestBook::StaticClass(), FTransform::Identity, Spawn);
+		if (!GuestBookActor.IsValid()) return;
+	}
+	const FVector BookLocation = Counter->GetActorTransform().TransformPosition(FVector(0.f, 0.f, 60.f));
+	GuestBookActor->SetActorLocationAndRotation(BookLocation, Counter->GetActorRotation());
+	FString Display;
+	const int32 First = FMath::Max(0, GuestBookEntries.Num() - 3);
+	for (int32 Index = First; Index < GuestBookEntries.Num(); ++Index)
+	{
+		const FIslandGuestBookEntry& Entry = GuestBookEntries[Index];
+		FString Line = Entry.Line.Left(34);
+		if (Entry.Line.Len() > 34) Line += TEXT("...");
+		if (!Display.IsEmpty()) Display += TEXT("\n");
+		Display += FString::Printf(TEXT("Day %d - %s\n%s"), Entry.Day, *Entry.AgentId.Left(12), *Line);
+	}
+	GuestBookActor->SetDisplayText(Display);
 }
 
 static FAutoConsoleCommandWithWorld GIslandForgetArrangementsCommand(
