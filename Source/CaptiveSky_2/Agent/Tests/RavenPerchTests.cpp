@@ -1,8 +1,11 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
+#include "AutonomousAgentCharacter.h"
 #include "AgentBrainComponent.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentRestPresentationComponent.h"
+#include "AgentSocialComponent.h"
+#include "IslandInnkeeperSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/TargetPoint.h"
@@ -166,11 +169,29 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		FNavLocation Ground;
 		TestTrue(TEXT("Aster spawn has navigation"), Navigation && Navigation->ProjectPointToNavigation(FVector(-100400, 100960, 2823), Ground, FVector(250, 250, 1000)));
 		TestTrue(TEXT("WindArch has a projected walking goal"), Navigation && Navigation->ProjectPointToNavigation(FVector(-101650, 100200, 2950), Ground, FVector(250, 250, 1000)));
+		const UIslandInnkeeperSubsystem* InnkeeperDefaults = GetDefault<UIslandInnkeeperSubsystem>();
+		UClass* GroundResidentClass = InnkeeperDefaults ? InnkeeperDefaults->BodyClass.LoadSynchronous() : nullptr;
+		const AAutonomousAgentCharacter* GroundResidentDefaults = GroundResidentClass
+			? Cast<AAutonomousAgentCharacter>(GroundResidentClass->GetDefaultObject()) : nullptr;
+		const UAgentSocialComponent* SocialDefaults = GetDefault<UAgentSocialComponent>();
 		for (const FName Tag : {FName(TEXT("Roost_West")), FName(TEXT("Roost_East"))})
 		{
 			AActor* Marker = nullptr;
 			for (TActorIterator<AActor> It(Island); It; ++It) if (It->ActorHasTag(Tag)) { Marker = *It; break; }
 			if (!TestNotNull(*FString::Printf(TEXT("Island marker %s exists"), *Tag.ToString()), Marker)) continue;
+			FNavLocation ResidentApproachStart;
+			FNavLocation ResidentApproachGoal;
+			const bool bGroundResidentHasConversationalRoute = Navigation && GroundResidentDefaults && SocialDefaults &&
+				AAutonomousAgentAIController::FindGroundedResidentApproachGoal(Navigation,
+					FVector(-100400.f, 100960.f, 2823.f), Marker->GetActorLocation(),
+					GroundResidentDefaults->GetNavAgentPropertiesRef(),
+					GroundResidentDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
+					SocialDefaults->SpeakingRadius, ResidentApproachStart, ResidentApproachGoal);
+			TestTrue(*FString::Printf(TEXT("A ground resident has a complete, in-range route beside airborne %s"), *Tag.ToString()),
+				bGroundResidentHasConversationalRoute);
+			if (bGroundResidentHasConversationalRoute)
+				AddInfo(FString::Printf(TEXT("Ground resident route to %s: %s -> %s."), *Tag.ToString(),
+					*ResidentApproachStart.Location.ToCompactString(), *ResidentApproachGoal.Location.ToCompactString()));
 			FActorSpawnParameters Spawn;
 			Spawn.ObjectFlags |= RF_Transient;
 			Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

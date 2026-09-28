@@ -11,7 +11,13 @@
 
 ## Decision
 
-Do not copy or replace a binary material based on its asset name or screenshot alone. CaptiveSky_2 already has a textured automatic parent assigned through `MI_Island_Landscape`, a separate modified `M_AutoLandscape`, the source textures, and a passing wetness-parameter contract. The remaining uncertainty is now specific: the saved Island's live Landscape component assignment/layer state and the resulting appearance in a controlled UE 5.8.3 view. The editor process is live, but `127.0.0.1:8000` has no listening MCP endpoint in this session; the shared current `Content/` also backs Claude's worktree. Keep assets unchanged until those live settings can be inspected safely.
+Do not copy or replace a binary material based on its asset name or screenshot alone. CaptiveSky_2 already has a textured automatic parent assigned through `MI_Island_Landscape`, a separate modified `M_AutoLandscape`, the source textures, and a passing wetness-parameter contract. The remaining uncertainty is now specific: the saved Island's live Landscape component assignment/layer state and the resulting appearance in a controlled UE 5.8.3 view. The original audit could not reach the configured `127.0.0.1:8000` MCP endpoint; the shared current `Content/` also backs Claude's worktree. Keep assets unchanged until those live settings can be inspected safely.
+
+## Follow-up (2026-09-28)
+
+- Captured a fresh h12 WindArch and h15 Tideglass frame with the no-play viewpoint script and optional ground-cover preview. The terrain still reads broad and muted at those fixed cameras, but that alone does not distinguish an assignment problem from the material's automatic blend, landscape scale, lighting, or layer/weight state.
+- The computer-use app inventory returned no desktop application windows, and no UnrealEditor process was running. No material, map, or other `Content/` asset was changed.
+- UE 5.8.3 build passed after extracting the grounded-to-airborne approach preflight into a shared helper. The Island-aware `RavenPerch` test now confirms complete, speaking-range ground paths from Aster's spawn to both actual roost markers; this does not validate the landscape's visual appearance.
 
 ## Next safe step
 

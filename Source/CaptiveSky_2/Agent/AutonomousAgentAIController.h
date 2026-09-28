@@ -45,6 +45,10 @@ public:
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
 	/** Horizontal stand-off point when the target is above the mover's walkable plane. */
 	static FVector BuildGroundedResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
+	/** Finds a complete, in-range ground route to a conversational stand-off beside an airborne resident. */
+	static bool FindGroundedResidentApproachGoal(UNavigationSystemV1* Navigation, const FVector& MoverLocation,
+		const FVector& TargetLocation, const FNavAgentProperties& AgentProperties, float CapsuleHalfHeight,
+		float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);

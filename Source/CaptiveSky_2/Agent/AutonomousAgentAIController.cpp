@@ -116,6 +116,21 @@ FVector AAutonomousAgentAIController::BuildGroundedResidentApproachPoint(const F
 	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
 	return FVector(TargetLocation.X, TargetLocation.Y, MoverLocation.Z) + Direction * ResidentApproachStandOffDistance;
 }
+bool AAutonomousAgentAIController::FindGroundedResidentApproachGoal(UNavigationSystemV1* Navigation,
+	const FVector& MoverLocation, const FVector& TargetLocation, const FNavAgentProperties& AgentProperties,
+	float CapsuleHalfHeight, float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext)
+{
+	if (!Navigation || CapsuleHalfHeight <= 0.f || SpeakingRadius <= 0.f) return false;
+	const FVector StartOnFloor = MoverLocation - FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+	if (!ProjectGroundedTarget(Navigation, StartOnFloor, AgentProperties, OutStart)) return false;
+	const FVector DesiredApproach = BuildGroundedResidentApproachPoint(OutStart.Location, TargetLocation);
+	if (!ProjectGroundedTarget(Navigation, DesiredApproach, AgentProperties, OutGoal)) return false;
+	const FVector GoalBodyCenter = OutGoal.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+	if (FVector::DistSquared(GoalBodyCenter, TargetLocation) > FMath::Square(SpeakingRadius)) return false;
+	const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
+		Navigation->GetWorld(), OutStart.Location, OutGoal.Location, PathfindingContext);
+	return Route && Route->IsValid() && !Route->IsPartial();
+}
 bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
 {
 	return !bContinuousPlay && RequestCount >= BoundedAutonomousRequestLimit;
@@ -532,26 +547,18 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 					const float HalfHeight = MoverCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 					FNavLocation GroundStart;
 					FNavLocation GroundGoal;
-					const FVector StartOnFloor = MoverCharacter->GetActorLocation() - FVector(0.f, 0.f, HalfHeight + 2.f);
-					const bool bHasGroundStart = ProjectGroundedTarget(NavSys, StartOnFloor,
-						MoverCharacter->GetNavAgentPropertiesRef(), GroundStart);
-					const FVector DesiredApproach = BuildGroundedResidentApproachPoint(
-						bHasGroundStart ? GroundStart.Location : StartOnFloor,
-						TargetActor->GetActorLocation());
-					const bool bHasGroundGoal = bHasGroundStart && ProjectGroundedTarget(NavSys, DesiredApproach,
-						MoverCharacter->GetNavAgentPropertiesRef(), GroundGoal);
 					const UAgentSocialComponent* MoverSocial = MoverCharacter->FindComponentByClass<UAgentSocialComponent>();
 					const UAgentSocialComponent* TargetSocial = TargetCharacter->FindComponentByClass<UAgentSocialComponent>();
 					const float SpeakingRadius = MoverSocial && TargetSocial
 						? FMath::Min(MoverSocial->SpeakingRadius, TargetSocial->SpeakingRadius) : 0.f;
-					const FVector GoalBodyCenter = bHasGroundGoal
-						? GroundGoal.Location + FVector(0.f, 0.f, HalfHeight + 2.f) : FVector::ZeroVector;
-					const bool bWithinSpeakingRange = bHasGroundGoal && SpeakingRadius > 0.f &&
-						FVector::DistSquared(GoalBodyCenter, TargetActor->GetActorLocation()) <= FMath::Square(SpeakingRadius);
-					const UNavigationPath* Route = bWithinSpeakingRange
-						? NavSys->FindPathToLocationSynchronously(GetWorld(), GroundStart.Location, GroundGoal.Location, ControlledPawn)
-						: nullptr;
-					if (Route && Route->IsValid() && !Route->IsPartial())
+					if (!FindGroundedResidentApproachGoal(NavSys, MoverCharacter->GetActorLocation(),
+						TargetActor->GetActorLocation(), MoverCharacter->GetNavAgentPropertiesRef(), HalfHeight,
+						SpeakingRadius, GroundStart, GroundGoal, MoverCharacter))
+					{
+						ReportAction(TEXT("Approach failed: no complete ground route reaches conversational range of the airborne resident."));
+						break;
+					}
+					else
 					{
 						const EPathFollowingRequestResult::Type GroundedResult = MoveToLocation(GroundGoal.Location,
 							WanderAcceptanceRadius, true, true, false, false, nullptr, false);
