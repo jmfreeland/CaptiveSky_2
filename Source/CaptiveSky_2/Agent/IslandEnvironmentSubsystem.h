@@ -61,6 +61,8 @@ public:
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
 	/** Preserves a material's authored dry baseline, rising smoothly to fully wet. */
 	static float LandscapeWetnessValue(float AuthoredWetness, float EnvironmentWetness);
+	/** Reuse an existing MID instead of creating an invalid MID-from-MID parent chain. */
+	static UMaterialInstanceDynamic* GetOrCreateLandscapeWetnessInstance(UMaterialInterface* Original, UObject* Outer, bool& bOutReused);
 	static float GoldenHourFor(float SunHeight);
 	/** What a resident notices underfoot: lingering wetness after rain has stopped. Empty when dry or still raining. */
 	static FString DescribeGround(float Wetness, float Rain);
@@ -89,6 +91,7 @@ protected:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
 private:
+	friend class FIslandEnvironmentTest;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> Collection;
 	UPROPERTY(Transient)
@@ -99,6 +102,7 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> LandscapeMaterialInstances;
 	UPROPERTY(Transient)
 	TArray<float> LandscapeWetnessBaselines;
+	TArray<uint8> LandscapeWetnessInstanceWasReused;
 
 	float RainIntensity = 0.f;
 	float Wetness = 0.f;

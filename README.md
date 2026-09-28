@@ -386,6 +386,8 @@ Also on 2026-09-28, `CaptiveSky2.Agent.RavenFlight` passed on UE 5.8.3 with a ra
 
 Wandering also now ranks complete, reachable candidates by their distance from the resident's last eight successful wander destinations. This is a lightweight novelty cue, not a landmark-seeking rule: a fresh time-capped continuous run should check whether paths become less repetitive without pushing residents toward places they have not perceived.
 
+A 2026-09-28 bounded UE 5.8.3 spectator sample ended normally at its eight-request cap after 134.9 seconds: a resident kindled the hearth, the raven completed West and East roost landings in hard rain, and the innkeeper spawned at a capsule-clear, door-reachable location. A ground resident's attempt to approach the perched raven still failed to find a conversational route. No Wander decision occurred before the cap, so the novelty cue awaits a live behavior check. The same run exposed a nested landscape-MID warning; the subsystem now reuses existing dynamic instances and restores their wetness baseline. The focused environment test passes, and a follow-up capped Island launch showed no repeat of that warning.
+
 Earlier roadmap notes:
 
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).

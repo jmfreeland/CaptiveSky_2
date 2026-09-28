@@ -92,6 +92,12 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("Landscape wetness can be driven through a reversible dynamic material instance"), WetLandscape);
 		if (WetLandscape)
 		{
+			bool bReusedDynamic = false;
+			UMaterialInstanceDynamic* ReusedLandscape = UIslandEnvironmentSubsystem::GetOrCreateLandscapeWetnessInstance(WetLandscape, GetTransientPackage(), bReusedDynamic);
+			TestTrue(TEXT("An already-dynamic landscape material is reused rather than wrapped in another MID"), bReusedDynamic && ReusedLandscape == WetLandscape);
+			bool bCreatedDynamic = true;
+			UMaterialInstanceDynamic* CreatedLandscape = UIslandEnvironmentSubsystem::GetOrCreateLandscapeWetnessInstance(IslandLandscapeMaterial, GetTransientPackage(), bCreatedDynamic);
+			TestTrue(TEXT("An authored constant instance still receives a new wetness MID"), CreatedLandscape && !bCreatedDynamic);
 			WetLandscape->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, 0.73f);
 			float MaterialWetness = -1.f;
 			TestTrue(TEXT("Landscape material accepts the simulated wetness value"),
@@ -186,8 +192,22 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Mist thickens the fog"), Environment->GetMist() > 0.9f && FogComponent->FogDensity > ClearDensity * 5.f);
 		TestTrue(TEXT("Mist is published to materials"), Instance->GetScalarParameterValue(TEXT("Mist"), Published) && Published > 0.9f);
 	}
+	UMaterialInstanceDynamic* ReusedLandscapeForTeardown = IslandLandscapeMaterial
+		? UMaterialInstanceDynamic::Create(IslandLandscapeMaterial, GetTransientPackage()) : nullptr;
+	if (ReusedLandscapeForTeardown)
+	{
+		ReusedLandscapeForTeardown->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, 0.83f);
+		Environment->LandscapeOriginalMaterials.Add(ReusedLandscapeForTeardown);
+		Environment->LandscapeMaterialInstances.Add(ReusedLandscapeForTeardown);
+		Environment->LandscapeWetnessBaselines.Add(0.15f);
+		Environment->LandscapeWetnessInstanceWasReused.Add(1);
+	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	float RestoredWetness = -1.f;
+	TestTrue(TEXT("World teardown restores the reused landscape MID's authored wetness baseline"),
+		ReusedLandscapeForTeardown && ReusedLandscapeForTeardown->GetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, RestoredWetness) &&
+		FMath::IsNearlyEqual(RestoredWetness, 0.15f));
 	return true;
 }
 

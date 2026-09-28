@@ -151,11 +151,13 @@ void UIslandEnvironmentSubsystem::InitializeLandscapeMaterials()
 				int32 MaterialIndex = LandscapeOriginalMaterials.IndexOfByKey(Original);
 				if (MaterialIndex == INDEX_NONE)
 				{
-					UMaterialInstanceDynamic* Dynamic = UMaterialInstanceDynamic::Create(Original, this);
+					bool bReusedDynamic = false;
+					UMaterialInstanceDynamic* Dynamic = GetOrCreateLandscapeWetnessInstance(Original, this, bReusedDynamic);
 					if (!Dynamic) continue;
 					MaterialIndex = LandscapeOriginalMaterials.Add(Original);
 					LandscapeMaterialInstances.Add(Dynamic);
-					LandscapeWetnessBaselines.Add(FMath::Clamp(AuthoredWetness, 0.f, 1.f));
+					LandscapeWetnessBaselines.Add(AuthoredWetness);
+					LandscapeWetnessInstanceWasReused.Add(bReusedDynamic ? 1 : 0);
 				}
 				if (LandscapeMaterialInstances.IsValidIndex(MaterialIndex))
 					Component->SetMaterial(Index, LandscapeMaterialInstances[MaterialIndex]);
@@ -179,6 +181,11 @@ void UIslandEnvironmentSubsystem::ApplyLandscapeWetness()
 
 void UIslandEnvironmentSubsystem::Deinitialize()
 {
+	for (int32 Index = 0; Index < LandscapeMaterialInstances.Num(); ++Index)
+		if (LandscapeWetnessInstanceWasReused.IsValidIndex(Index) && LandscapeWetnessInstanceWasReused[Index])
+			if (UMaterialInstanceDynamic* Material = LandscapeMaterialInstances[Index])
+				if (LandscapeWetnessBaselines.IsValidIndex(Index))
+					Material->SetScalarParameterValue(LandscapeWetnessParameter, LandscapeWetnessBaselines[Index]);
 	for (const FIslandLandscapeMaterialBackup& Backup : LandscapeMaterialBackups)
 	{
 		if (!IsValid(Backup.Component.Get())) continue;
@@ -189,6 +196,7 @@ void UIslandEnvironmentSubsystem::Deinitialize()
 	LandscapeMaterialInstances.Reset();
 	LandscapeOriginalMaterials.Reset();
 	LandscapeWetnessBaselines.Reset();
+	LandscapeWetnessInstanceWasReused.Reset();
 	if (Fog.IsValid())
 	{
 		Fog->GetComponent()->SetFogDensity(BaseFogDensity);
@@ -210,6 +218,18 @@ float UIslandEnvironmentSubsystem::StepWetness(float InWetness, float Rain, floa
 float UIslandEnvironmentSubsystem::LandscapeWetnessValue(float AuthoredWetness, float EnvironmentWetness)
 {
 	return FMath::Lerp(FMath::Clamp(AuthoredWetness, 0.f, 1.f), 1.f, FMath::Clamp(EnvironmentWetness, 0.f, 1.f));
+}
+
+UMaterialInstanceDynamic* UIslandEnvironmentSubsystem::GetOrCreateLandscapeWetnessInstance(UMaterialInterface* Original, UObject* Outer, bool& bOutReused)
+{
+	bOutReused = false;
+	if (!Original) return nullptr;
+	if (UMaterialInstanceDynamic* Existing = Cast<UMaterialInstanceDynamic>(Original))
+	{
+		bOutReused = true;
+		return Existing;
+	}
+	return UMaterialInstanceDynamic::Create(Original, Outer);
 }
 
 float UIslandEnvironmentSubsystem::GoldenHourFor(float InSunHeight)
