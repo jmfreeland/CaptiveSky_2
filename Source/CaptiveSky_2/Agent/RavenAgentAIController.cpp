@@ -58,9 +58,48 @@ FVector ARavenAgentAIController::MakeCruiseTarget() const
 
 void ARavenAgentAIController::BeginTakeoff(const FVector& Destination)
 {
+	APawn* Raven = GetPawn();
+	if (!Raven) return;
 	CruiseTarget = Destination;
 	bApproachingPerch = false;
-	MovementTarget = GetPawn()->GetActorLocation() + FVector(0.f, 0.f, TakeoffHeight);
+	FlightWaypoints.Reset();
+	bHasTakeoffEscapeTarget = false;
+	const FVector Origin = Raven->GetActorLocation();
+	MovementTarget = Origin + FVector(0.f, 0.f, TakeoffHeight);
+	const ACharacter* RavenCharacter = Cast<ACharacter>(Raven);
+	const float Radius = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 30.f;
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	const FCollisionShape Body = FCollisionShape::MakeCapsule(Radius, HalfHeight);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenTakeoffExit), false, Raven);
+	FHitResult Hit;
+	const bool bVerticalExitBlocked = GetWorld() &&
+		GetWorld()->SweepSingleByChannel(Hit, Origin, MovementTarget, FQuat::Identity, ECC_WorldStatic, Body, Query);
+	if (bVerticalExitBlocked)
+	{
+		// A perch under a branch or roof may have no vertical exit. Search for a
+		// collision-clear lateral move beneath the obstruction, then climb at its edge.
+		const float SearchStep = FMath::Max(90.f, Radius + 50.f);
+		FVector2D PreferredDirection(Destination.X - Origin.X, Destination.Y - Origin.Y);
+		PreferredDirection = PreferredDirection.GetSafeNormal();
+		if (PreferredDirection.IsNearlyZero()) PreferredDirection = FVector2D(1.f, 0.f);
+		const float PreferredAngle = FMath::Atan2(PreferredDirection.Y, PreferredDirection.X);
+		static constexpr int32 AngleOffsetsDegrees[] = { 0, 45, -45, 90, -90, 135, -135, 180 };
+		for (float Distance = SearchStep; Distance <= 700.f && !bHasTakeoffEscapeTarget; Distance += SearchStep)
+		{
+			for (const int32 OffsetDegrees : AngleOffsetsDegrees)
+			{
+				const float Angle = PreferredAngle + FMath::DegreesToRadians(static_cast<float>(OffsetDegrees));
+				const FVector Side = Origin + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Distance;
+				const FVector SideUp = Side + FVector(0.f, 0.f, TakeoffHeight);
+				if (GetWorld()->SweepSingleByChannel(Hit, Origin, Side, FQuat::Identity, ECC_WorldStatic, Body, Query)) continue;
+				if (GetWorld()->SweepSingleByChannel(Hit, Side, SideUp, FQuat::Identity, ECC_WorldStatic, Body, Query)) continue;
+				MovementTarget = Side;
+				TakeoffEscapeTarget = SideUp;
+				bHasTakeoffEscapeTarget = true;
+				break;
+			}
+		}
+	}
 	bHasMovementTarget = true;
 	bTargetIsPerch = false;
 	LocomotionState = ERavenLocomotionState::TakingOff;
@@ -265,6 +304,7 @@ bool ARavenAgentAIController::BeginPerchAt(AActor* Perch)
 void ARavenAgentAIController::SetGrounded()
 {
 	FlightWaypoints.Reset();
+	bHasTakeoffEscapeTarget = false;
 	bHasMovementTarget = false;
 	bTargetIsPerch = false;
 	bApproachingPerch = false;
@@ -330,6 +370,7 @@ bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
 	{
 		// Obstruction is not a successful landing/perch. Stop and allow another decision.
 		FlightWaypoints.Reset();
+		bHasTakeoffEscapeTarget = false;
 		bHasMovementTarget = false;
 		bTargetIsPerch = false;
 		bApproachingPerch = false;
@@ -347,6 +388,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	if (Decision.ActionType == EAgentActionType::Idle)
 	{
 		bHasMovementTarget = bApproachingPerch = bTargetIsPerch = false;
+		bHasTakeoffEscapeTarget = false;
 		FlightWaypoints.Reset();
 		if (LocomotionState == ERavenLocomotionState::TakingOff || LocomotionState == ERavenLocomotionState::Landing || LocomotionState == ERavenLocomotionState::Hopping)
 		{
@@ -466,8 +508,16 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	}
 	if (LocomotionState == ERavenLocomotionState::TakingOff)
 	{
-		LocomotionState = ERavenLocomotionState::Flying;
-		MovementTarget = PlanFlightLeg(Raven->GetActorLocation(), CruiseTarget);
+		if (bHasTakeoffEscapeTarget)
+		{
+			MovementTarget = TakeoffEscapeTarget;
+			bHasTakeoffEscapeTarget = false;
+		}
+		else
+		{
+			LocomotionState = ERavenLocomotionState::Flying;
+			MovementTarget = PlanFlightLeg(Raven->GetActorLocation(), CruiseTarget);
+		}
 		bHasMovementTarget = true;
 	}
 	else if (LocomotionState == ERavenLocomotionState::Flying && bApproachingPerch)

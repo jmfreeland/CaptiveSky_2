@@ -382,6 +382,8 @@ An independent 2026-09-28 day-three situation log from Claude's detached source 
 
 The current continuous-thinking-cap fix compiled in UE 5.8.3, and the focused `SessionSafety`, `ResidentWanderPaths`, `IslandInnRest`, `ResidentApproach`, and `RavenPerch` automation tests all passed on 2026-09-28. `SessionSafety` covers the controller policy and shared budget behavior; a bounded live continuous run is still needed to observe thinking resume after allowance refill without exceeding the hourly or daily caps.
 
+Also on 2026-09-28, `CaptiveSky2.Agent.RavenFlight` passed on UE 5.8.3 with a raven beneath a synthetic low canopy. Takeoff now looks for a capsule-clear sideways exit, favors the intended destination direction, climbs at the first clear edge, then resumes the planned flight. This verifies the collision behavior in an automation fixture; the Island's placed roosts and rendered play still need a live check.
+
 Earlier roadmap notes:
 
 - Give the agent a real body (`BP_Agent_Crow` or similar, per the class comment in `AutonomousAgentCharacter.h`).

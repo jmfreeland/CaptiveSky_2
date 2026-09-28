@@ -249,6 +249,19 @@ bool FRavenFlightTest::RunTest(const FString& Parameters)
 
 	// A clear route stays a straight flight with no detour.
 	TestTrue(TEXT("A clear route is flown directly"), Controller->PlanFlightLeg(FVector(2500, 0, 300), FVector(3500, 0, 300)).Equals(FVector(3500, 0, 300)) && Controller->FlightWaypoints.Num() == 0);
+
+	// A perch below a low canopy must allow a lateral exit before the raven climbs.
+	Raven->SetActorLocation(FVector(6000, 0, 100), false, nullptr, ETeleportType::TeleportPhysics);
+	Block(FVector(6000, 0, 220), FVector(200, 200, 20)); // underside at Z 200; vertical ascent is blocked
+	const FVector OpenAirTarget(4500, 0, 300);
+	Controller->BeginTakeoff(OpenAirTarget);
+	TestTrue(TEXT("A blocked vertical takeoff finds a collision-clear sideways exit"), Controller->bHasTakeoffEscapeTarget);
+	TestTrue(TEXT("The first escape leg moves laterally under the canopy"), FVector::Dist2D(Controller->MovementTarget, Raven->GetActorLocation()) > 100.f);
+	TestTrue(TEXT("The escape search favors the chosen destination direction"), Controller->MovementTarget.X < Raven->GetActorLocation().X);
+	for (int32 Step = 0; Step < 60 * 30 && (Controller->bHasMovementTarget || Controller->FlightWaypoints.Num() > 0); ++Step)
+		Controller->Tick(1.f / 60.f);
+	TestFalse(TEXT("The canopy does not trap the raven on takeoff"), Controller->DescribeActionState().Contains(TEXT("blocked by geometry")));
+	TestTrue(TEXT("After clearing the canopy, the raven continues to its chosen destination"), Raven->GetActorLocation().Equals(OpenAirTarget, 40.f));
 	Controller->UnPossess();
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

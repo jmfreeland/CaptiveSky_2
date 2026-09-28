@@ -73,12 +73,14 @@ private:
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;
+	FVector TakeoffEscapeTarget = FVector::ZeroVector;
 	FVector HopStart = FVector::ZeroVector;
 	FVector HopEnd = FVector::ZeroVector;
 	float HomeAltitude = 0.f;
 	float HopElapsed = 0.f;
 	float HopDuration = 0.55f;
 	bool bHasMovementTarget = false;
+	bool bHasTakeoffEscapeTarget = false;
 	bool bTargetIsPerch = false;
 	bool bApproachingPerch = false;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
