@@ -70,6 +70,11 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	TestEqual(TEXT("The independent memory directory identity is assigned before BeginPlay"), Resident->Memory->GetResolvedAgentId(), FString(TEXT("Agent_Innkeeper_01")));
+	Resident->RegisterApproachTargetTags();
+	TestTrue(TEXT("The stable movement tag retains the full Agent_ identity"), Resident->ActorHasTag(TEXT("ApproachAgent_Agent_Innkeeper_01")));
+	TestTrue(TEXT("The shortened movement tag resolves the model's common Agent_ omission"), Resident->ActorHasTag(TEXT("ApproachAgent_Innkeeper_01")));
+	Resident->RegisterApproachTargetTags();
+	TestEqual(TEXT("Registering aliases is idempotent"), Resident->Tags.FilterByPredicate([](const FName& Tag) { return Tag == FName(TEXT("ApproachAgent_Innkeeper_01")); }).Num(), 1);
 	TestEqual(TEXT("The resident uses its friendly display name"), Resident->GetAgentDisplayName(), FString(TEXT("Innkeeper")));
 	Resident->DisplayName.Reset();
 	TestEqual(TEXT("Residents without an authored display name retain their actor label"), Resident->GetAgentDisplayName(), Resident->GetActorNameOrLabel());

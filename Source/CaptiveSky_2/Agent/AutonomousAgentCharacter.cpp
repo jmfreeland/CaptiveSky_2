@@ -42,21 +42,7 @@ FString AAutonomousAgentCharacter::GetAgentDisplayName() const
 void AAutonomousAgentCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	// Give other residents a stable, body-independent movement target. Movement
-	// brings an agent within conversational range but never initiates speech by itself.
-	if (Memory)
-	{
-		const FString AgentId = Memory->GetResolvedAgentId();
-		if (!AgentId.IsEmpty())
-		{
-			const FName ApproachTag(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId));
-			Tags.AddUnique(ApproachTag);
-			// Models tidy the doubled word in "ApproachAgent_Agent_Aster_01" into "ApproachAgent_Aster_01";
-			// answer to that form too, or the move silently fails as "not found".
-			if (AgentId.StartsWith(TEXT("Agent_")))
-				Tags.AddUnique(FName(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId.RightChop(6))));
-		}
-	}
+	RegisterApproachTargetTags();
 
 	// Re-parent onto the actual assigned mesh's socket now that the Blueprint CDO's mesh is in effect.
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
@@ -79,6 +65,25 @@ void AAutonomousAgentCharacter::BeginPlay()
 		EyeRenderTarget->InitAutoFormat(EyeCaptureResolution, EyeCaptureResolution);
 		EyeRenderTarget->UpdateResourceImmediate(true);
 		EyeCapture->TextureTarget = EyeRenderTarget;
+	}
+}
+
+void AAutonomousAgentCharacter::RegisterApproachTargetTags()
+{
+	// Give other residents a stable, body-independent movement target. Movement
+	// brings an agent within conversational range but never initiates speech by itself.
+	if (Memory)
+	{
+		const FString AgentId = Memory->GetResolvedAgentId();
+		if (!AgentId.IsEmpty())
+		{
+			const FName ApproachTag(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId));
+			Tags.AddUnique(ApproachTag);
+			// Models tidy the doubled word in "ApproachAgent_Agent_Aster_01" into "ApproachAgent_Aster_01";
+			// answer to that form too, or the move silently fails as "not found".
+			if (AgentId.StartsWith(TEXT("Agent_")))
+				Tags.AddUnique(FName(*FString::Printf(TEXT("ApproachAgent_%s"), *AgentId.RightChop(6))));
+		}
 	}
 }
 

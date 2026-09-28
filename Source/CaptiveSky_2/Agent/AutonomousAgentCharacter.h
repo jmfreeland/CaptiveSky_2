@@ -80,4 +80,8 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+private:
+	friend class FIslandInnkeeperSpawnTest;
+	void RegisterApproachTargetTags();
 };
