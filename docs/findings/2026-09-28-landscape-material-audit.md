@@ -16,6 +16,7 @@ Do not copy or replace a binary material based on its asset name or screenshot a
 ## Follow-up (2026-09-28)
 
 - Captured a fresh h12 WindArch and h15 Tideglass frame with the no-play viewpoint script and optional ground-cover preview. The terrain still reads broad and muted at those fixed cameras, but that alone does not distinguish an assignment problem from the material's automatic blend, landscape scale, lighting, or layer/weight state.
+- A controlled UE 5.8.3 golden-hour comparison (`-Hour 17 -Only WindArchOverlook -GroundCover -NoWorldState`) gives the WindArch a stronger sunset silhouette, while its frame still shows a large brown ground plane and blockout-scale foreground props. The same no-play Tideglass view at 08:00 confirms sparse transient grass placement around the pool, but not the in-play minnows, weather, or fireflies. These captures do not justify a landscape-asset swap; they make the visual target and editor-side assignment/layer inspection more concrete.
 - The computer-use app inventory returned no desktop application windows, and no UnrealEditor process was running. No material, map, or other `Content/` asset was changed.
 - UE 5.8.3 build passed after extracting the grounded-to-airborne approach preflight into a shared helper. The Island-aware `RavenPerch` test now confirms complete, speaking-range ground paths from Aster's spawn to both actual roost markers; this does not validate the landscape's visual appearance.
 
