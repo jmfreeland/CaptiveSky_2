@@ -211,9 +211,33 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			const bool bSupport = Island->LineTraceSingleByChannel(GroundHit, Probe->GetActorLocation(), Probe->GetActorLocation() - FVector(0, 0, 70), ECC_Visibility, GroundQuery);
 			AddInfo(FString::Printf(TEXT("%s: state %d, half height %.2f, support %d, distance %.2f, normal %s"), *Tag.ToString(), static_cast<int32>(Pilot->LocomotionState), Probe->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), bSupport, GroundHit.Distance, *GroundHit.ImpactNormal.ToString()));
 			TestTrue(*FString::Printf(TEXT("Actual %s landing at %s"), *Tag.ToString(), *Probe->GetActorLocation().ToString()), Pilot->LocomotionState == ERavenLocomotionState::Perched);
+
+			const FName OtherTag = Tag == FName(TEXT("Roost_West")) ? FName(TEXT("Roost_East")) : FName(TEXT("Roost_West"));
+			AActor* OtherMarker = nullptr;
+			for (TActorIterator<AActor> It(Island); It; ++It)
+				if (It->ActorHasTag(OtherTag)) { OtherMarker = *It; break; }
+			const bool bOtherRoostExists = TestNotNull(*FString::Printf(TEXT("Opposite Island roost %s exists"), *OtherTag.ToString()), OtherMarker);
+			if (bOtherRoostExists)
+			{
+				TestTrue(*FString::Printf(TEXT("Perched raven can begin the real Island route %s -> %s"), *Tag.ToString(), *OtherTag.ToString()),
+					Pilot->RequestPerch(OtherTag));
+				for (int32 I = 0; I < 60 * 45 && (Pilot->bHasMovementTarget || Pilot->FlightWaypoints.Num() > 0); ++I)
+					Pilot->Tick(1.f / 60.f);
+				TestFalse(*FString::Printf(TEXT("The real Island route %s -> %s avoids collision"), *Tag.ToString(), *OtherTag.ToString()),
+					Pilot->DescribeActionState().Contains(TEXT("blocked by geometry")));
+				const bool bCrossRoostFlightCompleted = Pilot->LocomotionState == ERavenLocomotionState::Perched &&
+					Probe->GetActorLocation().Equals(OtherMarker->GetActorLocation(), 2.f);
+				TestTrue(*FString::Printf(TEXT("The raven completes the real Island flight %s -> %s"), *Tag.ToString(), *OtherTag.ToString()),
+					bCrossRoostFlightCompleted);
+				if (bCrossRoostFlightCompleted)
+					AddInfo(FString::Printf(TEXT("Island roost flight %s -> %s completed at %s without an obstruction."),
+						*Tag.ToString(), *OtherTag.ToString(), *Probe->GetActorLocation().ToCompactString()));
+			}
+			const float DepartureStartZ = Probe->GetActorLocation().Z;
 			Pilot->BeginTakeoff(Probe->GetActorLocation() + FVector(-400, 0, 350));
 			for (int32 I = 0; I < 300; ++I) Pilot->Tick(1.f / 60.f);
-			TestTrue(*FString::Printf(TEXT("Actual %s departure"), *Tag.ToString()), Pilot->LocomotionState == ERavenLocomotionState::Flying && Probe->GetActorLocation().Z > Marker->GetActorLocation().Z + 300);
+			TestTrue(*FString::Printf(TEXT("Actual %s departure after the inter-roost route"), *OtherTag.ToString()),
+				Pilot->LocomotionState == ERavenLocomotionState::Flying && Probe->GetActorLocation().Z > DepartureStartZ + 300.f);
 			Pilot->UnPossess();
 			Pilot->Destroy();
 			Probe->Destroy();
