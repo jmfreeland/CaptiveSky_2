@@ -37,8 +37,8 @@ public:
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
-	/** A nearby ListeningStones tone briefly lifts the natural glow pulse. */
-	void RespondToSoftChime();
+	/** A new nearby ListeningStones tone briefly lifts the natural glow pulse. */
+	bool RespondToSoftChime(AIslandListeningStonesChime* Chime);
 
 protected:
 	virtual void BeginPlay() override;

@@ -129,29 +129,37 @@ void AIslandFirefly::RespondToQuietObservation()
 	ObservationPulseRemaining = 3.f;
 }
 
-void AIslandFirefly::RespondToSoftChime()
+bool AIslandFirefly::RespondToSoftChime(AIslandListeningStonesChime* Chime)
 {
+	if (!IsValid(Chime) || !GetWorld() || Chime->GetWorld() != GetWorld()) return false;
+	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& HeardChime)
+	{
+		const AIslandListeningStonesChime* Actor = HeardChime.Get();
+		return !Actor || Actor->IsActorBeingDestroyed();
+	});
+	if (Chime->IsActorBeingDestroyed()) return false;
+	const TWeakObjectPtr<AIslandListeningStonesChime> ChimeRef(Chime);
+	if (RespondedChimes.Contains(ChimeRef) ||
+		FVector::DistSquared(GetActorLocation(), Chime->GetActorLocation()) > FMath::Square(AIslandListeningStonesChime::AudibleRadius))
+	{
+		return false;
+	}
+	RespondedChimes.Add(ChimeRef);
 	ChimeResponseRemaining = 1.2f;
+	return true;
 }
 
 void AIslandFirefly::CheckForNearbyStoneChime()
 {
 	if (!GetWorld() || ChimeResponseRemaining > 0.f) return;
-	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& Chime)
+	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& HeardChime)
 	{
-		return !Chime.IsValid();
+		const AIslandListeningStonesChime* Actor = HeardChime.Get();
+		return !Actor || Actor->IsActorBeingDestroyed();
 	});
 	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
 	{
-		const TWeakObjectPtr<AIslandListeningStonesChime> Chime(*It);
-		if (RespondedChimes.Contains(Chime) ||
-			FVector::DistSquared(GetActorLocation(), It->GetActorLocation()) > FMath::Square(AIslandListeningStonesChime::AudibleRadius))
-		{
-			continue;
-		}
-		RespondedChimes.Add(Chime);
-		RespondToSoftChime();
-		return;
+		if (RespondToSoftChime(*It)) return;
 	}
 }
 

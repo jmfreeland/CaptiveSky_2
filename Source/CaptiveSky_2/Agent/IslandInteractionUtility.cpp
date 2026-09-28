@@ -166,12 +166,28 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(Target->GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
+		bool bVisibleFireflyResponse = false;
+		if (Chime)
+		{
+			Chime->BeginChime(LocalWind.Size2D());
+			for (TActorIterator<AIslandFirefly> FireflyIt(World); FireflyIt; ++FireflyIt)
+			{
+				if (FireflyIt->RespondToSoftChime(Chime) &&
+					CanInspect(Observer, *FireflyIt, AIslandListeningStonesChime::AudibleRadius))
+				{
+					bVisibleFireflyResponse = true;
+				}
+			}
+		}
 		OutFact = Chime
 			? bWeatherSampled
 				? TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. Its pitch is tuned to the present local wind; it rings softly nearby and fades within a few seconds. The sound is synthesized locally, reveals nothing, and leaves no lasting change.")
 				: TEXT("Your inspection woke a quiet, layered resonance in the ListeningStones. No IslandWeather signal was present, so it used its calm-air pitch; it rings softly nearby, reveals nothing, and leaves no lasting change.")
 			: TEXT("You inspected the ListeningStones, but their short-lived resonance could not be created. No persistent change occurred.");
-		if (Chime) Chime->BeginChime(LocalWind.Size2D());
+		if (bVisibleFireflyResponse)
+		{
+			OutFact += TEXT(" In clear view, a nearby wild firefly answered with a small glow lift; it remains uncaught and unchanged.");
+		}
 		return true;
 	}
 

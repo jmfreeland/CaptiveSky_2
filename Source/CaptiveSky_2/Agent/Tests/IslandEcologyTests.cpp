@@ -417,9 +417,21 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Stronger wind raises the pitch more than lighter wind"), AIslandListeningStonesChime::CalculateWindPitchRatio(240.f) > AIslandListeningStonesChime::CalculateWindPitchRatio(90.f));
 	TestTrue(TEXT("Even maximum wind keeps the resonance within one and a half semitones"), AIslandListeningStonesChime::CalculateWindPitchRatio(900.f) <= FMath::Pow(2.f, 1.5f / 12.f));
 	TestEqual(TEXT("Non-finite wind falls back to the calm-air pitch"), AIslandListeningStonesChime::CalculateWindPitchRatio(std::numeric_limits<float>::quiet_NaN()), 1.f);
+	AIslandFirefly* VisibleStoneFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandFirefly* HiddenStoneFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(650.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("Nearby night-life fixture spawned within the chime radius"), VisibleStoneFirefly);
+	TestNotNull(TEXT("Occluded night-life fixture spawned within the chime radius"), HiddenStoneFirefly);
+	if (HiddenStoneFirefly) HiddenStoneFirefly->SetActorHiddenInGame(true);
 	Controller->InspectTarget(TEXT("ListeningStones"));
+	TestTrue(TEXT("The inspecting resident is told when a nearby firefly's response was actually visible"),
+		Controller->LastActionOutcome.Contains(TEXT("firefly answered with a small glow lift")));
+	TestTrue(TEXT("A nearby visible firefly responds to the controller-triggered chime"),
+		VisibleStoneFirefly && VisibleStoneFirefly->ChimeResponseRemaining > 0.f);
+	TestTrue(TEXT("An occluded firefly still hears the local tone without revealing itself"),
+		HiddenStoneFirefly && HiddenStoneFirefly->ChimeResponseRemaining > 0.f && HiddenStoneFirefly->IsHidden());
 	AIslandListeningStonesChime* Chime = nullptr;
 	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) { Chime = *It; break; }
+	AIslandFirefly* ChimeListener = nullptr;
 	TestNotNull(TEXT("ListeningStones interaction creates a transient chime actor"), Chime);
 	if (Chime)
 	{
@@ -439,7 +451,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("The firefly reaction uses the same inner-plus-falloff range as the chime audio"),
 			AIslandListeningStonesChime::AudibleRadius,
 			AIslandListeningStonesChime::AttenuationInnerRadius + AIslandListeningStonesChime::AttenuationFalloffDistance);
-		AIslandFirefly* ChimeListener = World->SpawnActor<AIslandFirefly>(
+		ChimeListener = World->SpawnActor<AIslandFirefly>(
 			StonesTarget->GetActorLocation() + FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f),
 			FRotator::ZeroRotator, Spawn);
 		TestNotNull(TEXT("A wild firefly fixture can sense the transient stone resonance"), ChimeListener);
@@ -454,18 +466,19 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				ChimeListener->ChimeResponseRemaining > 0.f && ChimeListener->ChimeResponseRemaining <= 1.2f);
 			TestTrue(TEXT("The firefly records only which transient sound it already answered"),
 				ChimeListener->RespondedChimes.Contains(TWeakObjectPtr<AIslandListeningStonesChime>(Chime)));
+			ChimeListener->Phase = 0.f;
+			ChimeListener->GlowIntensity = 100.f;
+			ChimeListener->ChimeResponseRemaining = 0.f;
+			ChimeListener->UpdateGlow(0.0, 0.f);
+			const float NaturalGlow = ChimeListener->Glow->Intensity;
+			ChimeListener->ChimeResponseRemaining = 1.2f;
+			ChimeListener->UpdateGlow(0.0, 0.f);
+			TestTrue(TEXT("The chime response gives a dim phase a small visible glow lift"),
+				ChimeListener->Glow->Intensity > NaturalGlow);
 			ChimeListener->ChimeResponseRemaining = 0.f;
 			ChimeListener->CheckForNearbyStoneChime();
 			TestTrue(TEXT("One chime cannot repeatedly retrigger the same firefly"),
 				FMath::IsNearlyZero(ChimeListener->ChimeResponseRemaining));
-			ChimeListener->Phase = 0.f;
-			ChimeListener->GlowIntensity = 100.f;
-			ChimeListener->UpdateGlow(0.0, 0.f);
-			const float NaturalGlow = ChimeListener->Glow->Intensity;
-			ChimeListener->RespondToSoftChime();
-			ChimeListener->UpdateGlow(0.0, 0.f);
-			TestTrue(TEXT("The chime response gives a dim phase a small visible glow lift"),
-				ChimeListener->Glow->Intensity > NaturalGlow);
 			ChimeListener->Tick(1.3f);
 			TestTrue(TEXT("The glow response fades without changing persistent state"),
 				FMath::IsNearlyZero(ChimeListener->ChimeResponseRemaining));
@@ -483,6 +496,20 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				ChimeListener->RespondedChimes.IsEmpty());
 		}
 	}
+	if (VisibleStoneFirefly) VisibleStoneFirefly->SetActorHiddenInGame(true);
+	if (ChimeListener) ChimeListener->SetActorHiddenInGame(true);
+	AActor* OtherListener = World->SpawnActor<AActor>(TestPoolLocation + FVector(50.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	FString OccludedChimeFact;
+	TestTrue(TEXT("A second nearby listener can ring the stones"),
+		OtherListener && IslandInteractionUtility::Perform(OtherListener, StonesTarget, OccludedChimeFact));
+	TestTrue(TEXT("A listening firefly reacts acoustically even behind visual cover"),
+		HiddenStoneFirefly && HiddenStoneFirefly->ChimeResponseRemaining > 0.f);
+	TestFalse(TEXT("The interaction result never claims an occluded firefly was seen"),
+		OccludedChimeFact.Contains(TEXT("firefly answered with a small glow lift")));
+	Controller->InspectTarget(TEXT("ListeningStones"));
+	int32 ChimeCountAfterRepeatedControllerAction = 0;
+	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCountAfterRepeatedControllerAction;
+	TestEqual(TEXT("The controller's repeat cooldown still prevents another chime"), ChimeCountAfterRepeatedControllerAction, 1);
 	AIslandFirefly* WatchableFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
 	TestNotNull(TEXT("Nearby wild firefly spawned for observation interaction"), WatchableFirefly);
 	if (WatchableFirefly)
