@@ -7,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "IslandInteractionUtility.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
 
@@ -26,6 +27,9 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 	UClass* BodyClass = Defaults->BodyClass.LoadSynchronous();
 	if (!TestNotNull(TEXT("The configured shared placeholder body is loadable"), BodyClass)) return false;
 	TestTrue(TEXT("The configured body uses the shared autonomous-agent architecture"), BodyClass->IsChildOf(AAutonomousAgentCharacter::StaticClass()));
+	const AAutonomousAgentCharacter* ConfiguredBodyDefaults = Cast<AAutonomousAgentCharacter>(BodyClass->GetDefaultObject());
+	if (!TestNotNull(TEXT("The configured body exposes the actual capsule dimensions"), ConfiguredBodyDefaults)) return false;
+	const float ConfiguredHalfHeight = ConfiguredBodyDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
 		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
@@ -42,11 +46,13 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The preferred start is within interaction range of the hearth"), FVector::Dist(HearthSideStart, HearthMarker->GetActorLocation()) < 400.f);
 	TestEqual(TEXT("A missing hearth falls back to the Inn landmark"), UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, nullptr), InnMarker->GetActorLocation());
 	const TArray<FVector> SpawnCandidates = UIslandInnkeeperSubsystem::GetSpawnCandidates(InnMarker, HearthMarker);
-	TestEqual(TEXT("Hearth-side placement searches nearby clear alternatives before the landmark"), SpawnCandidates.Num(), 6);
-	if (SpawnCandidates.Num() == 6)
+	TestEqual(TEXT("Hearth-side placement searches nearby clear alternatives before the landmark"), SpawnCandidates.Num(), 8);
+	if (SpawnCandidates.Num() == 8)
 	{
 		TestEqual(TEXT("The closest hearth-side candidate remains first"), SpawnCandidates[0], HearthSideStart);
-		TestTrue(TEXT("Alternative hearth-side candidates fan around furniture instead of repeating one point"),
+		TestTrue(TEXT("Nearby alternatives fan around furniture while retaining hearth interaction range"),
+			FVector::Dist(SpawnCandidates[1] + FVector(0.f, 0.f, ConfiguredHalfHeight + 2.f), HearthMarker->GetActorLocation()) <= IslandInteractionUtility::DefaultInteractionRange &&
+			FVector::Dist(SpawnCandidates[2] + FVector(0.f, 0.f, ConfiguredHalfHeight + 2.f), HearthMarker->GetActorLocation()) <= IslandInteractionUtility::DefaultInteractionRange &&
 			!SpawnCandidates[1].Equals(SpawnCandidates[2]) && !SpawnCandidates[3].Equals(SpawnCandidates[4]));
 		TestEqual(TEXT("The tagged Inn landmark remains the final placement fallback"), SpawnCandidates.Last(), InnMarker->GetActorLocation());
 	}
@@ -126,6 +132,9 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 				CandidateIndex >= 0 && CandidateIndex < IslandCandidates.Num() - 1);
 			TestTrue(TEXT("The selected start remains within five metres of the hearth"),
 				FVector::Dist2D(SpawnLocation.Location, IslandHearth->GetActorLocation()) <= 500.f);
+			TestTrue(TEXT("The selected resident body remains within the real hearth interaction range"),
+				FVector::Dist(SpawnLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f), IslandHearth->GetActorLocation()) <=
+				IslandInteractionUtility::DefaultInteractionRange);
 			TestTrue(TEXT("The selected hearth-side start has the strongest available capsule clearance"), SelectedExtraClearanceCm >= 50);
 			AddInfo(FString::Printf(TEXT("Saved Island innkeeper spawn selector chose candidate %d/%d at %s, %d cm extra capsule clearance, %.0f cm from the hearth."),
 				CandidateIndex, IslandCandidates.Num() - 1, *SpawnLocation.Location.ToCompactString(), SelectedExtraClearanceCm,
@@ -156,9 +165,11 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 						continue;
 					}
 					const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Island, CandidateLocation.Location, DoorGoal.Location);
-					AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: complete %.0f cm door path, up to %d cm extra capsule clearance, %.0f cm from hearth."),
-						Index, Path ? Path->GetPathLength() : 0.f, SingleExtraClearanceCm,
-						FVector::Dist2D(CandidateLocation.Location, IslandHearth->GetActorLocation())));
+					const float BodyToHearthDistance = FVector::Dist(CandidateLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f),
+						IslandHearth->GetActorLocation());
+					AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: complete %.0f cm door path, up to %d cm extra capsule clearance, %.0f cm body-to-hearth (%s interaction)."),
+						Index, Path ? Path->GetPathLength() : 0.f, SingleExtraClearanceCm, BodyToHearthDistance,
+						BodyToHearthDistance <= IslandInteractionUtility::DefaultInteractionRange ? TEXT("in") : TEXT("out of")));
 				}
 			}
 		}

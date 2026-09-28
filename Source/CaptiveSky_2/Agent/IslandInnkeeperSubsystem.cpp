@@ -2,6 +2,7 @@
 
 #include "AutonomousAgentCharacter.h"
 #include "AgentMemoryComponent.h"
+#include "IslandInteractionUtility.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -60,9 +61,11 @@ TArray<FVector> UIslandInnkeeperSubsystem::GetSpawnCandidates(const AActor* InnM
 		const FVector Forward = HearthMarker->GetActorForwardVector();
 		const FVector Right = HearthMarker->GetActorRightVector();
 		const FVector Hearth = HearthMarker->GetActorLocation();
-		// Start near the hearth, then fan toward the clear centre/door side of the room. The
-		// runtime selector still checks capsule clearance and a complete path before spawning.
+		// Start near the hearth, then fan through still-interactable positions toward the room
+		// centre/door. The runtime selector checks capsule clearance and complete paths.
 		Candidates.Add(Hearth + Forward * 220.f);
+		Candidates.Add(Hearth + Forward * 300.f + Right * 150.f);
+		Candidates.Add(Hearth + Forward * 300.f - Right * 150.f);
 		Candidates.Add(Hearth + Forward * 360.f + Right * 220.f);
 		Candidates.Add(Hearth + Forward * 360.f - Right * 220.f);
 		Candidates.Add(Hearth + Forward * 500.f);
@@ -84,6 +87,7 @@ bool UIslandInnkeeperSubsystem::FindSpawnLocation(UWorld& World, const TArray<FV
 	if (InnMarker) ClearanceQuery.AddIgnoredActor(InnMarker);
 	if (HearthMarker) ClearanceQuery.AddIgnoredActor(HearthMarker);
 	bool bFoundCandidate = false;
+	bool bBestCandidateIsWithinHearthRange = false;
 	float BestPathLength = TNumericLimits<float>::Max();
 	float BestHearthDistance = TNumericLimits<float>::Max();
 	OutExtraClearanceCm = INDEX_NONE;
@@ -106,15 +110,21 @@ bool UIslandInnkeeperSubsystem::FindSpawnLocation(UWorld& World, const TArray<FV
 			ExtraClearanceCm = Extra;
 		}
 		const float HearthDistance = HearthMarker ? FVector::Dist2D(Projected.Location, HearthMarker->GetActorLocation()) : 0.f;
-		const bool bIsBetterCandidate = !bFoundCandidate || ExtraClearanceCm > OutExtraClearanceCm ||
-			(ExtraClearanceCm == OutExtraClearanceCm && Path->GetPathLength() < BestPathLength) ||
-			(ExtraClearanceCm == OutExtraClearanceCm && Path->GetPathLength() == BestPathLength && HearthDistance < BestHearthDistance);
+		const bool bWithinHearthInteractionRange = HearthMarker &&
+			FVector::Dist(CapsuleCentre, HearthMarker->GetActorLocation()) <= IslandInteractionUtility::DefaultInteractionRange;
+		const bool bIsBetterCandidate = !bFoundCandidate ||
+			(bWithinHearthInteractionRange && !bBestCandidateIsWithinHearthRange) ||
+			(bWithinHearthInteractionRange == bBestCandidateIsWithinHearthRange && ExtraClearanceCm > OutExtraClearanceCm) ||
+			(bWithinHearthInteractionRange == bBestCandidateIsWithinHearthRange && ExtraClearanceCm == OutExtraClearanceCm && Path->GetPathLength() < BestPathLength) ||
+			(bWithinHearthInteractionRange == bBestCandidateIsWithinHearthRange && ExtraClearanceCm == OutExtraClearanceCm &&
+				Path->GetPathLength() == BestPathLength && HearthDistance < BestHearthDistance);
 		if (bIsBetterCandidate)
 		{
 			bFoundCandidate = true;
 			OutLocation = Projected;
 			OutCandidateIndex = CandidateIndex;
 			OutExtraClearanceCm = ExtraClearanceCm;
+			bBestCandidateIsWithinHearthRange = bWithinHearthInteractionRange;
 			BestPathLength = Path->GetPathLength();
 			BestHearthDistance = HearthDistance;
 		}
@@ -188,6 +198,9 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 	InitializeInnkeeper(Innkeeper, AgentId);
 	Innkeeper->FinishSpawning(SpawnTransform);
 	if (!Innkeeper->GetController()) Innkeeper->SpawnDefaultController();
-	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at capsule-clear, door-reachable candidate %d with %d cm extra capsule clearance, location %s."),
-		*AgentId, SpawnCandidateIndex, SpawnExtraClearanceCm, *NavLocation.Location.ToCompactString());
+	const bool bHearthInReach = HearthMarker && FVector::Dist(NavLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f),
+		HearthMarker->GetActorLocation()) <= IslandInteractionUtility::DefaultInteractionRange;
+	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at capsule-clear, door-reachable candidate %d with %d cm extra capsule clearance%s, location %s."),
+		*AgentId, SpawnCandidateIndex, SpawnExtraClearanceCm, bHearthInReach ? TEXT(" and within hearth interaction range") : TEXT(""),
+		*NavLocation.Location.ToCompactString());
 }
