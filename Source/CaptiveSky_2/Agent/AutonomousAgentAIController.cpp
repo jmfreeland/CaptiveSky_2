@@ -11,6 +11,7 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "AgentSocialComponent.h"
+#include "AgentPlaySessionSubsystem.h"
 #include "IslandInteractionUtility.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
@@ -43,7 +44,7 @@ void AAutonomousAgentAIController::OnPossess(APawn* InPawn)
 
 	NextThinkAt = FPlatformTime::Seconds() + 2;
 	NextRestAt = FPlatformTime::Seconds() + 600;
-	AutonomousRequests = RepeatedActions = 0;
+	BoundedAutonomousRequests = RepeatedActions = 0;
 	LastActionKey.Empty();
 	InspectedUntil.Reset();
 	GetWorldTimerManager().SetTimer(ThinkTimerHandle, this, &AAutonomousAgentAIController::Think, 1.f, true, 2.f);
@@ -83,8 +84,11 @@ void AAutonomousAgentAIController::Think()
 	{
 		return;
 	}
-	if (Now < NextThinkAt || AutonomousRequests >= 30) return;
-	++AutonomousRequests;
+	const UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance()
+		? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
+	const bool bContinuousPlay = Session && Session->IsContinuous();
+	if (Now < NextThinkAt || IsAutonomousRequestLimitReached(BoundedAutonomousRequests, bContinuousPlay)) return;
+	if (!bContinuousPlay) ++BoundedAutonomousRequests;
 	NextThinkAt = Now + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
 	Agent->Brain->RequestDecision(FString());
 }
@@ -101,6 +105,10 @@ FVector AAutonomousAgentAIController::BuildResidentApproachPoint(const FVector& 
 	Direction.Z = 0.f;
 	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
 	return TargetLocation + Direction * ResidentApproachStandOffDistance + FVector(0.f, 0.f, ResidentApproachAltitudeOffset);
+}
+bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
+{
+	return !bContinuousPlay && RequestCount >= BoundedAutonomousRequestLimit;
 }
 bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal)
 {

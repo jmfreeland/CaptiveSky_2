@@ -40,6 +40,9 @@ public:
 	static constexpr float ResidentApproachStandOffDistance = 350.f;
 	static constexpr float ResidentApproachAltitudeOffset = 180.f;
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
+	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
+	static constexpr int32 BoundedAutonomousRequestLimit = 30;
+	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
 	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
@@ -73,7 +76,7 @@ private:
 	FString LastActionOutcome = TEXT("No completed action yet.");
 	FString LastActionKey;
 	int32 RepeatedActions = 0;
-	int32 AutonomousRequests = 0;
+	int32 BoundedAutonomousRequests = 0;
 	double NextThinkAt = 0;
 	double NextRestAt = 0;
 	TMap<FName, double> InspectedUntil;

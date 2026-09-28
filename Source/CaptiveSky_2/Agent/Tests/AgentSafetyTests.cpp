@@ -32,6 +32,12 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Legacy 15-second Blueprint interval is bounded"), AAutonomousAgentAIController::BackgroundDelay(0, 15), 60.0);
 	TestEqual(TEXT("Repeats back off"), AAutonomousAgentAIController::BackgroundDelay(3, 60), 240.0);
 	TestEqual(TEXT("Backoff capped at five minutes"), AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
+	TestTrue(TEXT("Bounded play keeps the per-resident fallback limit"),
+		AAutonomousAgentAIController::IsAutonomousRequestLimitReached(AAutonomousAgentAIController::BoundedAutonomousRequestLimit, false));
+	TestFalse(TEXT("Continuous play does not exhaust a resident's thinking turns at the bounded fallback limit"),
+		AAutonomousAgentAIController::IsAutonomousRequestLimitReached(AAutonomousAgentAIController::BoundedAutonomousRequestLimit, true));
+	TestFalse(TEXT("Continuous thinking remains available beyond thirty attempts; shared session budgets govern dispatch"),
+		AAutonomousAgentAIController::IsAutonomousRequestLimitReached(39, true));
 	// Exercise reservations without registering a ticker or issuing any model calls.
 	UGameInstance* Instance = NewObject<UGameInstance>();
 	UAgentPlaySessionSubsystem* Session = NewObject<UAgentPlaySessionSubsystem>(Instance);
