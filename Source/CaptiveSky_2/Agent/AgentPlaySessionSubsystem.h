@@ -61,11 +61,12 @@ private:
 	TMap<FString, double> LastRequestByAgent;
 	FString LedgerDate;
 	int32 LedgerRequests = 0;
+	bool bLedgerPersistenceHealthy = true;
 	double Now() const;
 	void BeginContinuous();
 	void RefillAllowance();
 	FString LedgerPath() const;
 	void LoadLedger();
-	void SaveLedger() const;
+	bool SaveLedger() const;
 	static FString TodayUtc();
 };

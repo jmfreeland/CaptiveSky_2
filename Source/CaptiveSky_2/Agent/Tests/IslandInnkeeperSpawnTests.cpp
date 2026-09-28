@@ -36,6 +36,19 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 	const FVector HearthSideStart = UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, HearthMarker);
 	TestTrue(TEXT("The preferred start is within interaction range of the hearth"), FVector::Dist(HearthSideStart, HearthMarker->GetActorLocation()) < 400.f);
 	TestEqual(TEXT("A missing hearth falls back to the Inn landmark"), UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, nullptr), InnMarker->GetActorLocation());
+	const TArray<FVector> SpawnCandidates = UIslandInnkeeperSubsystem::GetSpawnCandidates(InnMarker, HearthMarker);
+	TestEqual(TEXT("Hearth-side placement searches nearby clear alternatives before the landmark"), SpawnCandidates.Num(), 6);
+	if (SpawnCandidates.Num() == 6)
+	{
+		TestEqual(TEXT("The closest hearth-side candidate remains first"), SpawnCandidates[0], HearthSideStart);
+		TestTrue(TEXT("Alternative hearth-side candidates fan around furniture instead of repeating one point"),
+			!SpawnCandidates[1].Equals(SpawnCandidates[2]) && !SpawnCandidates[3].Equals(SpawnCandidates[4]));
+		TestEqual(TEXT("The tagged Inn landmark remains the final placement fallback"), SpawnCandidates.Last(), InnMarker->GetActorLocation());
+	}
+	const TArray<FVector> LandmarkOnlyCandidates = UIslandInnkeeperSubsystem::GetSpawnCandidates(InnMarker, nullptr);
+	TestEqual(TEXT("Without a hearth only the tagged Inn landmark is considered"), LandmarkOnlyCandidates.Num(), 1);
+	if (LandmarkOnlyCandidates.Num() == 1)
+		TestEqual(TEXT("Without a hearth the candidate is the tagged Inn landmark"), LandmarkOnlyCandidates[0], InnMarker->GetActorLocation());
 	World->DestroyActor(InnMarker);
 	World->DestroyActor(HearthMarker);
 

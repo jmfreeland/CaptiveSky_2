@@ -3,6 +3,7 @@
 #include "AutonomousAgentAIController.h"
 #include "Engine/GameInstance.h"
 #include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentSafetyTest, "CaptiveSky2.Agent.SessionSafety", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -50,6 +51,9 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 
 	// Continuous play: no end time, a refilling allowance, per-resident spacing, and a daily ceiling that survives restarts.
 	const FString Ledger = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("SessionSafety") / TEXT("ModelBudget.json"));
+	const FString LedgerDirectory = FPaths::GetPath(Ledger);
+	if (!TestTrue(TEXT("Continuous-play ledger fixture directory is available"),
+		IFileManager::Get().DirectoryExists(*LedgerDirectory) || IFileManager::Get().MakeDirectory(*LedgerDirectory, true))) return false;
 	IFileManager::Get().Delete(*Ledger, false, true, true);
 	auto MakeContinuous = [&Ledger, Instance](double Now)
 	{
@@ -68,6 +72,7 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Continuous play never expires by time"), Continuous->IsExpired());
 	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestFalse(TEXT("One resident cannot fire requests back to back"), Continuous->TryReserveModelRequest(TEXT("Aster")));
+	TestTrue(TEXT("The first accepted request creates a durable daily ledger"), FPaths::FileExists(Ledger));
 	TestTrue(TEXT("Another resident may still think"), Continuous->TryReserveModelRequest(TEXT("Raven")));
 	TestFalse(TEXT("A spent allowance makes residents wait"), Continuous->TryReserveModelRequest(TEXT("Innkeeper")));
 	Continuous->NowOverride = 1061.0;
@@ -78,6 +83,27 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A spent day does not end play"), Continuous->IsExpired());
 	UAgentPlaySessionSubsystem* Restarted = MakeContinuous(5000.0);
 	TestFalse(TEXT("The daily ceiling survives a restart"), Restarted->TryReserveModelRequest(TEXT("Aster")));
+	if (!TestTrue(TEXT("Invalid-ledger fixture can be written"), FFileHelper::SaveStringToFile(TEXT("not-json"), *Ledger))) return false;
+	AddExpectedError(TEXT("daily budget ledger is unreadable"), EAutomationExpectedErrorFlags::Contains, 1);
+	UAgentPlaySessionSubsystem* CorruptLedger = MakeContinuous(5500.0);
+	TestFalse(TEXT("A corrupt ledger fails closed instead of resetting the daily allowance"), CorruptLedger->TryReserveModelRequest(TEXT("Aster")));
+
+	// A persistence failure must refuse the request rather than silently making the daily cap volatile.
+	const FString Blocker = FPaths::GetPath(Ledger) / (TEXT("NotADirectory_") + FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	if (!TestTrue(TEXT("Persistence-failure fixture blocker can be created"), FFileHelper::SaveStringToFile(TEXT("fixture"), *Blocker))) return false;
+	UAgentPlaySessionSubsystem* PersistenceFailure = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	PersistenceFailure->bContinuousPlay = true;
+	PersistenceFailure->ContinuousRequestsPerHour = 60.f;
+	PersistenceFailure->ContinuousBurst = 4;
+	PersistenceFailure->LedgerPathOverride = Blocker / TEXT("ModelBudget.json");
+	PersistenceFailure->NowOverride = 6000.0;
+	PersistenceFailure->StartedAt = FPlatformTime::Seconds() - 100000;
+	PersistenceFailure->BeginContinuous();
+	AddExpectedError(TEXT("daily budget ledger could not be saved"), EAutomationExpectedErrorFlags::Contains, 1);
+	TestFalse(TEXT("An unpersistable request is rejected before dispatch"), PersistenceFailure->TryReserveModelRequest(TEXT("Aster")));
+	TestEqual(TEXT("A failed ledger write does not consume a model request"), PersistenceFailure->ModelRequests, 0);
+	TestFalse(TEXT("A persistence failure fails closed for later requests"), PersistenceFailure->TryReserveModelRequest(TEXT("Raven")));
+	IFileManager::Get().Delete(*Blocker, false, true, true);
 	IFileManager::Get().Delete(*Ledger, false, true, true);
 	return true;
 }

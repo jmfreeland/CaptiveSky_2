@@ -19,10 +19,13 @@ bool FIslandWeatherTracesTest::RunTest(const FString& Parameters)
 {
 	// No model requests; a scratch world-state file holds a tall cairn and two nests.
 	const FString StateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("WeatherTraces") / TEXT("WorldState.json"));
-	FFileHelper::SaveStringToFile(TEXT(R"({"version": 1,
+	const FString FixtureDirectory = FPaths::GetPath(StateFile);
+	if (!TestTrue(TEXT("Weather-traces fixture directory is available"),
+		IFileManager::Get().DirectoryExists(*FixtureDirectory) || IFileManager::Get().MakeDirectory(*FixtureDirectory, true))) return false;
+	if (!TestTrue(TEXT("Weather-traces state fixture is saved"), FFileHelper::SaveStringToFile(TEXT(R"({"version": 1,
 		"nests": [{"site": "Roost_A", "layers": 3, "location": [300, 0, 0], "builders": ["Raven"]}, {"site": "Roost_B", "layers": 1, "location": [-300, 0, 0], "builders": ["Raven"]}],
 		"curios": [{"id": "Cairn", "kind": "Cairn", "location": [0, 300, 0], "state": 5, "last_changed_day": -1, "contributors": []}],
-		"arrangement_sites": []})"), *StateFile);
+		"arrangement_sites": []})"), *StateFile))) return false;
 
 	auto OpenWorld = [&StateFile]()
 	{

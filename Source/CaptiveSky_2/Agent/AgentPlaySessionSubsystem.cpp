@@ -4,6 +4,7 @@
 #include "Misc/Parse.h"
 #include "HAL/PlatformTime.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/FileManager.h"
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -66,6 +67,7 @@ bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId)
 	if (IsExpired()) return false;
 	if (bContinuousPlay)
 	{
+		if (!bLedgerPersistenceHealthy) return false;
 		RefillAllowance();
 		if (TodayUtc() != LedgerDate) { LedgerDate = TodayUtc(); LedgerRequests = 0; }
 		if (LedgerRequests >= FMath::Clamp(ContinuousDailyRequests, 1, 20000)) return false;
@@ -73,10 +75,27 @@ bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId)
 		if (!AgentId.IsEmpty())
 			if (const double* Last = LastRequestByAgent.Find(AgentId); Last && Time - *Last < ContinuousAgentSpacingSeconds) return false;
 		if (Allowance < 1.0) return false;
+		const double PreviousAllowance = Allowance;
 		Allowance -= 1.0;
 		++LedgerRequests;
+		double PreviousAgentRequest = 0.0;
+		const double* PreviousAgentRequestPtr = AgentId.IsEmpty() ? nullptr : LastRequestByAgent.Find(AgentId);
+		const bool bHadPreviousAgentRequest = PreviousAgentRequestPtr != nullptr;
+		if (PreviousAgentRequestPtr) PreviousAgentRequest = *PreviousAgentRequestPtr;
 		if (!AgentId.IsEmpty()) LastRequestByAgent.Add(AgentId, Time);
-		SaveLedger();
+		if (!SaveLedger())
+		{
+			--LedgerRequests;
+			Allowance = PreviousAllowance;
+			if (!AgentId.IsEmpty())
+			{
+				LastRequestByAgent.Remove(AgentId);
+				if (bHadPreviousAgentRequest) LastRequestByAgent.Add(AgentId, PreviousAgentRequest);
+			}
+			bLedgerPersistenceHealthy = false;
+			UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger could not be saved to %s."), *LedgerPath());
+			return false;
+		}
 	}
 	++ModelRequests;
 	return true;
@@ -118,23 +137,61 @@ void UAgentPlaySessionSubsystem::LoadLedger()
 {
 	LedgerDate = TodayUtc();
 	LedgerRequests = 0;
+	bLedgerPersistenceHealthy = true;
+	const FString Path = LedgerPath();
+	if (!FPaths::FileExists(Path)) return;
+
 	FString Json;
 	TSharedPtr<FJsonObject> Root;
-	if (!FFileHelper::LoadFileToString(Json, *LedgerPath()) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid()) return;
+	if (!FFileHelper::LoadFileToString(Json, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	{
+		bLedgerPersistenceHealthy = false;
+		UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger is unreadable: %s."), *Path);
+		return;
+	}
 	FString Date;
-	int32 Requests = 0;
-	if (Root->TryGetStringField(TEXT("date"), Date) && Date == LedgerDate && Root->TryGetNumberField(TEXT("requests"), Requests))
-		LedgerRequests = FMath::Max(0, Requests);
+	double Requests = 0.0;
+	FDateTime ParsedDate;
+	if (!Root->TryGetStringField(TEXT("date"), Date) || Date.IsEmpty() ||
+		!FDateTime::ParseIso8601(*(Date + TEXT("T00:00:00Z")), ParsedDate) ||
+		!Root->TryGetNumberField(TEXT("requests"), Requests) || !FMath::IsFinite(Requests) || Requests < 0.0)
+	{
+		bLedgerPersistenceHealthy = false;
+		UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger is invalid: %s."), *Path);
+		return;
+	}
+	if (Date.Compare(LedgerDate, ESearchCase::CaseSensitive) > 0)
+	{
+		bLedgerPersistenceHealthy = false;
+		UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger date is in the future: %s."), *Path);
+		return;
+	}
+	if (Date == LedgerDate)
+		LedgerRequests = Requests >= 20000.0 ? 20000 : static_cast<int32>(FMath::CeilToInt(Requests));
 }
 
-void UAgentPlaySessionSubsystem::SaveLedger() const
+bool UAgentPlaySessionSubsystem::SaveLedger() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetStringField(TEXT("date"), LedgerDate);
 	Root->SetNumberField(TEXT("requests"), LedgerRequests);
 	FString Json;
-	FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Json));
-	FFileHelper::SaveStringToFile(Json, *LedgerPath(), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	if (!FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Json))) return false;
+	const FString Path = LedgerPath();
+	const FString Directory = FPaths::GetPath(Path);
+	if (!IFileManager::Get().DirectoryExists(*Directory) && !IFileManager::Get().MakeDirectory(*Directory, true)) return false;
+	const FString Temporary = Path + TEXT(".tmp");
+	if (!FFileHelper::SaveStringToFile(Json, *Temporary, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		IFileManager::Get().Delete(*Temporary, false, true);
+		return false;
+	}
+	if (!IFileManager::Get().Move(*Path, *Temporary, true, true))
+	{
+		IFileManager::Get().Delete(*Temporary, false, true);
+		return false;
+	}
+	return true;
 }
 
 bool UAgentPlaySessionSubsystem::CheckDeadline(float DeltaSeconds)

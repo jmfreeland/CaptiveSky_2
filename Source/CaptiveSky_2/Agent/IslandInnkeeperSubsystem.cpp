@@ -5,6 +5,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "NavigationPath.h"
 #include "NavigationSystem.h"
 #include "Misc/PackageName.h"
 
@@ -51,6 +52,26 @@ FVector UIslandInnkeeperSubsystem::GetSpawnCandidate(const AActor* InnMarker, co
 	return InnMarker ? InnMarker->GetActorLocation() : FVector::ZeroVector;
 }
 
+TArray<FVector> UIslandInnkeeperSubsystem::GetSpawnCandidates(const AActor* InnMarker, const AActor* HearthMarker)
+{
+	TArray<FVector> Candidates;
+	if (HearthMarker)
+	{
+		const FVector Forward = HearthMarker->GetActorForwardVector();
+		const FVector Right = HearthMarker->GetActorRightVector();
+		const FVector Hearth = HearthMarker->GetActorLocation();
+		// Start near the hearth, then fan toward the clear centre/door side of the room. The
+		// runtime selector still checks capsule clearance and a complete path before spawning.
+		Candidates.Add(Hearth + Forward * 220.f);
+		Candidates.Add(Hearth + Forward * 360.f + Right * 220.f);
+		Candidates.Add(Hearth + Forward * 360.f - Right * 220.f);
+		Candidates.Add(Hearth + Forward * 500.f);
+		Candidates.Add(Hearth + Forward * 700.f);
+	}
+	if (InnMarker) Candidates.Add(InnMarker->GetActorLocation());
+	return Candidates;
+}
+
 void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 {
 	if (AgentId.IsEmpty() || BodyClass.IsNull()) return;
@@ -60,6 +81,7 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 
 	AActor* InnMarker = nullptr;
 	AActor* HearthMarker = nullptr;
+	AActor* DoorMarker = nullptr;
 	for (TActorIterator<AActor> It(&World); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("Inn")))
@@ -67,25 +89,12 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 			InnMarker = *It;
 		}
 		if (It->ActorHasTag(TEXT("InnHearth"))) HearthMarker = *It;
+		if (It->ActorHasTag(TEXT("InnDoorLantern"))) DoorMarker = *It;
 	}
 	if (!InnMarker)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: the tagged walkable Inn landmark is missing."));
 		return;
-	}
-
-	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
-	FNavLocation NavLocation;
-	const FVector SpawnCandidate = GetSpawnCandidate(InnMarker, HearthMarker);
-	if (!Navigation || !Navigation->ProjectPointToNavigation(SpawnCandidate, NavLocation, FVector(250.f, 250.f, 250.f)))
-	{
-		if (!Navigation || SpawnCandidate.Equals(InnMarker->GetActorLocation()) ||
-			!Navigation->ProjectPointToNavigation(InnMarker->GetActorLocation(), NavLocation, FVector(250.f, 250.f, 250.f)))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: no walkable navigation point was found at the Inn landmark or hearth-side start."));
-			return;
-		}
-		UE_LOG(LogTemp, Warning, TEXT("Innkeeper hearth-side start has no navmesh; falling back to the tagged Inn landmark."));
 	}
 
 	UClass* LoadedBodyClass = BodyClass.LoadSynchronous();
@@ -99,6 +108,45 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 	const float HalfHeight = Defaults && Defaults->GetCapsuleComponent()
 		? Defaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
 		: 96.f;
+	const float Radius = Defaults && Defaults->GetCapsuleComponent()
+		? Defaults->GetCapsuleComponent()->GetScaledCapsuleRadius()
+		: 42.f;
+
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
+	FNavLocation DoorLocation;
+	const FVector DoorCandidate = DoorMarker ? DoorMarker->GetActorLocation() : InnMarker->GetActorLocation();
+	if (!Navigation || !Navigation->ProjectPointToNavigation(DoorCandidate, DoorLocation, FVector(350.f, 350.f, 500.f)))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: no walkable destination was found at the Inn door or landmark."));
+		return;
+	}
+
+	FCollisionQueryParams ClearanceQuery(SCENE_QUERY_STAT(InnkeeperSpawnClearance), false);
+	ClearanceQuery.AddIgnoredActor(InnMarker);
+	if (HearthMarker) ClearanceQuery.AddIgnoredActor(HearthMarker);
+	const FCollisionShape Capsule = FCollisionShape::MakeCapsule(Radius, HalfHeight);
+	FNavLocation NavLocation;
+	bool bFoundClearRoute = false;
+	for (const FVector& Candidate : GetSpawnCandidates(InnMarker, HearthMarker))
+	{
+		FNavLocation Projected;
+		if (!Navigation->ProjectPointToNavigation(Candidate, Projected, FVector(250.f, 250.f, 250.f))) continue;
+		const FVector CapsuleCentre = Projected.Location + FVector(0.f, 0.f, HalfHeight + 2.f);
+		if (World.OverlapBlockingTestByChannel(CapsuleCentre, FQuat::Identity, ECC_Pawn, Capsule, ClearanceQuery)) continue;
+
+		const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(&World, Projected.Location, DoorLocation.Location);
+		if (!Path || !Path->IsValid() || Path->IsPartial()) continue;
+
+		NavLocation = Projected;
+		bFoundClearRoute = true;
+		break;
+	}
+	if (!bFoundClearRoute)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Island innkeeper was not spawned: no capsule-clear hearth/Inn position has a complete path to the door."));
+		return;
+	}
+
 	const FTransform SpawnTransform(FRotator::ZeroRotator, NavLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f));
 	AAutonomousAgentCharacter* Innkeeper = World.SpawnActorDeferred<AAutonomousAgentCharacter>(
 		LoadedBodyClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
@@ -107,6 +155,5 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 	InitializeInnkeeper(Innkeeper, AgentId);
 	Innkeeper->FinishSpawning(SpawnTransform);
 	if (!Innkeeper->GetController()) Innkeeper->SpawnDefaultController();
-	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at %s."), *AgentId,
-		HearthMarker && !SpawnCandidate.Equals(InnMarker->GetActorLocation()) ? TEXT("the walkable hearth-side start") : TEXT("the walkable Inn landmark"));
+	UE_LOG(LogTemp, Log, TEXT("Spawned Island innkeeper with stable identity %s at capsule-clear, door-reachable location %s."), *AgentId, *NavLocation.Location.ToCompactString());
 }
