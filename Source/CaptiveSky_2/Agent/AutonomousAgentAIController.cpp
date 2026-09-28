@@ -19,6 +19,7 @@
 #include "IslandWorldStateSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -107,6 +108,13 @@ FVector AAutonomousAgentAIController::BuildResidentApproachPoint(const FVector& 
 	Direction.Z = 0.f;
 	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
 	return TargetLocation + Direction * ResidentApproachStandOffDistance + FVector(0.f, 0.f, ResidentApproachAltitudeOffset);
+}
+FVector AAutonomousAgentAIController::BuildGroundedResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation)
+{
+	FVector Direction = MoverLocation - TargetLocation;
+	Direction.Z = 0.f;
+	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
+	return FVector(TargetLocation.X, TargetLocation.Y, MoverLocation.Z) + Direction * ResidentApproachStandOffDistance;
 }
 bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
 {
@@ -515,10 +523,50 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				// Resident movement targets represent a willing approach, not a request to occupy
 				// another body's capsule. Keep a comfortable stand-off; the target may move while
 				// we are travelling, so let path following track the actor rather than a stale point.
+				ACharacter* MoverCharacter = Cast<ACharacter>(ControlledPawn);
+				ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
+				if (MoverCharacter && TargetCharacter && MoverCharacter->GetCharacterMovement()->IsMovingOnGround() &&
+					!TargetCharacter->GetCharacterMovement()->IsMovingOnGround())
+				{
+					UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+					const float HalfHeight = MoverCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+					FNavLocation GroundStart;
+					FNavLocation GroundGoal;
+					const FVector StartOnFloor = MoverCharacter->GetActorLocation() - FVector(0.f, 0.f, HalfHeight + 2.f);
+					const bool bHasGroundStart = ProjectGroundedTarget(NavSys, StartOnFloor,
+						MoverCharacter->GetNavAgentPropertiesRef(), GroundStart);
+					const FVector DesiredApproach = BuildGroundedResidentApproachPoint(
+						bHasGroundStart ? GroundStart.Location : StartOnFloor,
+						TargetActor->GetActorLocation());
+					const bool bHasGroundGoal = bHasGroundStart && ProjectGroundedTarget(NavSys, DesiredApproach,
+						MoverCharacter->GetNavAgentPropertiesRef(), GroundGoal);
+					const UAgentSocialComponent* MoverSocial = MoverCharacter->FindComponentByClass<UAgentSocialComponent>();
+					const UAgentSocialComponent* TargetSocial = TargetCharacter->FindComponentByClass<UAgentSocialComponent>();
+					const float SpeakingRadius = MoverSocial && TargetSocial
+						? FMath::Min(MoverSocial->SpeakingRadius, TargetSocial->SpeakingRadius) : 0.f;
+					const FVector GoalBodyCenter = bHasGroundGoal
+						? GroundGoal.Location + FVector(0.f, 0.f, HalfHeight + 2.f) : FVector::ZeroVector;
+					const bool bWithinSpeakingRange = bHasGroundGoal && SpeakingRadius > 0.f &&
+						FVector::DistSquared(GoalBodyCenter, TargetActor->GetActorLocation()) <= FMath::Square(SpeakingRadius);
+					const UNavigationPath* Route = bWithinSpeakingRange
+						? NavSys->FindPathToLocationSynchronously(GetWorld(), GroundStart.Location, GroundGoal.Location, ControlledPawn)
+						: nullptr;
+					if (Route && Route->IsValid() && !Route->IsPartial())
+					{
+						const EPathFollowingRequestResult::Type GroundedResult = MoveToLocation(GroundGoal.Location,
+							WanderAcceptanceRadius, true, true, false, false, nullptr, false);
+						ReportAction(GroundedResult == EPathFollowingRequestResult::Failed
+							? TEXT("Approach failed: the raven is airborne and no grounded conversational route could start.")
+							: GroundedResult == EPathFollowingRequestResult::AlreadyAtGoal
+								? TEXT("Already at a reachable ground position near the airborne resident. Speaking remains optional.")
+								: TEXT("Approach started toward a reachable ground position near the airborne resident; arriving does not begin a conversation."));
+						break;
+					}
+				}
 				const EPathFollowingRequestResult::Type Result = MoveToActor(TargetActor,
 					ResidentApproachStandOffDistance, true, true, false, nullptr, false);
 				ReportAction(Result == EPathFollowingRequestResult::Failed
-					? TEXT("Approach failed: no navigable route to the other resident's conversational space.")
+					? TEXT("Approach failed: no complete route to a reachable conversational space near the other resident.")
 					: Result == EPathFollowingRequestResult::AlreadyAtGoal
 						? TEXT("Already near the other resident. Speaking remains optional; wait, observe, or choose another activity.")
 						: TEXT("Approach started toward the other resident's conversational space; arriving does not begin a conversation."));

@@ -43,6 +43,8 @@ public:
 	static constexpr float ResidentApproachStandOffDistance = 350.f;
 	static constexpr float ResidentApproachAltitudeOffset = 180.f;
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
+	/** Horizontal stand-off point when the target is above the mover's walkable plane. */
+	static FVector BuildGroundedResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
 	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);

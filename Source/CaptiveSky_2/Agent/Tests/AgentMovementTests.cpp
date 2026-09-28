@@ -27,6 +27,15 @@ bool FAgentMovementTest::RunTest(const FString& Parameters)
 	const FVector CoincidentApproach = AAutonomousAgentAIController::BuildResidentApproachPoint(Target, Target);
 	TestTrue(TEXT("Coincident residents receive a deterministic nonzero fallback direction"),
 		FMath::IsNearlyEqual(FVector::Dist2D(CoincidentApproach, Target), StandOff));
+
+	const FVector GroundMover(0.f, 0.f, 120.f);
+	const FVector PerchedRaven(1000.f, 0.f, 2400.f);
+	const FVector GroundedApproach = AAutonomousAgentAIController::BuildGroundedResidentApproachPoint(GroundMover, PerchedRaven);
+	TestTrue(TEXT("Ground fallback keeps a stand-off from an airborne resident"),
+		FMath::IsNearlyEqual(FVector::Dist2D(GroundedApproach, PerchedRaven), StandOff));
+	TestEqual(TEXT("Ground fallback stays on the mover's walkable plane"), GroundedApproach.Z, GroundMover.Z);
+	TestTrue(TEXT("Ground fallback approaches from the mover's side"),
+		FVector::DotProduct(GroundedApproach - PerchedRaven, FVector::ForwardVector) < 0.f);
 	return true;
 }
 
