@@ -95,7 +95,7 @@ void ACaptiveSky_2PlayerController::HandleAmbientAgentSpeech(AAutonomousAgentCha
 	{
 		return;
 	}
-	AmbientSpeechWidget->ShowSpeech(Speaker->GetActorNameOrLabel(), Speech);
+	AmbientSpeechWidget->ShowSpeech(Speaker->GetAgentDisplayName(), Speech);
 	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
 	GetWorldTimerManager().SetTimer(AmbientSpeechHideTimer, this,
 		&ACaptiveSky_2PlayerController::HideAmbientSpeech, AmbientSpeechDurationSeconds, false);
@@ -307,13 +307,7 @@ void ACaptiveSky_2PlayerController::ToggleConversation()
 		GetWorldTimerManager().SetTimer(HideHandle, this, &ACaptiveSky_2PlayerController::CloseConversation, 2.f, false);
 		return;
 	}
-	#if WITH_EDITOR
-	ConversationTargetDisplayName = ConversationTarget->GetActorLabel();
-	#else
-	ConversationTargetDisplayName = ConversationTarget->Memory
-		? ConversationTarget->Memory->GetResolvedAgentId()
-		: ConversationTarget->GetName();
-	#endif
+	ConversationTargetDisplayName = ConversationTarget->GetAgentDisplayName();
 	ConversationWidget->OpenFor(ConversationTargetDisplayName);
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(ConversationWidget->TakeWidget());

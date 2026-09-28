@@ -33,6 +33,13 @@ class CAPTIVESKY_2_API AAutonomousAgentCharacter : public ACharacter
 public:
 	AAutonomousAgentCharacter();
 
+	/** Friendly name shown in conversations, speech captions, and resident references. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
+	FString DisplayName;
+
+	UFUNCTION(BlueprintCallable, Category = "Agent")
+	FString GetAgentDisplayName() const;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAgentMemoryComponent> Memory;
 

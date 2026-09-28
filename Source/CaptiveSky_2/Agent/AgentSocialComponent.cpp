@@ -68,6 +68,7 @@ AAutonomousAgentCharacter* UAgentSocialComponent::FindAgent(const FString& IdOrN
 		}
 		const UAgentMemoryComponent* Memory = It->FindComponentByClass<UAgentMemoryComponent>();
 		if ((Memory && Memory->GetResolvedAgentId().Equals(IdOrName, ESearchCase::IgnoreCase)) ||
+			It->GetAgentDisplayName().Equals(IdOrName, ESearchCase::IgnoreCase) ||
 			It->GetActorNameOrLabel().Equals(IdOrName, ESearchCase::IgnoreCase) ||
 			It->GetName().Equals(IdOrName, ESearchCase::IgnoreCase) || It->ActorHasTag(FName(*IdOrName)))
 		{
@@ -234,8 +235,8 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 
 	const FString SpeakerId = SpeakerMemory->GetResolvedAgentId();
 	const FString RecipientId = RecipientMemory->GetResolvedAgentId();
-	const FString SpeakerName = Speaker->GetActorNameOrLabel();
-	const FString RecipientName = Recipient->GetActorNameOrLabel();
+	const FString SpeakerName = Speaker->GetAgentDisplayName();
+	const FString RecipientName = Recipient->GetAgentDisplayName();
 	if (UAgentRelationshipComponent* Relationships = Speaker->FindComponentByClass<UAgentRelationshipComponent>())
 	{
 		Relationships->RecordInteraction(RecipientId, RecipientName,

@@ -299,7 +299,8 @@ void AIslandSpectatorDirector::FocusOnSpeaker(AActor* Speaker, const FString& Sp
 		if (*It != Speaker && FVector::Dist(It->GetActorLocation(), Speaker->GetActorLocation()) < Nearest) { Nearest = FVector::Dist(It->GetActorLocation(), Speaker->GetActorLocation()); Listener = *It; }
 	FIslandShot Shot;
 	Shot.Kind = EIslandShotKind::Speech;
-	Shot.Title = Speaker->GetActorNameOrLabel();
+	const AAutonomousAgentCharacter* AgentSpeaker = Cast<AAutonomousAgentCharacter>(Speaker);
+	Shot.Title = AgentSpeaker ? AgentSpeaker->GetAgentDisplayName() : Speaker->GetActorNameOrLabel();
 	Shot.FieldOfView = 50.f;
 	Shot.Duration = FMath::Clamp(4.f + Speech.Len() / 15.f, 5.f, 12.f);
 	Shot.Focus = Speaker->GetActorLocation();

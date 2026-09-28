@@ -49,6 +49,7 @@ Details:
 
 - Level: `/Game/Maps/Island` — landscape + PCG-generated forest + an `OceanPlane` static mesh acting as a placeholder ocean.
 - Two autonomous agents are present: **Aster** (`Agent_Aster_01`) and an intentionally unnamed raven (`Agent_Raven_01`). Each has an independent identity, personality, memory, relationships, and consciousness lifecycle.
+- A third, role-named Innkeeper is configured to spawn only in Island Game/PIE from the walkable `Inn` landmark, using the shared placeholder body and its own `Agent_Innkeeper_01` identity, memory and personality. It has no personal name or invented lived history. It is map-gated, reversible through `UIslandInnkeeperSubsystem` configuration, and does not alter the two original residents or the session-wide model-request/realtime caps. The isolated `CaptiveSky2.Agent.IslandInnkeeperSpawn` fixture checks the map gate, body class, friendly display name, independent documents and memory-file isolation without beginning play or making model calls; actual nav placement and natural routines still need bounded PIE confirmation.
 - LLM backend: OpenAI-compatible Chat Completions endpoint, model `gpt-6-luna`, key via `OPENAI_API_KEY`. GPT-6 Luna is configured with no reasoning effort for routine embodied decisions and external correspondence.
 - Agent behavior is driven directly by C++ (no StateTree graph yet — see Roadmap).
 - No dedicated visual identity for the agent yet — it's using a placeholder capsule body.

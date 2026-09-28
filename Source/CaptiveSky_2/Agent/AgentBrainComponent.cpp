@@ -61,7 +61,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const float Distance = FVector::Dist(Location, It->GetActorLocation());
 			if (Distance <= 2500.f)
 			{
-				const FString OtherAgentId = It->Memory ? It->Memory->GetResolvedAgentId() : It->GetActorNameOrLabel();
+				const FString OtherAgentId = It->Memory ? It->Memory->GetResolvedAgentId() : It->GetAgentDisplayName();
 				NearbyBeings += FString::Printf(TEXT(" %s is %.0f metres away (move_to target: ApproachAgent_%s). You may approach them, but moving closer does not begin a conversation; speaking remains optional for both of you."),
 					*OtherAgentId, Distance / 100.f, *OtherAgentId);
 				if (OwnSocial)

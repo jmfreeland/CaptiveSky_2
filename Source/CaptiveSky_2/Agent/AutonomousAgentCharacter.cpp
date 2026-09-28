@@ -34,6 +34,11 @@ AAutonomousAgentCharacter::AAutonomousAgentCharacter()
 	EyeCapture->FOVAngle = 90.f;
 }
 
+FString AAutonomousAgentCharacter::GetAgentDisplayName() const
+{
+	return DisplayName.IsEmpty() ? GetActorNameOrLabel() : DisplayName;
+}
+
 void AAutonomousAgentCharacter::BeginPlay()
 {
 	Super::BeginPlay();
