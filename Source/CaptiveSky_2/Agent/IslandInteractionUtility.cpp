@@ -2,6 +2,7 @@
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "IslandGuestBook.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandFirefly.h"
 #include "IslandListeningStonesChime.h"
@@ -9,11 +10,13 @@
 #include "IslandTidepoolCrab.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
+#include "IslandWorldStateSubsystem.h"
 #include "IslandWindMoteEffect.h"
 
 FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 {
 	if (!Target) return NAME_None;
+	if (Target->IsA<AIslandGuestBook>()) return FName(TEXT("GuestBook"));
 	if (Target->ActorHasTag(TEXT("IslandLife")))
 	{
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));
@@ -93,6 +96,34 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	if (!IsValid(Observer) || !IsValid(Target) || !Observer->GetWorld() || Observer->GetWorld() != Target->GetWorld()) return false;
 	const FName TargetTag = GetTargetTag(Target);
 	UWorld* World = Observer->GetWorld();
+	if (TargetTag == FName(TEXT("GuestBook")))
+	{
+		const UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+		if (!State)
+		{
+			OutFact = TEXT("The inn guest book cannot be read here. Nothing changed.");
+			return false;
+		}
+
+		const TArray<FIslandGuestBookEntry>& Entries = State->GetGuestBookEntries();
+		if (Entries.IsEmpty())
+		{
+			OutFact = TEXT("The guest book's pages are blank. Nothing was written.");
+			return true;
+		}
+
+		OutFact = TEXT("The inn guest book, latest entries:\n");
+		const int32 First = FMath::Max(0, Entries.Num() - 3);
+		for (int32 Index = First; Index < Entries.Num(); ++Index)
+		{
+			const FIslandGuestBookEntry& Entry = Entries[Index];
+			FString Line = Entry.Line.Left(34);
+			if (Entry.Line.Len() > 34) Line += TEXT("...");
+			if (Index > First) OutFact += TEXT("\n");
+			OutFact += FString::Printf(TEXT("Day %d - %s: %s"), Entry.Day, *Entry.AgentId.Left(12), *Line);
+		}
+		return true;
+	}
 
 	if (TargetTag == FName(TEXT("InnHearth")) && Target->ActorHasTag(TEXT("IslandInn")))
 	{

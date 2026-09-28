@@ -157,14 +157,18 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	}
 
 	const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
+	const bool bReadOnlyGuestBook = TargetTag == FName(TEXT("GuestBook"));
 	const double Now = FPlatformTime::Seconds();
 	for (auto CooldownIt = WorldInteractionCooldowns.CreateIterator(); CooldownIt; ++CooldownIt)
 		if (!CooldownIt.Key().IsValid() || CooldownIt.Value() <= Now) CooldownIt.RemoveCurrent();
 	const TWeakObjectPtr<AActor> TargetKey(Target);
-	if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey); CooldownUntil && *CooldownUntil > Now)
+	if (!bReadOnlyGuestBook)
 	{
-		ShowWorldInteractionCaption(FString::Printf(TEXT("%s has already answered your attention; let the moment settle."), *TargetTag.ToString()));
-		return;
+		if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey); CooldownUntil && *CooldownUntil > Now)
+		{
+			ShowWorldInteractionCaption(FString::Printf(TEXT("%s has already answered your attention; let the moment settle."), *TargetTag.ToString()));
+			return;
+		}
 	}
 
 	FString Fact;
@@ -173,7 +177,8 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		ShowWorldInteractionCaption(TEXT("You cannot reach or clearly see that from here."));
 		return;
 	}
-	WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
+	if (!bReadOnlyGuestBook)
+		WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
 	ShowWorldInteractionCaption(TargetTag.ToString() + TEXT(": ") + Fact);
 }
 
