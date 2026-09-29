@@ -6,6 +6,7 @@
 
 class UPointLightComponent;
 class UStaticMeshComponent;
+class UMaterialInstanceDynamic;
 class AIslandWeather;
 class AIslandListeningStonesChime;
 
@@ -25,7 +26,7 @@ public:
 	float HoverHeight = 95.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Ecology", meta=(ClampMin="0", ClampMax="100"))
-	float GlowIntensity = 18.f;
+	float GlowIntensity = 60.f;
 
 	/** Bounded displacement response; the base wander remains independent of wind. */
 	static FVector WindDisplacement(const FVector& LocalWind);
@@ -41,6 +42,7 @@ public:
 	bool RespondToSoftChime(AIslandListeningStonesChime* Chime);
 
 protected:
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -58,6 +60,9 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UPointLightComponent> Glow;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> GlowMaterial;
+
 	FVector HomeLocation = FVector::ZeroVector;
 	float Phase = 0.f;
 	float MotionRate = 1.f;
@@ -70,6 +75,7 @@ private:
 	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
 	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
+	void EnsureGlowMaterial();
 	void CheckForNearbyStoneChime();
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
 	void UpdateWings(double IslandTimeSeconds, float RainIntensity);

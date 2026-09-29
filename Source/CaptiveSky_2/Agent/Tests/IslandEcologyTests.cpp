@@ -20,6 +20,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/InputComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "EngineUtils.h"
@@ -384,7 +385,19 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Night fireflies stay at Tideglass or within the stones' existing sound radius"),
 			PoolDistance < 700.f || StonesDistance <= AIslandListeningStonesChime::AudibleRadius);
 		if (StonesDistance <= AIslandListeningStonesChime::AudibleRadius) ++StoneSideFireflies;
-		TestNotNull(TEXT("Firefly has a fluctuating glow component"), It->FindComponentByClass<UPointLightComponent>());
+		UPointLightComponent* FireflyGlow = It->FindComponentByClass<UPointLightComponent>();
+		TestNotNull(TEXT("Firefly has a fluctuating glow component"), FireflyGlow);
+		TestTrue(TEXT("The visible body is large enough to read at the ListeningStones viewpoint"),
+			It->GlowingBody && It->GlowingBody->GetRelativeScale3D().X >= 0.07f);
+		TestNotNull(TEXT("Firefly has a per-instance emissive material"), It->GlowMaterial.Get());
+		if (It->GlowMaterial)
+		{
+			const FLinearColor Emission = It->GlowMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			TestTrue(TEXT("The emissive body keeps the characteristic yellow-green firefly hue"),
+				Emission.G > Emission.R * 2.f && Emission.G > Emission.B * 2.f);
+		}
+		TestTrue(TEXT("The firefly glow reaches nearby ground without changing the night sky fill"),
+			It->GlowIntensity >= 50.f && FireflyGlow && FireflyGlow->AttenuationRadius >= 400.f);
 		TestNotNull(TEXT("Firefly has its segmented body mesh"), It->FindComponentByClass<UStaticMeshComponent>());
 		TArray<UStaticMeshComponent*> BodyParts;
 		It->GetComponents<UStaticMeshComponent>(BodyParts);

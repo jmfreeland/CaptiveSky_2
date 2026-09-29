@@ -26,15 +26,30 @@ A matched 20:00 `ShoreApproach` capture showed that the prior moon intensity (`0
 skylight floor (`0.36`) left nearly all terrain black at the project's fixed exposure. Raising them
 only to `0.8` / `1.2` brightened the clouds but still left the ground unreadable. The current candidate
 uses `1.5` moon intensity and a `2.5` skylight floor: the same no-play view now shows the textured
-shore and ridge under a cool, dark-blue night. The dedicated `StonesFirefly` capture also has visible
-terrain texture; the firefly itself remains a tiny placeholder glint, so this does not solve its art
-or close-up readability.
+shore and ridge under a cool, dark-blue night. The first dedicated `StonesFirefly` capture still
+read the insect as a tiny bluish speck, leading to a separate procedural glow follow-up below.
 
 The final candidate compiled with UE 5.8.3 and rendered successfully at both `ShoreApproach` and
 `StonesFirefly` using `-NoWorldState`. Captures: `Saved/Viewpoints/2026-09-29_104735_h20.0/01_ShoreApproach.png`
 and `Saved/Viewpoints/2026-09-29_104848_h20.0/05_StonesFirefly.png`. No map or material asset was
 changed. A later PIE check should confirm the same balance in the live viewport and on the user's
 display before further tuning.
+
+### Firefly visibility follow-up (2026-09-29)
+
+The fixed `StonesFirefly` view places its route-side firefly about seven metres from the camera,
+but the original lit placeholder was barely distinguishable against the ground. The firefly now
+uses UE's built-in emissive mesh material with a per-instance yellow-green `Color`, a restrained
+seven-centimetre body, and the existing pulsing local light. Rain, quiet observation, and Listening
+Stones chimes still modulate its glow; population and roaming behavior are unchanged. This is a
+procedural readability improvement, not a finished insect asset, and no project `Content/` material
+or map was changed.
+
+The UE 5.8.3 build and `CaptiveSky2.Agent.NightEcology` test passed. The matched no-play capture at
+`Saved/Viewpoints/2026-09-29_112621_h20.0/05_StonesFirefly.png` shows a distinct green light point on
+the shore. Individual wing detail is still not readable at this distance, and the ground remains
+very dark. Confirm the effect in PIE and on the user's display before considering the visual task
+complete.
 
 ## Next safe step
 

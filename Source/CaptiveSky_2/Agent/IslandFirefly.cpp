@@ -8,6 +8,8 @@
 #include "Engine/StaticMesh.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIslandFirefly::AIslandFirefly()
@@ -16,27 +18,31 @@ AIslandFirefly::AIslandFirefly()
 	GlowingBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GlowingBody"));
 	GlowingBody->SetupAttachment(RootComponent);
 	GlowingBody->SetRelativeLocation(FVector(-1.8f, 0.f, 0.f));
-	GlowingBody->SetRelativeScale3D(FVector(0.028f, 0.018f, 0.018f));
+	// Keep the insect body small; its emissive material carries the glow against the dark ground.
+	GlowingBody->SetRelativeScale3D(FVector(0.07f, 0.04f, 0.04f));
 	GlowingBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GlowingBody->SetCastShadow(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FireflySphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (FireflySphere.Succeeded())
 	{
 		GlowingBody->SetStaticMesh(FireflySphere.Object);
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> FireflyEmissiveMaterial(
+			TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+		if (FireflyEmissiveMaterial.Succeeded()) GlowingBody->SetMaterial(0, FireflyEmissiveMaterial.Object);
 		// Thin ellipsoids are a placeholder for wings until a proper insect mesh is chosen.
 		LeftWing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftWing"));
 		LeftWing->SetupAttachment(RootComponent);
 		LeftWing->SetStaticMesh(FireflySphere.Object);
-		LeftWing->SetRelativeLocation(FVector(0.f, -1.25f, 1.1f));
-		LeftWing->SetRelativeScale3D(FVector(0.018f, 0.024f, 0.003f));
+		LeftWing->SetRelativeLocation(FVector(0.f, -3.2f, 1.8f));
+		LeftWing->SetRelativeScale3D(FVector(0.022f, 0.03f, 0.004f));
 		LeftWing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		LeftWing->SetCastShadow(false);
 
 		RightWing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RightWing"));
 		RightWing->SetupAttachment(RootComponent);
 		RightWing->SetStaticMesh(FireflySphere.Object);
-		RightWing->SetRelativeLocation(FVector(0.f, 1.25f, 1.1f));
-		RightWing->SetRelativeScale3D(FVector(0.018f, 0.024f, 0.003f));
+		RightWing->SetRelativeLocation(FVector(0.f, 3.2f, 1.8f));
+		RightWing->SetRelativeScale3D(FVector(0.022f, 0.03f, 0.004f));
 		RightWing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		RightWing->SetCastShadow(false);
 	}
@@ -45,7 +51,7 @@ AIslandFirefly::AIslandFirefly()
 	Glow->SetupAttachment(RootComponent);
 	Glow->SetMobility(EComponentMobility::Movable);
 	Glow->SetLightColor(FLinearColor(0.55f, 1.f, 0.42f));
-	Glow->SetAttenuationRadius(260.f);
+	Glow->SetAttenuationRadius(420.f);
 	Glow->SetCastShadows(false);
 	Glow->SetIntensity(0.f);
 	Glow->SetRelativeLocation(FVector(-1.8f, 0.f, 0.f));
@@ -55,10 +61,24 @@ AIslandFirefly::AIslandFirefly()
 	Tags.AddUnique(TEXT("Firefly"));
 }
 
+void AIslandFirefly::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	EnsureGlowMaterial();
+	if (GlowMaterial) GlowMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.08f, 0.38f, 0.02f));
+}
+
+void AIslandFirefly::EnsureGlowMaterial()
+{
+	if (!GlowMaterial && GlowingBody && GlowingBody->GetMaterial(0))
+		GlowMaterial = GlowingBody->CreateAndSetMaterialInstanceDynamic(0);
+}
+
 void AIslandFirefly::BeginPlay()
 {
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
+	EnsureGlowMaterial();
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.78f, 1.24f);
 	PulseRate = FMath::FRandRange(0.82f, 1.18f);
@@ -209,5 +229,10 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
 	const float ChimeAccent = FMath::Clamp(ChimeResponseRemaining / 1.2f, 0.f, 1.f);
 	const float ChimePulse = FMath::Lerp(NaturalPulse, FMath::Max(NaturalPulse, 0.32f), ChimeAccent);
-	Glow->SetIntensity(GlowIntensity * RainGlowScale(RainIntensity) * ChimePulse * ObservationAccent);
+	const float GlowScale = RainGlowScale(RainIntensity) * ChimePulse * ObservationAccent;
+	Glow->SetIntensity(GlowIntensity * GlowScale);
+	if (GlowMaterial)
+	{
+		GlowMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.08f, 0.38f, 0.02f) * GlowScale);
+	}
 }
