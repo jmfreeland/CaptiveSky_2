@@ -87,6 +87,17 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::WanderNoveltyScore(FVector(0.f, 100.f, 0.f), RecentDestinations));
 	TestEqual(TEXT("A new resident's first wander remains unbiased by nonexistent history"),
 		AAutonomousAgentAIController::WanderNoveltyScore(WanderGoal, {}), 0.f);
+	const TArray<FVector> FrontierRecentDestinations = { FVector::ZeroVector, FVector(200.f, 0.f, 0.f), FVector(0.f, 500.f, 0.f) };
+	TestTrue(TEXT("An explicit wander prefers extending a new frontier over circling familiar ground"),
+		AAutonomousAgentAIController::WanderFrontierScore(FVector(0.f, 1800.f, 0.f), FVector::ZeroVector,
+			1200.f, FrontierRecentDestinations) >
+		AAutonomousAgentAIController::WanderFrontierScore(FVector(100.f, 0.f, 0.f), FVector::ZeroVector,
+			1200.f, FrontierRecentDestinations));
+	TestTrue(TEXT("Recent-place novelty still guides wander choices without outward frontier progress"),
+		AAutonomousAgentAIController::WanderFrontierScore(FVector(0.f, 1500.f, 0.f), FVector::ZeroVector,
+			2000.f, RecentDestinations) >
+		AAutonomousAgentAIController::WanderFrontierScore(FVector(0.f, 100.f, 0.f), FVector::ZeroVector,
+			2000.f, RecentDestinations));
 	TestTrue(TEXT("Wander stop tolerance allows capsule overlap at navigation endpoints"),
 		AAutonomousAgentAIController::WanderAcceptanceRadius > 0.f);
 	return true;

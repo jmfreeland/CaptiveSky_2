@@ -59,9 +59,13 @@ public:
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
+	static constexpr float WanderFrontierProgressWeight = 4000.f;
 	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
 	/** Larger scores mean a wander goal is farther from the resident's recent successful destinations. */
 	static float WanderNoveltyScore(const FVector& Candidate, const TArray<FVector>& RecentDestinations);
+	/** Extends an explicit wander's explored frontier, with local novelty as a tie-breaker. */
+	static float WanderFrontierScore(const FVector& Candidate, const FVector& ExplorationOrigin,
+		float FurthestExploredDistance, const TArray<FVector>& RecentDestinations);
 	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
 	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 
@@ -96,6 +100,8 @@ private:
 	int32 RepeatedActions = 0;
 	int32 BoundedAutonomousRequests = 0;
 	TArray<FVector> RecentWanderDestinations;
+	FVector WanderExplorationOrigin = FVector::ZeroVector;
+	float FurthestWanderDistance = 0.f;
 	bool bCurrentMoveIsWander = false;
 	double NextThinkAt = 0;
 	double NextRestAt = 0;

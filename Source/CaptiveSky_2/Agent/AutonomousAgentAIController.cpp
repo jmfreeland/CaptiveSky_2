@@ -47,6 +47,8 @@ void AAutonomousAgentAIController::OnPossess(APawn* InPawn)
 	NextRestAt = FPlatformTime::Seconds() + 600;
 	BoundedAutonomousRequests = RepeatedActions = 0;
 	RecentWanderDestinations.Reset();
+	WanderExplorationOrigin = InPawn ? InPawn->GetActorLocation() : FVector::ZeroVector;
+	FurthestWanderDistance = 0.f;
 	bCurrentMoveIsWander = false;
 	LastActionKey.Empty();
 	InspectedUntil.Reset();
@@ -193,6 +195,13 @@ float AAutonomousAgentAIController::WanderNoveltyScore(const FVector& Candidate,
 	for (const FVector& Recent : RecentDestinations)
 		NearestRecentDistanceSquared = FMath::Min(NearestRecentDistanceSquared, FVector::DistSquared2D(Candidate, Recent));
 	return NearestRecentDistanceSquared;
+}
+float AAutonomousAgentAIController::WanderFrontierScore(const FVector& Candidate, const FVector& ExplorationOrigin,
+	float FurthestExploredDistance, const TArray<FVector>& RecentDestinations)
+{
+	const float CandidateDistance = FVector::Dist2D(Candidate, ExplorationOrigin);
+	const float FrontierProgress = FMath::Max(0.f, CandidateDistance - FurthestExploredDistance);
+	return WanderNoveltyScore(Candidate, RecentDestinations) + FrontierProgress * WanderFrontierProgressWeight;
 }
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
@@ -358,8 +367,11 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 	{
 		if (const APawn* ControlledPawn = GetPawn())
 		{
-			RecentWanderDestinations.Add(ControlledPawn->GetActorLocation());
+			const FVector WanderLocation = ControlledPawn->GetActorLocation();
+			RecentWanderDestinations.Add(WanderLocation);
 			if (RecentWanderDestinations.Num() > 8) RecentWanderDestinations.RemoveAt(0);
+			FurthestWanderDistance = FMath::Max(FurthestWanderDistance,
+				FVector::Dist2D(WanderLocation, WanderExplorationOrigin));
 		}
 	}
 	bCurrentMoveIsWander = false;
@@ -557,7 +569,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				if (!NavData || !NavSys->GetRandomReachablePointInRadius(Origin, WanderRadius, Candidate, NavData)) break;
 				const UNavigationPath* Route = NavSys->FindPathToLocationSynchronously(GetWorld(), Origin, Candidate.Location, ControlledPawn);
 				if (!IsUsableWanderPath(Route, Origin, Candidate.Location)) continue;
-				const float NoveltyScore = WanderNoveltyScore(Candidate.Location, RecentWanderDestinations);
+				const float NoveltyScore = WanderFrontierScore(Candidate.Location, WanderExplorationOrigin,
+					FurthestWanderDistance, RecentWanderDestinations);
 				if (bFoundFullRoute && NoveltyScore <= BestNoveltyScore) continue;
 				Destination = Candidate;
 				bFoundFullRoute = true;
