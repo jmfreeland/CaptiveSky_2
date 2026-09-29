@@ -45,7 +45,7 @@ namespace AgentModelTier
 				continue;
 			}
 			if (Other->ActorHasTag(TEXT("IslandLandmark")) || Other->ActorHasTag(TEXT("InnHearth")) || Other->ActorHasTag(TEXT("InnCounter"))
-				|| (Other->ActorHasTag(TEXT("IslandLife")) && !Other->IsHidden()) || (Raven && Other->ActorHasTag(TEXT("RavenNestSite"))))
+				|| (Other->ActorHasTag(TEXT("IslandLife")) && !Other->IsHidden()))
 				Consider(Other->GetActorLocation());
 		}
 		if (const UIslandWorldStateSubsystem* WorldState = World->GetSubsystem<UIslandWorldStateSubsystem>())

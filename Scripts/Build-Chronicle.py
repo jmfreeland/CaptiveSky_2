@@ -58,7 +58,7 @@ def describe(entry: dict) -> str | None:
     if kind == "decision":
         action, target = entry.get("action", "idle"), entry.get("target", "")
         if action == "speak":
-            partner = entry.get("with")
+            partner = name(entry["with"]) if entry.get("with") else ""
             return f"{who} said{' to ' + partner if partner else ''}: {quote(text)}"
         if action == "interact":
             return f"{who} reached for {target or 'something nearby'}" + (f" — {text}" if text else "")

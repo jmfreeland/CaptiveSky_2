@@ -720,7 +720,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	const FString AgentId = MemoryComp ? MemoryComp->GetResolvedAgentId() : FString();
 	// Quiet unprompted turns with nothing in reach use the light model, when one is configured.
 	const FString LightModel = AgentModelTier::LightModelName();
-	const bool bLight = !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(AgentModelTier::GatherTurnFacts(Owner, Context));
+	AgentModelTier::FTurnFacts TurnFacts;
+	if (!LightModel.IsEmpty()) TurnFacts = AgentModelTier::GatherTurnFacts(Owner, Context);
+	const bool bLight = !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(TurnFacts);
 	if (Session && !Session->TryReserveModelRequest(AgentId, bLight))
 	{
 		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred by the play-session guard for %s."), *AgentId);
@@ -787,9 +789,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			MemoryComp ? MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd() : FString(), MemoryLines);
 	}
 	else Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
-	UE_LOG(LogAgentBrain, Log, TEXT("Decision request for %s: %s tier (system prompt %d chars%s)."),
+	UE_LOG(LogAgentBrain, Log, TEXT("Decision request for %s: %s tier (system prompt %d chars%s; nearest being %d cm, thing %d cm)."),
 		MemoryComp ? *MemoryComp->GetResolvedAgentId() : *GetNameSafe(Owner), bLight ? TEXT("light") : TEXT("full"), Request.SystemPrompt.Len(),
-		SnapshotBase64.IsEmpty() ? TEXT("") : TEXT(", with image"));
+		SnapshotBase64.IsEmpty() ? TEXT("") : TEXT(", with image"),
+		FMath::RoundToInt(FMath::Min(TurnFacts.NearestBeingCm, 99999.f)), FMath::RoundToInt(FMath::Min(TurnFacts.NearestAffordanceCm, 99999.f)));
 	// -CaptiveSkyLogSituations: record exactly what each resident is shown, for reviewing test runs.
 	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyLogSituations")))
 		UE_LOG(LogAgentBrain, Log, TEXT("Situation for %s (%d chars, system prompt %d chars): %s"),
@@ -837,7 +840,8 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 				Extra.Add(TEXT("at"), FString::Printf(TEXT("%d,%d,%d"), FMath::RoundToInt(Where.X), FMath::RoundToInt(Where.Y), FMath::RoundToInt(Where.Z)));
 				if (!Decision.ActionTarget.IsEmpty()) Extra.Add(TEXT("target"), Decision.ActionTarget);
 				if (!Decision.Speech.IsEmpty() && !Decision.Thought.IsEmpty()) Extra.Add(TEXT("thought"), Decision.Thought);
-				if (!Context.ParticipantName.IsEmpty()) Extra.Add(TEXT("with"), Context.ParticipantName);
+				if (Decision.ActionType == EAgentActionType::Speak && !Context.ParticipantId.IsEmpty()) Extra.Add(TEXT("with"), Context.ParticipantId);
+				else if (Decision.ActionType == EAgentActionType::Speak && !Context.ParticipantName.IsEmpty()) Extra.Add(TEXT("with"), Context.ParticipantName);
 				UIslandChronicleSubsystem::Record(StrongThis->GetWorld(), TEXT("decision"),
 					WeakMemory.IsValid() ? WeakMemory->GetResolvedAgentId() : GetNameSafe(Body),
 					Decision.Speech.IsEmpty() ? Decision.Thought : Decision.Speech, Extra);

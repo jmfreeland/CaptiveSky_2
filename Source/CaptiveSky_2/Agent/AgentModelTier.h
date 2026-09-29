@@ -16,9 +16,9 @@ struct FAgentConversationContext;
 namespace AgentModelTier
 {
 	/** Another being this close could plausibly be spoken to. */
-	static constexpr float BeingRangeCm = 1000.f;
+	static constexpr float BeingRangeCm = 600.f;
 	/** Something to interact with or build on this close is an opportunity that deserves the full model. */
-	static constexpr float AffordanceRangeCm = 600.f;
+	static constexpr float AffordanceRangeCm = 400.f;
 	static constexpr float FarCm = 1.0e9f;
 
 	struct FTurnFacts

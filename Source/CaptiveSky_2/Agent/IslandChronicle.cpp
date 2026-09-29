@@ -83,14 +83,14 @@ void UIslandChronicleSubsystem::Record(const UWorld* World, const FString& Type,
 void UIslandChronicleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	RefreshClock();
-	RecordEntry(TEXT("session"), FString(), TEXT("The Island wakes; a session begins."), { { TEXT("event"), TEXT("start") } });
+	// The session opens on the first tick, once the Island clock has restored the saved day and hour.
+	SinceCheck = 5.f;
 }
 
 void UIslandChronicleSubsystem::Deinitialize()
 {
 	bClosing = true;
-	RecordEntry(TEXT("session"), FString(), TEXT("The session ends."), { { TEXT("event"), TEXT("end") } });
+	if (bSessionOpened) RecordEntry(TEXT("session"), FString(), TEXT("The session ends."), { { TEXT("event"), TEXT("end") } });
 	Super::Deinitialize();
 }
 
@@ -108,7 +108,13 @@ void UIslandChronicleSubsystem::WatchSky()
 	if (!World) return;
 	const int32 PreviousDay = LastDay;
 	RefreshClock();
-	if (PreviousDay > 0 && LastDay != PreviousDay)
+	if (!bSessionOpened)
+	{
+		if (LastDay <= 0) return;
+		bSessionOpened = true;
+		RecordEntry(TEXT("session"), FString(), TEXT("The Island wakes; a session begins."), { { TEXT("event"), TEXT("start") } });
+	}
+	else if (LastDay != PreviousDay)
 		RecordEntry(TEXT("day"), FString(), FString::Printf(TEXT("A new day begins on the Island: day %d."), LastDay), {});
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{

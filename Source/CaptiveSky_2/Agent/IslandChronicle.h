@@ -51,6 +51,7 @@ private:
 	bool bStormSeen = false;
 	bool bStormActive = false;
 	bool bClosing = false;
+	bool bSessionOpened = false;
 	int32 LastDay = 0;
 	FString LastClock;
 
