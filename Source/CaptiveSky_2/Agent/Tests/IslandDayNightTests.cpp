@@ -52,6 +52,8 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->Sky = Sky;
 	Clock->CurrentHour = 12.f;
 	Clock->DaySunIntensity = 10.f;
+	TestEqual(TEXT("Default moon illumination is tuned for a visible but dark night"), Clock->MoonIntensity, 1.5f);
+	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
 	Clock->MoonIntensity = 0.f;
 	float MinimumCover = 2.f;
 	float MaximumCover = -1.f;
@@ -74,7 +76,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Overcast cloud signal dims the actual skylight"), Sky->GetLightComponent()->Intensity < ClearSky * 0.75f);
 	Weather->WeatherSeed = ClearSeed;
 	Clock->CurrentHour = 0.f;
-	Clock->MoonIntensity = 0.24f;
+	Clock->MoonIntensity = 1.5f;
 	Clock->UpdateLighting();
 	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
 	TestTrue(TEXT("A clear midnight keeps the moon light active"), FMath::IsNearlyEqual(Clock->Moon->Intensity, Clock->MoonIntensity, 0.001f));

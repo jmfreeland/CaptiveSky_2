@@ -20,6 +20,22 @@ Do not copy or replace a binary material based on its asset name or screenshot a
 - The computer-use app inventory returned no desktop application windows, and no UnrealEditor process was running. No material, map, or other `Content/` asset was changed.
 - UE 5.8.3 build passed after extracting the grounded-to-airborne approach preflight into a shared helper. The Island-aware `RavenPerch` test now confirms complete, speaking-range ground paths from Aster's spawn to both actual roost markers; this does not validate the landscape's visual appearance.
 
+## Night visibility check (2026-09-29)
+
+A matched 20:00 `ShoreApproach` capture showed that the prior moon intensity (`0.24`) and night
+skylight floor (`0.36`) left nearly all terrain black at the project's fixed exposure. Raising them
+only to `0.8` / `1.2` brightened the clouds but still left the ground unreadable. The current candidate
+uses `1.5` moon intensity and a `2.5` skylight floor: the same no-play view now shows the textured
+shore and ridge under a cool, dark-blue night. The dedicated `StonesFirefly` capture also has visible
+terrain texture; the firefly itself remains a tiny placeholder glint, so this does not solve its art
+or close-up readability.
+
+The final candidate compiled with UE 5.8.3 and rendered successfully at both `ShoreApproach` and
+`StonesFirefly` using `-NoWorldState`. Captures: `Saved/Viewpoints/2026-09-29_104735_h20.0/01_ShoreApproach.png`
+and `Saved/Viewpoints/2026-09-29_104848_h20.0/05_StonesFirefly.png`. No map or material asset was
+changed. A later PIE check should confirm the same balance in the live viewport and on the user's
+display before further tuning.
+
 ## Next safe step
 
 When the editor's configured MCP server is reachable, inspect the saved Island Landscape component's material slots and painted layer weights, then compare the live parent and instance parameters against `M_Island_Textured_Auto`, `MI_Island_Landscape`, and `M_AutoLandscape`. Check the same location in a material preview and in the Island with matched lighting, both dry and wet; confirm that RVT, grass, and wetness features render as intended. Only if this points to a missing or incorrect dependency should a material be duplicated/migrated, on a reversible test copy/map, with the runtime `Ground Wetness` drive-and-restore behavior revalidated. The old `M_Landscape` and `M_AutoLandscape` remain useful references, not assumed replacements.

@@ -36,9 +36,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting", meta=(ClampMin="0"))
 	float DaySunIntensity = 10.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting", meta=(ClampMin="0"))
-	float MoonIntensity = 0.24f;
-	/** Keep terrain legible after sunset without replacing the local moon light. */
-	static constexpr float NightSkylightFloor = 0.36f;
+	float MoonIntensity = 1.5f;
+	/** Fixed-exposure night lighting needs a stronger sky fill for the Island terrain to remain readable. */
+	static constexpr float NightSkylightFloor = 2.5f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
 
