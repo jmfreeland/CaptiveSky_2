@@ -16,9 +16,14 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Request budget cannot exceed hard cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(1000), 120);
 	float SessionSeconds = 1800.f;
 	int32 SessionRequests = 120;
-	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=240 -CaptiveSkyMaxModelRequests=8"), SessionSeconds, SessionRequests);
+	bool bHasExplicitTimeCap = false;
+	bool bHasExplicitRequestCap = false;
+	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=240 -CaptiveSkyMaxModelRequests=8"),
+		SessionSeconds, SessionRequests, &bHasExplicitTimeCap, &bHasExplicitRequestCap);
 	TestEqual(TEXT("Command line can shorten real-time cap"), SessionSeconds, 240.f);
 	TestEqual(TEXT("Command line can lower request cap"), SessionRequests, 8);
+	TestTrue(TEXT("An explicitly supplied real-time cap is tracked for continuous play"), bHasExplicitTimeCap);
+	TestTrue(TEXT("An explicitly supplied request cap is tracked for continuous play"), bHasExplicitRequestCap);
 	SessionSeconds = 300.f;
 	SessionRequests = 12;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=1800 -CaptiveSkyMaxModelRequests=120"), SessionSeconds, SessionRequests);
@@ -76,6 +81,18 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	};
 	UAgentPlaySessionSubsystem* Continuous = MakeContinuous(1000.0);
 	TestFalse(TEXT("Continuous play never expires by time"), Continuous->IsExpired());
+	UAgentPlaySessionSubsystem* ExplicitlyTimeCapped = MakeContinuous(2000.0);
+	ExplicitlyTimeCapped->bHasExplicitTimeCap = true;
+	TestTrue(TEXT("Continuous play with an explicit real-time cap expires when elapsed"), ExplicitlyTimeCapped->IsExpired());
+	TestFalse(TEXT("Continuous play with an elapsed explicit time cap rejects new requests"),
+		ExplicitlyTimeCapped->TryReserveModelRequest(TEXT("Aster")));
+	UAgentPlaySessionSubsystem* ExplicitlyRequestCapped = MakeContinuous(2000.0);
+	ExplicitlyRequestCapped->bHasExplicitRequestCap = true;
+	ExplicitlyRequestCapped->MaxModelRequests = 1;
+	ExplicitlyRequestCapped->ModelRequests = 1;
+	TestTrue(TEXT("Continuous play with an explicit request cap expires when reached"), ExplicitlyRequestCapped->IsExpired());
+	TestFalse(TEXT("Continuous play with an explicit request cap rejects new requests"),
+		ExplicitlyRequestCapped->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestFalse(TEXT("One resident cannot fire requests back to back"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("The first accepted request creates a durable daily ledger"), FPaths::FileExists(Ledger));

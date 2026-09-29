@@ -11,12 +11,16 @@ bool FAgentPlacesTest::RunTest(const FString& Parameters)
 	UAgentBrainComponent::AddRememberedPlace(Places, TEXT("PaleStone_1"), TEXT("a small pale stone"), FVector(-4000.f, 0.f, 0.f));
 	UAgentBrainComponent::AddRememberedPlace(Places, TEXT("Cairn"), TEXT("the small cairn"), FVector(2000.f, 0.f, 0.f));
 	UAgentBrainComponent::AddRememberedPlace(Places, TEXT("Seedpod"), TEXT("a strange pod"), FVector(500.f, 0.f, 0.f));
-	UAgentBrainComponent::AddRememberedPlace(Places, TEXT("Cairn"), TEXT("the small cairn"), FVector(2100.f, 0.f, 0.f));
+	TestTrue(TEXT("A changed observation requests persistence"), UAgentBrainComponent::AddRememberedPlace(Places, TEXT("Cairn"), TEXT("the old cairn"), FVector(2100.f, 0.f, 0.f)));
 	TestEqual(TEXT("Remembering a place again updates it rather than duplicating it"), Places.Num(), 3);
+	TestEqual(TEXT("Updating a known place keeps its original discovery order"), Places[1].Target, FName(TEXT("Cairn")));
+	TestEqual(TEXT("Updated place label is retained"), Places[1].Label, FString(TEXT("the old cairn")));
+	TestTrue(TEXT("Updated place location is retained"), Places[1].Location.Equals(FVector(2100.f, 0.f, 0.f), 0.1f));
+	TestFalse(TEXT("An identical observation does not request another disk write"), UAgentBrainComponent::AddRememberedPlace(Places, TEXT("Cairn"), TEXT("the old cairn"), FVector(2100.f, 0.f, 0.f)));
 
 	const FVector Here = FVector::ZeroVector;
 	FString Text = UAgentBrainComponent::DescribeRememberedPlaces(Places, Here, {}, 1500.f, 3);
-	TestTrue(TEXT("Cairn is offered with its updated distance"), Text.Contains(TEXT("the small cairn, about 21 metres away")));
+	TestTrue(TEXT("Cairn is offered with its updated label and distance"), Text.Contains(TEXT("the old cairn, about 21 metres away")));
 	TestTrue(TEXT("Farther stone is offered too"), Text.Contains(TEXT("move_to target: PaleStone_1")));
 	TestFalse(TEXT("A place within the notice distance is not listed"), Text.Contains(TEXT("Seedpod")));
 	TestTrue(TEXT("Nearest place comes first"), Text.Find(TEXT("Cairn")) < Text.Find(TEXT("PaleStone_1")));
@@ -29,7 +33,7 @@ bool FAgentPlacesTest::RunTest(const FString& Parameters)
 	TArray<UAgentBrainComponent::FRememberedPlace> Many;
 	for (int32 Index = 0; Index < 20; ++Index)
 		UAgentBrainComponent::AddRememberedPlace(Many, FName(*FString::Printf(TEXT("PaleStone_%d"), Index)), TEXT("a small pale stone"), FVector::ZeroVector);
-	TestEqual(TEXT("Only the most recent places are kept"), Many.Num(), 12);
+	TestEqual(TEXT("Only the twelve most recently discovered places are kept"), Many.Num(), 12);
 	TestEqual(TEXT("The oldest are dropped first"), Many[0].Target, FName(TEXT("PaleStone_8")));
 	return true;
 }

@@ -112,7 +112,7 @@ bool ARavenAgentAIController::TraceGround(const FVector& DesiredLocation, FVecto
 	const FVector Start(DesiredLocation.X, DesiredLocation.Y, DesiredLocation.Z + 1000.f);
 	const FVector End(DesiredLocation.X, DesiredLocation.Y, DesiredLocation.Z - 5000.f);
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenGround), false, GetPawn());
-	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query)) return false;
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query) || Hit.ImpactNormal.Z < 0.7f) return false;
 	float HalfHeight = 45.f;
 	if (const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn()))
 		HalfHeight = RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
@@ -120,14 +120,73 @@ bool ARavenAgentAIController::TraceGround(const FVector& DesiredLocation, FVecto
 	return true;
 }
 
-void ARavenAgentAIController::BeginLanding(const FVector& DesiredLocation)
+bool ARavenAgentAIController::BeginLanding(const FVector& DesiredLocation)
 {
-	if (!TraceGround(DesiredLocation, MovementTarget)) return;
+	if (!TraceGround(DesiredLocation, MovementTarget)) return false;
 	bHasMovementTarget = true;
 	bTargetIsPerch = false;
 	LocomotionState = ERavenLocomotionState::Landing;
 	bApproachingPerch = false;
 	SetFlyingMovement(true);
+	return true;
+}
+
+void ARavenAgentAIController::BeginGroundLandingAt(FName SiteTag)
+{
+	if (LocomotionState == ERavenLocomotionState::Grounded)
+	{
+		ReportAction(TEXT("Already grounded; you may gather fallen twigs here if you choose."));
+		return;
+	}
+	if (bHasMovementTarget || LocomotionState == ERavenLocomotionState::TakingOff || LocomotionState == ERavenLocomotionState::Landing || LocomotionState == ERavenLocomotionState::Hopping)
+	{
+		ReportAction(TEXT("Finish the current movement before choosing a landing site."));
+		return;
+	}
+	const UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (!WorldState || !SiteTag.ToString().StartsWith(TEXT("ArrangingGround_")))
+	{
+		ReportAction(TEXT("Landing needs an exact listed ArrangingGround target; no lasting change occurred."));
+		return;
+	}
+	const FIslandArrangementSite* Site = nullptr;
+	int32 VisibleSites = 0;
+	for (const FIslandArrangementSite& Candidate : WorldState->GetArrangementSites())
+	{
+		if (VisibleSites >= 3) break;
+		const FVector View = Candidate.Location + FVector(0.f, 0.f, 30.f);
+		if (FVector::DistSquared(GetPawn()->GetActorLocation(), View) > FMath::Square(1200.f)) continue;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenLandingSiteVisibility), false, GetPawn());
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), View, ECC_Visibility, Query)) continue;
+		++VisibleSites;
+		if (Candidate.Id == SiteTag) { Site = &Candidate; break; }
+	}
+	if (!Site)
+	{
+		ReportAction(TEXT("That exact open-ground target is not currently visible. Choose one of the listed sites."));
+		return;
+	}
+
+	ArrangementLandingTarget = Site->Location;
+	bLandingAtArrangementSite = true;
+	const FVector FlightTarget = ArrangementLandingTarget + FVector(0.f, 0.f, 180.f);
+	if (LocomotionState == ERavenLocomotionState::Perched)
+	{
+		BeginTakeoff(FlightTarget);
+	}
+	else
+	{
+		FlightWaypoints.Reset();
+		CruiseTarget = FlightTarget;
+		MovementTarget = PlanFlightLeg(GetPawn()->GetActorLocation(), FlightTarget);
+		bHasMovementTarget = true;
+		bApproachingPerch = false;
+		bTargetIsPerch = false;
+		LocomotionState = ERavenLocomotionState::Flying;
+		SetFlyingMovement(true);
+	}
+	ReportAction(TEXT("Flight to the listed open-ground site started; the descent will be confirmed at arrival."));
 }
 
 void ARavenAgentAIController::BeginHop()
@@ -225,7 +284,7 @@ FString ARavenAgentAIController::DescribeBuildOptions() const
 	if (const double* Until = WovenUntil.Find(Site->Tags[0]); Until && *Until > FPlatformTime::Seconds())
 		return Result + TEXT(" The layer you just wove here is still settling; more weaving is not possible yet.");
 	if (!bCarryingTwigs)
-		return Result + TEXT(" To weave a nest here you would first need twigs gathered from the ground. None lie up on this perch; you would have to land on open ground (for example beside TideglassPool) to gather them, then return.");
+		return Result + TEXT(" To weave a nest here you would first need twigs gathered from the ground. None lie up on this perch. If you wish to forage, use land with a listed ArrangingGround target to fly to that open-ground site and descend; after landing, build with GatherTwigs. You can then move_to a listed roost and weave. This is optional.");
 	return Result + FString::Printf(TEXT(" While perched here you may weave them into %s (build target: %s). This is a small lasting change that stays after this session."),
 		Nest ? TEXT("the nest at this roost") : TEXT("the start of a nest"), *Site->Tags[0].ToString());
 }
@@ -308,6 +367,7 @@ void ARavenAgentAIController::SetGrounded()
 	bHasMovementTarget = false;
 	bTargetIsPerch = false;
 	bApproachingPerch = false;
+	bLandingAtArrangementSite = false;
 	LocomotionState = ERavenLocomotionState::Grounded;
 	SetFlyingMovement(false);
 }
@@ -374,6 +434,7 @@ bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
 		bHasMovementTarget = false;
 		bTargetIsPerch = false;
 		bApproachingPerch = false;
+		bLandingAtArrangementSite = false;
 		LocomotionState = ERavenLocomotionState::Flying;
 		ReportAction(TEXT("Flight was blocked by geometry; this is not a successful arrival. Choose a different approach."));
 		return false;
@@ -388,6 +449,7 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	if (Decision.ActionType == EAgentActionType::Idle)
 	{
 		bHasMovementTarget = bApproachingPerch = bTargetIsPerch = false;
+		bLandingAtArrangementSite = false;
 		bHasTakeoffEscapeTarget = false;
 		FlightWaypoints.Reset();
 		if (LocomotionState == ERavenLocomotionState::TakingOff || LocomotionState == ERavenLocomotionState::Landing || LocomotionState == ERavenLocomotionState::Hopping)
@@ -395,6 +457,11 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			LocomotionState = ERavenLocomotionState::Flying;
 			SetFlyingMovement(true);
 		}
+	}
+	if (Decision.ActionType == EAgentActionType::Land)
+	{
+		BeginGroundLandingAt(FName(*Decision.ActionTarget));
+		return;
 	}
 
 	if (Decision.ActionType == EAgentActionType::Build && !Decision.ActionTarget.StartsWith(TEXT("ArrangingGround")))
@@ -421,7 +488,10 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		else if (LocomotionState == ERavenLocomotionState::Flying)
 		{
 			const float Choice = FMath::FRand();
-			if (Choice < 0.18f) BeginLanding(GetPawn()->GetActorLocation());
+			if (Choice < 0.18f)
+			{
+				if (!BeginLanding(GetPawn()->GetActorLocation())) ReportAction(TEXT("No safe ground was found below; choose another flight or landing site."));
+			}
 			else if (Choice < 0.32f && BeginPerch()) {}
 			else { MovementTarget = PlanFlightLeg(GetPawn()->GetActorLocation(), MakeCruiseTarget()); bHasMovementTarget = true; bApproachingPerch = bTargetIsPerch = false; }
 		}
@@ -547,7 +617,22 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 			SetFlyingMovement(true);
 			ReportAction(TEXT("Landed and perched on solid support. Arrival is complete; you may rest here or choose to depart."));
 		}
-		else SetGrounded();
+		else
+		{
+			const bool bLandedAtArrangementSite = bLandingAtArrangementSite;
+			SetGrounded();
+			if (bLandedAtArrangementSite)
+				ReportAction(TEXT("Landed on the verified open-ground site. You are now grounded; gathering twigs is available if you choose."));
+		}
+	}
+	else if (LocomotionState == ERavenLocomotionState::Flying && bLandingAtArrangementSite)
+	{
+		if (!BeginLanding(ArrangementLandingTarget))
+		{
+			bLandingAtArrangementSite = false;
+			ReportAction(TEXT("The open-ground site had no safe landing surface on arrival. You remain in flight; choose another visible site."));
+		}
+		else ReportAction(TEXT("Reached the open-ground site; descending to the surface now."));
 	}
 	else if (LocomotionState == ERavenLocomotionState::Flying) ReportAction(TEXT("Reached the flight destination. No further movement is needed to arrive."));
 }

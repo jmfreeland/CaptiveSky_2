@@ -631,17 +631,41 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	int32 ChimeCountAfterRepeatedControllerAction = 0;
 	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCountAfterRepeatedControllerAction;
 	TestEqual(TEXT("The controller's repeat cooldown still prevents another chime"), ChimeCountAfterRepeatedControllerAction, 1);
+	AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(700.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandFirefly* OccludedFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandFirefly* WatchableFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation, FRotator::ZeroRotator, Spawn);
+	AActor* WildlifeBlocker = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Spawn);
+	UBoxComponent* WildlifeBlockerBox = WildlifeBlocker ? NewObject<UBoxComponent>(WildlifeBlocker) : nullptr;
+	if (WildlifeBlockerBox)
+	{
+		WildlifeBlocker->SetRootComponent(WildlifeBlockerBox);
+		WildlifeBlockerBox->SetBoxExtent(FVector(15.f, 100.f, 100.f));
+		WildlifeBlockerBox->SetCollisionProfileName(TEXT("BlockAll"));
+		WildlifeBlockerBox->RegisterComponent();
+		WildlifeBlocker->SetActorLocation(TestPoolLocation + FVector(100.f, 0.f, 0.f));
+	}
+	TestNotNull(TEXT("Distant firefly candidate spawned before close wildlife"), DistantFirefly);
+	TestNotNull(TEXT("Occluded nearby firefly candidate spawned before the visible one"), OccludedFirefly);
 	TestNotNull(TEXT("Nearby wild firefly spawned for observation interaction"), WatchableFirefly);
+	TestNotNull(TEXT("Wildlife visibility blocker registered"), WildlifeBlockerBox);
+	if (Observer && OccludedFirefly && WatchableFirefly)
+	{
+		TestFalse(TEXT("The first close firefly is genuinely occluded"), IslandInteractionUtility::CanInspect(Observer, OccludedFirefly));
+		TestTrue(TEXT("A second close firefly has a clear observation line"), IslandInteractionUtility::CanInspect(Observer, WatchableFirefly));
+	}
 	if (WatchableFirefly)
 	{
 		Controller->InspectTarget(TEXT("Firefly"));
 		TestTrue(TEXT("Quiet observation triggers only a brief glow accent"), WatchableFirefly->ObservationPulseRemaining > 0.f && WatchableFirefly->ObservationPulseRemaining <= 3.f);
+		TestTrue(TEXT("A visible close firefly is selected past earlier distant and occluded individuals"),
+			(!DistantFirefly || FMath::IsNearlyZero(DistantFirefly->ObservationPulseRemaining)) &&
+			(!OccludedFirefly || FMath::IsNearlyZero(OccludedFirefly->ObservationPulseRemaining)));
 		WatchableFirefly->Tick(1.f);
 		TestTrue(TEXT("Firefly returns naturally toward its usual pulse"), WatchableFirefly->ObservationPulseRemaining > 0.f && WatchableFirefly->ObservationPulseRemaining < 2.1f);
 		WatchableFirefly->Tick(2.f);
 		TestTrue(TEXT("Observation accent expires without persistent state"), FMath::IsNearlyZero(WatchableFirefly->ObservationPulseRemaining));
 	}
+	if (WildlifeBlocker) WildlifeBlocker->Destroy();
 	const FVector CrabStart = TestPoolLocation + FVector(100.f, 0.f, 0.f);
 	AIslandTidepoolCrab* WatchableCrab = World->SpawnActor<AIslandTidepoolCrab>(CrabStart, FRotator::ZeroRotator, Spawn);
 	TestNotNull(TEXT("Nearby independent shore crab spawned for a quiet observation"), WatchableCrab);
@@ -706,7 +730,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableCrab->SetActorHiddenInGame(true);
 		TestTrue(TEXT("Hiding the nearest creature exposes the nearest visible landmark"), IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World) == PoolTarget);
 		PoolTarget->SetActorHiddenInGame(true);
-		TestTrue(TEXT("Hiding the nearest landmark exposes the next visible choice"), IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World) == WindTarget);
+		for (TActorIterator<AIslandFirefly> It(World); It; ++It) It->SetActorHiddenInGame(true);
+		AActor* NextVisible = IslandInteractionUtility::FindNearestVisibleTarget(Visitor, World);
+		TestTrue(*FString::Printf(TEXT("Hiding the nearest landmark exposes the next visible choice (selected %s, tag %s)"),
+			NextVisible ? *NextVisible->GetName() : TEXT("none"), NextVisible ? *IslandInteractionUtility::GetTargetTag(NextVisible).ToString() : TEXT("none")),
+			NextVisible == WindTarget);
 		PoolTarget->SetActorHiddenInGame(false);
 		WatchableCrab->SetActorHiddenInGame(false);
 		TestTrue(TEXT("The shared landmark response accepts a human visitor without agent components"), IslandInteractionUtility::Perform(Visitor, PoolTarget, VisitorFact));

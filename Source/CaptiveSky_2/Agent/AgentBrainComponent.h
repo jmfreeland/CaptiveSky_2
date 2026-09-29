@@ -119,14 +119,16 @@ private:
 	};
 	mutable TArray<FRememberedPlace> RememberedPlaces;
 	mutable bool bPlacesLoaded = false;
+	mutable bool bPlacesDirty = false;
 	static constexpr int32 MaxRememberedPlaces = 12;
 
-	static void AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location);
+	// Upserts by target without refreshing discovery order; returns true when the stored details changed.
+	static bool AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location);
 	// Up to MaxListed places beyond MinDistance and not in Noticed, nearest first, as a sentence for the situation text.
 	static FString DescribeRememberedPlaces(const TArray<FRememberedPlace>& Places, const FVector& Location, const TSet<FName>& Noticed, float MinDistance, int32 MaxListed);
 	FString GetPlacesFilePath() const;
 	void LoadRememberedPlaces() const;
-	void SaveRememberedPlaces() const;
+	bool SaveRememberedPlaces() const;
 	void RememberPlace(FName Target, const FString& Label, const FVector& Location) const;
 
 	FString BuildSituationSummary(const FAgentConversationContext& Context) const;

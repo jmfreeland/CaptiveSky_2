@@ -9,6 +9,7 @@
 
 class UNavigationPath;
 class UNavigationSystemV1;
+class ACharacter;
 struct FNavAgentProperties;
 struct FNavLocation;
 
@@ -43,9 +44,13 @@ public:
 	static constexpr float ResidentApproachStandOffDistance = 350.f;
 	static constexpr float ResidentApproachAltitudeOffset = 180.f;
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
-	/** Horizontal stand-off point when the target is above the mover's walkable plane. */
+	/** Horizontal stand-off point when the target is elevated above the mover's walkable plane. */
 	static FVector BuildGroundedResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
-	/** Finds a complete, in-range ground route to a conversational stand-off beside an airborne resident. */
+	/** Eight nearby ground stand-offs, starting on the mover's side of an elevated resident. */
+	static TArray<FVector> BuildGroundedResidentApproachCandidates(const FVector& MoverLocation, const FVector& TargetLocation);
+	/** Raven locomotion state overrides walking movement mode while perched. */
+	static bool IsElevatedResidentForApproach(const ACharacter* TargetCharacter);
+	/** Finds a complete, in-range ground route to a conversational stand-off beside an elevated resident. */
 	static bool FindGroundedResidentApproachGoal(UNavigationSystemV1* Navigation, const FVector& MoverLocation,
 		const FVector& TargetLocation, const FNavAgentProperties& AgentProperties, float CapsuleHalfHeight,
 		float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);

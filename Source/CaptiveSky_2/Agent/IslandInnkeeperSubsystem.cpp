@@ -70,9 +70,52 @@ TArray<FVector> UIslandInnkeeperSubsystem::GetSpawnCandidates(const AActor* InnM
 		Candidates.Add(Hearth + Forward * 360.f - Right * 220.f);
 		Candidates.Add(Hearth + Forward * 500.f);
 		Candidates.Add(Hearth + Forward * 700.f);
+
+		// Furniture makes the marker's forward fan unreliable in blockout rooms. Search a small,
+		// deterministic grid around the hearth so the selector can choose a nearby point whose
+		// actual resident capsule has a clear route to the door, while keeping the hearth usable.
+		TArray<FVector> ClearanceSamples;
+		for (int32 X = -400; X <= 400; X += 100)
+		{
+			for (int32 Y = -400; Y <= 400; Y += 100)
+			{
+				const FVector Sample = Hearth + FVector(static_cast<float>(X), static_cast<float>(Y), 0.f);
+				if (FVector::DistSquared2D(Sample, Hearth) > FMath::Square(400.f)) continue;
+				const bool bAlreadyCovered = Candidates.ContainsByPredicate([&Sample](const FVector& Existing)
+					{ return FVector::DistSquared2D(Existing, Sample) < FMath::Square(75.f); });
+				if (!bAlreadyCovered) ClearanceSamples.Add(Sample);
+			}
+		}
+		ClearanceSamples.Sort([&Hearth](const FVector& A, const FVector& B)
+			{ return FVector::DistSquared2D(A, Hearth) < FVector::DistSquared2D(B, Hearth); });
+		Candidates.Append(ClearanceSamples);
 	}
 	if (InnMarker) Candidates.Add(InnMarker->GetActorLocation());
 	return Candidates;
+}
+
+bool UIslandInnkeeperSubsystem::HasCapsuleClearPath(UWorld& World, const TArray<FVector>& PathPoints,
+	float CapsuleRadius, float CapsuleHalfHeight, const AActor* InnMarker, const AActor* HearthMarker)
+{
+	if (PathPoints.Num() < 2 || CapsuleRadius <= 0.f || CapsuleHalfHeight < CapsuleRadius) return false;
+
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(InnkeeperEscapePath), false);
+	if (InnMarker) Query.AddIgnoredActor(InnMarker);
+	if (HearthMarker) Query.AddIgnoredActor(HearthMarker);
+	// Other residents can move while the innkeeper is leaving; assess the fixed room geometry,
+	// not a temporary blockage caused by a character crossing the doorway.
+	for (TActorIterator<AAutonomousAgentCharacter> It(&World); It; ++It) Query.AddIgnoredActor(*It);
+
+	const FVector CapsuleOffset(0.f, 0.f, CapsuleHalfHeight + 2.f);
+	const FCollisionShape Capsule = FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight);
+	for (int32 PointIndex = 1; PointIndex < PathPoints.Num(); ++PointIndex)
+	{
+		const FVector Start = PathPoints[PointIndex - 1] + CapsuleOffset;
+		const FVector End = PathPoints[PointIndex] + CapsuleOffset;
+		if (FVector::DistSquared(Start, End) <= FMath::Square(1.f)) continue;
+		if (World.SweepTestByChannel(Start, End, FQuat::Identity, ECC_Pawn, Capsule, Query)) return false;
+	}
+	return true;
 }
 
 bool UIslandInnkeeperSubsystem::FindSpawnLocation(UWorld& World, const TArray<FVector>& Candidates,
@@ -101,6 +144,7 @@ bool UIslandInnkeeperSubsystem::FindSpawnLocation(UWorld& World, const TArray<FV
 
 		const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(&World, Projected.Location, DoorLocation.Location);
 		if (!Path || !Path->IsValid() || Path->IsPartial()) continue;
+		if (!HasCapsuleClearPath(World, Path->PathPoints, CapsuleRadius, CapsuleHalfHeight, InnMarker, HearthMarker)) continue;
 
 		int32 ExtraClearanceCm = 0;
 		for (int32 Extra = 25; Extra <= 200; Extra += 25)

@@ -174,24 +174,32 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		const AAutonomousAgentCharacter* GroundResidentDefaults = GroundResidentClass
 			? Cast<AAutonomousAgentCharacter>(GroundResidentClass->GetDefaultObject()) : nullptr;
 		const UAgentSocialComponent* SocialDefaults = GetDefault<UAgentSocialComponent>();
+		const TArray<FVector> GroundResidentStarts = {
+			FVector(-100400.f, 100960.f, 2823.f), // Aster's saved spawn used by the existing reachability check.
+			FVector(-100039.f, 103308.f, 2778.f)  // Aster's logged indoor position when the raven approach failed.
+		};
+		const TCHAR* GroundResidentStartLabels[] = { TEXT("Aster spawn"), TEXT("inn common room") };
 		for (const FName Tag : {FName(TEXT("Roost_West")), FName(TEXT("Roost_East"))})
 		{
 			AActor* Marker = nullptr;
 			for (TActorIterator<AActor> It(Island); It; ++It) if (It->ActorHasTag(Tag)) { Marker = *It; break; }
 			if (!TestNotNull(*FString::Printf(TEXT("Island marker %s exists"), *Tag.ToString()), Marker)) continue;
-			FNavLocation ResidentApproachStart;
-			FNavLocation ResidentApproachGoal;
-			const bool bGroundResidentHasConversationalRoute = Navigation && GroundResidentDefaults && SocialDefaults &&
-				AAutonomousAgentAIController::FindGroundedResidentApproachGoal(Navigation,
-					FVector(-100400.f, 100960.f, 2823.f), Marker->GetActorLocation(),
-					GroundResidentDefaults->GetNavAgentPropertiesRef(),
-					GroundResidentDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
-					SocialDefaults->SpeakingRadius, ResidentApproachStart, ResidentApproachGoal);
-			TestTrue(*FString::Printf(TEXT("A ground resident has a complete, in-range route beside airborne %s"), *Tag.ToString()),
-				bGroundResidentHasConversationalRoute);
-			if (bGroundResidentHasConversationalRoute)
-				AddInfo(FString::Printf(TEXT("Ground resident route to %s: %s -> %s."), *Tag.ToString(),
-					*ResidentApproachStart.Location.ToCompactString(), *ResidentApproachGoal.Location.ToCompactString()));
+			for (int32 StartIndex = 0; StartIndex < GroundResidentStarts.Num(); ++StartIndex)
+			{
+				FNavLocation ResidentApproachStart;
+				FNavLocation ResidentApproachGoal;
+				const bool bGroundResidentHasConversationalRoute = Navigation && GroundResidentDefaults && SocialDefaults &&
+					AAutonomousAgentAIController::FindGroundedResidentApproachGoal(Navigation,
+						GroundResidentStarts[StartIndex], Marker->GetActorLocation(),
+						GroundResidentDefaults->GetNavAgentPropertiesRef(),
+						GroundResidentDefaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(),
+						SocialDefaults->SpeakingRadius, ResidentApproachStart, ResidentApproachGoal);
+				TestTrue(*FString::Printf(TEXT("A ground resident from %s has a complete, in-range route beside airborne %s"),
+					GroundResidentStartLabels[StartIndex], *Tag.ToString()), bGroundResidentHasConversationalRoute);
+				if (bGroundResidentHasConversationalRoute)
+					AddInfo(FString::Printf(TEXT("Ground resident route from %s to %s: %s -> %s."), GroundResidentStartLabels[StartIndex],
+						*Tag.ToString(), *ResidentApproachStart.Location.ToCompactString(), *ResidentApproachGoal.Location.ToCompactString()));
+			}
 			FActorSpawnParameters Spawn;
 			Spawn.ObjectFlags |= RF_Transient;
 			Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -211,6 +219,10 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			const bool bSupport = Island->LineTraceSingleByChannel(GroundHit, Probe->GetActorLocation(), Probe->GetActorLocation() - FVector(0, 0, 70), ECC_Visibility, GroundQuery);
 			AddInfo(FString::Printf(TEXT("%s: state %d, half height %.2f, support %d, distance %.2f, normal %s"), *Tag.ToString(), static_cast<int32>(Pilot->LocomotionState), Probe->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), bSupport, GroundHit.Distance, *GroundHit.ImpactNormal.ToString()));
 			TestTrue(*FString::Printf(TEXT("Actual %s landing at %s"), *Tag.ToString(), *Probe->GetActorLocation().ToString()), Pilot->LocomotionState == ERavenLocomotionState::Perched);
+			TestTrue(*FString::Printf(TEXT("Perched raven %s remains held in flying mode so gravity cannot pull it off the branch"), *Tag.ToString()),
+				Probe->GetCharacterMovement()->MovementMode == MOVE_Flying);
+			TestTrue(*FString::Printf(TEXT("Approach logic still recognizes perched raven %s as an elevated target"), *Tag.ToString()),
+				AAutonomousAgentAIController::IsElevatedResidentForApproach(Probe));
 
 			const FName OtherTag = Tag == FName(TEXT("Roost_West")) ? FName(TEXT("Roost_East")) : FName(TEXT("Roost_West"));
 			AActor* OtherMarker = nullptr;

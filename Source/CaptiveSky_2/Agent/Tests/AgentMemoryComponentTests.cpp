@@ -188,6 +188,20 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Unicode text preserved exactly"), UnicodeRecords.ContainsByPredicate([&](const FAgentMemoryRecord& Record) { return Record.Text == UnicodeText; }));
 		TestTrue(TEXT("ASCII after Unicode preserved"), UnicodeRecords.ContainsByPredicate([](const FAgentMemoryRecord& Record) { return Record.Text == TEXT("ASCII after Unicode"); }));
 	}
+	UAgentBrainComponent* PromptBrain = NewObject<UAgentBrainComponent>(GetTransientPackage());
+	const FString SystemPrompt = PromptBrain->BuildSystemPrompt({});
+	TestTrue(TEXT("Action targets must copy identifiers shown in the current situation"),
+		SystemPrompt.Contains(TEXT("copy the exact target identifier shown in the current situation")));
+	TestTrue(TEXT("The prompt discourages invented target names"), SystemPrompt.Contains(TEXT("Do not invent or paraphrase a target")));
+	TestTrue(TEXT("The prompt gives wander or idle as the alternative to a guessed target"),
+		SystemPrompt.Contains(TEXT("choose wander or idle instead of guessing")));
+	TestTrue(TEXT("The prompt restricts land to Raven and listed open-ground sites"),
+		SystemPrompt.Contains(TEXT("The land action is for the raven only")) && SystemPrompt.Contains(TEXT("ArrangingGround target")));
+	TestTrue(TEXT("The response schema lists land as an action type"), SystemPrompt.Contains(TEXT("sleep|build|land")));
+	const FAgentDecision LandDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
+		TEXT("{\"thought\":\"A quiet descent\",\"action\":{\"type\":\"land\",\"target\":\"ArrangingGround_1\"}}"), Writer);
+	TestTrue(TEXT("The land action parses with its exact site target"), LandDecision.bValid &&
+		LandDecision.ActionType == EAgentActionType::Land && LandDecision.ActionTarget == TEXT("ArrangingGround_1"));
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
 
 	return true;

@@ -65,7 +65,9 @@ enum class EAgentActionType : uint8
 	Interact,
 	Sleep,
 	// Makes a small lasting change to the world, only at targets the situation explicitly offers.
-	Build
+	Build,
+	// A raven flies to a listed open-ground site and descends; it does not alter the world.
+	Land
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */

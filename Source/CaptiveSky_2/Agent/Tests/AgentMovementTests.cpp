@@ -36,6 +36,22 @@ bool FAgentMovementTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Ground fallback stays on the mover's walkable plane"), GroundedApproach.Z, GroundMover.Z);
 	TestTrue(TEXT("Ground fallback approaches from the mover's side"),
 		FVector::DotProduct(GroundedApproach - PerchedRaven, FVector::ForwardVector) < 0.f);
+	const TArray<FVector> GroundedCandidates = AAutonomousAgentAIController::BuildGroundedResidentApproachCandidates(GroundMover, PerchedRaven);
+	TestEqual(TEXT("Grounded resident approach checks eight sides around a perched resident"), GroundedCandidates.Num(), 8);
+	if (GroundedCandidates.Num() == 8)
+	{
+		TestTrue(TEXT("The mover-facing ground stand-off is considered first"), GroundedCandidates[0].Equals(GroundedApproach));
+		for (int32 Index = 0; Index < GroundedCandidates.Num(); ++Index)
+		{
+			TestTrue(*FString::Printf(TEXT("Grounded candidate %d remains at the shared stand-off radius"), Index),
+				FMath::IsNearlyEqual(FVector::Dist2D(GroundedCandidates[Index], PerchedRaven), StandOff, 0.1f));
+			TestEqual(*FString::Printf(TEXT("Grounded candidate %d stays on the mover's plane"), Index),
+				GroundedCandidates[Index].Z, GroundMover.Z);
+			for (int32 OtherIndex = Index + 1; OtherIndex < GroundedCandidates.Num(); ++OtherIndex)
+				TestTrue(*FString::Printf(TEXT("Grounded candidates %d and %d are distinct"), Index, OtherIndex),
+					!GroundedCandidates[Index].Equals(GroundedCandidates[OtherIndex], 1.f));
+		}
+	}
 	return true;
 }
 

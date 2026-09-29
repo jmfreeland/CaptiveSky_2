@@ -9,10 +9,10 @@
  * Independent wall-clock watchdog. Exists for every play session, not as a placed actor.
  *
  * Bounded play (the default) ends after MaxRealtimeSeconds or MaxModelRequests. Continuous play is an
- * explicit opt-in (-CaptiveSkyContinuous or bContinuousPlay) for an unattended screen: play never ends by
- * itself; instead model requests draw on an allowance that refills steadily, each resident must leave a
- * few seconds between its own requests, and a daily ceiling recorded in Saved/CaptiveSky/ModelBudget.json
- * holds across restarts. When the allowance is spent, residents simply wait.
+ * explicit opt-in (-CaptiveSkyContinuous or bContinuousPlay) for an unattended screen: it has no default
+ * end time, but explicit command-line smoke-test caps still apply. Model requests draw on an allowance that
+ * refills steadily, each resident must leave a few seconds between its own requests, and a daily ceiling
+ * recorded in Saved/CaptiveSky/ModelBudget.json holds across restarts. When the allowance is spent, residents simply wait.
  */
 UCLASS(Config=Game)
 class CAPTIVESKY_2_API UAgentPlaySessionSubsystem : public UGameInstanceSubsystem
@@ -48,10 +48,13 @@ public:
 	static double ClampDuration(double Requested);
 	static int32 ClampRequestLimit(int32 Requested);
 	/** Applies command-line smoke-test limits without permitting either active cap to increase. */
-	static void ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests);
+	static void ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests,
+		bool* bOutHasExplicitTimeCap = nullptr, bool* bOutHasExplicitRequestCap = nullptr);
 private:
 	friend class FAgentSafetyTest;
 	double StartedAt = 0;
+	bool bHasExplicitTimeCap = false;
+	bool bHasExplicitRequestCap = false;
 	FTSTicker::FDelegateHandle Watchdog;
 	bool bStopRequested = false;
 	bool CheckDeadline(float DeltaSeconds);

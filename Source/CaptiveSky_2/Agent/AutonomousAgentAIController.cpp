@@ -116,6 +116,32 @@ FVector AAutonomousAgentAIController::BuildGroundedResidentApproachPoint(const F
 	if (!Direction.Normalize()) Direction = FVector::ForwardVector;
 	return FVector(TargetLocation.X, TargetLocation.Y, MoverLocation.Z) + Direction * ResidentApproachStandOffDistance;
 }
+TArray<FVector> AAutonomousAgentAIController::BuildGroundedResidentApproachCandidates(const FVector& MoverLocation, const FVector& TargetLocation)
+{
+	const FVector PreferredApproach = BuildGroundedResidentApproachPoint(MoverLocation, TargetLocation);
+	FVector PreferredDirection = PreferredApproach - TargetLocation;
+	PreferredDirection.Z = 0.f;
+	if (!PreferredDirection.Normalize()) PreferredDirection = FVector::ForwardVector;
+	const float PreferredAngle = FMath::Atan2(PreferredDirection.Y, PreferredDirection.X);
+	TArray<FVector> Candidates;
+	Candidates.Reserve(8);
+	for (int32 Side = 0; Side < 8; ++Side)
+	{
+		const float Angle = PreferredAngle + Side * (PI / 4.f);
+		const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+		Candidates.Add(FVector(TargetLocation.X, TargetLocation.Y, MoverLocation.Z) +
+			Direction * ResidentApproachStandOffDistance);
+	}
+	return Candidates;
+}
+bool AAutonomousAgentAIController::IsElevatedResidentForApproach(const ACharacter* TargetCharacter)
+{
+	if (!TargetCharacter) return false;
+	if (const ARavenAgentAIController* RavenController = Cast<ARavenAgentAIController>(TargetCharacter->GetController()))
+		return RavenController->LocomotionState != ERavenLocomotionState::Grounded;
+	const UCharacterMovementComponent* Movement = TargetCharacter->GetCharacterMovement();
+	return Movement && !Movement->IsMovingOnGround();
+}
 bool AAutonomousAgentAIController::FindGroundedResidentApproachGoal(UNavigationSystemV1* Navigation,
 	const FVector& MoverLocation, const FVector& TargetLocation, const FNavAgentProperties& AgentProperties,
 	float CapsuleHalfHeight, float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext)
@@ -123,13 +149,33 @@ bool AAutonomousAgentAIController::FindGroundedResidentApproachGoal(UNavigationS
 	if (!Navigation || CapsuleHalfHeight <= 0.f || SpeakingRadius <= 0.f) return false;
 	const FVector StartOnFloor = MoverLocation - FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
 	if (!ProjectGroundedTarget(Navigation, StartOnFloor, AgentProperties, OutStart)) return false;
-	const FVector DesiredApproach = BuildGroundedResidentApproachPoint(OutStart.Location, TargetLocation);
-	if (!ProjectGroundedTarget(Navigation, DesiredApproach, AgentProperties, OutGoal)) return false;
-	const FVector GoalBodyCenter = OutGoal.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
-	if (FVector::DistSquared(GoalBodyCenter, TargetLocation) > FMath::Square(SpeakingRadius)) return false;
-	const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
-		Navigation->GetWorld(), OutStart.Location, OutGoal.Location, PathfindingContext);
-	return Route && Route->IsValid() && !Route->IsPartial();
+
+	// A single arrival-side goal can land on water or the wrong side of a cliff,
+	// trunk, or building even when another place around the elevated resident is
+	// reachable. Search a small ring of grounded stand-offs and choose the shortest
+	// complete path that remains inside their shared speaking radius.
+	float BestPathLength = TNumericLimits<float>::Max();
+	bool bFoundGoal = false;
+	TArray<FVector> TestedGoals;
+	for (const FVector& DesiredApproach : BuildGroundedResidentApproachCandidates(OutStart.Location, TargetLocation))
+	{
+		FNavLocation CandidateGoal;
+		if (!ProjectGroundedTarget(Navigation, DesiredApproach, AgentProperties, CandidateGoal)) continue;
+		if (TestedGoals.ContainsByPredicate([&CandidateGoal](const FVector& Existing)
+			{ return FVector::DistSquared2D(Existing, CandidateGoal.Location) < FMath::Square(50.f); })) continue;
+		TestedGoals.Add(CandidateGoal.Location);
+
+		const FVector GoalBodyCenter = CandidateGoal.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		if (FVector::DistSquared(GoalBodyCenter, TargetLocation) > FMath::Square(SpeakingRadius)) continue;
+		const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
+			Navigation->GetWorld(), OutStart.Location, CandidateGoal.Location, PathfindingContext);
+		if (!Route || !Route->IsValid() || Route->IsPartial() || Route->GetPathLength() >= BestPathLength) continue;
+
+		OutGoal = CandidateGoal;
+		BestPathLength = Route->GetPathLength();
+		bFoundGoal = true;
+	}
+	return bFoundGoal;
 }
 bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
 {
@@ -329,6 +375,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		ReportAction(TEXT("Already inspected that place recently; no additional interaction is available yet."));
 		return;
 	}
+	bool bNearbyWildlifeOccluded = false;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
@@ -338,8 +385,17 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		// Ecology habitat markers can share a name with the interactable pool but are not themselves landmarks.
 		// Skip them before distance checks so an unrelated habitat cannot mask the actual TideglassPool landmark.
 		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
-		if (FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) { ReportAction(TEXT("Too far away to inspect; move within four metres first.")); return; }
-		if (!IslandInteractionUtility::CanInspect(Observer, *It)) { ReportAction(TEXT("The inspection point is occluded; find a clear approach.")); return; }
+		if (FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f))
+		{
+			ReportAction(TEXT("Too far away to inspect; move within four metres first."));
+			return;
+		}
+		if (!IslandInteractionUtility::CanInspect(Observer, *It))
+		{
+			if (bWildlifeTarget) { bNearbyWildlifeOccluded = true; continue; }
+			ReportAction(TEXT("The inspection point is occluded; find a clear approach."));
+			return;
+		}
 		FString Fact;
 		if (It->ActorHasTag(TEXT("RavenNestSite")))
 		{
@@ -375,7 +431,8 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Target.ToString() + TEXT(": ") + Fact, 0.45f, {TEXT("action-result"), Target.ToString()}));
 		return;
 	}
-	if (Target == FName(TEXT("Firefly"))) ReportAction(TEXT("No firefly is close enough to watch quietly; move within four metres and let it come near."));
+	if (bNearbyWildlifeOccluded) ReportAction(TEXT("That nearby wildlife is hidden from view; find a clear approach and watch without disturbing it."));
+	else if (Target == FName(TEXT("Firefly"))) ReportAction(TEXT("No firefly is close enough to watch quietly; move within four metres and let it come near."));
 	else if (Target == FName(TEXT("TidepoolCrab"))) ReportAction(TEXT("No shore crab is close enough to watch quietly; return to the TideglassPool and look near its edge."));
 	else if (Target == FName(TEXT("MinnowSchool"))) ReportAction(TEXT("No minnow school is close enough to watch; return to TideglassPool and look into the shallows."));
 	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
@@ -446,7 +503,9 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 {
 	if (!Decision.bValid)
 	{
-		UE_LOG(LogAutonomousAgentAI, Warning, TEXT("%s: brain returned an invalid decision."), *GetName());
+		// The brain has already logged parse/provider failures at their source. It also broadcasts
+		// default decisions for intentional deferrals (for example, a spent continuous-play allowance).
+		UE_LOG(LogAutonomousAgentAI, Verbose, TEXT("%s: brain returned no actionable decision."), *GetName());
 		return;
 	}
 	if (IsResting()) return;
@@ -455,7 +514,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 	{
 		const FString Key = FString::FromInt(static_cast<int32>(Decision.ActionType)) + TEXT(":") + Decision.ActionTarget.ToLower();
 		// Different speech and random wandering are not identical failed actions.
-		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build;
+		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land;
 		RepeatedActions = bRepeatSensitive ? (Key == LastActionKey ? RepeatedActions + 1 : 1) : 0;
 		LastActionKey = Key;
 		NextThinkAt = FPlatformTime::Seconds() + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
@@ -540,8 +599,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				// we are travelling, so let path following track the actor rather than a stale point.
 				ACharacter* MoverCharacter = Cast<ACharacter>(ControlledPawn);
 				ACharacter* TargetCharacter = Cast<ACharacter>(TargetActor);
-				if (MoverCharacter && TargetCharacter && MoverCharacter->GetCharacterMovement()->IsMovingOnGround() &&
-					!TargetCharacter->GetCharacterMovement()->IsMovingOnGround())
+				if (MoverCharacter && TargetCharacter && MoverCharacter->GetCharacterMovement() &&
+					MoverCharacter->GetCharacterMovement()->IsMovingOnGround() && IsElevatedResidentForApproach(TargetCharacter))
 				{
 					UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 					const float HalfHeight = MoverCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
@@ -555,7 +614,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 						TargetActor->GetActorLocation(), MoverCharacter->GetNavAgentPropertiesRef(), HalfHeight,
 						SpeakingRadius, GroundStart, GroundGoal, MoverCharacter))
 					{
-						ReportAction(TEXT("Approach failed: no complete ground route reaches conversational range of the airborne resident."));
+						ReportAction(TEXT("Approach failed: no complete ground route reaches conversational range of the elevated resident."));
 						break;
 					}
 					else
@@ -563,10 +622,10 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 						const EPathFollowingRequestResult::Type GroundedResult = MoveToLocation(GroundGoal.Location,
 							WanderAcceptanceRadius, true, true, false, false, nullptr, false);
 						ReportAction(GroundedResult == EPathFollowingRequestResult::Failed
-							? TEXT("Approach failed: the raven is airborne and no grounded conversational route could start.")
+							? TEXT("Approach failed: the raven's elevated position has no grounded conversational route that could start.")
 							: GroundedResult == EPathFollowingRequestResult::AlreadyAtGoal
-								? TEXT("Already at a reachable ground position near the airborne resident. Speaking remains optional.")
-								: TEXT("Approach started toward a reachable ground position near the airborne resident; arriving does not begin a conversation."));
+								? TEXT("Already at a reachable ground position near the elevated resident. Speaking remains optional.")
+								: TEXT("Approach started toward a reachable ground position near the elevated resident; arriving does not begin a conversation."));
 						break;
 					}
 				}
@@ -618,6 +677,10 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		break;
 	case EAgentActionType::Sleep:
 		TryRest(FName(*Decision.ActionTarget));
+		break;
+	case EAgentActionType::Land:
+		StopMovement();
+		ReportAction(TEXT("Landing at an open-ground site is available to the raven only; nothing changed."));
 		break;
 	case EAgentActionType::Idle:
 	default:

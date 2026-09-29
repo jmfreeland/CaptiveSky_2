@@ -59,6 +59,13 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 
 	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0, 0, 100), FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
+	AActor* Ground = World->SpawnActor<AActor>();
+	UBoxComponent* GroundBox = NewObject<UBoxComponent>(Ground);
+	Ground->SetRootComponent(GroundBox);
+	GroundBox->SetBoxExtent(FVector(5000.f, 5000.f, 20.f));
+	GroundBox->SetCollisionProfileName(TEXT("BlockAll"));
+	GroundBox->RegisterComponent();
+	Ground->SetActorLocation(FVector(0.f, 0.f, -20.f));
 	ATargetPoint* Perch = World->SpawnActor<ATargetPoint>(FVector(600, 0, 302), FRotator::ZeroRotator);
 	Perch->Tags = {Site, TEXT("RavenPerch"), TEXT("RavenNestSite")};
 	AActor* Support = World->SpawnActor<AActor>();
@@ -73,7 +80,7 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Controller->Possess(Raven);
 	TestEqual(TEXT("No lasting state exists before anything is built"), State->GetNests().Num(), 0);
 
-	auto Decide = [Controller](const FString& Target)
+	auto Decide = [&Controller](const FString& Target)
 	{
 		FAgentDecision Decision;
 		Decision.bValid = true;
@@ -138,6 +145,21 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	World = CreateNestWorld(StateFile);
 	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	World->BeginPlay();
+	Raven = World->SpawnActor<ACharacter>(FVector(600.f, 0.f, 302.f), FRotator::ZeroRotator);
+	Controller = World->SpawnActor<ARavenAgentAIController>();
+	AActor* ForageGround = World->SpawnActor<AActor>();
+	UBoxComponent* ForageGroundBox = NewObject<UBoxComponent>(ForageGround);
+	ForageGround->SetRootComponent(ForageGroundBox);
+	ForageGroundBox->SetBoxExtent(FVector(5000.f, 5000.f, 20.f));
+	ForageGroundBox->SetCollisionProfileName(TEXT("BlockAll"));
+	ForageGroundBox->RegisterComponent();
+	ForageGround->SetActorLocation(FVector(0.f, 0.f, -20.f));
+	Controller->Possess(Raven);
+	Controller->LocomotionState = ERavenLocomotionState::Perched;
+	Raven->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+	UAgentBrainComponent* RavenBrain = NewObject<UAgentBrainComponent>(Raven);
+	Raven->AddInstanceComponent(RavenBrain);
+	RavenBrain->RegisterComponent();
 	Nest = State->FindNest(Site);
 	TestTrue(TEXT("Nest persists across sessions"), Nest && Nest->Layers == 2 && Nest->Builders.Num() == 1);
 	TestEqual(TEXT("Persisted nest is visible again"), CountNestActors(World, Site), 1);
@@ -148,6 +170,55 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fifth layer completes the nest"), State->AddNestLayer(Site, FVector::ZeroVector, TEXT("Other")), UIslandWorldStateSubsystem::MaxNestLayers);
 	TestEqual(TEXT("A complete nest accepts no more layers"), State->AddNestLayer(Site, FVector::ZeroVector, TEXT("Other")), 0);
 	TestTrue(TEXT("Developer removal reverses the change"), State->RemoveNest(Site) && !State->FindNest(Site) && CountNestActors(World, Site) == 0);
+
+	FIslandArrangementSite ForageSite;
+	ForageSite.Id = TEXT("ArrangingGround_TestForage");
+	ForageSite.Location = FVector(1000.f, 0.f, 0.f);
+	State->ArrangementSites.Add(ForageSite);
+	FIslandArrangementSite HiddenSite;
+	HiddenSite.Id = TEXT("ArrangingGround_Hidden");
+	HiddenSite.Location = FVector(600.f, 1000.f, 0.f);
+	State->ArrangementSites.Add(HiddenSite);
+	AActor* Occluder = World->SpawnActor<AActor>();
+	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
+	Occluder->SetRootComponent(OccluderBox);
+	OccluderBox->SetBoxExtent(FVector(100.f, 100.f, 300.f));
+	OccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
+	OccluderBox->RegisterComponent();
+	Occluder->SetActorLocation(FVector(600.f, 500.f, 300.f));
+	const FString ForageSummary = RavenBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(*FString::Printf(TEXT("Open-ground forage site is offered (summary: %s)"), *ForageSummary),
+		ForageSummary.Contains(TEXT("move_to/land target: ArrangingGround_TestForage")));
+	FAgentDecision HiddenLanding;
+	HiddenLanding.bValid = true;
+	HiddenLanding.ActionType = EAgentActionType::Land;
+	HiddenLanding.ActionTarget = HiddenSite.Id.ToString();
+	Controller->ActOnDecision(HiddenLanding);
+	TestFalse(TEXT("An in-range but occluded landing site is refused"), Controller->bHasMovementTarget);
+	TestTrue(TEXT("Visibility refusal keeps the raven perched"), Controller->LocomotionState == ERavenLocomotionState::Perched);
+	TestTrue(*FString::Printf(TEXT("Visibility refusal explains why the target was unavailable (%s)"), *Controller->DescribeActionState()),
+		Controller->DescribeActionState().Contains(TEXT("not currently visible")));
+	FAgentDecision InvalidLanding;
+	InvalidLanding.bValid = true;
+	InvalidLanding.ActionType = EAgentActionType::Land;
+	InvalidLanding.ActionTarget = Site.ToString();
+	Controller->ActOnDecision(InvalidLanding);
+	TestFalse(TEXT("A nest perch cannot be used as an open-ground landing target"), Controller->bHasMovementTarget);
+	TestTrue(*FString::Printf(TEXT("Invalid landing target is explained without movement (%s)"), *Controller->DescribeActionState()),
+		Controller->DescribeActionState().Contains(TEXT("exact listed ArrangingGround")));
+	FAgentDecision Land;
+	Land.bValid = true;
+	Land.ActionType = EAgentActionType::Land;
+	Land.ActionTarget = ForageSite.Id.ToString();
+	Controller->ActOnDecision(Land);
+	for (int32 Frame = 0; Frame < 1800 && Controller->bHasMovementTarget; ++Frame) Controller->Tick(1.f / 60.f);
+	TestTrue(TEXT("Raven can fly from its perch and descend onto a verified open-ground site"), Controller->LocomotionState == ERavenLocomotionState::Grounded && !Controller->bHasMovementTarget);
+	TestTrue(TEXT("Landing reports the grounded forage affordance"), Controller->DescribeActionState().Contains(TEXT("gathering twigs is available")));
+	TestEqual(TEXT("Landing alone creates no lasting nest"), State->GetNests().Num(), 0);
+	TestTrue(TEXT("GatherTwigs is offered after ground arrival"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	Decide(TEXT("GatherTwigs"));
+	TestTrue(*FString::Printf(TEXT("The raven gathers the material after choosing to land (%s)"), *Controller->DescribeActionState()),
+		Controller->bCarryingTwigs);
 	DestroyNestWorld(World);
 
 	// An unreadable file is never overwritten by a later save.

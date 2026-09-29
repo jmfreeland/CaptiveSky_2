@@ -46,8 +46,8 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The preferred start is within interaction range of the hearth"), FVector::Dist(HearthSideStart, HearthMarker->GetActorLocation()) < 400.f);
 	TestEqual(TEXT("A missing hearth falls back to the Inn landmark"), UIslandInnkeeperSubsystem::GetSpawnCandidate(InnMarker, nullptr), InnMarker->GetActorLocation());
 	const TArray<FVector> SpawnCandidates = UIslandInnkeeperSubsystem::GetSpawnCandidates(InnMarker, HearthMarker);
-	TestEqual(TEXT("Hearth-side placement searches nearby clear alternatives before the landmark"), SpawnCandidates.Num(), 8);
-	if (SpawnCandidates.Num() == 8)
+	TestTrue(TEXT("Hearth-side placement searches a deterministic clearance grid before the landmark"), SpawnCandidates.Num() > 8);
+	if (SpawnCandidates.Num() > 8)
 	{
 		TestEqual(TEXT("The closest hearth-side candidate remains first"), SpawnCandidates[0], HearthSideStart);
 		TestTrue(TEXT("Nearby alternatives fan around furniture while retaining hearth interaction range"),
@@ -144,34 +144,12 @@ bool FIslandInnkeeperSpawnTest::RunTest(const FString& Parameters)
 			FNavLocation DoorGoal;
 			const bool bHasDoorGoal = Navigation && Navigation->ProjectPointToNavigation(IslandDoor->GetActorLocation(),
 				DoorGoal, FVector(350.f, 350.f, 500.f));
-			TestTrue(TEXT("The production door marker projects to navigation for candidate diagnostics"), bHasDoorGoal);
-			FCollisionQueryParams ClearanceQuery(SCENE_QUERY_STAT(InnkeeperSpawnAudit), false);
-			ClearanceQuery.AddIgnoredActor(IslandInn);
-			ClearanceQuery.AddIgnoredActor(IslandHearth);
-			if (bHasDoorGoal)
-			{
-				for (int32 Index = 0; Index < IslandCandidates.Num(); ++Index)
-				{
-					const TArray<FVector> SingleCandidate = { IslandCandidates[Index] };
-					FNavLocation CandidateLocation;
-					int32 SingleIndex = INDEX_NONE;
-					int32 SingleExtraClearanceCm = INDEX_NONE;
-					const bool bCandidateValid = UIslandInnkeeperSubsystem::FindSpawnLocation(*Island, SingleCandidate,
-						IslandDoor->GetActorLocation(), Radius, HalfHeight, IslandInn, IslandHearth, CandidateLocation, SingleIndex,
-						SingleExtraClearanceCm);
-					if (!bCandidateValid)
-					{
-						AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: blocked, unprojectable, or no complete door route."), Index));
-						continue;
-					}
-					const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Island, CandidateLocation.Location, DoorGoal.Location);
-					const float BodyToHearthDistance = FVector::Dist(CandidateLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f),
-						IslandHearth->GetActorLocation());
-					AddInfo(FString::Printf(TEXT("Island innkeeper candidate %d: complete %.0f cm door path, up to %d cm extra capsule clearance, %.0f cm body-to-hearth (%s interaction)."),
-						Index, Path ? Path->GetPathLength() : 0.f, SingleExtraClearanceCm, BodyToHearthDistance,
-						BodyToHearthDistance <= IslandInteractionUtility::DefaultInteractionRange ? TEXT("in") : TEXT("out of")));
-				}
-			}
+			const UNavigationPath* SelectedPath = bHasDoorGoal
+				? Navigation->FindPathToLocationSynchronously(Island, SpawnLocation.Location, DoorGoal.Location) : nullptr;
+			TestTrue(TEXT("The selected start retains a complete route to the inn door"),
+				SelectedPath && SelectedPath->IsValid() && !SelectedPath->IsPartial());
+		TestTrue(TEXT("The selected start's actual resident capsule clears the door route"), SelectedPath &&
+			UIslandInnkeeperSubsystem::HasCapsuleClearPath(*Island, SelectedPath->PathPoints, Radius, HalfHeight, IslandInn, IslandHearth));
 		}
 	}
 	return true;

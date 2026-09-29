@@ -83,6 +83,8 @@ private:
 	bool bHasTakeoffEscapeTarget = false;
 	bool bTargetIsPerch = false;
 	bool bApproachingPerch = false;
+	bool bLandingAtArrangementSite = false;
+	FVector ArrangementLandingTarget = FVector::ZeroVector;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
 	/** First target for flying From -> To: To itself when the way is clear, else a climb above what blocks it. */
@@ -94,7 +96,8 @@ private:
 
 	void SetFlyingMovement(bool bFlying) const;
 	void BeginTakeoff(const FVector& Destination);
-	void BeginLanding(const FVector& DesiredLocation);
+	bool BeginLanding(const FVector& DesiredLocation);
+	void BeginGroundLandingAt(FName SiteTag);
 	void BeginHop();
 	bool BeginPerch();
 	bool BeginPerchAt(AActor* Perch);

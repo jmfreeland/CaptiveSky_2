@@ -27,14 +27,17 @@ int32 UAgentPlaySessionSubsystem::ClampRequestLimit(int32 Requested)
 	return FMath::Clamp(Requested, 1, 120);
 }
 
-void UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests)
+void UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests,
+	bool* bOutHasExplicitTimeCap, bool* bOutHasExplicitRequestCap)
 {
 	const float ConfiguredSeconds = static_cast<float>(ClampDuration(InOutSeconds));
 	const int32 ConfiguredRequests = ClampRequestLimit(InOutRequests);
 	float RequestedSeconds = ConfiguredSeconds;
 	int32 RequestedRequests = ConfiguredRequests;
-	FParse::Value(*CommandLine, TEXT("CaptiveSkyMaxRealtimeSeconds="), RequestedSeconds);
-	FParse::Value(*CommandLine, TEXT("CaptiveSkyMaxModelRequests="), RequestedRequests);
+	const bool bHasExplicitTimeCap = FParse::Value(*CommandLine, TEXT("CaptiveSkyMaxRealtimeSeconds="), RequestedSeconds);
+	const bool bHasExplicitRequestCap = FParse::Value(*CommandLine, TEXT("CaptiveSkyMaxModelRequests="), RequestedRequests);
+	if (bOutHasExplicitTimeCap) *bOutHasExplicitTimeCap = bHasExplicitTimeCap;
+	if (bOutHasExplicitRequestCap) *bOutHasExplicitRequestCap = bHasExplicitRequestCap;
 	InOutSeconds = FMath::Min(ConfiguredSeconds, static_cast<float>(ClampDuration(RequestedSeconds)));
 	InOutRequests = FMath::Min(ConfiguredRequests, ClampRequestLimit(RequestedRequests));
 }
@@ -42,7 +45,8 @@ void UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(const FString& Comman
 void UAgentPlaySessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	ApplyCommandLineOverrides(FCommandLine::Get(), MaxRealtimeSeconds, MaxModelRequests);
+	ApplyCommandLineOverrides(FCommandLine::Get(), MaxRealtimeSeconds, MaxModelRequests,
+		&bHasExplicitTimeCap, &bHasExplicitRequestCap);
 	StartedAt = FPlatformTime::Seconds();
 	ModelRequests = 0;
 	bStopRequested = false;
@@ -50,16 +54,29 @@ void UAgentPlaySessionSubsystem::Initialize(FSubsystemCollectionBase& Collection
 	if (bContinuousPlay) BeginContinuous();
 	Watchdog = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &UAgentPlaySessionSubsystem::CheckDeadline), 0.25f);
 	if (bContinuousPlay)
-		UE_LOG(LogAgentSession, Log, TEXT("Continuous play: no end time; %.0f model requests per hour, bursts of %d, at most %d per day (%d used today)."),
-			ContinuousRequestsPerHour, ContinuousBurst, ContinuousDailyRequests, LedgerRequests)
+	{
+		FString ExplicitCaps = TEXT("no explicit command-line end cap");
+		if (bHasExplicitTimeCap)
+			ExplicitCaps = FString::Printf(TEXT("time cap %.0f seconds"), MaxRealtimeSeconds);
+		if (bHasExplicitRequestCap)
+			ExplicitCaps += FString::Printf(TEXT("%srequest cap %d"), bHasExplicitTimeCap ? TEXT(" and ") : TEXT(""), MaxModelRequests);
+		UE_LOG(LogAgentSession, Log, TEXT("Continuous play: %s; %.0f model requests per hour, bursts of %d, at most %d per day (%d used today)."),
+			*ExplicitCaps, ContinuousRequestsPerHour, ContinuousBurst, ContinuousDailyRequests, LedgerRequests);
+	}
 	else
 		UE_LOG(LogAgentSession, Log, TEXT("Play safety active: %.0f real seconds, at most %d model requests."), MaxRealtimeSeconds, MaxModelRequests);
 }
 
 bool UAgentPlaySessionSubsystem::IsExpired() const
 {
-	if (bContinuousPlay) return bStopRequested;
-	return bStopRequested || FPlatformTime::Seconds() - StartedAt >= ClampDuration(MaxRealtimeSeconds) || ModelRequests >= ClampRequestLimit(MaxModelRequests);
+	const double ElapsedSeconds = FPlatformTime::Seconds() - StartedAt;
+	if (bContinuousPlay)
+	{
+		return bStopRequested ||
+			(bHasExplicitTimeCap && ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds)) ||
+			(bHasExplicitRequestCap && ModelRequests >= ClampRequestLimit(MaxModelRequests));
+	}
+	return bStopRequested || ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds) || ModelRequests >= ClampRequestLimit(MaxModelRequests);
 }
 
 bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId)

@@ -113,6 +113,8 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	const FString AtFirstStone = DescribeFrom(World, First->Location + FVector(150, 0, 100));
 	TestTrue(TEXT("Close to the first stone, it is noticed"), AtFirstStone.Contains(TEXT("target: PaleStone_1")));
 	TestTrue(TEXT("The first stone hints at the second"), AtFirstStone.Contains(TEXT("move_to target: PaleStone_2")));
+	TestTrue(TEXT("A close inspection is clearly optional, factual, and leaves the trail stone unchanged"),
+		AtFirstStone.Contains(TEXT("Interact with target PaleStone_1 gives one closer look")) && AtFirstStone.Contains(TEXT("stays where it is")));
 	TestFalse(TEXT("The pod is not given away at the start of the trail"), AtFirstStone.Contains(TEXT("Seedpod")));
 	const FIslandCurioRecord* Second = State->FindCurio(TEXT("PaleStone_2"));
 	if (TestNotNull(TEXT("Second trail stone exists for the visibility check"), Second))
@@ -145,6 +147,8 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("The last stone points nowhere further"), AtLastStone.Contains(TEXT("PaleStone_7")));
 	const FString AtPod = DescribeFrom(World, Pod->Location + FVector(200, 0, 100));
 	TestTrue(TEXT("The closed pod is noticed up close"), AtPod.Contains(TEXT("closed pod")) && AtPod.Contains(TEXT("target: Seedpod")));
+	TestTrue(TEXT("A curious resident is told the pod can change slowly without a promised reward"),
+		AtPod.Contains(TEXT("Interact with target Seedpod may slowly unfold")) && AtPod.Contains(TEXT("at most once per Island day")) && AtPod.Contains(TEXT("No reward or explanation is promised")));
 
 	// Pod: one step per visit on a new Island day, then it stays open.
 	TestTrue(TEXT("Stones never change"), State->ExamineCurio(TEXT("PaleStone_3"), 1).Contains(TEXT("leave it as it was")));
@@ -160,6 +164,10 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	// Cairn through the real Interact path: any resident, one stone per Island day.
 	const FIslandCurioRecord* Cairn = State->FindCurio(TEXT("Cairn"));
 	if (!TestNotNull(TEXT("Cairn exists"), Cairn)) { DestroyCurioWorld(World); return false; }
+	const FString CairnApproach = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100));
+	TestTrue(TEXT("The cairn offers one small optional lasting contribution per day"),
+		CairnApproach.Contains(TEXT("Interact with target Cairn sets one nearby flat stone")) &&
+		CairnApproach.Contains(TEXT("limited to once per Island day")) && CairnApproach.Contains(TEXT("leaving it as it is is equally fine")));
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(Cairn->Location + FVector(150, 0, 100), FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
 	Controller->Possess(Visitor);
@@ -175,6 +183,8 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 	const FString ContributorView = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100), CairnContributorId);
 	TestTrue(TEXT("A maker recognizes their own contribution in perception"), ContributorView.Contains(TEXT("including stones you set there")));
 	TestTrue(TEXT("A maker is not told who placed the other stones"), ContributorView.Contains(TEXT("does not identify who placed the other stones")));
+	TestTrue(TEXT("A resident is told when the cairn has already changed today"), ContributorView.Contains(TEXT("another would topple it")));
+	TestFalse(TEXT("The same-day description does not invite an unavailable second interaction"), ContributorView.Contains(TEXT("Interact with target Cairn sets one nearby flat stone")));
 	TestTrue(TEXT("Only one stone per day, with no false contributor record"), State->ExamineCurio(TEXT("Cairn"), 1, TEXT("AnotherResident")).Contains(TEXT("another would topple it")) && State->FindCurio(TEXT("Cairn"))->State == 4 && !State->FindCurio(TEXT("Cairn"))->Contributors.Contains(TEXT("AnotherResident")));
 	TestTrue(TEXT("A second resident can contribute on a later day"), State->ExamineCurio(TEXT("Cairn"), 2, TEXT("AnotherResident")).Contains(TEXT("now stands 5 stones high")) && State->FindCurio(TEXT("Cairn"))->Contributors.Contains(TEXT("AnotherResident")));
 	const FString OtherMakerView = DescribeFrom(World, Cairn->Location + FVector(150, 0, 100), TEXT("AnotherResident"));

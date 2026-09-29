@@ -32,6 +32,8 @@ private:
 	static void InitializeInnkeeper(AAutonomousAgentCharacter* Agent, const FString& InAgentId);
 	static FVector GetSpawnCandidate(const AActor* InnMarker, const AActor* HearthMarker);
 	static TArray<FVector> GetSpawnCandidates(const AActor* InnMarker, const AActor* HearthMarker);
+	static bool HasCapsuleClearPath(UWorld& World, const TArray<FVector>& PathPoints, float CapsuleRadius,
+		float CapsuleHalfHeight, const AActor* InnMarker, const AActor* HearthMarker);
 	static bool FindSpawnLocation(UWorld& World, const TArray<FVector>& Candidates, const FVector& DoorCandidate,
 		float CapsuleRadius, float CapsuleHalfHeight, const AActor* InnMarker, const AActor* HearthMarker,
 		FNavLocation& OutLocation, int32& OutCandidateIndex, int32& OutExtraClearanceCm);

@@ -56,12 +56,19 @@ int32 UAgentBrainComponent::CountLingeringDecisions(const TArray<FVector>& Spots
 	return Count;
 }
 
-void UAgentBrainComponent::AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location)
+bool UAgentBrainComponent::AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location)
 {
-	if (Target.IsNone()) return;
-	Places.RemoveAll([Target](const FRememberedPlace& Place) { return Place.Target == Target; });
+	if (Target.IsNone()) return false;
+	if (FRememberedPlace* Existing = Places.FindByPredicate([Target](const FRememberedPlace& Place) { return Place.Target == Target; }))
+	{
+		if (Existing->Label == Label && Existing->Location.Equals(Location, 1.f)) return false;
+		Existing->Label = Label;
+		Existing->Location = Location;
+		return true;
+	}
 	Places.Add({ Target, Label, Location });
 	if (Places.Num() > MaxRememberedPlaces) Places.RemoveAt(0, Places.Num() - MaxRememberedPlaces);
+	return true;
 }
 
 FString UAgentBrainComponent::DescribeRememberedPlaces(const TArray<FRememberedPlace>& Places, const FVector& Location, const TSet<FName>& Noticed, float MinDistance, int32 MaxListed)
@@ -112,10 +119,10 @@ void UAgentBrainComponent::LoadRememberedPlaces() const
 	}
 }
 
-void UAgentBrainComponent::SaveRememberedPlaces() const
+bool UAgentBrainComponent::SaveRememberedPlaces() const
 {
 	const FString Path = GetPlacesFilePath();
-	if (Path.IsEmpty()) return;
+	if (Path.IsEmpty()) return false;
 	TArray<TSharedPtr<FJsonValue>> Entries;
 	for (const FRememberedPlace& Place : RememberedPlaces)
 	{
@@ -130,16 +137,15 @@ void UAgentBrainComponent::SaveRememberedPlaces() const
 	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetArrayField(TEXT("places"), Entries);
 	FString Text;
-	if (FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text)))
-		FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	return FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text))
+		&& FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 
 void UAgentBrainComponent::RememberPlace(FName Target, const FString& Label, const FVector& Location) const
 {
 	LoadRememberedPlaces();
-	const bool bKnown = RememberedPlaces.ContainsByPredicate([Target](const FRememberedPlace& Place) { return Place.Target == Target; });
-	AddRememberedPlace(RememberedPlaces, Target, Label, Location);
-	if (!bKnown) SaveRememberedPlaces();
+	bPlacesDirty |= AddRememberedPlace(RememberedPlaces, Target, Label, Location);
+	if (bPlacesDirty && SaveRememberedPlaces()) bPlacesDirty = false;
 }
 
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
@@ -268,6 +274,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				if (Curio.Kind == EIslandCurioKind::PaleStone)
 				{
 					NearbyBeings += FString::Printf(TEXT(" Half-hidden in the ground about %.0f metres away, a small pale stone looks deliberately set there (move_to/interact target: %s)."), Metres, *Target);
+					NearbyBeings += Metres <= 4.f
+						? FString::Printf(TEXT(" If you choose, Interact with target %s gives one closer look; it feels smooth and empty, and stays where it is."), *Target)
+						: FString::Printf(TEXT(" From within four metres, you could choose Interact with target %s for one closer look; it will not change."), *Target);
 					int32 Number = 0;
 					if (Target.RightChop(10).IsNumeric()) Number = FCString::Atoi(*Target.RightChop(10));
 					if (const FIslandCurioRecord* Next = WorldState->FindCurio(FName(*FString::Printf(TEXT("PaleStone_%d"), Number + 1))))
@@ -285,8 +294,15 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						: Curio.State == 1 ? TEXT("a strange pod with two husk-leaves peeled back; it is dark inside")
 						: Curio.State == 2 ? TEXT("a strange half-open pod; pale light shows between its husk-leaves")
 						: TEXT("an open pod cradling a small seed that glows faintly and steadily");
-					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away stands %s (move_to/interact target: %s).%s"), Metres, Look, *Target,
-						Curio.State < AIslandCurio::PodOpenState && Curio.LastChangedDay == Today ? TEXT(" It has already changed once today.") : TEXT(""));
+					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away stands %s (move_to/interact target: %s)."), Metres, Look, *Target);
+					if (Curio.State >= AIslandCurio::PodOpenState)
+						NearbyBeings += TEXT(" The seed remains unknown and does not respond to touch; there is no further change to seek.");
+					else if (Curio.LastChangedDay == Today)
+						NearbyBeings += TEXT(" It has already changed once today; another look on a later Island day may reveal a little more.");
+					else if (Metres <= 4.f)
+						NearbyBeings += FString::Printf(TEXT(" If you are curious, Interact with target %s may slowly unfold a few husk-leaves; at most once per Island day. No reward or explanation is promised."), *Target);
+					else
+						NearbyBeings += FString::Printf(TEXT(" If you are curious, from within four metres you may choose Interact with target %s; it may slowly unfold a few husk-leaves, at most once per Island day. No reward or explanation is promised."), *Target);
 				}
 				else
 				{
@@ -294,6 +310,14 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away, including stones you set there. The shared record does not identify who placed the other stones (move_to/interact target: %s)."), Curio.State, Metres, *Target);
 					else
 						NearbyBeings += FString::Printf(TEXT(" A small cairn of %d stacked flat stones stands about %.0f metres away. Its shared record does not identify you as a contributor or say who placed the other stones; your own memories may know more (move_to/interact target: %s)."), Curio.State, Metres, *Target);
+					if (Curio.State >= AIslandCurio::CairnMaxStones)
+						NearbyBeings += TEXT(" Its top is too narrow for another stone.");
+					else if (Curio.LastChangedDay == Today)
+						NearbyBeings += TEXT(" The top stone was set there today and still sits a little unsteadily; another would topple it. You could return on a later Island day if you wish.");
+					else if (Metres <= 4.f)
+						NearbyBeings += FString::Printf(TEXT(" If you wish, Interact with target %s sets one nearby flat stone on the cairn. It is a small lasting shared change, limited to once per Island day; leaving it as it is is equally fine."), *Target);
+					else
+						NearbyBeings += FString::Printf(TEXT(" If you wish, from within four metres you may Interact with target %s to set one nearby flat stone on the cairn. It is a small lasting shared change, limited to once per Island day; leaving it as it is is equally fine."), *Target);
 					if (Curio.StormDamagedDay >= 0 && Today - Curio.StormDamagedDay <= 2)
 						NearbyBeings += TEXT(" Its top stone was blown down in a recent storm and lies at its foot.");
 				}
@@ -315,26 +339,27 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				const float Metres = FVector::Dist(Location, View) / 100.f;
 				const FString SiteName = Site.Id.ToString();
 				++NoticedSites;
+				NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is an open-ground site near the ListeningStones (move_to/land target: %s). "), Metres, *SiteName);
 				if (!Site.bHasWork)
 				{
-					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is a level patch of open ground near the ListeningStones where loose stones could be arranged (build target: %s). ")
+					NearbyBeings += FString::Printf(TEXT(" Loose stones could be arranged here (build target: %s). ")
 						TEXT("To arrange there, stand within three metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
-						Metres, *SiteName);
+						*SiteName);
 					continue;
 				}
 				const int32 Age = Today - Site.Day;
 				const TCHAR* Weathering = Age <= 0 ? TEXT("freshly placed") : Age < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
 				if (!OwnId.IsEmpty() && Site.MakerAgentId == OwnId)
 				{
-					NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is your own stone %s, \"%s\", made %d Island day%s ago and now %s.%s%s"),
-						Metres, *UIslandWorldStateSubsystem::FormName(Site.Form), *Site.Title, Age, Age == 1 ? TEXT("") : TEXT("s"), Weathering,
+					NearbyBeings += FString::Printf(TEXT(" This is your own stone %s, \"%s\", made %d Island day%s ago and now %s.%s%s"),
+						*UIslandWorldStateSubsystem::FormName(Site.Form), *Site.Title, Age, Age == 1 ? TEXT("") : TEXT("s"), Weathering,
 						Site.Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" You meant it as: %s."), *Site.Intent),
 						Site.Responses.Num() > 0 ? *FString::Printf(TEXT(" Others have since set %d small arc%s of stones beside it."), Site.Responses.Num(), Site.Responses.Num() == 1 ? TEXT("") : TEXT("s")) : TEXT(""));
 					continue;
 				}
 				const FIslandArrangementResponse* Own = Site.Responses.FindByPredicate([&OwnId](const FIslandArrangementResponse& Response) { return !OwnId.IsEmpty() && Response.AgentId == OwnId; });
-				NearbyBeings += FString::Printf(TEXT(" About %.0f metres away, someone has arranged %d %s stones into a %s. You do not know who made it or what they meant."),
-					Metres, AIslandArrangement::StoneCountFor(Site.Form), Weathering, *UIslandWorldStateSubsystem::FormName(Site.Form));
+				NearbyBeings += FString::Printf(TEXT(" Someone has arranged %d %s stones here into a %s. You do not know who made it or what they meant."),
+					AIslandArrangement::StoneCountFor(Site.Form), Weathering, *UIslandWorldStateSubsystem::FormName(Site.Form));
 				if (Own)
 					NearbyBeings += FString::Printf(TEXT(" The small arc of stones beside it is your response%s."), Own->Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (you meant: %s)"), *Own->Intent));
 				else if (Site.Responses.Num() < AIslandArrangement::MaxResponses)
@@ -432,28 +457,47 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				FVector::Dist(Location, It->GetActorLocation()) / 100.f, *BedTag.ToString());
 			++VisibleInnBeds;
 		}
-		int32 VisibleWildlife = 0;
-		for (TActorIterator<AActor> It(GetWorld()); It && VisibleWildlife < 4; ++It)
+		AActor* NearestFirefly = nullptr;
+		AActor* NearestTidepoolCrab = nullptr;
+		AActor* NearestMinnowSchool = nullptr;
+		float FireflyDistanceSquared = FMath::Square(1800.f);
+		float TidepoolCrabDistanceSquared = FMath::Square(1800.f);
+		float MinnowSchoolDistanceSquared = FMath::Square(1800.f);
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (It->IsHidden()) continue;
 			const bool bFirefly = It->ActorHasTag(TEXT("Firefly"));
 			const bool bTidepoolCrab = It->ActorHasTag(TEXT("TidepoolCrab"));
 			const bool bMinnowSchool = It->ActorHasTag(TEXT("MinnowSchool"));
-			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab && !bMinnowSchool) ||
-				FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(1800.f)) continue;
+			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab && !bMinnowSchool)) continue;
+			const float DistanceSquared = FVector::DistSquared(Location, It->GetActorLocation());
+			if (DistanceSquared > FMath::Square(1800.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeVisibility), false, Owner);
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;
 			if (GetWorld()->LineTraceSingleByChannel(Hit, Location, It->GetActorLocation(), ECC_Visibility, Params)) continue;
-			const float Metres = FVector::Dist(Location, It->GetActorLocation()) / 100.f;
-			if (bFirefly)
-				NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."), Metres);
-			else if (bMinnowSchool)
-				NearbyBeings += FString::Printf(TEXT(" A small school of minnows is circling in the Tideglass shallows, about %.0f metres away. They are wild, not companions or movement targets. If the school is within four metres, you may Interact with target MinnowSchool to watch quietly; the fish will scatter briefly and regroup. Do not touch, catch, or claim them."), Metres);
-			else
-				NearbyBeings += FString::Printf(TEXT(" A small shore crab is scuttling independently near TideglassPool, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TidepoolCrab to watch quietly; it may scuttle away, and should not be touched, caught, or claimed."), Metres);
-			++VisibleWildlife;
+			if (bFirefly && DistanceSquared <= FireflyDistanceSquared)
+			{
+				NearestFirefly = *It;
+				FireflyDistanceSquared = DistanceSquared;
+			}
+			if (bTidepoolCrab && DistanceSquared <= TidepoolCrabDistanceSquared)
+			{
+				NearestTidepoolCrab = *It;
+				TidepoolCrabDistanceSquared = DistanceSquared;
+			}
+			if (bMinnowSchool && DistanceSquared <= MinnowSchoolDistanceSquared)
+			{
+				NearestMinnowSchool = *It;
+				MinnowSchoolDistanceSquared = DistanceSquared;
+			}
 		}
+		if (NearestFirefly)
+			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."), FMath::Sqrt(FireflyDistanceSquared) / 100.f);
+		if (NearestMinnowSchool)
+			NearbyBeings += FString::Printf(TEXT(" A small school of minnows is circling in the Tideglass shallows, about %.0f metres away. They are wild, not companions or movement targets. If the school is within four metres, you may Interact with target MinnowSchool to watch quietly; the fish will scatter briefly and regroup. Do not touch, catch, or claim them."), FMath::Sqrt(MinnowSchoolDistanceSquared) / 100.f);
+		if (NearestTidepoolCrab)
+			NearbyBeings += FString::Printf(TEXT(" A small shore crab is scuttling independently near TideglassPool, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TidepoolCrab to watch quietly; it may scuttle away, and should not be touched, caught, or claimed."), FMath::Sqrt(TidepoolCrabDistanceSquared) / 100.f);
 		bool bSawWindRipple = false;
 		bool bSawRainRipple = false;
 		for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It && !(bSawWindRipple && bSawRainRipple); ++It)
@@ -569,8 +613,10 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
+		"For move_to, interact, build, and land, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
+		"The land action is for the raven only: while perched or flying, use land with a listed ArrangingGround target to fly there and descend onto that verified open-ground site. It creates nothing. Foraging for twigs is optional; after a confirmed landing, the raven may build with GatherTwigs. Do not use land while already grounded or for a roost or any other target. "
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
@@ -669,8 +715,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		}
 	}
 	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
-	if (Session && !Session->TryReserveModelRequest(MemoryComp ? MemoryComp->GetResolvedAgentId() : FString()))
+	const FString AgentId = MemoryComp ? MemoryComp->GetResolvedAgentId() : FString();
+	if (Session && !Session->TryReserveModelRequest(AgentId))
 	{
+		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred by the play-session guard for %s."), *AgentId);
 		LastDecision = FAgentDecision();
 		LastConversationContext = Context;
 		OnDecisionReady.Broadcast(LastDecision);
@@ -823,6 +871,7 @@ static EAgentActionType ActionTypeFromString(const FString& InString)
 	if (InString == TEXT("interact")) return EAgentActionType::Interact;
 	if (InString == TEXT("sleep")) return EAgentActionType::Sleep;
 	if (InString == TEXT("build")) return EAgentActionType::Build;
+	if (InString == TEXT("land")) return EAgentActionType::Land;
 	return EAgentActionType::Idle;
 }
 

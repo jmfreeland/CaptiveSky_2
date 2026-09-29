@@ -191,6 +191,7 @@ protected:
 	virtual void Deinitialize() override;
 
 private:
+	friend class FIslandNestTest;
 	TArray<FIslandNestRecord> Nests;
 	TOptional<float> SavedHour;
 	TOptional<int32> SavedDay;

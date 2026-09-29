@@ -2,6 +2,9 @@
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
 #include "AgentMemoryComponent.h"
+#include "IslandFirefly.h"
+#include "IslandTidepoolCrab.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandArrangement.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
@@ -92,6 +95,37 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	World->BeginPlay();
 
+	ACharacter* WildlifeObserver = World->SpawnActor<ACharacter>(FVector(5000.f, 5000.f, 150.f), FRotator::ZeroRotator);
+	UAgentBrainComponent* WildlifeBrain = WildlifeObserver ? NewObject<UAgentBrainComponent>(WildlifeObserver) : nullptr;
+	if (WildlifeBrain)
+	{
+		WildlifeObserver->AddInstanceComponent(WildlifeBrain);
+		WildlifeBrain->RegisterComponent();
+	}
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(5100.f + 100.f * Index, 5000.f, 150.f), FRotator::ZeroRotator);
+		if (Firefly) Firefly->Tags.Append({TEXT("IslandLife"), TEXT("Firefly")});
+	}
+	AIslandTidepoolCrab* WildlifeCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(5300.f, 5000.f, 150.f), FRotator::ZeroRotator);
+	AIslandTidepoolMinnows* WildlifeMinnows = World->SpawnActor<AIslandTidepoolMinnows>(FVector(5400.f, 5000.f, 150.f), FRotator::ZeroRotator);
+	if (TestNotNull(TEXT("Wildlife perception observer spawned"), WildlifeObserver) && TestNotNull(TEXT("Wildlife perception brain registered"), WildlifeBrain))
+	{
+		const FString WildlifeView = WildlifeBrain->BuildSituationSummary(FAgentConversationContext());
+		AddInfo(FString::Printf(TEXT("Wildlife perception fixture summary: %s"), *WildlifeView));
+		int32 FireflyDescriptionCount = 0;
+		int32 SearchAt = 0;
+		while ((SearchAt = WildlifeView.Find(TEXT("A small firefly glow"), ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchAt)) != INDEX_NONE)
+		{
+			++FireflyDescriptionCount;
+			++SearchAt;
+		}
+		TestEqual(TEXT("Several visible fireflies produce one species-level observation"), FireflyDescriptionCount, 1);
+		TestTrue(TEXT("The nearest firefly, not an arbitrary member of the species, is described"), WildlifeView.Contains(TEXT("firefly glow is drifting independently nearby, about 1 metres away")));
+		TestTrue(TEXT("A larger firefly group does not crowd the shore crab out of perception"), WildlifeView.Contains(TEXT("A small shore crab is scuttling independently")));
+		TestTrue(TEXT("A larger firefly group does not crowd the minnows out of perception"), WildlifeView.Contains(TEXT("A small school of minnows is circling")));
+	}
+
 	const TArray<FIslandArrangementSite>& Sites = State->GetArrangementSites();
 	if (!TestEqual(TEXT("Four arranging grounds are placed near the ListeningStones"), Sites.Num(), 4)) { DestroyArrangementWorld(World); return false; }
 	for (const FIslandArrangementSite& Site : Sites)
@@ -122,7 +156,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 
 	// Others see the shape and age, never the maker, title, or intent.
 	const FString Bystander = DescribeFrom(World, First.Location + FVector(0, 200, 100), TEXT("Test_Bystander"));
-	TestTrue(TEXT("A bystander sees a fresh ring"), Bystander.Contains(TEXT("arranged 9 freshly placed stones into a ring")));
+	TestTrue(*FString::Printf(TEXT("A bystander sees a fresh ring (%s)"), *Bystander), Bystander.Contains(TEXT("arranged 9 freshly placed stones here into a ring")));
 	TestFalse(TEXT("The title and intent stay private"), Bystander.Contains(TEXT("Evening")) || Bystander.Contains(TEXT("chime carries")));
 	TestTrue(TEXT("A bystander is invited to respond"), Bystander.Contains(TEXT("respond by setting a few small stones")));
 
