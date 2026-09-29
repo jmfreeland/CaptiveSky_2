@@ -339,11 +339,13 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 	FString Reflection;
 	Root->TryGetStringField(TEXT("reflection"), Reflection);
 	int32 AppliedCount = 0;
+	TSet<FString> AdjustedTraitsThisSleep;
 	const TArray<TSharedPtr<FJsonValue>>* Adjustments = nullptr;
 	if (Root->TryGetArrayField(TEXT("personality_adjustments"), Adjustments) && Adjustments)
 	{
 		for (const TSharedPtr<FJsonValue>& Value : *Adjustments)
 		{
+			if (AppliedCount >= MaximumAdjustmentsPerSleep) break;
 			const TSharedPtr<FJsonObject>* Adjustment = nullptr;
 			if (!Value.IsValid() || !Value->TryGetObject(Adjustment) || !Adjustment || !Adjustment->IsValid()) continue;
 			FString Trait;
@@ -356,6 +358,7 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 			(*Adjustment)->TryGetNumberField(TEXT("amount"), RequestedAmount);
 			Trait.TrimStartAndEndInline();
 			Direction.ToLowerInline();
+			const FString NormalizedTrait = Trait.ToLower();
 			TArray<FString> EvidenceIds;
 			const TArray<TSharedPtr<FJsonValue>>* Evidence = nullptr;
 			if ((*Adjustment)->TryGetArrayField(TEXT("evidence_memory_ids"), Evidence) && Evidence)
@@ -366,12 +369,14 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 					if (EvidenceValue.IsValid() && EvidenceValue->TryGetString(Id) && ValidEvidenceIds.Contains(Id)) EvidenceIds.AddUnique(Id);
 				}
 			}
-			if (Trait.IsEmpty() || Trait.Len() > 64 || Reason.IsEmpty() || EvidenceIds.IsEmpty() ||
+			if (Trait.IsEmpty() || Trait.Len() > 64 || AdjustedTraitsThisSleep.Contains(NormalizedTrait) ||
+				Reason.IsEmpty() || EvidenceIds.IsEmpty() ||
 				(Direction != TEXT("strengthen") && Direction != TEXT("soften")) || RequestedAmount <= 0)
 			{
 				continue;
 			}
-			const float SignedAmount = FMath::Min(static_cast<float>(RequestedAmount), MaximumAdjustmentPerSleep) *
+			const float MaximumStep = FMath::Clamp(MaximumAdjustmentPerSleep, 0.001f, MaximumAdjustmentMagnitude);
+			const float SignedAmount = FMath::Min(static_cast<float>(RequestedAmount), MaximumStep) *
 				(Direction == TEXT("strengthen") ? 1.f : -1.f);
 			FAgentPersonalityTendency* Existing = Tendencies.FindByPredicate([&Trait](const FAgentPersonalityTendency& Item)
 			{
@@ -388,6 +393,7 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 			Existing->Strength = FMath::Clamp(PreviousStrength + SignedAmount, -1.f, 1.f);
 			Existing->LastReason = Reason;
 			Existing->EvidenceMemoryIds = EvidenceIds;
+			AdjustedTraitsThisSleep.Add(NormalizedTrait);
 			AppendHistory(Existing->Name, PreviousStrength, Existing->Strength, Reason, EvidenceIds);
 			++AppliedCount;
 		}

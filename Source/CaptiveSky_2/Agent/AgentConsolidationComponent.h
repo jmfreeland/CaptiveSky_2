@@ -62,7 +62,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Sleep", meta = (ClampMin = "1", ClampMax = "100"))
 	int32 MaximumMemoriesPerConsolidation = 40;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Sleep", meta = (ClampMin = "0.001", ClampMax = "0.05"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Sleep", meta = (ClampMin = "0.001", ClampMax = "0.03"))
 	float MaximumAdjustmentPerSleep = 0.03f;
 
 	UPROPERTY(BlueprintAssignable, Category = "Agent Sleep")
@@ -91,6 +91,9 @@ protected:
 private:
 	friend class AAutonomousAgentAIController;
 	friend class FIslandInnRestTest;
+	friend class FAgentConsolidationTest;
+	static constexpr int32 MaximumAdjustmentsPerSleep = 3;
+	static constexpr float MaximumAdjustmentMagnitude = 0.03f;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	FTimerHandle RestTimer;
 	int32 SleepGeneration = 0;
