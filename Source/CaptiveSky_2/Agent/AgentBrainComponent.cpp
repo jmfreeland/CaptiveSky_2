@@ -10,6 +10,7 @@
 #include "AgentSocialComponent.h"
 #include "AgentLLMProvider.h"
 #include "AgentModelTier.h"
+#include "IslandChronicle.h"
 #include "AutonomousAgentCharacter.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -824,6 +825,22 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 				Decision.ActionType = EAgentActionType::Idle;
 				Decision.ActionTarget.Reset();
 				Decision.Speech.Reset();
+			}
+			if (Decision.bValid)
+			{
+				static const TCHAR* const ActionNames[] = { TEXT("idle"), TEXT("move_to"), TEXT("speak"), TEXT("wander"), TEXT("interact"), TEXT("sleep"), TEXT("build") };
+				const AActor* Body = StrongThis->GetOwner();
+				const FVector Where = Body ? Body->GetActorLocation() : FVector::ZeroVector;
+				TMap<FString, FString> Extra;
+				Extra.Add(TEXT("action"), ActionNames[FMath::Min<int32>(static_cast<int32>(Decision.ActionType), UE_ARRAY_COUNT(ActionNames) - 1)]);
+				Extra.Add(TEXT("tier"), bLight ? TEXT("light") : TEXT("full"));
+				Extra.Add(TEXT("at"), FString::Printf(TEXT("%d,%d,%d"), FMath::RoundToInt(Where.X), FMath::RoundToInt(Where.Y), FMath::RoundToInt(Where.Z)));
+				if (!Decision.ActionTarget.IsEmpty()) Extra.Add(TEXT("target"), Decision.ActionTarget);
+				if (!Decision.Speech.IsEmpty() && !Decision.Thought.IsEmpty()) Extra.Add(TEXT("thought"), Decision.Thought);
+				if (!Context.ParticipantName.IsEmpty()) Extra.Add(TEXT("with"), Context.ParticipantName);
+				UIslandChronicleSubsystem::Record(StrongThis->GetWorld(), TEXT("decision"),
+					WeakMemory.IsValid() ? WeakMemory->GetResolvedAgentId() : GetNameSafe(Body),
+					Decision.Speech.IsEmpty() ? Decision.Thought : Decision.Speech, Extra);
 			}
 			if (Decision.bValid && !Decision.Speech.IsEmpty() && WeakMemory.IsValid())
 			{

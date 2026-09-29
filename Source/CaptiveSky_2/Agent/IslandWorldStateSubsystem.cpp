@@ -2,6 +2,7 @@
 #include "IslandNest.h"
 #include "IslandGuestBook.h"
 #include "IslandDayNight.h"
+#include "IslandChronicle.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
 #include "NavigationSystem.h"
@@ -388,6 +389,9 @@ int32 UIslandWorldStateSubsystem::AddNestLayer(FName SiteTag, const FVector& Sup
 		return 0;
 	}
 	RefreshNestActor(Updated);
+	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("nest"), BuilderAgentId,
+		FString::Printf(TEXT("wove a layer onto the nest at %s; it now has %d."), *SiteTag.ToString(), Updated.Layers),
+		{ { TEXT("site"), SiteTag.ToString() }, { TEXT("layers"), FString::FromInt(Updated.Layers) } });
 	return Updated.Layers;
 }
 
@@ -450,6 +454,7 @@ bool UIslandWorldStateSubsystem::ApplyStormMarks(double WeatherSeconds, int32 To
 	}
 	for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
 	for (const FIslandCurioRecord& Curio : Curios) RefreshCurioActor(Curio);
+	for (const FString& Mark : OutMarks) UIslandChronicleSubsystem::Record(GetWorld(), TEXT("storm_mark"), FString(), Mark);
 	return true;
 }
 
@@ -657,6 +662,12 @@ FString UIslandWorldStateSubsystem::ExamineCurio(FName Id, int32 Today, const FS
 		return TEXT("You examined it, but the change could not be kept, so nothing lasting happened.");
 	}
 	RefreshCurioActor(*Record);
+	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("curio"), ContributorAgentId,
+		Record->Kind == EIslandCurioKind::Cairn
+			? FString::Printf(TEXT("set a stone on the cairn; it now stands %d stones high."), Record->State)
+			: Record->State >= AIslandCurio::PodOpenState ? FString(TEXT("watched the last husk-leaves of the seed pod fold back, revealing a glowing seed."))
+			: FString::Printf(TEXT("coaxed the seed pod a little more open (stage %d of %d)."), Record->State, AIslandCurio::PodOpenState),
+		{ { TEXT("curio"), Id.ToString() }, { TEXT("state"), FString::FromInt(Record->State) } });
 	return Fact;
 }
 
@@ -878,6 +889,16 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 	}
 	bOutChanged = true;
 	RefreshArrangementActor(*Site);
+	if (!Before.bHasWork)
+		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("arrangement"), AgentId,
+			FString::Printf(TEXT("arranged stones into a %s and called it \"%s\"%s."), *FormName(Site->Form), *Site->Title,
+				Site->Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *Site->Intent)),
+			{ { TEXT("site"), SiteId.ToString() }, { TEXT("form"), FormName(Site->Form) }, { TEXT("title"), Site->Title } });
+	else
+		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("arrangement_response"), AgentId,
+			FString::Printf(TEXT("answered the %s called \"%s\" with a small arc of stones%s."), *FormName(Site->Form), *Site->Title,
+				CleanIntent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *CleanIntent)),
+			{ { TEXT("site"), SiteId.ToString() }, { TEXT("title"), Site->Title } });
 	return Fact;
 }
 
@@ -903,6 +924,7 @@ FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const
 	}
 	bOutChanged = true;
 	RefreshGuestBookActor();
+	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("guest_book"), AgentId, CleanLine);
 	return FString::Printf(TEXT("You leave this line in the inn guest book: \"%s\" The book keeps at most %d recent lines; anyone who reads it can see this one signed with your name."), *CleanLine, MaxGuestBookEntries);
 }
 
