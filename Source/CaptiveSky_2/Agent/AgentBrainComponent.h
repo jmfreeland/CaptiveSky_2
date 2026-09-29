@@ -101,6 +101,7 @@ private:
 	friend class FIslandInnRestTest;
 	friend class FIslandGuestBookTest;
 	friend class FAgentLingeringTest;
+	friend class FAgentPlacesTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.
@@ -108,6 +109,25 @@ private:
 
 	// How many of the most recent spots lie within Radius of Location, counting back until one does not.
 	static int32 CountLingeringDecisions(const TArray<FVector>& Spots, const FVector& Location, float Radius);
+
+	// Curios this resident has itself come across, so it can head back to one after it has drifted out of sight.
+	struct FRememberedPlace
+	{
+		FName Target;
+		FString Label;
+		FVector Location = FVector::ZeroVector;
+	};
+	mutable TArray<FRememberedPlace> RememberedPlaces;
+	mutable bool bPlacesLoaded = false;
+	static constexpr int32 MaxRememberedPlaces = 12;
+
+	static void AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location);
+	// Up to MaxListed places beyond MinDistance and not in Noticed, nearest first, as a sentence for the situation text.
+	static FString DescribeRememberedPlaces(const TArray<FRememberedPlace>& Places, const FVector& Location, const TSet<FName>& Noticed, float MinDistance, int32 MaxListed);
+	FString GetPlacesFilePath() const;
+	void LoadRememberedPlaces() const;
+	void SaveRememberedPlaces() const;
+	void RememberPlace(FName Target, const FString& Label, const FVector& Location) const;
 
 	FString BuildSituationSummary(const FAgentConversationContext& Context) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;

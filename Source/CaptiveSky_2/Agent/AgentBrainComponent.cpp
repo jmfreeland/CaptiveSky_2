@@ -2,6 +2,7 @@
 
 #include "AgentBrainComponent.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "AgentMemoryComponent.h"
 #include "AgentExternalBridgeComponent.h"
 #include "AgentRelationshipComponent.h"
@@ -55,11 +56,98 @@ int32 UAgentBrainComponent::CountLingeringDecisions(const TArray<FVector>& Spots
 	return Count;
 }
 
+void UAgentBrainComponent::AddRememberedPlace(TArray<FRememberedPlace>& Places, FName Target, const FString& Label, const FVector& Location)
+{
+	if (Target.IsNone()) return;
+	Places.RemoveAll([Target](const FRememberedPlace& Place) { return Place.Target == Target; });
+	Places.Add({ Target, Label, Location });
+	if (Places.Num() > MaxRememberedPlaces) Places.RemoveAt(0, Places.Num() - MaxRememberedPlaces);
+}
+
+FString UAgentBrainComponent::DescribeRememberedPlaces(const TArray<FRememberedPlace>& Places, const FVector& Location, const TSet<FName>& Noticed, float MinDistance, int32 MaxListed)
+{
+	TArray<const FRememberedPlace*> Candidates;
+	for (const FRememberedPlace& Place : Places)
+		if (!Noticed.Contains(Place.Target) && FVector::DistSquared2D(Place.Location, Location) > FMath::Square(MinDistance)) Candidates.Add(&Place);
+	Candidates.Sort([&Location](const FRememberedPlace& A, const FRememberedPlace& B)
+		{ return FVector::DistSquared2D(A.Location, Location) < FVector::DistSquared2D(B.Location, Location); });
+	FString Text;
+	for (int32 Index = 0; Index < Candidates.Num() && Index < MaxListed; ++Index)
+	{
+		const FRememberedPlace& Place = *Candidates[Index];
+		Text += FString::Printf(TEXT(" You remember %s, about %.0f metres away, out of sight from here (move_to target: %s)."),
+			*Place.Label, FMath::Sqrt(FVector::DistSquared2D(Place.Location, Location)) / 100.f, *Place.Target.ToString());
+	}
+	return Text;
+}
+
+FString UAgentBrainComponent::GetPlacesFilePath() const
+{
+	const UAgentMemoryComponent* Memory = GetOwner() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	return Memory ? Memory->GetAgentDirectory() / TEXT("places.json") : FString();
+}
+
+void UAgentBrainComponent::LoadRememberedPlaces() const
+{
+	if (bPlacesLoaded) return;
+	bPlacesLoaded = true;
+	const FString Path = GetPlacesFilePath();
+	FString Text;
+	if (Path.IsEmpty() || !FFileHelper::LoadFileToString(Text, *Path)) return;
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid()) return;
+	const TArray<TSharedPtr<FJsonValue>>* Entries = nullptr;
+	if (!Root->TryGetArrayField(TEXT("places"), Entries)) return;
+	for (const TSharedPtr<FJsonValue>& Value : *Entries)
+	{
+		const TSharedPtr<FJsonObject>* Entry = nullptr;
+		if (!Value.IsValid() || !Value->TryGetObject(Entry)) continue;
+		FString Target, Label;
+		double X = 0, Y = 0, Z = 0;
+		if (!(*Entry)->TryGetStringField(TEXT("target"), Target) || !(*Entry)->TryGetStringField(TEXT("label"), Label)) continue;
+		(*Entry)->TryGetNumberField(TEXT("x"), X);
+		(*Entry)->TryGetNumberField(TEXT("y"), Y);
+		(*Entry)->TryGetNumberField(TEXT("z"), Z);
+		AddRememberedPlace(RememberedPlaces, FName(*Target), Label, FVector(X, Y, Z));
+	}
+}
+
+void UAgentBrainComponent::SaveRememberedPlaces() const
+{
+	const FString Path = GetPlacesFilePath();
+	if (Path.IsEmpty()) return;
+	TArray<TSharedPtr<FJsonValue>> Entries;
+	for (const FRememberedPlace& Place : RememberedPlaces)
+	{
+		TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
+		Entry->SetStringField(TEXT("target"), Place.Target.ToString());
+		Entry->SetStringField(TEXT("label"), Place.Label);
+		Entry->SetNumberField(TEXT("x"), Place.Location.X);
+		Entry->SetNumberField(TEXT("y"), Place.Location.Y);
+		Entry->SetNumberField(TEXT("z"), Place.Location.Z);
+		Entries.Add(MakeShared<FJsonValueObject>(Entry));
+	}
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetArrayField(TEXT("places"), Entries);
+	FString Text;
+	if (FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Text)))
+		FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+}
+
+void UAgentBrainComponent::RememberPlace(FName Target, const FString& Label, const FVector& Location) const
+{
+	LoadRememberedPlaces();
+	const bool bKnown = RememberedPlaces.ContainsByPredicate([Target](const FRememberedPlace& Place) { return Place.Target == Target; });
+	AddRememberedPlace(RememberedPlaces, Target, Label, Location);
+	if (!bKnown) SaveRememberedPlaces();
+}
+
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
 {
 	const AActor* Owner = GetOwner();
 	const FVector Location = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
 	FString NearbyBeings;
+	TSet<FName> NoticedNow;
 	const UAgentSocialComponent* OwnSocial = Owner ? Owner->FindComponentByClass<UAgentSocialComponent>() : nullptr;
 	if (Owner && GetWorld())
 	{
@@ -210,6 +298,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						NearbyBeings += TEXT(" Its top stone was blown down in a recent storm and lies at its foot.");
 				}
 				++NoticedCurios;
+				NoticedNow.Add(Curio.Id);
+				RememberPlace(Curio.Id, Curio.Kind == EIslandCurioKind::PaleStone ? TEXT("a small pale stone")
+					: Curio.Kind == EIslandCurioKind::SeedPod ? TEXT("a strange pod") : TEXT("the small cairn"), Curio.Location);
 			}
 			// Arranging grounds and the works on them are human-scale: noticed within about twelve metres.
 			int32 NoticedSites = 0;
@@ -395,6 +486,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		// Small lasting things are only noticed up close, so a resident that never moves on never meets them.
 		if (const int32 Lingered = CountLingeringDecisions(RecentDecisionSpots, Location, 1200.f); Lingered >= 6)
 			NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
+		LoadRememberedPlaces();
+		NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 1500.f, 3);
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
 			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
