@@ -193,9 +193,10 @@ void FOpenAICompatibleLLMProvider::SendRequest(const FAgentLLMRequest& Request, 
 	const TCHAR* MaxTokensField = Settings->bUseMaxCompletionTokensParam ? TEXT("max_completion_tokens") : TEXT("max_tokens");
 	Root->SetNumberField(MaxTokensField, Request.MaxTokens > 0 ? Request.MaxTokens : Settings->DefaultMaxTokens);
 	Root->SetNumberField(TEXT("temperature"), Settings->Temperature);
-	if (!Settings->ReasoningEffort.IsEmpty())
+	const FString& ReasoningEffort = Request.ReasoningEffortOverride.IsEmpty() ? Settings->ReasoningEffort : Request.ReasoningEffortOverride;
+	if (!ReasoningEffort.IsEmpty())
 	{
-		Root->SetStringField(TEXT("reasoning_effort"), Settings->ReasoningEffort);
+		Root->SetStringField(TEXT("reasoning_effort"), ReasoningEffort);
 	}
 
 	TArray<TSharedPtr<FJsonValue>> MessagesArray;

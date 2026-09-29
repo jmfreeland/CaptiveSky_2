@@ -53,7 +53,8 @@ public:
 	bool GetRelationship(const FString& OtherAgentId, FAgentRelationshipRecord& OutRelationship) const;
 
 	/** Human-readable, bounded context for the agent's system prompt. */
-	FString BuildPromptSummary() const;
+	// bCompact keeps only the latest two lines of evidence per relationship, without conversation ids.
+	FString BuildPromptSummary(bool bCompact = false) const;
 
 	FString GetRelationshipsFilePath() const;
 

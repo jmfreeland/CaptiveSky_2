@@ -36,14 +36,20 @@ public:
 	/** Requests per real (UTC) day across restarts; hard-capped at 20000. */
 	UPROPERTY(Config, BlueprintReadOnly, Category="Agent|Continuous")
 	int32 ContinuousDailyRequests = 1500;
+	/** Light-model requests per real (UTC) day across restarts; hard-capped at 40000. */
+	UPROPERTY(Config, BlueprintReadOnly, Category="Agent|Continuous")
+	int32 ContinuousDailyLightRequests = 6000;
+	/** A light request draws this share of a full request from the shared allowance. */
+	static constexpr double LightRequestCost = 0.2;
 	static constexpr double ContinuousAgentSpacingSeconds = 12.0;
 	bool IsContinuous() const { return bContinuousPlay; }
 	/** Tests point this at a scratch file; empty uses Saved/CaptiveSky/ModelBudget.json. */
 	FString LedgerPathOverride;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
-	/** AgentId lets continuous play space out each resident's requests; empty skips that check. */
-	bool TryReserveModelRequest(const FString& AgentId = FString());
+	/** AgentId lets continuous play space out each resident's requests; empty skips that check.
+	 *  A light request (the cheap model) costs a fraction of the allowance and has its own daily ceiling. */
+	bool TryReserveModelRequest(const FString& AgentId = FString(), bool bLight = false);
 	bool IsExpired() const;
 	static double ClampDuration(double Requested);
 	static int32 ClampRequestLimit(int32 Requested);
@@ -64,6 +70,7 @@ private:
 	TMap<FString, double> LastRequestByAgent;
 	FString LedgerDate;
 	int32 LedgerRequests = 0;
+	int32 LedgerLightRequests = 0;
 	bool bLedgerPersistenceHealthy = true;
 	double Now() const;
 	void BeginContinuous();

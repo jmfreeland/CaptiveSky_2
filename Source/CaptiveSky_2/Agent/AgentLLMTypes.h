@@ -42,6 +42,10 @@ struct FAgentLLMRequest
 	// Empty = use UAgentLLMSettings::Model.
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString ModelOverride;
+
+	// Empty = use UAgentLLMSettings::ReasoningEffort. OpenAI-compatible provider only.
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString ReasoningEffortOverride;
 };
 
 /** Result of an LLM call. ResponseText is the raw assistant text -- decision-JSON parsing happens above this layer. */

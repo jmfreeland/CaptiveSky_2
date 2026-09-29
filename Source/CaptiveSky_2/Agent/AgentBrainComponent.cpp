@@ -9,6 +9,7 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentSocialComponent.h"
 #include "AgentLLMProvider.h"
+#include "AgentModelTier.h"
 #include "AutonomousAgentCharacter.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -595,7 +596,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 	{
 		for (const FAgentMemoryRecord& Record : RelevantMemories)
 		{
-			Prompt += FString::Printf(TEXT("- [%s] %s\n"), *Record.Timestamp.ToIso8601(), *Record.Text);
+			Prompt += FString::Printf(TEXT("- [%s] %s\n"), *AgentModelTier::CompactTimestamp(Record.Timestamp), *Record.Text);
 		}
 	}
 
@@ -604,7 +605,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		if (const UAgentRelationshipComponent* Relationships = Owner->FindComponentByClass<UAgentRelationshipComponent>())
 		{
 			Prompt += TEXT("\nKnown relationships (familiarity records exposure, not trust or affection):\n");
-			Prompt += Relationships->BuildPromptSummary();
+			Prompt += Relationships->BuildPromptSummary(true);
 		}
 	}
 
@@ -716,7 +717,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	}
 	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
 	const FString AgentId = MemoryComp ? MemoryComp->GetResolvedAgentId() : FString();
-	if (Session && !Session->TryReserveModelRequest(AgentId))
+	// Quiet unprompted turns with nothing in reach use the light model, when one is configured.
+	const FString LightModel = AgentModelTier::LightModelName();
+	const bool bLight = !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(AgentModelTier::GatherTurnFacts(Owner, Context));
+	if (Session && !Session->TryReserveModelRequest(AgentId, bLight))
 	{
 		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred by the play-session guard for %s."), *AgentId);
 		LastDecision = FAgentDecision();
@@ -759,18 +763,32 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	TArray<FAgentMemoryRecord> RelevantMemories;
 	if (MemoryComp)
 	{
-		RelevantMemories = MemoryComp->GetRelevantContext(MemoryContextTokenBudget, Situation);
+		RelevantMemories = MemoryComp->GetRelevantContext(bLight ? 150 : (Context.Text.IsEmpty() ? FMath::Min(MemoryContextTokenBudget, 500) : MemoryContextTokenBudget), Situation);
 	}
 
 	FString SnapshotBase64;
-	if (const AAutonomousAgentCharacter* AgentCharacter = Cast<AAutonomousAgentCharacter>(Owner))
+	if (const AAutonomousAgentCharacter* AgentCharacter = bLight ? nullptr : Cast<AAutonomousAgentCharacter>(Owner))
 	{
 		SnapshotBase64 = AgentCharacter->CaptureFirstPersonSnapshot();
 	}
 
 	FAgentLLMRequest Request;
 	Request.MaxTokens = Context.Text.IsEmpty() ? 400 : 700;
-	Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
+	if (bLight)
+	{
+		FString MemoryLines;
+		for (const FAgentMemoryRecord& Record : RelevantMemories)
+			MemoryLines += FString::Printf(TEXT("- [%s] %s\n"), *AgentModelTier::CompactTimestamp(Record.Timestamp), *Record.Text);
+		Request.MaxTokens = 150;
+		Request.ModelOverride = LightModel;
+		Request.ReasoningEffortOverride = AgentModelTier::LightReasoningEffort();
+		Request.SystemPrompt = AgentModelTier::BuildLightSystemPrompt(
+			MemoryComp ? MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd() : FString(), MemoryLines);
+	}
+	else Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
+	UE_LOG(LogAgentBrain, Log, TEXT("Decision request for %s: %s tier (system prompt %d chars%s)."),
+		MemoryComp ? *MemoryComp->GetResolvedAgentId() : *GetNameSafe(Owner), bLight ? TEXT("light") : TEXT("full"), Request.SystemPrompt.Len(),
+		SnapshotBase64.IsEmpty() ? TEXT("") : TEXT(", with image"));
 	// -CaptiveSkyLogSituations: record exactly what each resident is shown, for reviewing test runs.
 	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyLogSituations")))
 		UE_LOG(LogAgentBrain, Log, TEXT("Situation for %s (%d chars, system prompt %d chars): %s"),
@@ -787,7 +805,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	TWeakObjectPtr<UAgentBrainComponent> WeakThis(this);
 	TWeakObjectPtr<UAgentMemoryComponent> WeakMemory(MemoryComp);
 
-	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Context](const FAgentLLMResult& Result)
+	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Context, bLight](const FAgentLLMResult& Result)
 	{
 		UAgentBrainComponent* StrongThis = WeakThis.Get();
 		if (!StrongThis || StrongThis->bEndedPlay)
@@ -800,6 +818,13 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		if (Result.bSuccess)
 		{
 			Decision = ParseDecisionAndStoreMemories(Result.ResponseText, WeakMemory.Get());
+			if (bLight && Decision.bValid && !AgentModelTier::IsLightAction(Decision.ActionType))
+			{
+				UE_LOG(LogAgentBrain, Log, TEXT("Light model chose an action outside its four; treating it as idling."));
+				Decision.ActionType = EAgentActionType::Idle;
+				Decision.ActionTarget.Reset();
+				Decision.Speech.Reset();
+			}
 			if (Decision.bValid && !Decision.Speech.IsEmpty() && WeakMemory.IsValid())
 			{
 				TArray<FString> Tags = { TEXT("conversation"), TEXT("speech") };

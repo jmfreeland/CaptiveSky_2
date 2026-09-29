@@ -79,22 +79,23 @@ bool UAgentPlaySessionSubsystem::IsExpired() const
 	return bStopRequested || ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds) || ModelRequests >= ClampRequestLimit(MaxModelRequests);
 }
 
-bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId)
+bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId, bool bLight)
 {
 	if (IsExpired()) return false;
 	if (bContinuousPlay)
 	{
 		if (!bLedgerPersistenceHealthy) return false;
 		RefillAllowance();
-		if (TodayUtc() != LedgerDate) { LedgerDate = TodayUtc(); LedgerRequests = 0; }
-		if (LedgerRequests >= FMath::Clamp(ContinuousDailyRequests, 1, 20000)) return false;
+		if (TodayUtc() != LedgerDate) { LedgerDate = TodayUtc(); LedgerRequests = 0; LedgerLightRequests = 0; }
+		if (bLight ? LedgerLightRequests >= FMath::Clamp(ContinuousDailyLightRequests, 1, 40000) : LedgerRequests >= FMath::Clamp(ContinuousDailyRequests, 1, 20000)) return false;
 		const double Time = Now();
 		if (!AgentId.IsEmpty())
 			if (const double* Last = LastRequestByAgent.Find(AgentId); Last && Time - *Last < ContinuousAgentSpacingSeconds) return false;
-		if (Allowance < 1.0) return false;
+		const double Cost = bLight ? LightRequestCost : 1.0;
+		if (Allowance < Cost) return false;
 		const double PreviousAllowance = Allowance;
-		Allowance -= 1.0;
-		++LedgerRequests;
+		Allowance -= Cost;
+		if (bLight) ++LedgerLightRequests; else ++LedgerRequests;
 		double PreviousAgentRequest = 0.0;
 		const double* PreviousAgentRequestPtr = AgentId.IsEmpty() ? nullptr : LastRequestByAgent.Find(AgentId);
 		const bool bHadPreviousAgentRequest = PreviousAgentRequestPtr != nullptr;
@@ -102,7 +103,7 @@ bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId)
 		if (!AgentId.IsEmpty()) LastRequestByAgent.Add(AgentId, Time);
 		if (!SaveLedger())
 		{
-			--LedgerRequests;
+			if (bLight) --LedgerLightRequests; else --LedgerRequests;
 			Allowance = PreviousAllowance;
 			if (!AgentId.IsEmpty())
 			{
@@ -154,6 +155,7 @@ void UAgentPlaySessionSubsystem::LoadLedger()
 {
 	LedgerDate = TodayUtc();
 	LedgerRequests = 0;
+	LedgerLightRequests = 0;
 	bLedgerPersistenceHealthy = true;
 	const FString Path = LedgerPath();
 	if (!FPaths::FileExists(Path)) return;
@@ -183,8 +185,20 @@ void UAgentPlaySessionSubsystem::LoadLedger()
 		UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger date is in the future: %s."), *Path);
 		return;
 	}
+	// Ledgers written before the light tier have no light_requests field; that means none were spent.
+	double LightRequests = 0.0;
+	Root->TryGetNumberField(TEXT("light_requests"), LightRequests);
+	if (!FMath::IsFinite(LightRequests) || LightRequests < 0.0)
+	{
+		bLedgerPersistenceHealthy = false;
+		UE_LOG(LogAgentSession, Error, TEXT("Continuous play is refusing model requests because the daily budget ledger is invalid: %s."), *Path);
+		return;
+	}
 	if (Date == LedgerDate)
+	{
 		LedgerRequests = Requests >= 20000.0 ? 20000 : static_cast<int32>(FMath::CeilToInt(Requests));
+		LedgerLightRequests = LightRequests >= 40000.0 ? 40000 : static_cast<int32>(FMath::CeilToInt(LightRequests));
+	}
 }
 
 bool UAgentPlaySessionSubsystem::SaveLedger() const
@@ -192,6 +206,7 @@ bool UAgentPlaySessionSubsystem::SaveLedger() const
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetStringField(TEXT("date"), LedgerDate);
 	Root->SetNumberField(TEXT("requests"), LedgerRequests);
+	Root->SetNumberField(TEXT("light_requests"), LedgerLightRequests);
 	FString Json;
 	if (!FJsonSerializer::Serialize(Root, TJsonWriterFactory<>::Create(&Json))) return false;
 	const FString Path = LedgerPath();

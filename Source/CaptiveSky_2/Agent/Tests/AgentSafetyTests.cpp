@@ -127,6 +127,27 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A failed ledger write does not consume a model request"), PersistenceFailure->ModelRequests, 0);
 	TestFalse(TEXT("A persistence failure fails closed for later requests"), PersistenceFailure->TryReserveModelRequest(TEXT("Raven")));
 	IFileManager::Get().Delete(*Blocker, false, true, true);
+
+	// Light-model requests draw a fraction of the allowance and have their own daily ceiling, kept in the same ledger.
+	IFileManager::Get().Delete(*Ledger, false, true, true);
+	UAgentPlaySessionSubsystem* LightSession = MakeContinuous(9000.0);
+	LightSession->ContinuousDailyLightRequests = 5;
+	for (int32 Index = 0; Index < 5; ++Index)
+		TestTrue(*FString::Printf(TEXT("Light request %d is accepted"), Index + 1), LightSession->TryReserveModelRequest(FString(), true));
+	TestFalse(TEXT("The light daily ceiling holds with allowance left"), LightSession->TryReserveModelRequest(FString(), true));
+	TestEqual(TEXT("Light requests are not counted as full requests"), LightSession->LedgerRequests, 0);
+	TestEqual(TEXT("Light requests are counted on their own"), LightSession->LedgerLightRequests, 5);
+	TestEqual(TEXT("A light request draws a fifth of the allowance"), LightSession->Allowance, 1.0, 1.0e-6);
+	TestEqual(TEXT("Bounded-mode style counting still sees every request"), LightSession->ModelRequests, 5);
+	UAgentPlaySessionSubsystem* LightRestarted = MakeContinuous(9100.0);
+	TestEqual(TEXT("Light requests survive a restart"), LightRestarted->LedgerLightRequests, 5);
+	IFileManager::Get().Delete(*Ledger, false, true, true);
+	if (!TestTrue(TEXT("Pre-light-tier ledger fixture can be written"),
+		FFileHelper::SaveStringToFile(FString::Printf(TEXT("{\"date\":\"%s\",\"requests\":3}"), *FDateTime::UtcNow().ToString(TEXT("%Y-%m-%d"))), *Ledger))) return false;
+	UAgentPlaySessionSubsystem* OldLedger = MakeContinuous(9200.0);
+	TestEqual(TEXT("An older ledger keeps its full-request count"), OldLedger->LedgerRequests, 3);
+	TestEqual(TEXT("An older ledger has spent no light requests"), OldLedger->LedgerLightRequests, 0);
+	TestTrue(TEXT("An older ledger still allows light requests"), OldLedger->TryReserveModelRequest(FString(), true));
 	IFileManager::Get().Delete(*Ledger, false, true, true);
 	return true;
 }

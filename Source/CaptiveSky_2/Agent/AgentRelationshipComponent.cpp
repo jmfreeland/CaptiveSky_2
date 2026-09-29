@@ -143,7 +143,7 @@ bool UAgentRelationshipComponent::GetRelationship(const FString& OtherAgentId, F
 	return false;
 }
 
-FString UAgentRelationshipComponent::BuildPromptSummary() const
+FString UAgentRelationshipComponent::BuildPromptSummary(bool bCompact) const
 {
 	EnsureLoaded();
 	if (Relationships.IsEmpty())
@@ -160,10 +160,23 @@ FString UAgentRelationshipComponent::BuildPromptSummary() const
 		Summary += FString::Printf(TEXT("- %s (%s): %d recorded interaction(s), familiarity %.2f.\n"),
 			Record.DisplayName.IsEmpty() ? *AgentId : *Record.DisplayName, *AgentId,
 			Record.InteractionCount, Record.Familiarity);
-		const int32 FirstEvidenceIndex = FMath::Max(0, Record.RecentEvidence.Num() - 3);
+		const int32 FirstEvidenceIndex = FMath::Max(0, Record.RecentEvidence.Num() - (bCompact ? 2 : 3));
 		for (int32 EvidenceIndex = FirstEvidenceIndex; EvidenceIndex < Record.RecentEvidence.Num(); ++EvidenceIndex)
 		{
-			Summary += TEXT("  - ") + Record.RecentEvidence[EvidenceIndex] + TEXT("\n");
+			FString Evidence = Record.RecentEvidence[EvidenceIndex];
+			if (bCompact)
+			{
+				// Drop the trailing "(conversation <id>)" and the seconds/milliseconds of the leading "[timestamp]".
+				int32 IdStart = INDEX_NONE;
+				if (Evidence.EndsWith(TEXT(")")) && Evidence.FindLastChar(TEXT('('), IdStart) && Evidence.Mid(IdStart).StartsWith(TEXT("(conversation ")))
+				{
+					Evidence.LeftInline(IdStart);
+					Evidence.TrimEndInline();
+				}
+				int32 Close = INDEX_NONE;
+				if (Evidence.StartsWith(TEXT("[")) && Evidence.FindChar(TEXT(']'), Close) && Close >= 17) Evidence = TEXT("[") + Evidence.Mid(1, 16).Replace(TEXT("T"), TEXT(" ")) + Evidence.Mid(Close);
+			}
+			Summary += TEXT("  - ") + Evidence + TEXT("\n");
 		}
 	}
 	return Summary;

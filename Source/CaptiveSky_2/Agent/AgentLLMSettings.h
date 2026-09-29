@@ -39,6 +39,15 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
 	FString ReasoningEffort = TEXT("none");
 
+	// A very light, cheap model for the simplest decisions (quiet unprompted turns where a resident only chooses where to be).
+	// Empty turns the light tier off, so every turn uses Model. Same provider, endpoint and API key as Model.
+	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
+	FString LightModel;
+
+	// Reasoning effort for LightModel; empty = use ReasoningEffort.
+	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
+	FString LightReasoningEffort;
+
 	// Empty = provider's default public endpoint. Set this to target a local server (e.g. Ollama/LM Studio) for OpenAICompatible.
 	UPROPERTY(EditAnywhere, config, Category = "Agent LLM")
 	FString EndpointOverride;
