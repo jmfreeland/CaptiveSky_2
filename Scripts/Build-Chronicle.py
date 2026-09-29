@@ -140,7 +140,7 @@ def to_html(markdown: str) -> str:
             body.append(f"<h1>{text[2:]}</h1>")
         elif line.startswith("## "):
             body.append(f"<h2>{text[3:]}</h2>")
-        elif line.startswith("&gt; "):
+        elif line.startswith("> "):
             body.append(f"<blockquote>{text[5:]}</blockquote>")
         elif text.strip():
             body.append(f"<p>{text}</p>")
