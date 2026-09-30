@@ -89,6 +89,7 @@ protected:
 	bool TryRest(FName RequestedRestSite = NAME_None);
 
 private:
+	friend class FIslandMovementProbeCommand;
 	friend class FRavenPerchTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandMinnowTest;

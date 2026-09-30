@@ -21,6 +21,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/CommandLine.h"
 #include "Navigation/PathFollowingComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAutonomousAgentAI, Log, All);
@@ -72,6 +73,7 @@ void AAutonomousAgentAIController::OnUnPossess()
 
 void AAutonomousAgentAIController::Think()
 {
+	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyDisableAgentThinking"))) return;
 	AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(GetPawn());
 	if (!Agent || !Agent->Brain || Agent->Brain->bRequestInFlight || IsResting() || IsActionInProgress())
 	{
