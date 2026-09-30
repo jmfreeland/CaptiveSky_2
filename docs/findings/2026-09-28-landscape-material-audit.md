@@ -182,3 +182,28 @@ actual puddle function output in the material editor, then choose a new mask/rou
 that branch proves inert. Prototype assets live in ignored `Content/` and are reproducible with
 `Scripts/Create-LandscapePuddlePrototype.py`, `Scripts/Create-LandscapePuddleScalePrototype.py`,
 and `Scripts/Create-LandscapePuddleVisibilityProbe.py`; none is assigned to the map.
+
+### Puddle function wiring recheck (2026-09-30)
+
+A fresh read-only UE 5.8.3 graph dump confirms `MF_Puddles` is connected rather than dangling.
+Its `Material with Puddles` output is selected by the `Add Puddles` static switch, whose two
+inputs are the modified `SetMaterialAttributes` result and a pass-through of the original
+attributes. The assigned landscape instance has that switch false; the separate visibility
+probes override it to true. The mask path is `T_LandscapeNoise` sampled using landscape-layer
+coordinates divided by `Puddle Size`, then `pow(noise, Puddle Constrain) * Puddle Depth`,
+saturated. That mask drives attribute lerps for base color, normal, roughness and specular;
+`Puddle Clarity` scales the base-color contribution. The graph therefore contains the
+expected visual response path, but the earlier matched captures still showed no convincing
+puddles, even with the deliberately exaggerated probe parameters. The weak capture is not
+evidence that the branch is disconnected.
+
+The useful next diagnostic is to preview the raw mask and each modified attribute separately
+at the close Tideglass camera; this will distinguish a mask-distribution issue from an
+attribute/blend issue before any runtime integration. No authored material, instance or map
+was modified or saved. Graph output: `Saved/Logs/Codex_LandscapeFunctionAudit_20260930.log`.
+
+That inspection log also contains `LogPython: Warning` lines from an experimental probe of a
+generic `inputs` property that UE does not expose on these expressions. The existing
+`MaterialEditingLibrary` graph queries succeeded and produced the trace above. The temporary
+probe was removed from `Scripts/Inspect-LandscapeWetness.py`; no project gameplay or asset
+failure was involved.
