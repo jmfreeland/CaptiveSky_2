@@ -190,6 +190,24 @@ bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Pat
 	return Path && Path->IsValid() && !Path->IsPartial() &&
 		FVector::DistSquared2D(Origin, Goal) >= FMath::Square(WanderMinimumDistance);
 }
+bool AAutonomousAgentAIController::IsWanderPathPhysicallyClear(const UWorld* World, const UNavigationPath* Path, const APawn* Pawn)
+{
+	const UCapsuleComponent* Capsule = Pawn ? Pawn->FindComponentByClass<UCapsuleComponent>() : nullptr;
+	if (!World || !Path || !Capsule || Path->PathPoints.Num() < 2) return false;
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AgentWanderCapsuleClearance), false, Pawn);
+	const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
+	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	for (int32 PointIndex = 1; PointIndex < Path->PathPoints.Num(); ++PointIndex)
+	{
+		const FVector SegmentStart = Path->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		const FVector SegmentEnd = Path->PathPoints[PointIndex] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		FHitResult Hit;
+		if (World->SweepSingleByChannel(Hit, SegmentStart, SegmentEnd, FQuat::Identity,
+			ECC_Pawn, CapsuleShape, QueryParams)) return false;
+	}
+	return true;
+}
 float AAutonomousAgentAIController::WanderNoveltyScore(const FVector& Candidate, const TArray<FVector>& RecentDestinations)
 {
 	if (RecentDestinations.IsEmpty()) return 0.f;
@@ -204,6 +222,17 @@ float AAutonomousAgentAIController::WanderFrontierScore(const FVector& Candidate
 	const float CandidateDistance = FVector::Dist2D(Candidate, ExplorationOrigin);
 	const float FrontierProgress = FMath::Max(0.f, CandidateDistance - FurthestExploredDistance);
 	return WanderNoveltyScore(Candidate, RecentDestinations) + FrontierProgress * WanderFrontierProgressWeight;
+}
+float AAutonomousAgentAIController::WanderLandmarkProgressScore(const FVector& Candidate, const FVector& Origin,
+	const TArray<FVector>& VisibleLandmarks)
+{
+	float BestProgress = 0.f;
+	for (const FVector& Landmark : VisibleLandmarks)
+	{
+		BestProgress = FMath::Max(BestProgress,
+			FVector::Dist2D(Origin, Landmark) - FVector::Dist2D(Candidate, Landmark));
+	}
+	return BestProgress * WanderLandmarkProgressWeight;
 }
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
@@ -365,6 +394,15 @@ FString AAutonomousAgentAIController::DescribeActionState() const
 void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
 	Super::OnMoveCompleted(RequestID, Result);
+	if (bCurrentMoveIsWander)
+	{
+		const APawn* ControlledPawn = GetPawn();
+		UE_LOG(LogAutonomousAgentAI, Log,
+			TEXT("%s wander move completed with result code %d, flags %u; location %s, velocity %s."),
+			*GetName(), static_cast<int32>(Result.Code), static_cast<uint32>(Result.Flags),
+			ControlledPawn ? *ControlledPawn->GetActorLocation().ToCompactString() : TEXT("<no pawn>"),
+			ControlledPawn ? *ControlledPawn->GetVelocity().ToCompactString() : TEXT("<no pawn>"));
+	}
 	if (bCurrentMoveIsWander && Result.IsSuccess())
 	{
 		if (const APawn* ControlledPawn = GetPawn())
@@ -564,22 +602,52 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			ANavigationData* NavData = NavSys->GetNavDataForProps(AgentProperties);
 			FNavLocation Destination;
 			bool bFoundFullRoute = false;
-			float BestNoveltyScore = -1.f;
-			for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+			float BestWanderScore = -1.f;
+			float BestLandmarkProgressScore = 0.f;
+			TArray<FVector> BestWanderPathPoints;
+			TArray<FVector> VisibleLandmarks;
+			VisibleLandmarks.Reserve(6);
+			for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks.Num() < 6; ++It)
+			{
+				if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 ||
+					FVector::DistSquared(Origin, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
+				FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(AgentWanderLandmarkVisibility), false, ControlledPawn);
+				VisibilityParams.AddIgnoredActor(*It);
+				FHitResult VisibilityHit;
+				if (GetWorld()->LineTraceSingleByChannel(VisibilityHit, Origin, It->GetActorLocation(), ECC_Visibility, VisibilityParams)) continue;
+				VisibleLandmarks.Add(It->GetActorLocation());
+			}
+			int32 BlockedPathCount = 0;
+			for (int32 Attempt = 0; Attempt < 24; ++Attempt)
 			{
 				FNavLocation Candidate;
 				if (!NavData || !NavSys->GetRandomReachablePointInRadius(Origin, WanderRadius, Candidate, NavData)) break;
 				const UNavigationPath* Route = NavSys->FindPathToLocationSynchronously(GetWorld(), Origin, Candidate.Location, ControlledPawn);
 				if (!IsUsableWanderPath(Route, Origin, Candidate.Location)) continue;
-				const float NoveltyScore = WanderFrontierScore(Candidate.Location, WanderExplorationOrigin,
-					FurthestWanderDistance, RecentWanderDestinations);
-				if (bFoundFullRoute && NoveltyScore <= BestNoveltyScore) continue;
+				if (!IsWanderPathPhysicallyClear(GetWorld(), Route, ControlledPawn))
+				{
+					++BlockedPathCount;
+					continue;
+				}
+				const float LandmarkProgressScore = WanderLandmarkProgressScore(Candidate.Location, Origin, VisibleLandmarks);
+				const float WanderScore = WanderFrontierScore(Candidate.Location, WanderExplorationOrigin,
+					FurthestWanderDistance, RecentWanderDestinations) + LandmarkProgressScore;
+				if (bFoundFullRoute && WanderScore <= BestWanderScore) continue;
 				Destination = Candidate;
 				bFoundFullRoute = true;
-				BestNoveltyScore = NoveltyScore;
+				BestWanderScore = WanderScore;
+				BestLandmarkProgressScore = LandmarkProgressScore;
+				BestWanderPathPoints = Route->PathPoints;
 			}
 			if (bFoundFullRoute)
 			{
+				FString PathDescription;
+				for (const FVector& PathPoint : BestWanderPathPoints)
+					PathDescription += (PathDescription.IsEmpty() ? TEXT("") : TEXT(" -> ")) + PathPoint.ToCompactString();
+				UE_LOG(LogAutonomousAgentAI, Log,
+					TEXT("%s selected wander destination %s with %d visible nearby landmarks; landmark progress %.0f cm; rejected %d capsule-blocked paths; nav path: %s."),
+					*GetName(), *Destination.Location.ToCompactString(), VisibleLandmarks.Num(),
+					BestLandmarkProgressScore / WanderLandmarkProgressWeight, BlockedPathCount, *PathDescription);
 				// A random reachable point is usually not the exact point a capsule can occupy.
 				// Stop with overlap tolerance and reject partial paths instead of timing out at a wall.
 				const EPathFollowingRequestResult::Type Request = MoveToLocation(Destination.Location,

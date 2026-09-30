@@ -98,6 +98,14 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 			2000.f, RecentDestinations) >
 		AAutonomousAgentAIController::WanderFrontierScore(FVector(0.f, 100.f, 0.f), FVector::ZeroVector,
 			2000.f, RecentDestinations));
+	const TArray<FVector> VisibleLandmarks = { FVector(2000.f, 0.f, 0.f) };
+	TestTrue(TEXT("Wander gives an equal-quality candidate a gentle pull toward a visible landmark"),
+		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(1500.f, 0.f, 0.f), FVector::ZeroVector, VisibleLandmarks) >
+		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(-1500.f, 0.f, 0.f), FVector::ZeroVector, VisibleLandmarks));
+	TestEqual(TEXT("Wander is not biased toward landmarks that are not visible to the resident"),
+		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(1500.f, 0.f, 0.f), FVector::ZeroVector, {}), 0.f);
+	TestEqual(TEXT("A candidate moving away from a visible landmark receives no curiosity bonus"),
+		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(-1500.f, 0.f, 0.f), FVector::ZeroVector, VisibleLandmarks), 0.f);
 	TestTrue(TEXT("Wander stop tolerance allows capsule overlap at navigation endpoints"),
 		AAutonomousAgentAIController::WanderAcceptanceRadius > 0.f);
 	return true;

@@ -60,12 +60,17 @@ public:
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
 	static constexpr float WanderFrontierProgressWeight = 4000.f;
+	static constexpr float WanderLandmarkProgressWeight = 4000.f;
 	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
+	static bool IsWanderPathPhysicallyClear(const UWorld* World, const UNavigationPath* Path, const APawn* Pawn);
 	/** Larger scores mean a wander goal is farther from the resident's recent successful destinations. */
 	static float WanderNoveltyScore(const FVector& Candidate, const TArray<FVector>& RecentDestinations);
 	/** Extends an explicit wander's explored frontier, with local novelty as a tie-breaker. */
 	static float WanderFrontierScore(const FVector& Candidate, const FVector& ExplorationOrigin,
 		float FurthestExploredDistance, const TArray<FVector>& RecentDestinations);
+	/** Rewards a wander candidate only when it moves toward a currently visible nearby landmark. */
+	static float WanderLandmarkProgressScore(const FVector& Candidate, const FVector& Origin,
+		const TArray<FVector>& VisibleLandmarks);
 	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
 	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 

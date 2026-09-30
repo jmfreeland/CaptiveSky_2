@@ -24,10 +24,11 @@ public:
 		State->World = World;
 		State->MoverTag = FName(Args.IsEmpty() ? TEXT("IslandInnkeeper") : *Args[0]);
 		State->TargetTag = FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
+		State->bWanderProbe = State->TargetTag == FName(TEXT("Wander"));
 		World->GetTimerManager().SetTimer(State->PollTimer,
 			FTimerDelegate::CreateLambda([State]() { Poll(State); }), 0.5f, true);
-		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated movement probe: %s -> %s; waiting for runtime actors."),
-			*State->MoverTag.ToString(), *State->TargetTag.ToString());
+		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s probe for %s; waiting for runtime actors."),
+			State->bWanderProbe ? TEXT("wander") : TEXT("movement"), *State->MoverTag.ToString());
 	}
 
 private:
@@ -43,6 +44,7 @@ private:
 		double StartedAt = 0.0;
 		int32 StartupPolls = 0;
 		bool bMoveStarted = false;
+		bool bWanderProbe = false;
 	};
 
 	static void Poll(const TSharedRef<FProbeState>& State)
@@ -57,15 +59,16 @@ private:
 			for (TActorIterator<AActor> It(World); It; ++It)
 			{
 				if (!Mover && It->ActorHasTag(State->MoverTag)) Mover = *It;
-				if (!Target && It->ActorHasTag(State->TargetTag)) Target = *It;
+				if (!State->bWanderProbe && !Target && It->ActorHasTag(State->TargetTag)) Target = *It;
 			}
 			APawn* Pawn = Cast<APawn>(Mover);
 			AAutonomousAgentAIController* Controller = Pawn ? Cast<AAutonomousAgentAIController>(Pawn->GetController()) : nullptr;
-			if (!Pawn || !Controller || !Target)
+			if (!Pawn || !Controller || (!State->bWanderProbe && !Target))
 			{
 				if (++State->StartupPolls <= 40) return;
 				UE_LOG(LogIslandMovementProbe, Error, TEXT("Timed out finding mover/controller/target (mover=%s controller=%s target=%s)."),
-					Pawn ? TEXT("yes") : TEXT("no"), Controller ? TEXT("yes") : TEXT("no"), Target ? TEXT("yes") : TEXT("no"));
+					Pawn ? TEXT("yes") : TEXT("no"), Controller ? TEXT("yes") : TEXT("no"),
+					(State->bWanderProbe || Target) ? TEXT("yes") : TEXT("no"));
 				Finish(State, false);
 				return;
 			}
@@ -76,12 +79,20 @@ private:
 			State->StartedAt = World->GetTimeSeconds();
 			FAgentDecision Decision;
 			Decision.bValid = true;
-			Decision.ActionType = EAgentActionType::MoveTo;
-			Decision.ActionTarget = State->TargetTag.ToString();
+			Decision.ActionType = State->bWanderProbe ? EAgentActionType::Wander : EAgentActionType::MoveTo;
+			if (!State->bWanderProbe) Decision.ActionTarget = State->TargetTag.ToString();
 			Controller->ActOnDecision(Decision);
 			State->bMoveStarted = true;
-			UE_LOG(LogIslandMovementProbe, Log, TEXT("Move issued from %s toward %s (%s)."),
-				*State->StartLocation.ToCompactString(), *Target->GetActorLocation().ToCompactString(), *Controller->DescribeActionState());
+			if (Target)
+			{
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("Move issued from %s toward %s (%s)."),
+					*State->StartLocation.ToCompactString(), *Target->GetActorLocation().ToCompactString(), *Controller->DescribeActionState());
+			}
+			else
+			{
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("Wander issued from %s (%s)."),
+					*State->StartLocation.ToCompactString(), *Controller->DescribeActionState());
+			}
 			return;
 		}
 
@@ -122,5 +133,5 @@ private:
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag]"),
+	TEXT("Safely probes a runtime resident move or wander with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));

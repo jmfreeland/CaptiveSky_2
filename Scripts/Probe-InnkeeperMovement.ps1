@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-Runs an isolated, provider-free movement probe from the Island Inn to a tagged landmark.
+Runs an isolated, provider-free movement or wander probe from the Island Inn.
 
 .DESCRIPTION
 Launches the Island as a bounded game world, disables background agent thinking,
 and asks the runtime Innkeeper controller to move to a tagged landmark (the inn door
-by default). The run uses a separate data root and never contacts the model provider.
+by default), or to explicitly wander when `-TargetTag Wander` is supplied. The run
+uses a separate data root and never contacts the model provider.
 It exits when movement completes, fails, or reaches its short timeout.
 #>
 param(
