@@ -1,12 +1,14 @@
 #include "Misc/AutomationTest.h"
 #include "AutonomousAgentAIController.h"
 #include "Engine/Engine.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Character.h"
 #include "NavigationPath.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "IslandPoolRippleEffect.h"
 #include "RavenAgentAIController.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMovementTest, "CaptiveSky2.Agent.ResidentApproach",
@@ -91,7 +93,7 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 		World->DestroyWorld(false);
 		return false;
 	}
-	Target->Tags = { TEXT("IslandLandmark"), TEXT("InnDoorLantern") };
+	Target->Tags = { TEXT("IslandLandmark"), TEXT("TideglassPool") };
 	USceneComponent* TargetRoot = NewObject<USceneComponent>(Target);
 	Target->SetRootComponent(TargetRoot);
 	TargetRoot->RegisterComponent();
@@ -108,7 +110,17 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 	ReportBlockedMove();
 	TestTrue(TEXT("A blocked resident who can clearly inspect the landmark gets a reachable-approach outcome"),
 		Controller->DescribeActionState().Contains(TEXT("within clear inspection range")) &&
+		Controller->DescribeActionState().Contains(TEXT("TideglassPool")) &&
 		Controller->DescribeActionState().Contains(TEXT("did not reach the marker itself")));
+	Controller->InspectTarget(TEXT("TideglassPool"));
+	TestTrue(TEXT("The suggested close-range follow-up performs the TideglassPool response and truthfully describes it as temporary"),
+		Controller->DescribeActionState().Contains(TEXT("TideglassPool:")) &&
+		Controller->DescribeActionState().Contains(TEXT("It expands and fades")) &&
+		Controller->DescribeActionState().Contains(TEXT("changes no permanent level state")));
+	int32 RippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (!It->ActorHasTag(TEXT("RainImpact"))) ++RippleCount;
+	TestEqual(TEXT("The successful follow-up creates one transient pool ripple"), RippleCount, 1);
 
 	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	ReportBlockedMove();
