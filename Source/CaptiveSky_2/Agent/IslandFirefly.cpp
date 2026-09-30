@@ -13,6 +13,11 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+	const FLinearColor FireflyBodyEmissiveColor(0.025f, 0.12f, 0.007f);
+}
+
 AIslandFirefly::AIslandFirefly()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -66,7 +71,7 @@ void AIslandFirefly::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	EnsureGlowMaterial();
-	if (GlowMaterial) GlowMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.08f, 0.38f, 0.02f));
+	if (GlowMaterial) GlowMaterial->SetVectorParameterValue(TEXT("Color"), FireflyBodyEmissiveColor);
 }
 
 void AIslandFirefly::EnsureGlowMaterial()
@@ -247,6 +252,6 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	Glow->SetIntensity(GlowIntensity * GlowScale);
 	if (GlowMaterial)
 	{
-		GlowMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.08f, 0.38f, 0.02f) * GlowScale);
+		GlowMaterial->SetVectorParameterValue(TEXT("Color"), FireflyBodyEmissiveColor * GlowScale);
 	}
 }
