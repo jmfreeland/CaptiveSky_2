@@ -195,6 +195,9 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The prompt discourages invented target names"), SystemPrompt.Contains(TEXT("Do not invent or paraphrase a target")));
 	TestTrue(TEXT("The prompt gives wander or idle as the alternative to a guessed target"),
 		SystemPrompt.Contains(TEXT("choose wander or idle instead of guessing")));
+	TestTrue(TEXT("Remembered places are optional returns, not claims of changed world state"),
+		SystemPrompt.Contains(TEXT("optional return destinations, not evidence that anything has changed")) &&
+		SystemPrompt.Contains(TEXT("return only if you are curious")));
 	TestTrue(TEXT("The prompt restricts land to Raven and listed open-ground sites"),
 		SystemPrompt.Contains(TEXT("The land action is for the raven only")) && SystemPrompt.Contains(TEXT("ArrangingGround target")));
 	TestTrue(TEXT("The response schema lists land as an action type"), SystemPrompt.Contains(TEXT("sleep|build|land")));

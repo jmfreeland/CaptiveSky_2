@@ -533,7 +533,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		if (const int32 Lingered = CountLingeringDecisions(RecentDecisionSpots, Location, 1200.f); Lingered >= 6)
 			NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
 		LoadRememberedPlaces();
-		NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 1500.f, 3);
+		NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 300.f, 3);
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
 			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
@@ -618,6 +618,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"For move_to, interact, build, and land, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
+		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
 		"The land action is for the raven only: while perched or flying, use land with a listed ArrangingGround target to fly there and descend onto that verified open-ground site. It creates nothing. Foraging for twigs is optional; after a confirmed landing, the raven may build with GatherTwigs. Do not use land while already grounded or for a roost or any other target. "
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
