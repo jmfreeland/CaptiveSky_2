@@ -727,6 +727,15 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	TArray<FLandscapePreviewBackup> LandscapeBackups;
 	TArray<FReusedLandscapeMIDBackup> ReusedLandscapeInstances;
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> LandscapePreviewInstances;
+	FString LandscapeParentPath;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointLandscapeParent="), LandscapeParentPath))
+	{
+		UMaterialInterface* Parent = LoadObject<UMaterialInterface>(nullptr, *LandscapeParentPath);
+		if (!TestNotNull(TEXT("Landscape parent material loaded"), Parent)) return false;
+		if (!TestTrue(TEXT("Landscape parent swap reached an assigned landscape instance"), SwapLandscapeParent(Island, Parent) > 0))
+			return false;
+		AddInfo(FString::Printf(TEXT("Previewing landscape graph %s in memory; the authored parent will be restored after capture."), *LandscapeParentPath));
+	}
 	if (bLandscapeWetnessPreview || bCompareLandscapeWetness)
 	{
 		// The environment subsystem lazily replaces authored landscape materials with
@@ -734,16 +743,6 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		// so this test cannot race that one-time assignment during capture.
 		if (UIslandEnvironmentSubsystem* Environment = Island->GetSubsystem<UIslandEnvironmentSubsystem>())
 			Environment->Tick(0.f);
-
-		FString LandscapeParentPath;
-		if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointLandscapeParent="), LandscapeParentPath))
-		{
-			UMaterialInterface* Parent = LoadObject<UMaterialInterface>(nullptr, *LandscapeParentPath);
-			if (!TestNotNull(TEXT("Landscape parent material loaded"), Parent)) return false;
-			if (!TestTrue(TEXT("Landscape parent swap reached an assigned landscape instance"), SwapLandscapeParent(Island, Parent) > 0))
-				return false;
-			AddInfo(FString::Printf(TEXT("Previewing landscape graph %s in memory; the authored parent will be restored after capture."), *LandscapeParentPath));
-		}
 
 		const float PreviewWetness = bCompareLandscapeWetness ? -1.f : static_cast<float>(LandscapeWetness);
 		if (bLandscapeWetnessPreview) HoldEnvironmentWetness(Island, PreviewWetness);

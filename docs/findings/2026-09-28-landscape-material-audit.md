@@ -287,11 +287,22 @@ shader data instead of recompiling the full engine cache. The machine-wide cache
 in this environment. All debug materials are separate ignored assets; the authored landscape
 material, instance, map assignment and world state remain unchanged.
 
-The parent-only fix in `IslandViewpointCaptureTest` is still pending a source rebuild and a capture
-without `-LandscapeWetness`. A fresh `Build.bat` invocation reached UnrealBuildTool but remained
-idle for 2.5 minutes: its dotnet CPU, UBT log timestamp and editor Intermediate files did not move.
-Only that build invocation was stopped. The successful captures above used the existing editor
-binary with the wetness-preview condition explicitly enabled, so they do not verify the parent-only
-fix. Next: resolve the idle UBT process safely, build the C++ change, run parent-only restoration
-verification, then compare the actual `MF_Puddles` output/attributes before tuning the authored
-branch.
+The parent-only fix in `IslandViewpointCaptureTest` was compiled by invoking MSVC with Unreal's
+generated response file, then linking the updated test object into an isolated scratch editor module
+(the normal `Build.bat`/UBT launcher still idles). The scratch `UnrealEditor-Cmd` run used
+`-ViewpointLandscapeParent` without `-LandscapeWetness`, exited 0, logged the in-memory graph swap,
+and wrote `Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-09-30_232349_h12.0/02a_TideglassGroundDetail.png`.
+This verifies the parent-only code path; it does not improve the mask, which remains low contrast.
+
+Overnight validation triage: `Codex_FullAgentSuite_20260930.log` records 31 successful tests and
+zero failures. The two 20:52/20:54 standalone wetness crashes are old reports from before commit
+`89acbe6`, which added the `GIsEditor` guard around the editor-only `SetParentEditorOnly` call.
+The 20:22 landscape ensure is from the earlier generic debug material with no usable landscape
+material interfaces; that attempt was abandoned in favor of retaining the authored landscape graph.
+Separate startup fatals in the crash archive cite inaccessible shader-temp or read-only DDC paths,
+not CaptiveSky runtime behavior. The first scratch retry in this session also failed because it
+omitted the writable local DDC argument; the corrected retry above passed.
+
+Next for the landscape work: improve the diagnostic signal/contrast enough to reveal useful puddle
+shapes, then inspect the authored `MF_Puddles` output/attributes before tuning or enabling its
+static switch.
