@@ -303,6 +303,25 @@ Separate startup fatals in the crash archive cite inaccessible shader-temp or re
 not CaptiveSky runtime behavior. The first scratch retry in this session also failed because it
 omitted the writable local DDC argument; the corrected retry above passed.
 
-Next for the landscape work: improve the diagnostic signal/contrast enough to reveal useful puddle
-shapes, then inspect the authored `MF_Puddles` output/attributes before tuning or enabling its
-static switch.
+### Raw noise and thresholded mask calibration (2026-09-30)
+
+Added three reproducible UE Python helpers: `Scripts/Create-LandscapePuddleNoiseDebug.py` creates
+a raw-R preview; `Scripts/Create-LandscapePuddleContrastDebug.py` creates a high-contrast
+thresholded preview; `Scripts/Set-LandscapePuddleContrastThreshold.py` retunes only that generated
+diagnostic's threshold. All generated materials duplicate the functioning landscape parent to keep
+its landscape physical-material setup, and none is assigned to or saved into the Island map.
+
+The raw-noise close-up at 200 cm tile size produced grayscale capture values with mean `203.23/255`,
+standard deviation `8.18`, and range `175–224`. A threshold-remapped preview made the spatial mask
+legible: `saturate((R - threshold) * 10 + 0.5)` gave `2.35%` of pixels above `128/255` at threshold
+`0.60`, versus `10.19%` at `0.55`. Captures are
+`Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-09-30_235109_h12.0/02a_TideglassGroundDetail.png`
+and `.../2026-09-30_235407_h12.0/02a_TideglassGroundDetail.png`, respectively. Both UE 5.8.3
+material-creation runs and the viewpoint automation exited 0; transient parent/wetness previews
+left the authored landscape parent, instance, map and world state untouched.
+
+This is a diagnostic mask, not a proposed final puddle material: the hard threshold shows where
+coverage may fall but does not validate the existing `MF_Puddles` base-color, normal, roughness,
+or specular blends under lighting. Next compare those modified attributes in the same close view
+before deciding whether the existing exponent-based mask should be tuned or replaced in a separate
+prototype. Do not enable the authored static switch based on these threshold images alone.
