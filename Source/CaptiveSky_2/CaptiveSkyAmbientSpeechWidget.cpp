@@ -23,14 +23,44 @@ void UCaptiveSkyAmbientSpeechWidget::ShowSpeech(const FString& SpeakerName, cons
 void UCaptiveSkyAmbientSpeechWidget::ShowCaption(const FString& Caption)
 {
 	DisplayedCaption = Caption;
-	if (SpeechText.IsValid())
-	{
-		SpeechText->SetText(FText::FromString(Caption));
-	}
-	SetVisibility(ESlateVisibility::HitTestInvisible);
+	RefreshDisplayedText();
+}
+
+void UCaptiveSkyAmbientSpeechWidget::HideCaption()
+{
+	DisplayedCaption.Reset();
+	RefreshDisplayedText();
+}
+
+void UCaptiveSkyAmbientSpeechWidget::ShowInteractionHint(const FString& Hint)
+{
+	if (DisplayedInteractionHint == Hint) return;
+	DisplayedInteractionHint = Hint;
+	RefreshDisplayedText();
+}
+
+void UCaptiveSkyAmbientSpeechWidget::HideInteractionHint()
+{
+	if (DisplayedInteractionHint.IsEmpty()) return;
+	DisplayedInteractionHint.Reset();
+	RefreshDisplayedText();
+}
+
+void UCaptiveSkyAmbientSpeechWidget::RefreshDisplayedText()
+{
+	FString DisplayText = DisplayedInteractionHint;
+	if (!DisplayText.IsEmpty() && !DisplayedCaption.IsEmpty()) DisplayText += LINE_TERMINATOR;
+	DisplayText += DisplayedCaption;
+	if (SpeechText.IsValid()) SpeechText->SetText(FText::FromString(DisplayText));
+	SetVisibility(DisplayText.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 }
 
 FText UCaptiveSkyAmbientSpeechWidget::GetDisplayedCaption() const
 {
-	return SpeechText.IsValid() ? SpeechText->GetText() : FText::FromString(DisplayedCaption);
+	return FText::FromString(DisplayedCaption);
+}
+
+FText UCaptiveSkyAmbientSpeechWidget::GetDisplayedInteractionHint() const
+{
+	return FText::FromString(DisplayedInteractionHint);
 }

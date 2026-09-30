@@ -780,14 +780,23 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				VisitorController->SetFixturePawn(Visitor);
 				VisitorController->SetCaptionWidget(Caption);
 				VisitorController->BindFixtureInput();
+				VisitorController->RefreshInteractionHintForTest();
 				TestTrue(TEXT("Fixture controller satisfies the production local-player guard"), VisitorController->IsLocalPlayerController());
 				TestTrue(TEXT("Fixture controller has the visitor pawn"), VisitorController->GetPawn() == Visitor);
+				TestEqual(TEXT("A nearby visible landmark shows a discoverable, non-triggering visitor hint"),
+					Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: send a brief ripple across the pool")));
 				TestTrue(TEXT("E is bound to the local visitor interaction handler"), VisitorController->PressBoundE());
 				const FString BoundCaption = Caption->GetDisplayedCaption().ToString();
 				TestTrue(*FString::Printf(TEXT("Bound E displays the selected landmark's factual transient response; caption was: %s"), *BoundCaption),
 					BoundCaption.Contains(TEXT("TideglassPool: Your interaction sent")) &&
 					BoundCaption.Contains(TEXT("changes no permanent level state")));
 				TestTrue(TEXT("Visitor interaction caption becomes visible"), Caption->GetVisibility() == ESlateVisibility::HitTestInvisible);
+				TestTrue(TEXT("An interaction caption can appear while the in-range hint remains visible"),
+					!Caption->GetDisplayedCaption().IsEmpty() && !Caption->GetDisplayedInteractionHint().IsEmpty());
+				Caption->HideCaption();
+				TestTrue(TEXT("Hiding a transient caption does not erase the still-relevant visitor hint"),
+					Caption->GetDisplayedCaption().IsEmpty() && !Caption->GetDisplayedInteractionHint().IsEmpty() &&
+					Caption->GetVisibility() == ESlateVisibility::HitTestInvisible);
 				TestTrue(TEXT("A repeated E press produces a cooldown caption instead of another effect"), VisitorController->PressBoundE() &&
 					Caption->GetDisplayedCaption().ToString().Contains(TEXT("has already answered your attention")));
 				VisitorController->Destroy();

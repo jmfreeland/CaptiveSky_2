@@ -14,7 +14,11 @@ class CAPTIVESKY_2_API UCaptiveSkyAmbientSpeechWidget : public UUserWidget
 public:
 	void ShowSpeech(const FString& SpeakerName, const FString& Speech);
 	void ShowCaption(const FString& Caption);
+	void HideCaption();
+	void ShowInteractionHint(const FString& Hint);
+	void HideInteractionHint();
 	FText GetDisplayedCaption() const;
+	FText GetDisplayedInteractionHint() const;
 
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -22,4 +26,6 @@ protected:
 private:
 	TSharedPtr<STextBlock> SpeechText;
 	FString DisplayedCaption;
+	FString DisplayedInteractionHint;
+	void RefreshDisplayedText();
 };

@@ -78,6 +78,7 @@ protected:
 	float AmbientSpeechDurationSeconds = 6.f;
 
 	FTimerHandle AmbientSpeechHideTimer;
+	FTimerHandle InteractionHintRefreshTimer;
 
 	UPROPERTY(EditAnywhere, Category = "Conversation")
 	float ConversationRadius = 500.f;
@@ -89,6 +90,10 @@ protected:
 	/** Real-time pause between visitor-triggered responses at the same target. */
 	UPROPERTY(EditAnywhere, Category = "Island Interaction", meta = (ClampMin = "30", ClampMax = "900"))
 	float IslandInteractionCooldownSeconds = 300.f;
+
+	/** How often the local-only, non-interactive proximity hint refreshes. */
+	UPROPERTY(EditAnywhere, Category = "Island Interaction", meta = (ClampMin = "0.1", ClampMax = "2.0"))
+	float InteractionHintRefreshSeconds = 0.25f;
 
 	UPROPERTY()
 	TObjectPtr<AAutonomousAgentCharacter> ConversationTarget;
@@ -105,6 +110,7 @@ protected:
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;
+	void UpdateWorldInteractionHint();
 
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
@@ -126,6 +132,7 @@ protected:
 	void HandleAmbientAgentSpeech(AAutonomousAgentCharacter* Speaker, const FString& Speech);
 
 	void HideAmbientSpeech();
+	FString DescribeWorldInteractionHint(const AActor* Target) const;
 	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;
 
 };

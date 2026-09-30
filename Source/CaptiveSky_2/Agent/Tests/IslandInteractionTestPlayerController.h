@@ -24,6 +24,7 @@ public:
 	bool IsGuestBookPanelOpenForTest() const { return bGuestBookPanelOpen; }
 	bool IsArrangementPanelOpenForTest() const { return bArrangementPanelOpen; }
 	void BindFixtureInput() { SetupInputComponent(); }
+	void RefreshInteractionHintForTest() { UpdateWorldInteractionHint(); }
 
 	bool PressBoundE()
 	{

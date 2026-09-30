@@ -20,6 +20,7 @@
 #include "Agent/IslandArrangement.h"
 #include "Agent/IslandInteractionUtility.h"
 #include "Agent/IslandWorldStateSubsystem.h"
+#include "Agent/IslandSpectator.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -76,6 +77,10 @@ void ACaptiveSky_2PlayerController::BeginPlay()
 		{
 			AmbientSpeechWidget->AddToPlayerScreen(10);
 			AmbientSpeechWidget->SetVisibility(ESlateVisibility::Collapsed);
+			GetWorldTimerManager().SetTimer(InteractionHintRefreshTimer, this,
+				&ACaptiveSky_2PlayerController::UpdateWorldInteractionHint,
+				FMath::Max(0.1f, InteractionHintRefreshSeconds), true);
+			UpdateWorldInteractionHint();
 		}
 		if (UAgentSocialSubsystem* SocialSubsystem = GetWorld()->GetSubsystem<UAgentSocialSubsystem>())
 		{
@@ -93,6 +98,7 @@ void ACaptiveSky_2PlayerController::EndPlay(const EEndPlayReason::Type EndPlayRe
 			SocialSubsystem->OnAmbientSpeech.RemoveDynamic(this, &ACaptiveSky_2PlayerController::HandleAmbientAgentSpeech);
 		}
 		GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+		GetWorldTimerManager().ClearTimer(InteractionHintRefreshTimer);
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -114,7 +120,7 @@ void ACaptiveSky_2PlayerController::HideAmbientSpeech()
 {
 	if (AmbientSpeechWidget)
 	{
-		AmbientSpeechWidget->SetVisibility(ESlateVisibility::Collapsed);
+		AmbientSpeechWidget->HideCaption();
 	}
 }
 
@@ -154,6 +160,47 @@ AActor* ACaptiveSky_2PlayerController::FindNearestWorldInteraction() const
 	const APawn* PlayerPawn = GetPawn();
 	if (!PlayerPawn || !GetWorld()) return nullptr;
 	return IslandInteractionUtility::FindNearestVisibleTarget(PlayerPawn, GetWorld(), IslandInteractionRadius);
+}
+
+FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(const AActor* Target) const
+{
+	if (!Target) return FString();
+	const FName Tag = IslandInteractionUtility::GetTargetTag(Target);
+	FString Action;
+	if (Tag == FName(TEXT("GuestBook"))) Action = TEXT("read or leave a public guest-book line");
+	else if (Tag == FName(TEXT("IslandArrangement")))
+	{
+		const AIslandArrangement* WorkActor = Cast<AIslandArrangement>(Target);
+		const UIslandWorldStateSubsystem* State = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		const FIslandArrangementSite* Site = WorkActor && State ? State->FindArrangementSite(WorkActor->GetSiteId()) : nullptr;
+		Action = Site && Site->bHasWork ? TEXT("see or answer the stone work") : TEXT("arrange a few stones");
+	}
+	else if (Tag == FName(TEXT("Firefly"))) Action = TEXT("quietly watch a wild firefly");
+	else if (Tag == FName(TEXT("TidepoolCrab"))) Action = TEXT("quietly watch a wild shore crab");
+	else if (Tag == FName(TEXT("MinnowSchool"))) Action = TEXT("quietly watch the wild minnows");
+	else if (Tag == FName(TEXT("InnHearth"))) Action = TEXT("tend the inn hearth");
+	else if (Tag == FName(TEXT("ListeningStones"))) Action = TEXT("listen to the ListeningStones");
+	else if (Tag == FName(TEXT("TideglassPool"))) Action = TEXT("send a brief ripple across the pool");
+	else if (Tag == FName(TEXT("WindArch"))) Action = TEXT("stir a brief local gust at the WindArch");
+	else Action = TEXT("inspect ") + Tag.ToString();
+
+	const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
+	return FString::Printf(TEXT("%s: %s"), *Input, *Action);
+}
+
+void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
+{
+	if (!AmbientSpeechWidget) return;
+	const UIslandSpectatorSubsystem* Spectator = GetWorld() ? GetWorld()->GetSubsystem<UIslandSpectatorSubsystem>() : nullptr;
+	if (bGuestBookPanelOpen || bArrangementPanelOpen ||
+		(ConversationWidget && ConversationWidget->IsVisible()) || (Spectator && Spectator->IsSpectating()))
+	{
+		AmbientSpeechWidget->HideInteractionHint();
+		return;
+	}
+	const FString Hint = DescribeWorldInteractionHint(FindNearestWorldInteraction());
+	if (Hint.IsEmpty()) AmbientSpeechWidget->HideInteractionHint();
+	else AmbientSpeechWidget->ShowInteractionHint(Hint);
 }
 
 void ACaptiveSky_2PlayerController::ShowWorldInteractionCaption(const FString& Caption)
@@ -246,6 +293,7 @@ void ACaptiveSky_2PlayerController::OpenArrangement(AActor* Target)
 	ArrangementTarget = WorkActor;
 	ArrangementWidget->OpenFor(Site->Id, Description, Site->bHasWork, bCanCreate, bCanRespond, bOwnWork);
 	bArrangementPanelOpen = true;
+	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
 	HideAmbientSpeech();
 	SetArrangementInputMode(true);
@@ -335,6 +383,7 @@ void ACaptiveSky_2PlayerController::OpenGuestBook(AActor* Target)
 	HideAmbientSpeech();
 	GuestBookWidget->OpenFor(LatestEntries, !State->HasGuestBookEntryToday(TEXT("Visitor")));
 	bGuestBookPanelOpen = true;
+	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	SetGuestBookInputMode(true);
 }
 
@@ -423,6 +472,7 @@ void ACaptiveSky_2PlayerController::ToggleConversation()
 	ConversationTarget = FindNearestConversationAgent();
 	if (!ConversationTarget)
 	{
+		if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 		ConversationWidget->SetVisibility(ESlateVisibility::Visible);
 		ConversationWidget->ShowMessage(TEXT("No one is close enough to hear you."), false);
 		FTimerHandle HideHandle;
@@ -431,6 +481,7 @@ void ACaptiveSky_2PlayerController::ToggleConversation()
 	}
 	ConversationTargetDisplayName = ConversationTarget->GetAgentDisplayName();
 	ConversationWidget->OpenFor(ConversationTargetDisplayName);
+	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(ConversationWidget->TakeWidget());
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);

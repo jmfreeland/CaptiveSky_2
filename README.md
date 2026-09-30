@@ -114,6 +114,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Open `/Game/Maps/Island`, press Simulate (or Play) — Aster (`Agent_Aster_01`) starts thinking within ~2–17 seconds.
 - In Play mode, approach Aster and press Enter to open conversation. Type a message and press Enter to send it; Escape closes the conversation. The initial conversation radius is 5 metres.
 - Approach a visible Island landmark or wild creature and press **E** to trigger its existing close-range response and read a brief caption. The visitor can ring the ListeningStones, stir a temporary Tideglass ripple or WindArch gust, quietly watch a nearby firefly/crab, or open the inn guest book. There, visitors can read the latest entries or leave one public line per Island day (up to 180 characters). Transient effects use a five-real-minute per-target pause; reading and writing the book are not cooldown-gated. Entries are bounded and reversible through `Island.ForgetGuestBook`. Autonomous residents share the landmark/wildlife response implementation.
+- In-range, clearly visible targets now display a small contextual **E** hint describing the available response; it never triggers the response. Menus and spectator mode suppress the hint, and it can coexist with temporary captions for wildlife, weather and resident speech.
 
 ## Roadmap / Open Questions
 
