@@ -160,3 +160,25 @@ The preview harness now snapshots every landscape component's material before as
 preview material. `ULandscapeComponent::SetMaterial` can affect later component reads through the
 proxy's shared landscape-material override, so interleaving snapshot and assignment made restoration
 order-dependent. The capture now validates exact restoration after a successful render.
+
+### Puddle mask scale/contrast follow-up (2026-09-30)
+
+Extended the read-only UE inspection to identify the `MF_Puddles` texture sample: it uses
+`/Game/Materals/Textures/T_LandscapeNoise.T_LandscapeNoise` with landscape-layer coordinates divided
+by `Puddle Size`, then raises that sample to `Puddle Constrain`, multiplies by `Puddle Depth`, and
+saturates the result. The assigned instance's effective values are `Puddle Size=200`,
+`Puddle Depth=3`, `Puddle Clarity=0.75`, and notably `Puddle Constrain=10`; the function's displayed
+defaults alone were therefore misleading about the actual mask.
+
+Created two additional ignored, isolated copies to test the hypothesis: one used size 500 / constrain
+1 / clarity 0.5, and a deliberately exaggerated visibility probe used size 25 / depth 20 / constrain
+1 / clarity 0.1. UE readbacks confirmed those overrides and `Add Puddles=True`; the authored instance
+still reports `Add Puddles=False`. Both matched noon captures passed the restoration assertion. The
+exaggerated wet frame remains effectively pixel-identical to the milder puddle prototypes and shows
+no convincing pooled-water shapes, while the within-run dry/wet pair does change slightly. Thus the
+branch is not yet a useful visual improvement even under extreme scalar tuning; do not wire it into
+the environment subsystem. Next inspect the parent material's compiled/static-switch path and the
+actual puddle function output in the material editor, then choose a new mask/roughness approach if
+that branch proves inert. Prototype assets live in ignored `Content/` and are reproducible with
+`Scripts/Create-LandscapePuddlePrototype.py`, `Scripts/Create-LandscapePuddleScalePrototype.py`,
+and `Scripts/Create-LandscapePuddleVisibilityProbe.py`; none is assigned to the map.

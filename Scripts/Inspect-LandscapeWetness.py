@@ -7,6 +7,10 @@ import unreal
 MATERIAL_PATH = "/Game/Materials/M_Island_Textured_Auto"
 PARAMETER_NAME = "Ground Wetness"
 INSTANCE_PATH = "/Game/Materials/MI_Island_Landscape"
+PROTOTYPE_PATHS = (
+    "/Game/Materials/MI_Island_Landscape_WetPrototype",
+    "/Game/Materials/MI_Island_Landscape_PuddleScalePrototype",
+)
 
 
 def label(expression):
@@ -37,6 +41,35 @@ def main():
             unreal.log("[LandscapeWetness] Landscape MI Add Puddles value: {}".format(add_puddles))
         except Exception as error:
             unreal.log_warning("[LandscapeWetness] Landscape MI switch query failed: {}".format(error))
+    for instance_path in PROTOTYPE_PATHS:
+        prototype = unreal.load_asset(instance_path)
+        if not prototype:
+            continue
+        try:
+            switch_value = unreal.MaterialEditingLibrary.get_material_instance_static_switch_parameter_value(
+                prototype, "Add Puddles")
+            unreal.log("[LandscapeWetness] Prototype {} Add Puddles readback: {}".format(
+                instance_path, switch_value))
+            static_parameters = prop(prototype, "static_parameters")
+            unreal.log("[LandscapeWetness] Prototype {} static_parameters: {}".format(
+                instance_path, static_parameters))
+            runtime_parameters = prop(prototype, "static_parameters_runtime")
+            unreal.log("[LandscapeWetness] Prototype {} runtime static parameters: {}".format(
+                instance_path, runtime_parameters))
+            switches = prop(runtime_parameters, "static_switch_parameters", []) if runtime_parameters else []
+            for switch in switches or []:
+                info = prop(switch, "parameter_info")
+                unreal.log("[LandscapeWetness] Prototype switch entry: name={}, association={}, index={}, value={}, override={}, guid={}".format(
+                    prop(info, "name"), prop(info, "association"), prop(info, "index"),
+                    prop(switch, "value"), prop(switch, "b_override"), prop(switch, "expression_guid")))
+            for parameter_name in ("Puddle Size", "Puddle Depth", "Puddle Clarity", "Puddle Constrain"):
+                scalar_value = unreal.MaterialEditingLibrary.get_material_instance_scalar_parameter_value(
+                    prototype, parameter_name)
+                unreal.log("[LandscapeWetness] Prototype {} {} readback: {}".format(
+                    instance_path, parameter_name, scalar_value))
+        except Exception as error:
+            unreal.log_warning("[LandscapeWetness] Prototype query failed for {}: {}".format(
+                instance_path, error))
     expressions = unreal.MaterialEditingLibrary.get_material_expressions(material)
     targets = []
     for expression in expressions:
@@ -107,6 +140,11 @@ def main():
                 if function.get_name() == "MF_Puddles" and expression_class == "MaterialExpressionStaticSwitchParameter":
                     unreal.log("[LandscapeWetness] MF_Puddles switch: name={}, default={}".format(
                         prop(function_expression, "parameter_name"), prop(function_expression, "default_value")))
+                if function.get_name() == "MF_Puddles" and expression_class == "MaterialExpressionTextureSample":
+                    texture = prop(function_expression, "texture")
+                    unreal.log("[LandscapeWetness] MF_Puddles texture sample: texture={}, sampler_type={}".format(
+                        texture.get_path_name() if texture else "<none>",
+                        prop(function_expression, "sampler_type")))
                 if function.get_name() == "MF_Puddles" and expression_class in (
                         "MaterialExpressionSetMaterialAttributes", "MaterialExpressionGetMaterialAttributes"):
                     try:
