@@ -117,6 +117,27 @@
 			"min_height": 170
 		},
 		{
+			"name": "02a_TideglassGroundDetail",
+			"from": {
+				"tag": "TideglassPool",
+				"offset": [
+					800,
+					-600,
+					170
+				]
+			},
+			"look": {
+				"tag": "TideglassPool",
+				"offset": [
+					600,
+					-200,
+					-60
+				]
+			},
+			"fov": 45,
+			"min_height": -1
+		},
+		{
 			"name": "03_ListeningStones",
 			"from": {
 				"tag": "ListeningStones",

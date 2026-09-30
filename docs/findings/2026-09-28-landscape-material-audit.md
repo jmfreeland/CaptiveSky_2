@@ -53,7 +53,7 @@ complete.
 
 ## Next safe step
 
-Compare the same Island location in a material preview and in-world under matched lighting, both dry and wet; include the runtime `Ground Wetness` drive-and-restore behavior. The audit found no painted layer allocations, so focus next on the automatic material's blend logic and current texture/scalar configuration. Only if this identifies a specific cause should a material be duplicated or migrated for a reversible test, with the wetness behavior revalidated. The old `M_Landscape` and `M_AutoLandscape` remain useful references, not assumed replacements.
+The controlled wetness pairs and material graph trace are recorded below. Next, test a matched pair at a low, grazing sun angle; if specular-only wetness still reads poorly, prototype roughness/puddle response in a reversible copy. Keep the old `M_Landscape` and `M_AutoLandscape` as references, not assumed replacements.
 
 No Unreal assets were modified during this audit.
 
@@ -98,6 +98,40 @@ At this wide Wind Arch composition, the two states show no obvious terrain chang
 to conclude the parameter is disconnected: the view is dominated by a broad, distant surface and may
 not resolve puddle/roughness detail. Earlier captures launched in separate editor processes also had
 different cloud states, so they are not a valid visual comparison. The paired result is the useful
-baseline; next inspect a closer, low-angle landscape view or the material's wetness wiring before
-changing any asset. The authored material remains `Ground Wetness = 0.15` when dry, rising to `1.0`
-when fully wet.
+baseline. The authored material remains `Ground Wetness = 0.15` when dry, rising to `1.0` when fully
+wet; the close-up and graph trace that follow further investigate its effect.
+
+## Close-range wetness and graph trace (2026-09-30)
+
+Added the fixed `02a_TideglassGroundDetail` camera to `Config/IslandViewpoints.json` and captured
+another same-session dry/fully-wet pair, this time looking down across the detailed ground around
+Tideglass Pool. The paired frames are
+`Saved/Viewpoints/2026-09-30_115447_h12.0_authored_dry/02a_TideglassGroundDetail.png` and
+`Saved/Viewpoints/2026-09-30_115447_h12.0_fully_wet/02a_TideglassGroundDetail.png`. The close-up
+still has no readily visible change at noon. A second matched pair at 17:00 also appeared nearly
+identical:
+`Saved/Viewpoints/2026-09-30_122416_h17.0_authored_dry/02a_TideglassGroundDetail.png` and
+`Saved/Viewpoints/2026-09-30_122416_h17.0_fully_wet/02a_TideglassGroundDetail.png`. That sunset
+view is very dark, however, so it is weak evidence about grazing-angle specular rather than a
+conclusive lighting test. Both paired automation runs passed without starting play or writing world
+state.
+
+A read-only UE Python graph inspection then traced the `Ground Wetness` scalar in
+`M_Island_Textured_Auto` into an `MF_CreateLayer` call. That call maps the scalar to the function's
+`Specular` input; inside `MF_CreateLayer`, that input feeds the `Specular` input of
+`MakeMaterialAttributes`, which is returned as the layer material attributes. The inspected wetness
+node therefore changes specular response, not the layer's roughness or a puddle mask. This narrow,
+specular-only path plausibly explains why changing 0.15 to 1.0 is imperceptible in the noon pairs;
+it does not prove there is no lighting-angle-dependent difference.
+
+The successful graph inspection used UE 5.8.3 with the project's required
+`-shaderworkingdir=<project>/Saved/ShaderWorking`. A prior one-off launch omitted that flag and
+crashed before Python ran when UE could not create a transfer file under the default user shader
+directory. The read-only diagnostic is `Scripts/Inspect-LandscapeWetness.py`. No material asset was
+modified or saved. The graph dump is in
+`%TEMP%/Codex_InspectLandscapeWetness_MFCreateLayer_20260930.log`.
+
+The next useful step is a reversible material prototype that also lowers roughness and/or drives a
+restrained puddle mask from wetness; don't replace the authored material in place. Recheck runtime
+drive-and-restore behavior and verify the prototype in PIE before considering migration. `Content/`
+assets are outside this source audit and were not changed.
