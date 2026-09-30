@@ -787,6 +787,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 					Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: send a brief ripple across the pool")));
 				TestTrue(TEXT("E is bound to the local visitor interaction handler"), VisitorController->PressBoundE());
 				const FString BoundCaption = Caption->GetDisplayedCaption().ToString();
+				TestEqual(TEXT("The visitor hint immediately reflects the target cooldown"),
+					Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: let that response settle")));
 				TestTrue(*FString::Printf(TEXT("Bound E displays the selected landmark's factual transient response; caption was: %s"), *BoundCaption),
 					BoundCaption.Contains(TEXT("TideglassPool: Your interaction sent")) &&
 					BoundCaption.Contains(TEXT("changes no permanent level state")));

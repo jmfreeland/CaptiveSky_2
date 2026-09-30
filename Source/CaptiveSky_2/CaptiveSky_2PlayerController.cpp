@@ -162,7 +162,7 @@ AActor* ACaptiveSky_2PlayerController::FindNearestWorldInteraction() const
 	return IslandInteractionUtility::FindNearestVisibleTarget(PlayerPawn, GetWorld(), IslandInteractionRadius);
 }
 
-FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(const AActor* Target) const
+FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Target) const
 {
 	if (!Target) return FString();
 	const FName Tag = IslandInteractionUtility::GetTargetTag(Target);
@@ -183,6 +183,13 @@ FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(const AActor
 	else if (Tag == FName(TEXT("TideglassPool"))) Action = TEXT("send a brief ripple across the pool");
 	else if (Tag == FName(TEXT("WindArch"))) Action = TEXT("stir a brief local gust at the WindArch");
 	else Action = TEXT("inspect ") + Tag.ToString();
+
+	const TWeakObjectPtr<AActor> TargetKey(Target);
+	if (const double* CooldownUntil = WorldInteractionCooldowns.Find(TargetKey);
+		CooldownUntil && *CooldownUntil > FPlatformTime::Seconds())
+	{
+		Action = TEXT("let that response settle");
+	}
 
 	const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
 	return FString::Printf(TEXT("%s: %s"), *Input, *Action);
@@ -251,6 +258,7 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		return;
 	}
 	WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
+	UpdateWorldInteractionHint();
 	ShowWorldInteractionCaption(TargetTag.ToString() + TEXT(": ") + Fact);
 }
 

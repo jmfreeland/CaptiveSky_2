@@ -132,7 +132,7 @@ protected:
 	void HandleAmbientAgentSpeech(AAutonomousAgentCharacter* Speaker, const FString& Speech);
 
 	void HideAmbientSpeech();
-	FString DescribeWorldInteractionHint(const AActor* Target) const;
+	FString DescribeWorldInteractionHint(AActor* Target) const;
 	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;
 
 };
