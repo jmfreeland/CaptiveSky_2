@@ -19,6 +19,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only ShoreApproach -OceanMaterial /Game/Materials/M_IslandOcean
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/MI_Island_Landscape_WetPrototype
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -LogPath Saved/Logs/Codex_ViewpointProbe.log
 #>
 param(
 	[double]$Hour = -1,
@@ -27,7 +28,9 @@ param(
 	[switch]$CompareLandscapeWetness,
 	[switch]$LandscapePuddlePreview,
 	[string]$LandscapeMaterial = "",
+	[string]$LandscapeParent = "",
 	[string]$OceanMaterial = "",
+	[string]$LogPath = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
@@ -39,7 +42,9 @@ $ErrorActionPreference = "Stop"
 $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 if (-not (Test-Path $editor)) { throw "UnrealEditor-Cmd.exe not found under $EngineDir; pass -EngineDir." }
-$log = Join-Path $env:TEMP "CaptiveSky_Viewpoints.log"
+$log = if ($LogPath) { [System.IO.Path]::GetFullPath($LogPath) } else { Join-Path $env:TEMP "CaptiveSky_Viewpoints_$PID.log" }
+$logDirectory = Split-Path -Parent $log
+if ($logDirectory) { New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null }
 $shaderWorkingDir = Join-Path (Split-Path $project) "Saved\ShaderWorking"
 New-Item -ItemType Directory -Force -Path $shaderWorkingDir | Out-Null
 
@@ -61,6 +66,7 @@ if ($LandscapePuddlePreview) {
 } elseif ($LandscapeMaterial) {
 	throw "-LandscapeMaterial is only valid with -LandscapePuddlePreview."
 }
+if ($LandscapeParent) { $extra += "-ViewpointLandscapeParent=$LandscapeParent" }
 if ($OceanMaterial) { $extra += "-ViewpointOceanMaterial=$OceanMaterial" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
@@ -72,4 +78,5 @@ if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 $lines = Select-String -Path $log -Pattern "Test Completed|Viewpoint captures saved|LogAutomationController: Error" | ForEach-Object { $_.Line }
 $lines
+"Viewpoint log: $log"
 if (-not ($lines -match "Result=\{Success\}")) { throw "Viewpoint capture failed; see $log" }

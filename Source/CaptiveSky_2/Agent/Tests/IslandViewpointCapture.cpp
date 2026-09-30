@@ -17,9 +17,12 @@
 #include "IslandFirefly.h"
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/PointLightComponent.h"
 #include "ContentStreaming.h"
+#include "ShaderCompiler.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
 #include "Engine/SceneCapture2D.h"
@@ -30,6 +33,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "LandscapeComponent.h"
 #include "LandscapeProxy.h"
+#include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ImageUtils.h"
@@ -55,6 +59,55 @@ namespace
 		TWeakObjectPtr<UMaterialInstanceDynamic> Material;
 		float Wetness = 0.f;
 	};
+
+	// Landscape components render from instances baked in the map, so a SetMaterial swap never reaches the
+	// screen. Previewing a different base graph therefore reparents the assigned landscape instance in memory only
+	// (nothing is saved) and puts the authored parent back afterwards.
+	struct FLandscapeParentSwap
+	{
+		TWeakObjectPtr<UMaterialInstanceConstant> Instance;
+		TStrongObjectPtr<UMaterialInterface> Parent;
+	};
+	TArray<FLandscapeParentSwap> GLandscapeParentSwaps;
+
+	int32 SwapLandscapeParent(UWorld* World, UMaterialInterface* NewParent)
+	{
+		for (TActorIterator<ALandscapeProxy> It(World); It; ++It)
+		{
+			UMaterialInstanceConstant* Instance = Cast<UMaterialInstanceConstant>(It->LandscapeMaterial);
+			if (!Instance || NewParent == Instance->Parent) continue;
+			const bool bKnown = GLandscapeParentSwaps.ContainsByPredicate([Instance](const FLandscapeParentSwap& Swap) { return Swap.Instance == Instance; });
+			if (bKnown) continue;
+			FLandscapeParentSwap& Swap = GLandscapeParentSwaps.AddDefaulted_GetRef();
+			Swap.Instance = Instance;
+			Swap.Parent.Reset(Instance->Parent);
+			Instance->SetParentEditorOnly(NewParent);
+			It->UpdateAllComponentMaterialInstances();
+			// Each component renders from its own baked instance, which keeps the old parent's shader until recached.
+			for (TObjectIterator<UMaterialInstanceConstant> Mic; Mic; ++Mic)
+				if (Mic->GetOuter() == *It) Mic->InitStaticPermutation();
+			TArray<ULandscapeComponent*> Comps; It->GetComponents<ULandscapeComponent>(Comps);
+			for (ULandscapeComponent* C : Comps) C->MarkRenderStateDirty();
+		}
+		return GLandscapeParentSwaps.Num();
+	}
+
+	// Landscape instances are map-baked, so wetness reaches them through the environment collection, not a MID.
+	// The environment subsystem does not run in editor worlds, so the capture writes the collection itself.
+	void HoldEnvironmentWetness(UWorld* World, float Wetness)
+	{
+		UMaterialParameterCollection* Collection = LoadObject<UMaterialParameterCollection>(nullptr, UIslandEnvironmentSubsystem::CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!World || !Collection) return;
+		World->GetParameterCollectionInstance(Collection)->SetScalarParameterValue(TEXT("Wetness"), FMath::Max(Wetness, 0.f));
+		World->UpdateParameterCollectionInstances(true, false);
+	}
+
+	void RestoreLandscapeParents()
+	{
+		for (const FLandscapeParentSwap& Swap : GLandscapeParentSwaps)
+			if (Swap.Instance.IsValid()) Swap.Instance->SetParentEditorOnly(Swap.Parent.Get());
+		GLandscapeParentSwaps.Reset();
+	}
 
 	void RestoreLandscapeWetnessPreview(const TArray<FLandscapePreviewBackup>& Backups,
 		const TArray<FReusedLandscapeMIDBackup>& ReusedInstances)
@@ -262,6 +315,7 @@ namespace
 					bCapturingWetLandscape = true;
 					Index = 0;
 					Directory = BaseDirectory + TEXT("_fully_wet");
+					HoldEnvironmentWetness(World.Get(), 1.f);
 					for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Material : LandscapePreviewInstances)
 						if (Material.IsValid())
 						{
@@ -275,6 +329,8 @@ namespace
 					return false;
 				}
 				RestoreLandscapeWetnessPreview(LandscapeBackups, ReusedLandscapeInstances);
+				RestoreLandscapeParents();
+				HoldEnvironmentWetness(World.Get(), -1.f);
 				FString RestoreError;
 				if (!IsLandscapeWetnessPreviewRestored(LandscapeBackups, ReusedLandscapeInstances, RestoreError))
 					Test->AddError(FString::Printf(TEXT("Landscape wetness preview failed to restore original material assignments and values: %s"), *RestoreError));
@@ -311,6 +367,8 @@ namespace
 				Frames = 0;
 			}
 			Capture->GetCaptureComponent2D()->CaptureScene();
+			// A swapped-in landscape graph can take minutes to compile; capturing earlier shows the previous look.
+			if (Frames == 1 && GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
 			if (++Frames < 60) return false;
 
 			FlushRenderingCommands();
@@ -677,12 +735,25 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		if (UIslandEnvironmentSubsystem* Environment = Island->GetSubsystem<UIslandEnvironmentSubsystem>())
 			Environment->Tick(0.f);
 
+		FString LandscapeParentPath;
+		if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointLandscapeParent="), LandscapeParentPath))
+		{
+			UMaterialInterface* Parent = LoadObject<UMaterialInterface>(nullptr, *LandscapeParentPath);
+			if (!TestNotNull(TEXT("Landscape parent material loaded"), Parent)) return false;
+			if (!TestTrue(TEXT("Landscape parent swap reached an assigned landscape instance"), SwapLandscapeParent(Island, Parent) > 0))
+				return false;
+			AddInfo(FString::Printf(TEXT("Previewing landscape graph %s in memory; the authored parent will be restored after capture."), *LandscapeParentPath));
+		}
+
 		const float PreviewWetness = bCompareLandscapeWetness ? -1.f : static_cast<float>(LandscapeWetness);
+		if (bLandscapeWetnessPreview) HoldEnvironmentWetness(Island, PreviewWetness);
 		const int32 ChangedSlots = ApplyLandscapeWetnessPreview(Island, PreviewWetness, LandscapePreviewParent,
 			bPuddlePreview ? 0.f : -1.f, LandscapeBackups, ReusedLandscapeInstances, LandscapePreviewInstances);
 		if (!TestTrue(TEXT("Landscape wetness preview affects at least one parameterized material slot"), ChangedSlots > 0))
 		{
 			RestoreLandscapeWetnessPreview(LandscapeBackups, ReusedLandscapeInstances);
+			RestoreLandscapeParents();
+			HoldEnvironmentWetness(Island, -1.f);
 			return false;
 		}
 		if (bPuddlePreview)
