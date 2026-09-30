@@ -74,6 +74,30 @@ successful UE 5.8.3 build log is `Saved/Logs/Codex_LandscapeAudit_Compile_202609
 
 This rules out a missing or mixed landscape-material assignment as the cause of the broad, muted
 terrain in the recent no-play captures. The audit establishes configuration but not the exact visual
-cause; material blend behavior, lighting, and dry/wet rendering still need a controlled comparison.
-No `Content/` asset was changed. The next step is a matched-hour dry/wet capture or material preview,
-then only a reversible material-copy experiment if a specific cause is isolated.
+cause; material blend behavior and close-range dry/wet rendering still need inspection. No `Content/`
+asset was changed. Use the transient paired-preview tooling below at a closer, lower camera angle,
+then inspect material wiring before considering a reversible material-copy experiment.
+
+## Transient wetness preview (2026-09-30)
+
+`Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -NoWorldState -CompareLandscapeWetness`
+now captures the authored-dry value and fully wet value in the same editor-world session, using
+transient material instances. Cleanup restores the original material parent and authored wetness;
+UE creates per-component dynamic wrappers when the parent is reassigned, so the test validates that
+equivalent state rather than pointer identity. The editor-only capture does not start play or write
+world state. The UE 5.8.3 build and `CaptiveSky2.Visual.Viewpoints` run passed; the run prepared all
+4,096 landscape material slots. Captures:
+
+- `Saved/Viewpoints/2026-09-30_113633_h12.0_authored_dry/04_WindArchOverlook.png`
+- `Saved/Viewpoints/2026-09-30_113633_h12.0_fully_wet/04_WindArchOverlook.png`
+
+Build and automation logs are `Saved/Logs/Codex_LandscapeWetnessPair_Compile_20260930.log` and
+`Saved/Logs/Codex_LandscapeWetnessPair_Automation_20260930.log`.
+
+At this wide Wind Arch composition, the two states show no obvious terrain change. This is not enough
+to conclude the parameter is disconnected: the view is dominated by a broad, distant surface and may
+not resolve puddle/roughness detail. Earlier captures launched in separate editor processes also had
+different cloud states, so they are not a valid visual comparison. The paired result is the useful
+baseline; next inspect a closer, low-angle landscape view or the material's wetness wiring before
+changing any asset. The authored material remains `Ground Wetness = 0.15` when dry, rising to `1.0`
+when fully wet.

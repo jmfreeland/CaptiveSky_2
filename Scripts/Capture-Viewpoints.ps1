@@ -14,10 +14,15 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCover
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState -Day 1
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 0
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 1
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
 #>
 param(
 	[double]$Hour = -1,
 	[int]$Day = 0,
+	[double]$LandscapeWetness = -1,
+	[switch]$CompareLandscapeWetness,
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
@@ -37,6 +42,12 @@ $extra = @()
 if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
 if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
 if ($Day -gt 0) { $extra += "-ViewpointDay=$Day" }
+if ($LandscapeWetness -lt -1 -or $LandscapeWetness -gt 1) { throw "-LandscapeWetness must be -1 (not set) or between 0 and 1." }
+if ($LandscapeWetness -ge 0) {
+	if ($CompareLandscapeWetness) { throw "Use either -LandscapeWetness or -CompareLandscapeWetness, not both." }
+	$extra += "-ViewpointLandscapeWetness=$LandscapeWetness"
+}
+if ($CompareLandscapeWetness) { $extra += "-ViewpointLandscapeWetnessPair" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover) { $extra += "-ViewpointGroundCover" }
