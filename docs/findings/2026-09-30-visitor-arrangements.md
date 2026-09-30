@@ -33,3 +33,20 @@ keyboard focus and actual mouse/touch clicks remain to be checked in rendered Pl
 PIE. The next useful pass is a brief, bounded visual interaction check, followed by
 confirming residents can notice and optionally respond to a visitor's work in live
 play without prompting them or implying they know its private meaning.
+
+### Residents remember public stone work
+
+When a resident sees a completed arrangement, they now add its exact site to their
+private remembered-places file under a neutral, form-only label (for example, `a stone
+ring`). While the work is visible, it is not redundantly offered as a remembered
+destination; after the resident walks out of sight, the exact site tag is available as
+an optional return target. Empty grounds are not kept as discoveries. This deliberately
+does not copy the maker's title or intent into another resident's memory.
+
+The UE 5.8.3 editor target built successfully, and
+`CaptiveSky2.Agent.IslandArrangement` passed with assertions for return-from-memory,
+privacy, and no remembered target for empty ground. The fixture uses unique agent IDs
+and cleans their place-memory directories. Log:
+`Saved/Logs/Codex_ArrangementMemory_Final_20260930.log`. This validates the
+perception/memory path without LLM calls; naturally choosing to return in a live session
+and the visual appearance remain unverified.

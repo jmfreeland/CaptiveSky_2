@@ -225,12 +225,15 @@ Evidence and privacy follow the rest of the world model:
 
 `AIslandArrangement` draws the work with flattened engine spheres, no collision, tinted from pale fresh stone toward moss over seven Island days; this is a code-only stand-in for proper weathering materials. To start over, run `Island.ForgetArrangements` during play; fresh empty grounds are placed the next time play begins.
 
+When a resident sees completed work, they privately keep a neutral label and its exact site as an optional return place. The label names only the visible stone form; it never stores or repeats another maker's private title or intent. Empty arranging grounds are not remembered as discoveries.
+
 `CaptiveSky2.Agent.IslandArrangement` covers:
 - site placement;
 - how close a resident must be, and form validation;
 - text cleanup;
 - the daily and response limits;
 - privacy in perception, and makers recognizing their own work;
+- remembering only completed public work by its neutral stone form, with an optional exact return target once it is out of sight;
 - weathering;
 - reloading in a new session, and the developer reset;
 - on the open Island map, walking paths from the ListeningStones to every arranging ground.

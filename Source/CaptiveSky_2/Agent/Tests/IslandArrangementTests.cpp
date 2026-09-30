@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
+#include "AgentDataPaths.h"
 #include "AgentMemoryComponent.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
@@ -19,6 +20,7 @@
 #include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
+#include "Misc/Guid.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 
@@ -27,6 +29,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandArrangementTest, "CaptiveSky2.Agent.Isla
 
 namespace
 {
+	struct FScopedArrangementAgentData
+	{
+		TArray<FString> Directories;
+
+		void Track(const FString& AgentId)
+		{
+			Directories.Add(CaptiveSkyDataPaths::ResolveProjectDataPath(FString::Printf(TEXT("Agents/%s"), *AgentId)));
+		}
+
+		~FScopedArrangementAgentData()
+		{
+			for (const FString& Directory : Directories)
+				IFileManager::Get().DeleteDirectory(*Directory, false, true);
+		}
+	};
+
 	UWorld* CreateArrangementWorld(const FString& StateFile)
 	{
 		const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
@@ -61,8 +79,16 @@ namespace
 
 bool FIslandArrangementTest::RunTest(const FString& Parameters)
 {
-	// No gateway or model requests. Residents here have no memory component, so nothing is written
-	// to agent journals; the one memory component below is only read for its id.
+	// No gateway or model requests. Isolated, unique identities keep the place-memory regression
+	// from reading or overwriting any actual resident's data.
+	const FString TestSuffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString BystanderAgentId = TEXT("ArrangementBystander_") + TestSuffix;
+	const FString ArrangerAgentId = TEXT("ArrangementMaker_") + TestSuffix;
+	const FString EmptySiteObserverAgentId = TEXT("EmptyArrangementObserver_") + TestSuffix;
+	FScopedArrangementAgentData AgentDataCleanup;
+	AgentDataCleanup.Track(BystanderAgentId);
+	AgentDataCleanup.Track(ArrangerAgentId);
+	AgentDataCleanup.Track(EmptySiteObserverAgentId);
 	auto DescribeFrom = [](UWorld* World, const FVector& Where, const FString& AgentId)
 	{
 		ACharacter* Body = World->SpawnActor<ACharacter>(Where, FRotator::ZeroRotator);
@@ -142,6 +168,10 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	}
 	const FIslandArrangementSite First = Sites[0];
 	TestTrue(TEXT("Empty ground is offered as a build target up close"), DescribeFrom(World, First.Location + FVector(150, 0, 100), FString()).Contains(TEXT("build target: ArrangingGround_1")));
+	DescribeFrom(World, First.Location + FVector(0.f, 200.f, 100.f), EmptySiteObserverAgentId);
+	const FString EmptyGroundReturn = DescribeFrom(World, First.Location + FVector(2000.f, 0.f, 100.f), EmptySiteObserverAgentId);
+	TestFalse(TEXT("An empty arranging ground is not remembered as a discovered work"),
+		EmptyGroundReturn.Contains(TEXT("move_to target: ArrangingGround_1")));
 
 	ACharacter* Maker = World->SpawnActor<ACharacter>(First.Location + FVector(3000, 0, 100), FRotator::ZeroRotator);
 	ARavenAgentAIController* MakerController = World->SpawnActor<ARavenAgentAIController>();
@@ -160,10 +190,15 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("One arrangement per resident per Island day"), Arrange(MakerController, TEXT("ArrangingGround_2"), TEXT("line"), TEXT("Again"), TEXT("")).Contains(TEXT("already arranged stones today")));
 
 	// Others see the shape and age, never the maker, title, or intent.
-	const FString Bystander = DescribeFrom(World, First.Location + FVector(0, 200, 100), TEXT("Test_Bystander"));
+	const FString Bystander = DescribeFrom(World, First.Location + FVector(0, 200, 100), BystanderAgentId);
 	TestTrue(*FString::Printf(TEXT("A bystander sees a fresh ring (%s)"), *Bystander), Bystander.Contains(TEXT("arranged 9 freshly placed stones here into a ring")));
 	TestFalse(TEXT("The title and intent stay private"), Bystander.Contains(TEXT("Evening")) || Bystander.Contains(TEXT("chime carries")));
 	TestTrue(TEXT("A bystander is invited to respond"), Bystander.Contains(TEXT("respond by setting a few small stones")));
+	const FString RememberedWork = DescribeFrom(World, First.Location + FVector(2000.f, 0.f, 100.f), BystanderAgentId);
+	TestTrue(TEXT("A bystander privately remembers a completed arrangement after walking out of sight"),
+		RememberedWork.Contains(TEXT("You remember a stone ring")) && RememberedWork.Contains(TEXT("move_to target: ArrangingGround_1")));
+	TestFalse(TEXT("A remembered public work still reveals neither its private title nor intent"),
+		RememberedWork.Contains(TEXT("Evening")) || RememberedWork.Contains(TEXT("chime carries")));
 
 	// A second resident answers it.
 	ACharacter* Responder = World->SpawnActor<ACharacter>(First.Location + FVector(-120, 0, 100), FRotator::ZeroRotator);
@@ -179,10 +214,10 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Makers do not respond to their own work"), bChanged);
 
 	// A remembered maker recognizes their own work and its private meaning.
-	State->ArrangeStones(TEXT("ArrangingGround_3"), TEXT("spiral"), TEXT("Slow turning"), TEXT("For the raven's return"), TEXT("Test_Arranger"), 1, bChanged);
+	State->ArrangeStones(TEXT("ArrangingGround_3"), TEXT("spiral"), TEXT("Slow turning"), TEXT("For the raven's return"), ArrangerAgentId, 1, bChanged);
 	TestTrue(TEXT("A spiral is made directly"), bChanged);
 	const FIslandArrangementSite* Third = State->FindArrangementSite(TEXT("ArrangingGround_3"));
-	const FString MakerView = DescribeFrom(World, Third->Location + FVector(150, 0, 100), TEXT("Test_Arranger"));
+	const FString MakerView = DescribeFrom(World, Third->Location + FVector(150, 0, 100), ArrangerAgentId);
 	TestTrue(TEXT("The maker recognizes their own work and remembers its meaning"), MakerView.Contains(TEXT("your own stone spiral, \"Slow turning\"")) && MakerView.Contains(TEXT("For the raven's return")));
 
 	// Weathering: a week of Island days darkens the stones toward moss.
@@ -221,7 +256,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The persistent actor picks up the visitor's stones"), VisitorSite->GetVisibleStoneCount() == AIslandArrangement::StoneCountFor(EIslandArrangementForm::Spiral));
 		TestTrue(TEXT("The visitor receives an honest save result"), ArrangementWidget->GetDisplayedContent().Contains(TEXT("stays in the world")));
 		TestFalse(TEXT("The visitor has used today's one-contribution limit"), ArrangementWidget->CanContribute());
-		const FString VisitorBystanderView = DescribeFrom(World, VisitorWork->Location + FVector(0, 200, 100), TEXT("Test_Bystander"));
+		const FString VisitorBystanderView = DescribeFrom(World, VisitorWork->Location + FVector(0, 200, 100), BystanderAgentId);
 		TestTrue(TEXT("Other residents see the visitor's form but not their title or intent"),
 			VisitorBystanderView.Contains(TEXT("spiral")) && !VisitorBystanderView.Contains(TEXT("turning mark")));
 		TestTrue(TEXT("Escape closes the arrangement panel"), VisitorController->PressBoundEscape() && !VisitorController->IsArrangementPanelOpenForTest());

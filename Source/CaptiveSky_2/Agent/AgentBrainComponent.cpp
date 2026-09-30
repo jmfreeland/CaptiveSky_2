@@ -349,6 +349,10 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						*SiteName);
 					continue;
 				}
+				// Lasting public work is a place worth finding again. Remember only its visible
+				// form and location; the maker's title and intent remain private to their own view.
+				RememberPlace(Site.Id, TEXT("a stone ") + UIslandWorldStateSubsystem::FormName(Site.Form), Site.Location);
+				NoticedNow.Add(Site.Id);
 				const int32 Age = Today - Site.Day;
 				const TCHAR* Weathering = Age <= 0 ? TEXT("freshly placed") : Age < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
 				if (!OwnId.IsEmpty() && Site.MakerAgentId == OwnId)

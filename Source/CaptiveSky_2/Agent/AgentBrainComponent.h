@@ -110,7 +110,7 @@ private:
 	// How many of the most recent spots lie within Radius of Location, counting back until one does not.
 	static int32 CountLingeringDecisions(const TArray<FVector>& Spots, const FVector& Location, float Radius);
 
-	// Curios this resident has itself come across, so it can head back to one after it has drifted out of sight.
+	// Lasting places this resident has come across, so it can find them again after they drift out of sight.
 	struct FRememberedPlace
 	{
 		FName Target;
