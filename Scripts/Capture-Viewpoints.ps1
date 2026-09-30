@@ -17,6 +17,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 0
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only ShoreApproach -OceanMaterial /Game/Materials/M_IslandOcean
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/MI_Island_Landscape_WetPrototype
 #>
 param(
@@ -26,6 +27,7 @@ param(
 	[switch]$CompareLandscapeWetness,
 	[switch]$LandscapePuddlePreview,
 	[string]$LandscapeMaterial = "",
+	[string]$OceanMaterial = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
@@ -59,6 +61,7 @@ if ($LandscapePuddlePreview) {
 } elseif ($LandscapeMaterial) {
 	throw "-LandscapeMaterial is only valid with -LandscapePuddlePreview."
 }
+if ($OceanMaterial) { $extra += "-ViewpointOceanMaterial=$OceanMaterial" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover) { $extra += "-ViewpointGroundCover" }

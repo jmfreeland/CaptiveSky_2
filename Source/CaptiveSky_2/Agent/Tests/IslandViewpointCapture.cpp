@@ -26,6 +26,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
 #include "LandscapeComponent.h"
 #include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -421,6 +423,24 @@ namespace
 		bool bPuddlePreview = false;
 		float PuddleDepthTarget = 0.f;
 	};
+
+	/** Puts the ocean plane's authored material back once the captures are done. */
+	class FRestoreOceanMaterialCommand : public IAutomationLatentCommand
+	{
+	public:
+		FRestoreOceanMaterialCommand(UStaticMeshComponent* InComponent, UMaterialInterface* InOriginal)
+			: Component(InComponent), Original(InOriginal) {}
+
+		virtual bool Update() override
+		{
+			if (Component.IsValid()) Component->SetMaterial(0, Original.Get());
+			return true;
+		}
+
+	private:
+		TWeakObjectPtr<UStaticMeshComponent> Component;
+		TStrongObjectPtr<UMaterialInterface> Original;
+	};
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandViewpointCaptureTest, "CaptiveSky2.Visual.Viewpoints",
@@ -672,11 +692,29 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		else
 			AddInfo(FString::Printf(TEXT("Applied transient Ground Wetness %.2f to %d landscape material slot(s); authored material parent and wetness will be restored after capture."), LandscapeWetness, ChangedSlots));
 	}
-	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
+		UStaticMeshComponent* OceanMesh = nullptr;
+	UMaterialInterface* OriginalOceanMaterial = nullptr;
+	FString OceanMaterialPath;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointOceanMaterial="), OceanMaterialPath))
+	{
+		UMaterialInterface* OceanMaterial = LoadObject<UMaterialInterface>(nullptr, *OceanMaterialPath);
+		for (TActorIterator<AStaticMeshActor> It(Island); It && !OceanMesh; ++It)
+			if (It->GetActorLabel() == TEXT("OceanPlane")) OceanMesh = It->GetStaticMeshComponent();
+		if (!OceanMaterial || !OceanMesh)
+		{
+			AddError(FString::Printf(TEXT("Ocean preview needs a loadable material (%s) and an actor labelled OceanPlane."), *OceanMaterialPath));
+			return false;
+		}
+		OriginalOceanMaterial = OceanMesh->GetMaterial(0);
+		OceanMesh->SetMaterial(0, OceanMaterial);
+		AddInfo(FString::Printf(TEXT("Transient ocean material preview %s on OceanPlane; the authored material is restored after capture."), *OceanMaterialPath));
+	}
+ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
 		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview, PuddleDepthTarget,
 		MoveTemp(LandscapePreviewInstances)));
+	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreOceanMaterialCommand(OceanMesh, OriginalOceanMaterial));
 	return true;
 }
 
