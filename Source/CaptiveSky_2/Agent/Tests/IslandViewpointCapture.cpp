@@ -38,13 +38,14 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "TextureResource.h"
+#include "UObject/StrongObjectPtr.h"
 
 namespace
 {
 	struct FLandscapePreviewBackup
 	{
 		TWeakObjectPtr<ULandscapeComponent> Component;
-		TArray<TObjectPtr<UMaterialInterface>> Materials;
+		TArray<TStrongObjectPtr<UMaterialInterface>> Materials;
 	};
 
 	struct FReusedLandscapeMIDBackup
@@ -108,12 +109,16 @@ namespace
 		return true;
 	}
 
-	int32 ApplyLandscapeWetnessPreview(UWorld* World, float Wetness, TArray<FLandscapePreviewBackup>& OutBackups,
+	int32 ApplyLandscapeWetnessPreview(UWorld* World, float Wetness, UMaterialInterface* PreviewParent,
+		float PuddleDepthOverride, TArray<FLandscapePreviewBackup>& OutBackups,
 		TArray<FReusedLandscapeMIDBackup>& OutReusedInstances, TArray<TWeakObjectPtr<UMaterialInstanceDynamic>>& OutPreviewInstances)
 	{
 		if (!World) return 0;
+		static const FName PuddleDepthParameter(TEXT("Puddle Depth"));
 		TMap<UMaterialInterface*, UMaterialInstanceDynamic*> PreviewInstances;
-		int32 ChangedSlots = 0;
+		// Landscape material overrides can be shared by every component on a proxy.
+		// Snapshot all slots before the first SetMaterial call so later reads cannot
+		// accidentally capture an already-mutated proxy-wide material.
 		for (TActorIterator<ALandscapeProxy> It(World); It; ++It)
 		{
 			TArray<ULandscapeComponent*> Components;
@@ -126,32 +131,45 @@ namespace
 				const int32 MaterialCount = Component->GetNumMaterials();
 				Backup.Materials.Reserve(MaterialCount);
 				for (int32 Index = 0; Index < MaterialCount; ++Index)
-				{
-					UMaterialInterface* Original = Component->GetMaterial(Index);
-					Backup.Materials.Add(Original);
-					float AuthoredWetness = 0.f;
-					if (!Original || !Original->GetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, AuthoredWetness)) continue;
+					Backup.Materials.Emplace(Component->GetMaterial(Index));
+			}
+		}
 
-					UMaterialInstanceDynamic* Preview = PreviewInstances.FindRef(Original);
-					if (!Preview)
+		int32 ChangedSlots = 0;
+		for (const FLandscapePreviewBackup& Backup : OutBackups)
+		{
+			ULandscapeComponent* Component = Backup.Component.Get();
+			if (!Component) continue;
+			for (int32 Index = 0; Index < Backup.Materials.Num(); ++Index)
+			{
+				UMaterialInterface* Original = Backup.Materials[Index].Get();
+				UMaterialInterface* Source = PreviewParent ? PreviewParent : Original;
+				float AuthoredWetness = 0.f;
+				if (!Original || !Source || !Source->GetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, AuthoredWetness)) continue;
+
+				UMaterialInstanceDynamic* Preview = PreviewInstances.FindRef(Source);
+				if (!Preview)
+				{
+					bool bReused = false;
+					Preview = PreviewParent
+						? UMaterialInstanceDynamic::Create(PreviewParent, Component)
+						: UIslandEnvironmentSubsystem::GetOrCreateLandscapeWetnessInstance(Original, Component, bReused);
+					if (!Preview) continue;
+					PreviewInstances.Add(Source, Preview);
+					if (bReused)
 					{
-						bool bReused = false;
-						Preview = UIslandEnvironmentSubsystem::GetOrCreateLandscapeWetnessInstance(Original, Component, bReused);
-						if (!Preview) continue;
-						PreviewInstances.Add(Original, Preview);
-						if (bReused)
-						{
-							FReusedLandscapeMIDBackup& ReusedBackup = OutReusedInstances.AddDefaulted_GetRef();
-							ReusedBackup.Material = Preview;
-							ReusedBackup.Wetness = AuthoredWetness;
-						}
-						Preview->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter,
-							Wetness >= 0.f ? Wetness : AuthoredWetness);
-						OutPreviewInstances.Add(Preview);
+						FReusedLandscapeMIDBackup& ReusedBackup = OutReusedInstances.AddDefaulted_GetRef();
+						ReusedBackup.Material = Preview;
+						ReusedBackup.Wetness = AuthoredWetness;
 					}
-					Component->SetMaterial(Index, Preview);
-					++ChangedSlots;
+					Preview->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter,
+						Wetness >= 0.f ? Wetness : AuthoredWetness);
+					if (PuddleDepthOverride >= 0.f)
+						Preview->SetScalarParameterValue(PuddleDepthParameter, PuddleDepthOverride);
+					OutPreviewInstances.Add(Preview);
 				}
+				Component->SetMaterial(Index, Preview);
+				++ChangedSlots;
 			}
 		}
 		return ChangedSlots;
@@ -196,15 +214,17 @@ namespace
 	{
 	public:
 		FIslandViewpointCaptureCommand(UWorld* InWorld, TArray<FIslandViewpoint> InViewpoints, float InHour, FIntPoint InSize, FString InDirectory,
-			FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, int32 InOriginalDayNumber, TArray<TWeakObjectPtr<AActor>> InPreviewActors,
+		FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, int32 InOriginalDayNumber, TArray<TWeakObjectPtr<AActor>> InPreviewActors,
 			AIslandWeather* InGroundCoverWeather, bool bInClearGroundCover, TArray<FLandscapePreviewBackup> InLandscapeBackups,
 			TArray<FReusedLandscapeMIDBackup> InReusedLandscapeInstances, bool bInCompareLandscapeWetness,
+			bool bInPuddlePreview, float InPuddleDepthTarget,
 			TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> InLandscapePreviewInstances)
 			: PreviewActors(MoveTemp(InPreviewActors)), World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize),
 			  Test(InTest), Clock(InClock), GroundCoverWeather(InGroundCoverWeather), BaseDirectory(MoveTemp(InDirectory)), Directory(BaseDirectory),
 			  OriginalStartHour(InOriginalStartHour), OriginalDayNumber(InOriginalDayNumber), bClearGroundCover(bInClearGroundCover),
 			  LandscapeBackups(MoveTemp(InLandscapeBackups)), ReusedLandscapeInstances(MoveTemp(InReusedLandscapeInstances)),
-			  LandscapePreviewInstances(MoveTemp(InLandscapePreviewInstances)), bCompareLandscapeWetness(bInCompareLandscapeWetness)
+			  LandscapePreviewInstances(MoveTemp(InLandscapePreviewInstances)), bCompareLandscapeWetness(bInCompareLandscapeWetness),
+			  bPuddlePreview(bInPuddlePreview), PuddleDepthTarget(InPuddleDepthTarget)
 		{
 			if (bCompareLandscapeWetness) Directory = BaseDirectory + TEXT("_authored_dry");
 		}
@@ -242,8 +262,14 @@ namespace
 					Directory = BaseDirectory + TEXT("_fully_wet");
 					for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Material : LandscapePreviewInstances)
 						if (Material.IsValid())
+						{
 							Material->SetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, 1.f);
-					Test->AddInfo(TEXT("Capturing the same viewpoints fully wet in the same editor world; authored-dry capture is retained for comparison."));
+							if (bPuddlePreview)
+								Material->SetScalarParameterValue(FName(TEXT("Puddle Depth")), PuddleDepthTarget);
+						}
+					Test->AddInfo(bPuddlePreview
+						? TEXT("Capturing the puddle-enabled prototype with full wetness and authored Puddle Depth in the same editor world; dry capture used zero Puddle Depth.")
+						: TEXT("Capturing the same viewpoints fully wet in the same editor world; authored-dry capture is retained for comparison."));
 					return false;
 				}
 				RestoreLandscapeWetnessPreview(LandscapeBackups, ReusedLandscapeInstances);
@@ -392,6 +418,8 @@ namespace
 		TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> LandscapePreviewInstances;
 		bool bCompareLandscapeWetness = false;
 		bool bCapturingWetLandscape = false;
+		bool bPuddlePreview = false;
+		float PuddleDepthTarget = 0.f;
 	};
 }
 
@@ -428,6 +456,31 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	double LandscapeWetness = -1.0;
 	const bool bLandscapeWetnessPreview = FParse::Value(FCommandLine::Get(), TEXT("ViewpointLandscapeWetness="), LandscapeWetness);
 	const bool bCompareLandscapeWetness = FParse::Param(FCommandLine::Get(), TEXT("ViewpointLandscapeWetnessPair"));
+	const bool bPuddlePreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointLandscapePuddlePreview"));
+	FString LandscapeMaterialPath;
+	const bool bLandscapeMaterialOverride = FParse::Value(FCommandLine::Get(), TEXT("ViewpointLandscapeMaterial="), LandscapeMaterialPath);
+	UMaterialInterface* LandscapePreviewParent = nullptr;
+	float PuddleDepthTarget = 0.f;
+	if (bPuddlePreview)
+	{
+		if (!bCompareLandscapeWetness || !bLandscapeMaterialOverride)
+		{
+			AddError(TEXT("Landscape puddle preview requires -ViewpointLandscapeWetnessPair and -ViewpointLandscapeMaterial."));
+			return false;
+		}
+		LandscapePreviewParent = LoadObject<UMaterialInterface>(nullptr, *LandscapeMaterialPath);
+		if (!TestNotNull(TEXT("Puddle preview material asset loaded"), LandscapePreviewParent) ||
+			!LandscapePreviewParent->GetScalarParameterValue(FName(TEXT("Puddle Depth")), PuddleDepthTarget))
+		{
+			AddError(FString::Printf(TEXT("Puddle preview material %s must expose Puddle Depth."), *LandscapeMaterialPath));
+			return false;
+		}
+	}
+	else if (bLandscapeMaterialOverride)
+	{
+		AddError(TEXT("-ViewpointLandscapeMaterial is only supported with -ViewpointLandscapePuddlePreview."));
+		return false;
+	}
 	if (bLandscapeWetnessPreview && bCompareLandscapeWetness)
 	{
 		AddError(TEXT("Choose either one -LandscapeWetness value or -CompareLandscapeWetness, not both."));
@@ -598,14 +651,23 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> LandscapePreviewInstances;
 	if (bLandscapeWetnessPreview || bCompareLandscapeWetness)
 	{
+		// The environment subsystem lazily replaces authored landscape materials with
+		// its own wetness MIDs on first tick. Prime it before taking the preview backup
+		// so this test cannot race that one-time assignment during capture.
+		if (UIslandEnvironmentSubsystem* Environment = Island->GetSubsystem<UIslandEnvironmentSubsystem>())
+			Environment->Tick(0.f);
+
 		const float PreviewWetness = bCompareLandscapeWetness ? -1.f : static_cast<float>(LandscapeWetness);
-		const int32 ChangedSlots = ApplyLandscapeWetnessPreview(Island, PreviewWetness, LandscapeBackups, ReusedLandscapeInstances, LandscapePreviewInstances);
+		const int32 ChangedSlots = ApplyLandscapeWetnessPreview(Island, PreviewWetness, LandscapePreviewParent,
+			bPuddlePreview ? 0.f : -1.f, LandscapeBackups, ReusedLandscapeInstances, LandscapePreviewInstances);
 		if (!TestTrue(TEXT("Landscape wetness preview affects at least one parameterized material slot"), ChangedSlots > 0))
 		{
 			RestoreLandscapeWetnessPreview(LandscapeBackups, ReusedLandscapeInstances);
 			return false;
 		}
-		if (bCompareLandscapeWetness)
+		if (bPuddlePreview)
+			AddInfo(FString::Printf(TEXT("Prepared a transient puddle-enabled material preview across %d landscape slot(s); the assigned material will be restored after capture."), ChangedSlots));
+		else if (bCompareLandscapeWetness)
 			AddInfo(FString::Printf(TEXT("Prepared an authored-dry/full-wet landscape comparison across %d transient material slot(s); authored material parent and wetness will be restored after capture."), ChangedSlots));
 		else
 			AddInfo(FString::Printf(TEXT("Applied transient Ground Wetness %.2f to %d landscape material slot(s); authored material parent and wetness will be restored after capture."), LandscapeWetness, ChangedSlots));
@@ -613,7 +675,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
 		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
-		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, MoveTemp(LandscapePreviewInstances)));
+		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview, PuddleDepthTarget,
+		MoveTemp(LandscapePreviewInstances)));
 	return true;
 }
 

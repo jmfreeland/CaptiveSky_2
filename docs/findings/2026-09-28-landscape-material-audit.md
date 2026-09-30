@@ -135,3 +135,28 @@ The next useful step is a reversible material prototype that also lowers roughne
 restrained puddle mask from wetness; don't replace the authored material in place. Recheck runtime
 drive-and-restore behavior and verify the prototype in PIE before considering migration. `Content/`
 assets are outside this source audit and were not changed.
+
+## Puddle-branch prototype (2026-09-30)
+
+UE's read-only material inspection found an existing `MF_Puddles` branch gated by the static switch
+`Add Puddles`, but the assigned `MI_Island_Landscape` has the switch disabled. Its parent,
+`M_Island_Textured_Auto`, also exposes `Puddle Depth` (authored as 3.0) and `Puddle Clarity` (0.75).
+Created a separate ignored Content asset, `/Game/Materials/MI_Island_Landscape_WetPrototype`, with
+only `Add Puddles` enabled; the assigned instance and Island map were not modified. The reproducible
+editor Python helper is `Scripts/Create-LandscapePuddlePrototype.py`.
+
+The paired, same-session noon capture at
+`Saved/Viewpoints/2026-09-30_135732_h12.0_authored_dry/02a_TideglassGroundDetail.png` and
+`Saved/Viewpoints/2026-09-30_135732_h12.0_fully_wet/02a_TideglassGroundDetail.png` used that
+prototype with puddle depth 0 when dry and 3 when fully wet. `CaptiveSky2.Visual.Viewpoints` passed,
+including the exact landscape material restoration check, with no play session or world-state write.
+The two frames differ slightly at pixel level but show no convincing visible puddle response from
+this camera. This is evidence that enabling the existing branch alone is not a sufficient visual
+fix; inspect its mask/coordinate inputs and tune it in a reversible copy before considering any
+runtime integration. The prototype `.uasset` is ignored by Git, so the helper can recreate it but
+the generated asset itself is not part of a source commit.
+
+The preview harness now snapshots every landscape component's material before assigning any
+preview material. `ULandscapeComponent::SetMaterial` can affect later component reads through the
+proxy's shared landscape-material override, so interleaving snapshot and assignment made restoration
+order-dependent. The capture now validates exact restoration after a successful render.

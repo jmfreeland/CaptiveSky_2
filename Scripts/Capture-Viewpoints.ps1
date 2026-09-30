@@ -17,12 +17,15 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 0
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/MI_Island_Landscape_WetPrototype
 #>
 param(
 	[double]$Hour = -1,
 	[int]$Day = 0,
 	[double]$LandscapeWetness = -1,
 	[switch]$CompareLandscapeWetness,
+	[switch]$LandscapePuddlePreview,
+	[string]$LandscapeMaterial = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
@@ -48,6 +51,14 @@ if ($LandscapeWetness -ge 0) {
 	$extra += "-ViewpointLandscapeWetness=$LandscapeWetness"
 }
 if ($CompareLandscapeWetness) { $extra += "-ViewpointLandscapeWetnessPair" }
+if ($LandscapePuddlePreview) {
+	if (-not $CompareLandscapeWetness) { throw "-LandscapePuddlePreview requires -CompareLandscapeWetness." }
+	if (-not $LandscapeMaterial) { throw "-LandscapePuddlePreview requires -LandscapeMaterial." }
+	$extra += "-ViewpointLandscapePuddlePreview"
+	$extra += "-ViewpointLandscapeMaterial=$LandscapeMaterial"
+} elseif ($LandscapeMaterial) {
+	throw "-LandscapeMaterial is only valid with -LandscapePuddlePreview."
+}
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover) { $extra += "-ViewpointGroundCover" }

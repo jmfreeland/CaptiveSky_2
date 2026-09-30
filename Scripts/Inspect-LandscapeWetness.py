@@ -6,6 +6,7 @@ import unreal
 
 MATERIAL_PATH = "/Game/Materials/M_Island_Textured_Auto"
 PARAMETER_NAME = "Ground Wetness"
+INSTANCE_PATH = "/Game/Materials/MI_Island_Landscape"
 
 
 def label(expression):
@@ -28,6 +29,14 @@ def main():
         raise RuntimeError("Could not load " + MATERIAL_PATH)
 
     unreal.log("[LandscapeWetness] Material: {}".format(material.get_path_name()))
+    instance = unreal.load_asset(INSTANCE_PATH)
+    if instance:
+        try:
+            add_puddles = unreal.MaterialEditingLibrary.get_material_instance_static_switch_parameter_value(
+                instance, "Add Puddles")
+            unreal.log("[LandscapeWetness] Landscape MI Add Puddles value: {}".format(add_puddles))
+        except Exception as error:
+            unreal.log_warning("[LandscapeWetness] Landscape MI switch query failed: {}".format(error))
     expressions = unreal.MaterialEditingLibrary.get_material_expressions(material)
     targets = []
     for expression in expressions:
@@ -56,12 +65,13 @@ def main():
         if not function:
             continue
         unreal.log("[LandscapeWetness] Function call: {} -> {}".format(label(expression), function.get_path_name()))
-        if function.get_name() == "MF_CreateLayer":
+        if function.get_name() in ("MF_CreateLayer", "MF_Puddles"):
             try:
                 input_names = unreal.MaterialEditingLibrary.get_material_expression_input_names(expression)
                 connected_nodes = unreal.MaterialEditingLibrary.get_inputs_for_material_expression(material, expression)
-                unreal.log("[LandscapeWetness] MF_CreateLayer call input pins: {}".format(input_names))
-                unreal.log("[LandscapeWetness] MF_CreateLayer call connected inputs: {}".format([label(node) for node in connected_nodes]))
+                unreal.log("[LandscapeWetness] {} call input pins: {}".format(function.get_name(), input_names))
+                unreal.log("[LandscapeWetness] {} call connected inputs: {}".format(
+                    function.get_name(), [label(node) for node in connected_nodes]))
             except Exception as error:
                 unreal.log_warning("[LandscapeWetness] Call input details unavailable: {}".format(error))
         try:
@@ -88,17 +98,34 @@ def main():
                 unreal.log("[LandscapeWetness] Function output: {}".format(label(function_expression)))
                 unreal.log("[LandscapeWetness] Output properties: name={}, description={}".format(
                     prop(function_expression, "output_name"), prop(function_expression, "description")))
-        if function.get_name() == "MF_CreateLayer":
+        if function.get_name() in ("MF_CreateLayer", "MF_Puddles"):
             for function_expression in function_expressions:
+                expression_class = function_expression.get_class().get_name()
+                if function.get_name() == "MF_Puddles" and expression_class == "MaterialExpressionScalarParameter":
+                    unreal.log("[LandscapeWetness] MF_Puddles scalar: name={}, default={}".format(
+                        prop(function_expression, "parameter_name"), prop(function_expression, "default_value")))
+                if function.get_name() == "MF_Puddles" and expression_class == "MaterialExpressionStaticSwitchParameter":
+                    unreal.log("[LandscapeWetness] MF_Puddles switch: name={}, default={}".format(
+                        prop(function_expression, "parameter_name"), prop(function_expression, "default_value")))
+                if function.get_name() == "MF_Puddles" and expression_class in (
+                        "MaterialExpressionSetMaterialAttributes", "MaterialExpressionGetMaterialAttributes"):
+                    try:
+                        unreal.log("[LandscapeWetness] MF_Puddles attribute node {} inputs={} outputs={}".format(
+                            label(function_expression),
+                            unreal.MaterialEditingLibrary.get_material_expression_input_names(function_expression),
+                            unreal.MaterialEditingLibrary.get_material_expression_output_names(function_expression)))
+                    except Exception as error:
+                        unreal.log_warning("[LandscapeWetness] Attribute pin query failed: {}".format(error))
                 try:
                     inputs = unreal.MaterialEditingLibrary.get_inputs_for_material_function_expression(function, function_expression)
                 except Exception:
                     inputs = []
                 if inputs:
-                    unreal.log("[LandscapeWetness] MF_CreateLayer graph: {} <- {}".format(
-                        label(function_expression), [label(node) for node in inputs]))
+                    unreal.log("[LandscapeWetness] {} graph: {} <- {}".format(
+                        function.get_name(), label(function_expression), [label(node) for node in inputs]))
                 if function_expression.get_class().get_name() == "MaterialExpressionFunctionInput":
-                    unreal.log("[LandscapeWetness] MF_CreateLayer input: name={}, description={}, preview={}".format(
+                    unreal.log("[LandscapeWetness] {} input: name={}, description={}, preview={}".format(
+                        function.get_name(),
                         prop(function_expression, "input_name"), prop(function_expression, "description"),
                         prop(function_expression, "preview_value")))
 
