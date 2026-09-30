@@ -1,4 +1,6 @@
 #include "AutonomousAgentAIController.h"
+#include "AutonomousAgentCharacter.h"
+#include "RavenAgentAIController.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -23,7 +25,24 @@ public:
 		const TSharedRef<FProbeState> State = MakeShared<FProbeState>();
 		State->World = World;
 		State->MoverTag = FName(Args.IsEmpty() ? TEXT("IslandInnkeeper") : *Args[0]);
-		State->TargetTag = FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
+		State->bApproachProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Approach"), ESearchCase::IgnoreCase);
+		State->TargetTag = State->bApproachProbe
+			? FName(Args.Num() > 2 ? *Args[2] : TEXT("ApproachAgent_Raven_01"))
+			: FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
+		State->PerchTag = State->bApproachProbe ? FName(Args.Num() > 3 ? *Args[3] : TEXT("Roost_East")) : NAME_None;
+		if (State->bApproachProbe && Args.Num() > 6)
+		{
+			double StartX = 0.0;
+			double StartY = 0.0;
+			double StartZ = 0.0;
+			if (!LexTryParseString(StartX, *Args[4]) || !LexTryParseString(StartY, *Args[5]) || !LexTryParseString(StartZ, *Args[6]))
+			{
+				UE_LOG(LogIslandMovementProbe, Error, TEXT("Approach start override needs three numeric world coordinates."));
+				return;
+			}
+			State->bHasMoverStartOverride = true;
+			State->MoverStartOverride = FVector(StartX, StartY, StartZ);
+		}
 		State->bWanderProbe = State->TargetTag == FName(TEXT("Wander"));
 		World->GetTimerManager().SetTimer(State->PollTimer,
 			FTimerDelegate::CreateLambda([State]() { Poll(State); }), 0.5f, true);
@@ -39,12 +58,18 @@ private:
 		TWeakObjectPtr<APawn> Pawn;
 		FName MoverTag;
 		FName TargetTag;
+		FName PerchTag;
 		FTimerHandle PollTimer;
 		FVector StartLocation = FVector::ZeroVector;
 		double StartedAt = 0.0;
+		double PerchRequestedAt = 0.0;
 		int32 StartupPolls = 0;
 		bool bMoveStarted = false;
 		bool bWanderProbe = false;
+		bool bApproachProbe = false;
+		bool bPerchRequested = false;
+		bool bHasMoverStartOverride = false;
+		FVector MoverStartOverride = FVector::ZeroVector;
 	};
 
 	static void Poll(const TSharedRef<FProbeState>& State)
@@ -69,6 +94,51 @@ private:
 				UE_LOG(LogIslandMovementProbe, Error, TEXT("Timed out finding mover/controller/target (mover=%s controller=%s target=%s)."),
 					Pawn ? TEXT("yes") : TEXT("no"), Controller ? TEXT("yes") : TEXT("no"),
 					(State->bWanderProbe || Target) ? TEXT("yes") : TEXT("no"));
+				Finish(State, false);
+				return;
+			}
+			if (State->bApproachProbe)
+			{
+				const AAutonomousAgentCharacter* TargetResident = Cast<AAutonomousAgentCharacter>(Target);
+				ARavenAgentAIController* RavenController = TargetResident
+					? Cast<ARavenAgentAIController>(TargetResident->GetController()) : nullptr;
+				if (!RavenController)
+				{
+					UE_LOG(LogIslandMovementProbe, Error,
+						TEXT("Approach probe target %s is not an embodied raven with a raven controller."), *State->TargetTag.ToString());
+					Finish(State, false);
+					return;
+				}
+				if (RavenController->LocomotionState != ERavenLocomotionState::Perched)
+				{
+					if (!State->bPerchRequested)
+					{
+						State->PerchRequestedAt = World->GetTimeSeconds();
+						State->bPerchRequested = RavenController->RequestPerch(State->PerchTag);
+						if (!State->bPerchRequested)
+						{
+							UE_LOG(LogIslandMovementProbe, Error,
+								TEXT("Approach probe could not start the raven's perch request for %s."), *State->PerchTag.ToString());
+							Finish(State, false);
+							return;
+						}
+						UE_LOG(LogIslandMovementProbe, Log,
+							TEXT("Approach probe is preparing the raven at %s before issuing resident movement."), *State->PerchTag.ToString());
+					}
+					else if (World->GetTimeSeconds() - State->PerchRequestedAt >= 45.0)
+					{
+						UE_LOG(LogIslandMovementProbe, Warning,
+							TEXT("Approach probe timed out waiting for the raven to perch at %s."), *State->PerchTag.ToString());
+						Finish(State, false);
+					}
+					return;
+				}
+			}
+			if (State->bHasMoverStartOverride &&
+				!Pawn->SetActorLocation(State->MoverStartOverride, false, nullptr, ETeleportType::TeleportPhysics))
+			{
+				UE_LOG(LogIslandMovementProbe, Error, TEXT("Could not place the mover at the requested diagnostic start %s."),
+					*State->MoverStartOverride.ToCompactString());
 				Finish(State, false);
 				return;
 			}
@@ -133,5 +203,5 @@ private:
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move or wander with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander]"),
+	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));
