@@ -1,6 +1,13 @@
 #include "Misc/AutomationTest.h"
 #include "AutonomousAgentAIController.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
+#include "GameFramework/Character.h"
 #include "NavigationPath.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "RavenAgentAIController.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMovementTest, "CaptiveSky2.Agent.ResidentApproach",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -52,6 +59,81 @@ bool FAgentMovementTest::RunTest(const FString& Parameters)
 					!GroundedCandidates[Index].Equals(GroundedCandidates[OtherIndex], 1.f));
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentBlockedGroundMoveTest, "CaptiveSky2.Agent.BlockedGroundMoveApproach",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Blocked-move fixture world created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ACharacter* Observer = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	AActor* Target = World->SpawnActor<AActor>(FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>(Spawn);
+	if (!TestNotNull(TEXT("Inspection-capable resident spawned"), Observer) ||
+		!TestNotNull(TEXT("Tagged landmark spawned"), Target) ||
+		!TestNotNull(TEXT("Resident controller spawned"), Controller))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Target->Tags = { TEXT("IslandLandmark"), TEXT("InnDoorLantern") };
+	USceneComponent* TargetRoot = NewObject<USceneComponent>(Target);
+	Target->SetRootComponent(TargetRoot);
+	TargetRoot->RegisterComponent();
+	Target->SetActorLocation(FVector(200.f, 0.f, 0.f));
+	TestTrue(TEXT("Landmark fixture retains its intended target location"), Target->GetActorLocation().Equals(FVector(200.f, 0.f, 0.f)));
+	World->BeginPlay();
+	Controller->Possess(Observer);
+
+	auto ReportBlockedMove = [Controller, Target]()
+	{
+		Controller->PendingGroundMoveTargetName = Target->GetFName();
+		Controller->OnMoveCompleted(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Blocked, FPathFollowingResultFlags::None));
+	};
+	ReportBlockedMove();
+	TestTrue(TEXT("A blocked resident who can clearly inspect the landmark gets a reachable-approach outcome"),
+		Controller->DescribeActionState().Contains(TEXT("within clear inspection range")) &&
+		Controller->DescribeActionState().Contains(TEXT("did not reach the marker itself")));
+
+	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+	ReportBlockedMove();
+	TestTrue(TEXT("A blocked resident beyond four metres receives the ordinary failure, not the approach fallback"),
+		Controller->DescribeActionState().Contains(TEXT("Movement did not complete")) &&
+		!Controller->DescribeActionState().Contains(TEXT("within clear inspection range")));
+
+	AActor* Occluder = World->SpawnActor<AActor>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("Visibility blocker spawned"), Occluder))
+	{
+		UBoxComponent* Box = NewObject<UBoxComponent>(Occluder);
+		Occluder->SetRootComponent(Box);
+		Box->SetBoxExtent(FVector(15.f, 100.f, 100.f));
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		Occluder->SetActorLocation(FVector(100.f, 0.f, 0.f));
+		Observer->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
+		ReportBlockedMove();
+		TestTrue(TEXT("A blocked resident behind an occlusion receives the ordinary failure"),
+			Controller->DescribeActionState().Contains(TEXT("Movement did not complete")) &&
+			!Controller->DescribeActionState().Contains(TEXT("within clear inspection range")));
+	}
+	Controller->UnPossess();
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }
 

@@ -424,6 +424,23 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		}
 	}
 	bCurrentMoveIsWander = false;
+	if (Result.Code == EPathFollowingResult::Blocked)
+	{
+		APawn* ControlledPawn = GetPawn();
+		AActor* Target = nullptr;
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			if (It->GetFName() == PendingGroundMoveTargetName) { Target = *It; break; }
+		const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
+		if (ControlledPawn && !TargetTag.IsNone() && IslandInteractionUtility::CanInspect(ControlledPawn, Target))
+		{
+			PendingGroundMoveTargetName = NAME_None;
+			ReportAction(FString::Printf(
+				TEXT("The route to the projected ground point was blocked, but you stopped within clear inspection range of %s. You may inspect or interact from this reachable approach; you did not reach the marker itself."),
+				*TargetTag.ToString()));
+			return;
+		}
+	}
+	PendingGroundMoveTargetName = NAME_None;
 	ReportAction(Result.IsSuccess() ? TEXT("Reached the requested destination. Arrival is complete; it does not imply an interaction or a discovery.") : TEXT("Movement did not complete (blocked, cancelled, or unreachable). Choose a reachable destination instead of repeating this route."));
 }
 void AAutonomousAgentAIController::InspectTarget(FName Target)
@@ -598,6 +615,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	{
 		return;
 	}
+	PendingGroundMoveTargetName = NAME_None;
 
 	switch (Decision.ActionType)
 	{
@@ -749,7 +767,10 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				!Route || !Route->IsValid() ? TEXT("missing") : Route->IsPartial() ? TEXT("partial") : TEXT("complete"),
 				Route && Route->IsValid() ? *FString::Printf(TEXT(", %.0f m"), Route->GetPathLength() / 100.f) : TEXT(""),
 				Route ? Route->PathPoints.Num() : 0);
-			const EPathFollowingRequestResult::Type Result = MoveToLocation(GroundGoal.Location, 50.f, true, true, false, true, nullptr, false);
+			PendingGroundMoveTargetName = TargetActor->GetFName();
+			const EPathFollowingRequestResult::Type Result = MoveToLocation(GroundGoal.Location,
+				50.f, true, true, false, true, nullptr, false);
+			if (Result != EPathFollowingRequestResult::RequestSuccessful) PendingGroundMoveTargetName = NAME_None;
 			ReportAction(Result == EPathFollowingRequestResult::Failed ? TEXT("Movement failed: no navigable route to that target.") : Result == EPathFollowingRequestResult::AlreadyAtGoal ? TEXT("Already at this destination. Do not keep requesting arrival; inspect once, wait, or rest.") : TEXT("Movement started; arrival is not yet complete."));
 		}
 		else

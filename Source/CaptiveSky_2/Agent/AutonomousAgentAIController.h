@@ -95,6 +95,7 @@ protected:
 
 private:
 	friend class FIslandMovementProbeCommand;
+	friend class FAgentBlockedGroundMoveTest;
 	friend class FRavenPerchTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandMinnowTest;
@@ -109,6 +110,7 @@ private:
 	FVector WanderExplorationOrigin = FVector::ZeroVector;
 	float FurthestWanderDistance = 0.f;
 	bool bCurrentMoveIsWander = false;
+	FName PendingGroundMoveTargetName;
 	double NextThinkAt = 0;
 	double NextRestAt = 0;
 	TMap<FName, double> InspectedUntil;
