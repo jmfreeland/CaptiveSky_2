@@ -7,6 +7,7 @@
 class UPointLightComponent;
 class UStaticMeshComponent;
 class UMaterialInstanceDynamic;
+class AIslandDayNight;
 class AIslandWeather;
 class AIslandListeningStonesChime;
 
@@ -35,6 +36,8 @@ public:
 	static float RainMovementScale(float RainIntensity);
 	static float RainGlowScale(float RainIntensity);
 	static float RainWingBeatScale(float RainIntensity);
+	/** Firefly contrast gently yields to moonlight without going dark. */
+	static float MoonlightGlowScale(float LunarIllumination);
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
@@ -71,6 +74,7 @@ private:
 	float ObservationPulseRemaining = 0.f;
 	float ChimeCheckRemaining = 0.f;
 	float ChimeResponseRemaining = 0.f;
+	TWeakObjectPtr<AIslandDayNight> DayNight;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
 	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */

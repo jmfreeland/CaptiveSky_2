@@ -1,4 +1,5 @@
 #include "IslandFirefly.h"
+#include "IslandDayNight.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "Components/PointLightComponent.h"
@@ -83,6 +84,11 @@ void AIslandFirefly::BeginPlay()
 	MotionRate = FMath::FRandRange(0.78f, 1.24f);
 	PulseRate = FMath::FRandRange(0.82f, 1.18f);
 	WingBeatPhase = FMath::FRandRange(0.f, 2.f * PI);
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		DayNight = *It;
+		break;
+	}
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
 		Weather = *It;
@@ -117,6 +123,11 @@ float AIslandFirefly::RainGlowScale(float RainIntensity)
 float AIslandFirefly::RainWingBeatScale(float RainIntensity)
 {
 	return FMath::Lerp(1.f, 0.65f, RainActivity(RainIntensity));
+}
+
+float AIslandFirefly::MoonlightGlowScale(float LunarIllumination)
+{
+	return FMath::Lerp(1.f, 0.72f, FMath::Clamp(LunarIllumination, 0.f, 1.f));
 }
 
 FVector AIslandFirefly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
@@ -229,7 +240,10 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
 	const float ChimeAccent = FMath::Clamp(ChimeResponseRemaining / 1.2f, 0.f, 1.f);
 	const float ChimePulse = FMath::Lerp(NaturalPulse, FMath::Max(NaturalPulse, 0.32f), ChimeAccent);
-	const float GlowScale = RainGlowScale(RainIntensity) * ChimePulse * ObservationAccent;
+	const float LunarIllumination = DayNight.IsValid()
+		? AIslandDayNight::LunarIllumination(DayNight->DayNumber, DayNight->CurrentHour)
+		: 0.f;
+	const float GlowScale = RainGlowScale(RainIntensity) * MoonlightGlowScale(LunarIllumination) * ChimePulse * ObservationAccent;
 	Glow->SetIntensity(GlowIntensity * GlowScale);
 	if (GlowMaterial)
 	{

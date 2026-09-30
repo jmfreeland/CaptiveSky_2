@@ -162,6 +162,13 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		AIslandFirefly::RainMovementScale(0.75f) < AIslandFirefly::RainMovementScale(0.45f) &&
 		AIslandFirefly::RainGlowScale(0.75f) < AIslandFirefly::RainGlowScale(0.45f) &&
 		AIslandFirefly::RainWingBeatScale(0.75f) < AIslandFirefly::RainWingBeatScale(0.45f));
+	TestTrue(TEXT("New-moon fireflies keep their full natural glow"),
+		FMath::IsNearlyEqual(AIslandFirefly::MoonlightGlowScale(0.f), 1.f));
+	TestTrue(TEXT("Bright moonlight gently softens, but never removes, firefly glow"),
+		AIslandFirefly::MoonlightGlowScale(1.f) >= 0.72f && AIslandFirefly::MoonlightGlowScale(1.f) < 1.f);
+	TestTrue(TEXT("Firefly moonlight response changes smoothly through the phase"),
+		AIslandFirefly::MoonlightGlowScale(1.f) < AIslandFirefly::MoonlightGlowScale(0.5f) &&
+		AIslandFirefly::MoonlightGlowScale(0.5f) < AIslandFirefly::MoonlightGlowScale(0.f));
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
@@ -445,6 +452,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		{
 			// This isolated fixture calls ecology refresh directly without starting world play.
 			RainSensitiveFirefly->Weather = Weather;
+			RainSensitiveFirefly->DayNight = Clock;
 			RainSensitiveFirefly->HomeLocation = RainSensitiveFirefly->GetActorLocation();
 			RainSensitiveFirefly->Phase = 1.1f;
 			const float OriginalWindSpeed = Weather->MaximumWindSpeed;
@@ -457,6 +465,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			RainSensitiveFirefly->Tick(0.f);
 			const float RainWanderRadius = FVector::Dist2D(RainSensitiveFirefly->HomeLocation, RainSensitiveFirefly->GetActorLocation());
 			TestTrue(TEXT("A lived firefly contracts its lateral drift during a strong shower"), RainWanderRadius < DryWanderRadius);
+			Clock->CurrentHour = 20.f;
+			Clock->DayNumber = 1;
+			RainSensitiveFirefly->UpdateGlow(1.37, 0.f);
+			const float NewMoonGlow = RainSensitiveFirefly->Glow->Intensity;
+			Clock->DayNumber = 15;
+			RainSensitiveFirefly->UpdateGlow(1.37, 0.f);
+			TestTrue(TEXT("The same firefly softens its pulse under a full moon"), RainSensitiveFirefly->Glow->Intensity < NewMoonGlow);
+			Clock->DayNumber = 1;
 			RainSensitiveFirefly->UpdateGlow(1.37, 0.f);
 			const float ClearGlowAtFixedPhase = RainSensitiveFirefly->Glow->Intensity;
 			RainSensitiveFirefly->UpdateGlow(1.37, 1.f);
