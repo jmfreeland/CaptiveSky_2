@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "IslandGuestBook.h"
+#include "IslandArrangement.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandFirefly.h"
 #include "IslandListeningStonesChime.h"
@@ -17,6 +18,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 {
 	if (!Target) return NAME_None;
 	if (Target->IsA<AIslandGuestBook>()) return FName(TEXT("GuestBook"));
+	if (Target->IsA<AIslandArrangement>()) return FName(TEXT("IslandArrangement"));
 	if (Target->ActorHasTag(TEXT("IslandLife")))
 	{
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));

@@ -6,6 +6,10 @@
 #include "IslandTidepoolCrab.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandArrangement.h"
+#include "IslandDayNight.h"
+#include "CaptiveSkyArrangementWidget.h"
+#include "IslandInteractionTestPlayerController.h"
+#include "IslandInteractionUtility.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Engine/TargetPoint.h"
@@ -132,6 +136,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(*FString::Printf(TEXT("%s is a short walk from the stones"), *Site.Id.ToString()), FVector::Dist2D(Site.Location, FVector::ZeroVector) <= 1250.f);
 		TestFalse(*FString::Printf(TEXT("%s starts empty"), *Site.Id.ToString()), Site.bHasWork);
+		TestNotNull(*FString::Printf(TEXT("%s is visible as soon as the sites are first placed"), *Site.Id.ToString()), FindArrangementActor(World, Site.Id));
 		for (const FIslandCurioRecord& Curio : State->GetCurios())
 			TestTrue(*FString::Printf(TEXT("%s keeps clear of %s"), *Site.Id.ToString(), *Curio.Id.ToString()), FVector::Dist2D(Site.Location, Curio.Location) >= 399.f);
 	}
@@ -187,6 +192,56 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	Visible->ShowSite(Aged, Aged.Day + AIslandArrangement::DaysToWeather);
 	TestTrue(TEXT("Old work looks weathered"), !Visible->GetCurrentTint().Equals(Fresh) && Visible->GetCurrentTint().Equals(AIslandArrangement::WeatheredTint(AIslandArrangement::DaysToWeather)));
 	TestTrue(TEXT("Perception describes old work as mossy"), [&]() { State->ArrangeStones(TEXT("ArrangingGround_4"), TEXT("pair"), TEXT("Old"), FString(), TEXT("Someone"), -10, bChanged); return DescribeFrom(World, State->FindArrangementSite(TEXT("ArrangingGround_4"))->Location + FVector(150, 0, 100), FString()).Contains(TEXT("mossy and settled")); }());
+
+	// Visitors can make the same bounded, lasting contribution through the local E interaction.
+	AIslandArrangement* VisitorSite = FindArrangementActor(World, TEXT("ArrangingGround_2"));
+	ACharacter* VisitorBody = World->SpawnActor<ACharacter>(Sites[1].Location + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator);
+	AIslandInteractionTestPlayerController* VisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	UCaptiveSkyArrangementWidget* ArrangementWidget = VisitorController
+		? NewObject<UCaptiveSkyArrangementWidget>(World, NAME_None, RF_Transient)
+		: nullptr;
+	if (TestNotNull(TEXT("Visitor's open arranging site has its stable id"), VisitorSite) &&
+		TestEqual(TEXT("The arranging site is an ordinary visible E target"), IslandInteractionUtility::GetTargetTag(VisitorSite), FName(TEXT("IslandArrangement"))) &&
+		TestNotNull(TEXT("Visitor body created beside open ground"), VisitorBody) &&
+		TestNotNull(TEXT("Visitor controller created for the bound E path"), VisitorController) &&
+		TestNotNull(TEXT("Visitor arrangement panel created"), ArrangementWidget))
+	{
+		VisitorController->SetFixturePawn(VisitorBody);
+		VisitorController->SetArrangementWidget(ArrangementWidget);
+		VisitorController->BindFixtureInput();
+		TestTrue(TEXT("Pressing E opens the nearby arranging-ground panel"), VisitorController->PressBoundE() && VisitorController->IsArrangementPanelOpenForTest());
+		TestTrue(TEXT("The panel states the durable/public shape and private intent policy"),
+			ArrangementWidget->GetDisplayedContent().Contains(TEXT("private unless you share")) && ArrangementWidget->GetDisplayedContent().Contains(TEXT("persists with the Island")));
+		VisitorController->SubmitVisitorArrangement(TEXT("spiral"), TEXT("A visitor's turning mark"), TEXT("A small hello to the raven"));
+		const FIslandArrangementSite* VisitorWork = State->FindArrangementSite(TEXT("ArrangingGround_2"));
+		TestTrue(TEXT("A visitor can create a lasting spiral at an empty site"), VisitorWork && VisitorWork->bHasWork &&
+			VisitorWork->MakerAgentId == TEXT("Visitor") && VisitorWork->Form == EIslandArrangementForm::Spiral &&
+			VisitorWork->Title == TEXT("A visitor's turning mark") && VisitorWork->Intent == TEXT("A small hello to the raven"));
+		TestTrue(TEXT("A visitor's contribution counts against their one-per-Island-day limit"), State->HasArrangedStonesToday(TEXT("Visitor"), 1));
+		TestTrue(TEXT("The persistent actor picks up the visitor's stones"), VisitorSite->GetVisibleStoneCount() == AIslandArrangement::StoneCountFor(EIslandArrangementForm::Spiral));
+		TestTrue(TEXT("The visitor receives an honest save result"), ArrangementWidget->GetDisplayedContent().Contains(TEXT("stays in the world")));
+		TestFalse(TEXT("The visitor has used today's one-contribution limit"), ArrangementWidget->CanContribute());
+		const FString VisitorBystanderView = DescribeFrom(World, VisitorWork->Location + FVector(0, 200, 100), TEXT("Test_Bystander"));
+		TestTrue(TEXT("Other residents see the visitor's form but not their title or intent"),
+			VisitorBystanderView.Contains(TEXT("spiral")) && !VisitorBystanderView.Contains(TEXT("turning mark")));
+		TestTrue(TEXT("Escape closes the arrangement panel"), VisitorController->PressBoundEscape() && !VisitorController->IsArrangementPanelOpenForTest());
+
+		// The same visitor may respond on a later Island day, but still only once that day.
+		VisitorBody->SetActorLocation(Sites[0].Location + FVector(0.f, 0.f, 100.f));
+		AIslandDayNight* TestClock = World->SpawnActor<AIslandDayNight>();
+		if (TestClock) TestClock->DayNumber = 2;
+		TestTrue(TEXT("An existing arrangement is an ordinary visible E target on the next Island day"),
+			VisitorController->PressBoundE() && VisitorController->IsArrangementPanelOpenForTest());
+		VisitorController->SubmitVisitorArrangementResponse(TEXT("Another morning, another answer"));
+		const FIslandArrangementSite* RespondedWork = State->FindArrangementSite(TEXT("ArrangingGround_1"));
+		TestTrue(TEXT("A visitor can add a response on the following Island day"), RespondedWork &&
+			RespondedWork->Responses.ContainsByPredicate([](const FIslandArrangementResponse& Response)
+				{ return Response.AgentId == TEXT("Visitor") && Response.Day == 2 && Response.Intent == TEXT("Another morning, another answer"); }));
+		TestTrue(TEXT("The visible arrangement grows by three response stones"),
+			FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 9 + 2 * AIslandArrangement::StonesPerResponse);
+		TestFalse(TEXT("The visitor cannot make a second contribution on the new Island day"), ArrangementWidget->CanContribute());
+	}
+	if (VisitorController) VisitorController->Destroy();
 	MakerController->UnPossess();
 	ResponderController->UnPossess();
 	DestroyArrangementWorld(World);
@@ -198,8 +253,12 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Sites are not placed a second time"), State->GetArrangementSites().Num(), 4);
 	TestTrue(TEXT("Sites stay where they were"), State->FindArrangementSite(TEXT("ArrangingGround_1")) && State->FindArrangementSite(TEXT("ArrangingGround_1"))->Location.Equals(First.Location, 0.5f));
 	const FIslandArrangementSite* Restored = State->FindArrangementSite(TEXT("ArrangingGround_1"));
-	TestTrue(TEXT("The ring and its response persist"), Restored && Restored->bHasWork && Restored->Responses.Num() == 1 && Restored->Intent == TEXT("To mark where the chime carries farthest"));
-	TestTrue(TEXT("The restored work is visible"), FindArrangementActor(World, TEXT("ArrangingGround_1")) && FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 12);
+	TestTrue(TEXT("The ring and both responses persist"), Restored && Restored->bHasWork && Restored->Responses.Num() == 2 && Restored->Intent == TEXT("To mark where the chime carries farthest"));
+	const FIslandArrangementSite* RestoredVisitorWork = State->FindArrangementSite(TEXT("ArrangingGround_2"));
+	TestTrue(TEXT("The visitor's work survives a new Island session"), RestoredVisitorWork && RestoredVisitorWork->MakerAgentId == TEXT("Visitor") &&
+		RestoredVisitorWork->Form == EIslandArrangementForm::Spiral && RestoredVisitorWork->Title == TEXT("A visitor's turning mark"));
+	TestTrue(TEXT("The visitor's daily limit follows their persistent contribution"), State->HasArrangedStonesToday(TEXT("Visitor"), 1));
+	TestTrue(TEXT("The restored work is visible"), FindArrangementActor(World, TEXT("ArrangingGround_1")) && FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 9 + 2 * AIslandArrangement::StonesPerResponse);
 	TestTrue(TEXT("Developer reset forgets arrangements"), State->ForgetArrangements() && State->GetArrangementSites().Num() == 0 && !FindArrangementActor(World, TEXT("ArrangingGround_1")));
 	DestroyArrangementWorld(World);
 	IFileManager::Get().Delete(*StateFile, false, true, true);

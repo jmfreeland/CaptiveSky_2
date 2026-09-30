@@ -11,8 +11,10 @@ class UUserWidget;
 class UCaptiveSkyConversationWidget;
 class UCaptiveSkyAmbientSpeechWidget;
 class UCaptiveSkyGuestBookWidget;
+class UCaptiveSkyArrangementWidget;
 class AAutonomousAgentCharacter;
 class AIslandGuestBook;
+class AIslandArrangement;
 class AActor;
 struct FAgentDecision;
 
@@ -30,6 +32,9 @@ public:
 	void CloseConversation();
 	void SubmitGuestBookEntry(const FString& Line);
 	void CloseGuestBook();
+	void SubmitVisitorArrangement(const FString& Form, const FString& Title, const FString& Intent);
+	void SubmitVisitorArrangementResponse(const FString& Intent);
+	void CloseArrangement();
 	
 protected:
 
@@ -58,8 +63,13 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UCaptiveSkyGuestBookWidget> GuestBookWidget;
 
+	UPROPERTY()
+	TObjectPtr<UCaptiveSkyArrangementWidget> ArrangementWidget;
+
 	TWeakObjectPtr<AIslandGuestBook> GuestBookTarget;
+	TWeakObjectPtr<AIslandArrangement> ArrangementTarget;
 	bool bGuestBookPanelOpen = false;
+	bool bArrangementPanelOpen = false;
 
 	UPROPERTY(EditAnywhere, Category = "Conversation")
 	float AmbientSpeechRadius = 3000.f;
@@ -101,9 +111,11 @@ protected:
 	void ToggleConversation();
 	void HandleEscape();
 	virtual void SetGuestBookInputMode(bool bOpen);
+	virtual void SetArrangementInputMode(bool bOpen);
 	AAutonomousAgentCharacter* FindNearestConversationAgent() const;
 	void InteractWithNearestWorldObject();
 	void OpenGuestBook(AActor* Target);
+	void OpenArrangement(AActor* Target);
 	AActor* FindNearestWorldInteraction() const;
 	void ShowWorldInteractionCaption(const FString& Caption);
 

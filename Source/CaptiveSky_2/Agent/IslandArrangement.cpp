@@ -41,6 +41,8 @@ int32 AIslandArrangement::GetVisibleStoneCount() const
 
 void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Today)
 {
+	SiteId = Site.Id;
+	Tags.AddUnique(Site.Id);
 	Stones->ClearInstances();
 	if (!Site.bHasWork) return;
 	if (!Surface) Surface = Stones->CreateAndSetMaterialInstanceDynamic(0);

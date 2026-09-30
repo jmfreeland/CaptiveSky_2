@@ -831,6 +831,7 @@ bool UIslandWorldStateSubsystem::PlaceArrangementSites()
 		ArrangementSites.Reset();
 		return false;
 	}
+	for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 	UE_LOG(LogIslandWorldState, Log, TEXT("Placed %d arranging sites near the ListeningStones."), ArrangementSites.Num());
 	return true;
 }
@@ -839,14 +840,11 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 	const FString& AgentId, int32 Today, bool& bOutChanged)
 {
 	bOutChanged = false;
+	if (AgentId.IsEmpty()) return TEXT("Stone arrangements need a visitor identity. Nothing changed.");
 	FIslandArrangementSite* Site = ArrangementSites.FindByPredicate([SiteId](const FIslandArrangementSite& Existing) { return Existing.Id == SiteId; });
 	if (!Site) return TEXT("There is no arranging ground by that name here. Nothing changed.");
-	for (const FIslandArrangementSite& Other : ArrangementSites)
-	{
-		const bool bMadeToday = Other.bHasWork && Other.MakerAgentId == AgentId && Other.Day == Today;
-		const bool bAnsweredToday = Other.Responses.ContainsByPredicate([&AgentId, Today](const FIslandArrangementResponse& Response) { return Response.AgentId == AgentId && Response.Day == Today; });
-		if (bMadeToday || bAnsweredToday) return TEXT("You have already arranged stones today; another arrangement will have to wait for a new Island day. Nothing changed.");
-	}
+	if (HasArrangedStonesToday(AgentId, Today))
+		return TEXT("You have already arranged stones today; another arrangement will have to wait for a new Island day. Nothing changed.");
 	const FString CleanIntent = CleanArrangementText(Intent, 200);
 	const FIslandArrangementSite Before = *Site;
 	FString Fact;
@@ -901,6 +899,18 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 				CleanIntent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *CleanIntent)),
 			{ { TEXT("site"), SiteId.ToString() }, { TEXT("title"), Site->Title } });
 	return Fact;
+}
+
+bool UIslandWorldStateSubsystem::HasArrangedStonesToday(const FString& AgentId, int32 Today) const
+{
+	if (AgentId.IsEmpty() || Today < 1) return false;
+	for (const FIslandArrangementSite& Site : ArrangementSites)
+	{
+		if (Site.bHasWork && Site.MakerAgentId == AgentId && Site.Day == Today) return true;
+		if (Site.Responses.ContainsByPredicate([&AgentId, Today](const FIslandArrangementResponse& Response)
+			{ return Response.AgentId == AgentId && Response.Day == Today; })) return true;
+	}
+	return false;
 }
 
 FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const FString& Line, int32 Today, bool& bOutChanged)

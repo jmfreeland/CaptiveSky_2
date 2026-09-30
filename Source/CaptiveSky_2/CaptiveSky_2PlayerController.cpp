@@ -11,11 +11,13 @@
 #include "CaptiveSkyConversationWidget.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
 #include "CaptiveSkyGuestBookWidget.h"
+#include "CaptiveSkyArrangementWidget.h"
 #include "Agent/AutonomousAgentCharacter.h"
 #include "Agent/AgentMemoryComponent.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Agent/AgentSocialSubsystem.h"
 #include "Agent/IslandGuestBook.h"
+#include "Agent/IslandArrangement.h"
 #include "Agent/IslandInteractionUtility.h"
 #include "Agent/IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
@@ -60,6 +62,13 @@ void ACaptiveSky_2PlayerController::BeginPlay()
 		{
 			GuestBookWidget->AddToPlayerScreen(25);
 			GuestBookWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
+		ArrangementWidget = CreateWidget<UCaptiveSkyArrangementWidget>(this, UCaptiveSkyArrangementWidget::StaticClass());
+		if (ArrangementWidget)
+		{
+			ArrangementWidget->AddToPlayerScreen(24);
+			ArrangementWidget->SetVisibility(ESlateVisibility::Collapsed);
 		}
 
 		AmbientSpeechWidget = CreateWidget<UCaptiveSkyAmbientSpeechWidget>(this, UCaptiveSkyAmbientSpeechWidget::StaticClass());
@@ -158,7 +167,7 @@ void ACaptiveSky_2PlayerController::ShowWorldInteractionCaption(const FString& C
 
 void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 {
-	if (!IsLocalPlayerController() || (ConversationWidget && ConversationWidget->IsVisible()) || bGuestBookPanelOpen) return;
+	if (!IsLocalPlayerController() || (ConversationWidget && ConversationWidget->IsVisible()) || bGuestBookPanelOpen || bArrangementPanelOpen) return;
 	AActor* Target = FindNearestWorldInteraction();
 	if (!Target)
 	{
@@ -170,6 +179,11 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	if (TargetTag == FName(TEXT("GuestBook")))
 	{
 		OpenGuestBook(Target);
+		return;
+	}
+	if (TargetTag == FName(TEXT("IslandArrangement")))
+	{
+		OpenArrangement(Target);
 		return;
 	}
 
@@ -191,6 +205,109 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	}
 	WorldInteractionCooldowns.Add(TargetKey, Now + FMath::Max(30.f, IslandInteractionCooldownSeconds));
 	ShowWorldInteractionCaption(TargetTag.ToString() + TEXT(": ") + Fact);
+}
+
+void ACaptiveSky_2PlayerController::OpenArrangement(AActor* Target)
+{
+	AIslandArrangement* WorkActor = Cast<AIslandArrangement>(Target);
+	APawn* Visitor = GetPawn();
+	UWorld* World = GetWorld();
+	UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	const FIslandArrangementSite* Site = WorkActor && State ? State->FindArrangementSite(WorkActor->GetSiteId()) : nullptr;
+	if (!ArrangementWidget || !IsValid(Visitor) || !WorkActor || !Site ||
+		!IslandInteractionUtility::CanInteract(Visitor, WorkActor, IslandInteractionRadius))
+	{
+		ShowWorldInteractionCaption(TEXT("You cannot reach or clearly see that arranging ground."));
+		return;
+	}
+
+	const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(World);
+	const FString VisitorId(TEXT("Visitor"));
+	const bool bUsedToday = State->HasArrangedStonesToday(VisitorId, Today);
+	const bool bOwnWork = Site->bHasWork && Site->MakerAgentId == VisitorId;
+	const bool bAlreadyResponded = Site->Responses.ContainsByPredicate([&VisitorId](const FIslandArrangementResponse& Response)
+		{ return Response.AgentId == VisitorId; });
+	const bool bCanCreate = !Site->bHasWork && !bUsedToday;
+	const bool bCanRespond = Site->bHasWork && !bOwnWork && !bAlreadyResponded && !bUsedToday &&
+		Site->Responses.Num() < AIslandArrangement::MaxResponses;
+	FString Description;
+	if (!Site->bHasWork)
+	{
+		Description = TEXT("This is an open patch of level ground beside the ListeningStones. Choose a simple shape and leave a few stones here.");
+	}
+	else
+	{
+		const bool bWeathered = Today - Site->Day >= AIslandArrangement::DaysToWeather;
+		Description = FString::Printf(TEXT("A %s of stones rests here, %s, with %d small response(s) nearby."),
+			*UIslandWorldStateSubsystem::FormName(Site->Form), bWeathered ? TEXT("mossy and settled") : TEXT("still taking shape"),
+			Site->Responses.Num());
+	}
+
+	ArrangementTarget = WorkActor;
+	ArrangementWidget->OpenFor(Site->Id, Description, Site->bHasWork, bCanCreate, bCanRespond, bOwnWork);
+	bArrangementPanelOpen = true;
+	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
+	HideAmbientSpeech();
+	SetArrangementInputMode(true);
+}
+
+void ACaptiveSky_2PlayerController::SubmitVisitorArrangement(const FString& Form, const FString& Title, const FString& Intent)
+{
+	if (!ArrangementWidget || !bArrangementPanelOpen) return;
+	APawn* Visitor = GetPawn();
+	AIslandArrangement* Target = ArrangementTarget.Get();
+	UWorld* World = GetWorld();
+	UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	const FIslandArrangementSite* Site = State ? State->FindArrangementSite(ArrangementWidget->GetSiteId()) : nullptr;
+	if (!IsValid(Visitor) || !IsValid(Target) || !Site || Target->GetSiteId() != Site->Id ||
+		!IslandInteractionUtility::CanInteract(Visitor, Target, IslandInteractionRadius))
+	{
+		ArrangementWidget->ShowResult(TEXT("That arranging ground is no longer within reach and view; nothing was saved."),
+			Site && Site->bHasWork, false, false, false);
+		return;
+	}
+
+	bool bChanged = false;
+	const FString Result = State->ArrangeStones(Site->Id, Form, Title, Intent, TEXT("Visitor"),
+		UIslandWorldStateSubsystem::CurrentIslandDay(World), bChanged);
+	Site = State->FindArrangementSite(Target->GetSiteId());
+	const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(World);
+	const bool bUsedToday = State->HasArrangedStonesToday(TEXT("Visitor"), Today);
+	const bool bOwnWork = Site && Site->bHasWork && Site->MakerAgentId == TEXT("Visitor");
+	const bool bAlreadyResponded = Site && Site->Responses.ContainsByPredicate([](const FIslandArrangementResponse& Response)
+		{ return Response.AgentId == TEXT("Visitor"); });
+	ArrangementWidget->ShowResult(Result, Site && Site->bHasWork,
+		Site && !Site->bHasWork && !bUsedToday,
+		Site && Site->bHasWork && !bOwnWork && !bAlreadyResponded && !bUsedToday && Site->Responses.Num() < AIslandArrangement::MaxResponses,
+		bChanged);
+}
+
+void ACaptiveSky_2PlayerController::SubmitVisitorArrangementResponse(const FString& Intent)
+{
+	SubmitVisitorArrangement(FString(), FString(), Intent);
+}
+
+void ACaptiveSky_2PlayerController::CloseArrangement()
+{
+	if (ArrangementWidget) ArrangementWidget->SetVisibility(ESlateVisibility::Collapsed);
+	bArrangementPanelOpen = false;
+	ArrangementTarget.Reset();
+	SetArrangementInputMode(false);
+}
+
+void ACaptiveSky_2PlayerController::SetArrangementInputMode(bool bOpen)
+{
+	if (bOpen && ArrangementWidget)
+	{
+		FInputModeGameAndUI InputMode;
+		InputMode.SetWidgetToFocus(ArrangementWidget->TakeWidget());
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+		bShowMouseCursor = true;
+		return;
+	}
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
 }
 
 void ACaptiveSky_2PlayerController::OpenGuestBook(AActor* Target)
@@ -274,6 +391,11 @@ void ACaptiveSky_2PlayerController::HandleEscape()
 		CloseGuestBook();
 		return;
 	}
+	if (bArrangementPanelOpen)
+	{
+		CloseArrangement();
+		return;
+	}
 	CloseConversation();
 }
 
@@ -297,7 +419,7 @@ AAutonomousAgentCharacter* ACaptiveSky_2PlayerController::FindNearestConversatio
 
 void ACaptiveSky_2PlayerController::ToggleConversation()
 {
-	if (!ConversationWidget || ConversationWidget->IsVisible() || bGuestBookPanelOpen) return;
+	if (!ConversationWidget || ConversationWidget->IsVisible() || bGuestBookPanelOpen || bArrangementPanelOpen) return;
 	ConversationTarget = FindNearestConversationAgent();
 	if (!ConversationTarget)
 	{

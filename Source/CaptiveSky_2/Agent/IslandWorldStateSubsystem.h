@@ -158,6 +158,8 @@ public:
 	 */
 	FString ArrangeStones(FName SiteId, const FString& Form, const FString& Title, const FString& Intent,
 		const FString& AgentId, int32 Today, bool& bOutChanged);
+	/** Whether this identity has already made a work or response on this Island day. */
+	bool HasArrangedStonesToday(const FString& AgentId, int32 Today) const;
 
 	/** Where arranging sites would go around the ListeningStones, clear of Avoid points. No saving or spawning. */
 	static bool BuildArrangementSiteLayout(UWorld* World, const TArray<FVector>& Avoid, TArray<FIslandArrangementSite>& OutSites);

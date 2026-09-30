@@ -15,11 +15,14 @@ class AIslandInteractionTestPlayerController final : public ACaptiveSky_2PlayerC
 public:
 	virtual bool IsLocalController() const override { return true; }
 	virtual void SetGuestBookInputMode(bool bOpen) override {}
+	virtual void SetArrangementInputMode(bool bOpen) override {}
 
 	void SetFixturePawn(APawn* InPawn) { SetPawn(InPawn); }
 	void SetCaptionWidget(UCaptiveSkyAmbientSpeechWidget* InWidget) { AmbientSpeechWidget = InWidget; }
 	void SetGuestBookWidget(UCaptiveSkyGuestBookWidget* InWidget) { GuestBookWidget = InWidget; }
+	void SetArrangementWidget(UCaptiveSkyArrangementWidget* InWidget) { ArrangementWidget = InWidget; }
 	bool IsGuestBookPanelOpenForTest() const { return bGuestBookPanelOpen; }
+	bool IsArrangementPanelOpenForTest() const { return bArrangementPanelOpen; }
 	void BindFixtureInput() { SetupInputComponent(); }
 
 	bool PressBoundE()

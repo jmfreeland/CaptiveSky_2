@@ -105,6 +105,7 @@ public:
 	void ShowSite(const FIslandArrangementSite& Site, int32 Today);
 	int32 GetVisibleStoneCount() const;
 	FLinearColor GetCurrentTint() const { return CurrentTint; }
+	FName GetSiteId() const { return SiteId; }
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Island|Arrangement")
@@ -112,6 +113,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> Surface;
+
+	FName SiteId;
 
 	FLinearColor CurrentTint = FLinearColor::White;
 };
