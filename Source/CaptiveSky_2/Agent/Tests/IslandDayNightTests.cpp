@@ -21,6 +21,16 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Sun rises at six"), FMath::IsNearlyZero(AIslandDayNight::SunHeight(6)));
 	TestTrue(TEXT("Sun overhead at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12), 1.f));
 	TestTrue(TEXT("Sun below horizon at midnight"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(0), -1.f));
+	const float QuarterMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.25 - 7.0) * 24.0);
+	const float FullMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.5 - 14.0) * 24.0);
+	const float NextNewMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays - 29.0) * 24.0);
+	TestTrue(TEXT("Day one begins at a new moon"), FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(1, 0.f), 0.001f));
+	TestTrue(TEXT("A quarter cycle has half illumination"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(8, QuarterMoonHour), 0.5f, 0.001f));
+	TestTrue(TEXT("Half a lunar cycle reaches a full moon"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(15, FullMoonHour), 1.f, 0.001f));
+	TestTrue(TEXT("The 29.53-day cycle returns continuously to new moon"),
+		FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(30, NextNewMoonHour), 0.001f));
+	TestTrue(TEXT("Lunar phase advances smoothly across Island midnight"),
+		FMath::Abs(AIslandDayNight::LunarPhaseProgress(2, 0.f) - AIslandDayNight::LunarPhaseProgress(1, 23.99f)) < 0.001f);
 	TestTrue(TEXT("Clear weather leaves daylight unchanged"), FMath::IsNearlyEqual(AIslandDayNight::CloudSunlightTransmission(0.f), 1.f) && FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(0.f), 1.f));
 	TestTrue(TEXT("Overcast modestly softens direct sunlight"), FMath::IsNearlyEqual(AIslandDayNight::CloudSunlightTransmission(1.f), 0.76f));
 	TestTrue(TEXT("Overcast gently softens ambient skylight"), FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(1.f), 0.70f));
@@ -51,9 +61,25 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->Sun = Sun;
 	Clock->Sky = Sky;
 	Clock->CurrentHour = 12.f;
+	Clock->DayNumber = 1;
 	Clock->DaySunIntensity = 10.f;
 	TestEqual(TEXT("Default moon illumination is tuned for a visible but dark night"), Clock->MoonIntensity, 1.5f);
 	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
+	Clock->CurrentHour = 0.f;
+	Clock->UpdateLighting();
+	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
+	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);
+	const FString NewMoonDescription = Clock->DescribeTime();
+	TestTrue(TEXT("Time observations describe a waxing phase with very faint illumination"),
+		NewMoonDescription.Contains(TEXT("waxing")) && NewMoonDescription.Contains(TEXT("very faint")));
+	Clock->DayNumber = 15;
+	Clock->UpdateLighting();
+	const float FullMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
+	TestTrue(TEXT("Near full moon, the moon moves opposite the sun's arc"), FullMoonOffset > 170.f);
+	const FString FullMoonDescription = Clock->DescribeTime();
+	TestTrue(TEXT("Time observations describe a waxing phase with bright illumination"),
+		FullMoonDescription.Contains(TEXT("waxing")) && FullMoonDescription.Contains(TEXT("bright")));
+	Clock->CurrentHour = 12.f;
 	Clock->MoonIntensity = 0.f;
 	float MinimumCover = 2.f;
 	float MaximumCover = -1.f;
@@ -76,10 +102,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Overcast cloud signal dims the actual skylight"), Sky->GetLightComponent()->Intensity < ClearSky * 0.75f);
 	Weather->WeatherSeed = ClearSeed;
 	Clock->CurrentHour = 0.f;
+	Clock->DayNumber = 15;
 	Clock->MoonIntensity = 1.5f;
 	Clock->UpdateLighting();
 	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
-	TestTrue(TEXT("A clear midnight keeps the moon light active"), FMath::IsNearlyEqual(Clock->Moon->Intensity, Clock->MoonIntensity, 0.001f));
+	TestTrue(TEXT("A clear near-full-moon midnight keeps moonlight active"), FMath::IsNearlyEqual(Clock->Moon->Intensity,
+		Clock->MoonIntensity * AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour), 0.001f));
 	TestTrue(TEXT("The ambient sky retains the tested low-light visibility floor"),
 		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,
 			AIslandDayNight::NightSkylightFloor * AIslandDayNight::CloudSkylightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));

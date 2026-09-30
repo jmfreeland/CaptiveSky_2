@@ -39,11 +39,15 @@ public:
 	float MoonIntensity = 1.5f;
 	/** Fixed-exposure night lighting needs a stronger sky fill for the Island terrain to remain readable. */
 	static constexpr float NightSkylightFloor = 2.5f;
+	/** Approximate synodic month used for the repeating Island moon-light cycle. */
+	static constexpr double LunarCycleDays = 29.53059;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
 
 	static float WrapHour(double Hour);
 	static float SunHeight(float Hour);
+	static float LunarPhaseProgress(int32 IslandDay, float IslandHour);
+	static float LunarIllumination(int32 IslandDay, float IslandHour);
 	static float CloudSunlightTransmission(float CloudCover);
 	static float CloudSkylightTransmission(float CloudCover);
 	FString DescribeTime() const;

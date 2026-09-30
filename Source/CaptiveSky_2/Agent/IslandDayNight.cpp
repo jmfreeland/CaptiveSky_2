@@ -33,6 +33,19 @@ float AIslandDayNight::SunHeight(float Hour)
 	return FMath::Sin((WrapHour(Hour) - 6.f) * PI / 12.f);
 }
 
+float AIslandDayNight::LunarPhaseProgress(int32 IslandDay, float IslandHour)
+{
+	const double ElapsedDays = static_cast<double>(FMath::Max(1, IslandDay) - 1) +
+		WrapHour(IslandHour) / 24.0;
+	return static_cast<float>(FMath::Fmod(ElapsedDays, LunarCycleDays) / LunarCycleDays);
+}
+
+float AIslandDayNight::LunarIllumination(int32 IslandDay, float IslandHour)
+{
+	const float PhaseAngle = LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI;
+	return 0.5f - 0.5f * FMath::Cos(PhaseAngle);
+}
+
 float AIslandDayNight::CloudSunlightTransmission(float CloudCover)
 {
 	return FMath::Lerp(1.f, 0.76f, FMath::Clamp(CloudCover, 0.f, 1.f));
@@ -125,8 +138,13 @@ void AIslandDayNight::UpdateLighting()
 		Light->SetIntensity(FMath::Max(0.f, DaySunIntensity) * Daylight * CloudSunlightTransmission(CloudCover));
 		Light->SetLightColor(FMath::Lerp(FLinearColor(1.f, 0.32f, 0.12f), FLinearColor(1.f, 0.96f, 0.88f), FMath::SmoothStep(0.f, 0.4f, Height)));
 	}
-	Moon->SetWorldRotation(FRotator(-Angle + 180.f, 35.f, 0.f));
-	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * FMath::SmoothStep(0.02f, 0.25f, -Height));
+	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
+	const float LunarIlluminationAmount = LunarIllumination(DayNumber, CurrentHour);
+	// New moon follows the sun below the horizon; full moon travels opposite it.
+	// Intermediate phases therefore shift the moon's rise and set through the night.
+	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
+	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * LunarIlluminationAmount *
+		FMath::SmoothStep(0.02f, 0.25f, -Height));
 	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
 }
 
@@ -135,8 +153,13 @@ FString AIslandDayNight::DescribeTime() const
 	const TCHAR* Phase = CurrentHour < 5.f || CurrentHour >= 20.f ? TEXT("night") :
 		CurrentHour < 7.f ? TEXT("dawn") : CurrentHour < 12.f ? TEXT("morning") :
 		CurrentHour < 17.f ? TEXT("afternoon") : TEXT("dusk");
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The sun and moon move as time passes; cloud cover gently softens direct and ambient daylight."),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f));
+	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
+	const TCHAR* LunarTrend = LunarProgress < 0.5f ? TEXT("waxing") : TEXT("waning");
+	const float LunarLight = LunarIllumination(DayNumber, CurrentHour);
+	const TCHAR* LunarBrightness = LunarLight < 0.12f ? TEXT("very faint") : LunarLight < 0.4f ? TEXT("faint") :
+		LunarLight < 0.72f ? TEXT("moderate") : TEXT("bright");
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The lunar phase is %s with %s illumination; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarTrend, LunarBrightness);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(
