@@ -1,4 +1,5 @@
 #include "IslandChronicle.h"
+#include "AgentDataPaths.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
 #include "EngineUtils.h"
@@ -25,7 +26,7 @@ FString UIslandChronicleSubsystem::GetChroniclePath() const
 	if (!ChronicleFileOverride.IsEmpty()) return ChronicleFileOverride;
 	// Worlds created in code (test fixtures) get no chronicle, like they get no lasting state.
 	if (!GetWorld() || GetWorld()->GetOutermost()->GetName().StartsWith(TEXT("/Temp/"))) return FString();
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / TEXT("chronicle.jsonl"));
+	return CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState/chronicle.jsonl"));
 }
 
 FString UIslandChronicleSubsystem::FormatEntry(const FDateTime& Utc, int32 Day, const FString& Clock, const FString& Type,

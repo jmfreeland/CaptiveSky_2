@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+#include "AgentDataPaths.h"
 #include "AgentBrainComponent.h"
 #include "AgentMemoryComponent.h"
 #include "HAL/FileManager.h"
@@ -13,7 +14,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMemoryComponentTest, "CaptiveSky2.Agent.M
 bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 {
 	const FString TestAgentId = TEXT("AutomationTest_Memory");
-	const FString TestDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / TestAgentId);
+	const FString TestDir = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / TestAgentId);
 
 	// Start from a clean slate so re-running the test is deterministic.
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
@@ -113,7 +114,7 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	}
 	{
 		const FString ConversationOnlyId = TEXT("AutomationTest_MemoryConversationOnly");
-		const FString ConversationOnlyDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / ConversationOnlyId);
+		const FString ConversationOnlyDir = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / ConversationOnlyId);
 		IFileManager::Get().DeleteDirectory(*ConversationOnlyDir, false, true);
 		UAgentMemoryComponent* ConversationOnly = NewObject<UAgentMemoryComponent>(GetTransientPackage());
 		ConversationOnly->AgentId = ConversationOnlyId;

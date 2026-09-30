@@ -11,10 +11,10 @@
  * Long-term memory store for an autonomous agent.
  *
  * Storage: plain-text, append-only JSON Lines under
- * <ProjectDir>/Agents/<AgentId>/memory.jsonl -- deliberately outside
- * Unreal's Saved/ directory (which is disposable/gitignored) so this data
- * survives engine cleanup and can be read, migrated, or re-implemented by
- * different technology later without needing Unreal at all.
+ * <DataRoot>/Agents/<AgentId>/memory.jsonl (DataRoot defaults to ProjectDir;
+ * -CaptiveSkyDataRoot can isolate playtests) -- deliberately outside Unreal's
+ * disposable/gitignored Saved/ directory in production so this data survives
+ * engine cleanup and can be read, migrated, or re-implemented without Unreal.
  *
  * Retrieval: GetRelevantContext is the "pre-filter for a context budget"
  * function. It is intentionally a simple, explainable heuristic (recency +
@@ -61,7 +61,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	FString GetResolvedAgentId() const;
 
-	/** Loads a UTF-8 document from this agent's directory (for example identity.md). */
+	/** Loads a UTF-8 authored document from the project's Agents/<id> directory (for example identity.md). */
 	UFUNCTION(BlueprintCallable, Category = "Agent Memory")
 	FString LoadAgentDocument(const FString& FileName) const;
 

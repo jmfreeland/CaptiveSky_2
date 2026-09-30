@@ -1,4 +1,5 @@
 #include "IslandWorldStateSubsystem.h"
+#include "AgentDataPaths.h"
 #include "IslandNest.h"
 #include "IslandGuestBook.h"
 #include "IslandDayNight.h"
@@ -36,7 +37,7 @@ FString UIslandWorldStateSubsystem::GetStorageFilePath() const
 	// Worlds created in code (test fixtures) have no saved map, so they get no lasting state.
 	if (!GetWorld() || GetWorld()->GetOutermost()->GetName().StartsWith(TEXT("/Temp/"))) return FString();
 	const FString MapName = UWorld::RemovePIEPrefix(GetWorld()->GetMapName());
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / (MapName + TEXT(".json")));
+	return CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState") / (MapName + TEXT(".json")));
 }
 
 const FIslandNestRecord* UIslandWorldStateSubsystem::FindNest(FName SiteTag) const

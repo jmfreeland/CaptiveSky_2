@@ -10,17 +10,23 @@ minutes and 120 model requests), after which the game closes. -Continuous switch
 for an unattended screen: no end time, model requests drawn from a steadily refilling allowance, and a
 daily ceiling (see AgentPlaySessionSubsystem). With -Continuous the world is relaunched if the game
 crashes (not when it is closed normally), at most five times in any hour; each restart is noted in
-Saved/Logs/SpectatorRestarts.log. Press ` and type Island.Spectate to toggle back to normal control.
+Saved/Logs/SpectatorRestarts.log. Use -DataRoot and explicit caps for an isolated bounded sample; when
+either cap is supplied, even -Continuous ends at that limit. Press ` and type Island.Spectate to toggle
+back to normal control.
 
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
+./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
 param(
 	[switch]$Windowed,
 	[switch]$Shots,
 	[switch]$Continuous,
+	[string]$DataRoot,
+	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
+	[ValidateRange(1, 120)][Nullable[int]]$MaxModelRequests,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
 
@@ -33,6 +39,9 @@ $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
 if ($Windowed) { $arguments += @("-windowed", "-ResX=1600", "-ResY=900") } else { $arguments += "-fullscreen" }
 if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot under Saved/Screenshots/Spectator
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
+if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
+if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }
+if ($PSBoundParameters.ContainsKey("MaxModelRequests")) { $arguments += "-CaptiveSkyMaxModelRequests=$MaxModelRequests" }
 if (-not $Continuous) { & $editor @arguments; return }
 $arguments += "-unattended" # a crash must end the process rather than wait on a crash-report dialog
 

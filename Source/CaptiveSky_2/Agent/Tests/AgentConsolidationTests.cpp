@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+#include "AgentDataPaths.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "Engine/Engine.h"
@@ -15,7 +16,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentConsolidationTest, "CaptiveSky2.Agent.Per
 bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 {
 	const FString TestAgentId = TEXT("Automation_Consolidation_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-	const FString TestDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / TestAgentId);
+	const FString TestDirectory = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / TestAgentId);
 	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)

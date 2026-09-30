@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AgentMemoryComponent.h"
+#include "AgentDataPaths.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/Guid.h"
@@ -37,7 +38,7 @@ FString UAgentMemoryComponent::ResolveAgentId() const
 
 FString UAgentMemoryComponent::GetAgentDirectory() const
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("Agents") / ResolveAgentId());
+	return CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / ResolveAgentId());
 }
 
 FString UAgentMemoryComponent::GetResolvedAgentId() const
@@ -52,7 +53,7 @@ FString UAgentMemoryComponent::GetMemoryFilePath() const
 
 FString UAgentMemoryComponent::GetLegacyMemoryFilePath() const
 {
-	return FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("AgentMemory") / ResolveAgentId() / TEXT("memory.jsonl"));
+	return CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("AgentMemory") / ResolveAgentId() / TEXT("memory.jsonl"));
 }
 
 FString UAgentMemoryComponent::LoadAgentDocument(const FString& FileName) const
@@ -65,7 +66,8 @@ FString UAgentMemoryComponent::LoadAgentDocument(const FString& FileName) const
 	}
 
 	FString Contents;
-	FFileHelper::LoadFileToString(Contents, *(GetAgentDirectory() / FileName));
+	const FString AuthoredAgentDirectory = FPaths::ProjectDir() / TEXT("Agents") / ResolveAgentId();
+	FFileHelper::LoadFileToString(Contents, *(AuthoredAgentDirectory / FileName));
 	return Contents;
 }
 

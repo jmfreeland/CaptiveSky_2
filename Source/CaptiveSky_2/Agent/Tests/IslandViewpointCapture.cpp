@@ -4,6 +4,7 @@
 // Run through Scripts/Capture-Viewpoints.ps1 (it needs a real RHI, so never with -nullrhi).
 
 #include "Misc/AutomationTest.h"
+#include "AgentDataPaths.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
 
@@ -176,7 +177,7 @@ namespace
 					break;
 				}
 			if (FParse::Param(FCommandLine::Get(), TEXT("ViewpointNoWorldState"))) return;
-			const FString Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("WorldState") / (World->GetMapName() + TEXT(".json")));
+			const FString Path = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState") / (World->GetMapName() + TEXT(".json")));
 			UIslandWorldStateSubsystem* Reader = NewObject<UIslandWorldStateSubsystem>(GetTransientPackage());
 			if (!FPaths::FileExists(Path) || !Reader->ReadStateFile(Path))
 			{
