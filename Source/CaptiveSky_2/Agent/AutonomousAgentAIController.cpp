@@ -403,6 +403,15 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 			ControlledPawn ? *ControlledPawn->GetActorLocation().ToCompactString() : TEXT("<no pawn>"),
 			ControlledPawn ? *ControlledPawn->GetVelocity().ToCompactString() : TEXT("<no pawn>"));
 	}
+	else if (Result.Code == EPathFollowingResult::Blocked)
+	{
+		const APawn* ControlledPawn = GetPawn();
+		UE_LOG(LogAutonomousAgentAI, Warning,
+			TEXT("%s non-wander movement was blocked (result code %d, flags %u); location %s, velocity %s."),
+			*GetName(), static_cast<int32>(Result.Code), static_cast<uint32>(Result.Flags),
+			ControlledPawn ? *ControlledPawn->GetActorLocation().ToCompactString() : TEXT("<no pawn>"),
+			ControlledPawn ? *ControlledPawn->GetVelocity().ToCompactString() : TEXT("<no pawn>"));
+	}
 	if (bCurrentMoveIsWander && Result.IsSuccess())
 	{
 		if (const APawn* ControlledPawn = GetPawn())
@@ -731,6 +740,15 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				ReportAction(TEXT("Movement failed: no walkable ground near that marker. Choose another destination."));
 				break;
 			}
+			const UNavigationPath* Route = NavSys
+				? NavSys->FindPathToLocationSynchronously(GetWorld(), ControlledPawn->GetActorLocation(), GroundGoal.Location, ControlledPawn)
+				: nullptr;
+			UE_LOG(LogAutonomousAgentAI, Log,
+				TEXT("%s projected %s to grounded goal %s; nav route %s%s (%d points)."),
+				*GetName(), *Decision.ActionTarget, *GroundGoal.Location.ToCompactString(),
+				!Route || !Route->IsValid() ? TEXT("missing") : Route->IsPartial() ? TEXT("partial") : TEXT("complete"),
+				Route && Route->IsValid() ? *FString::Printf(TEXT(", %.0f m"), Route->GetPathLength() / 100.f) : TEXT(""),
+				Route ? Route->PathPoints.Num() : 0);
 			const EPathFollowingRequestResult::Type Result = MoveToLocation(GroundGoal.Location, 50.f, true, true, false, true, nullptr, false);
 			ReportAction(Result == EPathFollowingRequestResult::Failed ? TEXT("Movement failed: no navigable route to that target.") : Result == EPathFollowingRequestResult::AlreadyAtGoal ? TEXT("Already at this destination. Do not keep requesting arrival; inspect once, wait, or rest.") : TEXT("Movement started; arrival is not yet complete."));
 		}
