@@ -207,3 +207,91 @@ generic `inputs` property that UE does not expose on these expressions. The exis
 `MaterialEditingLibrary` graph queries succeeded and produced the trace above. The temporary
 probe was removed from `Scripts/Inspect-LandscapeWetness.py`; no project gameplay or asset
 failure was involved.
+
+### Puddle mask material preview attempt (2026-09-30)
+
+Added `Scripts/Create-LandscapePuddleMaskDebug.py` to create a distinct, ignored material at
+`/Game/Materials/M_Island_PuddleMaskDebug`. The first version was generated successfully but
+the 12:00 close-up capture displayed only the landscape checkerboard fallback; UE also logged a
+handled ensure in `LandscapeRender.cpp` while updating landscape material instances, and
+`CaptiveSky2.Visual.Viewpoints` failed. The output is
+`Saved/Viewpoints/2026-09-30_202252_h12.0_fully_wet/02a_TideglassGroundDetail.png`; the
+paired dry/wet captures do not validate mask appearance. The authored landscape material and
+Island map assignment were not changed.
+
+The capture failure suggests a newly created generic material does not retain the working
+landscape setup needed by this map. A second builder attempt duplicated
+`/Game/Materials/M_Island_Textured_Auto` to
+`/Game/Materials/M_Island_PuddleMaskDebug_Landscape`, but clearing its expression graph caused
+`Landscape Physical Material Output` compile errors due to missing inputs. The current builder
+keeps the copied graph and routes only the diagnostic Base Color and Emissive outputs around it;
+this revision still needs a real-RHI validation. UE 5.8.3 also reported repeated Zen DDC
+connection retries during editor startup. The capture helper now
+supports an explicit `-LogPath` and uses a process-specific `%TEMP%` log by default: its old
+shared name collided with a concurrent run from the Claude worktree, making combined log text
+ambiguous. No gameplay or world-state changes were made, and no authored material or map asset
+was saved.
+
+### Wet-parent capture visual check (2026-09-30)
+
+The 12:00 authored-dry/fully-wet pair at
+`Saved/Viewpoints/2026-09-30_204634_h12.0_{authored_dry,fully_wet}/` predates the component-MIC
+recache fix. Its mean absolute RGB difference is only `2.287/255`, as expected when both passes
+still rendered the old graph. It is not evidence against the current wet-parent response; see
+[`2026-09-30-landscape-wetness.md`](2026-09-30-landscape-wetness.md) for the later recached capture,
+which measured mean RGB `[72.0, 56.9, 4.5]` dry versus `[39.7, 32.1, 10.0]` wet.
+
+### Puddle-mask visualization and parent-only capture fix (2026-09-30)
+
+The first generic debug material at `/Game/Materials/M_Island_PuddleMaskDebug` showed the
+landscape checkerboard and caused a handled `LandscapeRender.cpp` ensure. Duplicating
+`M_Island_Textured_Auto` retained the landscape setup, but deleting its graph failed compilation
+because `Landscape Physical Material Output` had missing inputs. Keeping the graph allowed a
+separate material to compile, but parent-only viewpoint commands still displayed the original
+colored landscape.
+
+The cause was in `IslandViewpointCaptureTest`: it parsed `-ViewpointLandscapeParent` only inside
+the wetness-preview conditional. A capture with `-LandscapeParent` alone therefore passed while
+never swapping the parent. The automation source now applies any requested parent swap
+independently of the optional wetness-preview branch; that C++ change still needs a build and a
+parent-only verification run.
+
+With the wetness branch explicitly activated (`-LandscapeWetness 1`), the log confirmed the
+in-memory swap to `/Game/Materials/M_Island_PuddleMaskDebug_AttrOutput` and transient wetness on
+4,096 landscape slots. The test restored state and reported success, but its capture
+`Saved/Viewpoints/2026-09-30_220218_h12.0/02a_TideglassGroundDetail.png` was nearly black: mean RGB
+`2.06/255`, maximum channel value `12`, and 25.71% of pixels above `3/255`. The diagnostic was
+still using the authored mask values (`Puddle Size=200`, `Puddle Depth=3`, `Puddle Constrain=10`),
+so this indicates that this mask path produces very little signal at those values; it does not
+yet distinguish the threshold distribution from a graph-output issue.
+
+The first exaggerated capture looked yellow because scalar-to-vector promotion did not populate
+all material-attribute color channels. An `AppendVector` attempt then failed UE compilation because
+the landscape mask was carried as a two-component value. The final graph explicitly masks only R
+(with G/B/A disabled), then appends that scalar into an RGB triplet. UE 5.8.3 compiled and saved
+`/Game/Materials/M_Island_PuddleMaskDebug_ExaggeratedRGB` successfully.
+
+The final close-up capture is
+`Saved/Viewpoints/2026-09-30_230104_h12.0/02a_TideglassGroundDetail.png`; its run log is
+`Saved/Logs/Codex_PuddleMaskDebug_ExaggeratedRGB_FinalCapture_20260930.log`. The viewpoint test
+passed, logged the graph swap and transient wetness on 4,096 slots, and restored the landscape
+state. Pixel statistics are RGB mean `[158.24, 158.43, 158.42]`, channel standard deviation
+`[10.18, 10.12, 10.13]`, and range `123–175` in every channel (261 unique RGB values). This
+confirms the replicated raw mask reaches the landscape in neutral grayscale, but the viewed signal
+is still low-contrast noise rather than convincing pooled-water shapes. It is not yet a visual
+validation of the authored `MF_Puddles` blend or grounds for enabling its static switch.
+
+The capture helper now routes DDC to the ignored project-local `Saved/LocalDDC` instead of forcing
+an in-memory cache. UE confirmed that path is writable; subsequent capture startups reused its
+shader data instead of recompiling the full engine cache. The machine-wide cache remains read-only
+in this environment. All debug materials are separate ignored assets; the authored landscape
+material, instance, map assignment and world state remain unchanged.
+
+The parent-only fix in `IslandViewpointCaptureTest` is still pending a source rebuild and a capture
+without `-LandscapeWetness`. A fresh `Build.bat` invocation reached UnrealBuildTool but remained
+idle for 2.5 minutes: its dotnet CPU, UBT log timestamp and editor Intermediate files did not move.
+Only that build invocation was stopped. The successful captures above used the existing editor
+binary with the wetness-preview condition explicitly enabled, so they do not verify the parent-only
+fix. Next: resolve the idle UBT process safely, build the C++ change, run parent-only restoration
+verification, then compare the actual `MF_Puddles` output/attributes before tuning the authored
+branch.

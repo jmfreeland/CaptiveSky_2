@@ -46,7 +46,9 @@ $log = if ($LogPath) { [System.IO.Path]::GetFullPath($LogPath) } else { Join-Pat
 $logDirectory = Split-Path -Parent $log
 if ($logDirectory) { New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null }
 $shaderWorkingDir = Join-Path (Split-Path $project) "Saved\ShaderWorking"
+$localDataCachePath = Join-Path (Split-Path $project) "Saved\LocalDDC"
 New-Item -ItemType Directory -Force -Path $shaderWorkingDir | Out-Null
+New-Item -ItemType Directory -Force -Path $localDataCachePath | Out-Null
 
 $extra = @()
 if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
@@ -74,7 +76,8 @@ if ($GroundCover) { $extra += "-ViewpointGroundCover" }
 if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `
-	-unattended -RenderOffscreen -nosplash -nosound -NoZen -DDC-ForceMemoryCache "-shaderworkingdir=$shaderWorkingDir" "-abslog=$log" @extra | Out-Null
+	-unattended -RenderOffscreen -nosplash -nosound -NoZen "-LocalDataCachePath=$localDataCachePath" `
+	"-shaderworkingdir=$shaderWorkingDir" "-abslog=$log" @extra | Out-Null
 
 $lines = Select-String -Path $log -Pattern "Test Completed|Viewpoint captures saved|LogAutomationController: Error" | ForEach-Object { $_.Line }
 $lines
