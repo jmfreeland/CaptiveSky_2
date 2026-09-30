@@ -325,3 +325,35 @@ coverage may fall but does not validate the existing `MF_Puddles` base-color, no
 or specular blends under lighting. Next compare those modified attributes in the same close view
 before deciding whether the existing exponent-based mask should be tuned or replaced in a separate
 prototype. Do not enable the authored static switch based on these threshold images alone.
+
+### Baked-parent puddle preview correction (2026-10-01)
+
+The earlier `-ViewpointLandscapePuddlePreview -ViewpointLandscapeMaterial` implementation assigned
+MIDs with `ULandscapeComponent::SetMaterial`, which cannot reach this map's baked per-component
+landscape material instances. Two matched A/B probes of the old puddle instance and wet-material
+instance therefore both measured the same low signal as the dry map (mean absolute RGB difference
+`2.287/255`). The preview command now swaps the selected preview graph onto the landscape's assigned
+MIC, recaches the baked component instances and drives its material-collection wetness from 0 to 1.
+Parent restoration now recaches those instances and their static permutations as well. The CLI
+example uses the working wet graph `/Game/Materials/M_Island_Textured_Wet`; no authored Content asset
+or map was edited or saved.
+
+In UE 5.8.3, the repaired puddle command and the direct parent command both pass
+`CaptiveSky2.Visual.Viewpoints` and restore the authored parent. The wet graph's paired close-up
+measures dry RGB `[72.00, 56.87, 4.54]` versus wet `[39.71, 32.06, 10.04]`, with mean absolute
+pixel difference `24.671/255` (all pixels change by more than 5 levels). The wet capture visibly
+shows sky-reflecting pools while the surrounding ground stays dark and slopes stay mostly dry.
+Output: `Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-10-01_003128_h12.0_{authored_dry,fully_wet}/02a_TideglassGroundDetail.png`;
+log: `Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Logs/Codex_PuddleCommandFixed_20261001.log`.
+The normal UBT launcher remained idle for three minutes and was cancelled through its own session;
+the changed capture test was compiled with UE's generated MSVC response file and linked only into
+the ignored scratch editor module for this validation. The authored landscape assignment and
+weather/world state were not persisted.
+
+The broad `RunTests CaptiveSky2` verification ran 39 tests but is not a clean suite result:
+37 passed; `IslandInnkeeperSpawn` failed only its identity/personality-file assertions because the
+isolated scratch project does not contain the main checkout's untracked `Agents/Agent_Innkeeper_01`
+documents, and `LLMProviderLive` could not connect to its configured OpenAI-compatible endpoint.
+The latter is a live-provider test and should be excluded from future offline suite runs. No
+unhandled exception or fatal crash appeared in this run; the `IslandInnkeeperSpawn` teardown logged
+two `World has no context` actor-destroy warnings. The focused visual capture passed independently.
