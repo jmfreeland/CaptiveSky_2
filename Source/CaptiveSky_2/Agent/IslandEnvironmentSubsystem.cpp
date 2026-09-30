@@ -14,10 +14,16 @@
 #include "HAL/IConsoleManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceConstant.h"
+#include "Misc/App.h"
+#if WITH_EDITOR
+#include "ShaderCompiler.h"
+#endif
 
 const TCHAR* UIslandEnvironmentSubsystem::CollectionPath = TEXT("/Game/Environment/MPC_IslandEnvironment.MPC_IslandEnvironment");
 const FName UIslandEnvironmentSubsystem::WindDirectionParameter(TEXT("WindDirection"));
 const FName UIslandEnvironmentSubsystem::LandscapeWetnessParameter(TEXT("Ground Wetness"));
+const TCHAR* UIslandEnvironmentSubsystem::WetLandscapeMaterialPath = TEXT("/Game/Materials/M_Island_Textured_Wet.M_Island_Textured_Wet");
 
 const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
@@ -36,6 +42,7 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	Collection = CollectionOverride ? CollectionOverride.Get() : LoadObject<UMaterialParameterCollection>(nullptr, CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UseWetLandscapeGraph();
 	InitializeLandscapeMaterials();
 	// Mist works through the level's height fog; a level without one gets a faint one for the session.
 	for (TActorIterator<AExponentialHeightFog> It(&InWorld); It; ++It) { Fog = *It; break; }
@@ -167,6 +174,46 @@ void UIslandEnvironmentSubsystem::InitializeLandscapeMaterials()
 	ApplyLandscapeWetness();
 }
 
+void UIslandEnvironmentSubsystem::UseWetLandscapeGraph()
+{
+#if WITH_EDITOR
+	// Each landscape component renders from its own instance baked into the map, so SetMaterial never reaches the
+	// screen. Reparenting the shared instance and recaching those baked instances does.
+	// Changing a parent is editor-only (standalone game asserts), so packaged builds need the wet graph authored in.
+	if (!GIsEditor || !FApp::CanEverRender() || !GetWorld()) return;
+	UMaterialInterface* WetGraph = LoadObject<UMaterialInterface>(nullptr, WetLandscapeMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!WetGraph) return;
+	for (TActorIterator<ALandscapeProxy> It(GetWorld()); It; ++It)
+	{
+		UMaterialInstanceConstant* Instance = Cast<UMaterialInstanceConstant>(It->LandscapeMaterial);
+		if (!Instance || Instance->Parent == WetGraph) continue;
+		WetSwappedInstances.Add(Instance);
+		WetSwappedParents.Add(Instance->Parent);
+		Instance->SetParentEditorOnly(WetGraph);
+		It->UpdateAllComponentMaterialInstances();
+		for (TObjectIterator<UMaterialInstanceConstant> Baked; Baked; ++Baked)
+			if (Baked->GetOuter() == *It) Baked->InitStaticPermutation();
+		TArray<ULandscapeComponent*> Components;
+		It->GetComponents<ULandscapeComponent>(Components);
+		for (ULandscapeComponent* Component : Components) Component->MarkRenderStateDirty();
+	}
+	if (WetSwappedInstances.Num() == 0) return;
+	// Finish now rather than showing the fallback grid while a first-time landscape shader compiles.
+	if (GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
+	UE_LOG(LogTemp, Display, TEXT("IslandEnvironment: landscape now uses the wet graph %s"), WetLandscapeMaterialPath);
+#endif
+}
+
+void UIslandEnvironmentSubsystem::RestoreLandscapeGraph()
+{
+#if WITH_EDITOR
+	for (int32 Index = 0; Index < WetSwappedInstances.Num(); ++Index)
+		if (WetSwappedInstances[Index]) WetSwappedInstances[Index]->SetParentEditorOnly(WetSwappedParents[Index]);
+#endif
+	WetSwappedInstances.Reset();
+	WetSwappedParents.Reset();
+}
+
 void UIslandEnvironmentSubsystem::ApplyLandscapeWetness()
 {
 	if (FMath::IsNearlyEqual(Wetness, LastAppliedLandscapeWetness, 0.002f)) return;
@@ -181,6 +228,7 @@ void UIslandEnvironmentSubsystem::ApplyLandscapeWetness()
 
 void UIslandEnvironmentSubsystem::Deinitialize()
 {
+	RestoreLandscapeGraph();
 	for (int32 Index = 0; Index < LandscapeMaterialInstances.Num(); ++Index)
 		if (LandscapeWetnessInstanceWasReused.IsValidIndex(Index) && LandscapeWetnessInstanceWasReused[Index])
 			if (UMaterialInstanceDynamic* Material = LandscapeMaterialInstances[Index])
@@ -292,7 +340,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	SunHeight = AIslandDayNight::SunHeight(IslandHour);
 	Daylight = FMath::SmoothStep(-0.04f, 0.18f, SunHeight);
 	GoldenHour = GoldenHourFor(SunHeight);
-	Wetness = StepWetness(Wetness, RainIntensity, Daylight, Wind.Size2D(), DeltaTime);
+	Wetness = ForcedWetness >= 0.f ? FMath::Clamp(ForcedWetness, 0.f, 1.f) : StepWetness(Wetness, RainIntensity, Daylight, Wind.Size2D(), DeltaTime);
 	// Mist eases toward its target rather than snapping, so fog rolls in and lifts.
 	const float TargetMist = Now < ForcedMistUntil ? FMath::Clamp(ForcedMist, 0.f, 1.f) : MistFor(Wetness, IslandHour, Wind.Size2D(), RainIntensity, Storm);
 	Mist = FMath::FInterpTo(Mist, TargetMist, DeltaTime, Now < ForcedMistUntil ? 2.f : 0.05f);
@@ -316,6 +364,15 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	const FVector Direction = Wind.GetSafeNormal();
 	Instance->SetVectorParameterValue(WindDirectionParameter, FLinearColor(Direction.X, Direction.Y, Direction.Z, Wind.Size()));
 }
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandWetnessCommand(
+	TEXT("Island.Wetness"),
+	TEXT("Developer override: hold ground wetness at an amount (0..1); no argument returns it to the weather. Not saved. Usage: Island.Wetness [amount]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (UIslandEnvironmentSubsystem* Environment = World ? World->GetSubsystem<UIslandEnvironmentSubsystem>() : nullptr)
+			Environment->ForcedWetness = Args.Num() > 0 ? FCString::Atof(*Args[0]) : -1.f;
+	}));
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMistCommand(
 	TEXT("Island.Mist"),

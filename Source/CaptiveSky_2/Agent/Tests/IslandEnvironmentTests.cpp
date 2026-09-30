@@ -196,7 +196,20 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Mist thickens the fog"), Environment->GetMist() > 0.9f && FogComponent->FogDensity > ClearDensity * 5.f);
 		TestTrue(TEXT("Mist is published to materials"), Instance->GetScalarParameterValue(TEXT("Mist"), Published) && Published > 0.9f);
 	}
-	UMaterialInstanceDynamic* ReusedLandscapeForTeardown = IslandLandscapeMaterial
+	// The Island.Wetness developer override holds the published ground wetness until cleared.
+		Environment->ForcedWetness = 0.8f;
+		Environment->Tick(0.5f);
+		TestTrue(TEXT("Forced wetness reaches the shared collection that the wet landscape graph reads"),
+			Instance->GetScalarParameterValue(TEXT("Wetness"), Published) && FMath::IsNearlyEqual(Published, 0.8f, 0.001f));
+		Environment->ForcedWetness = 7.f;
+		Environment->Tick(0.5f);
+		TestTrue(TEXT("Forced wetness is clamped to fully wet"),
+			Instance->GetScalarParameterValue(TEXT("Wetness"), Published) && FMath::IsNearlyEqual(Published, 1.f));
+		Environment->ForcedWetness = -1.f;
+		Environment->Tick(0.5f);
+		TestTrue(TEXT("Clearing the override returns wetness to the weather simulation"),
+			Instance->GetScalarParameterValue(TEXT("Wetness"), Published) && Published < 1.f);
+		UMaterialInstanceDynamic* ReusedLandscapeForTeardown = IslandLandscapeMaterial
 		? UMaterialInstanceDynamic::Create(IslandLandscapeMaterial, GetTransientPackage()) : nullptr;
 	if (ReusedLandscapeForTeardown)
 	{

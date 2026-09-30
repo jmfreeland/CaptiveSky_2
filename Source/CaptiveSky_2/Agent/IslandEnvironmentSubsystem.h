@@ -9,6 +9,7 @@ class AExponentialHeightFog;
 class ULandscapeComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
+class UMaterialInstanceConstant;
 
 USTRUCT()
 struct FIslandLandscapeMaterialBackup
@@ -46,6 +47,8 @@ public:
 	static const TArray<FName>& ScalarParameterNames();
 	static const FName WindDirectionParameter;
 	static const FName LandscapeWetnessParameter;
+	/** Wet-ground variant of the landscape graph, built by Scripts/Create-LandscapeWetMaterial.py; an optional local asset. */
+	static const TCHAR* WetLandscapeMaterialPath;
 
 	/** Tests supply a transient collection here; empty uses CollectionPath. */
 	UPROPERTY(Transient)
@@ -81,6 +84,8 @@ public:
 	/** Developer override (Island.Mist): hold this mist amount until the given world time. Not saved. */
 	float ForcedMist = -1.f;
 	double ForcedMistUntil = -1.0;
+	/** Developer override (Island.Wetness): hold ground wetness at this 0..1 amount; negative follows the weather. Not saved. */
+	float ForcedWetness = -1.f;
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
@@ -102,6 +107,10 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> LandscapeMaterialInstances;
 	UPROPERTY(Transient)
 	TArray<float> LandscapeWetnessBaselines;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceConstant>> WetSwappedInstances;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> WetSwappedParents;
 	TArray<uint8> LandscapeWetnessInstanceWasReused;
 
 	float RainIntensity = 0.f;
@@ -125,4 +134,7 @@ private:
 
 	void InitializeLandscapeMaterials();
 	void ApplyLandscapeWetness();
+	/** Editor builds: points the map's landscape instance at the wet graph in memory (nothing is saved). The graph reads the collection's Wetness. */
+	void UseWetLandscapeGraph();
+	void RestoreLandscapeGraph();
 };
