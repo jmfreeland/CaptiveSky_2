@@ -11,8 +11,12 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInterface.h"
 #include "Components/BoxComponent.h"
+#include "LandscapeComponent.h"
+#include "LandscapeLayerInfoObject.h"
+#include "LandscapeProxy.h"
 #include "UObject/Package.h"
 
 #if WITH_EDITOR
@@ -208,6 +212,84 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("World teardown restores the reused landscape MID's authored wetness baseline"),
 		ReusedLandscapeForTeardown && ReusedLandscapeForTeardown->GetScalarParameterValue(UIslandEnvironmentSubsystem::LandscapeWetnessParameter, RestoredWetness) &&
 		FMath::IsNearlyEqual(RestoredWetness, 0.15f));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandLandscapeAssignmentTest, "CaptiveSky2.Agent.IslandLandscapeAssignment",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandLandscapeAssignmentTest::RunTest(const FString& Parameters)
+{
+	int32 IslandWorldCount = 0;
+	int32 LandscapeActorCount = 0;
+	int32 LandscapeComponentCount = 0;
+	int32 AssignedMaterialCount = 0;
+	bool bUsesIslandLandscapeInstance = false;
+	TSet<FString> AssignedMaterialPaths;
+	TMap<FName, int32> LayerComponentCounts;
+
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		UWorld* Island = Context.World();
+		if (Context.WorldType != EWorldType::Editor || !Island || Island->GetMapName() != TEXT("Island")) continue;
+		++IslandWorldCount;
+		for (TActorIterator<ALandscapeProxy> It(Island); It; ++It)
+		{
+			++LandscapeActorCount;
+			TArray<ULandscapeComponent*> Components;
+			It->GetComponents<ULandscapeComponent>(Components);
+			for (const ULandscapeComponent* Component : Components)
+			{
+				if (!Component) continue;
+				++LandscapeComponentCount;
+				for (const FWeightmapLayerAllocationInfo& Layer : Component->GetWeightmapLayerAllocations())
+					if (Layer.LayerInfo && !Layer.LayerInfo->GetLayerName().IsNone()) ++LayerComponentCounts.FindOrAdd(Layer.LayerInfo->GetLayerName());
+				for (int32 MaterialIndex = 0; MaterialIndex < Component->GetNumMaterials(); ++MaterialIndex)
+				{
+					const UMaterialInterface* Material = Component->GetMaterial(MaterialIndex);
+					if (!Material) continue;
+					++AssignedMaterialCount;
+					const FString MaterialPath = Material->GetPathName();
+					AssignedMaterialPaths.Add(MaterialPath);
+					if (MaterialPath == TEXT("/Game/Materials/MI_Island_Landscape.MI_Island_Landscape"))
+						bUsesIslandLandscapeInstance = true;
+				}
+			}
+		}
+	}
+
+	TArray<FString> SortedMaterialPaths = AssignedMaterialPaths.Array();
+	SortedMaterialPaths.Sort();
+	TArray<FName> SortedLayerNames;
+	LayerComponentCounts.GetKeys(SortedLayerNames);
+	SortedLayerNames.Sort(FNameLexicalLess());
+	FString LayerSummary;
+	for (const FName LayerName : SortedLayerNames)
+	{
+		if (!LayerSummary.IsEmpty()) LayerSummary += TEXT(", ");
+		LayerSummary += FString::Printf(TEXT("%s on %d component(s)"), *LayerName.ToString(), LayerComponentCounts.FindRef(LayerName));
+	}
+	FString MaterialInstanceSummary(TEXT("unavailable"));
+	if (const UMaterialInstance* Instance = LoadObject<UMaterialInstance>(nullptr, TEXT("/Game/Materials/MI_Island_Landscape.MI_Island_Landscape")))
+	{
+		TArray<FString> ScalarOverrides;
+		for (const FScalarParameterValue& Value : Instance->ScalarParameterValues)
+			ScalarOverrides.Add(FString::Printf(TEXT("%s=%.3f"), *Value.ParameterInfo.Name.ToString(), Value.ParameterValue));
+		TArray<FString> TextureOverrides;
+		for (const FTextureParameterValue& Value : Instance->TextureParameterValues)
+			if (Value.ParameterValue)
+				TextureOverrides.Add(FString::Printf(TEXT("%s=%s"), *Value.ParameterInfo.Name.ToString(), *Value.ParameterValue->GetPathName()));
+		MaterialInstanceSummary = FString::Printf(TEXT("parent=%s; scalar overrides=[%s]; texture overrides=[%s]"),
+			Instance->Parent ? *Instance->Parent->GetPathName() : TEXT("none"),
+			*FString::Join(ScalarOverrides, TEXT(", ")), *FString::Join(TextureOverrides, TEXT(", ")));
+	}
+	AddInfo(FString::Printf(TEXT("Saved Island landscape audit: %d editor map(s), %d landscape actor(s), %d component(s), %d assigned material slot(s). Distinct materials: %s. Allocated painted layers: %s"),
+		IslandWorldCount, LandscapeActorCount, LandscapeComponentCount, AssignedMaterialCount,
+		*FString::Join(SortedMaterialPaths, TEXT(", ")), LayerSummary.IsEmpty() ? TEXT("none") : *LayerSummary));
+	AddInfo(FString::Printf(TEXT("Configured landscape instance: %s"), *MaterialInstanceSummary));
+	TestTrue(TEXT("The saved Island editor map is loaded for the material audit"), IslandWorldCount > 0);
+	TestTrue(TEXT("The saved Island has landscape components with assigned materials"), LandscapeComponentCount > 0 && AssignedMaterialCount > 0);
+	TestTrue(TEXT("The Island landscape uses its configured MI_Island_Landscape instance"), bUsesIslandLandscapeInstance);
 	return true;
 }
 

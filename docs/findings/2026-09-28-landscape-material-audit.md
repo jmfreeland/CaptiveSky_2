@@ -11,7 +11,7 @@
 
 ## Decision
 
-Do not copy or replace a binary material based on its asset name or screenshot alone. CaptiveSky_2 already has a textured automatic parent assigned through `MI_Island_Landscape`, a separate modified `M_AutoLandscape`, the source textures, and a passing wetness-parameter contract. The remaining uncertainty is now specific: the saved Island's live Landscape component assignment/layer state and the resulting appearance in a controlled UE 5.8.3 view. The original audit could not reach the configured `127.0.0.1:8000` MCP endpoint; the shared current `Content/` also backs Claude's worktree. Keep assets unchanged until those live settings can be inspected safely.
+Do not copy or replace a binary material based on its asset name or screenshot alone. CaptiveSky_2 already has a textured automatic parent assigned through `MI_Island_Landscape`, a separate modified `M_AutoLandscape`, the source textures, and a passing wetness-parameter contract. The saved-map audit below confirms the expected instance occupies every landscape material slot and that no painted layer allocations are present. The remaining uncertainty is how the configured auto-material blends and renders under matched dry/wet and lighting conditions. Keep assets unchanged until those inputs identify a specific cause.
 
 ## Follow-up (2026-09-28)
 
@@ -53,6 +53,27 @@ complete.
 
 ## Next safe step
 
-When the editor's configured MCP server is reachable, inspect the saved Island Landscape component's material slots and painted layer weights, then compare the live parent and instance parameters against `M_Island_Textured_Auto`, `MI_Island_Landscape`, and `M_AutoLandscape`. Check the same location in a material preview and in the Island with matched lighting, both dry and wet; confirm that RVT, grass, and wetness features render as intended. Only if this points to a missing or incorrect dependency should a material be duplicated/migrated, on a reversible test copy/map, with the runtime `Ground Wetness` drive-and-restore behavior revalidated. The old `M_Landscape` and `M_AutoLandscape` remain useful references, not assumed replacements.
+Compare the same Island location in a material preview and in-world under matched lighting, both dry and wet; include the runtime `Ground Wetness` drive-and-restore behavior. The audit found no painted layer allocations, so focus next on the automatic material's blend logic and current texture/scalar configuration. Only if this identifies a specific cause should a material be duplicated or migrated for a reversible test, with the wetness behavior revalidated. The old `M_Landscape` and `M_AutoLandscape` remain useful references, not assumed replacements.
 
 No Unreal assets were modified during this audit.
+
+## Saved-Island assignment audit (2026-09-30)
+
+The read-only `CaptiveSky2.Agent.IslandLandscapeAssignment` test passed against the saved Island. It
+found one editor map, one landscape actor, 4,096 landscape components and 4,096 assigned material
+slots. Every slot resolves to `/Game/Materials/MI_Island_Landscape.MI_Island_Landscape`; there are no
+alternate or null material assignments. No components have allocated painted weightmap layers.
+
+The instance's parent is
+`/Game/Materials/M_Island_Textured_Auto.M_Island_Textured_Auto`. Its overrides include Rocky Ground
+for the ground layer, Mossy Grass for MidLow, Rocky Ground for MidHigh, Rock Cliff, Windswept Snow,
+and Asphalt for roads. Among the notable scalar settings are Ground Wetness `0.15`, Ground AO
+Intensity `0.3`, Near/Far Tiling Sizes `4`/`40`, and Blend Distance Start/Transition `1000`/`5000`.
+The full parameter dump is in `Saved/Logs/Codex_LandscapeAudit_Automation_20260930.log`; the
+successful UE 5.8.3 build log is `Saved/Logs/Codex_LandscapeAudit_Compile_20260930.log`.
+
+This rules out a missing or mixed landscape-material assignment as the cause of the broad, muted
+terrain in the recent no-play captures. The audit establishes configuration but not the exact visual
+cause; material blend behavior, lighting, and dry/wet rendering still need a controlled comparison.
+No `Content/` asset was changed. The next step is a matched-hour dry/wet capture or material preview,
+then only a reversible material-copy experiment if a specific cause is isolated.
