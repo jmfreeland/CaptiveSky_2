@@ -75,11 +75,11 @@ namespace
 	{
 	public:
 		FIslandViewpointCaptureCommand(UWorld* InWorld, TArray<FIslandViewpoint> InViewpoints, float InHour, FIntPoint InSize, FString InDirectory,
-			FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, TArray<TWeakObjectPtr<AActor>> InPreviewActors,
+			FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, int32 InOriginalDayNumber, TArray<TWeakObjectPtr<AActor>> InPreviewActors,
 			AIslandWeather* InGroundCoverWeather, bool bInClearGroundCover)
 			: PreviewActors(MoveTemp(InPreviewActors)), World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize),
 			  Directory(MoveTemp(InDirectory)), Test(InTest), Clock(InClock), GroundCoverWeather(InGroundCoverWeather),
-			  OriginalStartHour(InOriginalStartHour), bClearGroundCover(bInClearGroundCover) {}
+			  OriginalStartHour(InOriginalStartHour), OriginalDayNumber(InOriginalDayNumber), bClearGroundCover(bInClearGroundCover) {}
 
 		virtual bool Update() override
 		{
@@ -110,6 +110,7 @@ namespace
 				if (Clock.IsValid())
 				{
 					Clock->StartHour = OriginalStartHour;
+					Clock->DayNumber = OriginalDayNumber;
 					Clock->OnConstruction(Clock->GetActorTransform());
 				}
 				for (const TWeakObjectPtr<AActor>& Preview : PreviewActors)
@@ -235,6 +236,7 @@ namespace
 		TWeakObjectPtr<AIslandDayNight> Clock;
 		TWeakObjectPtr<AIslandWeather> GroundCoverWeather;
 		float OriginalStartHour = 9.f;
+		int32 OriginalDayNumber = 1;
 		int32 Index = 0;
 		int32 Frames = 0;
 		bool bStarted = false;
@@ -270,12 +272,15 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	Root->TryGetNumberField(TEXT("width"), Width);
 	Root->TryGetNumberField(TEXT("height"), Height);
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointHour="), Hour);
+	int32 PreviewDayNumber = 0;
+	FParse::Value(FCommandLine::Get(), TEXT("ViewpointDay="), PreviewDayNumber);
 	const bool bNightFireflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointNightFireflies"));
 	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover"));
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
 	AIslandDayNight* PreviewClock = nullptr;
 	float OriginalStartHour = 9.f;
+	int32 OriginalDayNumber = 1;
 	TArray<TWeakObjectPtr<AActor>> PreviewActors;
 	AIslandWeather* PreviewWeather = nullptr;
 	if (bNightFireflyPreview)
@@ -289,7 +294,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		{
 			PreviewClock = *It;
 			OriginalStartHour = It->StartHour;
+			OriginalDayNumber = It->DayNumber;
 			It->StartHour = Hour;
+			if (PreviewDayNumber > 0) It->DayNumber = PreviewDayNumber;
 			It->OnConstruction(It->GetActorTransform());
 			break;
 		}
@@ -299,6 +306,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			if (PreviewClock)
 			{
 				PreviewClock->StartHour = OriginalStartHour;
+				PreviewClock->DayNumber = OriginalDayNumber;
 				PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
 			}
 			AddError(TEXT("Night firefly preview needs the Island day/night and weather actors."));
@@ -318,7 +326,12 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewActors.Add(*It);
 			if (UPointLightComponent* Glow = It->FindComponentByClass<UPointLightComponent>())
 			{
-				Glow->SetIntensity(It->GlowIntensity);
+				It->DayNight = PreviewClock;
+				It->Phase = PI / 2.f - static_cast<float>(Island->GetTimeSeconds()) * 4.2f;
+				It->PulseRate = 1.f;
+				It->ObservationPulseRemaining = 0.f;
+				It->ChimeResponseRemaining = 0.f;
+				It->UpdateGlow(Island->GetTimeSeconds(), PreviewWeather->SampleRainIntensity(Island->GetTimeSeconds()));
 				Glow->SetVisibility(true);
 			}
 			if (Stones)
@@ -332,6 +345,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			for (const TWeakObjectPtr<AActor>& Preview : PreviewActors) if (Preview.IsValid()) Preview->Destroy();
 			PreviewActors.Reset();
 			PreviewClock->StartHour = OriginalStartHour;
+			PreviewClock->DayNumber = OriginalDayNumber;
 			PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
 			AddError(TEXT("The Island map did not produce a route-side night firefly for capture."));
 			return false;
@@ -350,6 +364,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			if (PreviewClock)
 			{
 				PreviewClock->StartHour = OriginalStartHour;
+				PreviewClock->DayNumber = OriginalDayNumber;
 				PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
 			}
 			AddError(TEXT("Ground-cover preview needs the Island weather actor."));
@@ -407,6 +422,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		if (PreviewClock)
 		{
 			PreviewClock->StartHour = OriginalStartHour;
+			PreviewClock->DayNumber = OriginalDayNumber;
 			PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
 		}
 		return false;
@@ -415,7 +431,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		FString::Printf(TEXT("%s_h%04.1f"), *FDateTime::Now().ToString(TEXT("%Y-%m-%d_%H%M%S")), Hour));
 	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
-		PreviewClock, OriginalStartHour, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview));
+		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview));
 	return true;
 }
 

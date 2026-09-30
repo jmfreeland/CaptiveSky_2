@@ -13,9 +13,11 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 7.5 -Only Tideglass
 ./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCover
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
+./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState -Day 1
 #>
 param(
 	[double]$Hour = -1,
+	[int]$Day = 0,
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
@@ -34,6 +36,7 @@ New-Item -ItemType Directory -Force -Path $shaderWorkingDir | Out-Null
 $extra = @()
 if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
 if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
+if ($Day -gt 0) { $extra += "-ViewpointDay=$Day" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover) { $extra += "-ViewpointGroundCover" }
