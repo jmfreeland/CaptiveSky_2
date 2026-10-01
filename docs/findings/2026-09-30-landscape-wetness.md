@@ -84,6 +84,28 @@ and `.../Codex_WetnessBuilderDefaultPair_20261001.log`; the captures are under
 The automation logs include expected offline Epic-service connection warnings; the UE processes
 exited 0 and no material compile error or crash was recorded.
 
+### Mid-wetness visual comparison (2026-10-01)
+
+The full-wet comparison still showed a few bright reflective flecks in the island-wide camera, so
+I rendered two more matched UE 5.8.3 previews with the environment collection held at a fixed
+`Ground Wetness` of 0.65: `BalancedPools` and `GentlePools`. Both
+`CaptiveSky2.Visual.Viewpoints` runs passed. They used the same noon camera and transient baked-parent
+swap; neither changed the saved landscape assignment nor wrote world state.
+
+At this partial wetness, `BalancedPools` keeps the wide view very quiet but its Tideglass ground
+detail is almost indistinguishable from dry. `GentlePools` retains a few clearly readable close
+reflections while the wide view stays restrained, with only a small number of glints remaining.
+The comparison supports keeping `GentlePools` as the generated wet graph's default; it does not
+justify making the graph the authored map material. Captures:
+`Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-10-01_024510_h12.0/`
+(`BalancedPools`) and `.../2026-10-01_024635_h12.0/` (`GentlePools`); logs:
+`Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Logs/Codex_WetPoolsPartial65_BalancedPools_20261001.log`
+and `.../Codex_WetPoolsPartial65_GentlePools_20261001.log`.
+
+This is a scalar preview, not a rain-driven PIE transition. Confirm the dry → wet → drying sequence
+in PIE before changing the Island's landscape assignment; standalone and packaged behavior remain
+unverified.
+
 This is still an editor/PIE graph: the current subsystem swaps it only in editor and PIE. The next
 visual check should be a short PIE weather transition on the user's UE display, including authored
 dry, rain rising, and drying down. Do not treat these offscreen captures as confirmation of packaged
