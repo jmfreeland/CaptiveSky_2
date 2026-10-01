@@ -820,7 +820,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		PreviewWeather->InitializeGroundCover();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass, ListeningStones, WindArch, and the tagged inn entrance."), PreviewWeather->GroundCoverInstanceCount));
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d broadleaf plants) near Tideglass, ListeningStones, WindArch, and the tagged inn entrance."),
+			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), PreviewWeather->ShoreGroundPlants->GetInstanceCount()));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;
@@ -859,6 +860,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			};
 			MeasureMaximumSway(PreviewWeather->ShoreGrassA, PreviewWeather->ShoreGrassABaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGrassB, PreviewWeather->ShoreGrassBBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->ShoreGroundPlants, PreviewWeather->ShoreGroundPlantBaseTransforms);
 			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
 			TestTrue(TEXT("Fixed preview gusts respect the ten-degree response limit"), MaximumVisibleSwayDegrees <= 10.01f);
 			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));

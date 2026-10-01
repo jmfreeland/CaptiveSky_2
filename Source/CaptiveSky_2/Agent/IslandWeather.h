@@ -107,6 +107,7 @@ private:
 	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
 	TArray<FTransform> ShoreGrassABaseTransforms;
 	TArray<FTransform> ShoreGrassBBaseTransforms;
+	TArray<FTransform> ShoreGroundPlantBaseTransforms;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
 	FTimerHandle EcologyTimerHandle;
@@ -123,6 +124,7 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGrassA;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGrassB;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlants;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
