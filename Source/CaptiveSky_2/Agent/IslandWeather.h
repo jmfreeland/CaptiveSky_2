@@ -155,6 +155,7 @@ private:
 	int32 ActiveRainStreakCount = 0;
 	int32 ActiveRainGroundImpactCount = 0;
 	int32 GroundCoverInstanceCount = 0;
+	int32 GroundCoverMeadowInstanceCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;

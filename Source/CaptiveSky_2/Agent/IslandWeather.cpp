@@ -18,6 +18,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "LandscapeProxy.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
@@ -169,9 +170,44 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGrassB->ClearInstances();
 	ShoreGroundPlants->ClearInstances();
 	GroundCoverInstanceCount = 0;
+	GroundCoverMeadowInstanceCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
 	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
-		if ((*IgnoreIt)->ActorHasTag(TEXT("IslandLandmark")) || (*IgnoreIt)->GetName().Contains(TEXT("Ocean"))) Query.AddIgnoredActor(*IgnoreIt);
+	{
+		bool bIgnoreActor = (*IgnoreIt)->ActorHasTag(TEXT("IslandLandmark")) || (*IgnoreIt)->GetName().Contains(TEXT("Ocean"));
+		TArray<UStaticMeshComponent*> Components;
+		(*IgnoreIt)->GetComponents<UStaticMeshComponent>(Components);
+		for (const UStaticMeshComponent* Component : Components)
+			if (Component && Component->GetStaticMesh() && Component->GetStaticMesh()->GetName().Contains(TEXT("WaterPlane"), ESearchCase::IgnoreCase))
+				bIgnoreActor = true;
+		if (bIgnoreActor) Query.AddIgnoredActor(*IgnoreIt);
+	}
+
+	auto PlaceFoliage = [this](const FHitResult& GroundHit, const FTransform& Offset, int32 Index)
+	{
+		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
+		const FQuat Rotation = AlignToGround * Offset.GetRotation();
+		const float JitterScale = Offset.GetScale3D().X;
+		FVector Scale = FVector(JitterScale * 1.7f);
+		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
+		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
+		if (Index % 4 == 0)
+		{
+			Species = ShoreGroundPlants;
+			const FBoxSphereBounds PlantBounds = ShoreGroundPlants->GetStaticMesh()->GetBounds();
+			const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
+			const float PlantScale = (70.f / (2.f * PlantHalfHeight)) * JitterScale;
+			Scale = FVector(PlantScale);
+			Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * (PlantHalfHeight * PlantScale + 1.2f) -
+				Rotation.RotateVector(PlantBounds.Origin * PlantScale);
+		}
+		else
+		{
+			Species = (Index % 2 == 0) ? ShoreGrassA : ShoreGrassB;
+		}
+		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
+		++GroundCoverInstanceCount;
+	};
 
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
@@ -244,27 +280,125 @@ void AIslandWeather::InitializeGroundCover()
 				if (GetWorld()->LineTraceSingleByChannel(OverheadHit, OpenSkyStart, OpenSkyEnd, ECC_WorldStatic, Query)) continue;
 			}
 
-			const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
-			const FQuat Rotation = AlignToGround * Offset.GetRotation();
-			FVector Scale = FVector(Offset.GetScale3D().X * 1.7f);
-			FVector PlantLocation = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
-			UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-			if (Index % 4 == 0)
-			{
-				Species = ShoreGroundPlants;
-				const FBoxSphereBounds PlantBounds = ShoreGroundPlants->GetStaticMesh()->GetBounds();
-				const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
-				// Normalize this foliage asset to a readable ~70 cm plant regardless of its import units.
-				const float PlantScale = (70.f / (2.f * PlantHalfHeight)) * Offset.GetScale3D().X;
-				Scale = FVector(PlantScale);
-				PlantLocation = GroundHit.ImpactPoint + GroundHit.ImpactNormal * (PlantHalfHeight * PlantScale + 1.2f) -
-					Rotation.RotateVector(PlantBounds.Origin * PlantScale);
-			}
-			else
-				Species = (Index % 2 == 0) ? ShoreGrassA : ShoreGrassB;
-			Species->AddInstance(FTransform(Rotation, PlantLocation, Scale), true);
-			++GroundCoverInstanceCount;
+			PlaceFoliage(GroundHit, Offset, Index);
 		}
+	}
+
+	// Place separated, deterministic broadleaf/grass patches across exposed Island landscape.
+	// Close POI verges above remain denser, while the broad patch layer fills walkable hillside sightlines.
+	ALandscapeProxy* IslandLandscape = nullptr;
+	for (TActorIterator<ALandscapeProxy> LandscapeIt(GetWorld()); LandscapeIt; ++LandscapeIt)
+	{
+		IslandLandscape = *LandscapeIt;
+		break;
+	}
+	float SeaLevel = TNumericLimits<float>::Lowest();
+	for (TActorIterator<AActor> OceanIt(GetWorld()); OceanIt; ++OceanIt)
+	{
+		TArray<UStaticMeshComponent*> Components;
+		OceanIt->GetComponents<UStaticMeshComponent>(Components);
+		for (const UStaticMeshComponent* Component : Components)
+			if (Component && Component->GetStaticMesh() && Component->GetStaticMesh()->GetName().Contains(TEXT("WaterPlane"), ESearchCase::IgnoreCase))
+			{
+				SeaLevel = OceanIt->GetActorLocation().Z;
+				break;
+			}
+		if (SeaLevel > TNumericLimits<float>::Lowest()) break;
+	}
+	if (IslandLandscape && SeaLevel > TNumericLimits<float>::Lowest())
+	{
+		FVector BoundsOrigin, BoundsExtent;
+		IslandLandscape->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+		TArray<FVector> ExclusionLocations;
+		for (TActorIterator<AActor> AnchorIt(GetWorld()); AnchorIt; ++AnchorIt)
+			if (AnchorIt->ActorHasTag(TEXT("IslandLandmark")) || AnchorIt->ActorHasTag(TEXT("InnDoorLantern")))
+				ExclusionLocations.Add(AnchorIt->GetActorLocation());
+		TArray<FVector> MeadowCenters;
+		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
+		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
+		constexpr int32 MeadowPatchCount = 96;
+		constexpr int32 AnchorPatchesPerLandmark = 10;
+		constexpr int32 MeadowClumpsPerPatch = 96;
+		constexpr float MeadowPatchInnerRadius = 600.f;
+		constexpr float MeadowPatchOuterRadius = 3600.f;
+		constexpr float MeadowCenterExclusionRadius = 5500.f;
+		constexpr float LandmarkPatchMinRadius = 1500.f;
+		constexpr float LandmarkPatchMaxRadius = 4400.f;
+		constexpr float LandmarkPatchMinSpacing = 1200.f;
+		constexpr float MeadowCenterSpacing = 4000.f;
+		int32 MeadowTraceCount = 0;
+		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
+		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
+		auto AddMeadowPatch = [this, &MeadowCenters, &MeadowRandom, &MeadowTraceCount, &TraceTop, &TraceBottom, &PlaceFoliage,
+			&Query, MeadowClumpsPerPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, SeaLevel](FVector Center)
+		{
+			MeadowCenters.Add(Center);
+			TArray<FTransform> PatchOffsets;
+			const int32 PatchSeed = static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ (0x3e5a93b7u + MeadowCenters.Num() * 7919u));
+			BuildGroundCoverOffsets(PatchSeed, MeadowClumpsPerPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, PatchOffsets);
+			for (int32 ClumpIndex = 0; ClumpIndex < PatchOffsets.Num(); ++ClumpIndex)
+			{
+				const FVector PatchCandidate = MeadowCenters.Last() + PatchOffsets[ClumpIndex].GetLocation();
+				FHitResult PatchHit;
+				++MeadowTraceCount;
+				if (!GetWorld()->LineTraceSingleByChannel(PatchHit,
+					FVector(PatchCandidate.X, PatchCandidate.Y, TraceTop), FVector(PatchCandidate.X, PatchCandidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+					!Cast<ALandscapeProxy>(PatchHit.GetActor()) || PatchHit.ImpactNormal.Z < 0.72f || PatchHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
+				PlaceFoliage(PatchHit, PatchOffsets[ClumpIndex], ClumpIndex + MeadowCenters.Num());
+			}
+		};
+		auto TryAddMeadowCenter = [this, &MeadowCenters, &MeadowTraceCount, &Query, &TraceTop, &TraceBottom, SeaLevel](const FVector& Candidate)
+		{
+			FHitResult CenterHit;
+			++MeadowTraceCount;
+			if (!GetWorld()->LineTraceSingleByChannel(CenterHit,
+				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+				!Cast<ALandscapeProxy>(CenterHit.GetActor()) || CenterHit.ImpactNormal.Z < 0.78f || CenterHit.ImpactPoint.Z < SeaLevel + 100.f) return false;
+			MeadowCenters.Add(CenterHit.ImpactPoint);
+			return true;
+		};
+
+		// Keep part of the patch budget in the actual landmark sightlines, outside each close-up verge.
+		for (int32 AnchorIndex = 0; AnchorIndex < ExclusionLocations.Num() && MeadowCenters.Num() < MeadowPatchCount; ++AnchorIndex)
+		{
+			int32 AddedForAnchor = 0;
+			for (int32 Attempt = 0; Attempt < AnchorPatchesPerLandmark * 24 && AddedForAnchor < AnchorPatchesPerLandmark && MeadowCenters.Num() < MeadowPatchCount; ++Attempt)
+			{
+				const float Angle = MeadowRandom.FRandRange(0.f, 2.f * PI);
+				const float Radius = MeadowRandom.FRandRange(LandmarkPatchMinRadius, LandmarkPatchMaxRadius);
+				const FVector Candidate = ExclusionLocations[AnchorIndex] + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+				bool bTooCloseToOtherAnchor = false;
+				for (int32 OtherAnchorIndex = 0; OtherAnchorIndex < ExclusionLocations.Num(); ++OtherAnchorIndex)
+					if (OtherAnchorIndex != AnchorIndex && FVector::Dist2D(Candidate, ExclusionLocations[OtherAnchorIndex]) < 1600.f)
+						{ bTooCloseToOtherAnchor = true; break; }
+				if (bTooCloseToOtherAnchor) continue;
+				bool bTooCloseToPatch = false;
+				for (const FVector& ExistingCenter : MeadowCenters)
+					if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
+				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate)) continue;
+				AddMeadowPatch(MeadowCenters.Last());
+				++AddedForAnchor;
+			}
+		}
+		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
+		for (int32 Probe = 0; Probe < 1536 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
+		{
+			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
+				MeadowRandom.FRandRange(BoundsOrigin.Y - BoundsExtent.Y, BoundsOrigin.Y + BoundsExtent.Y), BoundsOrigin.Z);
+			bool bNearAnchor = false;
+			for (const FVector& Exclusion : ExclusionLocations)
+				if (FVector::Dist2D(Candidate, Exclusion) < MeadowCenterExclusionRadius) { bNearAnchor = true; break; }
+			if (bNearAnchor) continue;
+			bool bNearOtherPatch = false;
+			for (const FVector& ExistingCenter : MeadowCenters)
+				if (FVector::Dist2D(Candidate, ExistingCenter) < MeadowCenterSpacing) { bNearOtherPatch = true; break; }
+			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate)) continue;
+			AddMeadowPatch(MeadowCenters.Last());
+		}
+		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
+		// The patch population is recorded separately from the closer anchor rings for capture diagnostics.
+		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter placed %d patches with %d ground-cover instances after %d bounded traces."),
+			MeadowCenters.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount);
 	}
 
 	ShoreGrassABaseTransforms.Reset(ShoreGrassA->GetInstanceCount());
@@ -303,6 +437,7 @@ void AIslandWeather::ClearGroundCover()
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
 	GroundCoverInstanceCount = 0;
+	GroundCoverMeadowInstanceCount = 0;
 	bGroundCoverInitialized = false;
 }
 

@@ -820,8 +820,12 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		PreviewWeather->InitializeGroundCover();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d broadleaf plants) near Tideglass, ListeningStones, WindArch, and the tagged inn entrance."),
-			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), PreviewWeather->ShoreGroundPlants->GetInstanceCount()));
+		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
+		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 9,900-instance budget"),
+			PreviewWeather->GroundCoverMeadowInstanceCount <= 9216 && PreviewWeather->GroundCoverInstanceCount <= 9900);
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d broadleaf plants), including %d exposed-hillside patch instances."),
+			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(),
+			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;
