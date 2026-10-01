@@ -134,8 +134,8 @@ FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransf
 	const FVector WindDirection = HorizontalWind.GetSafeNormal();
 	const FVector LeanAxis = FVector::CrossProduct(FVector::UpVector, WindDirection).GetSafeNormal();
 	const double Phase = TimeSeconds * 1.15 + InstanceIndex * 2.39996323 + Seed * 0.113;
-	const float LeanDegrees = 4.f * Intensity;
-	const float SwayDegrees = FMath::Sin(Phase) * 1.5f * Intensity;
+	const float LeanDegrees = 7.f * Intensity;
+	const float SwayDegrees = FMath::Sin(Phase) * 2.5f * Intensity;
 	const FQuat Lean(LeanAxis, FMath::DegreesToRadians(LeanDegrees));
 	const FQuat Flutter(FVector::ForwardVector, FMath::DegreesToRadians(SwayDegrees));
 	FTransform Result = BaseTransform;

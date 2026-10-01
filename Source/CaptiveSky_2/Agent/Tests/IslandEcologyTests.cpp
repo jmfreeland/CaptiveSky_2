@@ -117,8 +117,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wind bends a clump without translating its planted base"),
 		WindyGrass.GetLocation().Equals(GrassBase.GetLocation()) && WindyGrass.GetScale3D().Equals(GrassBase.GetScale3D()) &&
 		!WindyGrass.GetRotation().Equals(GrassBase.GetRotation()));
-	TestTrue(TEXT("Wind sway stays below six degrees even at the reference wind ceiling"),
-		GrassBase.GetRotation().AngularDistance(WindyGrass.GetRotation()) <= FMath::DegreesToRadians(6.f));
+	TestTrue(TEXT("Wind sway stays below ten degrees even at the reference wind ceiling"),
+		GrassBase.GetRotation().AngularDistance(WindyGrass.GetRotation()) <= FMath::DegreesToRadians(10.f));
 	Weather->AddTransientGust(Tideglass->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->AddTransientGust(ListeningStones->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->UpdateGroundCoverSway();
