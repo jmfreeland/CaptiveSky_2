@@ -1,0 +1,7 @@
+# Raven forage loop validation (2026-10-01)
+
+The empty-beak refusal seen in the 2026-09-29 bounded run exposed a gap in the raven's build loop: after weaving, the bird needed to leave its roost and reach open ground before it could gather again. The controller now offers a `land` choice only for an exact, currently visible, world-state-backed `ArrangingGround_N` site. At arrival it verifies walkable support, reports the grounded state, and then exposes `GatherTwigs`; no lasting world state changes until the raven chooses to weave at a roost.
+
+The UE 5.8.3 `CaptiveSky2.Agent.IslandNest` automation test passed on 2026-10-01 with the current editor module. It exercised the raven's flight from a perch to a visible open-ground site, refusal of an occluded site and of a nest perch as a landing target, confirmed descent to the ground, and successful twig gathering afterward. The fixture uses scratch world-state under `Saved/Automation/IslandNest`, makes no model calls, and does not save the Island map. There were no failed assertions; process exit code was 0.
+
+This is physical/action-path evidence, not evidence that Raven will voluntarily choose to forage after an empty-beak refusal. A future bounded, zero- or low-request provider-free test can continue to prove deterministic action outcomes; observing autonomous intent requires a separately authorized live-provider session because resident prompts and memories can be transmitted externally.
