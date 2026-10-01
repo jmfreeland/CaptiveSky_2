@@ -389,6 +389,8 @@ Residents notice the mist, and wet ground after rain. On a misty dawn Aster rema
 
 ### Latest observed play behavior
 
+The 2026-10-01 rendered checkpoint for `04_WindArchOverlook` passed in UE 5.8.3. It confirms the golden-hour scene renders from the isolated editor copy, while showing that the foreground rock and arch partly obscure Roost_West; because no play session starts, it does not validate a raven arrival or wind-driven choice. See [`docs/findings/2026-10-01-roost-overlook.md`](docs/findings/2026-10-01-roost-overlook.md) for the capture and bounded follow-up.
+
 An independent 2026-09-28 day-three situation log from Claude's detached source snapshot (`2aa86db`) recorded Aster optionally writing a guest-book line about minnows circling back, while the raven's two-layer nest remained persistent. This is evidence that residents used the lasting social/ecology systems in that run, not verification of the later `main` build. The same old snapshot rejected perch sleep; current perch-sleep behavior is covered separately by `RavenPerch` and `IslandInnRest` automation tests.
 
 The current continuous-thinking-cap fix compiled in UE 5.8.3, and the focused `SessionSafety`, `ResidentWanderPaths`, `IslandInnRest`, `ResidentApproach`, and `RavenPerch` automation tests all passed on 2026-09-28. `SessionSafety` covers the controller policy, continuous refill, and shared-budget persistence; actual resident resumption after allowance refill remains unverified in live play.
