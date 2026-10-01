@@ -20,6 +20,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -ScreenshotDirectory Screenshots/Spectator/ReturnCheck
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
 param(
@@ -28,6 +29,7 @@ param(
 	[string]$ScreenshotDirectory,
 	[string]$ViewpointFile,
 	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
+	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
 	[switch]$DisableAgentThinking,
 	[switch]$Continuous,
 	[string]$DataRoot,
@@ -49,6 +51,12 @@ if (-not [string]::IsNullOrWhiteSpace($ViewpointFile)) {
 	$viewpointPath = if ([System.IO.Path]::IsPathRooted($ViewpointFile)) { $ViewpointFile } else { Join-Path (Split-Path $project) $ViewpointFile }
 	if (-not (Test-Path $viewpointPath)) { throw "Spectator viewpoint file not found: $viewpointPath" }
 	$arguments += "-SpectatorViewpointFile=$viewpointPath"
+}
+if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
+	if (-not $Shots) { throw "-ViewpointHour requires -Shots; it is a capture-only clock override." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ViewpointHour requires an explicit isolated -DataRoot so the captured hour cannot overwrite your normal Island clock." }
+	$hour = ([double]$ViewpointHour).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
+	$arguments += "-ExecCmds=Island.Hour $hour"
 }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
