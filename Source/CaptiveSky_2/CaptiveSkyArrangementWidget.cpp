@@ -89,12 +89,15 @@ void UCaptiveSkyArrangementWidget::OpenFor(FName InSiteId, const FString& Descri
 	SetVisibility(ESlateVisibility::Visible);
 	if (StatusText.IsValid()) StatusText->SetText(FText::FromString(DisplayedContent));
 	if (TitleBox.IsValid())
-	{
 		TitleBox->SetText(FText::GetEmpty());
-		if (!bHasWork && bCanCreate && FSlateApplication::IsInitialized())
-			FSlateApplication::Get().SetKeyboardFocus(TitleBox, EFocusCause::SetDirectly);
-	}
 	if (IntentBox.IsValid()) IntentBox->SetText(FText::GetEmpty());
+	if (FSlateApplication::IsInitialized())
+	{
+		if (!bHasWork && bCanCreate && TitleBox.IsValid())
+			FSlateApplication::Get().SetKeyboardFocus(TitleBox, EFocusCause::SetDirectly);
+		else if (bHasWork && bCanRespond && IntentBox.IsValid())
+			FSlateApplication::Get().SetKeyboardFocus(IntentBox, EFocusCause::SetDirectly);
+	}
 }
 
 void UCaptiveSkyArrangementWidget::ShowResult(const FString& Result, bool bHasWork, bool bCanCreate, bool bCanRespond, bool bClearInput)

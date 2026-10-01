@@ -50,3 +50,12 @@ and cleans their place-memory directories. Log:
 `Saved/Logs/Codex_ArrangementMemory_Final_20260930.log`. This validates the
 perception/memory path without LLM calls; naturally choosing to return in a live session
 and the visual appearance remain unverified.
+
+### Response-field keyboard focus
+
+Source review found that the panel focused the title field for a new arrangement but did
+not focus the visible intent field when opening another maker's work. The panel now sends
+keyboard focus to that response field when a response is available; a new empty site
+continues to focus its title field. The `CaptiveSky2.Agent.IslandArrangement` automation
+covers the existing create/respond paths, but actual rendered keyboard focus still needs a
+PIE check because the current desktop automation surface exposes no application windows.
