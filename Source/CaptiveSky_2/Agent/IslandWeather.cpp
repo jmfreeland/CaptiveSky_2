@@ -444,12 +444,12 @@ void AIslandWeather::InitializeGroundCover()
 		GroundCoverTreeCount = 0;
 		if (IslandSpruce && IslandSpruce->GetStaticMesh())
 		{
-			constexpr int32 SpruceGroveCount = 10;
+			constexpr int32 SpruceGroveCount = 16;
 			constexpr int32 SpruceTreesPerGrove = 16;
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
 			constexpr float SpruceGroveInnerRadius = 500.f;
 			constexpr float SpruceGroveOuterRadius = 1600.f;
-			constexpr float SpruceGroveMinSpacing = 3800.f;
+			constexpr float SpruceGroveMinSpacing = 3400.f;
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
 			const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();

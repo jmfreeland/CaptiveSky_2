@@ -826,7 +826,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Existing interactive-spruce forest mesh is available"),
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("Deterministic spruce groves add a bounded population without affecting collision or navigation"),
-			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 160 && PreviewWeather->IslandSpruce &&
+			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 256 && PreviewWeather->IslandSpruce &&
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
