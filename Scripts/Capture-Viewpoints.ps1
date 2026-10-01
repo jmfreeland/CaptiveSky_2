@@ -20,6 +20,8 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only ShoreApproach -OceanMaterial /Game/Materials/M_IslandOcean
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only Tideglass -TideglassMaterial /Game/Materials/M_IslandOcean -NoWorldState
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only Tideglass -TideglassMaterial /Game/Materials/M_TideglassPool_NormalizedWind -TideglassWeather Calm -NoWorldState
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only Tideglass -TideglassMaterial /Game/Materials/M_TideglassPool_NormalizedWind -TideglassWeather Storm -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/M_Island_Textured_Wet
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -LogPath Saved/Logs/Codex_ViewpointProbe.log
 #>
@@ -33,6 +35,7 @@ param(
 	[string]$LandscapeParent = "",
 	[string]$OceanMaterial = "",
 	[string]$TideglassMaterial = "",
+	[ValidateSet("Calm", "Storm")][string]$TideglassWeather = "",
 	[string]$LogPath = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
@@ -75,6 +78,11 @@ if ($LandscapePuddlePreview) {
 if ($LandscapeParent) { $extra += "-ViewpointLandscapeParent=$LandscapeParent" }
 if ($OceanMaterial) { $extra += "-ViewpointOceanMaterial=$OceanMaterial" }
 if ($TideglassMaterial) { $extra += "-ViewpointTideglassMaterial=$TideglassMaterial" }
+if ($TideglassWeather) {
+	if (-not $TideglassMaterial) { throw "-TideglassWeather requires -TideglassMaterial." }
+	if ($Only -and $Only -ne "Tideglass") { throw "-TideglassWeather is only valid with -Only Tideglass." }
+	$extra += "-ViewpointTideglassWeather=$TideglassWeather"
+}
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover -or $GroundCoverSway) { $extra += "-ViewpointGroundCover" }

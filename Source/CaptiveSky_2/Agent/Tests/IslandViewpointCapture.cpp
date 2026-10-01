@@ -62,6 +62,54 @@ namespace
 		float Wetness = 0.f;
 	};
 
+	struct FTideglassWeatherPreview
+	{
+		TWeakObjectPtr<UMaterialParameterCollectionInstance> Instance;
+		float OriginalWindSpeed = 0.f;
+		float OriginalStorm = 0.f;
+		float OriginalRainIntensity = 0.f;
+		float PreviewWindSpeed = 0.f;
+		float PreviewStorm = 0.f;
+		float PreviewRainIntensity = 0.f;
+		bool bEnabled = false;
+
+		void Apply(UWorld* World) const
+		{
+			if (!bEnabled || !World || !Instance.IsValid()) return;
+			Instance->SetScalarParameterValue(TEXT("WindSpeed"), PreviewWindSpeed);
+			Instance->SetScalarParameterValue(TEXT("Storm"), PreviewStorm);
+			Instance->SetScalarParameterValue(TEXT("RainIntensity"), PreviewRainIntensity);
+			World->UpdateParameterCollectionInstances(true, false);
+		}
+
+		bool Restore(UWorld* World, FString& OutError) const
+		{
+			if (!bEnabled) return true;
+			if (!World || !Instance.IsValid())
+			{
+				OutError = TEXT("the world or environment collection instance was destroyed before restoration");
+				return false;
+			}
+			Instance->SetScalarParameterValue(TEXT("WindSpeed"), OriginalWindSpeed);
+			Instance->SetScalarParameterValue(TEXT("Storm"), OriginalStorm);
+			Instance->SetScalarParameterValue(TEXT("RainIntensity"), OriginalRainIntensity);
+			World->UpdateParameterCollectionInstances(true, false);
+			float WindSpeed = 0.f, Storm = 0.f, RainIntensity = 0.f;
+			if (!Instance->GetScalarParameterValue(TEXT("WindSpeed"), WindSpeed) ||
+				!Instance->GetScalarParameterValue(TEXT("Storm"), Storm) ||
+				!Instance->GetScalarParameterValue(TEXT("RainIntensity"), RainIntensity) ||
+				!FMath::IsNearlyEqual(WindSpeed, OriginalWindSpeed) ||
+				!FMath::IsNearlyEqual(Storm, OriginalStorm) ||
+				!FMath::IsNearlyEqual(RainIntensity, OriginalRainIntensity))
+			{
+				OutError = FString::Printf(TEXT("wind/storm/rain were %.3f/%.3f/%.3f, expected %.3f/%.3f/%.3f"),
+					WindSpeed, Storm, RainIntensity, OriginalWindSpeed, OriginalStorm, OriginalRainIntensity);
+				return false;
+			}
+			return true;
+		}
+	};
+
 	// Landscape components render from instances baked in the map, so a SetMaterial swap never reaches the
 	// screen. Previewing a different base graph therefore reparents the assigned landscape instance in memory only
 	// (nothing is saved) and puts the authored parent back afterwards.
@@ -288,13 +336,14 @@ namespace
 			AIslandWeather* InGroundCoverWeather, bool bInClearGroundCover, TArray<FLandscapePreviewBackup> InLandscapeBackups,
 			TArray<FReusedLandscapeMIDBackup> InReusedLandscapeInstances, bool bInCompareLandscapeWetness,
 			bool bInPuddlePreview,
-			TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> InLandscapePreviewInstances)
+			TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> InLandscapePreviewInstances,
+			FTideglassWeatherPreview InTideglassWeatherPreview)
 			: PreviewActors(MoveTemp(InPreviewActors)), World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize),
 			  Test(InTest), Clock(InClock), GroundCoverWeather(InGroundCoverWeather), BaseDirectory(MoveTemp(InDirectory)), Directory(BaseDirectory),
 			  OriginalStartHour(InOriginalStartHour), OriginalDayNumber(InOriginalDayNumber), bClearGroundCover(bInClearGroundCover),
 			  LandscapeBackups(MoveTemp(InLandscapeBackups)), ReusedLandscapeInstances(MoveTemp(InReusedLandscapeInstances)),
 			  LandscapePreviewInstances(MoveTemp(InLandscapePreviewInstances)), bCompareLandscapeWetness(bInCompareLandscapeWetness),
-			  bPuddlePreview(bInPuddlePreview)
+			  bPuddlePreview(bInPuddlePreview), TideglassWeatherPreview(MoveTemp(InTideglassWeatherPreview))
 		{
 			if (bCompareLandscapeWetness) Directory = BaseDirectory + TEXT("_authored_dry");
 		}
@@ -302,6 +351,7 @@ namespace
 		virtual bool Update() override
 		{
 			if (!World.IsValid()) return true;
+			TideglassWeatherPreview.Apply(World.Get());
 			if (!bStarted)
 			{
 				bStarted = true;
@@ -340,6 +390,9 @@ namespace
 					return false;
 				}
 				RestoreLandscapeWetnessPreview(LandscapeBackups, ReusedLandscapeInstances);
+				FString WeatherRestoreError;
+				if (!TideglassWeatherPreview.Restore(World.Get(), WeatherRestoreError))
+					Test->AddError(FString::Printf(TEXT("Tideglass weather preview failed to restore the environment collection: %s"), *WeatherRestoreError));
 				RestoreLandscapeParents();
 				HoldEnvironmentWetness(World.Get(), -1.f);
 				FString RestoreError;
@@ -490,6 +543,7 @@ namespace
 		bool bCompareLandscapeWetness = false;
 		bool bCapturingWetLandscape = false;
 		bool bPuddlePreview = false;
+		FTideglassWeatherPreview TideglassWeatherPreview;
 	};
 
 	/** Puts a previewed static-mesh material back once the captures are done. */
@@ -589,6 +643,20 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover")) || bGroundCoverSwayPreview;
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
+	FString TideglassMaterialPath;
+	const bool bTideglassMaterialOverride = FParse::Value(FCommandLine::Get(), TEXT("ViewpointTideglassMaterial="), TideglassMaterialPath);
+	FString TideglassWeatherMode;
+	const bool bTideglassWeatherOverride = FParse::Value(FCommandLine::Get(), TEXT("ViewpointTideglassWeather="), TideglassWeatherMode);
+	if (bTideglassWeatherOverride && (!bTideglassMaterialOverride || (!Only.IsEmpty() && Only != TEXT("Tideglass"))))
+	{
+		AddError(TEXT("Tideglass weather preview requires a Tideglass material and -ViewpointOnly=Tideglass."));
+		return false;
+	}
+	if (bTideglassWeatherOverride && TideglassWeatherMode != TEXT("Calm") && TideglassWeatherMode != TEXT("Storm"))
+	{
+		AddError(TEXT("ViewpointTideglassWeather must be Calm or Storm."));
+		return false;
+	}
 	AIslandDayNight* PreviewClock = nullptr;
 	float OriginalStartHour = 9.f;
 	int32 OriginalDayNumber = 1;
@@ -846,8 +914,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	}
 	UStaticMeshComponent* TideglassMesh = nullptr;
 	UMaterialInterface* OriginalTideglassMaterial = nullptr;
-	FString TideglassMaterialPath;
-	if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointTideglassMaterial="), TideglassMaterialPath))
+	FTideglassWeatherPreview TideglassWeather;
+	if (bTideglassMaterialOverride)
 	{
 		UMaterialInterface* TideglassMaterial = LoadObject<UMaterialInterface>(nullptr, *TideglassMaterialPath);
 		TideglassMesh = UIslandTideglassSubsystem::FindPoolSurface(Island);
@@ -860,12 +928,34 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		OriginalTideglassMaterial = TideglassMesh->GetMaterial(0);
 		TideglassMesh->SetMaterial(0, TideglassMaterial);
 		AddInfo(FString::Printf(TEXT("Transient Tideglass material preview %s on the flattened sphere; the authored material is restored after capture."), *TideglassMaterialPath));
+		if (bTideglassWeatherOverride)
+		{
+			UMaterialParameterCollection* Collection = LoadObject<UMaterialParameterCollection>(nullptr, UIslandEnvironmentSubsystem::CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+			UMaterialParameterCollectionInstance* Instance = Collection ? Island->GetParameterCollectionInstance(Collection) : nullptr;
+			if (!Instance ||
+				!Instance->GetScalarParameterValue(TEXT("WindSpeed"), TideglassWeather.OriginalWindSpeed) ||
+				!Instance->GetScalarParameterValue(TEXT("Storm"), TideglassWeather.OriginalStorm) ||
+				!Instance->GetScalarParameterValue(TEXT("RainIntensity"), TideglassWeather.OriginalRainIntensity))
+			{
+				TideglassMesh->SetMaterial(0, OriginalTideglassMaterial);
+				if (OceanMesh) OceanMesh->SetMaterial(0, OriginalOceanMaterial);
+				AddError(TEXT("Could not load and snapshot the environment collection's wind/storm/rain values."));
+				return false;
+			}
+			TideglassWeather.Instance = Instance;
+			TideglassWeather.bEnabled = true;
+			const bool bStormPreview = TideglassWeatherMode == TEXT("Storm");
+			TideglassWeather.PreviewWindSpeed = bStormPreview ? 300.f : 0.f;
+			TideglassWeather.PreviewStorm = bStormPreview ? 1.f : 0.f;
+			TideglassWeather.PreviewRainIntensity = bStormPreview ? 1.f : 0.f;
+			AddInfo(FString::Printf(TEXT("Tideglass material-response diagnostic: forcing %s collection values during capture, then restoring their prior values; this is not a gameplay weather simulation."), *TideglassWeatherMode));
+		}
 	}
 ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
 		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview,
-		MoveTemp(LandscapePreviewInstances)));
+		MoveTemp(LandscapePreviewInstances), MoveTemp(TideglassWeather)));
 	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(OceanMesh, OriginalOceanMaterial));
 	if (TideglassMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(TideglassMesh, OriginalTideglassMaterial));
 	return true;

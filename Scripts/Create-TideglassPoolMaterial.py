@@ -2,14 +2,15 @@
 
 The asset is additive and is never assigned to the saved Island map. Runtime code swaps it onto the
 flattened pool surface for Game/PIE only, then restores the authored blockout material at teardown.
-This builder refuses to overwrite an existing asset; remove or rename it deliberately to rebuild.
+It uses a new asset path so an earlier generated version is preserved. The builder refuses to
+overwrite its own output; remove or rename that exact generated asset deliberately to rebuild.
 """
 
 import traceback
 import unreal
 
 
-MATERIAL_PATH = "/Game/Materials/M_TideglassPool"
+MATERIAL_PATH = "/Game/Materials/M_TideglassPool_NormalizedWind"
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WAVE_NORMAL = "/Water/Textures/Normals/T_Water_TilingNormal_Waves_02"
 MEL = unreal.MaterialEditingLibrary
@@ -69,7 +70,7 @@ def build():
         raise RuntimeError("Missing environment collection or Water plugin normal texture")
 
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    material = tools.create_asset("M_TideglassPool", "/Game/Materials",
+    material = tools.create_asset("M_TideglassPool_NormalizedWind", "/Game/Materials",
                                   unreal.Material, unreal.MaterialFactoryNew())
     if not material:
         raise RuntimeError("Could not create " + MATERIAL_PATH)
@@ -82,8 +83,14 @@ def build():
     storm = collection_value(material, collection, "Storm", -1800, -760)
     rain = collection_value(material, collection, "RainIntensity", -1800, -620)
     agitation = expr(material, unreal.MaterialExpressionSaturate, -1100, -720)
-    wind_part = binary(material, unreal.MaterialExpressionMultiply, wind,
-                       scalar(material, "WindResponse", 0.65, -1600, -900), -1350, -900)
+    # MPC WindSpeed is in cm/s. Normalize before applying the response so ordinary breeze
+    # does not immediately saturate the material's weather blend.
+    wind_fraction = binary(material, unreal.MaterialExpressionDivide, wind,
+                           scalar(material, "WindNormalizationCmPerSec", 300.0, -1600, -980), -1450, -930)
+    wind_fraction_clamped = expr(material, unreal.MaterialExpressionSaturate, -1250, -930)
+    link(wind_fraction, wind_fraction_clamped)
+    wind_part = binary(material, unreal.MaterialExpressionMultiply, wind_fraction_clamped,
+                       scalar(material, "WindResponse", 0.65, -1600, -820), -1050, -900)
     storm_part = binary(material, unreal.MaterialExpressionMultiply, storm,
                         scalar(material, "StormResponse", 0.75, -1600, -760), -1350, -760)
     rain_part = binary(material, unreal.MaterialExpressionMultiply, rain,
