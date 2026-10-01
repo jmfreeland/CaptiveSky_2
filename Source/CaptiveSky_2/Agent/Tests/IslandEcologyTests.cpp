@@ -102,7 +102,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
 	}
 	Weather->InitializeGroundCover();
-	TestEqual(TEXT("Ground cover places one 48-clump ring around each landmark"), Weather->GroundCoverInstanceCount, 96);
+	TestEqual(TEXT("Ground cover places one 96-clump ring around each landmark"), Weather->GroundCoverInstanceCount, 192);
 	TestEqual(TEXT("Each wind-driven species retains an immutable baseline for every clump"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
@@ -163,7 +163,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		bRepeatedSwayIsStable &= FirstSwayB[Index].Equals(SecondSwayB[Index], 0.001f);
 	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
 	Weather->InitializeGroundCover();
-	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, 96);
+	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, 192);
 	Weather->ClearGroundCover();
 	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
 	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),
@@ -183,7 +183,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsA);
 	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsB);
 	AIslandWeather::BuildGroundCoverOffsets(27182, GrassOffsetsOtherSeed);
-	TestEqual(TEXT("Shore ground-cover scatter has a small fixed instance budget"), GrassOffsetsA.Num(), 48);
+	TestEqual(TEXT("Shore ground-cover scatter has a bounded 96-clump instance budget"), GrassOffsetsA.Num(), 96);
 	bool bSameSeedMatches = GrassOffsetsA.Num() == GrassOffsetsB.Num();
 	bool bOtherSeedDiffers = GrassOffsetsA.Num() == GrassOffsetsOtherSeed.Num();
 	for (int32 Index = 0; Index < GrassOffsetsA.Num(); ++Index)

@@ -106,7 +106,7 @@ void AIslandWeather::PersistWeatherTime()
 
 void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms)
 {
-	constexpr int32 ClumpCount = 48;
+	constexpr int32 ClumpCount = 96;
 	constexpr float InnerRadius = 260.f;
 	constexpr float OuterRadius = 720.f;
 	OutTransforms.Reset(ClumpCount);
