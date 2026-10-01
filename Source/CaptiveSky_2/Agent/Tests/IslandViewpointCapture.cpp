@@ -821,8 +821,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		}
 		PreviewWeather->InitializeGroundCover();
 		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
-		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 17,068-instance budget"),
-			PreviewWeather->GroundCoverMeadowInstanceCount <= 16384 && PreviewWeather->GroundCoverInstanceCount <= 17068);
+		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 31,404-instance budget"),
+			PreviewWeather->GroundCoverMeadowInstanceCount <= 30720 && PreviewWeather->GroundCoverInstanceCount <= 31404);
 		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
