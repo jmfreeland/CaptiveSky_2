@@ -55,7 +55,25 @@ complete.
 
 The controlled wetness pairs and material graph trace are recorded below. Next, test a matched pair at a low, grazing sun angle; if specular-only wetness still reads poorly, prototype roughness/puddle response in a reversible copy. Keep the old `M_Landscape` and `M_AutoLandscape` as references, not assumed replacements.
 
-No Unreal assets were modified during this audit.
+## Wet-pool scale follow-up (2026-10-01)
+
+A controlled noon comparison tested three capture-only pool scales against the original generated
+wet graph. The broadest variant suppressed reflective speckle but nearly removed wet response; the
+balanced variant also weakened the detailed ground shot. The selected 1,200 cm / 0.36 coverage /
+6.5 sharpness setting retained broader connected pools in the Tideglass detail capture and reduced
+the blue-reflection pixel proxy in four of five wider views. Those values are now the defaults in
+`Scripts/Create-LandscapeWetMaterial.py`. The detailed metrics, output paths, and test caveats are in
+[`2026-09-30-landscape-wetness.md`](2026-09-30-landscape-wetness.md#pool-scale-comparison-and-selected-builder-defaults-2026-10-01).
+
+UE 5.8.3 rebuilt both generated wet assets and passed a fresh paired nine-view automation run via
+the scratch project. Its `Content/` is junctioned to the main project, so the ignored wet parent and
+wet instance were regenerated in the main Content tree too. The saved landscape assignment and
+authored assets were not changed. The offscreen result is not yet a PIE or packaged-build validation;
+inspect a real rain-to-dry transition in the user's editor before calling the wet-ground presentation
+finished.
+
+No Unreal assets were modified during the original 2026-09-28 audit. Later generated wet-graph and
+capture-only assets are ignored by Git; the saved authored landscape materials and map remain unchanged.
 
 ## Saved-Island assignment audit (2026-09-30)
 

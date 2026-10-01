@@ -35,5 +35,56 @@ This note records why earlier attempts looked inert and what the working path is
 
 `TideglassGroundDetail`, noon: mean RGB dry [72.0, 56.9, 4.5] vs wet [39.7, 32.1, 10.0]. The wet pass shows
 sky-reflecting pools on flat ground only; slopes stay dry. Low sun (17:00) and `WindArchOverlook` look plausible.
-Puddle noise tiles every 900 cm (`PuddleTileCm`); tune `PuddleCoverage`, `PuddleSharpness`, `WetDarken`,
-`PuddleDarken` on the wet parent.
+The original puddle-noise scale was 900 cm (`PuddleTileCm`); the 2026-10-01 controlled comparison
+promoted a broader 1,200 cm / 0.36 coverage / 6.5 sharpness setting into the builder defaults.
+`WetDarken` and `PuddleDarken` remain unchanged.
+
+## Pool-scale comparison and selected builder defaults (2026-10-01)
+
+To reduce small reflective flecks in the wide island shots without losing readable wet ground near
+Tideglass, `Scripts/Create-LandscapeWetMaterialPrototype.py` generated three separate variants for
+comparison against the original builder defaults.
+Each variant was captured dry and fully wet in the same UE 5.8.3 automation run at noon, with no
+world-state writes. The commandlet used the scratch `.uproject`, but its `Content/` directory is a
+junction to the main project's `Content/`; therefore the builder also regenerated the ignored
+`M_Island_Textured_Wet` and `MI_Island_Landscape_Wet` assets in the main Content tree. The saved
+landscape assignment, authored material, and runtime weather/world state were not changed.
+
+| Variant | `PuddleTileCm` | `PuddleCoverage` | `PuddleSharpness` |
+|---|---:|---:|---:|
+| Original | 900 | 0.40 | 8.0 |
+| BroadPools | 1,800 | 0.28 | 5.0 |
+| BalancedPools | 1,300 | 0.34 | 6.0 |
+| GentlePools | 1,200 | 0.36 | 6.5 |
+
+The table below reports the share of pixels in the lower two-thirds of each image whose blue
+channel increased by more than 20 levels between its paired dry and wet captures. This is a quick
+reflection-change proxy, not the physical puddle coverage of the material; view angle, roughness,
+lighting and surface orientation all affect it.
+
+| Viewpoint | Original | BroadPools | BalancedPools | GentlePools |
+|---|---:|---:|---:|---:|
+| ShoreApproach | 2.37% | 0.35% | 0.95% | 1.39% |
+| Tideglass | 5.53% | 0.78% | 2.76% | 2.67% |
+| TideglassGroundDetail | 2.88% | 0.00% | 0.97% | 8.36% |
+| ListeningStones | 6.35% | 1.34% | 2.78% | 3.44% |
+| WindArchOverlook | 3.69% | 0.62% | 1.72% | 2.44% |
+
+BroadPools removes too much wet response. BalancedPools suppresses the wide-shot flecks but makes
+the close ground response weak. GentlePools gives the clearest connected sky reflections in the
+close ground detail while cutting the reflection proxy in four of five wide views versus the
+original. Accordingly, `Scripts/Create-LandscapeWetMaterial.py` now builds that measured parameter
+set by default; all other wet response values and the landscape graph wiring are unchanged.
+
+UE's material builder completed successfully and created both generated wet assets. A fresh nine-view dry/wet automation pair against the builder output passed, prepared all
+4,096 landscape component slots transiently, and restored the authored parent afterward. The
+builder and capture logs are `Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Logs/Codex_BuildGentleWetMaterial_20261001.log`
+and `.../Codex_WetnessBuilderDefaultPair_20261001.log`; the captures are under
+`Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-10-01_010810_h12.0_{authored_dry,fully_wet}/`.
+The automation logs include expected offline Epic-service connection warnings; the UE processes
+exited 0 and no material compile error or crash was recorded.
+
+This is still an editor/PIE graph: the current subsystem swaps it only in editor and PIE. The next
+visual check should be a short PIE weather transition on the user's UE display, including authored
+dry, rain rising, and drying down. Do not treat these offscreen captures as confirmation of packaged
+or standalone rendering.

@@ -129,13 +129,13 @@ def build():
     # Pools: tiled noise below a wetness-dependent threshold, on flat ground only.
     world = expr(material, unreal.MaterialExpressionWorldPosition, 3000, 900)
     world_xy = channel(material, world, 3200, 900, r=True, g=True)
-    uv = binary(material, unreal.MaterialExpressionDivide, world_xy, scalar(material, "PuddleTileCm", 900.0, 3200, 1000), 3400, 900)
+    uv = binary(material, unreal.MaterialExpressionDivide, world_xy, scalar(material, "PuddleTileCm", 1200.0, 3200, 1000), 3400, 900)
     noise_sample = expr(material, unreal.MaterialExpressionTextureSample, 3600, 900, texture=noise,
                         sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
     link(uv, noise_sample, "UVs")
     noise_value = channel(material, noise_sample, 3800, 900, r=True)
-    threshold = mul(material, wet, scalar(material, "PuddleCoverage", 0.4, 3600, 1050), 3800, 1000)
-    depth = mul(material, sub(material, threshold, noise_value, 4000, 1000), scalar(material, "PuddleSharpness", 8.0, 3800, 1100), 4200, 1000)
+    threshold = mul(material, wet, scalar(material, "PuddleCoverage", 0.36, 3600, 1050), 3800, 1000)
+    depth = mul(material, sub(material, threshold, noise_value, 4000, 1000), scalar(material, "PuddleSharpness", 6.5, 3800, 1100), 4200, 1000)
     normal_z = channel(material, expr(material, unreal.MaterialExpressionVertexNormalWS, 3800, 1250), 4000, 1250, b=True)
     flat = saturate(material, mul(material, sub(material, normal_z, constant(material, 0.93, 4000, 1350), 4200, 1250),
                                   constant(material, 25.0, 4200, 1350), 4400, 1250), 4600, 1250)
