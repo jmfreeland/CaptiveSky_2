@@ -9,14 +9,21 @@
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "Engine/SceneCapture2D.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
+#include "HAL/FileManager.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "ImageUtils.h"
+#include "Misc/Paths.h"
 #include "NavigationSystem.h"
+#include "ContentStreaming.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -411,6 +418,119 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			Probe->Destroy();
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandRavenWingCaptureTest, "CaptiveSky2.Visual.RavenWingMotion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
+{
+	UWorld* Island = nullptr;
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		if (Context.WorldType == EWorldType::Editor && Context.World() && Context.World()->GetMapName() == TEXT("Island"))
+		{
+			Island = Context.World();
+			break;
+		}
+	if (!TestNotNull(TEXT("The editor Island world is loaded for the raven wing capture"), Island)) return false;
+
+	UClass* RavenClass = LoadClass<ACharacter>(nullptr, TEXT("/Game/Agents/BP_Raven_Placeholder.BP_Raven_Placeholder_C"));
+	if (!TestNotNull(TEXT("The raven placeholder Blueprint is available"), RavenClass)) return false;
+	AActor* Roost = nullptr;
+	for (TActorIterator<AActor> It(Island); It; ++It)
+		if (It->ActorHasTag(TEXT("RavenPerch")) && It->ActorHasTag(TEXT("Roost_West"))) { Roost = *It; break; }
+	if (!TestNotNull(TEXT("Roost_West provides a scenic capture location"), Roost)) return false;
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ACharacter* Raven = Island->SpawnActor<ACharacter>(RavenClass, Roost->GetActorLocation(), FRotator::ZeroRotator, Spawn);
+	ARavenAgentAIController* Controller = Island->SpawnActor<ARavenAgentAIController>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("A transient raven placeholder was spawned at the west roost"), Raven) ||
+		!TestNotNull(TEXT("A transient raven controller was spawned"), Controller))
+	{
+		if (Raven) Raven->Destroy();
+		if (Controller) Controller->Destroy();
+		return false;
+	}
+
+	UStaticMeshComponent* LeftWing = nullptr;
+	UStaticMeshComponent* RightWing = nullptr;
+	TArray<UStaticMeshComponent*> MeshComponents;
+	Raven->GetComponents<UStaticMeshComponent>(MeshComponents);
+	for (UStaticMeshComponent* Component : MeshComponents)
+	{
+		if (!Component) continue;
+		if (Component->GetName().Contains(TEXT("LeftWing"), ESearchCase::IgnoreCase)) LeftWing = Component;
+		if (Component->GetName().Contains(TEXT("RightWing"), ESearchCase::IgnoreCase)) RightWing = Component;
+	}
+	if (!TestNotNull(TEXT("The real Blueprint left wing exists"), LeftWing) || !TestNotNull(TEXT("The real Blueprint right wing exists"), RightWing))
+	{
+		Raven->Destroy();
+		Controller->Destroy();
+		return false;
+	}
+	Controller->Possess(Raven);
+	const FRotator LeftRest = LeftWing->GetRelativeRotation();
+	const FRotator RightRest = RightWing->GetRelativeRotation();
+
+	const FIntPoint CaptureSize(1280, 720);
+	UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(GetTransientPackage(), NAME_None, RF_Transient);
+	Target->RenderTargetFormat = RTF_RGBA8_SRGB;
+	Target->InitAutoFormat(CaptureSize.X, CaptureSize.Y);
+	Target->UpdateResourceImmediate(true);
+	const FVector LookAt = Raven->GetActorLocation() + FVector(0.f, 0.f, 70.f);
+	const FVector CameraLocation = LookAt + FVector(-330.f, -420.f, 150.f);
+	ASceneCapture2D* Camera = Island->SpawnActor<ASceneCapture2D>(CameraLocation, (LookAt - CameraLocation).Rotation(), Spawn);
+	USceneCaptureComponent2D* Capture = Camera ? Camera->GetCaptureComponent2D() : nullptr;
+	if (!TestNotNull(TEXT("The transient real-RHI wing camera was spawned"), Capture))
+	{
+		Controller->UnPossess();
+		Raven->Destroy();
+		Controller->Destroy();
+		if (Camera) Camera->Destroy();
+		return false;
+	}
+	Capture->TextureTarget = Target;
+	Capture->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	Capture->FOVAngle = 42.f;
+	Capture->bCaptureEveryFrame = false;
+	Capture->bCaptureOnMovement = false;
+	Capture->bAlwaysPersistRenderingState = true;
+	IStreamingManager::Get().StreamAllResources(2.f);
+
+	const FString CaptureDirectory = FPaths::Combine(FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir()),
+		TEXT("Viewpoints"), TEXT("RavenWingMotion_"), FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S")));
+	IFileManager::Get().MakeDirectory(*CaptureDirectory, true);
+	auto SavePose = [this, &Capture, &Target, &CaptureSize, &CaptureDirectory](const TCHAR* FileName)
+	{
+		Capture->CaptureScene();
+		FlushRenderingCommands();
+		TArray<FColor> Pixels;
+		if (!Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels) || Pixels.Num() != CaptureSize.X * CaptureSize.Y)
+			return false;
+		for (FColor& Pixel : Pixels) Pixel.A = 255;
+		const FString Path = CaptureDirectory / FString(FileName);
+		if (!FImageUtils::SaveImageByExtension(*Path, FImageView(Pixels.GetData(), CaptureSize.X, CaptureSize.Y))) return false;
+		AddInfo(FString::Printf(TEXT("Raven wing pose captured at %s"), *Path));
+		return true;
+	};
+
+	TestTrue(TEXT("Authored rest-pose screenshot is saved"), SavePose(TEXT("01_Rest.png")));
+	Controller->LocomotionState = ERavenLocomotionState::Flying;
+	Controller->Tick(0.05f);
+	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("02_FlightStrokeA.png")));
+	Controller->Tick(0.15f);
+	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("03_FlightStrokeB.png")));
+	Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	Controller->Tick(1.f / 60.f);
+	TestTrue(TEXT("A captured flight returns both wings to their authored rests"),
+		LeftWing->GetRelativeRotation().Equals(LeftRest) && RightWing->GetRelativeRotation().Equals(RightRest));
+	Controller->UnPossess();
+	Raven->Destroy();
+	Controller->Destroy();
+	Camera->Destroy();
 	return true;
 }
 
