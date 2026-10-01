@@ -17,6 +17,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandSpectatorTest, "CaptiveSky2.Agent.Specta
 
 bool FIslandSpectatorTest::RunTest(const FString& Parameters)
 {
+	const FString SavedDirectory = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir());
+	const FString ScreenshotRoot = FPaths::Combine(SavedDirectory, TEXT("Automation"), TEXT("SpectatorShots"));
+	TestEqual(TEXT("The default screenshot directory stays compatible"),
+		AIslandSpectatorDirector::ResolveScreenshotDirectory(FPaths::ProjectSavedDir(), FString()),
+		FPaths::Combine(SavedDirectory, TEXT("Screenshots"), TEXT("Spectator")));
+	TestEqual(TEXT("A relative screenshot directory is isolated under Saved"),
+		AIslandSpectatorDirector::ResolveScreenshotDirectory(FPaths::ProjectSavedDir(), TEXT("Automation/SpectatorShots")),
+		ScreenshotRoot);
+	TestEqual(TEXT("An absolute screenshot directory is respected"),
+		AIslandSpectatorDirector::ResolveScreenshotDirectory(FPaths::ProjectSavedDir(), ScreenshotRoot), ScreenshotRoot);
+
 	// No model requests; the fixture has its own viewpoints and a scratch world-state file.
 	const FString Scratch = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("Spectator"));
 	const FString Viewpoints = Scratch / TEXT("Viewpoints.json");

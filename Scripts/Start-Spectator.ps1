@@ -17,12 +17,14 @@ back to normal control.
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -ScreenshotDirectory Screenshots/Spectator/ReturnCheck
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
 param(
 	[switch]$Windowed,
 	[switch]$Shots,
+	[string]$ScreenshotDirectory,
 	[switch]$Continuous,
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
@@ -37,7 +39,8 @@ if (-not (Test-Path $editor)) { throw "UnrealEditor.exe not found under $EngineD
 
 $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
 if ($Windowed) { $arguments += @("-windowed", "-ResX=1600", "-ResY=900") } else { $arguments += "-fullscreen" }
-if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot under Saved/Screenshots/Spectator
+if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot; use -ScreenshotDirectory to isolate runs
+if (-not [string]::IsNullOrWhiteSpace($ScreenshotDirectory)) { $arguments += "-SpectatorScreenshotDir=$ScreenshotDirectory" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }

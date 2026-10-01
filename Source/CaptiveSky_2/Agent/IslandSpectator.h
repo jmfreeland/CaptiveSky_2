@@ -73,6 +73,8 @@ public:
 	int32 GetEstablishingCount() const { return Establishing.Num(); }
 	/** Camera placement for a subject at Head seen from Distance, avoiding anything that would block the view. */
 	static FVector FrameSubject(UWorld* World, const FVector& Head, const FVector& Facing, float Distance, const TArray<const AActor*>& Ignore);
+	/** Resolves -SpectatorScreenshotDir; an empty override preserves the historical output folder. */
+	static FString ResolveScreenshotDirectory(const FString& ProjectSavedDir, const FString& Override);
 
 	virtual void Tick(float DeltaSeconds) override;
 

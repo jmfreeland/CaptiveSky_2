@@ -322,7 +322,7 @@ Residents can perceive an unobstructed tagged `InnBed_n` within 25 metres as an 
 
 ### Spectator mode (2026-09-27)
 
-This is the first step toward running the Island on a dedicated screen. Start it with `Scripts/Start-Spectator.ps1` (add `-Windowed`, or `-Shots` to save one frame per shot), or pass `-Spectator` to any game launch. During play, the `Island.Spectate` console command toggles it.
+This is the first step toward running the Island on a dedicated screen. Start it with `Scripts/Start-Spectator.ps1` (add `-Windowed`, or `-Shots` to save one frame per shot). Shot names are stable by design; pass a unique `-ScreenshotDirectory` for each capture run to avoid replacing earlier screenshots. Relative directories are under `Saved/`, so use `Screenshots/Spectator/ReturnCheck` to create `Saved/Screenshots/Spectator/ReturnCheck`. Otherwise the historical `Saved/Screenshots/Spectator` location is preserved. You can also pass `-Spectator` to any game launch. During play, the `Island.Spectate` console command toggles it.
 
 `AIslandSpectatorDirector` takes over the local player's view:
 - **Views:** it drifts slowly, 24 seconds per view, through the journey viewpoints in `Config/IslandViewpoints.json`, skipping the overhead survey. Without that file, it circles the landmarks instead.
@@ -389,7 +389,7 @@ Residents notice the mist, and wet ground after rain. On a misty dawn Aster rema
 
 ### Latest observed play behavior
 
-The 2026-10-01 rendered checkpoint for `04_WindArchOverlook` passed in UE 5.8.3. It confirms the golden-hour scene renders from the isolated editor copy, while showing that the foreground rock and arch partly obscure Roost_West; because no play session starts, it does not validate a raven arrival or wind-driven choice. See [`docs/findings/2026-10-01-roost-overlook.md`](docs/findings/2026-10-01-roost-overlook.md) for the capture and bounded follow-up.
+The 2026-10-01 editor render and bounded UE 5.8.3 Game-world spectator runs completed with zero model requests. The Tideglass frame shows the pool surface is nearly featureless white. Spectator capture now accepts `-ScreenshotDirectory`; an isolated 60-second run verified three frames landed in a new folder without touching the historical output folder, and `CaptiveSky2.Agent.Spectator` passes. The first capture shows the shore clearly, but the inn common-room view is poorly framed and remains a camera-composition follow-up. These runs do not prove a raven arrival or wind-driven choice. See [`docs/findings/2026-10-01-roost-overlook.md`](docs/findings/2026-10-01-roost-overlook.md) for logs, limits, and visual findings.
 
 An independent 2026-09-28 day-three situation log from Claude's detached source snapshot (`2aa86db`) recorded Aster optionally writing a guest-book line about minnows circling back, while the raven's two-layer nest remained persistent. This is evidence that residents used the lasting social/ecology systems in that run, not verification of the later `main` build. The same old snapshot rejected perch sleep; current perch-sleep behavior is covered separately by `RavenPerch` and `IslandInnRest` automation tests.
 

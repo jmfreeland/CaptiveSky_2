@@ -13,6 +13,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
@@ -26,6 +27,19 @@
 #include "Widgets/Text/STextBlock.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandSpectator, Log, All);
+
+FString AIslandSpectatorDirector::ResolveScreenshotDirectory(const FString& ProjectSavedDir, const FString& Override)
+{
+	FString SavedDirectory = FPaths::ConvertRelativePathToFull(ProjectSavedDir);
+	FPaths::NormalizeDirectoryName(SavedDirectory);
+	FString Directory = Override.TrimStartAndEnd();
+	if (Directory.IsEmpty())
+		Directory = FPaths::Combine(SavedDirectory, TEXT("Screenshots"), TEXT("Spectator"));
+	else if (FPaths::IsRelative(Directory))
+		Directory = FPaths::Combine(SavedDirectory, Directory);
+	FPaths::NormalizeDirectoryName(Directory);
+	return FPaths::ConvertRelativePathToFull(Directory);
+}
 
 namespace
 {
@@ -407,7 +421,13 @@ void AIslandSpectatorDirector::Tick(float DeltaSeconds)
 		bShotCaptured = true;
 		FString Name = Current.Title;
 		for (TCHAR& Character : Name) if (!FChar::IsAlnum(Character)) Character = TEXT('_');
-		FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Screenshots") / TEXT("Spectator") / FString::Printf(TEXT("%03d_%s.png"), ShotIndex, *Name), true, false);
+		FString ScreenshotDirectoryOverride;
+		FParse::Value(FCommandLine::Get(), TEXT("SpectatorScreenshotDir="), ScreenshotDirectoryOverride);
+		const FString ScreenshotDirectory = ResolveScreenshotDirectory(FPaths::ProjectSavedDir(), ScreenshotDirectoryOverride);
+		IFileManager::Get().MakeDirectory(*ScreenshotDirectory, true);
+		const FString ScreenshotPath = ScreenshotDirectory / FString::Printf(TEXT("%03d_%s.png"), ShotIndex, *Name);
+		FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
+		UE_LOG(LogIslandSpectator, Log, TEXT("Spectator screenshot queued at %s"), *ScreenshotPath);
 	}
 	if (Elapsed >= Current.Duration) NextEstablishingShot();
 }
