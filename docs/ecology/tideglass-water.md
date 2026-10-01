@@ -82,21 +82,29 @@ not overwrite the authored sphere material.
 
 ## Runtime lifecycle follow-up (2026-10-01)
 
-The `CaptiveSky2.Agent.IslandTideglass` regression now starts its synthetic Game world with the
-normal `UWorld::BeginPlay()` lifecycle instead of manually invoking
-`UIslandTideglassSubsystem::OnWorldBeginPlay()`. When the generated asset is present, the test now
-uses the same default asset path as Game startup; otherwise it injects a transient fallback. It
-asserts that the runtime procedural surface is created and the hidden map sphere retains its authored
-material. Startup now logs whether the water material is missing or the tagged flattened footprint
-could not be applied, while leaving other maps without a Tideglass marker quiet. These diagnostics
-will distinguish an asset/footprint failure from a subsystem lifecycle failure in a future Game log.
-The changed unity translation unit was compiled and linked into a scratch editor module, but the
-automation runner stalled before producing a test result on this machine, so the new assertion is
-compiled but not runtime-verified.
+The `CaptiveSky2.Agent.IslandTideglass` regression starts its synthetic Game world with the normal
+`UWorld::BeginPlay()` lifecycle instead of manually invoking
+`UIslandTideglassSubsystem::OnWorldBeginPlay()`. When the generated asset is present, the test uses
+the same default material path as Game startup; otherwise it injects a transient fallback. It
+asserts the procedural surface is created, receives the startup material, and leaves the hidden map
+sphere's authored material intact. The UE 5.8.3 test passed using the actual default Lively asset.
+Startup also logs whether the material is missing or the tagged flattened footprint cannot be applied,
+while leaving maps without a Tideglass marker quiet.
 
-A bounded Game launch also stalled during engine startup before reaching the play-time cap or writing
-a screenshot. Its last log entry was the `ValidatePlatforms` UnrealBuildTool launch. The previous
-Game capture at `Saved/Screenshots/Spectator/005_Tideglass.png` still shows the white blockout disc,
-but it predates the current scratch module; do not treat it as evidence against the current source.
-The original editor module was restored byte-for-byte after both isolated attempts. Rerun the focused
-automation and a sub-minute, zero-request Game capture when the UE startup/build path is responsive.
+A bounded real-RHI Game capture with the current source confirmed that the default water material
+applies at world start and the Tideglass ground-cover system reports a 306 cm pool-edge clearance.
+It ended normally at 60.1 seconds with zero model requests. The runtime capture at
+`Saved/Playtests/Codex_TideglassRuntimeVisual_Elevated_20261001/Screenshots/001_Tideglass.png`
+shows the pool in its intended cyan rather than as the white blockout disc; the paired overhead
+capture at
+`Saved/Playtests/Codex_TideglassOverhead_Elevated_20261001/Screenshots/001_Overhead.png`
+shows the grass-free water footprint and the surrounding verge. Low-angle views still show grass
+silhouettes crossing the water in screen space; the overhead view indicates that is foreground
+occlusion, not plants rooted inside the pool. Both runs used isolated world-state roots and restored
+the original editor DLL byte-for-byte. The Game log still contains the known UE Experimental Toolsets
+Python startup tracebacks, but the run exited normally. These are capped spectator checks, not a
+packaged-performance benchmark or autonomous resident behavior test.
+
+Logs: `Saved/Logs/Codex_TideglassLifecycle_Elevated_20261001.log`,
+`Saved/Logs/Codex_TideglassRuntimeVisual_Elevated_20261001.log`, and
+`Saved/Logs/Codex_TideglassOverhead_Elevated_20261001.log`.
