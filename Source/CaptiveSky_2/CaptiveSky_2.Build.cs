@@ -32,7 +32,8 @@ public class CaptiveSky_2 : ModuleRules
 			"RHI",
 			"DeveloperSettings",
 			"ImageCore",
-			"Landscape"
+			"Landscape",
+			"ProceduralMeshComponent"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

@@ -5,6 +5,8 @@
 #include "IslandTideglassSubsystem.generated.h"
 
 class UMaterialInterface;
+class UMeshComponent;
+class UProceduralMeshComponent;
 class UStaticMeshComponent;
 
 /** Applies a weather-responsive water surface to Tideglass for the play session only. */
@@ -22,9 +24,12 @@ public:
 
 	/** Finds the flattened sphere placed beside the map's TideglassPool marker. */
 	static UStaticMeshComponent* FindPoolSurface(UWorld* World);
+	/** Creates an irregular, shallow, transient water mesh over the blockout footprint. Caller owns visibility/lifetime. */
+	static UProceduralMeshComponent* CreatePoolSurfaceMesh(UStaticMeshComponent* BlockoutSurface);
 
-	/** Changes only the runtime component material. The authored material is restored at teardown. */
+	/** Creates the transient water surface, applies Material, and hides the blockout until restoration. */
 	bool ApplyPoolMaterial(UMaterialInterface* Material);
+	/** Restores the blockout's prior visibility and destroys the generated surface. */
 	void RestorePoolMaterial();
 	bool IsApplied() const { return AppliedTo.IsValid(); }
 
@@ -33,8 +38,15 @@ public:
 	virtual void Deinitialize() override;
 
 private:
-	UPROPERTY(Transient)
-	TObjectPtr<UMaterialInterface> OriginalMaterial;
+	friend class FIslandTideglassSurfaceTest;
 
-	TWeakObjectPtr<UStaticMeshComponent> AppliedTo;
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> RuntimeSurface;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UStaticMeshComponent> BlockoutSurface;
+
+	TWeakObjectPtr<UMeshComponent> AppliedTo;
+	bool bBlockoutWasVisible = true;
+	bool bBlockoutWasHiddenInGame = false;
 };

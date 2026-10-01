@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "Agent/IslandTideglassSubsystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -54,10 +55,29 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			Tideglass->MaterialOverride = PreviewWater;
 			Tideglass->OnWorldBeginPlay(*World);
 			TestTrue(TEXT("Play start applies the transient pool-water material"), Tideglass->IsApplied());
-			TestTrue(TEXT("The pool surface receives the transient material"), Surface->GetMaterial(0) == PreviewWater);
+			UProceduralMeshComponent* RuntimeWater = Cast<UProceduralMeshComponent>(Tideglass->AppliedTo.Get());
+			TestNotNull(TEXT("Play start creates an organic procedural water surface"), RuntimeWater);
+			if (RuntimeWater)
+			{
+				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
+				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
+					RuntimeWater->GetComponentLocation().Equals(Surface->GetComponentLocation(), 1.f));
+				TestTrue(TEXT("The water surface contains a 64-segment double-ring mesh"),
+					WaterSection && WaterSection->ProcVertexBuffer.Num() == 129 && WaterSection->ProcIndexBuffer.Num() == 576);
+				TestTrue(TEXT("The pool's top faces use the winding Unreal renders from above"),
+					WaterSection && WaterSection->ProcIndexBuffer.Num() >= 3 && WaterSection->ProcIndexBuffer[0] == 0 &&
+					WaterSection->ProcIndexBuffer[1] == 2 && WaterSection->ProcIndexBuffer[2] == 1);
+				TestTrue(TEXT("The generated water surface receives the transient material"), RuntimeWater->GetMaterial(0) == PreviewWater);
+				TestTrue(TEXT("The generated water surface does not replace the blockout's collision"),
+					RuntimeWater->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+				TestTrue(TEXT("The old sphere is hidden only while the procedural surface is active"), Surface->bHiddenInGame);
+			}
 			TestTrue(TEXT("Repeated runtime application is safe"), Tideglass->ApplyPoolMaterial(PreviewWater));
 			Tideglass->RestorePoolMaterial();
 			TestTrue(TEXT("Teardown restores the authored blockout material"), Surface->GetMaterial(0) == AuthoredBlockout);
+			TestTrue(TEXT("Teardown restores the blockout component visibility"), Surface->IsVisible());
+			TestFalse(TEXT("Teardown restores the blockout sphere visibility"), Surface->bHiddenInGame);
+			TestNull(TEXT("Teardown destroys the transient procedural water surface"), Tideglass->RuntimeSurface.Get());
 			TestFalse(TEXT("No Tideglass material remains applied after restore"), Tideglass->IsApplied());
 		}
 	}

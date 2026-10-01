@@ -38,6 +38,7 @@
 #include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
 #include "ImageUtils.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
@@ -563,6 +564,32 @@ namespace
 		TWeakObjectPtr<UStaticMeshComponent> Component;
 		TStrongObjectPtr<UMaterialInterface> Original;
 	};
+
+	class FRestoreTideglassSurfacePreviewCommand : public IAutomationLatentCommand
+	{
+	public:
+		FRestoreTideglassSurfacePreviewCommand(UStaticMeshComponent* InBlockout, UProceduralMeshComponent* InPreview,
+			bool bInWasVisible, bool bInWasHiddenInGame)
+			: Blockout(InBlockout), Preview(InPreview), bWasVisible(bInWasVisible), bWasHiddenInGame(bInWasHiddenInGame) {}
+
+		virtual bool Update() override
+		{
+			if (Preview.IsValid())
+				if (AActor* Owner = Preview->GetOwner()) Owner->Destroy();
+			if (Blockout.IsValid())
+			{
+				Blockout->SetVisibility(bWasVisible);
+				Blockout->SetHiddenInGame(bWasHiddenInGame);
+			}
+			return true;
+		}
+
+	private:
+		TWeakObjectPtr<UStaticMeshComponent> Blockout;
+		TStrongObjectPtr<UProceduralMeshComponent> Preview;
+		bool bWasVisible = true;
+		bool bWasHiddenInGame = false;
+	};
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandViewpointCaptureTest, "CaptiveSky2.Visual.Viewpoints",
@@ -913,7 +940,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Transient ocean material preview %s on OceanPlane; the authored material is restored after capture."), *OceanMaterialPath));
 	}
 	UStaticMeshComponent* TideglassMesh = nullptr;
-	UMaterialInterface* OriginalTideglassMaterial = nullptr;
+	UProceduralMeshComponent* TideglassPreviewSurface = nullptr;
+	bool bTideglassWasVisible = true;
+	bool bTideglassWasHiddenInGame = false;
 	FTideglassWeatherPreview TideglassWeather;
 	if (bTideglassMaterialOverride)
 	{
@@ -925,9 +954,29 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			AddError(FString::Printf(TEXT("Tideglass preview needs a loadable material (%s) and the flattened sphere beside the TideglassPool marker."), *TideglassMaterialPath));
 			return false;
 		}
-		OriginalTideglassMaterial = TideglassMesh->GetMaterial(0);
-		TideglassMesh->SetMaterial(0, TideglassMaterial);
-		AddInfo(FString::Printf(TEXT("Transient Tideglass material preview %s on the flattened sphere; the authored material is restored after capture."), *TideglassMaterialPath));
+		bTideglassWasVisible = TideglassMesh->IsVisible();
+		bTideglassWasHiddenInGame = TideglassMesh->bHiddenInGame;
+		TideglassPreviewSurface = UIslandTideglassSubsystem::CreatePoolSurfaceMesh(TideglassMesh);
+		if (!TideglassPreviewSurface)
+		{
+			if (OceanMesh) OceanMesh->SetMaterial(0, OriginalOceanMaterial);
+			AddError(TEXT("Could not create the transient irregular Tideglass surface over the blockout footprint."));
+			return false;
+		}
+		TideglassMesh->SetVisibility(false);
+		TideglassMesh->SetHiddenInGame(true);
+		TideglassPreviewSurface->SetMaterial(0, TideglassMaterial);
+		const FProcMeshSection* TideglassSection = TideglassPreviewSurface->GetProcMeshSection(0);
+		AddInfo(FString::Printf(TEXT("Transient Tideglass preview %s: surface at %s bounds origin %s extent %s, registered=%s visible=%s hiddenInGame=%s actorHidden=%s, section vertices=%d indices=%d; footprint at %s."),
+			*TideglassMaterialPath, *TideglassPreviewSurface->GetComponentLocation().ToString(),
+			*TideglassPreviewSurface->Bounds.Origin.ToString(), *TideglassPreviewSurface->Bounds.BoxExtent.ToString(),
+			TideglassPreviewSurface->IsRegistered() ? TEXT("true") : TEXT("false"),
+			TideglassPreviewSurface->IsVisible() ? TEXT("true") : TEXT("false"),
+			TideglassPreviewSurface->bHiddenInGame ? TEXT("true") : TEXT("false"),
+			TideglassPreviewSurface->GetOwner()->IsHidden() ? TEXT("true") : TEXT("false"),
+			TideglassSection ? TideglassSection->ProcVertexBuffer.Num() : 0,
+			TideglassSection ? TideglassSection->ProcIndexBuffer.Num() : 0,
+			*TideglassMesh->GetComponentLocation().ToString()));
 		if (bTideglassWeatherOverride)
 		{
 			UMaterialParameterCollection* Collection = LoadObject<UMaterialParameterCollection>(nullptr, UIslandEnvironmentSubsystem::CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -937,7 +986,10 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				!Instance->GetScalarParameterValue(TEXT("Storm"), TideglassWeather.OriginalStorm) ||
 				!Instance->GetScalarParameterValue(TEXT("RainIntensity"), TideglassWeather.OriginalRainIntensity))
 			{
-				TideglassMesh->SetMaterial(0, OriginalTideglassMaterial);
+				if (AActor* Owner = TideglassPreviewSurface->GetOwner()) Owner->Destroy();
+				TideglassPreviewSurface = nullptr;
+				TideglassMesh->SetVisibility(bTideglassWasVisible);
+				TideglassMesh->SetHiddenInGame(bTideglassWasHiddenInGame);
 				if (OceanMesh) OceanMesh->SetMaterial(0, OriginalOceanMaterial);
 				AddError(TEXT("Could not load and snapshot the environment collection's wind/storm/rain values."));
 				return false;
@@ -957,7 +1009,9 @@ ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Vi
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview,
 		MoveTemp(LandscapePreviewInstances), MoveTemp(TideglassWeather)));
 	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(OceanMesh, OriginalOceanMaterial));
-	if (TideglassMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(TideglassMesh, OriginalTideglassMaterial));
+	if (TideglassMesh && TideglassPreviewSurface)
+		ADD_LATENT_AUTOMATION_COMMAND(FRestoreTideglassSurfacePreviewCommand(TideglassMesh, TideglassPreviewSurface,
+			bTideglassWasVisible, bTideglassWasHiddenInGame));
 	return true;
 }
 
