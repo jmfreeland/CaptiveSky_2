@@ -63,7 +63,19 @@ values. This tests the material response, not the weather actor or gameplay inte
 normalized against a tunable 300 cm/s reference before blending, avoiding immediate saturation at
 ordinary breeze speeds. The new material's waves now span the small pool footprint, and its matched
 storm frame visibly roughens the surface. These editor-world stills verify weather-driven variation,
-not temporal motion during play; a short provider-free PIE capture should next confirm that swells move
-over time without spending model requests. The organic surface remains a non-colliding visual prototype without depth,
+not temporal motion during play. A bounded provider-free Game capture is now reproducible with:
+
+```powershell
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
+```
+
+The October 1 run completed in 40.2 seconds, made zero model requests, and produced four 1600x900
+frames under `Saved/Playtests/TideglassMotion/Screenshots/`. The visible pool pattern differs between
+the first and last frames, but the environment clock advanced from 09:00 to 09:18 and the surrounding
+lighting changed too; this is suggestive, not a clean isolation of animated swells. Freeze the clock
+or compare material-space motion under fixed lighting before calling temporal motion confirmed. That
+Game launch also logged nine Python tracebacks from UE's Experimental Toolsets/ToolsetRegistry startup
+scripts (missing editor Python classes); no CaptiveSky error appeared, and the game exited normally.
+The organic surface remains a non-colliding visual prototype without depth,
 temperature, water quality, swimming or shoreline blending. Keep the map material reversible and do
 not overwrite the authored sphere material.

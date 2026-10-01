@@ -102,7 +102,15 @@ void AIslandSpectatorDirector::LoadEstablishingShots()
 {
 	Establishing.Reset();
 	UWorld* World = GetWorld();
-	const FString Path = ViewpointFileOverride.IsEmpty() ? FPaths::ProjectConfigDir() / TEXT("IslandViewpoints.json") : ViewpointFileOverride;
+	FString CommandLineViewpointFile;
+	FString Path;
+	if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorViewpointFile="), CommandLineViewpointFile) && !CommandLineViewpointFile.IsEmpty())
+		Path = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir(), CommandLineViewpointFile);
+	else
+		Path = ViewpointFileOverride.IsEmpty() ? FPaths::ProjectConfigDir() / TEXT("IslandViewpoints.json") : ViewpointFileOverride;
+	double ShotDuration = EstablishingSeconds;
+	FParse::Value(FCommandLine::Get(), TEXT("SpectatorEstablishingSeconds="), ShotDuration);
+	ShotDuration = FMath::Clamp(FMath::IsFinite(ShotDuration) ? ShotDuration : static_cast<double>(EstablishingSeconds), 1.0, 600.0);
 	FString Json;
 	TSharedPtr<FJsonObject> Root;
 	const TArray<TSharedPtr<FJsonValue>>* Entries = nullptr;
@@ -133,11 +141,13 @@ void AIslandSpectatorDirector::LoadEstablishingShots()
 			Shot.Kind = EIslandShotKind::Establishing;
 			Shot.Title = TitleFromViewpointName(Name);
 			Shot.FieldOfView = FieldOfView;
-			Shot.Duration = EstablishingSeconds;
+			Shot.Duration = static_cast<float>(ShotDuration);
 			Shot.Focus = Shot.LookAt;
 			Establishing.Add(Shot);
 		}
 	}
+	if (Establishing.Num() > 0)
+		UE_LOG(LogIslandSpectator, Log, TEXT("Loaded %d establishing viewpoints from %s at %.1f seconds per shot"), Establishing.Num(), *Path, ShotDuration);
 	if (Establishing.Num() > 0) return;
 	// Without viewpoints, circle the landmarks instead.
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -150,7 +160,7 @@ void AIslandSpectatorDirector::LoadEstablishingShots()
 		KeepAboveGround(World, Shot.From, 160.f);
 		KeepAboveGround(World, Shot.To, 160.f);
 		Shot.Title = It->Tags[0].ToString();
-		Shot.Duration = EstablishingSeconds;
+		Shot.Duration = static_cast<float>(ShotDuration);
 		Shot.Focus = Shot.LookAt;
 		Establishing.Add(Shot);
 	}

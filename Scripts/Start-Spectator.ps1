@@ -19,12 +19,16 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -ScreenshotDirectory Screenshots/Spectator/ReturnCheck
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
 param(
 	[switch]$Windowed,
 	[switch]$Shots,
 	[string]$ScreenshotDirectory,
+	[string]$ViewpointFile,
+	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
+	[switch]$DisableAgentThinking,
 	[switch]$Continuous,
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
@@ -41,6 +45,13 @@ $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
 if ($Windowed) { $arguments += @("-windowed", "-ResX=1600", "-ResY=900") } else { $arguments += "-fullscreen" }
 if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot; use -ScreenshotDirectory to isolate runs
 if (-not [string]::IsNullOrWhiteSpace($ScreenshotDirectory)) { $arguments += "-SpectatorScreenshotDir=$ScreenshotDirectory" }
+if (-not [string]::IsNullOrWhiteSpace($ViewpointFile)) {
+	$viewpointPath = if ([System.IO.Path]::IsPathRooted($ViewpointFile)) { $ViewpointFile } else { Join-Path (Split-Path $project) $ViewpointFile }
+	if (-not (Test-Path $viewpointPath)) { throw "Spectator viewpoint file not found: $viewpointPath" }
+	$arguments += "-SpectatorViewpointFile=$viewpointPath"
+}
+if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
+if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }

@@ -1,0 +1,39 @@
+{
+	"viewpoints": [
+		{
+			"name": "02_Tideglass",
+			"from": { "tag": "TideglassPool", "offset": [600, -360, 0] },
+			"look": { "tag": "ListeningStones", "offset": [0, 0, 60] },
+			"fov": 65,
+			"min_height": 170
+		},
+		{
+			"name": "02_Tideglass",
+			"from": { "tag": "TideglassPool", "offset": [600, -360, 0] },
+			"look": { "tag": "ListeningStones", "offset": [0, 0, 60] },
+			"fov": 65,
+			"min_height": 170
+		},
+		{
+			"name": "02_Tideglass",
+			"from": { "tag": "TideglassPool", "offset": [600, -360, 0] },
+			"look": { "tag": "ListeningStones", "offset": [0, 0, 60] },
+			"fov": 65,
+			"min_height": 170
+		},
+		{
+			"name": "02_Tideglass",
+			"from": { "tag": "TideglassPool", "offset": [600, -360, 0] },
+			"look": { "tag": "ListeningStones", "offset": [0, 0, 60] },
+			"fov": 65,
+			"min_height": 170
+		},
+		{
+			"name": "02_Tideglass",
+			"from": { "tag": "TideglassPool", "offset": [600, -360, 0] },
+			"look": { "tag": "ListeningStones", "offset": [0, 0, 60] },
+			"fov": 65,
+			"min_height": 170
+		}
+	]
+}
