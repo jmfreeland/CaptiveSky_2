@@ -487,6 +487,7 @@ void AIslandWeather::InitializeGroundCover()
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
 				int32 SpruceTraceCount = 0;
+				int32 SpruceSaplingCount = 0;
 				auto TraceSpruceGround = [this, &Query, &TraceTop, &TraceBottom, SeaLevel, IslandLandscape, &SpruceTraceCount](const FVector& Candidate, FHitResult& Hit)
 				{
 					++SpruceTraceCount;
@@ -557,9 +558,44 @@ void AIslandWeather::InitializeGroundCover()
 						SpruceLocations.Add(TreeHit.ImpactPoint);
 						++GroundCoverTreeCount;
 					}
+
+					// Seed the grove edges with small, nonblocking spruce saplings. They use the same
+					// native mesh, but a distinct scale band and spacing so they read as younger growth.
+					constexpr int32 SaplingsPerGrove = 6;
+					constexpr int32 MaxSaplingTracesPerGrove = 64;
+					constexpr float SaplingInnerRadius = 1700.f;
+					constexpr float SaplingOuterRadius = 2600.f;
+					constexpr float SaplingMinSpacing = 450.f;
+					const int32 SaplingsBeforeGrove = SpruceSaplingCount;
+					for (int32 Attempt = 0; Attempt < MaxSaplingTracesPerGrove && SpruceSaplingCount - SaplingsBeforeGrove < SaplingsPerGrove; ++Attempt)
+					{
+						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
+						const float Radius = SpruceRandom.FRandRange(SaplingInnerRadius, SaplingOuterRadius);
+						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+						bool bNearLandmark = false;
+						for (const FVector& Exclusion : ExclusionLocations)
+							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
+						if (bNearLandmark) continue;
+						bool bTooClose = false;
+						for (const FVector& ExistingTree : SpruceLocations)
+							if (FVector::Dist2D(Candidate, ExistingTree) < SaplingMinSpacing) { bTooClose = true; break; }
+						if (bTooClose) continue;
+
+						FHitResult SaplingHit;
+						if (!TraceSpruceGround(Candidate, SaplingHit)) continue;
+						const float TargetHeight = SpruceRandom.FRandRange(180.f, 420.f);
+						const FVector Scale(TargetHeight / (2.f * SpruceBounds.BoxExtent.Z));
+						const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
+						const FVector MeshBottom(SpruceBounds.Origin.X, SpruceBounds.Origin.Y, SpruceBounds.Origin.Z - SpruceBounds.BoxExtent.Z);
+						const FVector Location = SaplingHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+						IslandSpruce->AddInstance(FTransform(Rotation, Location, Scale), true);
+						SpruceLocations.Add(SaplingHit.ImpactPoint);
+						++SpruceSaplingCount;
+						++GroundCoverTreeCount;
+					}
 				}
-			UE_LOG(LogIslandWeather, Log, TEXT("Landscape spruce scatter placed %d trees in %d groves after %d bounded traces."),
-				GroundCoverTreeCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+			UE_LOG(LogIslandWeather, Log, TEXT("Landscape spruce scatter placed %d trees (%d saplings) in %d groves after %d bounded traces."),
+				GroundCoverTreeCount, SpruceSaplingCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
 	}
 	}

@@ -832,16 +832,31 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->GroundCoverMeadowInstanceCount <= 983040 && PreviewWeather->GroundCoverInstanceCount <= 983724);
 		TestTrue(TEXT("Existing interactive-spruce forest mesh is available"),
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
-		TestTrue(TEXT("Deterministic spruce groves add a bounded population without affecting collision or navigation"),
-			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 256 && PreviewWeather->IslandSpruce &&
+		int32 MatureSpruceCount = 0;
+		int32 SaplingCount = 0;
+		const float SpruceMeshHalfHeight = PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh()
+			? PreviewWeather->IslandSpruce->GetStaticMesh()->GetBounds().BoxExtent.Z : 0.f;
+		for (int32 TreeIndex = 0; SpruceMeshHalfHeight > KINDA_SMALL_NUMBER && TreeIndex < PreviewWeather->IslandSpruce->GetInstanceCount(); ++TreeIndex)
+		{
+			FTransform TreeTransform;
+			if (!PreviewWeather->IslandSpruce->GetInstanceTransform(TreeIndex, TreeTransform, true)) continue;
+			const float TreeHeight = TreeTransform.GetScale3D().Z * (2.f * SpruceMeshHalfHeight);
+			if (TreeHeight >= 150.f && TreeHeight <= 450.f) ++SaplingCount;
+			else if (TreeHeight >= 900.f && TreeHeight <= 1800.f) ++MatureSpruceCount;
+		}
+		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within their combined population budget"),
+			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 352 &&
+			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 96 &&
+			PreviewWeather->IslandSpruce &&
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
 		UHierarchicalInstancedStaticMeshComponent* GrassC = PreviewWeather->FindShoreGrassC();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances and %d spruce trees."),
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances and %d spruce trees (%d mature + %d saplings)."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), GrassC ? GrassC->GetInstanceCount() : 0,
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
-			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount));
+			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
+			MatureSpruceCount, SaplingCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;
