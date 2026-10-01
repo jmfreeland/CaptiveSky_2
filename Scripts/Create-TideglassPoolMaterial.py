@@ -1,16 +1,17 @@
-"""Creates a separate, weather-responsive opaque water material for the shallow Tideglass pool.
+"""Creates a separate, visibly wave-shaped opaque water material for the Tideglass pool.
 
 The asset is additive and is never assigned to the saved Island map. Runtime code swaps it onto the
-flattened pool surface for Game/PIE only, then restores the authored blockout material at teardown.
-It uses a new asset path so an earlier generated version is preserved. The builder refuses to
-overwrite its own output; remove or rename that exact generated asset deliberately to rebuild.
+procedural pool surface for Game/PIE only, then restores the authored blockout at teardown. Tighter
+world-aligned normal tiling makes waves legible at this small pool scale; weather also changes base
+color, roughness and normal strength. This output uses a new path and the builder refuses to overwrite
+it; the previous M_TideglassPool_NormalizedWind asset is preserved.
 """
 
 import traceback
 import unreal
 
 
-MATERIAL_PATH = "/Game/Materials/M_TideglassPool_NormalizedWind"
+MATERIAL_PATH = "/Game/Materials/M_TideglassPool_Lively"
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WAVE_NORMAL = "/Water/Textures/Normals/T_Water_TilingNormal_Waves_02"
 MEL = unreal.MaterialEditingLibrary
@@ -70,7 +71,7 @@ def build():
         raise RuntimeError("Missing environment collection or Water plugin normal texture")
 
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    material = tools.create_asset("M_TideglassPool_NormalizedWind", "/Game/Materials",
+    material = tools.create_asset("M_TideglassPool_Lively", "/Game/Materials",
                                   unreal.Material, unreal.MaterialFactoryNew())
     if not material:
         raise RuntimeError("Could not create " + MATERIAL_PATH)
@@ -116,13 +117,15 @@ def build():
                           scalar(material, name + "Strength", strength, -700, y + 150), -500, y)
         return weighted
 
-    swell_a = swell("LongSwell", 5200.0, (0.010, 0.004), 0.32, 0)
-    swell_b = swell("ShortChop", 1500.0, (-0.018, 0.014), 0.18, 420)
+    # The pool is only a few metres across: ocean-scale UV tiling made the whole surface
+    # sample one nearly constant part of the normal texture. These wavelengths span it.
+    swell_a = swell("LongSwell", 420.0, (0.035, 0.012), 0.40, 0)
+    swell_b = swell("ShortChop", 160.0, (-0.075, 0.058), 0.26, 420)
     slope = binary(material, unreal.MaterialExpressionAdd, swell_a, swell_b, -250, 180)
     weather_gain = binary(material, unreal.MaterialExpressionAdd,
-                          scalar(material, "CalmNormalGain", 0.45, -250, 350),
+                          scalar(material, "CalmNormalGain", 0.65, -250, 350),
                           binary(material, unreal.MaterialExpressionMultiply, agitation,
-                                 scalar(material, "WeatherNormalGain", 0.65, -250, 500), 0, 400),
+                                 scalar(material, "WeatherNormalGain", 1.4, -250, 500), 0, 400),
                           200, 250)
     weather_slope = binary(material, unreal.MaterialExpressionMultiply, slope, weather_gain, 400, 200)
     normal_xy = expr(material, unreal.MaterialExpressionAppendVector, 600, 200)
@@ -132,7 +135,12 @@ def build():
     link(normal_xy, normalized)
     MEL.connect_material_property(normalized, "", unreal.MaterialProperty.MP_NORMAL)
 
-    pool_color = vector(material, "PoolColor", (0.025, 0.17, 0.22), 300, -250)
+    calm_pool_color = vector(material, "CalmPoolColor", (0.025, 0.17, 0.22), 100, -250)
+    storm_pool_color = vector(material, "StormPoolColor", (0.006, 0.045, 0.08), 100, -100)
+    pool_color = expr(material, unreal.MaterialExpressionLinearInterpolate, 360, -260)
+    link(calm_pool_color, pool_color, "A")
+    link(storm_pool_color, pool_color, "B")
+    link(agitation, pool_color, "Alpha")
     reflection_tint = vector(material, "EdgeReflectionTint", (0.14, 0.43, 0.47), 300, -100)
     fresnel = expr(material, unreal.MaterialExpressionFresnel, 300, 50, exponent=4.0)
     color = expr(material, unreal.MaterialExpressionLinearInterpolate, 700, -180)
@@ -142,9 +150,9 @@ def build():
     MEL.connect_material_property(color, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     roughness = binary(material, unreal.MaterialExpressionAdd,
-                       scalar(material, "CalmRoughness", 0.18, 700, -600),
+                       scalar(material, "CalmRoughness", 0.12, 700, -600),
                        binary(material, unreal.MaterialExpressionMultiply, agitation,
-                              scalar(material, "WeatherRoughness", 0.38, 700, -450), 900, -450),
+                              scalar(material, "WeatherRoughness", 0.62, 700, -450), 900, -450),
                        1100, -550)
     MEL.connect_material_property(roughness, "", unreal.MaterialProperty.MP_ROUGHNESS)
     MEL.connect_material_property(scalar(material, "Specular", 0.62, 1000, -300),
@@ -155,7 +163,7 @@ def build():
         raise RuntimeError("Material compile errors: " + " | ".join(str(error) for error in errors))
     if not unreal.EditorAssetLibrary.save_asset(MATERIAL_PATH):
         raise RuntimeError("Could not save " + MATERIAL_PATH)
-    unreal.log("[TideglassMaterial] Created additive weather-responsive pool material {}".format(MATERIAL_PATH))
+    unreal.log("[TideglassMaterial] Created additive visibly wavy pool material {}".format(MATERIAL_PATH))
 
 
 try:

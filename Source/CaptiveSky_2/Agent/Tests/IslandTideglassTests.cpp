@@ -79,6 +79,16 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			TestFalse(TEXT("Teardown restores the blockout sphere visibility"), Surface->bHiddenInGame);
 			TestNull(TEXT("Teardown destroys the transient procedural water surface"), Tideglass->RuntimeSurface.Get());
 			TestFalse(TEXT("No Tideglass material remains applied after restore"), Tideglass->IsApplied());
+			if (PoolWater)
+			{
+				Tideglass->MaterialOverride = nullptr;
+				TestTrue(TEXT("The configured default material path resolves to the generated Lively asset"),
+					LoadObject<UMaterialInterface>(nullptr, UIslandTideglassSubsystem::MaterialPath) == PoolWater);
+				TestTrue(TEXT("The generated default material applies to the procedural surface"), Tideglass->ApplyPoolMaterial(PoolWater));
+				TestTrue(TEXT("The configured default material is assigned to the procedural surface"),
+					Tideglass->RuntimeSurface && Tideglass->RuntimeSurface->GetMaterial(0) == PoolWater);
+				Tideglass->RestorePoolMaterial();
+			}
 		}
 	}
 

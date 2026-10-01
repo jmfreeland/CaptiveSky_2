@@ -8,7 +8,7 @@
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 
-const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_NormalizedWind.M_TideglassPool_NormalizedWind");
+const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_Lively.M_TideglassPool_Lively");
 
 bool UIslandTideglassSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
 {
