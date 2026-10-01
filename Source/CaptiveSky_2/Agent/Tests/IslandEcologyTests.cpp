@@ -58,11 +58,13 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	ATargetPoint* ListeningStones = World->SpawnActor<ATargetPoint>(FVector(3500.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	AActor* TideglassGround = World->SpawnActor<AActor>(FVector(0.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
 	AActor* StonesGround = World->SpawnActor<AActor>(FVector(3500.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
+	AActor* TideglassFootprint = World->SpawnActor<AActor>(FVector(0.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	if (!TestNotNull(TEXT("Ground-cover weather actor spawned"), Weather) ||
 		!TestNotNull(TEXT("Tideglass ground-cover marker spawned"), Tideglass) ||
 		!TestNotNull(TEXT("ListeningStones ground-cover marker spawned"), ListeningStones) ||
 		!TestNotNull(TEXT("Tideglass collision fixture spawned"), TideglassGround) ||
-		!TestNotNull(TEXT("ListeningStones collision fixture spawned"), StonesGround))
+		!TestNotNull(TEXT("ListeningStones collision fixture spawned"), StonesGround) ||
+		!TestNotNull(TEXT("Tideglass water-footprint fixture spawned"), TideglassFootprint))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -70,6 +72,22 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	Tideglass->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
 	ListeningStones->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+	TideglassFootprint->Tags.Add(TEXT("IslandLandmark"));
+	UStaticMesh* TideglassSphereAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (!TestNotNull(TEXT("Tideglass water-footprint sphere asset loaded"), TideglassSphereAsset))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	UStaticMeshComponent* TideglassSphere = NewObject<UStaticMeshComponent>(TideglassFootprint);
+	TideglassSphere->SetStaticMesh(TideglassSphereAsset);
+	TideglassFootprint->SetRootComponent(TideglassSphere);
+	TideglassSphere->SetRelativeScale3D(FVector(6.f, 6.f, 0.01f));
+	TideglassSphere->RegisterComponent();
+	TideglassFootprint->SetActorLocation(Tideglass->GetActorLocation());
+	TestTrue(TEXT("The shallow sphere fixture remains within the pool marker's 25 cm discovery radius"),
+		FVector::Dist(TideglassFootprint->GetActorLocation(), Tideglass->GetActorLocation()) <= 25.f);
 	auto AddGround = [](AActor* Actor, const FVector& Location, const FVector& Extent)
 	{
 		UBoxComponent* Box = NewObject<UBoxComponent>(Actor);
@@ -102,7 +120,25 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
 	}
 	Weather->InitializeGroundCover();
-	TestEqual(TEXT("Ground cover places one 96-clump ring around each landmark"), Weather->GroundCoverInstanceCount, 192);
+	TestTrue(TEXT("Pool footprint clearance removes the Tideglass inner-ring grass while preserving both landmark verges"),
+		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount < 192);
+	const FVector PoolScale = TideglassSphere->GetComponentScale();
+	const FBoxSphereBounds PoolBounds = TideglassSphereAsset->GetBounds();
+	const float PoolClearanceRadius = FVector::Dist2D(TideglassSphere->GetComponentLocation(), Tideglass->GetActorLocation()) +
+		FMath::Max(PoolBounds.BoxExtent.X * PoolScale.X, PoolBounds.BoxExtent.Y * PoolScale.Y) * 1.13f + 125.f;
+	AddInfo(FString::Printf(TEXT("Pool-edge fixture expects %.1f cm clearance; weather placed %d instances (%d + %d)."),
+		PoolClearanceRadius, Weather->GroundCoverInstanceCount, Weather->ShoreGrassA->GetInstanceCount(), Weather->ShoreGrassB->GetInstanceCount()));
+	int32 GrassInsidePoolClearance = 0;
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA, Weather->ShoreGrassB})
+	{
+		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (Grass->GetInstanceTransform(Index, Transform, true) && FVector::Dist2D(Transform.GetLocation(), Tideglass->GetActorLocation()) < PoolClearanceRadius)
+				++GrassInsidePoolClearance;
+		}
+	}
+	TestEqual(TEXT("No ground-cover instance intrudes into the Tideglass water footprint or edge margin"), GrassInsidePoolClearance, 0);
 	TestEqual(TEXT("Each wind-driven species retains an immutable baseline for every clump"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
@@ -162,8 +198,9 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayB.Num(), SecondSwayB.Num()); ++Index)
 		bRepeatedSwayIsStable &= FirstSwayB[Index].Equals(SecondSwayB[Index], 0.001f);
 	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
+	const int32 GroundCoverCountAfterFirstInitialization = Weather->GroundCoverInstanceCount;
 	Weather->InitializeGroundCover();
-	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, 192);
+	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, GroundCoverCountAfterFirstInitialization);
 	Weather->ClearGroundCover();
 	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
 	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),

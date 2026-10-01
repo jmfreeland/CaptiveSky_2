@@ -10,6 +10,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -162,6 +163,32 @@ void AIslandWeather::InitializeGroundCover()
 		const bool bListeningStones = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("ListeningStones"));
 		if (!bTideglass && !bListeningStones) continue;
 
+		float TideglassClearRadius = 0.f;
+		if (bTideglass)
+		{
+			for (TActorIterator<AActor> SurfaceIt(GetWorld()); SurfaceIt; ++SurfaceIt)
+			{
+				if (FVector::Dist(SurfaceIt->GetActorLocation(), Landmark->GetActorLocation()) > 25.f) continue;
+				TArray<UStaticMeshComponent*> MeshComponents;
+				SurfaceIt->GetComponents<UStaticMeshComponent>(MeshComponents);
+				for (const UStaticMeshComponent* Mesh : MeshComponents)
+				{
+					if (!Mesh || !Mesh->GetStaticMesh() || Mesh->GetStaticMesh()->GetName() != TEXT("Sphere")) continue;
+					const FVector Scale = Mesh->GetComponentScale();
+					if (Scale.X <= 2.f || Scale.Y <= 2.f || Scale.Z >= 0.25f) continue;
+					const FBoxSphereBounds LocalBounds = Mesh->GetStaticMesh()->GetBounds();
+					const float SurfaceRadius = FMath::Max(LocalBounds.BoxExtent.X * Scale.X, LocalBounds.BoxExtent.Y * Scale.Y);
+					// The generated water outline extends slightly beyond the source sphere bounds;
+					// keep full-sized grass clumps outside it, plus the marker's allowed offset.
+					TideglassClearRadius = FVector::Dist2D(Mesh->GetComponentLocation(), Landmark->GetActorLocation()) + SurfaceRadius * 1.13f + 125.f;
+					break;
+				}
+				if (TideglassClearRadius > 0.f) break;
+			}
+			if (TideglassClearRadius > 0.f)
+				UE_LOG(LogIslandWeather, Log, TEXT("Tideglass ground cover leaves a %.0f cm pool-edge clearance."), TideglassClearRadius);
+		}
+
 		TArray<FTransform> Offsets;
 		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^ (bTideglass ? 0x2f6e2b1u : 0x6d2b79f5u);
 		BuildGroundCoverOffsets(static_cast<int32>(Seed), Offsets);
@@ -169,6 +196,7 @@ void AIslandWeather::InitializeGroundCover()
 		{
 			const FTransform& Offset = Offsets[Index];
 			const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
+			if (TideglassClearRadius > 0.f && Offset.GetLocation().Size2D() < TideglassClearRadius) continue;
 			const FVector TraceStart = Candidate + FVector(0.f, 0.f, 1400.f);
 			const FVector TraceEnd = Candidate - FVector(0.f, 0.f, 5000.f);
 			FHitResult GroundHit;
