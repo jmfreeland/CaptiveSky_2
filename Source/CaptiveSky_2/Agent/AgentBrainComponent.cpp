@@ -328,13 +328,14 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				RememberPlace(Curio.Id, Curio.Kind == EIslandCurioKind::PaleStone ? TEXT("a small pale stone")
 					: Curio.Kind == EIslandCurioKind::SeedPod ? TEXT("a strange pod") : TEXT("the small cairn"), Curio.Location);
 			}
-			// Arranging grounds and the works on them are human-scale: noticed within about twelve metres.
+			// Ground residents notice arranging grounds nearby; a raven can spot a landing site from farther away.
 			int32 NoticedSites = 0;
 			for (const FIslandArrangementSite& Site : WorldState->GetArrangementSites())
 			{
 				if (NoticedSites >= 3) break;
 				const FVector View = Site.Location + FVector(0.f, 0.f, 30.f);
-				if (FVector::DistSquared(Location, View) > FMath::Square(1200.f)) continue;
+				const float NoticeRange = RavenRoostController ? ARavenAgentAIController::GroundLandingVisibilityRange : 1200.f;
+				if (FVector::DistSquared(Location, View) > FMath::Square(NoticeRange)) continue;
 				FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentArrangementVisibility), false, Owner);
 				FHitResult Hit;
 				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, View, ECC_Visibility, Params)) continue;

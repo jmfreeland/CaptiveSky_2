@@ -179,6 +179,10 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	HiddenSite.Id = TEXT("ArrangingGround_Hidden");
 	HiddenSite.Location = FVector(600.f, 1000.f, 0.f);
 	State->ArrangementSites.Add(HiddenSite);
+	FIslandArrangementSite FarForageSite;
+	FarForageSite.Id = TEXT("ArrangingGround_FarForage");
+	FarForageSite.Location = FVector(2600.f, 0.f, 0.f);
+	State->ArrangementSites.Add(FarForageSite);
 	AActor* Occluder = World->SpawnActor<AActor>();
 	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
 	Occluder->SetRootComponent(OccluderBox);
@@ -189,6 +193,8 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	const FString ForageSummary = RavenBrain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(*FString::Printf(TEXT("Open-ground forage site is offered (summary: %s)"), *ForageSummary),
 		ForageSummary.Contains(TEXT("move_to/land target: ArrangingGround_TestForage")));
+	TestTrue(*FString::Printf(TEXT("A clearly visible forage site 20 metres away is also offered as an exact landing target (summary: %s)"), *ForageSummary),
+		ForageSummary.Contains(TEXT("move_to/land target: ArrangingGround_FarForage")));
 	FAgentDecision HiddenLanding;
 	HiddenLanding.bValid = true;
 	HiddenLanding.ActionType = EAgentActionType::Land;
@@ -209,7 +215,7 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	FAgentDecision Land;
 	Land.bValid = true;
 	Land.ActionType = EAgentActionType::Land;
-	Land.ActionTarget = ForageSite.Id.ToString();
+	Land.ActionTarget = FarForageSite.Id.ToString();
 	Controller->ActOnDecision(Land);
 	for (int32 Frame = 0; Frame < 1800 && Controller->bHasMovementTarget; ++Frame) Controller->Tick(1.f / 60.f);
 	TestTrue(TEXT("Raven can fly from its perch and descend onto a verified open-ground site"), Controller->LocomotionState == ERavenLocomotionState::Grounded && !Controller->bHasMovementTarget);

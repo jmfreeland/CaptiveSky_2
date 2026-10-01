@@ -244,7 +244,7 @@ void ARavenAgentAIController::BeginGroundLandingAt(FName SiteTag)
 	{
 		if (VisibleSites >= 3) break;
 		const FVector View = Candidate.Location + FVector(0.f, 0.f, 30.f);
-		if (FVector::DistSquared(GetPawn()->GetActorLocation(), View) > FMath::Square(1200.f)) continue;
+		if (FVector::DistSquared(GetPawn()->GetActorLocation(), View) > FMath::Square(GroundLandingVisibilityRange)) continue;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenLandingSiteVisibility), false, GetPawn());
 		FHitResult Hit;
 		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), View, ECC_Visibility, Query)) continue;

@@ -48,6 +48,8 @@ public:
 
 	/** Read-only collision assessment for a tagged roost marker; does not begin movement or claim ownership. */
 	FString AssessRoostSite(const AActor* Site) const;
+	/** Maximum visible distance for selecting an exact open-ground landing target. */
+	static constexpr float GroundLandingVisibilityRange = 3500.f;
 
 	/** Build options this body has right now (gathering twigs, weaving at the roost it is perched on). */
 	FString DescribeBuildOptions() const;
