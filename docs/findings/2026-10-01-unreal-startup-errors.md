@@ -36,11 +36,25 @@ run; the session ended itself after 60.2 real seconds with zero model requests.
 ## Decision
 
 Do not disable `ModelContextProtocol`, `ToolsetRegistry`, `MCPClientToolset`,
-or the experimental toolset bundle as part of this triage. First verify which
-UE MCP surfaces the user relies on, then test a temporary, reversible launch
-with the unnecessary toolset plugins disabled while retaining the MCP server
-and client. Treat the repeated Python traces as engine/plugin-startup noise for
-now, not as proof that residents or world interactions crashed.
+or the experimental toolset bundle as part of this triage. A safer first step
+is to use Unreal's documented `-DisablePython` launch flag for a game-only
+spectator run; the [UE 5.8 command-line reference](https://dev.epicgames.com/documentation/unreal-engine/unreal-engine-command-line-arguments-reference?lang=en-US)
+lists this flag. This leaves the project's plugin configuration untouched.
+
+That test was run with `-NullRHI`, `-DDC-ForceMemoryCache`,
+`-CaptiveSkyDisableAgentThinking`, a unique `-CaptiveSkyDataRoot`, a 60-second
+real-time cap, and a one-request cap. It ended normally after 60.1 seconds with
+zero model requests. The log reports Python disabled and contains no Python
+Toolset tracebacks. The C++ `ModelContextProtocol` and
+`ModelContextProtocolEngine` modules still loaded. Because this was game mode,
+the editor-only `MCPClientToolset` was not exercised; this does not prove the
+editor MCP client works with Python disabled.
+
+`Scripts/Start-Spectator.ps1` now exposes this as opt-in `-DisablePython` for
+game-only runs. It is deliberately not enabled by default, and the project's
+plugin configuration remains unchanged. Treat the repeated Python traces as
+engine/plugin-startup noise, not as proof that residents or world interactions
+crashed.
 
 The one crowd-following warning is worth revisiting only if a play session
 shows actual navigation failure. It is currently an isolated warning, not

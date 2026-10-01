@@ -21,6 +21,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
+./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
 param(
@@ -31,6 +32,7 @@ param(
 	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
 	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
 	[switch]$DisableAgentThinking,
+	[switch]$DisablePython,
 	[switch]$Continuous,
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
@@ -60,6 +62,7 @@ if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
 }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
+if ($DisablePython) { $arguments += "-DisablePython" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }
