@@ -20,6 +20,7 @@
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "ContentStreaming.h"
 #include "ShaderCompiler.h"
@@ -583,7 +584,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	const bool bNightFireflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointNightFireflies"));
-	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover"));
+	const bool bGroundCoverSwayPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCoverSway"));
+	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover")) || bGroundCoverSwayPreview;
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
 	AIslandDayNight* PreviewClock = nullptr;
@@ -680,6 +682,48 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		}
 		PreviewWeather->InitializeGroundCover();
 		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass and ListeningStones."), PreviewWeather->GroundCoverInstanceCount));
+		if (bGroundCoverSwayPreview)
+		{
+			AActor* Tideglass = nullptr;
+			AActor* ListeningStones = nullptr;
+			for (TActorIterator<AActor> It(Island); It; ++It)
+			{
+				if (!Tideglass && It->ActorHasTag(TEXT("TideglassPool")) && It->ActorHasTag(TEXT("IslandLandmark"))) Tideglass = *It;
+				if (!ListeningStones && It->ActorHasTag(TEXT("ListeningStones")) && It->ActorHasTag(TEXT("IslandLandmark"))) ListeningStones = *It;
+			}
+			if (!Tideglass || !ListeningStones)
+			{
+				PreviewWeather->ClearGroundCoverPreview();
+				for (const TWeakObjectPtr<AActor>& Preview : PreviewActors) if (Preview.IsValid()) Preview->Destroy();
+				if (PreviewClock)
+				{
+					PreviewClock->StartHour = OriginalStartHour;
+					PreviewClock->DayNumber = OriginalDayNumber;
+					PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
+				}
+				AddError(TEXT("Ground-cover sway preview requires both tagged TideglassPool and ListeningStones landmarks."));
+				return false;
+			}
+			PreviewWeather->AddTransientGust(Tideglass->GetActorLocation(), FVector(0.857f, -0.514f, 0.f), 300.f, 1800.f, 18.f);
+			PreviewWeather->AddTransientGust(ListeningStones->GetActorLocation(), FVector(0.f, 1.f, 0.f), 300.f, 1800.f, 18.f);
+			PreviewWeather->UpdateGroundCoverSway();
+			float MaximumVisibleSwayDegrees = 0.f;
+			auto MeasureMaximumSway = [&MaximumVisibleSwayDegrees](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines)
+			{
+				for (int32 Index = 0; Grass && Index < Baselines.Num(); ++Index)
+				{
+					FTransform Current;
+					if (Grass->GetInstanceTransform(Index, Current, false))
+						MaximumVisibleSwayDegrees = FMath::Max(MaximumVisibleSwayDegrees,
+							FMath::RadiansToDegrees(Baselines[Index].GetRotation().AngularDistance(Current.GetRotation())));
+				}
+			};
+			MeasureMaximumSway(PreviewWeather->ShoreGrassA, PreviewWeather->ShoreGrassABaseTransforms);
+			MeasureMaximumSway(PreviewWeather->ShoreGrassB, PreviewWeather->ShoreGrassBBaseTransforms);
+			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
+			TestTrue(TEXT("Fixed preview gusts respect the six-degree response limit"), MaximumVisibleSwayDegrees <= 6.01f);
+			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));
+		}
 	}
 
 	// Log the landmarks so compositions can be planned against real coordinates.

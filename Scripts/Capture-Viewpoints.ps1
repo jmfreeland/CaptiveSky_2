@@ -12,6 +12,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 7.5 -Only Tideglass
 ./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCover
+./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCoverSway -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState -Day 1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 0
@@ -34,6 +35,7 @@ param(
 	[string]$Only = "",
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
+	[switch]$GroundCoverSway,
 	[switch]$NoWorldState,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
@@ -72,7 +74,8 @@ if ($LandscapeParent) { $extra += "-ViewpointLandscapeParent=$LandscapeParent" }
 if ($OceanMaterial) { $extra += "-ViewpointOceanMaterial=$OceanMaterial" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
-if ($GroundCover) { $extra += "-ViewpointGroundCover" }
+if ($GroundCover -or $GroundCoverSway) { $extra += "-ViewpointGroundCover" }
+if ($GroundCoverSway) { $extra += "-ViewpointGroundCoverSway" }
 if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `
