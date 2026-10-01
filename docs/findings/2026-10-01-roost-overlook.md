@@ -31,3 +31,13 @@ Game log: `Saved/Logs/Codex_WorldEcologyVisual_20261001_corrected.log`
 Isolation log: `Saved/Logs/Codex_ScreenshotIsolation_20261001_retry.log`
 
 Automation log: `Saved/Logs/Codex_SpectatorAutomation_20261001_retry.log`
+
+## Raven flight-wander curiosity
+
+Raven flight-wander now has a 40% chance to prefer one of twelve sampled cruise destinations that makes the most progress toward a nearby, currently visible actor tagged `IslandLandmark`; otherwise it retains the existing random cruise choice. It reuses the grounded residents' landmark-progress scorer and logs the selected landmark when the bias produces forward progress. This is a soft attraction, not a waypoint obligation or an LLM action.
+
+UE 5.8.3 editor build succeeded and `CaptiveSky2.Agent.RavenPerch` passed, including deterministic checks for curiosity selection and both random-fallback cases. The provider-free Game probe also completed both Raven movement branches in separate isolated launches: a 138 cm ground hop and a flight-wander ending at the reported flight destination; both runs made zero model requests. The sampled flight did not log a curiosity-selected landmark, so runtime selection in an unobstructed landmark view remains unverified. The probe now supports selecting a mover by actor tag or resident ID and waits for Raven's custom locomotion completion rather than relying only on nav path-following status.
+
+Automation log: `Saved/Logs/RavenLandmarkCuriosityTest.log`
+
+Game probe log (last run): `Saved/Logs/InnMovementProbe_Wander.log`

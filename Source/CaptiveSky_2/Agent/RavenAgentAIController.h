@@ -51,6 +51,9 @@ public:
 
 	/** Build options this body has right now (gathering twigs, weaving at the roost it is perched on). */
 	FString DescribeBuildOptions() const;
+	/** Keeps free flight random unless curiosity is active, then favors candidates approaching visible landmarks. */
+	static FVector SelectWanderCruiseTarget(const FVector& Origin, const TArray<FVector>& RandomCandidates,
+		const TArray<FVector>& VisibleLandmarks, int32 RandomFallbackIndex, bool bApplyCuriosityBias);
 
 	UPROPERTY(BlueprintReadOnly, Category = "Raven|Nest")
 	bool bCarryingTwigs = false;
@@ -79,6 +82,7 @@ private:
 	float HomeAltitude = 0.f;
 	float HopElapsed = 0.f;
 	float HopDuration = 0.55f;
+	static constexpr float WanderLandmarkCuriosityChance = 0.4f;
 	bool bHasMovementTarget = false;
 	bool bHasTakeoffEscapeTarget = false;
 	bool bTargetIsPerch = false;

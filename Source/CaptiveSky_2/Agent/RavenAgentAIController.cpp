@@ -10,6 +10,8 @@
 #include "AgentMemoryComponent.h"
 #include "HAL/PlatformTime.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogRavenAgentAI, Log, All);
+
 ARavenAgentAIController::ARavenAgentAIController()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -48,12 +50,87 @@ void ARavenAgentAIController::SetFlyingMovement(bool bFlying) const
 	}
 }
 
+FVector ARavenAgentAIController::SelectWanderCruiseTarget(const FVector& Origin, const TArray<FVector>& RandomCandidates,
+	const TArray<FVector>& VisibleLandmarks, int32 RandomFallbackIndex, bool bApplyCuriosityBias)
+{
+	if (RandomCandidates.IsEmpty()) return Origin;
+	const int32 SafeFallbackIndex = FMath::Clamp(RandomFallbackIndex, 0, RandomCandidates.Num() - 1);
+	if (!bApplyCuriosityBias || VisibleLandmarks.IsEmpty()) return RandomCandidates[SafeFallbackIndex];
+
+	int32 BestCandidateIndex = SafeFallbackIndex;
+	float BestScore = AAutonomousAgentAIController::WanderLandmarkProgressScore(
+		RandomCandidates[BestCandidateIndex], Origin, VisibleLandmarks);
+	for (int32 CandidateIndex = 0; CandidateIndex < RandomCandidates.Num(); ++CandidateIndex)
+	{
+		const float Score = AAutonomousAgentAIController::WanderLandmarkProgressScore(
+			RandomCandidates[CandidateIndex], Origin, VisibleLandmarks);
+		if (Score > BestScore)
+		{
+			BestCandidateIndex = CandidateIndex;
+			BestScore = Score;
+		}
+	}
+	return RandomCandidates[BestCandidateIndex];
+}
+
 FVector ARavenAgentAIController::MakeCruiseTarget() const
 {
 	const FVector Origin = GetPawn()->GetActorLocation();
-	const FVector2D Offset = FMath::RandPointInCircle(WanderRadius);
-	return FVector(Origin.X + Offset.X, Origin.Y + Offset.Y,
-		FMath::Clamp(HomeAltitude + FMath::FRandRange(-VerticalRange, VerticalRange), HomeAltitude - 100.f, HomeAltitude + VerticalRange));
+	const float CruiseAltitude = FMath::Clamp(HomeAltitude + FMath::FRandRange(-VerticalRange, VerticalRange),
+		HomeAltitude - 100.f, HomeAltitude + VerticalRange);
+	const auto RandomCruisePoint = [this, &Origin, CruiseAltitude]()
+	{
+		const FVector2D Offset = FMath::RandPointInCircle(WanderRadius);
+		return FVector(Origin.X + Offset.X, Origin.Y + Offset.Y, CruiseAltitude);
+	};
+
+	TArray<FVector> VisibleLandmarks;
+	TArray<FName> VisibleLandmarkNames;
+	if (UWorld* World = GetWorld())
+	{
+		VisibleLandmarks.Reserve(6);
+		VisibleLandmarkNames.Reserve(6);
+		for (TActorIterator<AActor> It(World); It && VisibleLandmarks.Num() < 6; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 ||
+				FVector::DistSquared(Origin, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
+
+			FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(RavenWanderLandmarkVisibility), false, GetPawn());
+			VisibilityParams.AddIgnoredActor(*It);
+			FHitResult VisibilityHit;
+			if (World->LineTraceSingleByChannel(VisibilityHit, Origin, It->GetActorLocation(), ECC_Visibility, VisibilityParams)) continue;
+			VisibleLandmarks.Add(It->GetActorLocation());
+			VisibleLandmarkNames.Add(It->Tags[0]);
+		}
+	}
+
+	const FVector RandomFallback = RandomCruisePoint();
+	if (VisibleLandmarks.IsEmpty() || FMath::FRand() >= WanderLandmarkCuriosityChance) return RandomFallback;
+
+	TArray<FVector> Candidates;
+	Candidates.Reserve(12);
+	Candidates.Add(RandomFallback);
+	for (int32 CandidateIndex = 1; CandidateIndex < 12; ++CandidateIndex) Candidates.Add(RandomCruisePoint());
+	const FVector CuriousTarget = SelectWanderCruiseTarget(Origin, Candidates, VisibleLandmarks, 0, true);
+	float BestProgress = 0.f;
+	FName BestLandmark = NAME_None;
+	for (int32 LandmarkIndex = 0; LandmarkIndex < VisibleLandmarks.Num(); ++LandmarkIndex)
+	{
+		const float Progress = FVector::Dist2D(Origin, VisibleLandmarks[LandmarkIndex]) -
+			FVector::Dist2D(CuriousTarget, VisibleLandmarks[LandmarkIndex]);
+		if (Progress > BestProgress)
+		{
+			BestProgress = Progress;
+			BestLandmark = VisibleLandmarkNames[LandmarkIndex];
+		}
+	}
+	if (BestProgress > 0.f)
+	{
+		UE_LOG(LogRavenAgentAI, Log, TEXT("Raven chose a curious flight-wander target %s, gaining %.0f cm toward visible landmark %s (%d visible nearby)."),
+			*CuriousTarget.ToCompactString(), BestProgress, *BestLandmark.ToString(), VisibleLandmarks.Num());
+		return CuriousTarget;
+	}
+	return RandomFallback;
 }
 
 void ARavenAgentAIController::BeginTakeoff(const FVector& Destination)
@@ -625,7 +702,11 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 		FVector Position = FMath::Lerp(HopStart, HopEnd, Alpha);
 		Position.Z += FMath::Sin(Alpha * PI) * HopHeight;
 		Raven->SetActorLocation(Position, true);
-		if (Alpha >= 1.f) SetGrounded();
+		if (Alpha >= 1.f)
+		{
+			SetGrounded();
+			ReportAction(TEXT("Completed a short ground hop."));
+		}
 		return;
 	}
 

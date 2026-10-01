@@ -214,10 +214,17 @@ private:
 			Finish(State, false);
 			return;
 		}
-		const bool bComplete = Controller->GetMoveStatus() != EPathFollowingStatus::Moving &&
-			Controller->DescribeActionState().Contains(TEXT("Reached the requested destination"));
+		const ARavenAgentAIController* RavenController = Cast<ARavenAgentAIController>(Controller);
+		const FString ActionState = Controller->DescribeActionState();
+		const bool bComplete = RavenController
+			? !Controller->IsActionInProgress() &&
+				(ActionState.Contains(TEXT("Reached the flight destination")) || ActionState.Contains(TEXT("short ground hop")))
+			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving &&
+				ActionState.Contains(TEXT("Reached the requested destination"));
 		const bool bTimedOut = World->GetTimeSeconds() - State->StartedAt >= 45.0;
-		if (bComplete || bTimedOut || Controller->GetMoveStatus() != EPathFollowingStatus::Moving)
+		const bool bMovementStopped = RavenController ? !Controller->IsActionInProgress()
+			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving;
+		if (bComplete || bTimedOut || bMovementStopped)
 		{
 			const float Distance = FVector::Dist2D(State->StartLocation, Pawn->GetActorLocation());
 			if (bComplete)

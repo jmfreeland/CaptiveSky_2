@@ -34,6 +34,15 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, SlightlyDifferentWind), 0);
 	TestEqual(TEXT("Malformed perch samples safely produce no candidate"),
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, IncompleteWindSamples), INDEX_NONE);
+	const FVector Origin(0.f, 0.f, 600.f);
+	const TArray<FVector> CruiseCandidates = { FVector(0.f, 0.f, 900.f), FVector(800.f, 0.f, 900.f), FVector(-800.f, 0.f, 900.f) };
+	const TArray<FVector> VisibleLandmarks = { FVector(2000.f, 0.f, 900.f) };
+	TestTrue(TEXT("Curiosity can select a candidate that approaches a visible landmark"),
+		ARavenAgentAIController::SelectWanderCruiseTarget(Origin, CruiseCandidates, VisibleLandmarks, 0, true).Equals(CruiseCandidates[1]));
+	TestTrue(TEXT("Ordinary flight wander preserves its random fallback when curiosity is inactive"),
+		ARavenAgentAIController::SelectWanderCruiseTarget(Origin, CruiseCandidates, VisibleLandmarks, 2, false).Equals(CruiseCandidates[2]));
+	TestTrue(TEXT("No visible landmarks leave flight wander on its random fallback"),
+		ARavenAgentAIController::SelectWanderCruiseTarget(Origin, CruiseCandidates, {}, 1, true).Equals(CruiseCandidates[1]));
 
 	// No gateway, model requests, or autobiographical memory in this fixture.
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
