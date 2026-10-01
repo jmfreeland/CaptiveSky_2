@@ -1,0 +1,62 @@
+# Landmark visual audit (2026-10-01)
+
+## Result
+
+A read-only Unreal Editor Python inspection loaded `/Game/Maps/Island` and
+enumerated 169 level actors. The visible pale forms around the named landmarks
+are blockout primitives, not authored stone sculptures or accidental debug
+markers:
+
+| Landmark | Level actors | Mesh and material |
+| --- | --- | --- |
+| Wind Arch | `WindArch_Pillar_A`, `WindArch_Pillar_B`, `WindArch_Beam` | Three `/Engine/BasicShapes/Cube` meshes using `/Engine/BasicShapes/BasicShapeMaterial` |
+| Listening Stones | `ListeningStone_A`, `ListeningStone_B`, `ListeningStone_C` | Three `/Engine/BasicShapes/Cube` meshes using `/Engine/BasicShapes/BasicShapeMaterial` |
+| Tideglass Pool | `TideglassPool` | `/Engine/BasicShapes/Sphere` using `/Engine/BasicShapes/BasicShapeMaterial` |
+
+The bounds support what the captures suggested: the Wind Arch is a pair of
+upright rectangular pillars (half-heights 333 and 299 cm) with a long narrow
+beam (half-length 380 cm); each Listening Stone is a narrow upright block
+(half-heights 112–151 cm); the pool is a shallow sphere (half-extents
+160×160×9 cm). These landmarks need authored silhouettes and materials, not a
+global landscape-material adjustment.
+
+The inn is also assembled mostly from `/Engine/BasicShapes/Cube` meshes, but
+many have authored `/Game/Inn/Materials/MI_Inn_Plaster` or
+`MI_Inn_Timber` materials. A few interior/floor pieces still use the Starter
+Content oak material. The nearby spruce trees are authored assets from
+`/Game/PN_interactiveSpruceForest`, whereas the natural ledge and roost foot
+stones use Starter Content's `SM_Rock` and `M_Rock`.
+
+## Recommended art pass
+
+1. Keep the current landmark locations and gameplay targets fixed.
+2. Replace only the landmark render meshes with more organic, weathered forms
+   while retaining the existing collision / interaction targets: carved,
+   mossed standing stones; a wind-worn stone arch with a visibly open center;
+   and a deliberately shallow, readable reflecting pool.
+3. Use the existing foliage and rock asset families as palette references;
+   avoid introducing a new marketplace dependency until its licensing and
+   visual fit are confirmed.
+4. Capture the same viewpoints in daylight and at golden hour/night, then
+   verify the landmark interactions still route to the original targets.
+
+No `.umap` or `.uasset` files were changed. They are gitignored and shared
+outside the reviewable source workflow; any replacement should be coordinated
+as a separate Content/map-art pass before edits.
+
+## Reproduction and validation
+
+The inventory script is [Scripts/Inspect-IslandLandmarkGeometry.py](../../Scripts/Inspect-IslandLandmarkGeometry.py).
+It ran against UE 5.8 with the Python scripting plugin using
+`UnrealEditor-Cmd.exe`, `-NullRHI`, and `-DDC-ForceMemoryCache`; the latter is
+needed in this restricted environment because the configured user DDC is
+read-only and the local Zen service cannot be updated here. The script logged
+four landmark anchors and nearby component bounds/materials, then the editor
+exited with code 0. It emitted an Editor Scripting Utilities deprecation
+warning for `EditorLevelLibrary.get_all_level_actors`; this did not affect the
+inventory and can be updated when the script is next extended.
+
+Two earlier launches in this inspection attempt crashed before the script ran:
+PowerShell argument quoting caused Unreal to ignore the local DDC override,
+then its default `Installed` cache graph failed because it had no writable
+node. Those are inspection-launch failures, not project/runtime exceptions.
