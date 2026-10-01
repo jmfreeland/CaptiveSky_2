@@ -6,6 +6,7 @@
 #include "AgentRestPresentationComponent.h"
 #include "AgentSocialComponent.h"
 #include "IslandInnkeeperSubsystem.h"
+#include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/TargetPoint.h"
@@ -192,6 +193,9 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			FVector(-100039.f, 103308.f, 2778.f)  // Aster's logged indoor position when the raven approach failed.
 		};
 		const TCHAR* GroundResidentStartLabels[] = { TEXT("Aster spawn"), TEXT("inn common room") };
+		AIslandWeather* IslandWeather = nullptr;
+		for (TActorIterator<AIslandWeather> It(Island); It; ++It) { IslandWeather = *It; break; }
+		TestNotNull(TEXT("Saved Island exposes its spatial weather signal to the raven"), IslandWeather);
 		for (const FName Tag : {FName(TEXT("Roost_West")), FName(TEXT("Roost_East"))})
 		{
 			AActor* Marker = nullptr;
@@ -222,6 +226,58 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				if (*It != Probe) Probe->GetCapsuleComponent()->IgnoreActorWhenMoving(*It, true);
 			ARavenAgentAIController* Pilot = Island->SpawnActor<ARavenAgentAIController>(Spawn);
 			Pilot->Possess(Probe);
+			if (Tag == FName(TEXT("Roost_West")) && IslandWeather)
+			{
+				TArray<FVector> SupportedLocations;
+				TArray<float> MeasuredWindSpeeds;
+				TArray<FName> SupportedTags;
+				for (const FName CandidateTag : {FName(TEXT("Roost_West")), FName(TEXT("Roost_East"))})
+				{
+					AActor* Candidate = nullptr;
+					for (TActorIterator<AActor> It(Island); It; ++It)
+						if (It->ActorHasTag(CandidateTag)) { Candidate = *It; break; }
+					if (Candidate && Pilot->HasSuitablePerchSupport(Candidate))
+					{
+						SupportedTags.Add(CandidateTag);
+						SupportedLocations.Add(Candidate->GetActorLocation());
+						MeasuredWindSpeeds.Add(IslandWeather->GetLocalWind(Candidate->GetActorLocation(), Probe).Size());
+					}
+				}
+				const float CurrentWindSpeed = IslandWeather->GetLocalWind(Probe->GetActorLocation(), Probe).Size();
+				const int32 PreferredIndex = ARavenAgentAIController::SelectWindAwarePerch(
+					Probe->GetActorLocation(), CurrentWindSpeed, SupportedLocations, MeasuredWindSpeeds);
+				TestEqual(TEXT("Both real Island roosts provide supported sites for the wind choice"), SupportedLocations.Num(), 2);
+				TestTrue(TEXT("The measured saved-Island conditions select one supported roost"), SupportedTags.IsValidIndex(PreferredIndex));
+				if (SupportedTags.Num() == 2 && SupportedTags.IsValidIndex(PreferredIndex))
+				{
+					int32 StrongWindSamples = 0;
+					TArray<int32> SelectionCounts = { 0, 0 };
+					TArray<int32> StrongWindSelectionCounts = { 0, 0 };
+					const double SampleStart = Island->GetTimeSeconds();
+					const double SampleDuration = FMath::Max(1200.0, static_cast<double>(IslandWeather->CycleSeconds) * 2.0);
+					for (double Seconds = SampleStart; Seconds <= SampleStart + SampleDuration; Seconds += 30.0)
+					{
+						const float SampledCurrentWind = IslandWeather->SampleLocalWind(Probe->GetActorLocation(), Seconds, Probe).Size();
+						TArray<float> SampledPerchWinds;
+						for (const FVector& Location : SupportedLocations)
+							SampledPerchWinds.Add(IslandWeather->SampleLocalWind(Location, Seconds, Probe).Size());
+						const int32 SampledChoice = ARavenAgentAIController::SelectWindAwarePerch(
+							Probe->GetActorLocation(), SampledCurrentWind, SupportedLocations, SampledPerchWinds);
+						if (SampledCurrentWind >= 85.f)
+						{
+							++StrongWindSamples;
+							if (StrongWindSelectionCounts.IsValidIndex(SampledChoice)) ++StrongWindSelectionCounts[SampledChoice];
+						}
+						if (SelectionCounts.IsValidIndex(SampledChoice)) ++SelectionCounts[SampledChoice];
+					}
+					TestTrue(TEXT("Real strong-wind samples sometimes favor the calmer non-nearest West roost"), StrongWindSelectionCounts[0] > 0);
+					AddInfo(FString::Printf(TEXT("Saved Island now: raven wind %.1f cm/s; %s %.1f cm/s, %s %.1f cm/s; preference %s. Across %.0f simulated seconds at 30-second steps: %d strong-wind samples, all-sample preferences %s=%d and %s=%d, strong-wind preferences %s=%d and %s=%d."),
+						CurrentWindSpeed, *SupportedTags[0].ToString(), MeasuredWindSpeeds[0], *SupportedTags[1].ToString(), MeasuredWindSpeeds[1],
+						*SupportedTags[PreferredIndex].ToString(), SampleDuration, StrongWindSamples,
+						*SupportedTags[0].ToString(), SelectionCounts[0], *SupportedTags[1].ToString(), SelectionCounts[1],
+						*SupportedTags[0].ToString(), StrongWindSelectionCounts[0], *SupportedTags[1].ToString(), StrongWindSelectionCounts[1]));
+				}
+			}
 			const FString SavedSiteAssessment = Pilot->AssessRoostSite(Marker);
 			AddInfo(FString::Printf(TEXT("%s read-only site assessment: %s"), *Tag.ToString(), *SavedSiteAssessment));
 			TestTrue(*FString::Printf(TEXT("Actual %s marker reports the support that the landing gate will require"), *Tag.ToString()), SavedSiteAssessment.Contains(TEXT("an upward-facing support surface is currently beneath the marker")));

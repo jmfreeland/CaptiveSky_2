@@ -895,11 +895,15 @@ FVector AIslandWeather::SampleWind(const FVector& Position, double Seconds) cons
 FVector AIslandWeather::GetLocalWind(const FVector& Position, const AActor* Observer) const
 {
 	if (!GetWorld()) return FVector::ZeroVector;
-	const double Now = GetWorld()->GetTimeSeconds();
-	FVector Wind = SampleWind(Position, Now);
+	return SampleLocalWind(Position, GetWorld()->GetTimeSeconds(), Observer);
+}
+
+FVector AIslandWeather::SampleLocalWind(const FVector& Position, double SessionSeconds, const AActor* Observer) const
+{
+	FVector Wind = SampleWind(Position, SessionSeconds);
 	for (const FIslandTransientGust& Gust : TransientGusts)
 	{
-		Wind += EvaluateTransientGust(Gust, Position, Now);
+		Wind += EvaluateTransientGust(Gust, Position, SessionSeconds);
 	}
 	if (HasUpwindObstruction(Position, Wind, Observer)) Wind *= 0.15f;
 	return Wind;

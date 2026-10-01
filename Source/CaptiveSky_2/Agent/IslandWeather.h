@@ -77,6 +77,8 @@ public:
 	float SampleCloudCover(double Seconds) const;
 	float SampleRainIntensity(double Seconds) const;
 	FVector GetLocalWind(const FVector& Position, const AActor* Observer = nullptr) const;
+	/** Sample local wind at a world-session time, including geometry shelter and active transient gusts. */
+	FVector SampleLocalWind(const FVector& Position, double SessionSeconds, const AActor* Observer = nullptr) const;
 	/** Bounded ambient wind/rain bed gains; an enclosed inn listener hears a softened version. */
 	static FVector2D CalculateAmbienceGains(float HorizontalWindSpeed, float RainIntensity, bool bIndoors = false);
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
