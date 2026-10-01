@@ -33,3 +33,15 @@ Related prior Aster movement validation is documented in
 `docs/findings/2026-09-28-long-runs.md`; these later missing-actor runs do not invalidate
 that earlier successful probe, but they do show the current isolated probe setup is not
 reproducible for Aster by itself.
+
+## Current editor log check (2026-10-01)
+
+The live editor log `Saved/Logs/CaptiveSky_2.log` (13:12–14:41 UTC) contains 1,201
+`libcurl error: 7` request failures. The accompanying connection details name
+`www.google.com`, `api.epicgames.dev`, and `datarouter.ol.epicgames.com`; EOS also reports
+retrying its SDK platform-config request. The same log has zero `LogCaptiveSky` warning,
+error, or fatal entries, zero Python error/traceback entries, and zero fatal, assertion,
+ensure, or unhandled-exception markers. This editor session's repeated warnings are
+therefore outbound-service connectivity noise, not evidence of CaptiveSky gameplay
+exceptions. The external services were not reachable from this machine during the log
+interval; no project plugin settings were changed.
