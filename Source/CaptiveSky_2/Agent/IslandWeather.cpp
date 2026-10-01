@@ -390,14 +390,14 @@ void AIslandWeather::InitializeGroundCover()
 				PlaceFoliage(PatchHit, PatchOffsets[ClumpIndex], ClumpIndex + MeadowCenters.Num());
 			}
 		};
-		auto TryAddMeadowCenter = [this, &MeadowCenters, &MeadowTraceCount, &Query, &TraceTop, &TraceBottom, SeaLevel](const FVector& Candidate)
+		auto TryAddMeadowCenter = [this, &MeadowTraceCount, &Query, &TraceTop, &TraceBottom, SeaLevel](const FVector& Candidate, FVector& OutCenter)
 		{
 			FHitResult CenterHit;
 			++MeadowTraceCount;
 			if (!GetWorld()->LineTraceSingleByChannel(CenterHit,
 				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 				!Cast<ALandscapeProxy>(CenterHit.GetActor()) || CenterHit.ImpactNormal.Z < 0.78f || CenterHit.ImpactPoint.Z < SeaLevel + 100.f) return false;
-			MeadowCenters.Add(CenterHit.ImpactPoint);
+			OutCenter = CenterHit.ImpactPoint;
 			return true;
 		};
 
@@ -418,8 +418,9 @@ void AIslandWeather::InitializeGroundCover()
 				bool bTooCloseToPatch = false;
 				for (const FVector& ExistingCenter : MeadowCenters)
 					if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
-				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate)) continue;
-				AddMeadowPatch(MeadowCenters.Last());
+				FVector MeadowCenter;
+				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
+				AddMeadowPatch(MeadowCenter);
 				++AddedForAnchor;
 			}
 		}
@@ -435,8 +436,9 @@ void AIslandWeather::InitializeGroundCover()
 			bool bNearOtherPatch = false;
 			for (const FVector& ExistingCenter : MeadowCenters)
 				if (FVector::Dist2D(Candidate, ExistingCenter) < MeadowCenterSpacing) { bNearOtherPatch = true; break; }
-			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate)) continue;
-			AddMeadowPatch(MeadowCenters.Last());
+			FVector MeadowCenter;
+			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
+			AddMeadowPatch(MeadowCenter);
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
 		// The patch population is recorded separately from the closer anchor rings for capture diagnostics.
