@@ -223,9 +223,9 @@ void AIslandWeather::InitializeGroundCover()
 		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
 		const FQuat Rotation = AlignToGround * Offset.GetRotation();
 		const float JitterScale = Offset.GetScale3D().X;
-		// The last dense pass still left too much bare soil visible between distant tufts.
-		// Broaden grass clumps rather than multiplying the already-large instance budget.
-		FVector Scale = FVector(JitterScale * 2.2f);
+		// The last dense pass still read as small, separated silhouettes from ground level.
+		// Broaden existing meshes instead of multiplying the already-large instance budget.
+		FVector Scale = FVector(JitterScale * 2.7f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
 		// Give low broadleaf cover half of the positions: the previous 25% plant ratio
@@ -236,9 +236,9 @@ void AIslandWeather::InitializeGroundCover()
 			Species = PlantVariant == 0 ? ShoreGroundPlants : PlantVariant == 4 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
 			const FBoxSphereBounds PlantBounds = Species->GetStaticMesh()->GetBounds();
 			const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
-			const float HeightScale = 70.f / (2.f * PlantHalfHeight);
+			const float HeightScale = 90.f / (2.f * PlantHalfHeight);
 			const float PlantFootprintDiameter = 2.f * FMath::Max(PlantBounds.BoxExtent.X, PlantBounds.BoxExtent.Y);
-			const float WidthScale = 48.f / FMath::Max(1.f, PlantFootprintDiameter);
+			const float WidthScale = 62.f / FMath::Max(1.f, PlantFootprintDiameter);
 			const float PlantScale = (Species == ShoreGroundPlants ? HeightScale : FMath::Min(HeightScale, WidthScale)) * JitterScale;
 			Scale = FVector(PlantScale);
 			Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * (PlantHalfHeight * PlantScale + 1.2f) -
