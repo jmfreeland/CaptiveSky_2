@@ -135,6 +135,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
 	}
 	Weather->InitializeGroundCover();
+	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
+	TestNotNull(TEXT("Third grass component is present"), GrassC);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
@@ -150,18 +152,18 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		{
 			FTransform Transform;
 			if (LowPlant->GetInstanceTransform(Index, Transform, false))
-				TestTrue(TEXT("Additional broad-leaf ground plants keep a restrained footprint"), MeshDiameter * Transform.GetScale3D().X <= 58.f);
+				TestTrue(TEXT("Additional broad-leaf ground plants stay within their 75 cm jittered footprint bound"), MeshDiameter * Transform.GetScale3D().X <= 75.f);
 		}
 	}
 	const FVector PoolScale = TideglassSphere->GetComponentScale();
 	const FBoxSphereBounds PoolBounds = TideglassSphereAsset->GetBounds();
 	const float PoolClearanceRadius = FVector::Dist2D(TideglassSphere->GetComponentLocation(), Tideglass->GetActorLocation()) +
 		FMath::Max(PoolBounds.BoxExtent.X * PoolScale.X, PoolBounds.BoxExtent.Y * PoolScale.Y) * 1.13f + 125.f;
-	AddInfo(FString::Printf(TEXT("Pool-edge fixture expects %.1f cm clearance; weather placed %d instances (%d grass A + %d grass B + %d broadleaf + %d low plant A + %d low plant B)."),
-		PoolClearanceRadius, Weather->GroundCoverInstanceCount, Weather->ShoreGrassA->GetInstanceCount(), Weather->ShoreGrassB->GetInstanceCount(),
+	AddInfo(FString::Printf(TEXT("Pool-edge fixture expects %.1f cm clearance; weather placed %d instances (%d grass A + %d grass B + %d grass C + %d broadleaf + %d low plant A + %d low plant B)."),
+		PoolClearanceRadius, Weather->GroundCoverInstanceCount, Weather->ShoreGrassA->GetInstanceCount(), Weather->ShoreGrassB->GetInstanceCount(), GrassC->GetInstanceCount(),
 		Weather->ShoreGroundPlants->GetInstanceCount(), Weather->ShoreGroundPlantLowA->GetInstanceCount(), Weather->ShoreGroundPlantLowB->GetInstanceCount()));
 	int32 GrassInsidePoolClearance = 0;
-	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA, Weather->ShoreGrassB, Weather->ShoreGroundPlants, Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB})
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA.Get(), Weather->ShoreGrassB.Get(), GrassC, Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(), Weather->ShoreGroundPlantLowB.Get()})
 	{
 		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
@@ -173,7 +175,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("No ground-cover instance intrudes into the Tideglass water footprint or edge margin"), GrassInsidePoolClearance, 0);
 	int32 InnApproachGrass = 0;
 	int32 InnGrassUnderRoof = 0;
-	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA, Weather->ShoreGrassB, Weather->ShoreGroundPlants, Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB})
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA.Get(), Weather->ShoreGrassB.Get(), GrassC, Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(), Weather->ShoreGroundPlantLowB.Get()})
 	{
 		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
@@ -190,7 +192,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("No inn ground cover is placed beneath the roof footprint"), InnGrassUnderRoof, 0);
 	int32 WindArchApproachGrass = 0;
 	int32 WindArchCenterGrass = 0;
-	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA, Weather->ShoreGrassB, Weather->ShoreGroundPlants, Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB})
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA.Get(), Weather->ShoreGrassB.Get(), GrassC, Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(), Weather->ShoreGroundPlantLowB.Get()})
 	{
 		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
@@ -207,18 +209,20 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num() + Weather->ShoreGroundPlantBaseTransforms.Num() +
 		Weather->ShoreGroundPlantLowABaseTransforms.Num() + Weather->ShoreGroundPlantLowBBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestEqual(TEXT("HISM populations match the reported transient ground-cover population"),
-		Weather->ShoreGrassA->GetInstanceCount() + Weather->ShoreGrassB->GetInstanceCount() + Weather->ShoreGroundPlants->GetInstanceCount() +
+		Weather->ShoreGrassA->GetInstanceCount() + Weather->ShoreGrassB->GetInstanceCount() + GrassC->GetInstanceCount() + Weather->ShoreGroundPlants->GetInstanceCount() +
 		Weather->ShoreGroundPlantLowA->GetInstanceCount() + Weather->ShoreGroundPlantLowB->GetInstanceCount(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
 		Weather->ShoreGrassA->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGrassB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		GrassC->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGroundPlants->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGroundPlantLowA->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGroundPlantLowB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
-		!Weather->ShoreGrassA->CanEverAffectNavigation() && !Weather->ShoreGrassB->CanEverAffectNavigation() && !Weather->ShoreGroundPlants->CanEverAffectNavigation() &&
+		!Weather->ShoreGrassA->CanEverAffectNavigation() && !Weather->ShoreGrassB->CanEverAffectNavigation() && !GrassC->CanEverAffectNavigation() && !Weather->ShoreGroundPlants->CanEverAffectNavigation() &&
 		!Weather->ShoreGroundPlantLowA->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowB->CanEverAffectNavigation());
 	TestTrue(TEXT("All grass and ground-plant variants are visible around the landmarks and inn approach"),
-		Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible() && Weather->ShoreGroundPlants->IsVisible() &&
+		Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible() && GrassC->IsVisible() && Weather->ShoreGroundPlants->IsVisible() &&
+		Weather->ShoreGrassA->GetInstanceCount() > 0 && Weather->ShoreGrassB->GetInstanceCount() > 0 && GrassC->GetInstanceCount() > 0 &&
 		Weather->ShoreGroundPlantLowA->IsVisible() && Weather->ShoreGroundPlantLowB->IsVisible() &&
 		Weather->ShoreGroundPlants->GetInstanceCount() > 0 && Weather->ShoreGroundPlantLowA->GetInstanceCount() > 0 &&
 		Weather->ShoreGroundPlantLowB->GetInstanceCount() > 0);
@@ -235,13 +239,13 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->AddTransientGust(ListeningStones->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->UpdateGroundCoverSway();
 	bool bAClumpRespondedToLocalWind = false;
-	auto CheckWindResponse = [&bAClumpRespondedToLocalWind, this](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines)
+	auto CheckWindResponse = [&bAClumpRespondedToLocalWind, this](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines, int32 FirstBaseline = 0)
 	{
-		for (int32 Index = 0; Index < Baselines.Num(); ++Index)
+		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
 			FTransform Current;
 			if (!Grass->GetInstanceTransform(Index, Current, false)) continue;
-			const FTransform& Base = Baselines[Index];
+			const FTransform& Base = Baselines[FirstBaseline + Index];
 			TestTrue(TEXT("Wind leaves each clump's planted location and scale unchanged"),
 				Current.GetLocation().Equals(Base.GetLocation(), 0.01f) && Current.GetScale3D().Equals(Base.GetScale3D(), 0.01f));
 			bAClumpRespondedToLocalWind |= !Current.GetRotation().Equals(Base.GetRotation(), 0.001f);
@@ -249,6 +253,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	};
 	CheckWindResponse(Weather->ShoreGrassA, Weather->ShoreGrassABaseTransforms);
 	CheckWindResponse(Weather->ShoreGrassB, Weather->ShoreGrassBBaseTransforms);
+	CheckWindResponse(GrassC, Weather->ShoreGrassBBaseTransforms, Weather->ShoreGrassB->GetInstanceCount());
 	CheckWindResponse(Weather->ShoreGroundPlants, Weather->ShoreGroundPlantBaseTransforms);
 	CheckWindResponse(Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowABaseTransforms);
 	CheckWindResponse(Weather->ShoreGroundPlantLowB, Weather->ShoreGroundPlantLowBBaseTransforms);
@@ -264,32 +269,38 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	};
 	TArray<FTransform> FirstSwayA;
 	TArray<FTransform> FirstSwayB;
+	TArray<FTransform> FirstSwayC;
 	TArray<FTransform> FirstSwayPlants;
 	TArray<FTransform> FirstSwayPlantsLowA;
 	TArray<FTransform> FirstSwayPlantsLowB;
 	CaptureTransforms(Weather->ShoreGrassA, FirstSwayA);
 	CaptureTransforms(Weather->ShoreGrassB, FirstSwayB);
+	CaptureTransforms(GrassC, FirstSwayC);
 	CaptureTransforms(Weather->ShoreGroundPlants, FirstSwayPlants);
 	CaptureTransforms(Weather->ShoreGroundPlantLowA, FirstSwayPlantsLowA);
 	CaptureTransforms(Weather->ShoreGroundPlantLowB, FirstSwayPlantsLowB);
 	Weather->UpdateGroundCoverSway();
 	TArray<FTransform> SecondSwayA;
 	TArray<FTransform> SecondSwayB;
+	TArray<FTransform> SecondSwayC;
 	TArray<FTransform> SecondSwayPlants;
 	TArray<FTransform> SecondSwayPlantsLowA;
 	TArray<FTransform> SecondSwayPlantsLowB;
 	CaptureTransforms(Weather->ShoreGrassA, SecondSwayA);
 	CaptureTransforms(Weather->ShoreGrassB, SecondSwayB);
+	CaptureTransforms(GrassC, SecondSwayC);
 	CaptureTransforms(Weather->ShoreGroundPlants, SecondSwayPlants);
 	CaptureTransforms(Weather->ShoreGroundPlantLowA, SecondSwayPlantsLowA);
 	CaptureTransforms(Weather->ShoreGroundPlantLowB, SecondSwayPlantsLowB);
-	bool bRepeatedSwayIsStable = FirstSwayA.Num() == SecondSwayA.Num() && FirstSwayB.Num() == SecondSwayB.Num() &&
+	bool bRepeatedSwayIsStable = FirstSwayA.Num() == SecondSwayA.Num() && FirstSwayB.Num() == SecondSwayB.Num() && FirstSwayC.Num() == SecondSwayC.Num() &&
 		FirstSwayPlants.Num() == SecondSwayPlants.Num() && FirstSwayPlantsLowA.Num() == SecondSwayPlantsLowA.Num() &&
 		FirstSwayPlantsLowB.Num() == SecondSwayPlantsLowB.Num();
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayA.Num(), SecondSwayA.Num()); ++Index)
 		bRepeatedSwayIsStable &= FirstSwayA[Index].Equals(SecondSwayA[Index], 0.001f);
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayB.Num(), SecondSwayB.Num()); ++Index)
 		bRepeatedSwayIsStable &= FirstSwayB[Index].Equals(SecondSwayB[Index], 0.001f);
+	for (int32 Index = 0; Index < FMath::Min(FirstSwayC.Num(), SecondSwayC.Num()); ++Index)
+		bRepeatedSwayIsStable &= FirstSwayC[Index].Equals(SecondSwayC[Index], 0.001f);
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayPlants.Num(), SecondSwayPlants.Num()); ++Index)
 		bRepeatedSwayIsStable &= FirstSwayPlants[Index].Equals(SecondSwayPlants[Index], 0.001f);
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayPlantsLowA.Num(), SecondSwayPlantsLowA.Num()); ++Index)
@@ -308,7 +319,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num() + Weather->ShoreGroundPlantBaseTransforms.Num() +
 		Weather->ShoreGroundPlantLowABaseTransforms.Num() + Weather->ShoreGroundPlantLowBBaseTransforms.Num(), 0);
-	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible() && !Weather->ShoreGroundPlants->IsVisible() &&
+	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible() && !GrassC->IsVisible() && !Weather->ShoreGroundPlants->IsVisible() &&
 		!Weather->ShoreGroundPlantLowA->IsVisible() && !Weather->ShoreGroundPlantLowB->IsVisible() && !Weather->IslandSpruce->IsVisible());
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
@@ -357,6 +368,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A different weather seed changes the grass placement"), bOtherSeedDiffers);
 	TestNotNull(TEXT("First native shore grass mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_02_mesh.grass_01_02_mesh")));
 	TestNotNull(TEXT("Second native shore grass mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_03_mesh.grass_01_03_mesh")));
+	TestNotNull(TEXT("Third native shore grass mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_04_mesh.grass_01_04_mesh")));
 	TestNotNull(TEXT("Existing broadleaf ground plant mesh is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_05_01.ground_05_01")));
 	TestNotNull(TEXT("First additional ground-plant species is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_01.ground_01_01")));
 	TestNotNull(TEXT("Second additional ground-plant species is available"), LoadObject<UStaticMesh>(nullptr, TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02")));

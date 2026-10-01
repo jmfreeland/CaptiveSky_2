@@ -190,6 +190,7 @@ private:
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
+	UHierarchicalInstancedStaticMeshComponent* FindShoreGrassC() const;
 	void InitializeGroundCover();
 	void UpdateGroundCoverSway();
 	void ClearGroundCover();

@@ -837,8 +837,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances and %d spruce trees."),
-			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(),
+		UHierarchicalInstancedStaticMeshComponent* GrassC = PreviewWeather->FindShoreGrassC();
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances and %d spruce trees."),
+			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), GrassC ? GrassC->GetInstanceCount() : 0,
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount));
 		if (bGroundCoverSwayPreview)
@@ -879,6 +880,15 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			};
 			MeasureMaximumSway(PreviewWeather->ShoreGrassA, PreviewWeather->ShoreGrassABaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGrassB, PreviewWeather->ShoreGrassBBaseTransforms);
+			if (GrassC)
+				for (int32 Index = 0; Index < GrassC->GetInstanceCount(); ++Index)
+				{
+					FTransform Current;
+					const int32 BaselineIndex = PreviewWeather->ShoreGrassB->GetInstanceCount() + Index;
+					if (PreviewWeather->ShoreGrassBBaseTransforms.IsValidIndex(BaselineIndex) && GrassC->GetInstanceTransform(Index, Current, false))
+						MaximumVisibleSwayDegrees = FMath::Max(MaximumVisibleSwayDegrees,
+							FMath::RadiansToDegrees(PreviewWeather->ShoreGrassBBaseTransforms[BaselineIndex].GetRotation().AngularDistance(Current.GetRotation())));
+				}
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlants, PreviewWeather->ShoreGroundPlantBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowA, PreviewWeather->ShoreGroundPlantLowABaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowB, PreviewWeather->ShoreGroundPlantLowBBaseTransforms);
