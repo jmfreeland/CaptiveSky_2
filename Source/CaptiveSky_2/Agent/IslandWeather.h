@@ -147,6 +147,7 @@ private:
 	float RainNoiseFilterLeft = 0.f;
 	float RainNoiseFilterRight = 0.f;
 	float AmbienceUpdateAccumulator = 0.f;
+	float GroundCoverSwayUpdateAccumulator = 0.f;
 	float OriginalCloudCoverage = 0.f;
 	float OriginalCloudDensity = 0.f;
 	float OriginalStormClouds = 0.f;

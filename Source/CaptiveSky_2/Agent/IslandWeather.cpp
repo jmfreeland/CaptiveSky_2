@@ -357,7 +357,7 @@ void AIslandWeather::InitializeGroundCover()
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
 		constexpr int32 MeadowPatchCount = 240;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		constexpr int32 MeadowClumpsPerPatch = 192;
+		constexpr int32 MeadowClumpsPerPatch = 384;
 		constexpr float MeadowPatchInnerRadius = 400.f;
 		constexpr float MeadowPatchOuterRadius = 2800.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
@@ -594,6 +594,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
+	GroundCoverSwayUpdateAccumulator = 0.f;
 	bGroundCoverInitialized = false;
 }
 
@@ -668,7 +669,13 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	UpdateRainRendering();
 	UpdateWindPoolResponse();
 	UpdateWeatherAmbience(DeltaSeconds);
-	UpdateGroundCoverSway();
+	GroundCoverSwayUpdateAccumulator += FMath::Max(0.f, DeltaSeconds);
+	constexpr float GroundCoverSwayUpdateInterval = 0.1f;
+	if (GroundCoverSwayUpdateAccumulator >= GroundCoverSwayUpdateInterval)
+	{
+		GroundCoverSwayUpdateAccumulator = FMath::Fmod(GroundCoverSwayUpdateAccumulator, GroundCoverSwayUpdateInterval);
+		UpdateGroundCoverSway();
+	}
 }
 
 bool AIslandWeather::InitializeRainRendering()
