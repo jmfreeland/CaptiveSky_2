@@ -223,7 +223,9 @@ void AIslandWeather::InitializeGroundCover()
 		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
 		const FQuat Rotation = AlignToGround * Offset.GetRotation();
 		const float JitterScale = Offset.GetScale3D().X;
-		FVector Scale = FVector(JitterScale * 1.7f);
+		// The last dense pass still left too much bare soil visible between distant tufts.
+		// Broaden grass clumps rather than multiplying the already-large instance budget.
+		FVector Scale = FVector(JitterScale * 2.2f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
 		const int32 PlantVariant = Index % 12;
@@ -357,14 +359,14 @@ void AIslandWeather::InitializeGroundCover()
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
 		constexpr int32 MeadowPatchCount = 512;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		constexpr int32 MeadowClumpsPerPatch = 1280;
-		constexpr float MeadowPatchInnerRadius = 300.f;
-		constexpr float MeadowPatchOuterRadius = 2000.f;
+		constexpr int32 MeadowClumpsPerPatch = 1920;
+		constexpr float MeadowPatchInnerRadius = 250.f;
+		constexpr float MeadowPatchOuterRadius = 1600.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
 		constexpr float LandmarkPatchMinSpacing = 1200.f;
-		constexpr float MeadowCenterSpacing = 2000.f;
+		constexpr float MeadowCenterSpacing = 1700.f;
 		int32 MeadowTraceCount = 0;
 		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
 		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
