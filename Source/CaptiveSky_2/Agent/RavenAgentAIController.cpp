@@ -2,6 +2,7 @@
 #include "AutonomousAgentCharacter.h"
 #include "AgentRestPresentationComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SceneComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "EngineUtils.h"
@@ -30,10 +31,91 @@ bool ARavenAgentAIController::CanRest() const
 void ARavenAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	CacheWingComponents(InPawn);
 	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(InPawn))
 		if (Agent->RestPresentation) Agent->RestPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
 	HomeAltitude = InPawn ? InPawn->GetActorLocation().Z + TakeoffHeight : 0.f;
 	SetGrounded();
+}
+
+void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
+{
+	LeftWing.Reset();
+	RightWing.Reset();
+	WingAnimationTime = 0.f;
+	if (!Raven) return;
+
+	TArray<USceneComponent*> Components;
+	Raven->GetComponents<USceneComponent>(Components);
+	for (USceneComponent* Component : Components)
+	{
+		if (!Component) continue;
+		const FString ComponentName = Component->GetName();
+		if (!LeftWing.IsValid() && ComponentName.Contains(TEXT("LeftWing"), ESearchCase::IgnoreCase))
+		{
+			LeftWing = Component;
+			LeftWingRestRotation = Component->GetRelativeRotation();
+		}
+		else if (!RightWing.IsValid() && ComponentName.Contains(TEXT("RightWing"), ESearchCase::IgnoreCase))
+		{
+			RightWing = Component;
+			RightWingRestRotation = Component->GetRelativeRotation();
+		}
+	}
+}
+
+void ARavenAgentAIController::UpdateWingAnimation(float DeltaSeconds)
+{
+	USceneComponent* Left = Cast<USceneComponent>(LeftWing.Get());
+	USceneComponent* Right = Cast<USceneComponent>(RightWing.Get());
+	if (!Left || !Right)
+	{
+		if (Left) Left->SetRelativeRotation(LeftWingRestRotation);
+		if (Right) Right->SetRelativeRotation(RightWingRestRotation);
+		return;
+	}
+
+	float AmplitudeDegrees = 0.f;
+	float FrequencyHz = 0.f;
+	switch (LocomotionState)
+	{
+	case ERavenLocomotionState::Hopping:
+		AmplitudeDegrees = 16.f;
+		FrequencyHz = 2.4f;
+		break;
+	case ERavenLocomotionState::TakingOff:
+		AmplitudeDegrees = 46.f;
+		FrequencyHz = 4.2f;
+		break;
+	case ERavenLocomotionState::Flying:
+		AmplitudeDegrees = 34.f;
+		FrequencyHz = 3.8f;
+		break;
+	case ERavenLocomotionState::Landing:
+		AmplitudeDegrees = 20.f;
+		FrequencyHz = 2.6f;
+		break;
+	default:
+		Left->SetRelativeRotation(LeftWingRestRotation);
+		Right->SetRelativeRotation(RightWingRestRotation);
+		WingAnimationTime = 0.f;
+		return;
+	}
+
+	if (IsResting())
+	{
+		Left->SetRelativeRotation(LeftWingRestRotation);
+		Right->SetRelativeRotation(RightWingRestRotation);
+		WingAnimationTime = 0.f;
+		return;
+	}
+
+	WingAnimationTime += FMath::Max(0.f, DeltaSeconds);
+	const float FlapDegrees = FMath::Sin(WingAnimationTime * 2.f * PI * FrequencyHz) * AmplitudeDegrees;
+	// The placeholder wings extend in opposite local Y directions, so mirror roll
+	// around each authored rest rotation to move both tips through the same stroke.
+	Left->SetRelativeRotation(LeftWingRestRotation + FRotator(0.f, 0.f, FlapDegrees));
+	Right->SetRelativeRotation(RightWingRestRotation + FRotator(0.f, 0.f, -FlapDegrees));
 }
 
 void ARavenAgentAIController::SetFlyingMovement(bool bFlying) const
@@ -705,6 +787,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	APawn* Raven = GetPawn();
 	if (!Raven) return;
+	UpdateWingAnimation(DeltaSeconds);
 	if (IsResting()) return;
 
 	if (LocomotionState == ERavenLocomotionState::Hopping)

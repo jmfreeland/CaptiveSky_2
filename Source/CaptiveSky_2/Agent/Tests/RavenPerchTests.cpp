@@ -9,6 +9,7 @@
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -50,6 +51,16 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0, 0, 100), FRotator::ZeroRotator);
+	UStaticMeshComponent* LeftWing = NewObject<UStaticMeshComponent>(Raven, TEXT("LeftWing"));
+	Raven->AddInstanceComponent(LeftWing);
+	LeftWing->SetupAttachment(Raven->GetRootComponent());
+	LeftWing->SetRelativeRotation(FRotator(0.f, 0.f, 8.f));
+	LeftWing->RegisterComponent();
+	UStaticMeshComponent* RightWing = NewObject<UStaticMeshComponent>(Raven, TEXT("RightWing"));
+	Raven->AddInstanceComponent(RightWing);
+	RightWing->SetupAttachment(Raven->GetRootComponent());
+	RightWing->SetRelativeRotation(FRotator(0.f, 0.f, -8.f));
+	RightWing->RegisterComponent();
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
 	ATargetPoint* Perch = World->SpawnActor<ATargetPoint>(FVector(600, 0, 302), FRotator::ZeroRotator);
 	Perch->Tags = {TEXT("RavenPerch"), TEXT("TestRoost")};
@@ -62,6 +73,33 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	Support->SetActorLocation(FVector(600, 0, 302 - Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 22));
 	World->BeginPlay();
 	Controller->Possess(Raven);
+	const FRotator LeftWingRest = LeftWing->GetRelativeRotation();
+	const FRotator RightWingRest = RightWing->GetRelativeRotation();
+	Controller->Tick(0.05f);
+	TestTrue(TEXT("Grounded rest preserves the placeholder wing pose"),
+		LeftWing->GetRelativeRotation().Equals(LeftWingRest) && RightWing->GetRelativeRotation().Equals(RightWingRest));
+	Controller->LocomotionState = ERavenLocomotionState::Flying;
+	Controller->Tick(0.05f);
+	const float LeftWingStroke = FMath::FindDeltaAngleDegrees(LeftWingRest.Roll, LeftWing->GetRelativeRotation().Roll);
+	const float RightWingStroke = FMath::FindDeltaAngleDegrees(RightWingRest.Roll, RightWing->GetRelativeRotation().Roll);
+	TestTrue(TEXT("Flying animates the left placeholder wing from its authored baseline"), FMath::Abs(LeftWingStroke) > 1.f);
+	TestTrue(TEXT("Flight mirrors the wing strokes instead of rotating both wings in the same direction"),
+		FMath::IsNearlyEqual(LeftWingStroke, -RightWingStroke, 0.1f));
+	Controller->LocomotionState = ERavenLocomotionState::Hopping;
+	Controller->HopStart = Raven->GetActorLocation();
+	Controller->HopEnd = Controller->HopStart;
+	Controller->HopElapsed = 0.f;
+	Controller->HopDuration = 100.f;
+	Controller->Tick(0.05f);
+	TestTrue(TEXT("A ground hop gets a smaller wing stroke than sustained flight"),
+		FMath::Abs(FMath::FindDeltaAngleDegrees(LeftWingRest.Roll, LeftWing->GetRelativeRotation().Roll)) > 1.f &&
+		FMath::Abs(FMath::FindDeltaAngleDegrees(LeftWingRest.Roll, LeftWing->GetRelativeRotation().Roll)) < FMath::Abs(LeftWingStroke));
+	Raven->SetActorLocation(Controller->HopStart);
+	Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	Controller->Tick(0.05f);
+	Controller->HopDuration = 0.55f;
+	TestTrue(TEXT("Settling returns both wings to their exact authored baselines without drift"),
+		LeftWing->GetRelativeRotation().Equals(LeftWingRest) && RightWing->GetRelativeRotation().Equals(RightWingRest));
 	UAgentConsolidationComponent* RavenRest = NewObject<UAgentConsolidationComponent>(Raven);
 	Raven->AddInstanceComponent(RavenRest);
 	RavenRest->RegisterComponent();
@@ -119,6 +157,9 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	Sleep.ActionType = EAgentActionType::Sleep;
 	Controller->ActOnDecision(Sleep);
 	TestFalse(TEXT("Perched raven can sleep"), RavenRest->IsAwake());
+	Controller->Tick(0.05f);
+	TestTrue(TEXT("Sleep leaves the wings at their authored rest rotations"),
+		LeftWing->GetRelativeRotation().Equals(LeftWingRest) && RightWing->GetRelativeRotation().Equals(RightWingRest));
 	TestFalse(TEXT("Raven sleep keeps the flight capsule un-crouched"), Raven->bIsCrouched);
 	RavenPresentation->TickComponent(0.5f, LEVELTICK_All, nullptr);
 	TestFalse(TEXT("Raven adopts its distinctive tucked resting posture"), Raven->GetMesh()->GetRelativeTransform().Equals(RavenAwakeMeshPose));

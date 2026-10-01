@@ -92,6 +92,11 @@ private:
 	bool bApproachingPerch = false;
 	bool bLandingAtArrangementSite = false;
 	FVector ArrangementLandingTarget = FVector::ZeroVector;
+	TWeakObjectPtr<UObject> LeftWing;
+	TWeakObjectPtr<UObject> RightWing;
+	FRotator LeftWingRestRotation = FRotator::ZeroRotator;
+	FRotator RightWingRestRotation = FRotator::ZeroRotator;
+	float WingAnimationTime = 0.f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
 	/** First target for flying From -> To: To itself when the way is clear, else a climb above what blocks it. */
@@ -112,6 +117,8 @@ private:
 	static int32 SelectWindAwarePerch(const FVector& Origin, float CurrentWindSpeed,
 		const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds);
 	void SetGrounded();
+	void CacheWingComponents(APawn* Raven);
+	void UpdateWingAnimation(float DeltaSeconds);
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
 	bool AdvanceTowardsTarget(float DeltaSeconds);
