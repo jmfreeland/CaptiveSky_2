@@ -24,6 +24,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only Tideglass -TideglassMaterial /Game/Materials/M_TideglassPool_Lively -TideglassWeather Storm -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/M_Island_Textured_Wet
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -LogPath Saved/Logs/Codex_ViewpointProbe.log
+./Scripts/Capture-Viewpoints.ps1 -Hour 17 -Only WindArchOverlook -LandmarkRockPreview -NoWorldState
 #>
 param(
 	[double]$Hour = -1,
@@ -41,6 +42,7 @@ param(
 	[switch]$NightFireflies,
 	[switch]$GroundCover,
 	[switch]$GroundCoverSway,
+	[switch]$LandmarkRockPreview,
 	[switch]$NoWorldState,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
@@ -87,6 +89,7 @@ if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover -or $GroundCoverSway) { $extra += "-ViewpointGroundCover" }
 if ($GroundCoverSway) { $extra += "-ViewpointGroundCoverSway" }
+if ($LandmarkRockPreview) { $extra += "-ViewpointLandmarkRockPreview" }
 if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 
 & $editor $project -ExecCmds="Automation RunTests CaptiveSky2.Visual.Viewpoints" -TestExit="Automation Test Queue Empty" `

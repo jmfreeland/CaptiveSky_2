@@ -60,3 +60,9 @@ Two earlier launches in this inspection attempt crashed before the script ran:
 PowerShell argument quoting caused Unreal to ignore the local DDC override,
 then its default `Installed` cache graph failed because it had no writable
 node. Those are inspection-launch failures, not project/runtime exceptions.
+
+## Transient rock-silhouette preview (2026-10-01)
+
+`CaptiveSky2.Visual.Viewpoints` accepts `-ViewpointLandmarkRockPreview` to test the six Wind Arch and Listening Stones render silhouettes with the existing Starter Content `SM_Rock` and `M_Rock`. It adds collisionless, navigation-free child components at the blockout transforms and hides only the original render components; those original meshes and collision remain in place. A latent cleanup command removes all six preview components and restores the prior visibility, including after a capture failure. Preview scale is fitted from each blockout mesh's local bounds to avoid the oversized first attempt. The flag changes neither the saved map nor any asset, and is an art-direction comparison only—not a gameplay or final-mesh approval.
+
+The combined 17:00 real-RHI capture used `-ViewpointLandmarkRockPreview -ViewpointGroundCover` and passed `CaptiveSky2.Visual.Viewpoints`. The rocks now fit the existing blockout dimensions better, though remain dark and backlit; the beam is still partly clipped at the top of this viewpoint. The added grass makes the approach less barren. Capture: `Saved/CompileScratch/Codex_InnGroundCover_20261001/Project/Saved/Viewpoints/2026-10-01_161310_h17.0/04_WindArchOverlook.png`; baseline: `Saved/CompileScratch/AgentMovementAutomationProjectWithContent/Saved/Viewpoints/2026-10-01_040746_h17.0/04_WindArchOverlook.png`. If the rock forms are promising, coordinate a separate authored Content/map-art pass for intentional scaling, distinct carved shapes, and a readable arch opening; do not promote stretched Starter Content rocks as the finished landmark art.

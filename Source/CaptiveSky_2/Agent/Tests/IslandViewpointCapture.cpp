@@ -63,6 +63,16 @@ namespace
 		float Wetness = 0.f;
 	};
 
+	struct FLandmarkRockPreviewBackup
+	{
+		TWeakObjectPtr<UStaticMeshComponent> OriginalComponent;
+		TWeakObjectPtr<UStaticMesh> OriginalMesh;
+		TWeakObjectPtr<UStaticMeshComponent> PreviewComponent;
+		ECollisionEnabled::Type OriginalCollisionEnabled = ECollisionEnabled::NoCollision;
+		FTransform OriginalTransform = FTransform::Identity;
+		bool bOriginalWasVisible = true;
+	};
+
 	struct FTideglassWeatherPreview
 	{
 		TWeakObjectPtr<UMaterialParameterCollectionInstance> Instance;
@@ -565,6 +575,38 @@ namespace
 		TStrongObjectPtr<UMaterialInterface> Original;
 	};
 
+	/** Removes transient rock visuals after the capture and restores each blockout component's visibility. */
+	class FRestoreLandmarkRockPreviewCommand : public IAutomationLatentCommand
+	{
+	public:
+		FRestoreLandmarkRockPreviewCommand(TArray<FLandmarkRockPreviewBackup> InBackups, FAutomationTestBase* InTest)
+			: Backups(MoveTemp(InBackups)), Test(InTest) {}
+
+		virtual bool Update() override
+		{
+			for (FLandmarkRockPreviewBackup& Backup : Backups)
+			{
+				if (Backup.OriginalComponent.IsValid())
+				{
+					Backup.OriginalComponent->SetVisibility(Backup.bOriginalWasVisible, false);
+					const bool bOriginalStatePreserved = Backup.OriginalComponent->IsVisible() == Backup.bOriginalWasVisible &&
+						Backup.OriginalComponent->GetStaticMesh() == Backup.OriginalMesh.Get() &&
+						Backup.OriginalComponent->GetCollisionEnabled() == Backup.OriginalCollisionEnabled &&
+						Backup.OriginalComponent->GetComponentTransform().Equals(Backup.OriginalTransform);
+					if (!bOriginalStatePreserved && Test)
+						Test->AddError(TEXT("Landmark rock preview did not restore the blockout component's original visibility or preserve its mesh, collision, and transform."));
+				}
+				if (Backup.PreviewComponent.IsValid()) Backup.PreviewComponent->DestroyComponent();
+			}
+			Backups.Reset();
+			return true;
+		}
+
+	private:
+		TArray<FLandmarkRockPreviewBackup> Backups;
+		FAutomationTestBase* Test = nullptr;
+	};
+
 	class FRestoreTideglassSurfacePreviewCommand : public IAutomationLatentCommand
 	{
 	public:
@@ -668,6 +710,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	const bool bNightFireflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointNightFireflies"));
 	const bool bGroundCoverSwayPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCoverSway"));
 	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover")) || bGroundCoverSwayPreview;
+	const bool bLandmarkRockPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointLandmarkRockPreview"));
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
 	FString TideglassMaterialPath;
@@ -777,7 +820,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		PreviewWeather->InitializeGroundCover();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass, ListeningStones, and the tagged inn entrance."), PreviewWeather->GroundCoverInstanceCount));
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass, ListeningStones, WindArch, and the tagged inn entrance."), PreviewWeather->GroundCoverInstanceCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;
@@ -1003,11 +1046,94 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			AddInfo(FString::Printf(TEXT("Tideglass material-response diagnostic: forcing %s collection values during capture, then restoring their prior values; this is not a gameplay weather simulation."), *TideglassWeatherMode));
 		}
 	}
-ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
+	TArray<FLandmarkRockPreviewBackup> LandmarkRockPreviewBackups;
+	if (bLandmarkRockPreview)
+	{
+		UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
+		UMaterialInterface* RockMaterial = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock"));
+		if (!TestNotNull(TEXT("Starter Content rock mesh for the landmark prototype loaded"), RockMesh) ||
+			!TestNotNull(TEXT("Starter Content rock material for the landmark prototype loaded"), RockMaterial)) return false;
+
+		const TSet<FString> LandmarkLabels = {
+			TEXT("WindArch_Pillar_A"), TEXT("WindArch_Pillar_B"), TEXT("WindArch_Beam"),
+			TEXT("ListeningStone_A"), TEXT("ListeningStone_B"), TEXT("ListeningStone_C")
+		};
+		TMap<FString, UStaticMeshComponent*> ComponentsByLabel;
+		for (TActorIterator<AStaticMeshActor> It(Island); It; ++It)
+		{
+			const FString Label = It->GetActorLabel();
+			if (!LandmarkLabels.Contains(Label)) continue;
+			if (UStaticMeshComponent* Component = It->GetStaticMeshComponent()) ComponentsByLabel.Add(Label, Component);
+		}
+		if (!TestEqual(TEXT("All six blockout landmark components are present for the transient rock prototype"),
+			ComponentsByLabel.Num(), LandmarkLabels.Num())) return false;
+
+		for (const FString& Label : LandmarkLabels)
+		{
+			UStaticMeshComponent* Original = ComponentsByLabel.FindRef(Label);
+			if (!Original || !Original->GetStaticMesh())
+			{
+				AddError(FString::Printf(TEXT("Landmark %s has no original static mesh to preserve."), *Label));
+				for (FLandmarkRockPreviewBackup& Backup : LandmarkRockPreviewBackups)
+				{
+					if (Backup.OriginalComponent.IsValid()) Backup.OriginalComponent->SetVisibility(Backup.bOriginalWasVisible, false);
+					if (Backup.PreviewComponent.IsValid()) Backup.PreviewComponent->DestroyComponent();
+				}
+				return false;
+			}
+
+			AActor* Owner = Original->GetOwner();
+			UStaticMeshComponent* Preview = NewObject<UStaticMeshComponent>(Owner, NAME_None, RF_Transient);
+			if (!Preview)
+			{
+				AddError(FString::Printf(TEXT("Could not create the transient rock visual for %s."), *Label));
+				for (FLandmarkRockPreviewBackup& Backup : LandmarkRockPreviewBackups)
+				{
+					if (Backup.OriginalComponent.IsValid()) Backup.OriginalComponent->SetVisibility(Backup.bOriginalWasVisible, false);
+					if (Backup.PreviewComponent.IsValid()) Backup.PreviewComponent->DestroyComponent();
+				}
+				return false;
+			}
+			Preview->SetupAttachment(Original);
+			Preview->SetStaticMesh(RockMesh);
+			Preview->SetMaterial(0, RockMaterial);
+			Preview->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Preview->SetCanEverAffectNavigation(false);
+			Preview->SetGenerateOverlapEvents(false);
+			Preview->SetWorldTransform(Original->GetComponentTransform());
+			const FVector OriginalMeshExtent = Original->GetStaticMesh()->GetBounds().BoxExtent;
+			const FVector RockMeshExtent = RockMesh->GetBounds().BoxExtent;
+			const FVector BoundsFitScale(
+				OriginalMeshExtent.X / FMath::Max(RockMeshExtent.X, 1.f),
+				OriginalMeshExtent.Y / FMath::Max(RockMeshExtent.Y, 1.f),
+				OriginalMeshExtent.Z / FMath::Max(RockMeshExtent.Z, 1.f));
+			Preview->SetRelativeScale3D(BoundsFitScale * 0.9f);
+			Preview->RegisterComponent();
+
+			FLandmarkRockPreviewBackup& Backup = LandmarkRockPreviewBackups.AddDefaulted_GetRef();
+			Backup.OriginalComponent = Original;
+			Backup.OriginalMesh = Original->GetStaticMesh();
+			Backup.PreviewComponent = Preview;
+			Backup.OriginalCollisionEnabled = Original->GetCollisionEnabled();
+			Backup.OriginalTransform = Original->GetComponentTransform();
+			Backup.bOriginalWasVisible = Original->IsVisible();
+			Original->SetVisibility(false, false);
+			TestTrue(FString::Printf(TEXT("%s preserves its original mesh, collision, and transform while the noncolliding rock silhouette is visible"), *Label),
+				Original->GetStaticMesh() == Backup.OriginalMesh.Get() &&
+				Original->GetCollisionEnabled() == Backup.OriginalCollisionEnabled &&
+				Original->GetComponentTransform().Equals(Backup.OriginalTransform) && !Original->IsVisible() && Preview->IsVisible() &&
+				Preview->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Preview->CanEverAffectNavigation());
+		}
+		AddInfo(TEXT("Transient art preview only: six Wind Arch and Listening Stones render components use Starter Content SM_Rock/M_Rock; original blockout meshes remain as collision, and the preview visuals will be removed after capture."));
+	}
+	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
 		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview,
 		MoveTemp(LandscapePreviewInstances), MoveTemp(TideglassWeather)));
+	if (bLandmarkRockPreview)
+		ADD_LATENT_AUTOMATION_COMMAND(FRestoreLandmarkRockPreviewCommand(MoveTemp(LandmarkRockPreviewBackups), this));
 	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(OceanMesh, OriginalOceanMaterial));
 	if (TideglassMesh && TideglassPreviewSurface)
 		ADD_LATENT_AUTOMATION_COMMAND(FRestoreTideglassSurfacePreviewCommand(TideglassMesh, TideglassPreviewSurface,

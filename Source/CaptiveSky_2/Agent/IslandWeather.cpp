@@ -167,8 +167,9 @@ void AIslandWeather::InitializeGroundCover()
 		const AActor* Landmark = *It;
 		const bool bTideglass = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("TideglassPool"));
 		const bool bListeningStones = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("ListeningStones"));
+		const bool bWindArch = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("WindArch"));
 		const bool bInnEntrance = Landmark->ActorHasTag(TEXT("InnDoorLantern"));
-		if (!bTideglass && !bListeningStones && !bInnEntrance) continue;
+		if (!bTideglass && !bListeningStones && !bWindArch && !bInnEntrance) continue;
 
 		float TideglassClearRadius = 0.f;
 		if (bTideglass)
@@ -198,12 +199,15 @@ void AIslandWeather::InitializeGroundCover()
 
 		TArray<FTransform> Offsets;
 		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^
-			(bTideglass ? 0x2f6e2b1u : bListeningStones ? 0x6d2b79f5u : 0x51a7e2d3u);
+			(bTideglass ? 0x2f6e2b1u : bListeningStones ? 0x6d2b79f5u : bWindArch ? 0x32b4d8e1u : 0x51a7e2d3u);
 		constexpr int32 InnClumpCount = 72;
 		constexpr float InnInnerRadius = 350.f;
 		constexpr float InnOuterRadius = 1200.f;
+		constexpr int32 WindArchClumpCount = 192;
 		if (bInnEntrance)
 			BuildGroundCoverOffsets(static_cast<int32>(Seed), InnClumpCount, InnInnerRadius, InnOuterRadius, Offsets);
+		else if (bWindArch)
+			BuildGroundCoverOffsets(static_cast<int32>(Seed), WindArchClumpCount, InnInnerRadius, InnOuterRadius, Offsets);
 		else
 			BuildGroundCoverOffsets(static_cast<int32>(Seed), Offsets);
 		for (int32 Index = 0; Index < Offsets.Num(); ++Index)
@@ -211,7 +215,7 @@ void AIslandWeather::InitializeGroundCover()
 			const FTransform& Offset = Offsets[Index];
 			const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
 			if (TideglassClearRadius > 0.f && Offset.GetLocation().Size2D() < TideglassClearRadius) continue;
-			const FVector TraceStart = Candidate + FVector(0.f, 0.f, bInnEntrance ? 5000.f : 1400.f);
+			const FVector TraceStart = Candidate + FVector(0.f, 0.f, (bInnEntrance || bWindArch) ? 5000.f : 1400.f);
 			const FVector TraceEnd = Candidate - FVector(0.f, 0.f, 5000.f);
 			FHitResult GroundHit;
 			if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, Query) ||

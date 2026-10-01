@@ -57,19 +57,23 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	ATargetPoint* Tideglass = World->SpawnActor<ATargetPoint>(FVector(0.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	ATargetPoint* ListeningStones = World->SpawnActor<ATargetPoint>(FVector(3500.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	ATargetPoint* InnDoorLantern = World->SpawnActor<ATargetPoint>(FVector(7000.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
+	ATargetPoint* WindArch = World->SpawnActor<ATargetPoint>(FVector(10500.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	AActor* TideglassGround = World->SpawnActor<AActor>(FVector(0.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
 	AActor* StonesGround = World->SpawnActor<AActor>(FVector(3500.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
 	AActor* InnGround = World->SpawnActor<AActor>(FVector(7000.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
 	AActor* InnRoof = World->SpawnActor<AActor>(FVector(7000.f, 0.f, 480.f), FRotator::ZeroRotator, Spawn);
+	AActor* WindArchGround = World->SpawnActor<AActor>(FVector(10500.f, 0.f, -20.f), FRotator::ZeroRotator, Spawn);
 	AActor* TideglassFootprint = World->SpawnActor<AActor>(FVector(0.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	if (!TestNotNull(TEXT("Ground-cover weather actor spawned"), Weather) ||
 		!TestNotNull(TEXT("Tideglass ground-cover marker spawned"), Tideglass) ||
 		!TestNotNull(TEXT("ListeningStones ground-cover marker spawned"), ListeningStones) ||
 		!TestNotNull(TEXT("Inn-door lantern ground-cover marker spawned"), InnDoorLantern) ||
+		!TestNotNull(TEXT("WindArch ground-cover marker spawned"), WindArch) ||
 		!TestNotNull(TEXT("Tideglass collision fixture spawned"), TideglassGround) ||
 		!TestNotNull(TEXT("ListeningStones collision fixture spawned"), StonesGround) ||
 		!TestNotNull(TEXT("Inn approach ground fixture spawned"), InnGround) ||
 		!TestNotNull(TEXT("Inn roof fixture spawned"), InnRoof) ||
+		!TestNotNull(TEXT("WindArch approach ground fixture spawned"), WindArchGround) ||
 		!TestNotNull(TEXT("Tideglass water-footprint fixture spawned"), TideglassFootprint))
 	{
 		GEngine->DestroyWorldContext(World);
@@ -78,6 +82,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	Tideglass->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
 	ListeningStones->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+	WindArch->Tags = {TEXT("WindArch"), TEXT("IslandLandmark")};
 	InnDoorLantern->Tags.Add(TEXT("InnDoorLantern"));
 	TideglassFootprint->Tags.Add(TEXT("IslandLandmark"));
 	UStaticMesh* TideglassSphereAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
@@ -108,6 +113,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	AddGround(StonesGround, FVector(3500.f, 0.f, -20.f), FVector(1000.f, 1000.f, 10.f));
 	AddGround(InnGround, FVector(7000.f, 0.f, -20.f), FVector(1500.f, 1500.f, 10.f));
 	AddGround(InnRoof, FVector(7000.f, 0.f, 480.f), FVector(500.f, 500.f, 20.f));
+	AddGround(WindArchGround, FVector(10500.f, 0.f, -20.f), FVector(1500.f, 1500.f, 10.f));
 	int32 TideglassLandmarkCount = 0;
 	int32 ListeningStonesLandmarkCount = 0;
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -129,8 +135,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
 	}
 	Weather->InitializeGroundCover();
-	TestTrue(TEXT("Pool clearance and the inn roof filter preserve multiple landmark verges within the 264-clump budget"),
-		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount < 264);
+	TestTrue(TEXT("Pool clearance, the inn roof filter, and the WindArch ring preserve verges within the 456-clump budget"),
+		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 456);
 	const FVector PoolScale = TideglassSphere->GetComponentScale();
 	const FBoxSphereBounds PoolBounds = TideglassSphereAsset->GetBounds();
 	const float PoolClearanceRadius = FVector::Dist2D(TideglassSphere->GetComponentLocation(), Tideglass->GetActorLocation()) +
@@ -165,6 +171,21 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Transient grass reaches the outdoor inn approach"), InnApproachGrass > 0 && InnApproachGrass <= 72);
 	TestEqual(TEXT("No inn ground cover is placed beneath the roof footprint"), InnGrassUnderRoof, 0);
+	int32 WindArchApproachGrass = 0;
+	int32 WindArchCenterGrass = 0;
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA, Weather->ShoreGrassB})
+	{
+		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (!Grass->GetInstanceTransform(Index, Transform, true)) continue;
+			const float Distance = FVector::Dist2D(Transform.GetLocation(), WindArch->GetActorLocation());
+			if (Distance >= 349.f && Distance <= 1201.f) ++WindArchApproachGrass;
+			if (Distance < 349.f) ++WindArchCenterGrass;
+		}
+	}
+	TestTrue(TEXT("Transient grass populates the WindArch approach"), WindArchApproachGrass > 0 && WindArchApproachGrass <= 192);
+	TestEqual(TEXT("WindArch landmark center remains open"), WindArchCenterGrass, 0);
 	TestEqual(TEXT("Each wind-driven species retains an immutable baseline for every clump"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
@@ -244,12 +265,15 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TArray<FTransform> GrassOffsetsB;
 	TArray<FTransform> GrassOffsetsOtherSeed;
 	TArray<FTransform> InnGrassOffsets;
+	TArray<FTransform> WindArchGrassOffsets;
 	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsA);
 	AIslandWeather::BuildGroundCoverOffsets(31415, GrassOffsetsB);
 	AIslandWeather::BuildGroundCoverOffsets(27182, GrassOffsetsOtherSeed);
 	AIslandWeather::BuildGroundCoverOffsets(31415, 72, 350.f, 1200.f, InnGrassOffsets);
+	AIslandWeather::BuildGroundCoverOffsets(31415, 192, 350.f, 1200.f, WindArchGrassOffsets);
 	TestEqual(TEXT("Shore ground-cover scatter has a bounded 96-clump instance budget"), GrassOffsetsA.Num(), 96);
 	TestEqual(TEXT("Inn approach scatter has a bounded 72-clump instance budget"), InnGrassOffsets.Num(), 72);
+	TestEqual(TEXT("WindArch verge has a bounded 192-clump instance budget"), WindArchGrassOffsets.Num(), 192);
 	bool bSameSeedMatches = GrassOffsetsA.Num() == GrassOffsetsB.Num();
 	bool bOtherSeedDiffers = GrassOffsetsA.Num() == GrassOffsetsOtherSeed.Num();
 	for (int32 Index = 0; Index < GrassOffsetsA.Num(); ++Index)
@@ -266,6 +290,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	{
 		const float Radius = OffsetTransform.GetLocation().Size2D();
 		TestTrue(TEXT("Inn approach clumps stay 3.5–12 metres from the door marker"), Radius >= 349.f && Radius <= 1201.f);
+	}
+	for (const FTransform& OffsetTransform : WindArchGrassOffsets)
+	{
+		const float Radius = OffsetTransform.GetLocation().Size2D();
+		TestTrue(TEXT("WindArch verge clumps stay 3.5–12 metres from the landmark marker"), Radius >= 349.f && Radius <= 1201.f);
 	}
 	TestTrue(TEXT("The same weather seed reproduces identical grass placement"), bSameSeedMatches);
 	TestTrue(TEXT("A different weather seed changes the grass placement"), bOtherSeedDiffers);
