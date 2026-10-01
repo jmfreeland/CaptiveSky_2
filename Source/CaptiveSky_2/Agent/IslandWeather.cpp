@@ -316,9 +316,9 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
-		constexpr int32 MeadowPatchCount = 96;
+		constexpr int32 MeadowPatchCount = 128;
 		constexpr int32 AnchorPatchesPerLandmark = 10;
-		constexpr int32 MeadowClumpsPerPatch = 96;
+		constexpr int32 MeadowClumpsPerPatch = 128;
 		constexpr float MeadowPatchInnerRadius = 600.f;
 		constexpr float MeadowPatchOuterRadius = 3600.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
