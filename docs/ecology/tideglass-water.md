@@ -79,3 +79,20 @@ scripts (missing editor Python classes); no CaptiveSky error appeared, and the g
 The organic surface remains a non-colliding visual prototype without depth,
 temperature, water quality, swimming or shoreline blending. Keep the map material reversible and do
 not overwrite the authored sphere material.
+
+## Runtime lifecycle follow-up (2026-10-01)
+
+The `CaptiveSky2.Agent.IslandTideglass` regression now starts its synthetic Game world with the
+normal `UWorld::BeginPlay()` lifecycle instead of manually invoking
+`UIslandTideglassSubsystem::OnWorldBeginPlay()`. It asserts that the runtime procedural surface is
+created, receives its transient material, and leaves the hidden map sphere's authored material intact.
+The changed unity translation unit compiled with the generated UE 5.8.3 MSVC response file and
+linked into a scratch editor module. The automation runner stalled before producing its log or test
+result on this machine, so the new lifecycle assertion is compiled but not yet runtime-verified.
+
+A bounded Game launch also stalled during engine startup before reaching the play-time cap or writing
+a screenshot. Its last log entry was the `ValidatePlatforms` UnrealBuildTool launch. The previous
+Game capture at `Saved/Screenshots/Spectator/005_Tideglass.png` still shows the white blockout disc,
+but it predates the current scratch module; do not treat it as evidence against the current source.
+The original editor module was restored byte-for-byte after both isolated attempts. Rerun the focused
+automation and a sub-minute, zero-request Game capture when the UE startup/build path is responsive.

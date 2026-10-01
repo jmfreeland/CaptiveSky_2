@@ -53,12 +53,13 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			Surface->SetMaterial(0, AuthoredBlockout);
 			TestTrue(TEXT("The subsystem finds the flattened sphere beside the tagged pool"), Tideglass->FindPoolSurface(World) == Surface);
 			Tideglass->MaterialOverride = PreviewWater;
-			Tideglass->OnWorldBeginPlay(*World);
-			TestTrue(TEXT("Play start applies the transient pool-water material"), Tideglass->IsApplied());
+			World->BeginPlay();
+			TestTrue(TEXT("Normal Game-world BeginPlay applies transient pool water through the subsystem lifecycle"), Tideglass->IsApplied());
 			UProceduralMeshComponent* RuntimeWater = Cast<UProceduralMeshComponent>(Tideglass->AppliedTo.Get());
 			TestNotNull(TEXT("Play start creates an organic procedural water surface"), RuntimeWater);
 			if (RuntimeWater)
 			{
+				TestTrue(TEXT("The automatically started surface receives the configured preview material"), RuntimeWater->GetMaterial(0) == PreviewWater);
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
 					RuntimeWater->GetComponentLocation().Equals(Surface->GetComponentLocation(), 1.f));
@@ -67,7 +68,7 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("The pool's top faces use the winding Unreal renders from above"),
 					WaterSection && WaterSection->ProcIndexBuffer.Num() >= 3 && WaterSection->ProcIndexBuffer[0] == 0 &&
 					WaterSection->ProcIndexBuffer[1] == 2 && WaterSection->ProcIndexBuffer[2] == 1);
-				TestTrue(TEXT("The generated water surface receives the transient material"), RuntimeWater->GetMaterial(0) == PreviewWater);
+				TestTrue(TEXT("The hidden map sphere retains its authored material while transient water is active"), Surface->GetMaterial(0) == AuthoredBlockout);
 				TestTrue(TEXT("The generated water surface does not replace the blockout's collision"),
 					RuntimeWater->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 				TestTrue(TEXT("The old sphere is hidden only while the procedural surface is active"), Surface->bHiddenInGame);
