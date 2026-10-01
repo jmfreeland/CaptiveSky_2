@@ -1,11 +1,14 @@
 #include "AutonomousAgentAIController.h"
 #include "AutonomousAgentCharacter.h"
+#include "AgentMemoryComponent.h"
 #include "RavenAgentAIController.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "TimerManager.h"
 
@@ -63,8 +66,10 @@ private:
 		FVector StartLocation = FVector::ZeroVector;
 		double StartedAt = 0.0;
 		double PerchRequestedAt = 0.0;
+		double GroundingStartedAt = 0.0;
 		int32 StartupPolls = 0;
 		bool bMoveStarted = false;
+		bool bWaitingForGround = false;
 		bool bWanderProbe = false;
 		bool bApproachProbe = false;
 		bool bPerchRequested = false;
@@ -84,6 +89,15 @@ private:
 			for (TActorIterator<AActor> It(World); It; ++It)
 			{
 				if (!Mover && It->ActorHasTag(State->MoverTag)) Mover = *It;
+				if (!Mover)
+				{
+					const AAutonomousAgentCharacter* Resident = Cast<AAutonomousAgentCharacter>(*It);
+					if (Resident && Resident->Memory &&
+						Resident->Memory->GetResolvedAgentId().Equals(State->MoverTag.ToString(), ESearchCase::IgnoreCase))
+					{
+						Mover = *It;
+					}
+				}
 				if (!State->bWanderProbe && !Target && It->ActorHasTag(State->TargetTag)) Target = *It;
 			}
 			APawn* Pawn = Cast<APawn>(Mover);
@@ -96,6 +110,33 @@ private:
 					(State->bWanderProbe || Target) ? TEXT("yes") : TEXT("no"));
 				Finish(State, false);
 				return;
+			}
+			if (State->bWanderProbe && !Cast<ARavenAgentAIController>(Controller))
+			{
+				const ACharacter* Character = Cast<ACharacter>(Pawn);
+				const UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
+				if (Movement && !Movement->IsMovingOnGround())
+				{
+					if (!State->bWaitingForGround)
+					{
+						State->bWaitingForGround = true;
+						State->GroundingStartedAt = World->GetTimeSeconds();
+						UE_LOG(LogIslandMovementProbe, Log,
+							TEXT("Wander probe is waiting for the grounded resident to land (location=%s mode=%d)."),
+							*Pawn->GetActorLocation().ToCompactString(), static_cast<int32>(Movement->MovementMode));
+					}
+					if (World->GetTimeSeconds() - State->GroundingStartedAt < 12.0) return;
+					UE_LOG(LogIslandMovementProbe, Warning,
+						TEXT("Wander probe timed out before its grounded resident landed (location=%s mode=%d)."),
+						*Pawn->GetActorLocation().ToCompactString(), static_cast<int32>(Movement->MovementMode));
+					Finish(State, false);
+					return;
+				}
+				if (State->bWaitingForGround)
+				{
+					UE_LOG(LogIslandMovementProbe, Log, TEXT("Grounded resident landed at %s; issuing wander now."),
+						*Pawn->GetActorLocation().ToCompactString());
+				}
 			}
 			if (State->bApproachProbe)
 			{
