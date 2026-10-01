@@ -315,6 +315,11 @@ This verifies the parent-only code path; it does not improve the mask, which rem
 Overnight validation triage: `Codex_FullAgentSuite_20260930.log` records 31 successful tests and
 zero failures. The two 20:52/20:54 standalone wetness crashes are old reports from before commit
 `89acbe6`, which added the `GIsEditor` guard around the editor-only `SetParentEditorOnly` call.
+On 2026-10-01 the current UE 5.8.3 build was exercised in standalone `-game` by the isolated
+Innkeeper-to-door probe (30-second realtime ceiling; background thinking disabled; separate data
+root). It completed the 959 cm route in 5.5 simulated seconds, returned success, and
+`Saved/Logs/MovementProbe_IslandInnkeeper_InnDoorLantern.log` contains no `SetParentEditorOnly`
+assertion or fatal exception, confirming the guard on the current build.
 The 20:22 landscape ensure is from the earlier generic debug material with no usable landscape
 material interfaces; that attempt was abandoned in favor of retaining the authored landscape graph.
 Separate startup fatals in the crash archive cite inaccessible shader-temp or read-only DDC paths,
