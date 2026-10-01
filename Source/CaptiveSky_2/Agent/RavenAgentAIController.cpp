@@ -203,15 +203,82 @@ void ARavenAgentAIController::BeginHop()
 
 bool ARavenAgentAIController::BeginPerch()
 {
-	AActor* BestPerch = nullptr;
-	float BestDistance = TNumericLimits<float>::Max();
+	TArray<AActor*> CandidatePerches;
+	TArray<FVector> CandidateLocations;
+	TArray<float> CandidateWindSpeeds;
+	AIslandWeather* Weather = nullptr;
+	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+	{
+		Weather = *It;
+		break;
+	}
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (!It->ActorHasTag(TEXT("RavenPerch"))) continue;
-		const float Distance = FVector::DistSquared(It->GetActorLocation(), GetPawn()->GetActorLocation());
-		if (Distance < BestDistance) { BestDistance = Distance; BestPerch = *It; }
+		if (!It->ActorHasTag(TEXT("RavenPerch")) || !HasSuitablePerchSupport(*It)) continue;
+		CandidatePerches.Add(*It);
+		CandidateLocations.Add(It->GetActorLocation());
+		CandidateWindSpeeds.Add(Weather ? Weather->GetLocalWind(It->GetActorLocation(), GetPawn()).Size() : 0.f);
 	}
+	const float CurrentWindSpeed = Weather ? Weather->GetLocalWind(GetPawn()->GetActorLocation(), GetPawn()).Size() : 0.f;
+	const int32 PreferredIndex = SelectWindAwarePerch(GetPawn()->GetActorLocation(), CurrentWindSpeed,
+		CandidateLocations, CandidateWindSpeeds);
+	AActor* BestPerch = CandidatePerches.IsValidIndex(PreferredIndex) ? CandidatePerches[PreferredIndex] : nullptr;
 	return BeginPerchAt(BestPerch);
+}
+
+int32 ARavenAgentAIController::SelectWindAwarePerch(const FVector& Origin, float CurrentWindSpeed,
+	const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds)
+{
+	if (PerchLocations.IsEmpty() || PerchLocations.Num() != PerchWindSpeeds.Num()) return INDEX_NONE;
+
+	int32 NearestIndex = INDEX_NONE;
+	float NearestDistanceSquared = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < PerchLocations.Num(); ++Index)
+	{
+		const float DistanceSquared = FVector::DistSquared(Origin, PerchLocations[Index]);
+		if (DistanceSquared < NearestDistanceSquared)
+		{
+			NearestDistanceSquared = DistanceSquared;
+			NearestIndex = Index;
+		}
+	}
+
+	// In light air, preserve the ordinary nearest-roost choice. In stronger wind,
+	// trade travel distance against the wind measured at each physically supported site.
+	static constexpr float StrongWindThreshold = 85.f;
+	static constexpr float TravelCostPerCentimeter = 0.008f;
+	static constexpr float MinimumUsefulShelterGain = 15.f;
+	if (CurrentWindSpeed < StrongWindThreshold) return NearestIndex;
+
+	int32 CalmestIndex = NearestIndex;
+	float NearestScore = PerchWindSpeeds[NearestIndex] + FMath::Sqrt(NearestDistanceSquared) * TravelCostPerCentimeter;
+	float CalmestScore = NearestScore;
+	for (int32 Index = 0; Index < PerchLocations.Num(); ++Index)
+	{
+		const float Distance = FVector::Distance(Origin, PerchLocations[Index]);
+		const float Score = PerchWindSpeeds[Index] + Distance * TravelCostPerCentimeter;
+		if (Score < CalmestScore)
+		{
+			CalmestScore = Score;
+			CalmestIndex = Index;
+		}
+	}
+	return CalmestScore + MinimumUsefulShelterGain < NearestScore ? CalmestIndex : NearestIndex;
+}
+
+bool ARavenAgentAIController::HasSuitablePerchSupport(const AActor* Site, FHitResult* OutSupport) const
+{
+	if (!Site || !GetWorld() || !GetPawn()) return false;
+	const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn());
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenRoostAssessment), false, GetPawn());
+	Query.AddIgnoredActor(Site);
+	FHitResult Support;
+	const FVector SiteLocation = Site->GetActorLocation();
+	const bool bSupportHit = GetWorld()->LineTraceSingleByChannel(Support, SiteLocation,
+		SiteLocation - FVector(0.f, 0.f, HalfHeight + 12.f), ECC_Visibility, Query);
+	if (OutSupport) *OutSupport = Support;
+	return bSupportHit && Support.ImpactNormal.Z >= 0.5f;
 }
 
 bool ARavenAgentAIController::RequestPerch(FName PerchTag)
@@ -233,9 +300,7 @@ FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenRoostAssessment), false, GetPawn());
 	Query.AddIgnoredActor(Site);
 	FHitResult Support;
-	const bool bSupportHit = GetWorld()->LineTraceSingleByChannel(Support, SiteLocation,
-		SiteLocation - FVector(0.f, 0.f, HalfHeight + 12.f), ECC_Visibility, Query);
-	const bool bHasSuitableSupport = bSupportHit && Support.ImpactNormal.Z >= 0.5f;
+	const bool bHasSuitableSupport = HasSuitablePerchSupport(Site, &Support);
 
 	const float ProbeSpread = FMath::Min(CapsuleRadius * 0.65f, 30.f);
 	const FVector HeadHeight = SiteLocation + FVector(0.f, 0.f, HalfHeight + 5.f);

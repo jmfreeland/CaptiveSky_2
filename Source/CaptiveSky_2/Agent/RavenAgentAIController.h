@@ -101,6 +101,9 @@ private:
 	void BeginHop();
 	bool BeginPerch();
 	bool BeginPerchAt(AActor* Perch);
+	bool HasSuitablePerchSupport(const AActor* Site, FHitResult* OutSupport = nullptr) const;
+	static int32 SelectWindAwarePerch(const FVector& Origin, float CurrentWindSpeed,
+		const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds);
 	void SetGrounded();
 	FVector MakeCruiseTarget() const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;

@@ -21,6 +21,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch"
 
 bool FRavenPerchTest::RunTest(const FString& Parameters)
 {
+	const TArray<FVector> PerchOptions = { FVector(400.f, 0.f, 0.f), FVector(900.f, 0.f, 0.f) };
+	const TArray<float> ShelteredWind = { 160.f, 20.f };
+	const TArray<float> SlightlyDifferentWind = { 160.f, 155.f };
+	const TArray<float> IncompleteWindSamples = { 160.f };
+	TestEqual(TEXT("Light wind leaves the raven's ordinary nearest-roost choice intact"),
+		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 50.f, PerchOptions, ShelteredWind), 0);
+	TestEqual(TEXT("Strong wind can favor a materially calmer nearby supported roost"),
+		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, ShelteredWind), 1);
+	TestEqual(TEXT("Small exposure differences do not outweigh the nearest roost preference"),
+		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, SlightlyDifferentWind), 0);
+	TestEqual(TEXT("Malformed perch samples safely produce no candidate"),
+		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, IncompleteWindSamples), INDEX_NONE);
+
 	// No gateway, model requests, or autobiographical memory in this fixture.
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	// CreateWorld already initializes the world; do not initialize WorldSettings twice.
