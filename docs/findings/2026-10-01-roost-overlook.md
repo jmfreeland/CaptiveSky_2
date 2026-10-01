@@ -38,8 +38,12 @@ Raven flight-wander now has a 40% chance to prefer one of twelve sampled cruise 
 
 UE 5.8.3 editor build succeeded and `CaptiveSky2.Agent.RavenPerch` passed, including deterministic checks for curiosity selection and both random-fallback cases. Earlier provider-free Game probes completed both ordinary Raven movement branches in separate isolated launches: a 138 cm ground hop and a flight-wander ending at the reported destination; both made zero model requests. Those launches did not happen to log a curiosity selection, so the movement harness was extended with an optional start override and a forced-curiosity diagnostic branch. From Aster's logged exploration start `(-100400, 100960, 2749)`, the live Raven saw two visible nearby landmarks and selected a cruise target gaining 1,073 cm toward `WindArch`. He physically completed the flight after 1,220 cm in 4 simulated seconds; the Game run made zero model requests and exited normally. The diagnostic bypasses only the ordinary 40% random gate; it uses Raven's production sightline scan, candidate scoring, and flight movement. It is not evidence that an LLM autonomously requested wander or that a camera-framed player would necessarily see the marker.
 
+A subsequent Game probe used the exact same start and ordinary `Wander` action, with no curiosity override. This time the normal random gate fired: Raven saw two visible nearby landmarks, selected WindArch (+1,220 cm progress), and reached the flight destination after 1,660 cm in 5 simulated seconds. It made zero model requests and exited normally. This confirms the production soft-curiosity path can be selected naturally and carry Raven to its destination; it does not estimate the 40% rate statistically, prove an LLM independently chose wander, or guarantee that every player camera would frame WindArch.
+
 The final UE 5.8.3 editor build succeeded after the diagnostic change, and `CaptiveSky2.Agent.RavenPerch` passed again. The movement probe now supports selecting a mover by actor tag or resident ID, optional wander start coordinates, and Raven's custom locomotion completion instead of relying only on nav path-following status.
 
 Automation logs: `Saved/Logs/RavenLandmarkCuriosityTest.log`, `Saved/Logs/RavenCuriosityAutomation_20261001.log`
 
-Game probe log: `Saved/Logs/MovementProbe_Agent_Raven_01_Wander_Curiosity.log`
+Forced-curiosity game probe: `Saved/Logs/MovementProbe_Agent_Raven_01_Wander_Curiosity.log`
+
+Natural curiosity game probe: `Saved/Logs/MovementProbe_Agent_Raven_01_Wander.log`
