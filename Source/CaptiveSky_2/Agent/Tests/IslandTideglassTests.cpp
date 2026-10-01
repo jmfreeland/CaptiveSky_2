@@ -52,14 +52,15 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			SurfaceActor->SetActorScale3D(FVector(4.f, 4.f, 0.1f));
 			Surface->SetMaterial(0, AuthoredBlockout);
 			TestTrue(TEXT("The subsystem finds the flattened sphere beside the tagged pool"), Tideglass->FindPoolSurface(World) == Surface);
-			Tideglass->MaterialOverride = PreviewWater;
+			UMaterialInterface* StartupMaterial = PoolWater ? PoolWater : PreviewWater;
+			Tideglass->MaterialOverride = PoolWater ? nullptr : PreviewWater;
 			World->BeginPlay();
-			TestTrue(TEXT("Normal Game-world BeginPlay applies transient pool water through the subsystem lifecycle"), Tideglass->IsApplied());
+			TestTrue(TEXT("Normal Game-world BeginPlay applies its default asset or isolated preview fallback"), Tideglass->IsApplied());
 			UProceduralMeshComponent* RuntimeWater = Cast<UProceduralMeshComponent>(Tideglass->AppliedTo.Get());
 			TestNotNull(TEXT("Play start creates an organic procedural water surface"), RuntimeWater);
 			if (RuntimeWater)
 			{
-				TestTrue(TEXT("The automatically started surface receives the configured preview material"), RuntimeWater->GetMaterial(0) == PreviewWater);
+				TestTrue(TEXT("The automatically started surface receives the configured startup material"), RuntimeWater->GetMaterial(0) == StartupMaterial);
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
 					RuntimeWater->GetComponentLocation().Equals(Surface->GetComponentLocation(), 1.f));

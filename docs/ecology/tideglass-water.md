@@ -84,11 +84,15 @@ not overwrite the authored sphere material.
 
 The `CaptiveSky2.Agent.IslandTideglass` regression now starts its synthetic Game world with the
 normal `UWorld::BeginPlay()` lifecycle instead of manually invoking
-`UIslandTideglassSubsystem::OnWorldBeginPlay()`. It asserts that the runtime procedural surface is
-created, receives its transient material, and leaves the hidden map sphere's authored material intact.
-The changed unity translation unit compiled with the generated UE 5.8.3 MSVC response file and
-linked into a scratch editor module. The automation runner stalled before producing its log or test
-result on this machine, so the new lifecycle assertion is compiled but not yet runtime-verified.
+`UIslandTideglassSubsystem::OnWorldBeginPlay()`. When the generated asset is present, the test now
+uses the same default asset path as Game startup; otherwise it injects a transient fallback. It
+asserts that the runtime procedural surface is created and the hidden map sphere retains its authored
+material. Startup now logs whether the water material is missing or the tagged flattened footprint
+could not be applied, while leaving other maps without a Tideglass marker quiet. These diagnostics
+will distinguish an asset/footprint failure from a subsystem lifecycle failure in a future Game log.
+The changed unity translation unit was compiled and linked into a scratch editor module, but the
+automation runner stalled before producing a test result on this machine, so the new assertion is
+compiled but not runtime-verified.
 
 A bounded Game launch also stalled during engine startup before reaching the play-time cap or writing
 a screenshot. Its last log entry was the `ValidatePlatforms` UnrealBuildTool launch. The previous

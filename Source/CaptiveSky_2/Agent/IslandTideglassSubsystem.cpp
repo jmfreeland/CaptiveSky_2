@@ -8,6 +8,8 @@
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
+
 const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_Lively.M_TideglassPool_Lively");
 
 bool UIslandTideglassSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
@@ -175,11 +177,31 @@ void UIslandTideglassSubsystem::RestorePoolMaterial()
 void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	bool bHasTideglassMarker = false;
+	for (TActorIterator<AActor> It(&InWorld); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("TideglassPool")))
+		{
+			bHasTideglassMarker = true;
+			break;
+		}
+	}
+	if (!bHasTideglassMarker) return;
+
 	UMaterialInterface* Material = MaterialOverride
 		? MaterialOverride.Get()
 		: LoadObject<UMaterialInterface>(nullptr, MaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
-	if (Material && ApplyPoolMaterial(Material))
-		UE_LOG(LogTemp, Log, TEXT("IslandTideglass: runtime water material applied to the shallow pool"));
+	if (!Material)
+	{
+		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water is unavailable: could not load %s; the white blockout surface remains visible."), MaterialPath);
+		return;
+	}
+	if (!ApplyPoolMaterial(Material))
+	{
+		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water could not find a flattened sphere beside the TideglassPool marker."));
+		return;
+	}
+	UE_LOG(LogIslandTideglass, Log, TEXT("Tideglass runtime water material applied to the shallow pool."));
 }
 
 void UIslandTideglassSubsystem::Deinitialize()
