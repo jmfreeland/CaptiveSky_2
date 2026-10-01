@@ -1,4 +1,4 @@
-"""Builds a wet-ground variant of the Island landscape material, leaving the authored assets untouched.
+"""Builds a wet-ground variant of the Island landscape material.
 
 Creates /Game/Materials/M_Island_Textured_Wet (a copy of M_Island_Textured_Auto) and
 /Game/Materials/MI_Island_Landscape_Wet (a copy of MI_Island_Landscape reparented to it). The copy gets an extra
@@ -11,11 +11,18 @@ UIslandEnvironmentSubsystem drives from rain, so wet weather changes the ground 
 The stock `Ground Wetness` only moves specular and the stock `Add Puddles` branch showed no visible response
 (docs/findings/2026-09-28-landscape-material-audit.md), hence this separate stage. Rebuilds its own two assets every run.
 
+Authoring: with LANDSCAPE_WET_AUTHOR=1 in the environment, /Game/Materials/MI_Island_Landscape (the map's landscape
+material) is reparented onto the wet graph, so standalone and packaged builds get it too. The first time, the authored
+instance is copied to MI_Island_Landscape_AuthoredBackup. Later runs keep whatever state the instance is in (wet stays
+wet across rebuilds); LANDSCAPE_WET_AUTHOR=0 puts the authored parent back. With the variable unset and the instance
+never authored, authored assets are untouched. At wetness 0 the wet graph renders as the authored one.
+
 Preview: Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness
          -LandscapeParent /Game/Materials/M_Island_Textured_Wet
-In the editor and PIE, UIslandEnvironmentSubsystem swaps this graph in at runtime; standalone and packaged builds do not.
+Not authored, the graph is only swapped in at runtime by UIslandEnvironmentSubsystem, in the editor and PIE.
 """
 
+import os
 import traceback
 import unreal
 
@@ -23,6 +30,7 @@ PARENT_SOURCE = "/Game/Materials/M_Island_Textured_Auto"
 INSTANCE_SOURCE = "/Game/Materials/MI_Island_Landscape"
 PARENT_COPY = "/Game/Materials/M_Island_Textured_Wet"
 INSTANCE_COPY = "/Game/Materials/MI_Island_Landscape_Wet"
+INSTANCE_BACKUP = "/Game/Materials/MI_Island_Landscape_AuthoredBackup"
 NOISE_TEXTURE = "/Game/Materals/Textures/T_LandscapeNoise"
 WETNESS_PARAMETER = "Wetness"
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
@@ -97,6 +105,13 @@ def delete_if_exists(path):
             raise RuntimeError("Could not delete " + path)
 
 
+def set_authored_parent(instance, parent):
+    instance.set_editor_property("parent", parent)
+    MEL.update_material_instance(instance)
+    if not unreal.EditorAssetLibrary.save_asset(INSTANCE_SOURCE):
+        raise RuntimeError("Could not save " + INSTANCE_SOURCE)
+
+
 def build():
     noise = unreal.load_asset(NOISE_TEXTURE)
     if not noise:
@@ -104,6 +119,18 @@ def build():
     collection = unreal.load_asset(COLLECTION_PATH)
     if not collection:
         raise RuntimeError("Missing collection " + COLLECTION_PATH)
+    authored = unreal.load_asset(INSTANCE_SOURCE)
+    if not authored:
+        raise RuntimeError("Missing " + INSTANCE_SOURCE)
+    mode = os.environ.get("LANDSCAPE_WET_AUTHOR", "")
+    authored_was_wet = PARENT_COPY.rsplit("/", 1)[-1] in authored.get_editor_property("parent").get_path_name()
+    # The wet parent is deleted and rebuilt below, so detach the authored instance from it first.
+    if authored_was_wet:
+        set_authored_parent(authored, unreal.load_asset(PARENT_SOURCE))
+    elif mode == "1" and not unreal.EditorAssetLibrary.does_asset_exist(INSTANCE_BACKUP):
+        if not unreal.EditorAssetLibrary.duplicate_asset(INSTANCE_SOURCE, INSTANCE_BACKUP):
+            raise RuntimeError("Could not back up " + INSTANCE_SOURCE)
+        unreal.EditorAssetLibrary.save_asset(INSTANCE_BACKUP)
     delete_if_exists(INSTANCE_COPY)
     delete_if_exists(PARENT_COPY)
     material = unreal.EditorAssetLibrary.duplicate_asset(PARENT_SOURCE, PARENT_COPY)
@@ -169,7 +196,7 @@ def build():
     if not unreal.EditorAssetLibrary.save_asset(PARENT_COPY):
         raise RuntimeError("Could not save " + PARENT_COPY)
 
-    instance = unreal.EditorAssetLibrary.duplicate_asset(INSTANCE_SOURCE, INSTANCE_COPY)
+    instance = unreal.EditorAssetLibrary.duplicate_asset(INSTANCE_BACKUP if unreal.EditorAssetLibrary.does_asset_exist(INSTANCE_BACKUP) else INSTANCE_SOURCE, INSTANCE_COPY)
     if not instance:
         raise RuntimeError("Could not duplicate " + INSTANCE_SOURCE)
     instance.set_editor_property("parent", material)
@@ -177,12 +204,14 @@ def build():
     if not unreal.EditorAssetLibrary.save_asset(INSTANCE_COPY):
         raise RuntimeError("Could not save " + INSTANCE_COPY)
 
-    authored = unreal.load_asset(INSTANCE_SOURCE)
+    if mode == "1" or (authored_was_wet and mode != "0"):
+        set_authored_parent(authored, material)
     authored_parent = authored.get_editor_property("parent").get_path_name()
     copy_parent = instance.get_editor_property("parent").get_path_name()
-    unreal.log("[LandscapeWet] Built {} -> parent {}; authored instance still uses {}".format(INSTANCE_COPY, copy_parent, authored_parent))
-    if PARENT_SOURCE.rsplit("/", 1)[-1] not in authored_parent:
-        raise RuntimeError("Authored instance parent changed unexpectedly: " + authored_parent)
+    unreal.log("[LandscapeWet] Built {} -> parent {}; {} now uses {}".format(INSTANCE_COPY, copy_parent, INSTANCE_SOURCE, authored_parent))
+    expected = PARENT_COPY if mode == "1" or (authored_was_wet and mode != "0") else PARENT_SOURCE
+    if expected.rsplit("/", 1)[-1] not in authored_parent:
+        raise RuntimeError("Authored instance has an unexpected parent: " + authored_parent)
 
 
 try:

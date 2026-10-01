@@ -110,3 +110,19 @@ This is still an editor/PIE graph: the current subsystem swaps it only in editor
 visual check should be a short PIE weather transition on the user's UE display, including authored
 dry, rain rising, and drying down. Do not treat these offscreen captures as confirmation of packaged
 or standalone rendering.
+
+## Authored into the map's landscape material (2026-10-01)
+
+At the user's request, `/Game/Materials/MI_Island_Landscape` is now reparented onto `M_Island_Textured_Wet`, so
+standalone and packaged builds get the wet response without the editor-only swap (`UseWetLandscapeGraph` sees the
+parent is already the wet graph and does nothing). The previous instance is kept as
+`/Game/Materials/MI_Island_Landscape_AuthoredBackup`; `Content/` is gitignored, so that copy is the only way back.
+
+- Build or rebuild: `LANDSCAPE_WET_AUTHOR=1` with `Create-LandscapeWetMaterial.py` (full editor, `-ExecutePythonScript`).
+  Later runs without the variable keep the authored state (the script detaches the instance while it rebuilds the
+  wet parent). `LANDSCAPE_WET_AUTHOR=0` restores the original parent.
+- Wetness 0 is the old look: the `TideglassGroundDetail` authored-dry pass measured the same mean RGB as before
+  authoring ([72.00, 56.86, 4.54]); fully wet [39.5, 33.0, 12.3] with no `-LandscapeParent` swap.
+- Standalone check: `-game /Game/Maps/Island -Spectator -SpectatorShots` with `-ExecCmds="Island.Wetness 1"` renders dark,
+  glossy ground with pools around the inn, with no editor involved.
+- Not yet checked: a rain-driven dry -> wet -> drying sequence in PIE or a packaged build.
