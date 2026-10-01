@@ -62,6 +62,10 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	RightWing->SetRelativeRotation(FRotator(0.f, 0.f, -8.f));
 	RightWing->RegisterComponent();
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
+	UClass* RavenBlueprintClass = LoadClass<ACharacter>(nullptr, TEXT("/Game/Agents/BP_Raven_Placeholder.BP_Raven_Placeholder_C"));
+	ACharacter* BlueprintRaven = RavenBlueprintClass
+		? World->SpawnActor<ACharacter>(RavenBlueprintClass, FVector(1800.f, 0.f, 100.f), FRotator::ZeroRotator) : nullptr;
+	ARavenAgentAIController* BlueprintController = BlueprintRaven ? World->SpawnActor<ARavenAgentAIController>() : nullptr;
 	ATargetPoint* Perch = World->SpawnActor<ATargetPoint>(FVector(600, 0, 302), FRotator::ZeroRotator);
 	Perch->Tags = {TEXT("RavenPerch"), TEXT("TestRoost")};
 	AActor* Support = World->SpawnActor<AActor>();
@@ -100,6 +104,39 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	Controller->HopDuration = 0.55f;
 	TestTrue(TEXT("Settling returns both wings to their exact authored baselines without drift"),
 		LeftWing->GetRelativeRotation().Equals(LeftWingRest) && RightWing->GetRelativeRotation().Equals(RightWingRest));
+	TestNotNull(TEXT("The real raven placeholder Blueprint is available to the provider-free fixture"), BlueprintRaven);
+	if (TestNotNull(TEXT("The real raven placeholder has a controller"), BlueprintController))
+	{
+		BlueprintController->Possess(BlueprintRaven);
+		TArray<UStaticMeshComponent*> BlueprintWingComponents;
+		BlueprintRaven->GetComponents<UStaticMeshComponent>(BlueprintWingComponents);
+		UStaticMeshComponent* BlueprintLeftWing = nullptr;
+		UStaticMeshComponent* BlueprintRightWing = nullptr;
+		for (UStaticMeshComponent* Component : BlueprintWingComponents)
+		{
+			if (!Component) continue;
+			if (Component->GetName().Contains(TEXT("LeftWing"), ESearchCase::IgnoreCase)) BlueprintLeftWing = Component;
+			if (Component->GetName().Contains(TEXT("RightWing"), ESearchCase::IgnoreCase)) BlueprintRightWing = Component;
+		}
+		TestNotNull(TEXT("The Blueprint exposes its actual left wing component"), BlueprintLeftWing);
+		TestNotNull(TEXT("The Blueprint exposes its actual right wing component"), BlueprintRightWing);
+		if (BlueprintLeftWing && BlueprintRightWing)
+		{
+			const FRotator BlueprintLeftRest = BlueprintLeftWing->GetRelativeRotation();
+			const FRotator BlueprintRightRest = BlueprintRightWing->GetRelativeRotation();
+			BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+			BlueprintController->Tick(0.05f);
+			TestTrue(TEXT("Flight animates the actual Blueprint left wing from its authored transform"),
+				!BlueprintLeftWing->GetRelativeRotation().Equals(BlueprintLeftRest));
+			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+			BlueprintController->Tick(0.05f);
+			TestTrue(TEXT("The actual Blueprint wings return to their authored transforms"),
+				BlueprintLeftWing->GetRelativeRotation().Equals(BlueprintLeftRest) && BlueprintRightWing->GetRelativeRotation().Equals(BlueprintRightRest));
+		}
+		BlueprintController->UnPossess();
+		BlueprintController->Destroy();
+		BlueprintRaven->Destroy();
+	}
 	UAgentConsolidationComponent* RavenRest = NewObject<UAgentConsolidationComponent>(Raven);
 	Raven->AddInstanceComponent(RavenRest);
 	RavenRest->RegisterComponent();
