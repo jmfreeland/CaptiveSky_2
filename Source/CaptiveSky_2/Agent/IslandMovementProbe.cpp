@@ -29,28 +29,38 @@ public:
 		State->World = World;
 		State->MoverTag = FName(Args.IsEmpty() ? TEXT("IslandInnkeeper") : *Args[0]);
 		State->bApproachProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Approach"), ESearchCase::IgnoreCase);
+		State->bWanderProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Wander"), ESearchCase::IgnoreCase);
+		State->bForceCuriosityProbe = State->bWanderProbe && Args.Num() > 2 && Args[2].Equals(TEXT("Curious"), ESearchCase::IgnoreCase);
 		State->TargetTag = State->bApproachProbe
 			? FName(Args.Num() > 2 ? *Args[2] : TEXT("ApproachAgent_Raven_01"))
 			: FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
 		State->PerchTag = State->bApproachProbe ? FName(Args.Num() > 3 ? *Args[3] : TEXT("Roost_East")) : NAME_None;
-		if (State->bApproachProbe && Args.Num() > 6)
+		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : INDEX_NONE);
+		if (StartOverrideIndex != INDEX_NONE && Args.Num() > StartOverrideIndex)
 		{
+			if (Args.Num() <= StartOverrideIndex + 2)
+			{
+				UE_LOG(LogIslandMovementProbe, Error, TEXT("Start override needs all three numeric world coordinates."));
+				return;
+			}
 			double StartX = 0.0;
 			double StartY = 0.0;
 			double StartZ = 0.0;
-			if (!LexTryParseString(StartX, *Args[4]) || !LexTryParseString(StartY, *Args[5]) || !LexTryParseString(StartZ, *Args[6]))
+			if (!LexTryParseString(StartX, *Args[StartOverrideIndex]) ||
+				!LexTryParseString(StartY, *Args[StartOverrideIndex + 1]) ||
+				!LexTryParseString(StartZ, *Args[StartOverrideIndex + 2]))
 			{
-				UE_LOG(LogIslandMovementProbe, Error, TEXT("Approach start override needs three numeric world coordinates."));
+				UE_LOG(LogIslandMovementProbe, Error, TEXT("Start override needs three numeric world coordinates."));
 				return;
 			}
 			State->bHasMoverStartOverride = true;
 			State->MoverStartOverride = FVector(StartX, StartY, StartZ);
 		}
-		State->bWanderProbe = State->TargetTag == FName(TEXT("Wander"));
 		World->GetTimerManager().SetTimer(State->PollTimer,
 			FTimerDelegate::CreateLambda([State]() { Poll(State); }), 0.5f, true);
-		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s probe for %s; waiting for runtime actors."),
-			State->bWanderProbe ? TEXT("wander") : TEXT("movement"), *State->MoverTag.ToString());
+		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s%s probe for %s; waiting for runtime actors."),
+			State->bForceCuriosityProbe ? TEXT("forced-curiosity ") : (State->bWanderProbe ? TEXT("wander ") : TEXT("")),
+			State->bWanderProbe ? TEXT("flight-wander") : TEXT("movement"), *State->MoverTag.ToString());
 	}
 
 private:
@@ -71,6 +81,7 @@ private:
 		bool bMoveStarted = false;
 		bool bWaitingForGround = false;
 		bool bWanderProbe = false;
+		bool bForceCuriosityProbe = false;
 		bool bApproachProbe = false;
 		bool bPerchRequested = false;
 		bool bHasMoverStartOverride = false;
@@ -188,11 +199,25 @@ private:
 			State->Controller = Controller;
 			State->StartLocation = Pawn->GetActorLocation();
 			State->StartedAt = World->GetTimeSeconds();
-			FAgentDecision Decision;
-			Decision.bValid = true;
-			Decision.ActionType = State->bWanderProbe ? EAgentActionType::Wander : EAgentActionType::MoveTo;
-			if (!State->bWanderProbe) Decision.ActionTarget = State->TargetTag.ToString();
-			Controller->ActOnDecision(Decision);
+			if (State->bForceCuriosityProbe)
+			{
+				ARavenAgentAIController* RavenController = Cast<ARavenAgentAIController>(Controller);
+				if (!RavenController)
+				{
+					UE_LOG(LogIslandMovementProbe, Error, TEXT("Curiosity flight probe requires an embodied raven controller."));
+					Finish(State, false);
+					return;
+				}
+				RavenController->BeginTakeoff(RavenController->MakeCruiseTarget(true));
+			}
+			else
+			{
+				FAgentDecision Decision;
+				Decision.bValid = true;
+				Decision.ActionType = State->bWanderProbe ? EAgentActionType::Wander : EAgentActionType::MoveTo;
+				if (!State->bWanderProbe) Decision.ActionTarget = State->TargetTag.ToString();
+				Controller->ActOnDecision(Decision);
+			}
 			State->bMoveStarted = true;
 			if (Target)
 			{
@@ -201,7 +226,8 @@ private:
 			}
 			else
 			{
-				UE_LOG(LogIslandMovementProbe, Log, TEXT("Wander issued from %s (%s)."),
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("%s issued from %s (%s)."),
+					State->bForceCuriosityProbe ? TEXT("Forced-curiosity flight-wander") : TEXT("Wander"),
 					*State->StartLocation.ToCompactString(), *Controller->DescribeActionState());
 			}
 			return;
@@ -251,5 +277,5 @@ private:
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
+	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));

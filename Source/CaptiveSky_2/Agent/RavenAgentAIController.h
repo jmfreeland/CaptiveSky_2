@@ -67,6 +67,7 @@ protected:
 	virtual void ActOnDecision(const FAgentDecision& Decision) override;
 
 private:
+	friend class FIslandMovementProbeCommand;
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
 	friend class FRavenFlightTest;
@@ -109,7 +110,7 @@ private:
 	static int32 SelectWindAwarePerch(const FVector& Origin, float CurrentWindSpeed,
 		const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds);
 	void SetGrounded();
-	FVector MakeCruiseTarget() const;
+	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
 	bool AdvanceTowardsTarget(float DeltaSeconds);
 };

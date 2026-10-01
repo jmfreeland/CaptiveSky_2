@@ -73,7 +73,7 @@ FVector ARavenAgentAIController::SelectWanderCruiseTarget(const FVector& Origin,
 	return RandomCandidates[BestCandidateIndex];
 }
 
-FVector ARavenAgentAIController::MakeCruiseTarget() const
+FVector ARavenAgentAIController::MakeCruiseTarget(bool bForceCuriosityForProbe) const
 {
 	const FVector Origin = GetPawn()->GetActorLocation();
 	const float CruiseAltitude = FMath::Clamp(HomeAltitude + FMath::FRandRange(-VerticalRange, VerticalRange),
@@ -100,12 +100,21 @@ FVector ARavenAgentAIController::MakeCruiseTarget() const
 			FHitResult VisibilityHit;
 			if (World->LineTraceSingleByChannel(VisibilityHit, Origin, It->GetActorLocation(), ECC_Visibility, VisibilityParams)) continue;
 			VisibleLandmarks.Add(It->GetActorLocation());
-			VisibleLandmarkNames.Add(It->Tags[0]);
+			FName LandmarkName = It->GetFName();
+			for (const FName& Tag : It->Tags)
+				if (Tag != FName(TEXT("IslandLandmark"))) { LandmarkName = Tag; break; }
+			VisibleLandmarkNames.Add(LandmarkName);
 		}
 	}
 
 	const FVector RandomFallback = RandomCruisePoint();
-	if (VisibleLandmarks.IsEmpty() || FMath::FRand() >= WanderLandmarkCuriosityChance) return RandomFallback;
+	if (VisibleLandmarks.IsEmpty())
+	{
+		if (bForceCuriosityForProbe)
+			UE_LOG(LogRavenAgentAI, Warning, TEXT("Forced curiosity probe found no visible IslandLandmark within 5000 cm of %s."), *Origin.ToCompactString());
+		return RandomFallback;
+	}
+	if (!bForceCuriosityForProbe && FMath::FRand() >= WanderLandmarkCuriosityChance) return RandomFallback;
 
 	TArray<FVector> Candidates;
 	Candidates.Reserve(12);
@@ -130,6 +139,9 @@ FVector ARavenAgentAIController::MakeCruiseTarget() const
 			*CuriousTarget.ToCompactString(), BestProgress, *BestLandmark.ToString(), VisibleLandmarks.Num());
 		return CuriousTarget;
 	}
+	if (bForceCuriosityForProbe)
+		UE_LOG(LogRavenAgentAI, Warning, TEXT("Forced curiosity probe found %d visible landmarks, but none of twelve cruise candidates made progress from %s."),
+			VisibleLandmarks.Num(), *Origin.ToCompactString());
 	return RandomFallback;
 }
 
