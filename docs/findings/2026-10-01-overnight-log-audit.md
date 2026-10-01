@@ -45,3 +45,16 @@ ensure, or unhandled-exception markers. This editor session's repeated warnings 
 therefore outbound-service connectivity noise, not evidence of CaptiveSky gameplay
 exceptions. The external services were not reachable from this machine during the log
 interval; no project plugin settings were changed.
+
+## Wet-surface authoring save failure (2026-10-01)
+
+`Saved/Logs/Claude_WetSurfaces.log` records a separate, real editor-tool failure at
+14:26 UTC. `Create-IslandWetSurfaces.py` failed while saving its first target,
+`/Game/Inn/Materials/MI_Inn_Plaster`: Windows returned error 32 while Unreal tried
+to move the package to its temporary save file. The script raises `RuntimeError`
+at that save and exits before rebuilding `M_Island_WetColor`, reparenting the other
+inn instances, or authoring `M_Rock`. The primary `UnrealEditor.exe` was open on the
+same project during this run; that overlap is a plausible cause, but the exact file
+handle owner was not identified. This is an asset-save/tooling failure, not a
+gameplay exception. Do not rerun the script in a second editor against the same
+project while the primary editor is open; coordinate a single-editor run instead.
