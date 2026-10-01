@@ -228,8 +228,10 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Scale = FVector(JitterScale * 2.2f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-		const int32 PlantVariant = Index % 12;
-		if (PlantVariant == 0 || PlantVariant == 4 || PlantVariant == 8)
+		// Give low broadleaf cover half of the positions: the previous 25% plant ratio
+		// made dense hillsides read as isolated grass tufts with bare soil between them.
+		const int32 PlantVariant = Index % 6;
+		if (PlantVariant == 0 || PlantVariant == 2 || PlantVariant == 4)
 		{
 			Species = PlantVariant == 0 ? ShoreGroundPlants : PlantVariant == 4 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
 			const FBoxSphereBounds PlantBounds = Species->GetStaticMesh()->GetBounds();
@@ -244,7 +246,7 @@ void AIslandWeather::InitializeGroundCover()
 		}
 		else
 		{
-			Species = (Index % 2 == 0) ? ShoreGrassA : ShoreGrassB;
+			Species = ((Index / 2) % 2 == 0) ? ShoreGrassA : ShoreGrassB;
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
 		++GroundCoverInstanceCount;

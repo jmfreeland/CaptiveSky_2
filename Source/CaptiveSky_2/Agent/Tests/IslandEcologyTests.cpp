@@ -137,6 +137,11 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->InitializeGroundCover();
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
+	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
+		Weather->ShoreGroundPlantLowB->GetInstanceCount();
+	TestTrue(TEXT("Leafy ground plants make up about half of the fixed-budget vegetation mix"),
+		Weather->GroundCoverInstanceCount > 0 && FixturePlantCount * 100 >= Weather->GroundCoverInstanceCount * 40 &&
+		FixturePlantCount * 100 <= Weather->GroundCoverInstanceCount * 60);
 	TestEqual(TEXT("The fixture has no landscape or sea plane, so no global meadow patches are generated"), Weather->GroundCoverMeadowInstanceCount, 0);
 	for (UHierarchicalInstancedStaticMeshComponent* LowPlant : {Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB})
 	{
