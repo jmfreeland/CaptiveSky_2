@@ -355,7 +355,7 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
-		constexpr int32 MeadowPatchCount = 160;
+		constexpr int32 MeadowPatchCount = 240;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
 		constexpr int32 MeadowClumpsPerPatch = 192;
 		constexpr float MeadowPatchInnerRadius = 400.f;
@@ -420,7 +420,7 @@ void AIslandWeather::InitializeGroundCover()
 			}
 		}
 		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
-		for (int32 Probe = 0; Probe < 1536 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
+		for (int32 Probe = 0; Probe < 2304 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
 		{
 			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
 				MeadowRandom.FRandRange(BoundsOrigin.Y - BoundsExtent.Y, BoundsOrigin.Y + BoundsExtent.Y), BoundsOrigin.Z);
@@ -444,12 +444,12 @@ void AIslandWeather::InitializeGroundCover()
 		GroundCoverTreeCount = 0;
 		if (IslandSpruce && IslandSpruce->GetStaticMesh())
 		{
-			constexpr int32 SpruceGroveCount = 6;
-			constexpr int32 SpruceTreesPerGrove = 12;
+			constexpr int32 SpruceGroveCount = 10;
+			constexpr int32 SpruceTreesPerGrove = 16;
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
 			constexpr float SpruceGroveInnerRadius = 500.f;
 			constexpr float SpruceGroveOuterRadius = 1600.f;
-			constexpr float SpruceGroveMinSpacing = 4500.f;
+			constexpr float SpruceGroveMinSpacing = 3800.f;
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
 			const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
