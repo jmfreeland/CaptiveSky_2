@@ -823,10 +823,17 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
 		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 31,404-instance budget"),
 			PreviewWeather->GroundCoverMeadowInstanceCount <= 30720 && PreviewWeather->GroundCoverInstanceCount <= 31404);
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances."),
+		TestTrue(TEXT("Existing interactive-spruce forest mesh is available"),
+			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
+		TestTrue(TEXT("Deterministic spruce groves add a bounded population without affecting collision or navigation"),
+			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 72 && PreviewWeather->IslandSpruce &&
+			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
+			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances and %d spruce trees."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
-			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount));
+			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;

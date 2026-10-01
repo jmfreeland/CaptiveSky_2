@@ -129,6 +129,7 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlants;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowA;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowB;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandSpruce;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
@@ -160,6 +161,7 @@ private:
 	int32 ActiveRainGroundImpactCount = 0;
 	int32 GroundCoverInstanceCount = 0;
 	int32 GroundCoverMeadowInstanceCount = 0;
+	int32 GroundCoverTreeCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;

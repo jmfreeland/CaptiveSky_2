@@ -295,14 +295,16 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	const int32 GroundCoverCountAfterFirstInitialization = Weather->GroundCoverInstanceCount;
 	Weather->InitializeGroundCover();
 	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, GroundCoverCountAfterFirstInitialization);
+	TestEqual(TEXT("The marker-only fixture has no landscape spruce groves"), Weather->GroundCoverTreeCount, 0);
 	Weather->ClearGroundCover();
 	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
 	TestEqual(TEXT("Transient cleanup clears the meadow-patch diagnostic count"), Weather->GroundCoverMeadowInstanceCount, 0);
+	TestEqual(TEXT("Transient cleanup clears the spruce-tree count"), Weather->GroundCoverTreeCount, 0);
 	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num() + Weather->ShoreGroundPlantBaseTransforms.Num() +
 		Weather->ShoreGroundPlantLowABaseTransforms.Num() + Weather->ShoreGroundPlantLowBBaseTransforms.Num(), 0);
 	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible() && !Weather->ShoreGroundPlants->IsVisible() &&
-		!Weather->ShoreGroundPlantLowA->IsVisible() && !Weather->ShoreGroundPlantLowB->IsVisible());
+		!Weather->ShoreGroundPlantLowA->IsVisible() && !Weather->ShoreGroundPlantLowB->IsVisible() && !Weather->IslandSpruce->IsVisible());
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;
