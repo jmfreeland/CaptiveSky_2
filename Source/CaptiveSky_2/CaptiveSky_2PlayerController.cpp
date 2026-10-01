@@ -299,12 +299,12 @@ void ACaptiveSky_2PlayerController::OpenArrangement(AActor* Target)
 	}
 
 	ArrangementTarget = WorkActor;
+	SetArrangementInputMode(true);
 	ArrangementWidget->OpenFor(Site->Id, Description, Site->bHasWork, bCanCreate, bCanRespond, bOwnWork);
 	bArrangementPanelOpen = true;
 	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
 	HideAmbientSpeech();
-	SetArrangementInputMode(true);
 }
 
 void ACaptiveSky_2PlayerController::SubmitVisitorArrangement(const FString& Form, const FString& Title, const FString& Intent)

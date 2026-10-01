@@ -56,6 +56,8 @@ and the visual appearance remain unverified.
 Source review found that the panel focused the title field for a new arrangement but did
 not focus the visible intent field when opening another maker's work. The panel now sends
 keyboard focus to that response field when a response is available; a new empty site
-continues to focus its title field. The `CaptiveSky2.Agent.IslandArrangement` automation
-covers the existing create/respond paths, but actual rendered keyboard focus still needs a
-PIE check because the current desktop automation surface exposes no application windows.
+continues to focus its title field. The controller applies the panel's input mode before
+the widget becomes visible and focuses the selected field, so the root widget does not
+take focus afterward. The `CaptiveSky2.Agent.IslandArrangement` automation covers the
+existing create/respond paths, but actual rendered keyboard focus still needs a PIE check
+because the current desktop automation surface exposes no application windows.
