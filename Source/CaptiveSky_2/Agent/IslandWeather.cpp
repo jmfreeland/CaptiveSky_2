@@ -123,6 +123,26 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& Out
 	}
 }
 
+FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
+	double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
+{
+	if (LocalWind.ContainsNaN() || !FMath::IsFinite(TimeSeconds)) return BaseTransform;
+	const FVector HorizontalWind(LocalWind.X, LocalWind.Y, 0.f);
+	const float Intensity = FMath::Clamp(HorizontalWind.Size() / FMath::Max(1.f, ReferenceWindSpeed), 0.f, 1.f);
+	if (Intensity <= KINDA_SMALL_NUMBER || HorizontalWind.IsNearlyZero()) return BaseTransform;
+
+	const FVector WindDirection = HorizontalWind.GetSafeNormal();
+	const FVector LeanAxis = FVector::CrossProduct(FVector::UpVector, WindDirection).GetSafeNormal();
+	const double Phase = TimeSeconds * 1.15 + InstanceIndex * 2.39996323 + Seed * 0.113;
+	const float LeanDegrees = 4.f * Intensity;
+	const float SwayDegrees = FMath::Sin(Phase) * 1.5f * Intensity;
+	const FQuat Lean(LeanAxis, FMath::DegreesToRadians(LeanDegrees));
+	const FQuat Flutter(FVector::ForwardVector, FMath::DegreesToRadians(SwayDegrees));
+	FTransform Result = BaseTransform;
+	Result.SetRotation((BaseTransform.GetRotation() * Lean * Flutter).GetNormalized());
+	return Result;
+}
+
 void AIslandWeather::InitializeGroundCover()
 {
 	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB ||
@@ -164,6 +184,19 @@ void AIslandWeather::InitializeGroundCover()
 		}
 	}
 
+	ShoreGrassABaseTransforms.Reset(ShoreGrassA->GetInstanceCount());
+	ShoreGrassBBaseTransforms.Reset(ShoreGrassB->GetInstanceCount());
+	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGrassA->GetInstanceTransform(Index, Transform, false)) ShoreGrassABaseTransforms.Add(Transform);
+	}
+	for (int32 Index = 0; Index < ShoreGrassB->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGrassB->GetInstanceTransform(Index, Transform, false)) ShoreGrassBBaseTransforms.Add(Transform);
+	}
+
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
 	ShoreGrassB->SetVisibility(bVisible, true);
@@ -175,8 +208,33 @@ void AIslandWeather::ClearGroundCover()
 {
 	if (ShoreGrassA) { ShoreGrassA->ClearInstances(); ShoreGrassA->SetVisibility(false, true); }
 	if (ShoreGrassB) { ShoreGrassB->ClearInstances(); ShoreGrassB->SetVisibility(false, true); }
+	ShoreGrassABaseTransforms.Reset();
+	ShoreGrassBBaseTransforms.Reset();
 	GroundCoverInstanceCount = 0;
 	bGroundCoverInitialized = false;
+}
+
+void AIslandWeather::UpdateGroundCoverSway()
+{
+	if (!GetWorld() || !bGroundCoverInitialized) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	auto UpdateSpecies = [this, Now](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms)
+	{
+		if (!Grass || BaseTransforms.IsEmpty()) return;
+		const FTransform ComponentTransform = Grass->GetComponentTransform();
+		for (int32 Index = 0; Index < BaseTransforms.Num(); ++Index)
+		{
+			const FTransform& Base = BaseTransforms[Index];
+			const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
+			const FVector WorldWind = GetLocalWind(WorldLocation, this);
+			const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
+			const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
+			const FTransform Swayed = CalculateGroundCoverSway(Base, LocalWind, Now, Index, WeatherSeed, MaximumWindSpeed);
+			Grass->UpdateInstanceTransform(Index, Swayed, false, Index == BaseTransforms.Num() - 1, true);
+		}
+	};
+	UpdateSpecies(ShoreGrassA, ShoreGrassABaseTransforms);
+	UpdateSpecies(ShoreGrassB, ShoreGrassBBaseTransforms);
 }
 
 void AIslandWeather::ClearGroundCoverPreview()
@@ -224,6 +282,7 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	UpdateRainRendering();
 	UpdateWindPoolResponse();
 	UpdateWeatherAmbience(DeltaSeconds);
+	UpdateGroundCoverSway();
 }
 
 bool AIslandWeather::InitializeRainRendering()

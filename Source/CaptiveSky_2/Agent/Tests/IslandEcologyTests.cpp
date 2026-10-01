@@ -103,15 +103,71 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	Weather->InitializeGroundCover();
 	TestEqual(TEXT("Ground cover places one 48-clump ring around each landmark"), Weather->GroundCoverInstanceCount, 96);
+	TestEqual(TEXT("Each wind-driven species retains an immutable baseline for every clump"),
+		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
 		Weather->ShoreGrassA->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGrassB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		!Weather->ShoreGrassA->CanEverAffectNavigation() && !Weather->ShoreGrassB->CanEverAffectNavigation());
 	TestTrue(TEXT("Placed grass is visible around both landmarks"), Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible());
+	const FTransform GrassBase(FQuat(FVector::UpVector, FMath::DegreesToRadians(37.f)), FVector(120.f, 230.f, 8.f), FVector(1.7f));
+	const FTransform CalmGrass = AIslandWeather::CalculateGroundCoverSway(GrassBase, FVector::ZeroVector, 2.0, 4, 71, 180.f);
+	TestTrue(TEXT("Calm air preserves the exact authored grass transform"), CalmGrass.Equals(GrassBase));
+	const FTransform WindyGrass = AIslandWeather::CalculateGroundCoverSway(GrassBase, FVector(180.f, 0.f, 0.f), 2.0, 4, 71, 180.f);
+	TestTrue(TEXT("Wind bends a clump without translating its planted base"),
+		WindyGrass.GetLocation().Equals(GrassBase.GetLocation()) && WindyGrass.GetScale3D().Equals(GrassBase.GetScale3D()) &&
+		!WindyGrass.GetRotation().Equals(GrassBase.GetRotation()));
+	TestTrue(TEXT("Wind sway stays below six degrees even at the reference wind ceiling"),
+		GrassBase.GetRotation().AngularDistance(WindyGrass.GetRotation()) <= FMath::DegreesToRadians(6.f));
+	Weather->AddTransientGust(Tideglass->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
+	Weather->AddTransientGust(ListeningStones->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
+	Weather->UpdateGroundCoverSway();
+	bool bAClumpRespondedToLocalWind = false;
+	auto CheckWindResponse = [&bAClumpRespondedToLocalWind, this](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines)
+	{
+		for (int32 Index = 0; Index < Baselines.Num(); ++Index)
+		{
+			FTransform Current;
+			if (!Grass->GetInstanceTransform(Index, Current, false)) continue;
+			const FTransform& Base = Baselines[Index];
+			TestTrue(TEXT("Wind leaves each clump's planted location and scale unchanged"),
+				Current.GetLocation().Equals(Base.GetLocation(), 0.01f) && Current.GetScale3D().Equals(Base.GetScale3D(), 0.01f));
+			bAClumpRespondedToLocalWind |= !Current.GetRotation().Equals(Base.GetRotation(), 0.001f);
+		}
+	};
+	CheckWindResponse(Weather->ShoreGrassA, Weather->ShoreGrassABaseTransforms);
+	CheckWindResponse(Weather->ShoreGrassB, Weather->ShoreGrassBBaseTransforms);
+	TestTrue(TEXT("Transient local gusts visibly sway planted shore grass"), bAClumpRespondedToLocalWind);
+	auto CaptureTransforms = [](UHierarchicalInstancedStaticMeshComponent* Grass, TArray<FTransform>& OutTransforms)
+	{
+		OutTransforms.Reset(Grass->GetInstanceCount());
+		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
+		{
+			FTransform Current;
+			if (Grass->GetInstanceTransform(Index, Current, false)) OutTransforms.Add(Current);
+		}
+	};
+	TArray<FTransform> FirstSwayA;
+	TArray<FTransform> FirstSwayB;
+	CaptureTransforms(Weather->ShoreGrassA, FirstSwayA);
+	CaptureTransforms(Weather->ShoreGrassB, FirstSwayB);
+	Weather->UpdateGroundCoverSway();
+	TArray<FTransform> SecondSwayA;
+	TArray<FTransform> SecondSwayB;
+	CaptureTransforms(Weather->ShoreGrassA, SecondSwayA);
+	CaptureTransforms(Weather->ShoreGrassB, SecondSwayB);
+	bool bRepeatedSwayIsStable = FirstSwayA.Num() == SecondSwayA.Num() && FirstSwayB.Num() == SecondSwayB.Num();
+	for (int32 Index = 0; Index < FMath::Min(FirstSwayA.Num(), SecondSwayA.Num()); ++Index)
+		bRepeatedSwayIsStable &= FirstSwayA[Index].Equals(SecondSwayA[Index], 0.001f);
+	for (int32 Index = 0; Index < FMath::Min(FirstSwayB.Num(), SecondSwayB.Num()); ++Index)
+		bRepeatedSwayIsStable &= FirstSwayB[Index].Equals(SecondSwayB[Index], 0.001f);
+	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
 	Weather->InitializeGroundCover();
 	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, 96);
 	Weather->ClearGroundCover();
 	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
+	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),
+		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num(), 0);
 	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible());
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
