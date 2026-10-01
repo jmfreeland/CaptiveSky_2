@@ -19,6 +19,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only ShoreApproach -OceanMaterial /Game/Materials/M_IslandOcean
+./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only Tideglass -TideglassMaterial /Game/Materials/M_IslandOcean -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -CompareLandscapeWetness -LandscapePuddlePreview -LandscapeMaterial /Game/Materials/M_Island_Textured_Wet
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -LogPath Saved/Logs/Codex_ViewpointProbe.log
 #>
@@ -31,6 +32,7 @@ param(
 	[string]$LandscapeMaterial = "",
 	[string]$LandscapeParent = "",
 	[string]$OceanMaterial = "",
+	[string]$TideglassMaterial = "",
 	[string]$LogPath = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
@@ -72,6 +74,7 @@ if ($LandscapePuddlePreview) {
 }
 if ($LandscapeParent) { $extra += "-ViewpointLandscapeParent=$LandscapeParent" }
 if ($OceanMaterial) { $extra += "-ViewpointOceanMaterial=$OceanMaterial" }
+if ($TideglassMaterial) { $extra += "-ViewpointTideglassMaterial=$TideglassMaterial" }
 if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover -or $GroundCoverSway) { $extra += "-ViewpointGroundCover" }

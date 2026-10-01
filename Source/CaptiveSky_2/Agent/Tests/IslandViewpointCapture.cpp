@@ -17,6 +17,7 @@
 #include "IslandFirefly.h"
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandTideglassSubsystem.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -491,11 +492,11 @@ namespace
 		bool bPuddlePreview = false;
 	};
 
-	/** Puts the ocean plane's authored material back once the captures are done. */
-	class FRestoreOceanMaterialCommand : public IAutomationLatentCommand
+	/** Puts a previewed static-mesh material back once the captures are done. */
+	class FRestoreStaticMeshMaterialCommand : public IAutomationLatentCommand
 	{
 	public:
-		FRestoreOceanMaterialCommand(UStaticMeshComponent* InComponent, UMaterialInterface* InOriginal)
+		FRestoreStaticMeshMaterialCommand(UStaticMeshComponent* InComponent, UMaterialInterface* InOriginal)
 			: Component(InComponent), Original(InOriginal) {}
 
 		virtual bool Update() override
@@ -843,12 +844,30 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		OceanMesh->SetMaterial(0, OceanMaterial);
 		AddInfo(FString::Printf(TEXT("Transient ocean material preview %s on OceanPlane; the authored material is restored after capture."), *OceanMaterialPath));
 	}
+	UStaticMeshComponent* TideglassMesh = nullptr;
+	UMaterialInterface* OriginalTideglassMaterial = nullptr;
+	FString TideglassMaterialPath;
+	if (FParse::Value(FCommandLine::Get(), TEXT("ViewpointTideglassMaterial="), TideglassMaterialPath))
+	{
+		UMaterialInterface* TideglassMaterial = LoadObject<UMaterialInterface>(nullptr, *TideglassMaterialPath);
+		TideglassMesh = UIslandTideglassSubsystem::FindPoolSurface(Island);
+		if (!TideglassMaterial || !TideglassMesh)
+		{
+			if (OceanMesh) OceanMesh->SetMaterial(0, OriginalOceanMaterial);
+			AddError(FString::Printf(TEXT("Tideglass preview needs a loadable material (%s) and the flattened sphere beside the TideglassPool marker."), *TideglassMaterialPath));
+			return false;
+		}
+		OriginalTideglassMaterial = TideglassMesh->GetMaterial(0);
+		TideglassMesh->SetMaterial(0, TideglassMaterial);
+		AddInfo(FString::Printf(TEXT("Transient Tideglass material preview %s on the flattened sphere; the authored material is restored after capture."), *TideglassMaterialPath));
+	}
 ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
 		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview,
 		MoveTemp(LandscapePreviewInstances)));
-	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreOceanMaterialCommand(OceanMesh, OriginalOceanMaterial));
+	if (OceanMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(OceanMesh, OriginalOceanMaterial));
+	if (TideglassMesh) ADD_LATENT_AUTOMATION_COMMAND(FRestoreStaticMeshMaterialCommand(TideglassMesh, OriginalTideglassMaterial));
 	return true;
 }
 
