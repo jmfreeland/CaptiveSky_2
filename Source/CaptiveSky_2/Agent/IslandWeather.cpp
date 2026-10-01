@@ -355,16 +355,16 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
-		constexpr int32 MeadowPatchCount = 240;
+		constexpr int32 MeadowPatchCount = 280;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		constexpr int32 MeadowClumpsPerPatch = 384;
-		constexpr float MeadowPatchInnerRadius = 400.f;
-		constexpr float MeadowPatchOuterRadius = 2800.f;
+		constexpr int32 MeadowClumpsPerPatch = 448;
+		constexpr float MeadowPatchInnerRadius = 350.f;
+		constexpr float MeadowPatchOuterRadius = 2400.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
 		constexpr float LandmarkPatchMinSpacing = 1200.f;
-		constexpr float MeadowCenterSpacing = 3200.f;
+		constexpr float MeadowCenterSpacing = 2800.f;
 		int32 MeadowTraceCount = 0;
 		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
 		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
@@ -420,7 +420,7 @@ void AIslandWeather::InitializeGroundCover()
 			}
 		}
 		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
-		for (int32 Probe = 0; Probe < 2304 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
+		for (int32 Probe = 0; Probe < 2688 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
 		{
 			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
 				MeadowRandom.FRandRange(BoundsOrigin.Y - BoundsExtent.Y, BoundsOrigin.Y + BoundsExtent.Y), BoundsOrigin.Z);

@@ -821,8 +821,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		}
 		PreviewWeather->InitializeGroundCover();
 		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
-		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 92,844-instance budget"),
-			PreviewWeather->GroundCoverMeadowInstanceCount <= 92160 && PreviewWeather->GroundCoverInstanceCount <= 92844);
+		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 126,124-instance budget"),
+			PreviewWeather->GroundCoverMeadowInstanceCount <= 125440 && PreviewWeather->GroundCoverInstanceCount <= 126124);
 		TestTrue(TEXT("Existing interactive-spruce forest mesh is available"),
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("Deterministic spruce groves add a bounded population without affecting collision or navigation"),
