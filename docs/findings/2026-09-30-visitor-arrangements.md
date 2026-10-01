@@ -58,6 +58,13 @@ not focus the visible intent field when opening another maker's work. The panel 
 keyboard focus to that response field when a response is available; a new empty site
 continues to focus its title field. The controller applies the panel's input mode before
 the widget becomes visible and focuses the selected field, so the root widget does not
-take focus afterward. The `CaptiveSky2.Agent.IslandArrangement` automation covers the
-existing create/respond paths, but actual rendered keyboard focus still needs a PIE check
-because the current desktop automation surface exposes no application windows.
+take focus afterward. `CaptiveSky2.Agent.IslandArrangement` now builds the real Slate
+widget tree and asserts title focus for new work and intent focus for responses, in
+addition to the existing create/respond behavior. A first test attempt called `TakeWidget()`
+on an uninitialized `NewObject` and crashed in UMG; the fixture now explicitly initializes
+the widget and hosts it in a temporary Slate window. This caught and fixes a test-harness
+mistake, not a game crash. The fixture's controller intentionally stubs input-mode changes,
+so in-game focus after the real input-mode handoff, panel placement at game resolution, and
+mouse/touch behavior remain to be checked in PIE.
+The latest bounded UE 5.8.3 scratch run passed `CaptiveSky2.Agent.IslandArrangement`:
+`Saved/CompileScratch/Codex_InnGroundCover_20261001/Project/Saved/Logs/Codex_ArrangementSlateFocus_Final2_20261001.log`.

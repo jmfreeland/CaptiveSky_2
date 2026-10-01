@@ -19,10 +19,13 @@
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Misc/Paths.h"
 #include "Misc/Guid.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/SWindow.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandArrangementTest, "CaptiveSky2.Agent.IslandArrangement",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -235,6 +238,23 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	UCaptiveSkyArrangementWidget* ArrangementWidget = VisitorController
 		? NewObject<UCaptiveSkyArrangementWidget>(World, NAME_None, RF_Transient)
 		: nullptr;
+	TestTrue(TEXT("Slate is initialized for keyboard-focus assertions"), FSlateApplication::IsInitialized());
+	TSharedPtr<SWindow> ArrangementSlateWindow;
+	if (ArrangementWidget && FSlateApplication::IsInitialized())
+	{
+		const bool bWidgetInitialized = ArrangementWidget->Initialize();
+		TestTrue(TEXT("Visitor arrangement Slate widget initializes"), bWidgetInitialized);
+		if (bWidgetInitialized)
+		{
+			// A real Slate window gives SetKeyboardFocus a valid widget path without using the game viewport.
+			ArrangementSlateWindow = SNew(SWindow)
+				.Title(FText::FromString(TEXT("Arrangement focus fixture")))
+				.ClientSize(FVector2D(900.f, 360.f))
+				.SupportsMaximize(false);
+			ArrangementSlateWindow->SetContent(ArrangementWidget->TakeWidget());
+			FSlateApplication::Get().AddWindow(ArrangementSlateWindow.ToSharedRef(), true);
+		}
+	}
 	if (TestNotNull(TEXT("Visitor's open arranging site has its stable id"), VisitorSite) &&
 		TestEqual(TEXT("The arranging site is an ordinary visible E target"), IslandInteractionUtility::GetTargetTag(VisitorSite), FName(TEXT("IslandArrangement"))) &&
 		TestNotNull(TEXT("Visitor body created beside open ground"), VisitorBody) &&
@@ -245,6 +265,8 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		VisitorController->SetArrangementWidget(ArrangementWidget);
 		VisitorController->BindFixtureInput();
 		TestTrue(TEXT("Pressing E opens the nearby arranging-ground panel"), VisitorController->PressBoundE() && VisitorController->IsArrangementPanelOpenForTest());
+		if (FSlateApplication::IsInitialized())
+			TestTrue(TEXT("A new arrangement focuses its visible title field"), ArrangementWidget->TitleBox.IsValid() && ArrangementWidget->TitleBox->HasKeyboardFocus());
 		TestTrue(TEXT("The panel states the durable/public shape and private intent policy"),
 			ArrangementWidget->GetDisplayedContent().Contains(TEXT("private unless you share")) && ArrangementWidget->GetDisplayedContent().Contains(TEXT("persists with the Island")));
 		VisitorController->SubmitVisitorArrangement(TEXT("spiral"), TEXT("A visitor's turning mark"), TEXT("A small hello to the raven"));
@@ -267,6 +289,8 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		if (TestClock) TestClock->DayNumber = 2;
 		TestTrue(TEXT("An existing arrangement is an ordinary visible E target on the next Island day"),
 			VisitorController->PressBoundE() && VisitorController->IsArrangementPanelOpenForTest());
+		if (FSlateApplication::IsInitialized())
+			TestTrue(TEXT("Responding to existing work focuses the visible intent field"), ArrangementWidget->IntentBox.IsValid() && ArrangementWidget->IntentBox->HasKeyboardFocus());
 		VisitorController->SubmitVisitorArrangementResponse(TEXT("Another morning, another answer"));
 		const FIslandArrangementSite* RespondedWork = State->FindArrangementSite(TEXT("ArrangingGround_1"));
 		TestTrue(TEXT("A visitor can add a response on the following Island day"), RespondedWork &&
@@ -276,6 +300,8 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 			FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 9 + 2 * AIslandArrangement::StonesPerResponse);
 		TestFalse(TEXT("The visitor cannot make a second contribution on the new Island day"), ArrangementWidget->CanContribute());
 	}
+	if (ArrangementSlateWindow.IsValid() && FSlateApplication::IsInitialized())
+		FSlateApplication::Get().RequestDestroyWindow(ArrangementSlateWindow.ToSharedRef());
 	if (VisitorController) VisitorController->Destroy();
 	MakerController->UnPossess();
 	ResponderController->UnPossess();

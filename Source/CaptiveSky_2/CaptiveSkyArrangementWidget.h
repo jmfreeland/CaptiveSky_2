@@ -26,6 +26,8 @@ protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 private:
+	friend class FIslandArrangementTest;
+
 	TSharedPtr<STextBlock> StatusText;
 	TSharedPtr<SEditableTextBox> TitleBox;
 	TSharedPtr<SEditableTextBox> IntentBox;
