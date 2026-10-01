@@ -68,6 +68,22 @@ AIslandWeather::AIslandWeather()
 	ShoreGroundPlants->SetCastShadow(false);
 	ShoreGroundPlants->bReceivesDecals = false;
 	ShoreGroundPlants->SetVisibility(false);
+	ShoreGroundPlantLowA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGroundPlantLowA"));
+	ShoreGroundPlantLowA->SetupAttachment(RootComponent);
+	ShoreGroundPlantLowA->SetMobility(EComponentMobility::Movable);
+	ShoreGroundPlantLowA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGroundPlantLowA->SetCanEverAffectNavigation(false);
+	ShoreGroundPlantLowA->SetCastShadow(false);
+	ShoreGroundPlantLowA->bReceivesDecals = false;
+	ShoreGroundPlantLowA->SetVisibility(false);
+	ShoreGroundPlantLowB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGroundPlantLowB"));
+	ShoreGroundPlantLowB->SetupAttachment(RootComponent);
+	ShoreGroundPlantLowB->SetMobility(EComponentMobility::Movable);
+	ShoreGroundPlantLowB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGroundPlantLowB->SetCanEverAffectNavigation(false);
+	ShoreGroundPlantLowB->SetCastShadow(false);
+	ShoreGroundPlantLowB->bReceivesDecals = false;
+	ShoreGroundPlantLowB->SetVisibility(false);
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
 	WindAmbienceAudio->bAutoActivate = false;
@@ -85,9 +101,13 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GrassMeshA(TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_02_mesh.grass_01_02_mesh"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GrassMeshB(TEXT("/Game/PN_FoliageCollection/Meshes/grassMesh/grass_01_03_mesh.grass_01_03_mesh"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_05_01.ground_05_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowAMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_01.ground_01_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowBMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02"));
 	if (GrassMeshA.Succeeded()) ShoreGrassA->SetStaticMesh(GrassMeshA.Object);
 	if (GrassMeshB.Succeeded()) ShoreGrassB->SetStaticMesh(GrassMeshB.Object);
 	if (GroundPlantMesh.Succeeded()) ShoreGroundPlants->SetStaticMesh(GroundPlantMesh.Object);
+	if (GroundPlantLowAMesh.Succeeded()) ShoreGroundPlantLowA->SetStaticMesh(GroundPlantLowAMesh.Object);
+	if (GroundPlantLowBMesh.Succeeded()) ShoreGroundPlantLowB->SetStaticMesh(GroundPlantLowBMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -163,12 +183,15 @@ FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransf
 
 void AIslandWeather::InitializeGroundCover()
 {
-	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !ShoreGroundPlants ||
-		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh() || !ShoreGroundPlants->GetStaticMesh()) return;
+	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB ||
+		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh() || !ShoreGroundPlants->GetStaticMesh() ||
+		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh()) return;
 	bGroundCoverInitialized = true;
 	ShoreGrassA->ClearInstances();
 	ShoreGrassB->ClearInstances();
 	ShoreGroundPlants->ClearInstances();
+	ShoreGroundPlantLowA->ClearInstances();
+	ShoreGroundPlantLowB->ClearInstances();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
@@ -191,12 +214,16 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Scale = FVector(JitterScale * 1.7f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-		if (Index % 4 == 0)
+		const int32 PlantVariant = Index % 12;
+		if (PlantVariant == 0 || PlantVariant == 4 || PlantVariant == 8)
 		{
-			Species = ShoreGroundPlants;
-			const FBoxSphereBounds PlantBounds = ShoreGroundPlants->GetStaticMesh()->GetBounds();
+			Species = PlantVariant == 0 ? ShoreGroundPlants : PlantVariant == 4 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
+			const FBoxSphereBounds PlantBounds = Species->GetStaticMesh()->GetBounds();
 			const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
-			const float PlantScale = (70.f / (2.f * PlantHalfHeight)) * JitterScale;
+			const float HeightScale = 70.f / (2.f * PlantHalfHeight);
+			const float PlantFootprintDiameter = 2.f * FMath::Max(PlantBounds.BoxExtent.X, PlantBounds.BoxExtent.Y);
+			const float WidthScale = 48.f / FMath::Max(1.f, PlantFootprintDiameter);
+			const float PlantScale = (Species == ShoreGroundPlants ? HeightScale : FMath::Min(HeightScale, WidthScale)) * JitterScale;
 			Scale = FVector(PlantScale);
 			Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * (PlantHalfHeight * PlantScale + 1.2f) -
 				Rotation.RotateVector(PlantBounds.Origin * PlantScale);
@@ -404,6 +431,8 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGrassABaseTransforms.Reset(ShoreGrassA->GetInstanceCount());
 	ShoreGrassBBaseTransforms.Reset(ShoreGrassB->GetInstanceCount());
 	ShoreGroundPlantBaseTransforms.Reset(ShoreGroundPlants->GetInstanceCount());
+	ShoreGroundPlantLowABaseTransforms.Reset(ShoreGroundPlantLowA->GetInstanceCount());
+	ShoreGroundPlantLowBBaseTransforms.Reset(ShoreGroundPlantLowB->GetInstanceCount());
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -419,11 +448,23 @@ void AIslandWeather::InitializeGroundCover()
 		FTransform Transform;
 		if (ShoreGroundPlants->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantBaseTransforms.Add(Transform);
 	}
+	for (int32 Index = 0; Index < ShoreGroundPlantLowA->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGroundPlantLowA->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowABaseTransforms.Add(Transform);
+	}
+	for (int32 Index = 0; Index < ShoreGroundPlantLowB->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGroundPlantLowB->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowBBaseTransforms.Add(Transform);
+	}
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
 	ShoreGrassB->SetVisibility(bVisible, true);
 	ShoreGroundPlants->SetVisibility(bVisible, true);
+	ShoreGroundPlantLowA->SetVisibility(bVisible, true);
+	ShoreGroundPlantLowB->SetVisibility(bVisible, true);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
@@ -433,9 +474,13 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGrassA) { ShoreGrassA->ClearInstances(); ShoreGrassA->SetVisibility(false, true); }
 	if (ShoreGrassB) { ShoreGrassB->ClearInstances(); ShoreGrassB->SetVisibility(false, true); }
 	if (ShoreGroundPlants) { ShoreGroundPlants->ClearInstances(); ShoreGroundPlants->SetVisibility(false, true); }
+	if (ShoreGroundPlantLowA) { ShoreGroundPlantLowA->ClearInstances(); ShoreGroundPlantLowA->SetVisibility(false, true); }
+	if (ShoreGroundPlantLowB) { ShoreGroundPlantLowB->ClearInstances(); ShoreGroundPlantLowB->SetVisibility(false, true); }
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
+	ShoreGroundPlantLowABaseTransforms.Reset();
+	ShoreGroundPlantLowBBaseTransforms.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	bGroundCoverInitialized = false;
@@ -463,6 +508,8 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGrassA, ShoreGrassABaseTransforms);
 	UpdateSpecies(ShoreGrassB, ShoreGrassBBaseTransforms);
 	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms);
+	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms);
+	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms);
 }
 
 void AIslandWeather::ClearGroundCoverPreview()
