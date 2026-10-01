@@ -777,7 +777,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		PreviewWeather->InitializeGroundCover();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass and ListeningStones."), PreviewWeather->GroundCoverInstanceCount));
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking grass instances near Tideglass, ListeningStones, and the tagged inn entrance."), PreviewWeather->GroundCoverInstanceCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;

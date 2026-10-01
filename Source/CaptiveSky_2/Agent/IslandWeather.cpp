@@ -107,9 +107,15 @@ void AIslandWeather::PersistWeatherTime()
 
 void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms)
 {
-	constexpr int32 ClumpCount = 96;
-	constexpr float InnerRadius = 260.f;
-	constexpr float OuterRadius = 720.f;
+	BuildGroundCoverOffsets(Seed, 96, 260.f, 720.f, OutTransforms);
+}
+
+void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float InnerRadius, float OuterRadius,
+	TArray<FTransform>& OutTransforms)
+{
+	ClumpCount = FMath::Max(0, ClumpCount);
+	InnerRadius = FMath::Max(0.f, InnerRadius);
+	OuterRadius = FMath::Max(InnerRadius, OuterRadius);
 	OutTransforms.Reset(ClumpCount);
 	FRandomStream Random(Seed);
 	for (int32 Index = 0; Index < ClumpCount; ++Index)
@@ -161,7 +167,8 @@ void AIslandWeather::InitializeGroundCover()
 		const AActor* Landmark = *It;
 		const bool bTideglass = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("TideglassPool"));
 		const bool bListeningStones = Landmark->ActorHasTag(TEXT("IslandLandmark")) && Landmark->ActorHasTag(TEXT("ListeningStones"));
-		if (!bTideglass && !bListeningStones) continue;
+		const bool bInnEntrance = Landmark->ActorHasTag(TEXT("InnDoorLantern"));
+		if (!bTideglass && !bListeningStones && !bInnEntrance) continue;
 
 		float TideglassClearRadius = 0.f;
 		if (bTideglass)
@@ -190,18 +197,36 @@ void AIslandWeather::InitializeGroundCover()
 		}
 
 		TArray<FTransform> Offsets;
-		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^ (bTideglass ? 0x2f6e2b1u : 0x6d2b79f5u);
-		BuildGroundCoverOffsets(static_cast<int32>(Seed), Offsets);
+		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^
+			(bTideglass ? 0x2f6e2b1u : bListeningStones ? 0x6d2b79f5u : 0x51a7e2d3u);
+		constexpr int32 InnClumpCount = 72;
+		constexpr float InnInnerRadius = 350.f;
+		constexpr float InnOuterRadius = 1200.f;
+		if (bInnEntrance)
+			BuildGroundCoverOffsets(static_cast<int32>(Seed), InnClumpCount, InnInnerRadius, InnOuterRadius, Offsets);
+		else
+			BuildGroundCoverOffsets(static_cast<int32>(Seed), Offsets);
 		for (int32 Index = 0; Index < Offsets.Num(); ++Index)
 		{
 			const FTransform& Offset = Offsets[Index];
 			const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
 			if (TideglassClearRadius > 0.f && Offset.GetLocation().Size2D() < TideglassClearRadius) continue;
-			const FVector TraceStart = Candidate + FVector(0.f, 0.f, 1400.f);
+			const FVector TraceStart = Candidate + FVector(0.f, 0.f, bInnEntrance ? 5000.f : 1400.f);
 			const FVector TraceEnd = Candidate - FVector(0.f, 0.f, 5000.f);
 			FHitResult GroundHit;
 			if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, Query) ||
 				GroundHit.ImpactNormal.Z < 0.72f) continue;
+			if (bInnEntrance)
+			{
+				// The lantern hangs at the entrance, but a scatter ring also reaches behind and beside
+				// the building. Reject roofs and indoor floors, then require open sky above each clump.
+				const float HeightFromMarker = GroundHit.ImpactPoint.Z - Landmark->GetActorLocation().Z;
+				if (HeightFromMarker < -700.f || HeightFromMarker > 100.f) continue;
+				FHitResult OverheadHit;
+				const FVector OpenSkyStart = GroundHit.ImpactPoint + FVector(0.f, 0.f, 25.f);
+				const FVector OpenSkyEnd = OpenSkyStart + FVector(0.f, 0.f, 8000.f);
+				if (GetWorld()->LineTraceSingleByChannel(OverheadHit, OpenSkyStart, OpenSkyEnd, ECC_WorldStatic, Query)) continue;
+			}
 
 			const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
 			const FQuat Rotation = AlignToGround * Offset.GetRotation();
@@ -229,7 +254,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGrassA->SetVisibility(bVisible, true);
 	ShoreGrassB->SetVisibility(bVisible, true);
 	if (GroundCoverInstanceCount == 0)
-		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check the Tideglass and ListeningStones tags and ground collision."));
+		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
 
 void AIslandWeather::ClearGroundCover()

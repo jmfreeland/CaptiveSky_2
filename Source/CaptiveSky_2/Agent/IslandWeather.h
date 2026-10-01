@@ -175,6 +175,8 @@ private:
 	void PersistWeatherTime();
 	/** Deterministic local offsets, used by the runtime scatter and its editor fixture. */
 	static void BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms);
+	static void BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float InnerRadius, float OuterRadius,
+		TArray<FTransform>& OutTransforms);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
