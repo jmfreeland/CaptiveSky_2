@@ -842,6 +842,48 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandShrubs->IsVisible());
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
+		const UStaticMesh* ShrubMesh = PreviewWeather->IslandShrubs ? PreviewWeather->IslandShrubs->GetStaticMesh() : nullptr;
+		const UStaticMesh* SpruceMesh = PreviewWeather->IslandSpruce ? PreviewWeather->IslandSpruce->GetStaticMesh() : nullptr;
+		const FBoxSphereBounds ShrubBounds = ShrubMesh ? ShrubMesh->GetBounds() : FBoxSphereBounds();
+		const FBoxSphereBounds WoodlandSpruceBounds = SpruceMesh ? SpruceMesh->GetBounds() : FBoxSphereBounds();
+		const FVector ShrubBottomOffset = ShrubBounds.Origin - FVector(0.f, 0.f, ShrubBounds.BoxExtent.Z);
+		const FVector SpruceBottomOffset = WoodlandSpruceBounds.Origin - FVector(0.f, 0.f, WoodlandSpruceBounds.BoxExtent.Z);
+		TArray<FVector> WoodlandClearanceAnchors;
+		for (TActorIterator<AActor> It(Island); It; ++It)
+			if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")))
+				WoodlandClearanceAnchors.Add(It->GetActorLocation());
+		TArray<FVector> SprucePlantingPoints;
+		for (int32 TreeIndex = 0; PreviewWeather->IslandSpruce && TreeIndex < PreviewWeather->IslandSpruce->GetInstanceCount(); ++TreeIndex)
+		{
+			FTransform TreeTransform;
+			if (PreviewWeather->IslandSpruce->GetInstanceTransform(TreeIndex, TreeTransform, true))
+				SprucePlantingPoints.Add(TreeTransform.TransformPosition(SpruceBottomOffset));
+		}
+		TArray<FVector> ShrubPlantingPoints;
+		bool bShrubsStayInsideHeightBand = ShrubMesh != nullptr;
+		bool bShrubsRespectWoodlandClearances = ShrubMesh != nullptr;
+		for (int32 ShrubIndex = 0; PreviewWeather->IslandShrubs && ShrubIndex < PreviewWeather->IslandShrubs->GetInstanceCount(); ++ShrubIndex)
+		{
+			FTransform ShrubTransform;
+			if (!PreviewWeather->IslandShrubs->GetInstanceTransform(ShrubIndex, ShrubTransform, true))
+			{
+				bShrubsStayInsideHeightBand = false;
+				bShrubsRespectWoodlandClearances = false;
+				continue;
+			}
+			const float ShrubHeight = ShrubTransform.GetScale3D().Z * 2.f * ShrubBounds.BoxExtent.Z;
+			bShrubsStayInsideHeightBand &= ShrubHeight >= 124.9f && ShrubHeight <= 190.1f;
+			const FVector PlantingPoint = ShrubTransform.TransformPosition(ShrubBottomOffset);
+			for (const FVector& Anchor : WoodlandClearanceAnchors)
+				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, Anchor) >= 2599.9f;
+			for (const FVector& ExistingShrub : ShrubPlantingPoints)
+				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, ExistingShrub) >= 274.9f;
+			for (const FVector& ExistingTree : SprucePlantingPoints)
+				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, ExistingTree) >= 224.9f;
+			ShrubPlantingPoints.Add(PlantingPoint);
+		}
+		TestTrue(TEXT("Broadleaf shrubs use the authored 1.25–1.9 m height band"), bShrubsStayInsideHeightBand);
+		TestTrue(TEXT("Broadleaf shrubs preserve landmark, inter-shrub, and spruce-trunk clearances"), bShrubsRespectWoodlandClearances);
 		int32 MatureSpruceCount = 0;
 		int32 SaplingCount = 0;
 		const float SpruceMeshHalfHeight = PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh()
