@@ -39,7 +39,7 @@ TSharedRef<SWidget> UCaptiveSkyGuestBookWidget::RebuildWidget()
 				]
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
-					SNew(SButton).Text(FText::FromString(TEXT("Close (Esc)")))
+					SAssignNew(CloseButton, SButton).Text(FText::FromString(TEXT("Close (Esc)")))
 					.OnClicked_UObject(this, &UCaptiveSkyGuestBookWidget::HandleCloseClicked)
 				]
 			]
@@ -60,9 +60,19 @@ void UCaptiveSkyGuestBookWidget::OpenFor(const FString& LatestEntries, bool bCan
 	{
 		InputBox->SetEnabled(bCanWriteToday);
 		InputBox->SetText(FText::GetEmpty());
-		if (bCanWriteToday && FSlateApplication::IsInitialized())
-			FSlateApplication::Get().SetKeyboardFocus(InputBox, EFocusCause::SetDirectly);
 	}
+	if (FSlateApplication::IsInitialized())
+	{
+		if (bCanWriteToday && InputBox.IsValid()) FSlateApplication::Get().SetKeyboardFocus(InputBox, EFocusCause::SetDirectly);
+		else if (CloseButton.IsValid()) FSlateApplication::Get().SetKeyboardFocus(CloseButton, EFocusCause::SetDirectly);
+	}
+}
+
+TSharedPtr<SWidget> UCaptiveSkyGuestBookWidget::GetPreferredInputWidget() const
+{
+	if (bMayWriteToday && InputBox.IsValid()) return InputBox;
+	if (CloseButton.IsValid()) return CloseButton;
+	return nullptr;
 }
 
 void UCaptiveSkyGuestBookWidget::ShowWriteResult(const FString& Result, const FString& LatestEntries, bool bCanWriteToday, bool bClearInput)
@@ -77,8 +87,11 @@ void UCaptiveSkyGuestBookWidget::ShowWriteResult(const FString& Result, const FS
 	{
 		InputBox->SetEnabled(bCanWriteToday);
 		if (bClearInput) InputBox->SetText(FText::GetEmpty());
-		if (bCanWriteToday && FSlateApplication::IsInitialized())
-			FSlateApplication::Get().SetKeyboardFocus(InputBox, EFocusCause::SetDirectly);
+	}
+	if (FSlateApplication::IsInitialized())
+	{
+		if (bCanWriteToday && InputBox.IsValid()) FSlateApplication::Get().SetKeyboardFocus(InputBox, EFocusCause::SetDirectly);
+		else if (CloseButton.IsValid()) FSlateApplication::Get().SetKeyboardFocus(CloseButton, EFocusCause::SetDirectly);
 	}
 }
 

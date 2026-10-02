@@ -5,6 +5,7 @@
 #include "CaptiveSkyGuestBookWidget.generated.h"
 
 class SEditableTextBox;
+class SButton;
 class STextBlock;
 class FReply;
 
@@ -17,6 +18,7 @@ class CAPTIVESKY_2_API UCaptiveSkyGuestBookWidget : public UUserWidget
 public:
 	void OpenFor(const FString& LatestEntries, bool bCanWriteToday);
 	void ShowWriteResult(const FString& Result, const FString& LatestEntries, bool bCanWriteToday, bool bClearInput);
+	TSharedPtr<SWidget> GetPreferredInputWidget() const;
 	FString GetDisplayedContent() const { return DisplayedContent; }
 	bool CanWriteToday() const { return bMayWriteToday; }
 
@@ -24,8 +26,11 @@ protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 
 private:
+	friend class FIslandGuestBookTest;
+
 	TSharedPtr<STextBlock> StatusText;
 	TSharedPtr<SEditableTextBox> InputBox;
+	TSharedPtr<SButton> CloseButton;
 	FString DisplayedContent;
 	bool bMayWriteToday = true;
 

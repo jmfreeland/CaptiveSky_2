@@ -14,7 +14,7 @@ class AIslandInteractionTestPlayerController final : public ACaptiveSky_2PlayerC
 
 public:
 	virtual bool IsLocalController() const override { return true; }
-	virtual void SetGuestBookInputMode(bool bOpen) override {}
+	virtual void SetGuestBookInputMode(bool bOpen) override { ACaptiveSky_2PlayerController::SetGuestBookInputMode(bOpen); }
 	virtual void SetArrangementInputMode(bool bOpen) override { ACaptiveSky_2PlayerController::SetArrangementInputMode(bOpen); }
 
 	void SetFixturePawn(APawn* InPawn) { SetPawn(InPawn); }

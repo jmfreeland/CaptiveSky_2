@@ -432,7 +432,8 @@ void ACaptiveSky_2PlayerController::SetGuestBookInputMode(bool bOpen)
 	if (bOpen && GuestBookWidget)
 	{
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(GuestBookWidget->TakeWidget());
+		const TSharedPtr<SWidget> FocusWidget = GuestBookWidget->GetPreferredInputWidget();
+		InputMode.SetWidgetToFocus(FocusWidget.IsValid() ? FocusWidget : GuestBookWidget->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		SetInputMode(InputMode);
 		bShowMouseCursor = true;

@@ -14,6 +14,9 @@
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 #include "GameFramework/Character.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/SWindow.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandGuestBookTest, "CaptiveSky2.Agent.IslandGuestBook",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -101,6 +104,21 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 	UCaptiveSkyGuestBookWidget* BookWidget = VisitorController
 		? NewObject<UCaptiveSkyGuestBookWidget>(World, NAME_None, RF_Transient)
 		: nullptr;
+	TSharedPtr<SWindow> GuestBookSlateWindow;
+	if (BookWidget && FSlateApplication::IsInitialized())
+	{
+		const bool bWidgetInitialized = BookWidget->Initialize();
+		TestTrue(TEXT("Visitor guest-book Slate widget initializes"), bWidgetInitialized);
+		if (bWidgetInitialized)
+		{
+			GuestBookSlateWindow = SNew(SWindow)
+				.Title(FText::FromString(TEXT("Guest-book focus fixture")))
+				.ClientSize(FVector2D(900.f, 360.f))
+				.SupportsMaximize(false);
+			GuestBookSlateWindow->SetContent(BookWidget->TakeWidget());
+			FSlateApplication::Get().AddWindow(GuestBookSlateWindow.ToSharedRef(), true);
+		}
+	}
 	if (TestNotNull(TEXT("Visitor pawn created beside the book"), Reader) &&
 		TestNotNull(TEXT("Visitor controller created for the bound E path"), VisitorController) &&
 		TestNotNull(TEXT("Guest-book writing panel created"), BookWidget))
@@ -113,6 +131,8 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("E is bound on the test visitor controller"), bVisitorPressedE);
 		TestTrue(*FString::Printf(TEXT("Pressing E opens the guest-book panel (open=%d content=%s)"),
 			VisitorController->IsGuestBookPanelOpenForTest(), *BookWidget->GetDisplayedContent()), VisitorController->IsGuestBookPanelOpenForTest());
+		TestTrue(TEXT("Opening the book focuses the enabled entry field after the input-mode handoff"),
+			BookWidget->InputBox.IsValid() && BookWidget->InputBox->HasKeyboardFocus());
 		TestTrue(TEXT("The panel explains that notes are public and signed as Visitor"),
 			BookWidget->GetDisplayedContent().Contains(TEXT("public, signed as Visitor")));
 		VisitorController->SubmitGuestBookEntry(TEXT("The pool is silver this morning."));
@@ -132,6 +152,8 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 			return Entry.AgentId == TEXT("Visitor") && Entry.Day == 1 && Entry.Line == TEXT("The pool is silver this morning");
 		}));
 		TestFalse(TEXT("A successful visitor entry closes today's writing input"), BookWidget->CanWriteToday());
+		TestTrue(TEXT("After writing, keyboard focus moves to the available Close button"),
+			BookWidget->CloseButton.IsValid() && BookWidget->CloseButton->HasKeyboardFocus());
 		const int32 AfterVisitorWrite = State->GetGuestBookEntries().Num();
 		VisitorController->SubmitGuestBookEntry(TEXT("A second line today."));
 		TestEqual(TEXT("The visitor cannot write twice on the same Island day"), State->GetGuestBookEntries().Num(), AfterVisitorWrite);
@@ -139,6 +161,8 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Reopening the book shows the already-used daily limit"), VisitorController->PressBoundE() &&
 			VisitorController->IsGuestBookPanelOpenForTest() && !BookWidget->CanWriteToday() &&
 			BookWidget->GetDisplayedContent().Contains(TEXT("already left a line today")));
+		TestTrue(TEXT("Read-only reopening focuses the Close button, not a disabled text field"),
+			BookWidget->CloseButton.IsValid() && BookWidget->CloseButton->HasKeyboardFocus());
 	}
 	for (int32 Index = 0; Index < UIslandWorldStateSubsystem::MaxGuestBookEntries + 3; ++Index)
 		State->WriteGuestBook(FString::Printf(TEXT("Visitor_%d"), Index), TEXT("A bounded note."), 3 + Index, bChanged);
@@ -163,6 +187,8 @@ bool FIslandGuestBookTest::RunTest(const FString& Parameters)
 	}
 	TestFalse(TEXT("The oldest line rolls off when the book is full"),
 		State->GetGuestBookEntries().ContainsByPredicate([&WriterId](const FIslandGuestBookEntry& Entry) { return Entry.AgentId == WriterId && Entry.Day == 1; }));
+	if (GuestBookSlateWindow.IsValid() && FSlateApplication::IsInitialized())
+		FSlateApplication::Get().RequestDestroyWindow(GuestBookSlateWindow.ToSharedRef());
 	if (VisitorController) VisitorController->Destroy();
 	Controller->UnPossess();
 	DestroyWorld(World);
