@@ -861,8 +861,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandRhododendrons && PreviewWeather->IslandRhododendrons->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The locally imported cattail mesh is available for Tideglass wet edges"),
 			PreviewWeather->IslandCattails && PreviewWeather->IslandCattails->GetStaticMesh() != nullptr);
-		TestTrue(TEXT("Expanded broadleaf understory exceeds the previous 1,915-shrub population and stays within budget"),
-			PreviewWeather->GroundCoverShrubCount > 1915 && PreviewWeather->GroundCoverShrubCount <= 3840 &&
+		TestTrue(TEXT("Expanded broadleaf understory exceeds the previous 4,820-shrub population and stays within budget"),
+			PreviewWeather->GroundCoverShrubCount > 4820 && PreviewWeather->GroundCoverShrubCount <= 6400 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
 			PreviewWeather->IslandShrubs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandShrubs->CanEverAffectNavigation() &&
@@ -870,7 +870,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
 		TestTrue(TEXT("Flowering rhododendrons remain a sparse accent with nonblocking woodland placement"),
-			PreviewWeather->GroundCoverFlowerCount > 239 && PreviewWeather->GroundCoverFlowerCount <= 360 &&
+			PreviewWeather->GroundCoverFlowerCount > 480 && PreviewWeather->GroundCoverFlowerCount <= 600 &&
 			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount &&
 			PreviewWeather->IslandRhododendrons->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
@@ -1083,9 +1083,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			if (TreeHeight >= 150.f && TreeHeight <= 450.f) ++SaplingCount;
 			else if (TreeHeight >= 900.f && TreeHeight <= 1800.f) ++MatureSpruceCount;
 		}
-		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within their combined population budget"),
-			PreviewWeather->GroundCoverTreeCount > 2243 && PreviewWeather->GroundCoverTreeCount <= 6240 &&
-			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 2400 &&
+		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within their expanded population budget"),
+			PreviewWeather->GroundCoverTreeCount > 4837 && PreviewWeather->GroundCoverTreeCount <= 10400 &&
+			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 4000 &&
 			PreviewWeather->IslandSpruce &&
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
