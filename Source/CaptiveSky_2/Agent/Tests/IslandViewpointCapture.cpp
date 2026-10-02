@@ -862,6 +862,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TArray<FVector> ShrubPlantingPoints;
 		bool bShrubsStayInsideHeightBand = ShrubMesh != nullptr;
 		bool bShrubsRespectWoodlandClearances = ShrubMesh != nullptr;
+		float MinShrubLandmarkClearance = TNumericLimits<float>::Max();
+		float MinShrubShrubClearance = TNumericLimits<float>::Max();
+		float MinShrubSpruceClearance = TNumericLimits<float>::Max();
 		for (int32 ShrubIndex = 0; PreviewWeather->IslandShrubs && ShrubIndex < PreviewWeather->IslandShrubs->GetInstanceCount(); ++ShrubIndex)
 		{
 			FTransform ShrubTransform;
@@ -875,14 +878,28 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			bShrubsStayInsideHeightBand &= ShrubHeight >= 124.9f && ShrubHeight <= 190.1f;
 			const FVector PlantingPoint = ShrubTransform.TransformPosition(ShrubBottomOffset);
 			for (const FVector& Anchor : WoodlandClearanceAnchors)
-				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, Anchor) >= 2599.9f;
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, Anchor);
+				MinShrubLandmarkClearance = FMath::Min(MinShrubLandmarkClearance, Clearance);
+				bShrubsRespectWoodlandClearances &= Clearance >= 2599.9f;
+			}
 			for (const FVector& ExistingShrub : ShrubPlantingPoints)
-				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, ExistingShrub) >= 274.9f;
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingShrub);
+				MinShrubShrubClearance = FMath::Min(MinShrubShrubClearance, Clearance);
+				bShrubsRespectWoodlandClearances &= Clearance >= 274.9f;
+			}
 			for (const FVector& ExistingTree : SprucePlantingPoints)
-				bShrubsRespectWoodlandClearances &= FVector::Dist2D(PlantingPoint, ExistingTree) >= 224.9f;
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingTree);
+				MinShrubSpruceClearance = FMath::Min(MinShrubSpruceClearance, Clearance);
+				bShrubsRespectWoodlandClearances &= Clearance >= 224.9f;
+			}
 			ShrubPlantingPoints.Add(PlantingPoint);
 		}
 		TestTrue(TEXT("Broadleaf shrubs use the authored 1.25–1.9 m height band"), bShrubsStayInsideHeightBand);
+		AddInfo(FString::Printf(TEXT("Broadleaf minimum clearances in cm: landmark %.1f, shrub %.1f, spruce %.1f (%d shrubs)"),
+			MinShrubLandmarkClearance, MinShrubShrubClearance, MinShrubSpruceClearance, ShrubPlantingPoints.Num()));
 		TestTrue(TEXT("Broadleaf shrubs preserve landmark, inter-shrub, and spruce-trunk clearances"), bShrubsRespectWoodlandClearances);
 		int32 MatureSpruceCount = 0;
 		int32 SaplingCount = 0;

@@ -515,6 +515,7 @@ void AIslandWeather::InitializeGroundCover()
 			constexpr float SpruceGroveMinSpacing = 3400.f;
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
+			constexpr float ShrubTreeClearance = 225.f;
 			const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
@@ -581,6 +582,9 @@ void AIslandWeather::InitializeGroundCover()
 						bool bTooClose = false;
 						for (const FVector& ExistingTree : SpruceLocations)
 							if (FVector::Dist2D(Candidate, ExistingTree) < SpruceTreeMinSpacing) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
 
 						FHitResult TreeHit;
@@ -615,6 +619,9 @@ void AIslandWeather::InitializeGroundCover()
 						bool bTooClose = false;
 						for (const FVector& ExistingTree : SpruceLocations)
 							if (FVector::Dist2D(Candidate, ExistingTree) < SaplingMinSpacing) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
 
 						FHitResult SaplingHit;
@@ -637,7 +644,6 @@ void AIslandWeather::InitializeGroundCover()
 					constexpr float ShrubInnerRadius = 800.f;
 					constexpr float ShrubOuterRadius = 1900.f;
 					constexpr float ShrubMinSpacing = 275.f;
-					constexpr float ShrubTreeClearance = 225.f;
 					const FBoxSphereBounds ShrubBounds = IslandShrubs->GetStaticMesh()->GetBounds();
 					const int32 ShrubsBeforeGrove = GroundCoverShrubCount;
 					if (ShrubBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
