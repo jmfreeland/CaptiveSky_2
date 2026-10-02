@@ -616,7 +616,7 @@ void AIslandWeather::InitializeGroundCover()
 		GroundCoverTreeCount = 0;
 		if (IslandSpruce && IslandSpruce->GetStaticMesh())
 		{
-			constexpr int32 SpruceGroveCount = 200;
+			constexpr int32 SpruceGroveCount = 280;
 			constexpr int32 SpruceTreesPerGrove = 32;
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
 			constexpr float SpruceGroveInnerRadius = 500.f;
