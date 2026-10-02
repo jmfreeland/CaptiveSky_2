@@ -119,6 +119,10 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 - Approach a visible Island landmark or wild creature and press **E** to trigger its existing close-range response and read a brief caption. The visitor can ring the ListeningStones, stir a temporary Tideglass ripple or WindArch gust, quietly watch a nearby firefly/crab, or open the inn guest book. There, visitors can read the latest entries or leave one public line per Island day (up to 180 characters). Transient effects use a five-real-minute per-target pause; reading and writing the book are not cooldown-gated. Entries are bounded and reversible through `Island.ForgetGuestBook`. Autonomous residents share the landmark/wildlife response implementation.
 - In-range, clearly visible targets now display a small contextual **E** hint describing the available response; it never triggers the response. Menus and spectator mode suppress the hint, and it can coexist with temporary captions for wildlife, weather and resident speech.
 
+## Living landscape
+
+The Island combines wind-responsive meadow patches, broadleaf ground plants, spruce groves, and shrub understorey. The latest grove-coverage pass raises the deterministic scatter from 44 to 64 attempted groves while preserving terrain/shoreline and landmark clearances; read the [vegetation notes](docs/ecology/shore-grass.md) for placement counts and validation limits. Its offscreen capture timing is diagnostic only, not a packaged-game performance benchmark.
+
 ## Roadmap / Open Questions
 
 ### Visitor interactions and creation (2026-09-27; updated 2026-09-30)

@@ -40,6 +40,7 @@
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 #include "ImageUtils.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -440,13 +441,29 @@ namespace
 				Component->bAlwaysPersistRenderingState = true;
 				IStreamingManager::Get().StreamAllResources(2.f);
 				Frames = 0;
+				MeasuredCaptureStartSeconds = 0.0;
 			}
 			Capture->GetCaptureComponent2D()->CaptureScene();
 			// A swapped-in landscape graph can take minutes to compile; capturing earlier shows the previous look.
 			if (Frames == 1 && GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
-			if (++Frames < 60) return false;
+			++Frames;
+			constexpr int32 CaptureWarmupFrames = 10;
+			if (Frames == CaptureWarmupFrames) MeasuredCaptureStartSeconds = FPlatformTime::Seconds();
+			if (Frames < 60) return false;
 
 			FlushRenderingCommands();
+			if (GroundCoverWeather.IsValid() && MeasuredCaptureStartSeconds > 0.0)
+			{
+				const double MeasuredSeconds = FMath::Max(0.001, FPlatformTime::Seconds() - MeasuredCaptureStartSeconds);
+				const double CaptureFramesPerSecond = (Frames - CaptureWarmupFrames) / MeasuredSeconds;
+				const bool bGameplayScaleView = FVector::Dist(View.From, View.LookAt) <= 10000.f;
+				Test->AddInfo(FString::Printf(TEXT("%s: dense ground-cover SceneCapture throughput %.2f FPS over %d measured frames after %d warmup frames."),
+					*View.Name, CaptureFramesPerSecond, Frames - CaptureWarmupFrames, CaptureWarmupFrames));
+				if (!bGameplayScaleView)
+					Test->AddInfo(TEXT("This high-altitude overview is outside the gameplay-scale 100 m performance gate; its capture rate is diagnostic only."));
+				else if (CaptureFramesPerSecond < 10.0)
+					Test->AddInfo(TEXT("Low capture throughput is diagnostic only: this offscreen automation sample can include editor/render-thread stalls and is not a gameplay frame-rate benchmark."));
+			}
 			TArray<FColor> Pixels;
 			if (Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels) && Pixels.Num() == Size.X * Size.Y)
 			{
@@ -546,6 +563,7 @@ namespace
 		int32 OriginalDayNumber = 1;
 		int32 Index = 0;
 		int32 Frames = 0;
+		double MeasuredCaptureStartSeconds = 0.0;
 		bool bStarted = false;
 		bool bClearGroundCover = false;
 		TArray<FLandscapePreviewBackup> LandscapeBackups;
@@ -834,8 +852,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The existing broadleaf mesh is available for a separate grove understory"),
 			PreviewWeather->IslandShrubs && PreviewWeather->IslandShrubs->GetStaticMesh() != nullptr);
-		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 44 attempted groves"),
-			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 704 &&
+		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 64 attempted groves"),
+			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 1024 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
 			PreviewWeather->IslandShrubs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandShrubs->CanEverAffectNavigation() &&
@@ -853,11 +871,15 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")))
 				WoodlandClearanceAnchors.Add(It->GetActorLocation());
 		TArray<FVector> SprucePlantingPoints;
+		TArray<float> SpruceTreeHeights;
 		for (int32 TreeIndex = 0; PreviewWeather->IslandSpruce && TreeIndex < PreviewWeather->IslandSpruce->GetInstanceCount(); ++TreeIndex)
 		{
 			FTransform TreeTransform;
 			if (PreviewWeather->IslandSpruce->GetInstanceTransform(TreeIndex, TreeTransform, true))
+			{
+				SpruceTreeHeights.Add(TreeTransform.GetScale3D().Z * (2.f * WoodlandSpruceBounds.BoxExtent.Z));
 				SprucePlantingPoints.Add(TreeTransform.TransformPosition(SpruceBottomOffset));
+			}
 		}
 		TArray<FVector> ShrubPlantingPoints;
 		bool bShrubsStayInsideHeightBand = ShrubMesh != nullptr;
@@ -914,12 +936,24 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			else if (TreeHeight >= 900.f && TreeHeight <= 1800.f) ++MatureSpruceCount;
 		}
 		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within their combined population budget"),
-			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 1672 &&
-			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 528 &&
+			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 2432 &&
+			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 768 &&
 			PreviewWeather->IslandSpruce &&
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
+		bool bSpruceRespectsSpacing = SprucePlantingPoints.Num() == SpruceTreeHeights.Num();
+		float MinSpruceSpacing = TNumericLimits<float>::Max();
+		for (int32 First = 0; First < FMath::Min(SprucePlantingPoints.Num(), SpruceTreeHeights.Num()); ++First)
+			for (int32 Second = 0; Second < First; ++Second)
+			{
+				const float Clearance = FVector::Dist2D(SprucePlantingPoints[First], SprucePlantingPoints[Second]);
+				MinSpruceSpacing = FMath::Min(MinSpruceSpacing, Clearance);
+				const float RequiredClearance = SpruceTreeHeights[First] >= 900.f && SpruceTreeHeights[Second] >= 900.f ? 649.9f : 449.9f;
+				bSpruceRespectsSpacing &= Clearance >= RequiredClearance;
+			}
+		AddInfo(FString::Printf(TEXT("Spruce minimum inter-tree clearance in cm: %.1f (%d instances)"), MinSpruceSpacing, SprucePlantingPoints.Num()));
+		TestTrue(TEXT("Mature spruce and saplings preserve their distinct minimum planting spacings"), bSpruceRespectsSpacing);
 		UHierarchicalInstancedStaticMeshComponent* GrassC = PreviewWeather->FindShoreGrassC();
 		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances, %d spruce trees (%d mature + %d saplings), and %d broadleaf understory shrubs."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), GrassC ? GrassC->GetInstanceCount() : 0,
