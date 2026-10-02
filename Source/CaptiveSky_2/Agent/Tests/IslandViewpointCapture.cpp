@@ -23,6 +23,7 @@
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "ContentStreaming.h"
 #include "ShaderCompiler.h"
 #include "Dom/JsonObject.h"
@@ -32,6 +33,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMeshActor.h"
+#include "GameFramework/Character.h"
 #include "Components/StaticMeshComponent.h"
 #include "LandscapeComponent.h"
 #include "LandscapeProxy.h"
@@ -1019,7 +1021,47 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				const FTransform& SpruceBase = PreviewWeather->IslandSpruceBaseTransforms[0];
 				const FVector SpruceLocation = PreviewWeather->IslandSpruce->GetComponentTransform().TransformPosition(SpruceBase.GetLocation());
 				PreviewWeather->AddTransientGust(SpruceLocation, FVector(1.f, 0.f, 0.f), 300.f, 1800.f, 18.f);
-				PreviewWeather->UpdateSpruceSway();
+				int32 DistantSpruceIndex = INDEX_NONE;
+				FVector ViewLocation = FVector::ZeroVector;
+				bool bHasViewFocus = false;
+				if (APlayerController* PlayerController = PreviewWeather->GetWorld()->GetFirstPlayerController())
+				{
+					FRotator ViewRotation;
+					PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+					bHasViewFocus = true;
+				}
+				TArray<FVector> ActiveSwayFocuses{ SpruceLocation };
+				if (bHasViewFocus) ActiveSwayFocuses.Add(ViewLocation);
+				for (TActorIterator<ACharacter> CharacterIt(PreviewWeather->GetWorld()); CharacterIt; ++CharacterIt)
+				{
+					FVector GroundPoint = CharacterIt->GetActorLocation();
+					if (const UCapsuleComponent* Capsule = CharacterIt->GetCapsuleComponent())
+						GroundPoint.Z -= Capsule->GetScaledCapsuleHalfHeight();
+					ActiveSwayFocuses.Add(GroundPoint);
+				}
+				const double TestWorldTime = PreviewWeather->GetWorld()->GetTimeSeconds();
+				for (const FIslandTransientGust& Gust : PreviewWeather->TransientGusts)
+					if (TestWorldTime >= Gust.StartedAt && TestWorldTime < Gust.ExpiresAt) ActiveSwayFocuses.Add(Gust.Center);
+				for (int32 Index = 0; Index < PreviewWeather->IslandSpruceBaseTransforms.Num(); ++Index)
+				{
+					const FVector TreeLocation = PreviewWeather->IslandSpruce->GetComponentTransform().TransformPosition(
+						PreviewWeather->IslandSpruceBaseTransforms[Index].GetLocation());
+					const bool bOutsideAllFocuses = !ActiveSwayFocuses.ContainsByPredicate([&TreeLocation](const FVector& Focus)
+						{ return FVector::DistSquared(TreeLocation, Focus) <= FMath::Square(3000.f); });
+					if (bOutsideAllFocuses) { DistantSpruceIndex = Index; break; }
+				}
+				PreviewWeather->UpdateGroundCoverSway();
+				TestTrue(TEXT("The local spruce gust updates less than the full forest population"),
+					PreviewWeather->SpruceSwayLastUpdatedInstanceCount > 0 &&
+					PreviewWeather->SpruceSwayLastUpdatedInstanceCount < PreviewWeather->IslandSpruceBaseTransforms.Num());
+				TestTrue(TEXT("The real forest fixture contains a tree outside all active sway focuses"), DistantSpruceIndex != INDEX_NONE);
+				if (DistantSpruceIndex != INDEX_NONE)
+				{
+					FTransform DistantSpruce;
+					PreviewWeather->IslandSpruce->GetInstanceTransform(DistantSpruceIndex, DistantSpruce, false);
+					TestTrue(TEXT("Distant spruce remains at its immutable planted transform"),
+						DistantSpruce.Equals(PreviewWeather->IslandSpruceBaseTransforms[DistantSpruceIndex], 0.01f));
+				}
 				FTransform SpruceAfterGust;
 				const bool bGotSpruceTransform = PreviewWeather->IslandSpruce->GetInstanceTransform(0, SpruceAfterGust, false);
 				const float SpruceSwayDegrees = bGotSpruceTransform ? FMath::RadiansToDegrees(

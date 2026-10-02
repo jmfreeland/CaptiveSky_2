@@ -202,7 +202,7 @@ private:
 	UHierarchicalInstancedStaticMeshComponent* FindShoreGrassC() const;
 	void InitializeGroundCover();
 	void UpdateGroundCoverSway();
-	void UpdateSpruceSway();
+	void UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius);
 	void ClearGroundCover();
 	/** 0..1 strength of the passing rain front, before clouds gate it. */
 	float SampleFrontStrength(double Seconds) const;
@@ -235,4 +235,7 @@ private:
 	TMap<FIntPoint, TArray<int32>> GroundPlantLowBCells;
 	TMap<FIntPoint, TArray<int32>> ShrubCells;
 	int32 GroundCoverSwayLastUpdatedInstanceCount = 0;
+	TArray<int32> SwayedSpruceIndices;
+	TMap<FIntPoint, TArray<int32>> SpruceCells;
+	int32 SpruceSwayLastUpdatedInstanceCount = 0;
 };

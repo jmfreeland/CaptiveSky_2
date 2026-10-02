@@ -32,6 +32,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
 static constexpr float GroundCoverSwayCellSize = 1500.f;
+static constexpr float FoliageSwayFocusRadius = 3000.f;
 
 AIslandWeather::AIslandWeather()
 {
@@ -285,7 +286,9 @@ void AIslandWeather::InitializeGroundCover()
 	SwayedGroundPlantLowAIndices.Reset();
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
+	SwayedSpruceIndices.Reset();
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
+	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
@@ -780,6 +783,7 @@ void AIslandWeather::InitializeGroundCover()
 	BuildSwayCells(ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells);
 	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
 	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
+	BuildSwayCells(IslandSpruceBaseTransforms, 0, IslandSpruceBaseTransforms.Num(), SpruceCells);
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
@@ -825,11 +829,14 @@ void AIslandWeather::ClearGroundCover()
 	GroundPlantLowACells.Reset();
 	GroundPlantLowBCells.Reset();
 	ShrubCells.Reset();
+	SwayedSpruceIndices.Reset();
+	SpruceCells.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
+	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverSwayUpdateAccumulator = 0.f;
 	bGroundCoverInitialized = false;
 }
@@ -838,7 +845,6 @@ void AIslandWeather::UpdateGroundCoverSway()
 {
 	if (!GetWorld() || !bGroundCoverInitialized) return;
 	const double Now = GetWorld()->GetTimeSeconds();
-	constexpr float GroundCoverSwayRadius = 3000.f;
 	constexpr float ResidentPlantBendRadius = 180.f;
 	constexpr float ResidentPlantBendHeight = 140.f;
 	constexpr float ResidentPlantMaxBendDegrees = 16.f;
@@ -874,10 +880,10 @@ void AIslandWeather::UpdateGroundCoverSway()
 		for (const FVector& Focus : FocusPoints)
 		{
 			const FVector LocalFocus = ComponentTransform.InverseTransformPosition(Focus);
-			const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - GroundCoverSwayRadius) / GroundCoverSwayCellSize);
-			const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + GroundCoverSwayRadius) / GroundCoverSwayCellSize);
-			const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - GroundCoverSwayRadius) / GroundCoverSwayCellSize);
-			const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + GroundCoverSwayRadius) / GroundCoverSwayCellSize);
+			const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
+			const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
 			for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX)
 				for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY)
 					if (const TArray<int32>* CellIndices = SwayCells.Find(FIntPoint(CellX, CellY)))
@@ -891,7 +897,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 			const FVector WorldLocation = ComponentTransform.TransformPosition(BaseTransforms[FirstBaseline + CurrentSwayedIndices[Index]].GetLocation());
 			bool bWithinSwayRange = false;
 			for (const FVector& Focus : FocusPoints)
-				if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(GroundCoverSwayRadius)) { bWithinSwayRange = true; break; }
+			if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(FoliageSwayFocusRadius)) { bWithinSwayRange = true; break; }
 			if (!bWithinSwayRange) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
 		}
 		TArray<int32> UpdateIndices = PreviousSwayedIndices;
@@ -950,26 +956,64 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells, SwayedGroundPlantLowAIndices);
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
 	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
-	UpdateSpruceSway();
+	UpdateSpruceSway(FocusPoints, FoliageSwayFocusRadius);
 }
 
-void AIslandWeather::UpdateSpruceSway()
+void AIslandWeather::UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius)
 {
+	SpruceSwayLastUpdatedInstanceCount = 0;
 	if (!GetWorld() || !IslandSpruce || !IslandSpruce->GetStaticMesh() || IslandSpruceBaseTransforms.Num() != IslandSpruce->GetInstanceCount()) return;
 	const double Now = GetWorld()->GetTimeSeconds();
 	const FTransform ComponentTransform = IslandSpruce->GetComponentTransform();
 	const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
 	const FVector MeshBottomOffset = SpruceBounds.Origin - FVector(0.f, 0.f, SpruceBounds.BoxExtent.Z);
-	for (int32 Index = 0; Index < IslandSpruceBaseTransforms.Num(); ++Index)
+	TArray<int32> CurrentSwayedIndices;
+	for (const FVector& Focus : FocusPoints)
 	{
-		const FTransform& Base = IslandSpruceBaseTransforms[Index];
-		const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
-		const FVector WorldWind = GetLocalWind(WorldLocation, this);
-		const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
-		const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
-		const FTransform Swayed = CalculateSpruceSway(Base, MeshBottomOffset, LocalWind, Now, Index, WeatherSeed, MaximumWindSpeed);
-		IslandSpruce->UpdateInstanceTransform(Index, Swayed, false, Index == IslandSpruceBaseTransforms.Num() - 1, true);
+		const FVector LocalFocus = ComponentTransform.InverseTransformPosition(Focus);
+		const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - FocusRadius) / GroundCoverSwayCellSize);
+		const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + FocusRadius) / GroundCoverSwayCellSize);
+		const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - FocusRadius) / GroundCoverSwayCellSize);
+		const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + FocusRadius) / GroundCoverSwayCellSize);
+		for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX)
+			for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY)
+				if (const TArray<int32>* CellIndices = SpruceCells.Find(FIntPoint(CellX, CellY)))
+					CurrentSwayedIndices.Append(*CellIndices);
 	}
+	CurrentSwayedIndices.Sort();
+	for (int32 Index = CurrentSwayedIndices.Num() - 1; Index > 0; --Index)
+		if (CurrentSwayedIndices[Index] == CurrentSwayedIndices[Index - 1]) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+	for (int32 Index = CurrentSwayedIndices.Num() - 1; Index >= 0; --Index)
+	{
+		const FVector WorldLocation = ComponentTransform.TransformPosition(IslandSpruceBaseTransforms[CurrentSwayedIndices[Index]].GetLocation());
+		bool bWithinSwayRange = false;
+		for (const FVector& Focus : FocusPoints)
+			if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(FocusRadius)) { bWithinSwayRange = true; break; }
+		if (!bWithinSwayRange) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+	}
+	TArray<int32> UpdateIndices = SwayedSpruceIndices;
+	UpdateIndices.Append(CurrentSwayedIndices);
+	UpdateIndices.Sort();
+	for (int32 Index = UpdateIndices.Num() - 1; Index > 0; --Index)
+		if (UpdateIndices[Index] == UpdateIndices[Index - 1]) UpdateIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+	SpruceSwayLastUpdatedInstanceCount = CurrentSwayedIndices.Num();
+	for (int32 Position = 0; Position < UpdateIndices.Num(); ++Position)
+	{
+		const int32 InstanceIndex = UpdateIndices[Position];
+		if (!IslandSpruceBaseTransforms.IsValidIndex(InstanceIndex)) continue;
+		const FTransform& Base = IslandSpruceBaseTransforms[InstanceIndex];
+		FTransform Updated = Base;
+		if (Algo::BinarySearch(CurrentSwayedIndices, InstanceIndex) != INDEX_NONE)
+		{
+			const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
+			const FVector WorldWind = GetLocalWind(WorldLocation, this);
+			const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
+			const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
+			Updated = CalculateSpruceSway(Base, MeshBottomOffset, LocalWind, Now, InstanceIndex, WeatherSeed, MaximumWindSpeed);
+		}
+		IslandSpruce->UpdateInstanceTransform(InstanceIndex, Updated, false, Position == UpdateIndices.Num() - 1, true);
+	}
+	SwayedSpruceIndices = MoveTemp(CurrentSwayedIndices);
 }
 
 void AIslandWeather::ClearGroundCoverPreview()
