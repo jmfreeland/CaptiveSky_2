@@ -306,7 +306,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		FSlateApplication::Get().RequestDestroyWindow(ArrangementSlateWindow.ToSharedRef());
 	if (VisitorController) VisitorController->Destroy();
 	MakerController->UnPossess();
-	ResponderController->UnPossess();
+	// The fixture world is destroyed below; explicit unpossess can touch a torn-down brain in commandlet runs.
 	DestroyArrangementWorld(World);
 
 	// A later session restores every site, work, and response.

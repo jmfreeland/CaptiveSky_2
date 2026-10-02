@@ -100,6 +100,13 @@ void UCaptiveSkyArrangementWidget::OpenFor(FName InSiteId, const FString& Descri
 	}
 }
 
+TSharedPtr<SWidget> UCaptiveSkyArrangementWidget::GetPreferredInputWidget() const
+{
+	if (!bSiteHasWork && bMayContribute && TitleBox.IsValid()) return TitleBox;
+	if (bSiteHasWork && bMayRespond && IntentBox.IsValid()) return IntentBox;
+	return nullptr;
+}
+
 void UCaptiveSkyArrangementWidget::ShowResult(const FString& Result, bool bHasWork, bool bCanCreate, bool bCanRespond, bool bClearInput)
 {
 	bSiteHasWork = bHasWork;

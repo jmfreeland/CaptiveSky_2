@@ -18,6 +18,7 @@ public:
 	void OpenFor(FName InSiteId, const FString& Description, bool bHasWork, bool bMayContribute,
 		bool bMayRespond, bool bOwnWork);
 	void ShowResult(const FString& Result, bool bHasWork, bool bMayContribute, bool bMayRespond, bool bClearInput);
+	TSharedPtr<SWidget> GetPreferredInputWidget() const;
 	FString GetDisplayedContent() const { return DisplayedContent; }
 	bool CanContribute() const { return bMayContribute || bMayRespond; }
 	FName GetSiteId() const { return SiteId; }

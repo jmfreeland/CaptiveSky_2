@@ -53,18 +53,18 @@ and the visual appearance remain unverified.
 
 ### Response-field keyboard focus
 
-Source review found that the panel focused the title field for a new arrangement but did
-not focus the visible intent field when opening another maker's work. The panel now sends
-keyboard focus to that response field when a response is available; a new empty site
-continues to focus its title field. The controller applies the panel's input mode before
-the widget becomes visible and focuses the selected field, so the root widget does not
-take focus afterward. `CaptiveSky2.Agent.IslandArrangement` now builds the real Slate
-widget tree and asserts title focus for new work and intent focus for responses, in
-addition to the existing create/respond behavior. A first test attempt called `TakeWidget()`
-on an uninitialized `NewObject` and crashed in UMG; the fixture now explicitly initializes
-the widget and hosts it in a temporary Slate window. This caught and fixes a test-harness
-mistake, not a game crash. The fixture's controller intentionally stubs input-mode changes,
-so in-game focus after the real input-mode handoff, panel placement at game resolution, and
-mouse/touch behavior remain to be checked in PIE.
-The latest bounded UE 5.8.3 scratch run passed `CaptiveSky2.Agent.IslandArrangement`:
-`Saved/CompileScratch/Codex_InnGroundCover_20261001/Project/Saved/Logs/Codex_ArrangementSlateFocus_Final2_20261001.log`.
+The panel focuses the title field for a new arrangement and the intent field when opening
+another maker's work. A repeated-open test exposed a handoff race: the game-and-UI input
+mode targeted the panel root, which could take focus from the selected field. The controller
+now makes the panel visible and sets its state first, then targets the eligible edit field
+as the input-mode focus widget (falling back to the panel only when no contribution is
+available). The focus fixture forwards the real input-mode call and checks both field
+choices while preserving the existing create/respond flow. The scratch test also exposed
+unnecessary manual `UnPossess` cleanup on a transient AI controller; destroying the fixture
+world already cleans it up and avoids a commandlet teardown crash.
+
+The UE 5.8.3 scratch-linked module compiled and both `CaptiveSky2.Agent.IslandArrangement`
+and `CaptiveSky2.Agent.IslandArrangementInspection` passed. Log:
+`Saved/CompileScratch/Codex_ArrangementFocus_20261002/IslandArrangement_Fixed.log`.
+This verifies the Slate/input-mode handoff in the fixture; panel placement at game resolution
+and mouse/touch behavior still need a rendered PIE check.

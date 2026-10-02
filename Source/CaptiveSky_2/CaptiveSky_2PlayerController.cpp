@@ -299,8 +299,8 @@ void ACaptiveSky_2PlayerController::OpenArrangement(AActor* Target)
 	}
 
 	ArrangementTarget = WorkActor;
-	SetArrangementInputMode(true);
 	ArrangementWidget->OpenFor(Site->Id, Description, Site->bHasWork, bCanCreate, bCanRespond, bOwnWork);
+	SetArrangementInputMode(true);
 	bArrangementPanelOpen = true;
 	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
@@ -356,7 +356,8 @@ void ACaptiveSky_2PlayerController::SetArrangementInputMode(bool bOpen)
 	if (bOpen && ArrangementWidget)
 	{
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(ArrangementWidget->TakeWidget());
+		const TSharedPtr<SWidget> FocusWidget = ArrangementWidget->GetPreferredInputWidget();
+		InputMode.SetWidgetToFocus(FocusWidget.IsValid() ? FocusWidget : ArrangementWidget->TakeWidget());
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		SetInputMode(InputMode);
 		bShowMouseCursor = true;
