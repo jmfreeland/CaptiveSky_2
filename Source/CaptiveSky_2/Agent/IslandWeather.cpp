@@ -121,6 +121,14 @@ AIslandWeather::AIslandWeather()
 	IslandRhododendrons->SetCastShadow(false);
 	IslandRhododendrons->bReceivesDecals = false;
 	IslandRhododendrons->SetVisibility(false);
+	IslandCattails = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandCattails"));
+	IslandCattails->SetupAttachment(RootComponent);
+	IslandCattails->SetMobility(EComponentMobility::Movable);
+	IslandCattails->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandCattails->SetCanEverAffectNavigation(false);
+	IslandCattails->SetCastShadow(false);
+	IslandCattails->bReceivesDecals = false;
+	IslandCattails->SetVisibility(false);
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
 	WindAmbienceAudio->bAutoActivate = false;
@@ -143,6 +151,7 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowBMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CattailMesh(TEXT("/Game/Plants/Meshes/Typha_latifolia_LD.Typha_latifolia_LD"));
 	if (GrassMeshA.Succeeded()) ShoreGrassA->SetStaticMesh(GrassMeshA.Object);
 	if (GrassMeshB.Succeeded()) ShoreGrassB->SetStaticMesh(GrassMeshB.Object);
 	if (GrassMeshC.Succeeded()) ShoreGrassC->SetStaticMesh(GrassMeshC.Object);
@@ -152,6 +161,7 @@ AIslandWeather::AIslandWeather()
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
+	if (CattailMesh.Succeeded()) IslandCattails->SetStaticMesh(CattailMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -288,6 +298,7 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandShrubs->ClearInstances();
 	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
+	if (IslandCattails) IslandCattails->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
@@ -299,6 +310,7 @@ void AIslandWeather::InitializeGroundCover()
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
 	SwayedRhododendronIndices.Reset();
+	SwayedCattailIndices.Reset();
 	SwayedSpruceIndices.Reset();
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	SpruceSwayLastUpdatedInstanceCount = 0;
@@ -307,6 +319,7 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
 	GroundCoverFlowerCount = 0;
+	GroundCoverWetlandCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
 	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
 	{
@@ -354,6 +367,7 @@ void AIslandWeather::InitializeGroundCover()
 		++GroundCoverInstanceCount;
 	};
 
+	TArray<FVector> CattailLocations;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		const AActor* Landmark = *It;
@@ -388,6 +402,7 @@ void AIslandWeather::InitializeGroundCover()
 			if (TideglassClearRadius > 0.f)
 				UE_LOG(LogIslandWeather, Log, TEXT("Tideglass ground cover leaves a %.0f cm pool-edge clearance."), TideglassClearRadius);
 		}
+		TArray<FVector> TideglassGroundCoverLocations;
 
 		TArray<FTransform> Offsets;
 		const uint32 Seed = static_cast<uint32>(WeatherSeed) ^
@@ -426,6 +441,55 @@ void AIslandWeather::InitializeGroundCover()
 			}
 
 			PlaceFoliage(GroundHit, Offset, Index);
+			if (bTideglass) TideglassGroundCoverLocations.Add(GroundHit.ImpactPoint);
+		}
+
+		if (bTideglass && TideglassClearRadius > 0.f && IslandCattails && IslandCattails->GetStaticMesh())
+		{
+			const FBoxSphereBounds CattailBounds = IslandCattails->GetStaticMesh()->GetBounds();
+			if (CattailBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
+			{
+				constexpr int32 CattailsPerPool = 10;
+				constexpr int32 MaxCattailTracesPerPool = 80;
+				constexpr float CattailMinimumSpacing = 300.f;
+				constexpr float ExistingFoliageClearance = 225.f;
+				TArray<FTransform> CattailOffsets;
+				const uint32 CattailSeed = Seed ^ 0x7b352d91u;
+				BuildGroundCoverOffsets(static_cast<int32>(CattailSeed), MaxCattailTracesPerPool,
+					TideglassClearRadius + 250.f, TideglassClearRadius + 1100.f, CattailOffsets);
+				FRandomStream CattailRandom(static_cast<int32>(CattailSeed));
+				const int32 CattailsBeforePool = GroundCoverWetlandCount;
+				for (const FTransform& Offset : CattailOffsets)
+				{
+					if (GroundCoverWetlandCount - CattailsBeforePool >= CattailsPerPool) break;
+					const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
+					bool bTooClose = false;
+					for (const FVector& ExistingCattail : CattailLocations)
+						if (FVector::Dist2D(Candidate, ExistingCattail) < CattailMinimumSpacing) { bTooClose = true; break; }
+					if (bTooClose) continue;
+					for (const FVector& ExistingGroundCover : TideglassGroundCoverLocations)
+						if (FVector::Dist2D(Candidate, ExistingGroundCover) < ExistingFoliageClearance) { bTooClose = true; break; }
+					if (bTooClose) continue;
+
+					FHitResult GroundHit;
+					if (!GetWorld()->LineTraceSingleByChannel(GroundHit,
+						Candidate + FVector(0.f, 0.f, 1400.f), Candidate - FVector(0.f, 0.f, 5000.f), ECC_WorldStatic, Query) ||
+						!Cast<ALandscapeProxy>(GroundHit.GetActor()) || GroundHit.ImpactNormal.Z < 0.72f) continue;
+					const float TargetHeight = CattailRandom.FRandRange(170.f, 230.f);
+					const FVector Scale(TargetHeight / (2.f * CattailBounds.BoxExtent.Z));
+					const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
+					const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
+						FMath::DegreesToRadians(CattailRandom.FRandRange(0.f, 360.f)));
+					const FVector MeshBottom(CattailBounds.Origin.X, CattailBounds.Origin.Y,
+						CattailBounds.Origin.Z - CattailBounds.BoxExtent.Z);
+					const FVector Location = GroundHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+					IslandCattails->AddInstance(FTransform(Rotation, Location, Scale), true);
+					CattailLocations.Add(GroundHit.ImpactPoint);
+					++GroundCoverWetlandCount;
+				}
+				UE_LOG(LogIslandWeather, Log, TEXT("Tideglass wet-edge scatter placed %d nonblocking cattails outside the pool clearance."),
+					GroundCoverWetlandCount - CattailsBeforePool);
+			}
 		}
 	}
 
@@ -799,6 +863,7 @@ void AIslandWeather::InitializeGroundCover()
 	IslandSpruceBaseTransforms.Reset(IslandSpruce ? IslandSpruce->GetInstanceCount() : 0);
 	IslandShrubBaseTransforms.Reset(IslandShrubs ? IslandShrubs->GetInstanceCount() : 0);
 	IslandRhododendronBaseTransforms.Reset(IslandRhododendrons ? IslandRhododendrons->GetInstanceCount() : 0);
+	IslandCattailBaseTransforms.Reset(IslandCattails ? IslandCattails->GetInstanceCount() : 0);
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -847,6 +912,12 @@ void AIslandWeather::InitializeGroundCover()
 			FTransform Transform;
 			if (IslandRhododendrons->GetInstanceTransform(Index, Transform, false)) IslandRhododendronBaseTransforms.Add(Transform);
 		}
+	if (IslandCattails)
+		for (int32 Index = 0; Index < IslandCattails->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (IslandCattails->GetInstanceTransform(Index, Transform, false)) IslandCattailBaseTransforms.Add(Transform);
+		}
 	auto BuildSwayCells = [](const TArray<FTransform>& Baselines, int32 FirstBaseline, int32 InstanceCount,
 		TMap<FIntPoint, TArray<int32>>& OutCells)
 	{
@@ -866,6 +937,7 @@ void AIslandWeather::InitializeGroundCover()
 	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
 	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
 	BuildSwayCells(IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells);
+	BuildSwayCells(IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells);
 	BuildSwayCells(IslandSpruceBaseTransforms, 0, IslandSpruceBaseTransforms.Num(), SpruceCells);
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
@@ -878,6 +950,7 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(GroundCoverFlowerCount > 0, true);
+	if (IslandCattails) IslandCattails->SetVisibility(GroundCoverWetlandCount > 0, true);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
@@ -893,9 +966,11 @@ void AIslandWeather::ClearGroundCover()
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
 	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
+	if (IslandCattails) { IslandCattails->ClearInstances(); IslandCattails->SetVisibility(false, true); }
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
+	IslandCattailBaseTransforms.Reset();
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
@@ -909,6 +984,7 @@ void AIslandWeather::ClearGroundCover()
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
 	SwayedRhododendronIndices.Reset();
+	SwayedCattailIndices.Reset();
 	ShoreGrassACells.Reset();
 	ShoreGrassBCells.Reset();
 	ShoreGrassCCells.Reset();
@@ -917,6 +993,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundPlantLowBCells.Reset();
 	ShrubCells.Reset();
 	RhododendronCells.Reset();
+	CattailCells.Reset();
 	SwayedSpruceIndices.Reset();
 	SpruceCells.Reset();
 	GroundCoverInstanceCount = 0;
@@ -924,6 +1001,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
 	GroundCoverFlowerCount = 0;
+	GroundCoverWetlandCount = 0;
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverSwayUpdateAccumulator = 0.f;
@@ -1046,6 +1124,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
 	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
 	UpdateSpecies(IslandRhododendrons, IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells, SwayedRhododendronIndices);
+	UpdateSpecies(IslandCattails, IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells, SwayedCattailIndices);
 	UpdateSpruceSway(FocusPoints, FoliageSwayFocusRadius);
 }
 

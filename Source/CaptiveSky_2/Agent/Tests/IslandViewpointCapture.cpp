@@ -840,6 +840,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			return false;
 		}
 		PreviewWeather->InitializeGroundCover();
+		int32 TideglassPoolCount = 0;
+		for (TActorIterator<AActor> It(Island); It; ++It)
+			if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("TideglassPool"))) ++TideglassPoolCount;
 		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
 		TestTrue(TEXT("The Island uses the actual 512-patch meadow budget rather than counting candidate centers twice"),
 			PreviewWeather->GroundCoverMeadowInstanceCount >= 850000);
@@ -856,6 +859,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandShrubs && PreviewWeather->IslandShrubs->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The locally imported flowering rhododendron mesh is available"),
 			PreviewWeather->IslandRhododendrons && PreviewWeather->IslandRhododendrons->GetStaticMesh() != nullptr);
+		TestTrue(TEXT("The locally imported cattail mesh is available for Tideglass wet edges"),
+			PreviewWeather->IslandCattails && PreviewWeather->IslandCattails->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 64 attempted groves"),
 			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 1024 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
@@ -871,6 +876,14 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
 		TestEqual(TEXT("Every flowering rhododendron has an immutable wind-sway baseline"),
 			PreviewWeather->IslandRhododendronBaseTransforms.Num(), PreviewWeather->GroundCoverFlowerCount);
+		TestTrue(TEXT("Tideglass wet-edge planting stays capped and nonblocking"),
+			TideglassPoolCount > 0 && PreviewWeather->GroundCoverWetlandCount > 0 &&
+			PreviewWeather->GroundCoverWetlandCount <= TideglassPoolCount * 10 &&
+			PreviewWeather->IslandCattails->GetInstanceCount() == PreviewWeather->GroundCoverWetlandCount &&
+			PreviewWeather->IslandCattails->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandCattails->CanEverAffectNavigation() && PreviewWeather->IslandCattails->IsVisible());
+		TestEqual(TEXT("Every Tideglass cattail has an immutable wind-sway baseline"),
+			PreviewWeather->IslandCattailBaseTransforms.Num(), PreviewWeather->GroundCoverWetlandCount);
 		const UStaticMesh* ShrubMesh = PreviewWeather->IslandShrubs ? PreviewWeather->IslandShrubs->GetStaticMesh() : nullptr;
 		const UStaticMesh* RhododendronMesh = PreviewWeather->IslandRhododendrons ? PreviewWeather->IslandRhododendrons->GetStaticMesh() : nullptr;
 		const UStaticMesh* SpruceMesh = PreviewWeather->IslandSpruce ? PreviewWeather->IslandSpruce->GetStaticMesh() : nullptr;
@@ -987,6 +1000,77 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			MinRhododendronLandmarkClearance, MinRhododendronTreeClearance, MinRhododendronShrubClearance,
 			MinRhododendronSpacing, RhododendronPlantingPoints.Num()));
 		TestTrue(TEXT("Flowering rhododendrons preserve landmark, inter-flower, shrub, and spruce clearances"), bRhododendronsRespectWoodlandClearances);
+		struct FTideglassTestClearance { FVector Center; float Radius = 0.f; };
+		TArray<FTideglassTestClearance> TideglassTestClearances;
+		for (TActorIterator<AActor> PoolIt(Island); PoolIt; ++PoolIt)
+		{
+			if (!PoolIt->ActorHasTag(TEXT("IslandLandmark")) || !PoolIt->ActorHasTag(TEXT("TideglassPool"))) continue;
+			FTideglassTestClearance& Clearance = TideglassTestClearances.AddDefaulted_GetRef();
+			Clearance.Center = PoolIt->GetActorLocation();
+			for (TActorIterator<AActor> SurfaceIt(Island); SurfaceIt && Clearance.Radius <= 0.f; ++SurfaceIt)
+			{
+				if (FVector::Dist(SurfaceIt->GetActorLocation(), Clearance.Center) > 25.f) continue;
+				TArray<UStaticMeshComponent*> MeshComponents;
+				SurfaceIt->GetComponents<UStaticMeshComponent>(MeshComponents);
+				for (const UStaticMeshComponent* Mesh : MeshComponents)
+				{
+					if (!Mesh || !Mesh->GetStaticMesh() || Mesh->GetStaticMesh()->GetName() != TEXT("Sphere")) continue;
+					const FVector Scale = Mesh->GetComponentScale();
+					if (Scale.X <= 2.f || Scale.Y <= 2.f || Scale.Z >= 0.25f) continue;
+					const FBoxSphereBounds LocalBounds = Mesh->GetStaticMesh()->GetBounds();
+					Clearance.Radius = FVector::Dist2D(Mesh->GetComponentLocation(), Clearance.Center) +
+						FMath::Max(LocalBounds.BoxExtent.X * Scale.X, LocalBounds.BoxExtent.Y * Scale.Y) * 1.13f + 125.f;
+					break;
+				}
+			}
+		}
+		const UStaticMesh* CattailMesh = PreviewWeather->IslandCattails ? PreviewWeather->IslandCattails->GetStaticMesh() : nullptr;
+		const FBoxSphereBounds CattailBounds = CattailMesh ? CattailMesh->GetBounds() : FBoxSphereBounds();
+		const FVector CattailBottomOffset = CattailBounds.Origin - FVector(0.f, 0.f, CattailBounds.BoxExtent.Z);
+		TArray<FVector> CattailPlantingPoints;
+		bool bCattailsStayInsideHeightBand = CattailMesh != nullptr && !TideglassTestClearances.IsEmpty();
+		bool bCattailsRespectPoolClearance = bCattailsStayInsideHeightBand;
+		float MinCattailSpacing = TNumericLimits<float>::Max();
+		float MinCattailPoolEdgeClearance = TNumericLimits<float>::Max();
+		for (int32 CattailIndex = 0; PreviewWeather->IslandCattails && CattailIndex < PreviewWeather->IslandCattails->GetInstanceCount(); ++CattailIndex)
+		{
+			FTransform CattailTransform;
+			if (!PreviewWeather->IslandCattails->GetInstanceTransform(CattailIndex, CattailTransform, true))
+			{
+				bCattailsStayInsideHeightBand = false;
+				bCattailsRespectPoolClearance = false;
+				continue;
+			}
+			const float CattailHeight = CattailTransform.GetScale3D().Z * 2.f * CattailBounds.BoxExtent.Z;
+			bCattailsStayInsideHeightBand &= CattailHeight >= 169.9f && CattailHeight <= 230.1f;
+			const FVector PlantingPoint = CattailTransform.TransformPosition(CattailBottomOffset);
+			bool bNearPool = false;
+			for (const FTideglassTestClearance& Pool : TideglassTestClearances)
+			{
+				if (Pool.Radius <= 0.f) { bCattailsRespectPoolClearance = false; continue; }
+				const float Distance = FVector::Dist2D(PlantingPoint, Pool.Center);
+				if (Distance >= Pool.Radius + 249.9f && Distance <= Pool.Radius + 1100.1f) bNearPool = true;
+				if (Distance < Pool.Radius + 249.9f)
+				{
+					bCattailsRespectPoolClearance = false;
+					MinCattailPoolEdgeClearance = FMath::Min(MinCattailPoolEdgeClearance, Distance - Pool.Radius);
+				}
+				else MinCattailPoolEdgeClearance = FMath::Min(MinCattailPoolEdgeClearance, Distance - Pool.Radius);
+			}
+			bCattailsRespectPoolClearance &= bNearPool;
+			for (const FVector& ExistingCattail : CattailPlantingPoints)
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingCattail);
+				MinCattailSpacing = FMath::Min(MinCattailSpacing, Clearance);
+				bCattailsRespectPoolClearance &= Clearance >= 299.9f;
+			}
+			CattailPlantingPoints.Add(PlantingPoint);
+		}
+		TestTrue(TEXT("Tideglass cattails use the authored 1.7–2.3 m size band"), bCattailsStayInsideHeightBand);
+		AddInfo(FString::Printf(TEXT("Tideglass wet edge placed %d cattails; pool-edge clearance %.1f cm and inter-cattail spacing %.1f cm."),
+			CattailPlantingPoints.Num(), MinCattailPoolEdgeClearance, MinCattailSpacing));
+		TestTrue(TEXT("Tideglass cattails remain outside the 2.5 m shoreline buffer"), MinCattailPoolEdgeClearance >= 249.9f);
+		TestTrue(TEXT("Tideglass cattails grow outside the water and its plant-clearance ring"), bCattailsRespectPoolClearance);
 		int32 MatureSpruceCount = 0;
 		int32 SaplingCount = 0;
 		const float SpruceMeshHalfHeight = PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh()
@@ -1077,6 +1161,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowB, PreviewWeather->ShoreGroundPlantLowBBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandShrubs, PreviewWeather->IslandShrubBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandRhododendrons, PreviewWeather->IslandRhododendronBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->IslandCattails, PreviewWeather->IslandCattailBaseTransforms);
 			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
 			TestTrue(TEXT("Fixed preview gusts respect the ten-degree response limit"), MaximumVisibleSwayDegrees <= 10.01f);
 			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));

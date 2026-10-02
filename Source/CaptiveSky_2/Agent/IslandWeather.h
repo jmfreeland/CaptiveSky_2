@@ -243,4 +243,9 @@ private:
 	TArray<FTransform> IslandRhododendronBaseTransforms;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandRhododendrons;
 	int32 GroundCoverFlowerCount = 0;
+	TArray<FTransform> IslandCattailBaseTransforms;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandCattails;
+	int32 GroundCoverWetlandCount = 0;
+	TArray<int32> SwayedCattailIndices;
+	TMap<FIntPoint, TArray<int32>> CattailCells;
 };
