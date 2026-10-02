@@ -161,6 +161,9 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				RightFeatherSection && RightFeatherSection->ProcIndexBuffer.Num() > 60);
 			const FRotator BlueprintLeftRest = BlueprintLeftWingPivot->GetRelativeRotation();
 			const FRotator BlueprintRightRest = BlueprintRightWingPivot->GetRelativeRotation();
+			TestTrue(TEXT("Perched procedural wings fold close to the raven's body"),
+				FMath::Abs(BlueprintLeftRest.Yaw) >= 90.f && FMath::Abs(BlueprintLeftRest.Yaw) <= 110.f &&
+				FMath::IsNearlyEqual(BlueprintLeftRest.Yaw, -BlueprintRightRest.Yaw, 0.1f));
 			const FRotator BlueprintLeftWorldRest = BlueprintLeftFeathers->GetComponentRotation();
 			BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
 			BlueprintController->Tick(0.05f);
@@ -574,8 +577,10 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("02_FlightStrokeA.png")));
 	Controller->Tick(0.15f);
 	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("03_FlightStrokeB.png")));
+	TestTrue(TEXT("Flight fully deploys both wings from their folded perch pose"),
+		FMath::Abs(LeftWingPivot->GetRelativeRotation().Yaw) < 0.1f && FMath::Abs(RightWingPivot->GetRelativeRotation().Yaw) < 0.1f);
 	Controller->LocomotionState = ERavenLocomotionState::Grounded;
-	Controller->Tick(1.f / 60.f);
+	Controller->Tick(0.2f);
 	TestTrue(TEXT("A captured flight returns both wings to their authored rests"),
 		LeftWingPivot->GetRelativeRotation().Equals(LeftRest) && RightWingPivot->GetRelativeRotation().Equals(RightRest));
 	Controller->UnPossess();

@@ -212,6 +212,7 @@ namespace
 			Raven->AddInstanceComponent(WingPivot);
 			WingPivot->SetupAttachment(VisualRoot);
 			WingPivot->SetRelativeLocation(FVector(1.f, Side * 15.f, 7.f));
+			WingPivot->SetRelativeRotation(FRotator(0.f, Side * 104.f, 0.f));
 			WingPivot->RegisterComponent();
 			FRavenProcMeshData Wing;
 			AppendRavenWing(Wing, Side);
@@ -251,6 +252,11 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 {
 	LeftWing.Reset();
 	RightWing.Reset();
+	LeftWingRestRotation = FRotator::ZeroRotator;
+	RightWingRestRotation = FRotator::ZeroRotator;
+	LeftWingFlightRotation = FRotator::ZeroRotator;
+	RightWingFlightRotation = FRotator::ZeroRotator;
+	WingDeployment = 0.f;
 	WingAnimationTime = 0.f;
 	if (!Raven) return;
 
@@ -264,11 +270,15 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 		{
 			LeftWing = Component;
 			LeftWingRestRotation = Component->GetRelativeRotation();
+			LeftWingFlightRotation = LeftWingRestRotation;
+			LeftWingFlightRotation.Yaw = 0.f;
 		}
 		else if (ComponentName == TEXT("RavenRightWingPivot"))
 		{
 			RightWing = Component;
 			RightWingRestRotation = Component->GetRelativeRotation();
+			RightWingFlightRotation = RightWingRestRotation;
+			RightWingFlightRotation.Yaw = 0.f;
 		}
 	}
 	for (USceneComponent* Component : Components)
@@ -279,11 +289,13 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 		{
 			LeftWing = Component;
 			LeftWingRestRotation = Component->GetRelativeRotation();
+			LeftWingFlightRotation = LeftWingRestRotation;
 		}
 		else if (!RightWing.IsValid() && ComponentName.Contains(TEXT("RightWing"), ESearchCase::IgnoreCase))
 		{
 			RightWing = Component;
 			RightWingRestRotation = Component->GetRelativeRotation();
+			RightWingFlightRotation = RightWingRestRotation;
 		}
 	}
 }
@@ -299,47 +311,53 @@ void ARavenAgentAIController::UpdateWingAnimation(float DeltaSeconds)
 		return;
 	}
 
+	float TargetDeployment = 0.f;
 	float AmplitudeDegrees = 0.f;
 	float FrequencyHz = 0.f;
 	switch (LocomotionState)
 	{
 	case ERavenLocomotionState::Hopping:
+		TargetDeployment = 0.65f;
 		AmplitudeDegrees = 16.f;
 		FrequencyHz = 2.4f;
 		break;
 	case ERavenLocomotionState::TakingOff:
+		TargetDeployment = 1.f;
 		AmplitudeDegrees = 46.f;
 		FrequencyHz = 4.2f;
 		break;
 	case ERavenLocomotionState::Flying:
+		TargetDeployment = 1.f;
 		AmplitudeDegrees = 34.f;
 		FrequencyHz = 3.8f;
 		break;
 	case ERavenLocomotionState::Landing:
+		TargetDeployment = 1.f;
 		AmplitudeDegrees = 20.f;
 		FrequencyHz = 2.6f;
 		break;
 	default:
-		Left->SetRelativeRotation(LeftWingRestRotation);
-		Right->SetRelativeRotation(RightWingRestRotation);
-		WingAnimationTime = 0.f;
-		return;
+		break;
 	}
 
-	if (IsResting())
+	if (IsResting()) TargetDeployment = 0.f;
+	WingDeployment = FMath::FInterpConstantTo(WingDeployment, TargetDeployment, FMath::Max(0.f, DeltaSeconds), 10.f);
+	const bool bIsFlapping = FrequencyHz > 0.f && !IsResting();
+	if (bIsFlapping)
 	{
-		Left->SetRelativeRotation(LeftWingRestRotation);
-		Right->SetRelativeRotation(RightWingRestRotation);
-		WingAnimationTime = 0.f;
-		return;
+		WingAnimationTime += FMath::Max(0.f, DeltaSeconds);
 	}
+	else WingAnimationTime = 0.f;
 
-	WingAnimationTime += FMath::Max(0.f, DeltaSeconds);
-	const float FlapDegrees = FMath::Sin(WingAnimationTime * 2.f * PI * FrequencyHz) * AmplitudeDegrees;
-	// The placeholder wings extend in opposite local Y directions, so mirror roll
-	// around each authored rest rotation to move both tips through the same stroke.
-	Left->SetRelativeRotation(LeftWingRestRotation + FRotator(0.f, 0.f, FlapDegrees));
-	Right->SetRelativeRotation(RightWingRestRotation + FRotator(0.f, 0.f, -FlapDegrees));
+	const float FlapDegrees = bIsFlapping
+		? FMath::Sin(WingAnimationTime * 2.f * PI * FrequencyHz) * AmplitudeDegrees
+		: 0.f;
+	const FRotator LeftBase = FMath::Lerp(LeftWingRestRotation, LeftWingFlightRotation, WingDeployment);
+	const FRotator RightBase = FMath::Lerp(RightWingRestRotation, RightWingFlightRotation, WingDeployment);
+	// The procedural feathers extend in opposite local Y directions. Deployment
+	// first unfolds both wings; mirrored roll then drives their up/down flight stroke.
+	Left->SetRelativeRotation(LeftBase + FRotator(0.f, 0.f, FlapDegrees));
+	Right->SetRelativeRotation(RightBase + FRotator(0.f, 0.f, -FlapDegrees));
 }
 
 void ARavenAgentAIController::SetFlyingMovement(bool bFlying) const

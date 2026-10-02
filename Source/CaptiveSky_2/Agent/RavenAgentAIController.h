@@ -99,6 +99,9 @@ private:
 	TWeakObjectPtr<UObject> RightWing;
 	FRotator LeftWingRestRotation = FRotator::ZeroRotator;
 	FRotator RightWingRestRotation = FRotator::ZeroRotator;
+	FRotator LeftWingFlightRotation = FRotator::ZeroRotator;
+	FRotator RightWingFlightRotation = FRotator::ZeroRotator;
+	float WingDeployment = 0.f;
 	float WingAnimationTime = 0.f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
