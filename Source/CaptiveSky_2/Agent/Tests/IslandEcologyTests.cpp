@@ -334,6 +334,12 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			BrushedAsidePose.GetLocation().Equals(UnoccupiedWindPose.GetLocation(), 0.01f) &&
 			BrushedAsidePose.GetScale3D().Equals(UnoccupiedWindPose.GetScale3D(), 0.01f));
 		TestTrue(TEXT("The brushed grass leans away from the resident"), FVector::DotProduct(BrushedUp - WindOnlyUp, AwayFromResident) > 0.f);
+		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(100.f, 0.f, 590.f));
+		Weather->UpdateGroundCoverSway();
+		FTransform OverheadPose;
+		Weather->ShoreGrassA->GetInstanceTransform(0, OverheadPose, false);
+		TestTrue(TEXT("A resident passing overhead does not bend ground cover"),
+			OverheadPose.GetRotation().Equals(UnoccupiedWindPose.GetRotation(), 0.001f));
 		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(5000.f, 0.f, 90.f));
 		Weather->UpdateGroundCoverSway();
 		FTransform RecoveredPose;
