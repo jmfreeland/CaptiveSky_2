@@ -834,8 +834,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The existing broadleaf mesh is available for a separate grove understory"),
 			PreviewWeather->IslandShrubs && PreviewWeather->IslandShrubs->GetStaticMesh() != nullptr);
-		TestTrue(TEXT("Broadleaf understory placement stays within eight shrubs per each of 44 attempted groves"),
-			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 352 &&
+		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 44 attempted groves"),
+			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 704 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
 			PreviewWeather->IslandShrubs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandShrubs->CanEverAffectNavigation() &&

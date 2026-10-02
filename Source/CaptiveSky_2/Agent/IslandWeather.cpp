@@ -632,8 +632,8 @@ void AIslandWeather::InitializeGroundCover()
 
 					// A sparse, larger broadleaf layer softens the exposed lower trunks without
 					// filling the landmark clearings or multiplying the dense meadow budget.
-					constexpr int32 ShrubsPerGrove = 8;
-					constexpr int32 MaxShrubTracesPerGrove = 72;
+					constexpr int32 ShrubsPerGrove = 16;
+					constexpr int32 MaxShrubTracesPerGrove = 128;
 					constexpr float ShrubInnerRadius = 800.f;
 					constexpr float ShrubOuterRadius = 1900.f;
 					constexpr float ShrubMinSpacing = 275.f;
