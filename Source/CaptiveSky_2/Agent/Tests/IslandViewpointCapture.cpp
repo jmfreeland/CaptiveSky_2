@@ -861,8 +861,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandRhododendrons && PreviewWeather->IslandRhododendrons->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The locally imported cattail mesh is available for Tideglass wet edges"),
 			PreviewWeather->IslandCattails && PreviewWeather->IslandCattails->GetStaticMesh() != nullptr);
-		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 64 attempted groves"),
-			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 1024 &&
+		TestTrue(TEXT("Broadleaf understory placement stays within 24 shrubs per each of 64 attempted groves"),
+			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 1536 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
 			PreviewWeather->IslandShrubs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandShrubs->CanEverAffectNavigation() &&
