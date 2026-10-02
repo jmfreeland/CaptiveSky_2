@@ -6,6 +6,7 @@
 #include "AgentRestPresentationComponent.h"
 #include "AgentSocialComponent.h"
 #include "IslandInnkeeperSubsystem.h"
+#include "IslandArrangement.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -597,15 +598,67 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	const float IdleHeadYaw = HeadPivot->GetRelativeRotation().Yaw;
 	TestTrue(TEXT("The grounded head scan remains visibly small and bounded"), FMath::Abs(IdleHeadYaw) > 0.1f && FMath::Abs(IdleHeadYaw) <= 7.f);
 	TestTrue(TEXT("Subtle idle-glance screenshot is saved"), SavePose(TEXT("02_IdleGlance.png")));
-	Controller->bCarryingTwigs = true;
+	// Spawn a transient, one-use forage patch on nearby open ground and run the same
+	// Build decision path the resident uses; gathering must drive the actual beak visual.
+	FVector ForageGround = FVector::ZeroVector;
+	bool bFoundForageGround = false;
+	const FVector ForageOffsets[] = { FVector(450.f, 0.f, 0.f), FVector(0.f, 450.f, 0.f),
+		FVector(-450.f, 0.f, 0.f), FVector(0.f, -450.f, 0.f), FVector(800.f, 800.f, 0.f) };
+	FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(RavenWingCaptureForageGround), false, Raven);
+	for (const FVector& Offset : ForageOffsets)
+	{
+		FHitResult GroundHit;
+		const FVector Candidate = Roost->GetActorLocation() + Offset;
+		if (Island->LineTraceSingleByChannel(GroundHit, Candidate + FVector(0.f, 0.f, 1600.f),
+			Candidate - FVector(0.f, 0.f, 3000.f), ECC_Visibility, GroundQuery) && GroundHit.ImpactNormal.Z >= 0.8f)
+		{
+			ForageGround = GroundHit.ImpactPoint;
+			bFoundForageGround = true;
+			break;
+		}
+	}
+	if (!TestTrue(TEXT("Nearby walkable ground is available for the transient forage fixture"), bFoundForageGround))
+	{
+		Controller->UnPossess(); Raven->Destroy(); Controller->Destroy(); Camera->Destroy(); return false;
+	}
+	FIslandArrangementSite ForageSite;
+	ForageSite.Id = TEXT("ArrangingGround_RavenWingCapture");
+	ForageSite.Location = ForageGround;
+	AIslandArrangement* ForagePatch = Island->SpawnActor<AIslandArrangement>(ForageGround, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("A transient twig pile is spawned for the visible gather action"), ForagePatch))
+	{
+		Controller->UnPossess(); Raven->Destroy(); Controller->Destroy(); Camera->Destroy(); return false;
+	}
+	ForagePatch->ShowSite(ForageSite, 1);
+	const FVector PerchedLocation = Raven->GetActorLocation();
+	const FTransform PerchedCameraTransform = Camera->GetActorTransform();
+	Raven->SetActorLocation(ForageGround + FVector(0.f, 0.f, Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	const FVector ForageLookAt = Raven->GetActorLocation() + FVector(0.f, 0.f, 70.f);
+	const FVector ForageCameraLocation = ForageLookAt + FVector(-330.f, -420.f, 150.f);
+	Camera->SetActorLocationAndRotation(ForageCameraLocation, (ForageLookAt - ForageCameraLocation).Rotation());
+	Raven->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	TestTrue(TEXT("The grounded raven sees the exact transient gather option"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	FAgentDecision GatherDecision;
+	GatherDecision.bValid = true;
+	GatherDecision.ActionType = EAgentActionType::Build;
+	GatherDecision.ActionTarget = TEXT("GatherTwigs");
+	Controller->ActOnDecision(GatherDecision);
 	Controller->Tick(0.f);
-	TestTrue(TEXT("Gathering reveals the collisionless twig bundle at the beak"),
-		CarriedTwigs->IsVisible() && !CarriedTwigs->bHiddenInGame && CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
-		!CarriedTwigs->CanEverAffectNavigation());
+	TestTrue(TEXT("The real GatherTwigs action consumes the pile and reveals the bundle on the beak"),
+		Controller->bCarryingTwigs && !ForagePatch->HasForageableTwigs() && ForagePatch->GetVisibleForageTwigCount() == 0 &&
+		CarriedTwigs->IsVisible() && !CarriedTwigs->bHiddenInGame &&
+		CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !CarriedTwigs->CanEverAffectNavigation());
 	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("03_CarryingTwigs.png")));
+	// Reset only this transient test actor; a real weave has separate persistence coverage.
 	Controller->bCarryingTwigs = false;
 	Controller->Tick(0.f);
 	TestFalse(TEXT("Weaving or consuming the bundle restores the empty beak"), CarriedTwigs->IsVisible());
+	ForagePatch->Destroy();
+	Raven->SetActorLocation(PerchedLocation);
+	Camera->SetActorTransform(PerchedCameraTransform);
+	Raven->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+	Controller->LocomotionState = ERavenLocomotionState::Perched;
 	Controller->LocomotionState = ERavenLocomotionState::Flying;
 	Controller->Tick(0.05f);
 	TestTrue(TEXT("Flight visibly rotates the procedural wing pivots"),
