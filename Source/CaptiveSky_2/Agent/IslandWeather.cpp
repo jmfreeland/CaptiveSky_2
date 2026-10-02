@@ -100,6 +100,14 @@ AIslandWeather::AIslandWeather()
 	IslandSpruce->SetCastShadow(false);
 	IslandSpruce->bReceivesDecals = false;
 	IslandSpruce->SetVisibility(false);
+	IslandShrubs = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandShrubs"));
+	IslandShrubs->SetupAttachment(RootComponent);
+	IslandShrubs->SetMobility(EComponentMobility::Movable);
+	IslandShrubs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandShrubs->SetCanEverAffectNavigation(false);
+	IslandShrubs->SetCastShadow(false);
+	IslandShrubs->bReceivesDecals = false;
+	IslandShrubs->SetVisibility(false);
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
 	WindAmbienceAudio->bAutoActivate = false;
@@ -128,6 +136,7 @@ AIslandWeather::AIslandWeather()
 	if (GroundPlantLowAMesh.Succeeded()) ShoreGroundPlantLowA->SetStaticMesh(GroundPlantLowAMesh.Object);
 	if (GroundPlantLowBMesh.Succeeded()) ShoreGroundPlantLowB->SetStaticMesh(GroundPlantLowBMesh.Object);
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
+	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -235,9 +244,9 @@ FTransform AIslandWeather::CalculateSpruceSway(const FTransform& BaseTransform, 
 void AIslandWeather::InitializeGroundCover()
 {
 	UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC();
-	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB ||
+	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB || !IslandShrubs ||
 		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh() || !GrassC->GetStaticMesh() || !ShoreGroundPlants->GetStaticMesh() ||
-		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh()) return;
+		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh() || !IslandShrubs->GetStaticMesh()) return;
 	bGroundCoverInitialized = true;
 	ShoreGrassA->ClearInstances();
 	ShoreGrassB->ClearInstances();
@@ -246,10 +255,13 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowA->ClearInstances();
 	ShoreGroundPlantLowB->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
+	IslandShrubs->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
+	IslandShrubBaseTransforms.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
+	GroundCoverShrubCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
 	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
 	{
@@ -509,6 +521,7 @@ void AIslandWeather::InitializeGroundCover()
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
+				TArray<FVector> ShrubLocations;
 				int32 SpruceTraceCount = 0;
 				int32 SpruceSaplingCount = 0;
 				auto TraceSpruceGround = [this, &Query, &TraceTop, &TraceBottom, SeaLevel, IslandLandscape, &SpruceTraceCount](const FVector& Candidate, FHitResult& Hit)
@@ -616,9 +629,52 @@ void AIslandWeather::InitializeGroundCover()
 						++SpruceSaplingCount;
 						++GroundCoverTreeCount;
 					}
+
+					// A sparse, larger broadleaf layer softens the exposed lower trunks without
+					// filling the landmark clearings or multiplying the dense meadow budget.
+					constexpr int32 ShrubsPerGrove = 8;
+					constexpr int32 MaxShrubTracesPerGrove = 72;
+					constexpr float ShrubInnerRadius = 800.f;
+					constexpr float ShrubOuterRadius = 1900.f;
+					constexpr float ShrubMinSpacing = 275.f;
+					constexpr float ShrubTreeClearance = 225.f;
+					const FBoxSphereBounds ShrubBounds = IslandShrubs->GetStaticMesh()->GetBounds();
+					const int32 ShrubsBeforeGrove = GroundCoverShrubCount;
+					if (ShrubBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
+					{
+						for (int32 Attempt = 0; Attempt < MaxShrubTracesPerGrove && GroundCoverShrubCount - ShrubsBeforeGrove < ShrubsPerGrove; ++Attempt)
+						{
+							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
+							const float Radius = SpruceRandom.FRandRange(ShrubInnerRadius, ShrubOuterRadius);
+							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+							bool bNearLandmark = false;
+							for (const FVector& Exclusion : ExclusionLocations)
+								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
+							if (bNearLandmark) continue;
+							bool bTooClose = false;
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubMinSpacing) { bTooClose = true; break; }
+							if (bTooClose) continue;
+							for (const FVector& ExistingTree : SpruceLocations)
+								if (FVector::Dist2D(Candidate, ExistingTree) < ShrubTreeClearance) { bTooClose = true; break; }
+							if (bTooClose) continue;
+
+							FHitResult ShrubHit;
+							if (!TraceSpruceGround(Candidate, ShrubHit)) continue;
+							const float TargetHeight = SpruceRandom.FRandRange(125.f, 190.f);
+							const FVector Scale(TargetHeight / (2.f * ShrubBounds.BoxExtent.Z));
+							const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, ShrubHit.ImpactNormal);
+							const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector, FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
+							const FVector MeshBottom(ShrubBounds.Origin.X, ShrubBounds.Origin.Y, ShrubBounds.Origin.Z - ShrubBounds.BoxExtent.Z);
+							const FVector Location = ShrubHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+							IslandShrubs->AddInstance(FTransform(Rotation, Location, Scale), true);
+							ShrubLocations.Add(ShrubHit.ImpactPoint);
+							++GroundCoverShrubCount;
+						}
+					}
 				}
-			UE_LOG(LogIslandWeather, Log, TEXT("Landscape spruce scatter placed %d trees (%d saplings) in %d groves after %d bounded traces."),
-				GroundCoverTreeCount, SpruceSaplingCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+			UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings) and %d broadleaf shrubs in %d groves after %d bounded traces."),
+				GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
 	}
 	}
@@ -629,6 +685,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowABaseTransforms.Reset(ShoreGroundPlantLowA->GetInstanceCount());
 	ShoreGroundPlantLowBBaseTransforms.Reset(ShoreGroundPlantLowB->GetInstanceCount());
 	IslandSpruceBaseTransforms.Reset(IslandSpruce ? IslandSpruce->GetInstanceCount() : 0);
+	IslandShrubBaseTransforms.Reset(IslandShrubs ? IslandShrubs->GetInstanceCount() : 0);
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -665,6 +722,12 @@ void AIslandWeather::InitializeGroundCover()
 			FTransform Transform;
 			if (IslandSpruce->GetInstanceTransform(Index, Transform, false)) IslandSpruceBaseTransforms.Add(Transform);
 		}
+	if (IslandShrubs)
+		for (int32 Index = 0; Index < IslandShrubs->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (IslandShrubs->GetInstanceTransform(Index, Transform, false)) IslandShrubBaseTransforms.Add(Transform);
+		}
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
@@ -674,6 +737,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowA->SetVisibility(bVisible, true);
 	ShoreGroundPlantLowB->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
+	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
@@ -687,7 +751,9 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowA) { ShoreGroundPlantLowA->ClearInstances(); ShoreGroundPlantLowA->SetVisibility(false, true); }
 	if (ShoreGroundPlantLowB) { ShoreGroundPlantLowB->ClearInstances(); ShoreGroundPlantLowB->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
+	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
 	IslandSpruceBaseTransforms.Reset();
+	IslandShrubBaseTransforms.Reset();
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
@@ -696,6 +762,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
+	GroundCoverShrubCount = 0;
 	GroundCoverSwayUpdateAccumulator = 0.f;
 	bGroundCoverInitialized = false;
 }
@@ -727,6 +794,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num());
 	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num());
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num());
+	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num());
 	UpdateSpruceSway();
 }
 

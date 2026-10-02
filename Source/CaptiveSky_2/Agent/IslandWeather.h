@@ -111,6 +111,7 @@ private:
 	TArray<FTransform> ShoreGroundPlantLowABaseTransforms;
 	TArray<FTransform> ShoreGroundPlantLowBBaseTransforms;
 	TArray<FTransform> IslandSpruceBaseTransforms;
+	TArray<FTransform> IslandShrubBaseTransforms;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
 	FTimerHandle EcologyTimerHandle;
@@ -131,6 +132,7 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowA;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowB;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandSpruce;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandShrubs;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
@@ -164,6 +166,7 @@ private:
 	int32 GroundCoverInstanceCount = 0;
 	int32 GroundCoverMeadowInstanceCount = 0;
 	int32 GroundCoverTreeCount = 0;
+	int32 GroundCoverShrubCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;
