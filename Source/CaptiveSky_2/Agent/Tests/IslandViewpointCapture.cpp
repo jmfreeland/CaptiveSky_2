@@ -910,6 +910,24 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
 			TestTrue(TEXT("Fixed preview gusts respect the ten-degree response limit"), MaximumVisibleSwayDegrees <= 10.01f);
 			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));
+			if (PreviewWeather->IslandSpruceBaseTransforms.Num() > 0)
+			{
+				const FTransform& SpruceBase = PreviewWeather->IslandSpruceBaseTransforms[0];
+				const FVector SpruceLocation = PreviewWeather->IslandSpruce->GetComponentTransform().TransformPosition(SpruceBase.GetLocation());
+				PreviewWeather->AddTransientGust(SpruceLocation, FVector(1.f, 0.f, 0.f), 300.f, 1800.f, 18.f);
+				PreviewWeather->UpdateSpruceSway();
+				FTransform SpruceAfterGust;
+				const bool bGotSpruceTransform = PreviewWeather->IslandSpruce->GetInstanceTransform(0, SpruceAfterGust, false);
+				const float SpruceSwayDegrees = bGotSpruceTransform ? FMath::RadiansToDegrees(
+					SpruceBase.GetRotation().AngularDistance(SpruceAfterGust.GetRotation())) : 0.f;
+				const FBoxSphereBounds SpruceBounds = PreviewWeather->IslandSpruce->GetStaticMesh()->GetBounds();
+				const FVector MeshBottomOffset = SpruceBounds.Origin - FVector(0.f, 0.f, SpruceBounds.BoxExtent.Z);
+				TestTrue(TEXT("A local gust sways a spruce crown without translating the planted base"),
+					bGotSpruceTransform && SpruceSwayDegrees > 0.1f && SpruceSwayDegrees <= 4.5f &&
+					SpruceBase.TransformPosition(MeshBottomOffset).Equals(SpruceAfterGust.TransformPosition(MeshBottomOffset), 0.01f) &&
+					SpruceBase.GetScale3D().Equals(SpruceAfterGust.GetScale3D(), 0.01f));
+				AddInfo(FString::Printf(TEXT("A fixed local gust swayed one spruce crown by %.2f degrees while keeping its mesh-bottom planting point fixed."), SpruceSwayDegrees));
+			}
 		}
 	}
 

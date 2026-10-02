@@ -235,6 +235,17 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		!WindyGrass.GetRotation().Equals(GrassBase.GetRotation()));
 	TestTrue(TEXT("Wind sway stays below ten degrees even at the reference wind ceiling"),
 		GrassBase.GetRotation().AngularDistance(WindyGrass.GetRotation()) <= FMath::DegreesToRadians(10.f));
+	const FTransform SpruceBase(FQuat(FVector::UpVector, FMath::DegreesToRadians(19.f)), FVector(120.f, 230.f, 8.f), FVector(1.7f));
+	const FVector SpruceMeshBottom(12.f, -7.f, -100.f);
+	const FTransform CalmSpruce = AIslandWeather::CalculateSpruceSway(SpruceBase, SpruceMeshBottom, FVector::ZeroVector, 2.0, 4, 71, 180.f);
+	TestTrue(TEXT("Calm air preserves the exact planted spruce transform"), CalmSpruce.Equals(SpruceBase));
+	const FTransform WindySpruce = AIslandWeather::CalculateSpruceSway(SpruceBase, SpruceMeshBottom, FVector(180.f, 0.f, 0.f), 2.0, 4, 71, 180.f);
+	TestTrue(TEXT("Wind moves a spruce crown while the mesh-bottom planting point stays fixed"),
+		WindySpruce.TransformPosition(SpruceMeshBottom).Equals(SpruceBase.TransformPosition(SpruceMeshBottom), 0.01f) &&
+		WindySpruce.GetScale3D().Equals(SpruceBase.GetScale3D()) &&
+		!WindySpruce.GetRotation().Equals(SpruceBase.GetRotation()));
+	TestTrue(TEXT("Spruce crown lean stays below 4.5 degrees at the reference wind ceiling"),
+		SpruceBase.GetRotation().AngularDistance(WindySpruce.GetRotation()) <= FMath::DegreesToRadians(4.5f));
 	Weather->AddTransientGust(Tideglass->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->AddTransientGust(ListeningStones->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->UpdateGroundCoverSway();

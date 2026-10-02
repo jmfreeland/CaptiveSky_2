@@ -210,6 +210,28 @@ FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransf
 	return Result;
 }
 
+FTransform AIslandWeather::CalculateSpruceSway(const FTransform& BaseTransform, const FVector& MeshBottomOffset,
+	const FVector& LocalWind, double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
+{
+	if (LocalWind.ContainsNaN() || !FMath::IsFinite(TimeSeconds)) return BaseTransform;
+	const FVector HorizontalWind(LocalWind.X, LocalWind.Y, 0.f);
+	const float Intensity = FMath::Clamp(HorizontalWind.Size() / FMath::Max(1.f, ReferenceWindSpeed), 0.f, 1.f);
+	if (Intensity <= KINDA_SMALL_NUMBER || HorizontalWind.IsNearlyZero()) return BaseTransform;
+
+	const FVector WindDirection = HorizontalWind.GetSafeNormal();
+	const FVector LeanAxis = FVector::CrossProduct(FVector::UpVector, WindDirection).GetSafeNormal();
+	const double Phase = TimeSeconds * 0.62 + InstanceIndex * 1.61803399 + Seed * 0.05;
+	const float LeanDegrees = 3.25f * Intensity;
+	const float SwayDegrees = FMath::Sin(Phase) * 1.f * Intensity;
+	const FQuat Lean(LeanAxis, FMath::DegreesToRadians(LeanDegrees));
+	const FQuat Flutter(FVector::ForwardVector, FMath::DegreesToRadians(SwayDegrees));
+	FTransform Result = BaseTransform;
+	Result.SetRotation((BaseTransform.GetRotation() * Lean * Flutter).GetNormalized());
+	const FVector PlantedBottom = BaseTransform.TransformPosition(MeshBottomOffset);
+	Result.SetLocation(PlantedBottom - Result.GetRotation().RotateVector(MeshBottomOffset * BaseTransform.GetScale3D()));
+	return Result;
+}
+
 void AIslandWeather::InitializeGroundCover()
 {
 	UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC();
@@ -224,6 +246,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowA->ClearInstances();
 	ShoreGroundPlantLowB->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
+	IslandSpruceBaseTransforms.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
@@ -605,6 +628,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantBaseTransforms.Reset(ShoreGroundPlants->GetInstanceCount());
 	ShoreGroundPlantLowABaseTransforms.Reset(ShoreGroundPlantLowA->GetInstanceCount());
 	ShoreGroundPlantLowBBaseTransforms.Reset(ShoreGroundPlantLowB->GetInstanceCount());
+	IslandSpruceBaseTransforms.Reset(IslandSpruce ? IslandSpruce->GetInstanceCount() : 0);
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -635,6 +659,12 @@ void AIslandWeather::InitializeGroundCover()
 		FTransform Transform;
 		if (ShoreGroundPlantLowB->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowBBaseTransforms.Add(Transform);
 	}
+	if (IslandSpruce)
+		for (int32 Index = 0; Index < IslandSpruce->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (IslandSpruce->GetInstanceTransform(Index, Transform, false)) IslandSpruceBaseTransforms.Add(Transform);
+		}
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
@@ -657,6 +687,7 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowA) { ShoreGroundPlantLowA->ClearInstances(); ShoreGroundPlantLowA->SetVisibility(false, true); }
 	if (ShoreGroundPlantLowB) { ShoreGroundPlantLowB->ClearInstances(); ShoreGroundPlantLowB->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
+	IslandSpruceBaseTransforms.Reset();
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
@@ -696,6 +727,26 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num());
 	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num());
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num());
+	UpdateSpruceSway();
+}
+
+void AIslandWeather::UpdateSpruceSway()
+{
+	if (!GetWorld() || !IslandSpruce || !IslandSpruce->GetStaticMesh() || IslandSpruceBaseTransforms.Num() != IslandSpruce->GetInstanceCount()) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	const FTransform ComponentTransform = IslandSpruce->GetComponentTransform();
+	const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
+	const FVector MeshBottomOffset = SpruceBounds.Origin - FVector(0.f, 0.f, SpruceBounds.BoxExtent.Z);
+	for (int32 Index = 0; Index < IslandSpruceBaseTransforms.Num(); ++Index)
+	{
+		const FTransform& Base = IslandSpruceBaseTransforms[Index];
+		const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
+		const FVector WorldWind = GetLocalWind(WorldLocation, this);
+		const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
+		const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
+		const FTransform Swayed = CalculateSpruceSway(Base, MeshBottomOffset, LocalWind, Now, Index, WeatherSeed, MaximumWindSpeed);
+		IslandSpruce->UpdateInstanceTransform(Index, Swayed, false, Index == IslandSpruceBaseTransforms.Num() - 1, true);
+	}
 }
 
 void AIslandWeather::ClearGroundCoverPreview()

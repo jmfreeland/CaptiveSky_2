@@ -110,6 +110,7 @@ private:
 	TArray<FTransform> ShoreGroundPlantBaseTransforms;
 	TArray<FTransform> ShoreGroundPlantLowABaseTransforms;
 	TArray<FTransform> ShoreGroundPlantLowBBaseTransforms;
+	TArray<FTransform> IslandSpruceBaseTransforms;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
 	FTimerHandle EcologyTimerHandle;
@@ -190,9 +191,13 @@ private:
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
+	/** Softer crown movement for tall spruce; maximum tilt stays below 4.5 degrees. */
+	static FTransform CalculateSpruceSway(const FTransform& BaseTransform, const FVector& MeshBottomOffset,
+		const FVector& LocalWind, double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
 	UHierarchicalInstancedStaticMeshComponent* FindShoreGrassC() const;
 	void InitializeGroundCover();
 	void UpdateGroundCoverSway();
+	void UpdateSpruceSway();
 	void ClearGroundCover();
 	/** 0..1 strength of the passing rain front, before clouds gate it. */
 	float SampleFrontStrength(double Seconds) const;
