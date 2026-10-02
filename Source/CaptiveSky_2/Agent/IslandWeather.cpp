@@ -11,6 +11,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -20,6 +21,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "LandscapeProxy.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
@@ -837,7 +839,11 @@ void AIslandWeather::UpdateGroundCoverSway()
 	if (!GetWorld() || !bGroundCoverInitialized) return;
 	const double Now = GetWorld()->GetTimeSeconds();
 	constexpr float GroundCoverSwayRadius = 3000.f;
+	constexpr float ResidentPlantBendRadius = 180.f;
+	constexpr float ResidentPlantBendHeight = 140.f;
+	constexpr float ResidentPlantMaxBendDegrees = 16.f;
 	TArray<FVector> FocusPoints;
+	TArray<FVector> ResidentGroundPoints;
 	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
 	{
 		FVector ViewLocation;
@@ -845,11 +851,21 @@ void AIslandWeather::UpdateGroundCoverSway()
 		PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
 		FocusPoints.Add(ViewLocation);
 	}
+	// Nearby residents brush plants aside without collision, navmesh, state writes, or model calls.
+	// The root capsule bottom provides a useful ground reference for both walking and low flight.
+	for (TActorIterator<ACharacter> CharacterIt(GetWorld()); CharacterIt; ++CharacterIt)
+	{
+		FVector GroundPoint = CharacterIt->GetActorLocation();
+		if (const UCapsuleComponent* Capsule = CharacterIt->GetCapsuleComponent())
+			GroundPoint.Z -= Capsule->GetScaledCapsuleHalfHeight();
+		ResidentGroundPoints.Add(GroundPoint);
+		FocusPoints.Add(GroundPoint);
+	}
 	// Keep local gusts visible even when they're away from the player's current view.
 	for (const FIslandTransientGust& Gust : TransientGusts)
 		if (Now >= Gust.StartedAt && Now < Gust.ExpiresAt) FocusPoints.Add(Gust.Center);
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
-	auto UpdateSpecies = [this, Now, &FocusPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
+	auto UpdateSpecies = [this, Now, &FocusPoints, &ResidentGroundPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
 		int32 FirstBaseline, int32 InstanceCount, const TMap<FIntPoint, TArray<int32>>& SwayCells, TArray<int32>& PreviousSwayedIndices)
 	{
 		if (!Grass || InstanceCount <= 0 || FirstBaseline < 0 || FirstBaseline + InstanceCount > BaseTransforms.Num()) return;
@@ -901,6 +917,25 @@ void AIslandWeather::UpdateGroundCoverSway()
 				const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
 				const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
 				Updated = CalculateGroundCoverSway(Base, LocalWind, Now, InstanceIndex, WeatherSeed, MaximumWindSpeed);
+				for (const FVector& ResidentGroundPoint : ResidentGroundPoints)
+				{
+					const float HeightDifference = FMath::Abs(WorldLocation.Z - ResidentGroundPoint.Z);
+					if (HeightDifference >= ResidentPlantBendHeight) continue;
+					FVector AwayFromResident = WorldLocation - ResidentGroundPoint;
+					AwayFromResident.Z = 0.f;
+					const float Distance = AwayFromResident.Size();
+					if (Distance <= KINDA_SMALL_NUMBER || Distance >= ResidentPlantBendRadius) continue;
+					const float DistanceWeight = 1.f - Distance / ResidentPlantBendRadius;
+					const float HeightWeight = 1.f - HeightDifference / ResidentPlantBendHeight;
+					const FVector LocalAway = Base.GetRotation().UnrotateVector(
+						ComponentTransform.InverseTransformVectorNoScale(AwayFromResident.GetSafeNormal()));
+					const FVector LocalUp = Base.GetRotation().UnrotateVector(
+						ComponentTransform.InverseTransformVectorNoScale(FVector::UpVector));
+					const FVector BendAxis = FVector::CrossProduct(LocalUp, LocalAway).GetSafeNormal();
+					if (BendAxis.IsNearlyZero()) continue;
+					const float BendDegrees = ResidentPlantMaxBendDegrees * DistanceWeight * HeightWeight;
+					Updated.SetRotation((Updated.GetRotation() * FQuat(BendAxis, FMath::DegreesToRadians(BendDegrees))).GetNormalized());
+				}
 			}
 			Grass->UpdateInstanceTransform(InstanceIndex, Updated, false, Position == UpdateIndices.Num() - 1, true);
 		}

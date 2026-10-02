@@ -308,6 +308,33 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Distant plants stay at immutable baselines until they enter an active view or gust region"),
 		DistantInstanceCount > 0 && bDistantInstancesRemainAtBaseline);
 	TestTrue(TEXT("Transient local gusts visibly sway planted shore grass"), bAClumpRespondedToLocalWind);
+	FTransform InteractionSample;
+	FTransform UnoccupiedWindPose;
+	ACharacter* Walker = nullptr;
+	if (Weather->ShoreGrassA->GetInstanceCount() > 0 && Weather->ShoreGrassA->GetInstanceTransform(0, InteractionSample, true))
+	{
+		const FVector WalkerLocation = InteractionSample.GetLocation() + FVector(100.f, 0.f, 90.f);
+		Walker = World->SpawnActor<ACharacter>(ACharacter::StaticClass(), WalkerLocation, FRotator::ZeroRotator);
+	}
+	TestNotNull(TEXT("Resident interaction fixture creates a walking character"), Walker);
+	if (Walker)
+	{
+		Weather->ShoreGrassA->GetInstanceTransform(0, UnoccupiedWindPose, false);
+		Weather->UpdateGroundCoverSway();
+		FTransform BrushedAsidePose;
+		Weather->ShoreGrassA->GetInstanceTransform(0, BrushedAsidePose, false);
+		TestTrue(TEXT("A nearby resident bends grass away without moving its planted base"),
+			!BrushedAsidePose.GetRotation().Equals(UnoccupiedWindPose.GetRotation(), 0.001f) &&
+			BrushedAsidePose.GetLocation().Equals(UnoccupiedWindPose.GetLocation(), 0.01f) &&
+			BrushedAsidePose.GetScale3D().Equals(UnoccupiedWindPose.GetScale3D(), 0.01f));
+		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(5000.f, 0.f, 90.f));
+		Weather->UpdateGroundCoverSway();
+		FTransform RecoveredPose;
+		Weather->ShoreGrassA->GetInstanceTransform(0, RecoveredPose, false);
+		TestTrue(TEXT("Grass recovers to the same wind-only pose after the resident passes"),
+			RecoveredPose.GetRotation().Equals(UnoccupiedWindPose.GetRotation(), 0.001f));
+		Walker->Destroy();
+	}
 	auto CaptureTransforms = [](UHierarchicalInstancedStaticMeshComponent* Grass, TArray<FTransform>& OutTransforms)
 	{
 		OutTransforms.Reset(Grass->GetInstanceCount());

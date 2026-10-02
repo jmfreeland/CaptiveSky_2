@@ -121,7 +121,7 @@ Identity, lived memory, an evolving self-model, and private experience-consolida
 
 ## Living landscape
 
-The Island combines wind-responsive meadow patches, spatially clustered broadleaf ground plants and grasses, spruce groves, and shrub understorey. The deterministic species pattern repeats by weather seed while forming 7 m botanical patches, and wind-sway work is bounded to nearby view and gust regions; read the [vegetation notes](docs/ecology/shore-grass.md) for validation and performance limits. Offscreen capture timing is diagnostic only, not a packaged-game performance benchmark.
+The Island combines wind-responsive meadow patches, spatially clustered broadleaf ground plants and grasses, spruce groves, and shrub understorey. The deterministic species pattern repeats by weather seed while forming 7 m botanical patches; ground cover bends gently around nearby walking residents and recovers to its wind pose, while sway work stays bounded to nearby view, resident, and gust regions. Read the [vegetation notes](docs/ecology/shore-grass.md) for validation and performance limits. Offscreen capture timing is diagnostic only, not a packaged-game performance benchmark.
 
 ## Roadmap / Open Questions
 
