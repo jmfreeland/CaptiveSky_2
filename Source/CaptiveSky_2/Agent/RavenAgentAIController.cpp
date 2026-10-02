@@ -1,6 +1,7 @@
 #include "RavenAgentAIController.h"
 #include "AutonomousAgentCharacter.h"
 #include "AgentRestPresentationComponent.h"
+#include "IslandArrangement.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "GameFramework/Character.h"
@@ -504,11 +505,36 @@ AActor* ARavenAgentAIController::FindPerchedNestSite() const
 	return nullptr;
 }
 
+AIslandArrangement* ARavenAgentAIController::FindForageableTwigPatch() const
+{
+	const APawn* Body = GetPawn();
+	if (!Body || LocomotionState != ERavenLocomotionState::Grounded || !GetWorld()) return nullptr;
+	AIslandArrangement* BestPatch = nullptr;
+	float BestDistanceSquared = FMath::Square(250.f);
+	for (TActorIterator<AIslandArrangement> It(GetWorld()); It; ++It)
+	{
+		if (!It->GetSiteId().ToString().StartsWith(TEXT("ArrangingGround_")) || !It->HasForageableTwigs()) continue;
+		const FVector Delta = It->GetActorLocation() - Body->GetActorLocation();
+		if (FMath::Abs(Delta.Z) > 250.f || Delta.SizeSquared2D() >= BestDistanceSquared) continue;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenTwigForageVisibility), false, Body);
+		Query.AddIgnoredActor(*It);
+		FHitResult VisibilityHit;
+		const FVector EyePoint = Body->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		const FVector PilePoint = It->GetActorLocation() + FVector(0.f, 0.f, 15.f);
+		if (GetWorld()->LineTraceSingleByChannel(VisibilityHit, EyePoint, PilePoint, ECC_Visibility, Query)) continue;
+		BestDistanceSquared = Delta.SizeSquared2D();
+		BestPatch = *It;
+	}
+	return BestPatch;
+}
+
 FString ARavenAgentAIController::DescribeBuildOptions() const
 {
 	if (!GetPawn() || !GetWorld()) return FString();
 	if (LocomotionState == ERavenLocomotionState::Grounded && !bCarryingTwigs)
-		return TEXT(" Fallen twigs lie on the ground around you; you may gather a small bundle in your beak (build target: GatherTwigs). Carrying them does not oblige you to build anything.");
+		return FindForageableTwigPatch()
+			? TEXT("A small visible pile of fallen twigs lies beside you; you may gather its bundle into your beak (build target: GatherTwigs). The pile will be gone afterward, and carrying twigs does not oblige you to build anything.")
+			: TEXT("There are no fallen twigs within reach here. Fly to a listed open-ground ArrangingGround site with a visible twig pile, land, and look there; gathering is optional.");
 	FString Result = bCarryingTwigs ? TEXT(" You are carrying a small bundle of fallen twigs.") : FString();
 	const AActor* Site = FindPerchedNestSite();
 	if (!Site) return Result;
@@ -531,8 +557,14 @@ void ARavenAgentAIController::Build(FName Target)
 	{
 		if (LocomotionState != ERavenLocomotionState::Grounded) { ReportAction(TEXT("Twigs can only be gathered while standing on the ground. Nothing was gathered.")); return; }
 		if (bCarryingTwigs) { ReportAction(TEXT("You are already carrying a bundle of twigs; there is no room in your beak for more.")); return; }
+		AIslandArrangement* Patch = FindForageableTwigPatch();
+		if (!Patch || !Patch->GatherForageableTwigs())
+		{
+			ReportAction(TEXT("There are no fallen twigs within reach here; no bundle was gathered. Find another open-ground site with a visible twig pile."));
+			return;
+		}
 		bCarryingTwigs = true;
-		ReportAction(TEXT("GatherTwigs: You picked up a small bundle of fallen twigs in your beak. Nothing else was found, and nothing has been built yet."));
+		ReportAction(TEXT("GatherTwigs: You gathered the visible fallen-twig bundle into your beak; that small pile is gone. Nothing else was found, and nothing has been built yet."));
 		return;
 	}
 	AActor* Site = FindPerchedNestSite();
@@ -863,7 +895,9 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 			const bool bLandedAtArrangementSite = bLandingAtArrangementSite;
 			SetGrounded();
 			if (bLandedAtArrangementSite)
-				ReportAction(TEXT("Landed on the verified open-ground site. You are now grounded; gathering twigs is available if you choose."));
+				ReportAction(FindForageableTwigPatch()
+					? TEXT("Landed on the verified open-ground site. A visible bundle of fallen twigs is within reach if you choose to gather it.")
+					: TEXT("Landed on the verified open-ground site, but there is no visible twig bundle within reach. No resource was gathered."));
 		}
 	}
 	else if (LocomotionState == ERavenLocomotionState::Flying && bLandingAtArrangementSite)

@@ -104,6 +104,9 @@ public:
 
 	void ShowSite(const FIslandArrangementSite& Site, int32 Today);
 	int32 GetVisibleStoneCount() const;
+	int32 GetVisibleForageTwigCount() const;
+	bool HasForageableTwigs() const;
+	bool GatherForageableTwigs();
 	FLinearColor GetCurrentTint() const { return CurrentTint; }
 	FName GetSiteId() const { return SiteId; }
 
@@ -111,10 +114,19 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Island|Arrangement")
 	TObjectPtr<UInstancedStaticMeshComponent> Stones;
 
+	UPROPERTY(VisibleAnywhere, Category = "Island|Forage")
+	TObjectPtr<UInstancedStaticMeshComponent> ForageTwigs;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> Surface;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ForageSurface;
 
 	FName SiteId;
 
 	FLinearColor CurrentTint = FLinearColor::White;
+	bool bForageAvailable = true;
+
+	void ShowForageTwigs();
 };

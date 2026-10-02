@@ -4,6 +4,8 @@
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.generated.h"
 
+class AIslandArrangement;
+
 UENUM(BlueprintType)
 enum class ERavenLocomotionState : uint8
 {
@@ -105,6 +107,7 @@ private:
 	TMap<FName, double> WovenUntil;
 
 	AActor* FindPerchedNestSite() const;
+	AIslandArrangement* FindForageableTwigPatch() const;
 	void Build(FName Target);
 
 	void SetFlyingMovement(bool bFlying) const;

@@ -12,6 +12,12 @@ AIslandArrangement::AIslandArrangement()
 	Stones->SetCanEverAffectNavigation(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (Sphere.Succeeded()) Stones->SetStaticMesh(Sphere.Object);
+	ForageTwigs = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("ForageTwigs"));
+	ForageTwigs->SetupAttachment(Stones);
+	ForageTwigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ForageTwigs->SetCanEverAffectNavigation(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (TwigMesh.Succeeded()) ForageTwigs->SetStaticMesh(TwigMesh.Object);
 	Tags.AddUnique(TEXT("IslandArrangement"));
 	Tags.AddUnique(TEXT("AgentMade"));
 }
@@ -39,11 +45,58 @@ int32 AIslandArrangement::GetVisibleStoneCount() const
 	return Stones->GetInstanceCount();
 }
 
+int32 AIslandArrangement::GetVisibleForageTwigCount() const
+{
+	return ForageTwigs ? ForageTwigs->GetInstanceCount() : 0;
+}
+
+bool AIslandArrangement::HasForageableTwigs() const
+{
+	return bForageAvailable && ForageTwigs && ForageTwigs->GetInstanceCount() > 0;
+}
+
+bool AIslandArrangement::GatherForageableTwigs()
+{
+	if (!HasForageableTwigs()) return false;
+	bForageAvailable = false;
+	ForageTwigs->ClearInstances();
+	return true;
+}
+
+void AIslandArrangement::ShowForageTwigs()
+{
+	if (!ForageTwigs || !bForageAvailable || ForageTwigs->GetInstanceCount() > 0) return;
+	if (!ForageSurface)
+	{
+		if (UMaterialInterface* Wood = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/StarterContent/Materials/M_Wood_Oak.M_Wood_Oak"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			ForageTwigs->SetMaterial(0, Wood);
+		else if (UMaterialInstanceDynamic* Tint = ForageTwigs->CreateAndSetMaterialInstanceDynamic(0))
+		{
+			Tint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.24f, 0.15f, 0.08f));
+			ForageSurface = Tint;
+		}
+	}
+	FRandomStream Layout(static_cast<int32>(GetTypeHash(SiteId.ToString()) ^ 0x7a6f4d31u));
+	for (int32 Index = 0; Index < 7; ++Index)
+	{
+		const FVector Location(Layout.FRandRange(-22.f, 22.f), Layout.FRandRange(-22.f, 22.f), Layout.FRandRange(1.f, 3.f));
+		const FRotator Rotation(90.f + Layout.FRandRange(-12.f, 12.f), Layout.FRandRange(0.f, 360.f), 0.f);
+		const float LengthScale = Layout.FRandRange(0.19f, 0.31f);
+		ForageTwigs->AddInstance(FTransform(Rotation, Location, FVector(0.015f, 0.015f, LengthScale)));
+	}
+}
+
 void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Today)
 {
 	SiteId = Site.Id;
 	Tags.AddUnique(Site.Id);
 	Stones->ClearInstances();
+	if (Site.bHasWork)
+	{
+		bForageAvailable = false;
+		ForageTwigs->ClearInstances();
+	}
+	else ShowForageTwigs();
 	if (!Site.bHasWork) return;
 	if (!Surface) Surface = Stones->CreateAndSetMaterialInstanceDynamic(0);
 	CurrentTint = WeatheredTint(Today - Site.Day);

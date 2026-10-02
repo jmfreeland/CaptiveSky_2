@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
+#include "IslandArrangement.h"
 #include "IslandNest.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
@@ -77,6 +78,23 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	const float SupportTop = 302 - Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() - 2;
 	Support->SetActorLocation(FVector(600, 0, SupportTop - 20));
 	World->BeginPlay();
+	FIslandArrangementSite StartForageSite;
+	StartForageSite.Id = TEXT("ArrangingGround_TestStart");
+	StartForageSite.Location = FVector::ZeroVector;
+	AIslandArrangement* StartForagePatch = World->SpawnActor<AIslandArrangement>(StartForageSite.Location, FRotator::ZeroRotator);
+	if (StartForagePatch) StartForagePatch->ShowSite(StartForageSite, 1);
+	FIslandArrangementSite OccludedForageSite;
+	OccludedForageSite.Id = TEXT("ArrangingGround_TestOccluded");
+	OccludedForageSite.Location = FVector(200.f, 0.f, 0.f);
+	AIslandArrangement* OccludedForagePatch = World->SpawnActor<AIslandArrangement>(OccludedForageSite.Location, FRotator::ZeroRotator);
+	if (OccludedForagePatch) OccludedForagePatch->ShowSite(OccludedForageSite, 1);
+	AActor* ForageOccluder = World->SpawnActor<AActor>();
+	UBoxComponent* ForageOccluderBox = NewObject<UBoxComponent>(ForageOccluder);
+	ForageOccluder->SetRootComponent(ForageOccluderBox);
+	ForageOccluderBox->SetBoxExtent(FVector(20.f, 40.f, 50.f));
+	ForageOccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
+	ForageOccluderBox->RegisterComponent();
+	ForageOccluder->SetActorLocation(FVector(100.f, 0.f, 55.f));
 	Controller->Possess(Raven);
 	TestEqual(TEXT("No lasting state exists before anything is built"), State->GetNests().Num(), 0);
 
@@ -89,12 +107,30 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 		Controller->ActOnDecision(Decision);
 	};
 
-	// Gathering is embodied: only on the ground, one bundle at a time.
-	TestTrue(TEXT("Grounded raven is offered twig gathering"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	// Gathering is embodied: only on the ground and beside a visible, consumable resource.
+	TestTrue(TEXT("An empty arranging ground visibly holds one small twig bundle"), StartForagePatch &&
+		StartForagePatch->HasForageableTwigs() && StartForagePatch->GetVisibleForageTwigCount() == 7);
+	TestTrue(TEXT("Grounded raven is offered gathering only beside the visible twig pile"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	Decide(Site.ToString());
 	TestTrue(TEXT("Weaving away from the perch is refused"), Controller->DescribeActionState().Contains(TEXT("Weaving is only possible while perched")));
 	Decide(TEXT("GatherTwigs"));
-	TestTrue(TEXT("Twigs gathered on the ground"), Controller->bCarryingTwigs);
+	TestTrue(TEXT("Twigs gathered on the ground"), Controller->bCarryingTwigs && StartForagePatch && !StartForagePatch->HasForageableTwigs() &&
+		StartForagePatch->GetVisibleForageTwigCount() == 0);
+	Controller->bCarryingTwigs = false;
+	TestFalse(TEXT("Gathering again cannot create a bundle after the visible pile is depleted"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	Decide(TEXT("GatherTwigs"));
+	TestFalse(TEXT("A depleted patch refuses another bundle"), Controller->bCarryingTwigs);
+	TestTrue(TEXT("The refusal says no visible twigs remain nearby"), Controller->DescribeActionState().Contains(TEXT("no fallen twigs")));
+	TestTrue(TEXT("An occluded nearby pile is not offered or consumed"), OccludedForagePatch && OccludedForagePatch->HasForageableTwigs() &&
+		!Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	ForageOccluderBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	TestTrue(TEXT("A clear view reveals the nearby pile without changing it"), OccludedForagePatch &&
+		Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")) && OccludedForagePatch->HasForageableTwigs());
+	Decide(TEXT("GatherTwigs"));
+	TestTrue(TEXT("The newly visible second pile can be gathered once"), Controller->bCarryingTwigs && !OccludedForagePatch->HasForageableTwigs());
+	Controller->bCarryingTwigs = false;
+	TestFalse(TEXT("All nearby depleted piles remove the gathering option"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
+	Controller->bCarryingTwigs = true;
 	Decide(TEXT("GatherTwigs"));
 	TestTrue(TEXT("A second bundle cannot be carried"), Controller->DescribeActionState().Contains(TEXT("already carrying")));
 
@@ -183,6 +219,8 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	FarForageSite.Id = TEXT("ArrangingGround_FarForage");
 	FarForageSite.Location = FVector(2600.f, 0.f, 0.f);
 	State->ArrangementSites.Add(FarForageSite);
+	AIslandArrangement* FarForagePatch = World->SpawnActor<AIslandArrangement>(FarForageSite.Location, FRotator::ZeroRotator);
+	if (FarForagePatch) FarForagePatch->ShowSite(FarForageSite, 1);
 	AActor* Occluder = World->SpawnActor<AActor>();
 	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
 	Occluder->SetRootComponent(OccluderBox);
@@ -219,12 +257,12 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Controller->ActOnDecision(Land);
 	for (int32 Frame = 0; Frame < 1800 && Controller->bHasMovementTarget; ++Frame) Controller->Tick(1.f / 60.f);
 	TestTrue(TEXT("Raven can fly from its perch and descend onto a verified open-ground site"), Controller->LocomotionState == ERavenLocomotionState::Grounded && !Controller->bHasMovementTarget);
-	TestTrue(TEXT("Landing reports the grounded forage affordance"), Controller->DescribeActionState().Contains(TEXT("gathering twigs is available")));
+	TestTrue(TEXT("Landing reports the visible grounded forage affordance"), Controller->DescribeActionState().Contains(TEXT("visible bundle of fallen twigs is within reach")));
 	TestEqual(TEXT("Landing alone creates no lasting nest"), State->GetNests().Num(), 0);
 	TestTrue(TEXT("GatherTwigs is offered after ground arrival"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	Decide(TEXT("GatherTwigs"));
 	TestTrue(*FString::Printf(TEXT("The raven gathers the material after choosing to land (%s)"), *Controller->DescribeActionState()),
-		Controller->bCarryingTwigs);
+		Controller->bCarryingTwigs && FarForagePatch && !FarForagePatch->HasForageableTwigs() && FarForagePatch->GetVisibleForageTwigCount() == 0);
 	DestroyNestWorld(World);
 
 	// An unreadable file is never overwritten by a later save.
