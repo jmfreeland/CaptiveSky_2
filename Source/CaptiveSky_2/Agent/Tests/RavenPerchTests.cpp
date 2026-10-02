@@ -124,8 +124,10 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			bAllPlaceholderPartsHidden &= Part && !Part->IsVisible() && Part->bHiddenInGame;
 		TestTrue(TEXT("Every legacy static-mesh placeholder part is hidden behind the procedural raven"), bAllPlaceholderPartsHidden);
 		UProceduralMeshComponent* BlueprintBody = nullptr;
+		UProceduralMeshComponent* BlueprintHead = nullptr;
 		UProceduralMeshComponent* BlueprintLeftFeathers = nullptr;
 		UProceduralMeshComponent* BlueprintRightFeathers = nullptr;
+		USceneComponent* BlueprintHeadPivot = nullptr;
 		USceneComponent* BlueprintLeftWingPivot = nullptr;
 		USceneComponent* BlueprintRightWingPivot = nullptr;
 		TArray<UProceduralMeshComponent*> BlueprintBirdMeshes;
@@ -134,6 +136,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		{
 			if (!Component) continue;
 			if (Component->GetName() == TEXT("RavenBodyMesh")) BlueprintBody = Component;
+			if (Component->GetName() == TEXT("RavenHeadMesh")) BlueprintHead = Component;
 			if (Component->GetName() == TEXT("RavenLeftWingFeathers")) BlueprintLeftFeathers = Component;
 			if (Component->GetName() == TEXT("RavenRightWingFeathers")) BlueprintRightFeathers = Component;
 		}
@@ -142,23 +145,33 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		for (USceneComponent* Component : BlueprintSceneComponents)
 		{
 			if (!Component) continue;
+			if (Component->GetName() == TEXT("RavenHeadPivot")) BlueprintHeadPivot = Component;
 			if (Component->GetName() == TEXT("RavenLeftWingPivot")) BlueprintLeftWingPivot = Component;
 			if (Component->GetName() == TEXT("RavenRightWingPivot")) BlueprintRightWingPivot = Component;
 		}
 		TestNotNull(TEXT("The raven body is assembled from procedural bird geometry"), BlueprintBody);
+		TestNotNull(TEXT("The raven has a separate procedural head mesh"), BlueprintHead);
+		TestNotNull(TEXT("The raven head is mounted on a movable scan pivot"), BlueprintHeadPivot);
 		TestNotNull(TEXT("The procedural left wing has actual feather geometry"), BlueprintLeftFeathers);
 		TestNotNull(TEXT("The procedural right wing has actual feather geometry"), BlueprintRightFeathers);
 		TestNotNull(TEXT("The procedural left wing is mounted on an animated pivot"), BlueprintLeftWingPivot);
 		TestNotNull(TEXT("The procedural right wing is mounted on an animated pivot"), BlueprintRightWingPivot);
-		if (BlueprintBody && BlueprintLeftFeathers && BlueprintRightFeathers && BlueprintLeftWingPivot && BlueprintRightWingPivot)
+		if (BlueprintBody && BlueprintHead && BlueprintHeadPivot && BlueprintLeftFeathers && BlueprintRightFeathers && BlueprintLeftWingPivot && BlueprintRightWingPivot)
 		{
 			const FProcMeshSection* BodySection = BlueprintBody->GetProcMeshSection(0);
+			const FProcMeshSection* HeadSection = BlueprintHead->GetProcMeshSection(0);
 			const FProcMeshSection* LeftFeatherSection = BlueprintLeftFeathers->GetProcMeshSection(0);
 			const FProcMeshSection* RightFeatherSection = BlueprintRightFeathers->GetProcMeshSection(0);
-			TestTrue(TEXT("Body and both wings contain nontrivial triangle geometry"),
+			TestTrue(TEXT("Body, head, and both wings contain nontrivial triangle geometry"),
 				BodySection && BodySection->ProcIndexBuffer.Num() > 300 &&
+				HeadSection && HeadSection->ProcIndexBuffer.Num() > 300 &&
 				LeftFeatherSection && LeftFeatherSection->ProcIndexBuffer.Num() > 60 &&
 				RightFeatherSection && RightFeatherSection->ProcIndexBuffer.Num() > 60);
+			const FRotator HeadRest = BlueprintHeadPivot->GetRelativeRotation();
+			BlueprintController->Tick(1.f);
+			const FRotator IdleHeadPose = BlueprintHeadPivot->GetRelativeRotation();
+			TestTrue(TEXT("A grounded raven makes a subtle, bounded idle glance"),
+				FMath::Abs(IdleHeadPose.Yaw) > 0.1f && FMath::Abs(IdleHeadPose.Yaw) <= 7.f && FMath::Abs(IdleHeadPose.Pitch) <= 2.5f);
 			const FRotator BlueprintLeftRest = BlueprintLeftWingPivot->GetRelativeRotation();
 			const FRotator BlueprintRightRest = BlueprintRightWingPivot->GetRelativeRotation();
 			TestTrue(TEXT("Perched procedural wings fold close to the raven's body"),
@@ -167,6 +180,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			const FRotator BlueprintLeftWorldRest = BlueprintLeftFeathers->GetComponentRotation();
 			BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
 			BlueprintController->Tick(0.05f);
+			TestTrue(TEXT("Flight settles the head back to its forward pose"), BlueprintHeadPivot->GetRelativeRotation().Equals(HeadRest));
 			const float BlueprintLeftStroke = FMath::FindDeltaAngleDegrees(BlueprintLeftRest.Roll, BlueprintLeftWingPivot->GetRelativeRotation().Roll);
 			const float BlueprintRightStroke = FMath::FindDeltaAngleDegrees(BlueprintRightRest.Roll, BlueprintRightWingPivot->GetRelativeRotation().Roll);
 			TestTrue(TEXT("Flight animates the rendered procedural wing away from its perched pose"),
@@ -496,6 +510,7 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	Controller->Possess(Raven);
 	UProceduralMeshComponent* LeftWing = nullptr;
 	UProceduralMeshComponent* RightWing = nullptr;
+	USceneComponent* HeadPivot = nullptr;
 	USceneComponent* LeftWingPivot = nullptr;
 	USceneComponent* RightWingPivot = nullptr;
 	TArray<UProceduralMeshComponent*> WingMeshes;
@@ -511,10 +526,12 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	for (USceneComponent* Component : RavenComponents)
 	{
 		if (!Component) continue;
+		if (Component->GetName() == TEXT("RavenHeadPivot")) HeadPivot = Component;
 		if (Component->GetName() == TEXT("RavenLeftWingPivot")) LeftWingPivot = Component;
 		if (Component->GetName() == TEXT("RavenRightWingPivot")) RightWingPivot = Component;
 	}
-	if (!TestNotNull(TEXT("The rendered raven has a left procedural wing"), LeftWing) ||
+	if (!TestNotNull(TEXT("The rendered raven has a separate idle-scanning head pivot"), HeadPivot) ||
+		!TestNotNull(TEXT("The rendered raven has a left procedural wing"), LeftWing) ||
 		!TestNotNull(TEXT("The rendered raven has a right procedural wing"), RightWing) ||
 		!TestNotNull(TEXT("The left procedural wing has an animated pivot"), LeftWingPivot) ||
 		!TestNotNull(TEXT("The right procedural wing has an animated pivot"), RightWingPivot))
@@ -570,13 +587,17 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	};
 
 	TestTrue(TEXT("Authored rest-pose screenshot is saved"), SavePose(TEXT("01_Rest.png")));
+	Controller->Tick(1.f);
+	const float IdleHeadYaw = HeadPivot->GetRelativeRotation().Yaw;
+	TestTrue(TEXT("The grounded head scan remains visibly small and bounded"), FMath::Abs(IdleHeadYaw) > 0.1f && FMath::Abs(IdleHeadYaw) <= 7.f);
+	TestTrue(TEXT("Subtle idle-glance screenshot is saved"), SavePose(TEXT("02_IdleGlance.png")));
 	Controller->LocomotionState = ERavenLocomotionState::Flying;
 	Controller->Tick(0.05f);
 	TestTrue(TEXT("Flight visibly rotates the procedural wing pivots"),
 		!LeftWingPivot->GetRelativeRotation().Equals(LeftRest) && !RightWingPivot->GetRelativeRotation().Equals(RightRest));
-	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("02_FlightStrokeA.png")));
+	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("03_FlightStrokeA.png")));
 	Controller->Tick(0.15f);
-	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("03_FlightStrokeB.png")));
+	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("04_FlightStrokeB.png")));
 	TestTrue(TEXT("Flight fully deploys both wings from their folded perch pose"),
 		FMath::Abs(LeftWingPivot->GetRelativeRotation().Yaw) < 0.1f && FMath::Abs(RightWingPivot->GetRelativeRotation().Yaw) < 0.1f);
 	Controller->LocomotionState = ERavenLocomotionState::Grounded;

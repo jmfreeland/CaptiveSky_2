@@ -97,12 +97,15 @@ private:
 	FVector ArrangementLandingTarget = FVector::ZeroVector;
 	TWeakObjectPtr<UObject> LeftWing;
 	TWeakObjectPtr<UObject> RightWing;
+	TWeakObjectPtr<UObject> RavenHeadPivot;
 	FRotator LeftWingRestRotation = FRotator::ZeroRotator;
 	FRotator RightWingRestRotation = FRotator::ZeroRotator;
 	FRotator LeftWingFlightRotation = FRotator::ZeroRotator;
 	FRotator RightWingFlightRotation = FRotator::ZeroRotator;
+	FRotator RavenHeadRestRotation = FRotator::ZeroRotator;
 	float WingDeployment = 0.f;
 	float WingAnimationTime = 0.f;
+	float HeadScanTime = 0.f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
 	/** First target for flying From -> To: To itself when the way is clear, else a climb above what blocks it. */
@@ -126,6 +129,7 @@ private:
 	void SetGrounded();
 	void CacheWingComponents(APawn* Raven);
 	void UpdateWingAnimation(float DeltaSeconds);
+	void UpdateHeadAnimation(float DeltaSeconds);
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
 	bool AdvanceTowardsTarget(float DeltaSeconds);

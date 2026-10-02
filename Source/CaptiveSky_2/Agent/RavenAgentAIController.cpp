@@ -175,7 +175,6 @@ namespace
 		FRavenProcMeshData Body;
 		AppendEllipsoid(Body, FVector(-1.f, 0.f, -2.f), FVector(41.f, 22.f, 23.f));
 		AppendEllipsoid(Body, FVector(17.f, 0.f, -1.f), FVector(27.f, 19.f, 23.f));
-		AppendEllipsoid(Body, FVector(34.f, 0.f, 20.f), FVector(17.f, 15.f, 17.f));
 		AppendEllipsoid(Body, FVector(-39.f, 0.f, -7.f), FVector(21.f, 13.f, 12.f));
 		AppendEllipsoid(Body, FVector(2.f, -10.f, -29.f), FVector(4.f, 4.f, 13.f));
 		AppendEllipsoid(Body, FVector(2.f, 10.f, -29.f), FVector(4.f, 4.f, 13.f));
@@ -184,26 +183,35 @@ namespace
 		UMaterialInstanceDynamic* BodyMaterial = MakeRavenMaterial(Raven, FLinearColor(0.012f, 0.018f, 0.028f, 1.f));
 		AddRavenMesh(Raven, VisualRoot, TEXT("RavenBodyMesh"), MoveTemp(Body), BodyMaterial);
 
+		USceneComponent* HeadPivot = NewObject<USceneComponent>(Raven, TEXT("RavenHeadPivot"), RF_Transient);
+		Raven->AddInstanceComponent(HeadPivot);
+		HeadPivot->SetupAttachment(VisualRoot);
+		HeadPivot->SetRelativeLocation(FVector(34.f, 0.f, 20.f));
+		HeadPivot->RegisterComponent();
+		FRavenProcMeshData Head;
+		AppendEllipsoid(Head, FVector::ZeroVector, FVector(17.f, 15.f, 17.f));
+		AddRavenMesh(Raven, HeadPivot, TEXT("RavenHeadMesh"), MoveTemp(Head), BodyMaterial);
+
 		FRavenProcMeshData Beak;
-		const FVector BeakBaseA(46.f, -7.f, 23.f), BeakBaseB(46.f, 7.f, 23.f), BeakBaseC(46.f, 6.f, 14.f), BeakBaseD(46.f, -6.f, 14.f);
-		const FVector BeakTip(72.f, 0.f, 11.f);
+		const FVector BeakBaseA(12.f, -7.f, 3.f), BeakBaseB(12.f, 7.f, 3.f), BeakBaseC(12.f, 6.f, -6.f), BeakBaseD(12.f, -6.f, -6.f);
+		const FVector BeakTip(38.f, 0.f, -9.f);
 		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseB, BeakTip);
 		AppendDoubleSidedTriangle(Beak, BeakBaseB, BeakBaseC, BeakTip);
 		AppendDoubleSidedTriangle(Beak, BeakBaseC, BeakBaseD, BeakTip);
 		AppendDoubleSidedTriangle(Beak, BeakBaseD, BeakBaseA, BeakTip);
 		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseD, BeakBaseC);
 		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseC, BeakBaseB);
-		AddRavenMesh(Raven, VisualRoot, TEXT("RavenBeakMesh"), MoveTemp(Beak), MakeRavenMaterial(Raven, FLinearColor(0.055f, 0.065f, 0.08f, 1.f)));
+		AddRavenMesh(Raven, HeadPivot, TEXT("RavenBeakMesh"), MoveTemp(Beak), MakeRavenMaterial(Raven, FLinearColor(0.055f, 0.065f, 0.08f, 1.f)));
 
 		FRavenProcMeshData Eyes;
-		AppendEllipsoid(Eyes, FVector(40.f, -13.4f, 22.f), FVector(4.f, 2.1f, 4.f), 10, 6);
-		AppendEllipsoid(Eyes, FVector(40.f, 13.4f, 22.f), FVector(4.f, 2.1f, 4.f), 10, 6);
-		AddRavenMesh(Raven, VisualRoot, TEXT("RavenEyeMesh"), MoveTemp(Eyes), MakeRavenMaterial(Raven, FLinearColor(0.5f, 0.31f, 0.08f, 1.f)));
+		AppendEllipsoid(Eyes, FVector(6.f, -13.4f, 2.f), FVector(4.f, 2.1f, 4.f), 10, 6);
+		AppendEllipsoid(Eyes, FVector(6.f, 13.4f, 2.f), FVector(4.f, 2.1f, 4.f), 10, 6);
+		AddRavenMesh(Raven, HeadPivot, TEXT("RavenEyeMesh"), MoveTemp(Eyes), MakeRavenMaterial(Raven, FLinearColor(0.5f, 0.31f, 0.08f, 1.f)));
 
 		FRavenProcMeshData Pupils;
-		AppendEllipsoid(Pupils, FVector(41.5f, -15.1f, 22.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
-		AppendEllipsoid(Pupils, FVector(41.5f, 15.1f, 22.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
-		AddRavenMesh(Raven, VisualRoot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
+		AppendEllipsoid(Pupils, FVector(7.5f, -15.1f, 2.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
+		AppendEllipsoid(Pupils, FVector(7.5f, 15.1f, 2.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
+		AddRavenMesh(Raven, HeadPivot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
 
 		for (const float Side : { -1.f, 1.f })
 		{
@@ -256,6 +264,9 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 	RightWingRestRotation = FRotator::ZeroRotator;
 	LeftWingFlightRotation = FRotator::ZeroRotator;
 	RightWingFlightRotation = FRotator::ZeroRotator;
+	RavenHeadPivot.Reset();
+	RavenHeadRestRotation = FRotator::ZeroRotator;
+	HeadScanTime = 0.f;
 	WingDeployment = 0.f;
 	WingAnimationTime = 0.f;
 	if (!Raven) return;
@@ -266,7 +277,12 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 	{
 		if (!Component) continue;
 		const FString ComponentName = Component->GetName();
-		if (ComponentName == TEXT("RavenLeftWingPivot"))
+		if (ComponentName == TEXT("RavenHeadPivot"))
+		{
+			RavenHeadPivot = Component;
+			RavenHeadRestRotation = Component->GetRelativeRotation();
+		}
+		else if (ComponentName == TEXT("RavenLeftWingPivot"))
 		{
 			LeftWing = Component;
 			LeftWingRestRotation = Component->GetRelativeRotation();
@@ -358,6 +374,23 @@ void ARavenAgentAIController::UpdateWingAnimation(float DeltaSeconds)
 	// first unfolds both wings; mirrored roll then drives their up/down flight stroke.
 	Left->SetRelativeRotation(LeftBase + FRotator(0.f, 0.f, FlapDegrees));
 	Right->SetRelativeRotation(RightBase + FRotator(0.f, 0.f, -FlapDegrees));
+}
+
+void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
+{
+	USceneComponent* Head = Cast<USceneComponent>(RavenHeadPivot.Get());
+	if (!Head) return;
+	const bool bCanScan = (LocomotionState == ERavenLocomotionState::Grounded || LocomotionState == ERavenLocomotionState::Perched) && !IsResting();
+	if (!bCanScan)
+	{
+		Head->SetRelativeRotation(RavenHeadRestRotation);
+		return;
+	}
+
+	HeadScanTime = FMath::Fmod(HeadScanTime + FMath::Max(0.f, DeltaSeconds), 100.f);
+	const float YawDegrees = 7.f * FMath::Sin(HeadScanTime * 2.f * PI * 0.13f);
+	const float PitchDegrees = 2.5f * FMath::Sin(HeadScanTime * 2.f * PI * 0.09f + 1.2f);
+	Head->SetRelativeRotation(RavenHeadRestRotation + FRotator(PitchDegrees, YawDegrees, 0.f));
 }
 
 void ARavenAgentAIController::SetFlyingMovement(bool bFlying) const
@@ -1061,6 +1094,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	APawn* Raven = GetPawn();
 	if (!Raven) return;
 	UpdateWingAnimation(DeltaSeconds);
+	UpdateHeadAnimation(DeltaSeconds);
 	if (IsResting()) return;
 
 	if (LocomotionState == ERavenLocomotionState::Hopping)
