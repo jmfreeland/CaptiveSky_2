@@ -224,6 +224,8 @@ Any resident settled on the ground within three metres can use `build` on an emp
 
 A work already made by someone else can be answered once per resident with a small arc of three stones plus a private intent, up to three responses per work. Each resident may make or answer at most one arrangement per Island day. Makers don't respond to their own work.
 
+Residents can also inspect a visible arrangement with `Interact`: it reports only the public shape, age, and number of visible response arcs. The maker, title, and private intent remain undisclosed; inspection itself never changes the work. Lasting contributions still go through the separate build action.
+
 Evidence and privacy follow the rest of the world model:
 - **Others:** anyone nearby sees the form, stone count and age: freshly placed, a little weathered, or mossy and settled after four days. They are never told who made it, its title or its meaning.
 - **Makers and responders:** they recognize their own contribution and are reminded of their own words. A successful arrangement also becomes an action-result memory.
@@ -243,6 +245,8 @@ When a resident sees completed work, they privately keep a neutral label and its
 - weathering;
 - reloading in a new session, and the developer reset;
 - on the open Island map, walking paths from the ListeningStones to every arranging ground.
+
+`CaptiveSky2.Agent.IslandArrangementInspection` separately verifies that `Interact` reports public facts for empty and completed work, preserves private authorship and intent, and makes no lasting change.
 
 ### Journey viewpoints (2026-09-27)
 

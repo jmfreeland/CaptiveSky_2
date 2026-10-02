@@ -29,6 +29,8 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandArrangementTest, "CaptiveSky2.Agent.IslandArrangement",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandArrangementInspectionTest, "CaptiveSky2.Agent.IslandArrangementInspection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 namespace
 {
@@ -350,5 +352,49 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 			TestTrue(*FString::Printf(TEXT("Grounded residents can walk to %s"), *Site.Id.ToString()), bReachable);
 		}
 	}
+	return true;
+}
+
+bool FIslandArrangementInspectionTest::RunTest(const FString& Parameters)
+{
+	const FString StateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() /
+		TEXT("Automation") / TEXT("IslandArrangementInspection") / (FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".json")));
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	UWorld* World = CreateArrangementWorld(StateFile);
+	UIslandWorldStateSubsystem* State = World ? World->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (!World || !State)
+	{
+		AddError(TEXT("Could not create an isolated arrangement-inspection world."));
+		if (World) DestroyArrangementWorld(World);
+		IFileManager::Get().Delete(*StateFile, false, true, true);
+		return false;
+	}
+	World->BeginPlay();
+	const FIslandArrangementSite* EmptySite = State->FindArrangementSite(TEXT("ArrangingGround_1"));
+	AIslandArrangement* VisibleWork = FindArrangementActor(World, TEXT("ArrangingGround_1"));
+	AActor* Observer = EmptySite ? World->SpawnActor<AActor>(EmptySite->Location + FVector(0.f, 200.f, 100.f), FRotator::ZeroRotator) : nullptr;
+	FString Fact;
+	TestTrue(TEXT("An observer can inspect an empty arranging site"), EmptySite && VisibleWork && Observer &&
+		IslandInteractionUtility::Perform(Observer, VisibleWork, Fact));
+	TestTrue(TEXT("Empty-site inspection offers the separate build affordance without changing the site"),
+		Fact.Contains(TEXT("has no arrangement yet")) && Fact.Contains(TEXT("changes nothing")) && EmptySite && !EmptySite->bHasWork);
+
+	bool bChanged = false;
+	State->ArrangeStones(TEXT("ArrangingGround_1"), TEXT("spiral"), TEXT("Private title"), TEXT("Private intent"), TEXT("InspectionMaker"), 1, bChanged);
+	TestTrue(TEXT("Inspection fixture creates its sample work"), bChanged);
+	const FIslandArrangementSite* Work = State->FindArrangementSite(TEXT("ArrangingGround_1"));
+	VisibleWork = FindArrangementActor(World, TEXT("ArrangingGround_1"));
+	Fact.Reset();
+	const bool bInspectedWork = Work && VisibleWork && Observer && IslandInteractionUtility::Perform(Observer, VisibleWork, Fact);
+	TestTrue(TEXT("An observer can inspect visible completed work"), bInspectedWork);
+	TestTrue(TEXT("Inspection reports only public form, weathering, and response count"),
+		Fact.Contains(TEXT("spiral")) && Fact.Contains(TEXT("freshly placed")) && Fact.Contains(TEXT("0 small arcs")) &&
+		Fact.Contains(TEXT("Looking changes nothing")));
+	TestFalse(TEXT("Inspection withholds the maker, title, and private intent"),
+		Fact.Contains(TEXT("InspectionMaker")) || Fact.Contains(TEXT("Private title")) || Fact.Contains(TEXT("Private intent")));
+	TestTrue(TEXT("Read-only inspection adds no persistent response"), Work && Work->Responses.IsEmpty());
+
+	DestroyArrangementWorld(World);
+	IFileManager::Get().Delete(*StateFile, false, true, true);
 	return true;
 }

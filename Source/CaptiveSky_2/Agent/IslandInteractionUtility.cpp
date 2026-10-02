@@ -153,8 +153,6 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		OutFact = TEXT("A small school of minnows flicked through the Tideglass shallows, scattered from your quiet attention, then began circling back together. They remain wild and uncaught; nothing persistent changed.");
 		return true;
 	}
-	if (!Target->ActorHasTag(TEXT("IslandLandmark"))) return false;
-
 	if (TargetTag == FName(TEXT("ListeningStones")))
 	{
 		FVector LocalWind = FVector::ZeroVector;
@@ -246,6 +244,31 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		return true;
 	}
 
+	if (TargetTag == FName(TEXT("IslandArrangement")))
+	{
+		const AIslandArrangement* Arrangement = Cast<AIslandArrangement>(Target);
+		const UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+		const FIslandArrangementSite* Site = Arrangement && State ? State->FindArrangementSite(Arrangement->GetSiteId()) : nullptr;
+		if (!Site)
+		{
+			OutFact = TEXT("You looked over the stone-arranging ground, but no shared site record was available. Nothing changed.");
+			return false;
+		}
+		if (!Site->bHasWork)
+		{
+			OutFact = FString::Printf(TEXT("This open patch near the ListeningStones has no arrangement yet. You could use build with target %s if you wish; inspecting the empty ground changes nothing."),
+				*Site->Id.ToString());
+			return true;
+		}
+
+		const int32 AgeDays = FMath::Max(0, UIslandWorldStateSubsystem::CurrentIslandDay(World) - Site->Day);
+		const TCHAR* Weathering = AgeDays <= 0 ? TEXT("freshly placed") : AgeDays < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
+		OutFact = FString::Printf(TEXT("You looked closely at a %s made from %d small stones; it is %s. %d small arcs of stones answer it. The maker, title, and private meaning are not visible here. Looking changes nothing; the separate build action is how a resident can leave a response."),
+			*UIslandWorldStateSubsystem::FormName(Site->Form), AIslandArrangement::StoneCountFor(Site->Form), Weathering, Site->Responses.Num());
+		return true;
+	}
+
+	if (!Target->ActorHasTag(TEXT("IslandLandmark"))) return false;
 	OutFact = TEXT("You inspected a visible Island landmark. It is currently static prototype scenery: no hidden item, puzzle response, sound, or other interactive effect is implemented. Inspection is complete; returning immediately provides no new result.");
 	return true;
 }
