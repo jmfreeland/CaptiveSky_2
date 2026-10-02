@@ -271,14 +271,28 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->AddTransientGust(Tideglass->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->AddTransientGust(ListeningStones->GetActorLocation(), FVector::ForwardVector, 280.f, 900.f, 18.f);
 	Weather->UpdateGroundCoverSway();
+	AddInfo(FString::Printf(TEXT("Nearby ground-cover sway updated %d of %d instances in the landmark-gust fixture."),
+		Weather->GroundCoverSwayLastUpdatedInstanceCount, Weather->GroundCoverInstanceCount));
+	TestTrue(TEXT("Ground-cover sway updates only instances inside nearby view/gust regions"),
+		Weather->GroundCoverSwayLastUpdatedInstanceCount > 0 && Weather->GroundCoverSwayLastUpdatedInstanceCount < Weather->GroundCoverInstanceCount);
 	bool bAClumpRespondedToLocalWind = false;
-	auto CheckWindResponse = [&bAClumpRespondedToLocalWind, this](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines, int32 FirstBaseline = 0)
+	bool bDistantInstancesRemainAtBaseline = true;
+	int32 DistantInstanceCount = 0;
+	auto CheckWindResponse = [this, &bAClumpRespondedToLocalWind, &bDistantInstancesRemainAtBaseline, &DistantInstanceCount, Weather, Tideglass, ListeningStones](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& Baselines, int32 FirstBaseline = 0)
 	{
 		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
 			FTransform Current;
 			if (!Grass->GetInstanceTransform(Index, Current, false)) continue;
 			const FTransform& Base = Baselines[FirstBaseline + Index];
+			const FVector WorldLocation = Weather->GetActorTransform().TransformPosition(Base.GetLocation());
+			const bool bNearWindFocus = FVector::Dist2D(WorldLocation, Tideglass->GetActorLocation()) <= 3000.f ||
+				FVector::Dist2D(WorldLocation, ListeningStones->GetActorLocation()) <= 3000.f;
+			if (!bNearWindFocus)
+			{
+				++DistantInstanceCount;
+				bDistantInstancesRemainAtBaseline &= Current.GetRotation().Equals(Base.GetRotation(), 0.001f);
+			}
 			TestTrue(TEXT("Wind leaves each clump's planted location and scale unchanged"),
 				Current.GetLocation().Equals(Base.GetLocation(), 0.01f) && Current.GetScale3D().Equals(Base.GetScale3D(), 0.01f));
 			bAClumpRespondedToLocalWind |= !Current.GetRotation().Equals(Base.GetRotation(), 0.001f);
@@ -291,6 +305,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	CheckWindResponse(Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowABaseTransforms);
 	CheckWindResponse(Weather->ShoreGroundPlantLowB, Weather->ShoreGroundPlantLowBBaseTransforms);
 	CheckWindResponse(Weather->IslandShrubs, Weather->IslandShrubBaseTransforms);
+	TestTrue(TEXT("Distant plants stay at immutable baselines until they enter an active view or gust region"),
+		DistantInstanceCount > 0 && bDistantInstancesRemainAtBaseline);
 	TestTrue(TEXT("Transient local gusts visibly sway planted shore grass"), bAClumpRespondedToLocalWind);
 	auto CaptureTransforms = [](UHierarchicalInstancedStaticMeshComponent* Grass, TArray<FTransform>& OutTransforms)
 	{
@@ -361,6 +377,11 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Transient cleanup releases the saved grass baselines"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num() + Weather->ShoreGroundPlantBaseTransforms.Num() +
 		Weather->ShoreGroundPlantLowABaseTransforms.Num() + Weather->ShoreGroundPlantLowBBaseTransforms.Num() + Weather->IslandShrubBaseTransforms.Num(), 0);
+	TestTrue(TEXT("Transient cleanup releases nearby-sway indices and spatial cells"),
+		Weather->SwayedShoreGrassAIndices.IsEmpty() && Weather->SwayedShoreGrassBIndices.IsEmpty() && Weather->SwayedShoreGrassCIndices.IsEmpty() &&
+		Weather->SwayedGroundPlantIndices.IsEmpty() && Weather->SwayedGroundPlantLowAIndices.IsEmpty() && Weather->SwayedGroundPlantLowBIndices.IsEmpty() && Weather->SwayedShrubIndices.IsEmpty() &&
+		Weather->ShoreGrassACells.IsEmpty() && Weather->ShoreGrassBCells.IsEmpty() && Weather->ShoreGrassCCells.IsEmpty() &&
+		Weather->GroundPlantCells.IsEmpty() && Weather->GroundPlantLowACells.IsEmpty() && Weather->GroundPlantLowBCells.IsEmpty() && Weather->ShrubCells.IsEmpty());
 	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible() && !GrassC->IsVisible() && !Weather->ShoreGroundPlants->IsVisible() &&
 		!Weather->ShoreGroundPlantLowA->IsVisible() && !Weather->ShoreGroundPlantLowB->IsVisible() && !Weather->IslandSpruce->IsVisible() && !Weather->IslandShrubs->IsVisible());
 	GEngine->DestroyWorldContext(World);

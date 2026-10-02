@@ -1,4 +1,5 @@
 #include "IslandWeather.h"
+#include "Algo/BinarySearch.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandLightning.h"
@@ -28,6 +29,7 @@
 #include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
+static constexpr float GroundCoverSwayCellSize = 1500.f;
 
 AIslandWeather::AIslandWeather()
 {
@@ -274,6 +276,14 @@ void AIslandWeather::InitializeGroundCover()
 	IslandShrubs->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
+	SwayedShoreGrassAIndices.Reset();
+	SwayedShoreGrassBIndices.Reset();
+	SwayedShoreGrassCIndices.Reset();
+	SwayedGroundPlantIndices.Reset();
+	SwayedGroundPlantLowAIndices.Reset();
+	SwayedGroundPlantLowBIndices.Reset();
+	SwayedShrubIndices.Reset();
+	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
@@ -750,6 +760,24 @@ void AIslandWeather::InitializeGroundCover()
 			FTransform Transform;
 			if (IslandShrubs->GetInstanceTransform(Index, Transform, false)) IslandShrubBaseTransforms.Add(Transform);
 		}
+	auto BuildSwayCells = [](const TArray<FTransform>& Baselines, int32 FirstBaseline, int32 InstanceCount,
+		TMap<FIntPoint, TArray<int32>>& OutCells)
+	{
+		OutCells.Reset();
+		for (int32 Index = 0; Index < InstanceCount; ++Index)
+		{
+			const FVector& Location = Baselines[FirstBaseline + Index].GetLocation();
+			const FIntPoint Cell(FMath::FloorToInt(Location.X / GroundCoverSwayCellSize), FMath::FloorToInt(Location.Y / GroundCoverSwayCellSize));
+			OutCells.FindOrAdd(Cell).Add(Index);
+		}
+	};
+	BuildSwayCells(ShoreGrassABaseTransforms, 0, ShoreGrassABaseTransforms.Num(), ShoreGrassACells);
+	BuildSwayCells(ShoreGrassBBaseTransforms, 0, ShoreGrassB->GetInstanceCount(), ShoreGrassBCells);
+	BuildSwayCells(ShoreGrassBBaseTransforms, ShoreGrassB->GetInstanceCount(), GrassC->GetInstanceCount(), ShoreGrassCCells);
+	BuildSwayCells(ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num(), GroundPlantCells);
+	BuildSwayCells(ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells);
+	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
+	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
 	ShoreGrassA->SetVisibility(bVisible, true);
@@ -781,10 +809,25 @@ void AIslandWeather::ClearGroundCover()
 	ShoreGroundPlantBaseTransforms.Reset();
 	ShoreGroundPlantLowABaseTransforms.Reset();
 	ShoreGroundPlantLowBBaseTransforms.Reset();
+	SwayedShoreGrassAIndices.Reset();
+	SwayedShoreGrassBIndices.Reset();
+	SwayedShoreGrassCIndices.Reset();
+	SwayedGroundPlantIndices.Reset();
+	SwayedGroundPlantLowAIndices.Reset();
+	SwayedGroundPlantLowBIndices.Reset();
+	SwayedShrubIndices.Reset();
+	ShoreGrassACells.Reset();
+	ShoreGrassBCells.Reset();
+	ShoreGrassCCells.Reset();
+	GroundPlantCells.Reset();
+	GroundPlantLowACells.Reset();
+	GroundPlantLowBCells.Reset();
+	ShrubCells.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
+	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	GroundCoverSwayUpdateAccumulator = 0.f;
 	bGroundCoverInitialized = false;
 }
@@ -793,30 +836,85 @@ void AIslandWeather::UpdateGroundCoverSway()
 {
 	if (!GetWorld() || !bGroundCoverInitialized) return;
 	const double Now = GetWorld()->GetTimeSeconds();
-	auto UpdateSpecies = [this, Now](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
-		int32 FirstBaseline, int32 InstanceCount)
+	constexpr float GroundCoverSwayRadius = 3000.f;
+	TArray<FVector> FocusPoints;
+	if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+	{
+		FVector ViewLocation;
+		FRotator ViewRotation;
+		PlayerController->GetPlayerViewPoint(ViewLocation, ViewRotation);
+		FocusPoints.Add(ViewLocation);
+	}
+	// Keep local gusts visible even when they're away from the player's current view.
+	for (const FIslandTransientGust& Gust : TransientGusts)
+		if (Now >= Gust.StartedAt && Now < Gust.ExpiresAt) FocusPoints.Add(Gust.Center);
+	GroundCoverSwayLastUpdatedInstanceCount = 0;
+	auto UpdateSpecies = [this, Now, &FocusPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
+		int32 FirstBaseline, int32 InstanceCount, const TMap<FIntPoint, TArray<int32>>& SwayCells, TArray<int32>& PreviousSwayedIndices)
 	{
 		if (!Grass || InstanceCount <= 0 || FirstBaseline < 0 || FirstBaseline + InstanceCount > BaseTransforms.Num()) return;
+		TArray<int32> CurrentSwayedIndices;
 		const FTransform ComponentTransform = Grass->GetComponentTransform();
-		for (int32 Index = 0; Index < InstanceCount; ++Index)
+		for (const FVector& Focus : FocusPoints)
 		{
-			const FTransform& Base = BaseTransforms[FirstBaseline + Index];
-			const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
-			const FVector WorldWind = GetLocalWind(WorldLocation, this);
-			const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
-			const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
-			const FTransform Swayed = CalculateGroundCoverSway(Base, LocalWind, Now, Index, WeatherSeed, MaximumWindSpeed);
-			Grass->UpdateInstanceTransform(Index, Swayed, false, Index == InstanceCount - 1, true);
+			const FVector LocalFocus = ComponentTransform.InverseTransformPosition(Focus);
+			const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - GroundCoverSwayRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + GroundCoverSwayRadius) / GroundCoverSwayCellSize);
+			const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - GroundCoverSwayRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + GroundCoverSwayRadius) / GroundCoverSwayCellSize);
+			for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX)
+				for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY)
+					if (const TArray<int32>* CellIndices = SwayCells.Find(FIntPoint(CellX, CellY)))
+						CurrentSwayedIndices.Append(*CellIndices);
 		}
+		CurrentSwayedIndices.Sort();
+		for (int32 Index = CurrentSwayedIndices.Num() - 1; Index > 0; --Index)
+			if (CurrentSwayedIndices[Index] == CurrentSwayedIndices[Index - 1]) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+		for (int32 Index = CurrentSwayedIndices.Num() - 1; Index >= 0; --Index)
+		{
+			const FVector WorldLocation = ComponentTransform.TransformPosition(BaseTransforms[FirstBaseline + CurrentSwayedIndices[Index]].GetLocation());
+			bool bWithinSwayRange = false;
+			for (const FVector& Focus : FocusPoints)
+				if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(GroundCoverSwayRadius)) { bWithinSwayRange = true; break; }
+			if (!bWithinSwayRange) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+		}
+		TArray<int32> UpdateIndices = PreviousSwayedIndices;
+		UpdateIndices.Append(CurrentSwayedIndices);
+		UpdateIndices.Sort();
+		for (int32 Index = UpdateIndices.Num() - 1; Index > 0; --Index)
+			if (UpdateIndices[Index] == UpdateIndices[Index - 1]) UpdateIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+		if (UpdateIndices.IsEmpty())
+		{
+			PreviousSwayedIndices.Reset();
+			return;
+		}
+		for (int32 Position = 0; Position < UpdateIndices.Num(); ++Position)
+		{
+			const int32 InstanceIndex = UpdateIndices[Position];
+			if (InstanceIndex < 0 || InstanceIndex >= InstanceCount) continue;
+			const FTransform& Base = BaseTransforms[FirstBaseline + InstanceIndex];
+			FTransform Updated = Base;
+			if (Algo::BinarySearch(CurrentSwayedIndices, InstanceIndex) != INDEX_NONE)
+			{
+				const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
+				const FVector WorldWind = GetLocalWind(WorldLocation, this);
+				const FVector ComponentWind = ComponentTransform.InverseTransformVectorNoScale(WorldWind);
+				const FVector LocalWind = Base.GetRotation().UnrotateVector(ComponentWind);
+				Updated = CalculateGroundCoverSway(Base, LocalWind, Now, InstanceIndex, WeatherSeed, MaximumWindSpeed);
+			}
+			Grass->UpdateInstanceTransform(InstanceIndex, Updated, false, Position == UpdateIndices.Num() - 1, true);
+		}
+		GroundCoverSwayLastUpdatedInstanceCount += CurrentSwayedIndices.Num();
+		PreviousSwayedIndices = MoveTemp(CurrentSwayedIndices);
 	};
-	UpdateSpecies(ShoreGrassA, ShoreGrassABaseTransforms, 0, ShoreGrassABaseTransforms.Num());
-	UpdateSpecies(ShoreGrassB, ShoreGrassBBaseTransforms, 0, ShoreGrassB->GetInstanceCount());
+	UpdateSpecies(ShoreGrassA, ShoreGrassABaseTransforms, 0, ShoreGrassABaseTransforms.Num(), ShoreGrassACells, SwayedShoreGrassAIndices);
+	UpdateSpecies(ShoreGrassB, ShoreGrassBBaseTransforms, 0, ShoreGrassB->GetInstanceCount(), ShoreGrassBCells, SwayedShoreGrassBIndices);
 	if (UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC())
-		UpdateSpecies(GrassC, ShoreGrassBBaseTransforms, ShoreGrassB->GetInstanceCount(), GrassC->GetInstanceCount());
-	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num());
-	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num());
-	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num());
-	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num());
+		UpdateSpecies(GrassC, ShoreGrassBBaseTransforms, ShoreGrassB->GetInstanceCount(), GrassC->GetInstanceCount(), ShoreGrassCCells, SwayedShoreGrassCIndices);
+	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num(), GroundPlantCells, SwayedGroundPlantIndices);
+	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells, SwayedGroundPlantLowAIndices);
+	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
+	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
 	UpdateSpruceSway();
 }
 

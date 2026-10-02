@@ -219,4 +219,20 @@ private:
 	void UpdateWeatherAmbience(float DeltaSeconds);
 	void QueueAmbienceSamples(USoundWaveProcedural* Wave, FRandomStream& Random, float& FilterLeft, float& FilterRight, bool bHighPass);
 	bool HasUpwindObstruction(const FVector& Position, const FVector& Wind, const AActor* Observer) const;
+	// Appended after the original reflected/state layout to keep existing UPROPERTY offsets stable.
+	TArray<int32> SwayedShoreGrassAIndices;
+	TArray<int32> SwayedShoreGrassBIndices;
+	TArray<int32> SwayedShoreGrassCIndices;
+	TArray<int32> SwayedGroundPlantIndices;
+	TArray<int32> SwayedGroundPlantLowAIndices;
+	TArray<int32> SwayedGroundPlantLowBIndices;
+	TArray<int32> SwayedShrubIndices;
+	TMap<FIntPoint, TArray<int32>> ShoreGrassACells;
+	TMap<FIntPoint, TArray<int32>> ShoreGrassBCells;
+	TMap<FIntPoint, TArray<int32>> ShoreGrassCCells;
+	TMap<FIntPoint, TArray<int32>> GroundPlantCells;
+	TMap<FIntPoint, TArray<int32>> GroundPlantLowACells;
+	TMap<FIntPoint, TArray<int32>> GroundPlantLowBCells;
+	TMap<FIntPoint, TArray<int32>> ShrubCells;
+	int32 GroundCoverSwayLastUpdatedInstanceCount = 0;
 };
