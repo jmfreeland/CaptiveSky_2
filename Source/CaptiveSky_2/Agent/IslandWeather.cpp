@@ -199,6 +199,22 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float
 	}
 }
 
+int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed)
+{
+	// Coarse, stable species patches make mixed cover read as small plant communities rather than
+	// alternating individual tufts. A 2D world grid keeps the selection independent of trace order.
+	constexpr float SpeciesPatchSize = 700.f;
+	const uint32 CellX = static_cast<uint32>(FMath::FloorToInt(Position.X / SpeciesPatchSize));
+	const uint32 CellY = static_cast<uint32>(FMath::FloorToInt(Position.Y / SpeciesPatchSize));
+	uint32 Hash = CellX * 0x8da6b343u ^ CellY * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
+	Hash ^= Hash >> 16;
+	Hash *= 0x7feb352du;
+	Hash ^= Hash >> 15;
+	Hash *= 0x846ca68bu;
+	Hash ^= Hash >> 16;
+	return static_cast<int32>(Hash % 6u);
+}
+
 FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 	double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
 {
@@ -284,12 +300,12 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Scale = FVector(JitterScale * 2.7f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-		// Give low broadleaf cover half of the positions: the previous 25% plant ratio
-		// made dense hillsides read as isolated grass tufts with bare soil between them.
-		const int32 PlantVariant = Index % 6;
-		if (PlantVariant == 0 || PlantVariant == 2 || PlantVariant == 4)
+		// Each 7 m world patch selects one of three broadleafs or grasses, preventing an
+		// alternating per-instance mix while keeping the existing even species balance.
+		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed);
+		if (SpeciesVariant < 3)
 		{
-			Species = PlantVariant == 0 ? ShoreGroundPlants : PlantVariant == 4 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
+			Species = SpeciesVariant == 0 ? ShoreGroundPlants : SpeciesVariant == 1 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
 			const FBoxSphereBounds PlantBounds = Species->GetStaticMesh()->GetBounds();
 			const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
 			const float HeightScale = 90.f / (2.f * PlantHalfHeight);
@@ -302,7 +318,7 @@ void AIslandWeather::InitializeGroundCover()
 		}
 		else
 		{
-			const int32 GrassVariant = (Index / 2) % 3;
+			const int32 GrassVariant = SpeciesVariant - 3;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);

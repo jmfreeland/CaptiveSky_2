@@ -137,6 +137,25 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->InitializeGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
+	const FVector SpeciesPatchProbe(-100500.f, 100500.f, 0.f);
+	TestEqual(TEXT("Ground-cover species selection repeats for the same seed and world position"),
+		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71), AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71));
+	TestEqual(TEXT("Nearby plants within one botanical patch share a species"),
+		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71),
+		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(200.f, -300.f, 0.f), 71));
+	int32 SpeciesCounts[6] = {};
+	for (int32 X = 0; X < 8; ++X)
+		for (int32 Y = 0; Y < 8; ++Y)
+			++SpeciesCounts[AIslandWeather::SelectGroundCoverVariant(FVector(X * 2500.f + 900.f, Y * 2500.f + 900.f, 0.f), 71)];
+	int32 MinimumSpeciesCells = MAX_int32;
+	int32 MaximumSpeciesCells = 0;
+	for (int32 Count : SpeciesCounts)
+	{
+		MinimumSpeciesCells = FMath::Min(MinimumSpeciesCells, Count);
+		MaximumSpeciesCells = FMath::Max(MaximumSpeciesCells, Count);
+	}
+	TestTrue(TEXT("Spatial patches use all six existing species with a reasonably balanced distribution"),
+		MinimumSpeciesCells >= 4 && MaximumSpeciesCells <= 18);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
@@ -185,7 +204,10 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			if (FVector::Dist2D(Location, InnDoorLantern->GetActorLocation()) > 1250.f) continue;
 			++InnApproachGrass;
 			if (FMath::Abs(Location.X - 7000.f) <= 500.f && FMath::Abs(Location.Y) <= 500.f)
+			{
 				++InnGrassUnderRoof;
+				AddInfo(FString::Printf(TEXT("Roof-overlap instance in %s at %s."), *Grass->GetName(), *Location.ToCompactString()));
+			}
 		}
 	}
 	TestTrue(TEXT("Transient foliage reaches the outdoor inn approach"), InnApproachGrass > 0 && InnApproachGrass <= 108);

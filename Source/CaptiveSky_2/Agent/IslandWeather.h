@@ -191,6 +191,8 @@ private:
 	static void BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms);
 	static void BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float InnerRadius, float OuterRadius,
 		TArray<FTransform>& OutTransforms);
+	/** Select a stable species for a world-space botanical patch; 0..2 are plants and 3..5 are grasses. */
+	static int32 SelectGroundCoverVariant(const FVector& Position, int32 Seed);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
