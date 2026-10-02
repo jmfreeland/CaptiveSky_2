@@ -12,6 +12,7 @@
 #include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -323,10 +324,16 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->UpdateGroundCoverSway();
 		FTransform BrushedAsidePose;
 		Weather->ShoreGrassA->GetInstanceTransform(0, BrushedAsidePose, false);
+		const FVector ResidentGroundPoint = Walker->GetActorLocation() - FVector(0.f, 0.f, Walker->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		const FVector AwayFromResident = (InteractionSample.GetLocation() - ResidentGroundPoint).GetSafeNormal2D();
+		const FTransform GrassComponentTransform = Weather->ShoreGrassA->GetComponentTransform();
+		const FVector WindOnlyUp = GrassComponentTransform.TransformVectorNoScale(UnoccupiedWindPose.GetRotation().RotateVector(FVector::UpVector)).GetSafeNormal();
+		const FVector BrushedUp = GrassComponentTransform.TransformVectorNoScale(BrushedAsidePose.GetRotation().RotateVector(FVector::UpVector)).GetSafeNormal();
 		TestTrue(TEXT("A nearby resident bends grass away without moving its planted base"),
 			!BrushedAsidePose.GetRotation().Equals(UnoccupiedWindPose.GetRotation(), 0.001f) &&
 			BrushedAsidePose.GetLocation().Equals(UnoccupiedWindPose.GetLocation(), 0.01f) &&
 			BrushedAsidePose.GetScale3D().Equals(UnoccupiedWindPose.GetScale3D(), 0.01f));
+		TestTrue(TEXT("The brushed grass leans away from the resident"), FVector::DotProduct(BrushedUp - WindOnlyUp, AwayFromResident) > 0.f);
 		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(5000.f, 0.f, 90.f));
 		Weather->UpdateGroundCoverSway();
 		FTransform RecoveredPose;
