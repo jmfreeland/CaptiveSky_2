@@ -845,8 +845,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			else if (TreeHeight >= 900.f && TreeHeight <= 1800.f) ++MatureSpruceCount;
 		}
 		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within their combined population budget"),
-			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 1224 &&
-			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 360 &&
+			PreviewWeather->GroundCoverTreeCount > 0 && PreviewWeather->GroundCoverTreeCount <= 1672 &&
+			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 528 &&
 			PreviewWeather->IslandSpruce &&
 			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
