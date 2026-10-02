@@ -616,7 +616,7 @@ void AIslandWeather::InitializeGroundCover()
 		GroundCoverTreeCount = 0;
 		if (IslandSpruce && IslandSpruce->GetStaticMesh())
 		{
-			constexpr int32 SpruceGroveCount = 64;
+			constexpr int32 SpruceGroveCount = 80;
 			constexpr int32 SpruceTreesPerGrove = 26;
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
 			constexpr float SpruceGroveInnerRadius = 500.f;
@@ -716,7 +716,7 @@ void AIslandWeather::InitializeGroundCover()
 
 					// Seed the grove edges with small, nonblocking spruce saplings. They use the same
 					// native mesh, but a distinct scale band and spacing so they read as younger growth.
-					constexpr int32 SaplingsPerGrove = 12;
+					constexpr int32 SaplingsPerGrove = 16;
 					constexpr int32 MaxSaplingTracesPerGrove = 64;
 					constexpr float SaplingInnerRadius = 1700.f;
 					constexpr float SaplingOuterRadius = 2600.f;
