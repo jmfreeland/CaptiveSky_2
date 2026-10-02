@@ -9,6 +9,7 @@
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/StaticMeshComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -513,6 +514,7 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	USceneComponent* HeadPivot = nullptr;
 	USceneComponent* LeftWingPivot = nullptr;
 	USceneComponent* RightWingPivot = nullptr;
+	UInstancedStaticMeshComponent* CarriedTwigs = nullptr;
 	TArray<UProceduralMeshComponent*> WingMeshes;
 	Raven->GetComponents<UProceduralMeshComponent>(WingMeshes);
 	for (UProceduralMeshComponent* Component : WingMeshes)
@@ -529,12 +531,14 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		if (Component->GetName() == TEXT("RavenHeadPivot")) HeadPivot = Component;
 		if (Component->GetName() == TEXT("RavenLeftWingPivot")) LeftWingPivot = Component;
 		if (Component->GetName() == TEXT("RavenRightWingPivot")) RightWingPivot = Component;
+		if (Component->GetName() == TEXT("RavenCarriedTwigs")) CarriedTwigs = Cast<UInstancedStaticMeshComponent>(Component);
 	}
 	if (!TestNotNull(TEXT("The rendered raven has a separate idle-scanning head pivot"), HeadPivot) ||
 		!TestNotNull(TEXT("The rendered raven has a left procedural wing"), LeftWing) ||
 		!TestNotNull(TEXT("The rendered raven has a right procedural wing"), RightWing) ||
 		!TestNotNull(TEXT("The left procedural wing has an animated pivot"), LeftWingPivot) ||
-		!TestNotNull(TEXT("The right procedural wing has an animated pivot"), RightWingPivot))
+		!TestNotNull(TEXT("The right procedural wing has an animated pivot"), RightWingPivot) ||
+		!TestNotNull(TEXT("The beak has a hidden, instanced twig bundle ready to show on gather"), CarriedTwigs))
 	{
 		Controller->UnPossess();
 		Raven->Destroy();
@@ -543,6 +547,8 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	}
 	const FRotator LeftRest = LeftWingPivot->GetRelativeRotation();
 	const FRotator RightRest = RightWingPivot->GetRelativeRotation();
+	TestEqual(TEXT("The beak bundle contains three collisionless twigs"), CarriedTwigs->GetInstanceCount(), 3);
+	TestFalse(TEXT("The beak is empty before gathering"), CarriedTwigs->IsVisible());
 
 	const FIntPoint CaptureSize(1280, 720);
 	UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(GetTransientPackage(), NAME_None, RF_Transient);
@@ -591,13 +597,22 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	const float IdleHeadYaw = HeadPivot->GetRelativeRotation().Yaw;
 	TestTrue(TEXT("The grounded head scan remains visibly small and bounded"), FMath::Abs(IdleHeadYaw) > 0.1f && FMath::Abs(IdleHeadYaw) <= 7.f);
 	TestTrue(TEXT("Subtle idle-glance screenshot is saved"), SavePose(TEXT("02_IdleGlance.png")));
+	Controller->bCarryingTwigs = true;
+	Controller->Tick(0.f);
+	TestTrue(TEXT("Gathering reveals the collisionless twig bundle at the beak"),
+		CarriedTwigs->IsVisible() && !CarriedTwigs->bHiddenInGame && CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		!CarriedTwigs->CanEverAffectNavigation());
+	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("03_CarryingTwigs.png")));
+	Controller->bCarryingTwigs = false;
+	Controller->Tick(0.f);
+	TestFalse(TEXT("Weaving or consuming the bundle restores the empty beak"), CarriedTwigs->IsVisible());
 	Controller->LocomotionState = ERavenLocomotionState::Flying;
 	Controller->Tick(0.05f);
 	TestTrue(TEXT("Flight visibly rotates the procedural wing pivots"),
 		!LeftWingPivot->GetRelativeRotation().Equals(LeftRest) && !RightWingPivot->GetRelativeRotation().Equals(RightRest));
-	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("03_FlightStrokeA.png")));
+	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("04_FlightStrokeA.png")));
 	Controller->Tick(0.15f);
-	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("04_FlightStrokeB.png")));
+	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("05_FlightStrokeB.png")));
 	TestTrue(TEXT("Flight fully deploys both wings from their folded perch pose"),
 		FMath::Abs(LeftWingPivot->GetRelativeRotation().Yaw) < 0.1f && FMath::Abs(RightWingPivot->GetRelativeRotation().Yaw) < 0.1f);
 	Controller->LocomotionState = ERavenLocomotionState::Grounded;

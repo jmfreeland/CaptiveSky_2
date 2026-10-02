@@ -3,6 +3,7 @@
 #include "AgentRestPresentationComponent.h"
 #include "IslandArrangement.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
@@ -213,6 +214,36 @@ namespace
 		AppendEllipsoid(Pupils, FVector(7.5f, 15.1f, 2.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
 		AddRavenMesh(Raven, HeadPivot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
 
+		// A small warm-brown bundle sits at the bill while the existing forage state says
+		// twigs are carried. It is presentation-only and never affects collision or nav.
+		UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+		if (TwigMesh)
+		{
+			UInstancedStaticMeshComponent* Twigs = NewObject<UInstancedStaticMeshComponent>(Raven, TEXT("RavenCarriedTwigs"), RF_Transient);
+			Raven->AddInstanceComponent(Twigs);
+			Twigs->SetupAttachment(HeadPivot);
+			Twigs->SetStaticMesh(TwigMesh);
+			Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.16f, 0.075f, 0.025f, 1.f)));
+			Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Twigs->SetCanEverAffectNavigation(false);
+			Twigs->SetGenerateOverlapEvents(false);
+			const FTransform TwigTransforms[] = {
+				FTransform(
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, -0.10f, 0.13f).GetSafeNormal()),
+					FVector(50.f, -2.5f, -8.f), FVector(0.034f, 0.034f, 0.24f)),
+				FTransform(
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.08f, -0.12f).GetSafeNormal()),
+					FVector(49.f, 0.f, -10.f), FVector(0.034f, 0.034f, 0.24f)),
+				FTransform(
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.15f, 0.04f).GetSafeNormal()),
+					FVector(48.f, 2.5f, -7.f), FVector(0.034f, 0.034f, 0.24f))
+			};
+			for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
+			Twigs->SetVisibility(false, false);
+			Twigs->SetHiddenInGame(true, false);
+			Twigs->RegisterComponent();
+		}
+
 		for (const float Side : { -1.f, 1.f })
 		{
 			USceneComponent* WingPivot = NewObject<USceneComponent>(Raven,
@@ -265,6 +296,7 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 	LeftWingFlightRotation = FRotator::ZeroRotator;
 	RightWingFlightRotation = FRotator::ZeroRotator;
 	RavenHeadPivot.Reset();
+	CarriedTwigVisual.Reset();
 	RavenHeadRestRotation = FRotator::ZeroRotator;
 	HeadScanTime = 0.f;
 	WingDeployment = 0.f;
@@ -281,6 +313,10 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 		{
 			RavenHeadPivot = Component;
 			RavenHeadRestRotation = Component->GetRelativeRotation();
+		}
+		else if (ComponentName == TEXT("RavenCarriedTwigs"))
+		{
+			CarriedTwigVisual = Cast<UInstancedStaticMeshComponent>(Component);
 		}
 		else if (ComponentName == TEXT("RavenLeftWingPivot"))
 		{
@@ -391,6 +427,15 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 	const float YawDegrees = 7.f * FMath::Sin(HeadScanTime * 2.f * PI * 0.13f);
 	const float PitchDegrees = 2.5f * FMath::Sin(HeadScanTime * 2.f * PI * 0.09f + 1.2f);
 	Head->SetRelativeRotation(RavenHeadRestRotation + FRotator(PitchDegrees, YawDegrees, 0.f));
+}
+
+void ARavenAgentAIController::UpdateCarriedTwigVisual()
+{
+	if (UInstancedStaticMeshComponent* Twigs = CarriedTwigVisual.Get())
+	{
+		Twigs->SetVisibility(bCarryingTwigs, true);
+		Twigs->SetHiddenInGame(!bCarryingTwigs, true);
+	}
 }
 
 void ARavenAgentAIController::SetFlyingMovement(bool bFlying) const
@@ -1095,6 +1140,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	if (!Raven) return;
 	UpdateWingAnimation(DeltaSeconds);
 	UpdateHeadAnimation(DeltaSeconds);
+	UpdateCarriedTwigVisual();
 	if (IsResting()) return;
 
 	if (LocomotionState == ERavenLocomotionState::Hopping)

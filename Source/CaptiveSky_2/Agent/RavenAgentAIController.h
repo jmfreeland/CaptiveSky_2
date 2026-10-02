@@ -5,7 +5,7 @@
 #include "RavenAgentAIController.generated.h"
 
 class AIslandArrangement;
-
+class UInstancedStaticMeshComponent;
 UENUM(BlueprintType)
 enum class ERavenLocomotionState : uint8
 {
@@ -98,6 +98,7 @@ private:
 	TWeakObjectPtr<UObject> LeftWing;
 	TWeakObjectPtr<UObject> RightWing;
 	TWeakObjectPtr<UObject> RavenHeadPivot;
+	TWeakObjectPtr<UInstancedStaticMeshComponent> CarriedTwigVisual;
 	FRotator LeftWingRestRotation = FRotator::ZeroRotator;
 	FRotator RightWingRestRotation = FRotator::ZeroRotator;
 	FRotator LeftWingFlightRotation = FRotator::ZeroRotator;
@@ -130,6 +131,7 @@ private:
 	void CacheWingComponents(APawn* Raven);
 	void UpdateWingAnimation(float DeltaSeconds);
 	void UpdateHeadAnimation(float DeltaSeconds);
+	void UpdateCarriedTwigVisual();
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
 	bool AdvanceTowardsTarget(float DeltaSeconds);
