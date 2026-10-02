@@ -854,6 +854,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("The existing broadleaf mesh is available for a separate grove understory"),
 			PreviewWeather->IslandShrubs && PreviewWeather->IslandShrubs->GetStaticMesh() != nullptr);
+		TestTrue(TEXT("The locally imported flowering rhododendron mesh is available"),
+			PreviewWeather->IslandRhododendrons && PreviewWeather->IslandRhododendrons->GetStaticMesh() != nullptr);
 		TestTrue(TEXT("Broadleaf understory placement stays within sixteen shrubs per each of 64 attempted groves"),
 			PreviewWeather->GroundCoverShrubCount > 0 && PreviewWeather->GroundCoverShrubCount <= 1024 &&
 			PreviewWeather->IslandShrubs->GetInstanceCount() == PreviewWeather->GroundCoverShrubCount &&
@@ -862,11 +864,21 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandShrubs->IsVisible());
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
+		TestTrue(TEXT("Flowering rhododendrons remain a sparse accent with nonblocking woodland placement"),
+			PreviewWeather->GroundCoverFlowerCount > 0 && PreviewWeather->GroundCoverFlowerCount <= 192 &&
+			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount &&
+			PreviewWeather->IslandRhododendrons->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
+		TestEqual(TEXT("Every flowering rhododendron has an immutable wind-sway baseline"),
+			PreviewWeather->IslandRhododendronBaseTransforms.Num(), PreviewWeather->GroundCoverFlowerCount);
 		const UStaticMesh* ShrubMesh = PreviewWeather->IslandShrubs ? PreviewWeather->IslandShrubs->GetStaticMesh() : nullptr;
+		const UStaticMesh* RhododendronMesh = PreviewWeather->IslandRhododendrons ? PreviewWeather->IslandRhododendrons->GetStaticMesh() : nullptr;
 		const UStaticMesh* SpruceMesh = PreviewWeather->IslandSpruce ? PreviewWeather->IslandSpruce->GetStaticMesh() : nullptr;
 		const FBoxSphereBounds ShrubBounds = ShrubMesh ? ShrubMesh->GetBounds() : FBoxSphereBounds();
+		const FBoxSphereBounds RhododendronBounds = RhododendronMesh ? RhododendronMesh->GetBounds() : FBoxSphereBounds();
 		const FBoxSphereBounds WoodlandSpruceBounds = SpruceMesh ? SpruceMesh->GetBounds() : FBoxSphereBounds();
 		const FVector ShrubBottomOffset = ShrubBounds.Origin - FVector(0.f, 0.f, ShrubBounds.BoxExtent.Z);
+		const FVector RhododendronBottomOffset = RhododendronBounds.Origin - FVector(0.f, 0.f, RhododendronBounds.BoxExtent.Z);
 		const FVector SpruceBottomOffset = WoodlandSpruceBounds.Origin - FVector(0.f, 0.f, WoodlandSpruceBounds.BoxExtent.Z);
 		TArray<FVector> WoodlandClearanceAnchors;
 		for (TActorIterator<AActor> It(Island); It; ++It)
@@ -925,6 +937,56 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Broadleaf minimum clearances in cm: landmark %.1f, shrub %.1f, spruce %.1f (%d shrubs)"),
 			MinShrubLandmarkClearance, MinShrubShrubClearance, MinShrubSpruceClearance, ShrubPlantingPoints.Num()));
 		TestTrue(TEXT("Broadleaf shrubs preserve landmark, inter-shrub, and spruce-trunk clearances"), bShrubsRespectWoodlandClearances);
+		TArray<FVector> RhododendronPlantingPoints;
+		bool bRhododendronsStayInsideHeightBand = RhododendronMesh != nullptr;
+		bool bRhododendronsRespectWoodlandClearances = RhododendronMesh != nullptr;
+		float MinRhododendronLandmarkClearance = TNumericLimits<float>::Max();
+		float MinRhododendronTreeClearance = TNumericLimits<float>::Max();
+		float MinRhododendronShrubClearance = TNumericLimits<float>::Max();
+		float MinRhododendronSpacing = TNumericLimits<float>::Max();
+		for (int32 FlowerIndex = 0; PreviewWeather->IslandRhododendrons && FlowerIndex < PreviewWeather->IslandRhododendrons->GetInstanceCount(); ++FlowerIndex)
+		{
+			FTransform FlowerTransform;
+			if (!PreviewWeather->IslandRhododendrons->GetInstanceTransform(FlowerIndex, FlowerTransform, true))
+			{
+				bRhododendronsStayInsideHeightBand = false;
+				bRhododendronsRespectWoodlandClearances = false;
+				continue;
+			}
+			const float FlowerHeight = FlowerTransform.GetScale3D().Z * 2.f * RhododendronBounds.BoxExtent.Z;
+			bRhododendronsStayInsideHeightBand &= FlowerHeight >= 179.9f && FlowerHeight <= 240.1f;
+			const FVector PlantingPoint = FlowerTransform.TransformPosition(RhododendronBottomOffset);
+			for (const FVector& Anchor : WoodlandClearanceAnchors)
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, Anchor);
+				MinRhododendronLandmarkClearance = FMath::Min(MinRhododendronLandmarkClearance, Clearance);
+				bRhododendronsRespectWoodlandClearances &= Clearance >= 2599.9f;
+			}
+			for (const FVector& ExistingFlower : RhododendronPlantingPoints)
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingFlower);
+				MinRhododendronSpacing = FMath::Min(MinRhododendronSpacing, Clearance);
+				bRhododendronsRespectWoodlandClearances &= Clearance >= 474.9f;
+			}
+			for (const FVector& ExistingTree : SprucePlantingPoints)
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingTree);
+				MinRhododendronTreeClearance = FMath::Min(MinRhododendronTreeClearance, Clearance);
+				bRhododendronsRespectWoodlandClearances &= Clearance >= 449.9f;
+			}
+			for (const FVector& ExistingShrub : ShrubPlantingPoints)
+			{
+				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingShrub);
+				MinRhododendronShrubClearance = FMath::Min(MinRhododendronShrubClearance, Clearance);
+				bRhododendronsRespectWoodlandClearances &= Clearance >= 299.9f;
+			}
+			RhododendronPlantingPoints.Add(PlantingPoint);
+		}
+		TestTrue(TEXT("Flowering rhododendrons stay in the authored 1.8–2.4 m size band"), bRhododendronsStayInsideHeightBand);
+		AddInfo(FString::Printf(TEXT("Rhododendron minimum clearances in cm: landmark %.1f, tree %.1f, shrub %.1f, flower %.1f (%d plants)"),
+			MinRhododendronLandmarkClearance, MinRhododendronTreeClearance, MinRhododendronShrubClearance,
+			MinRhododendronSpacing, RhododendronPlantingPoints.Num()));
+		TestTrue(TEXT("Flowering rhododendrons preserve landmark, inter-flower, shrub, and spruce clearances"), bRhododendronsRespectWoodlandClearances);
 		int32 MatureSpruceCount = 0;
 		int32 SaplingCount = 0;
 		const float SpruceMeshHalfHeight = PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh()
@@ -962,6 +1024,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
 			MatureSpruceCount, SaplingCount, PreviewWeather->GroundCoverShrubCount));
+		AddInfo(FString::Printf(TEXT("Woodland understorey adds %d nonblocking flowering rhododendrons."), PreviewWeather->GroundCoverFlowerCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;
@@ -1013,6 +1076,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowA, PreviewWeather->ShoreGroundPlantLowABaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowB, PreviewWeather->ShoreGroundPlantLowBBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandShrubs, PreviewWeather->IslandShrubBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->IslandRhododendrons, PreviewWeather->IslandRhododendronBaseTransforms);
 			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
 			TestTrue(TEXT("Fixed preview gusts respect the ten-degree response limit"), MaximumVisibleSwayDegrees <= 10.01f);
 			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));

@@ -238,4 +238,9 @@ private:
 	TArray<int32> SwayedSpruceIndices;
 	TMap<FIntPoint, TArray<int32>> SpruceCells;
 	int32 SpruceSwayLastUpdatedInstanceCount = 0;
+	TArray<int32> SwayedRhododendronIndices;
+	TMap<FIntPoint, TArray<int32>> RhododendronCells;
+	TArray<FTransform> IslandRhododendronBaseTransforms;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandRhododendrons;
+	int32 GroundCoverFlowerCount = 0;
 };

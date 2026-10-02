@@ -113,6 +113,14 @@ AIslandWeather::AIslandWeather()
 	IslandShrubs->SetCastShadow(false);
 	IslandShrubs->bReceivesDecals = false;
 	IslandShrubs->SetVisibility(false);
+	IslandRhododendrons = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandRhododendrons"));
+	IslandRhododendrons->SetupAttachment(RootComponent);
+	IslandRhododendrons->SetMobility(EComponentMobility::Movable);
+	IslandRhododendrons->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandRhododendrons->SetCanEverAffectNavigation(false);
+	IslandRhododendrons->SetCastShadow(false);
+	IslandRhododendrons->bReceivesDecals = false;
+	IslandRhododendrons->SetVisibility(false);
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
 	WindAmbienceAudio->bAutoActivate = false;
@@ -134,6 +142,7 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowAMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_01.ground_01_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowBMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
 	if (GrassMeshA.Succeeded()) ShoreGrassA->SetStaticMesh(GrassMeshA.Object);
 	if (GrassMeshB.Succeeded()) ShoreGrassB->SetStaticMesh(GrassMeshB.Object);
 	if (GrassMeshC.Succeeded()) ShoreGrassC->SetStaticMesh(GrassMeshC.Object);
@@ -142,6 +151,7 @@ AIslandWeather::AIslandWeather()
 	if (GroundPlantLowBMesh.Succeeded()) ShoreGroundPlantLowB->SetStaticMesh(GroundPlantLowBMesh.Object);
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
+	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
 	PrimaryActorTick.bCanEverTick = true;
@@ -277,8 +287,10 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowB->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandShrubs->ClearInstances();
+	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
+	IslandRhododendronBaseTransforms.Reset();
 	SwayedShoreGrassAIndices.Reset();
 	SwayedShoreGrassBIndices.Reset();
 	SwayedShoreGrassCIndices.Reset();
@@ -286,6 +298,7 @@ void AIslandWeather::InitializeGroundCover()
 	SwayedGroundPlantLowAIndices.Reset();
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
+	SwayedRhododendronIndices.Reset();
 	SwayedSpruceIndices.Reset();
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	SpruceSwayLastUpdatedInstanceCount = 0;
@@ -293,6 +306,7 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
+	GroundCoverFlowerCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
 	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
 	{
@@ -547,6 +561,8 @@ void AIslandWeather::InitializeGroundCover()
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
 			constexpr float ShrubTreeClearance = 225.f;
+			constexpr float FlowerTreeClearance = 450.f;
+			constexpr float FlowerShrubClearance = 300.f;
 			const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
@@ -554,6 +570,7 @@ void AIslandWeather::InitializeGroundCover()
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
 				TArray<FVector> ShrubLocations;
+				TArray<FVector> RhododendronLocations;
 				int32 SpruceTraceCount = 0;
 				int32 SpruceSaplingCount = 0;
 				auto TraceSpruceGround = [this, &Query, &TraceTop, &TraceBottom, SeaLevel, IslandLandscape, &SpruceTraceCount](const FVector& Candidate, FHitResult& Hit)
@@ -616,6 +633,9 @@ void AIslandWeather::InitializeGroundCover()
 						if (!bTooClose)
 							for (const FVector& ExistingShrub : ShrubLocations)
 								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerTreeClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
 
 						FHitResult TreeHit;
@@ -653,6 +673,9 @@ void AIslandWeather::InitializeGroundCover()
 						if (!bTooClose)
 							for (const FVector& ExistingShrub : ShrubLocations)
 								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerTreeClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
 
 						FHitResult SaplingHit;
@@ -694,6 +717,9 @@ void AIslandWeather::InitializeGroundCover()
 							if (bTooClose) continue;
 							for (const FVector& ExistingTree : SpruceLocations)
 								if (FVector::Dist2D(Candidate, ExistingTree) < ShrubTreeClearance) { bTooClose = true; break; }
+							if (!bTooClose)
+								for (const FVector& ExistingFlower : RhododendronLocations)
+									if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerShrubClearance) { bTooClose = true; break; }
 							if (bTooClose) continue;
 
 							FHitResult ShrubHit;
@@ -709,9 +735,58 @@ void AIslandWeather::InitializeGroundCover()
 							++GroundCoverShrubCount;
 						}
 					}
+
+					// Flowering rhododendron accents the outer grove edge; keep this
+					// multi-material species sparse so it adds color without dominating the meadow.
+					constexpr int32 RhododendronsPerGrove = 3;
+					constexpr int32 MaxRhododendronTracesPerGrove = 48;
+					constexpr float RhododendronInnerRadius = 2100.f;
+					constexpr float RhododendronOuterRadius = 3600.f;
+					constexpr float RhododendronMinSpacing = 475.f;
+					const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
+						? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
+					if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
+					{
+						const int32 FlowersBeforeGrove = GroundCoverFlowerCount;
+						for (int32 Attempt = 0; Attempt < MaxRhododendronTracesPerGrove &&
+							GroundCoverFlowerCount - FlowersBeforeGrove < RhododendronsPerGrove; ++Attempt)
+						{
+							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
+							const float Radius = SpruceRandom.FRandRange(RhododendronInnerRadius, RhododendronOuterRadius);
+							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+							bool bNearLandmark = false;
+							for (const FVector& Exclusion : ExclusionLocations)
+								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
+							if (bNearLandmark) continue;
+							bool bTooClose = false;
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < RhododendronMinSpacing) { bTooClose = true; break; }
+							if (bTooClose) continue;
+							for (const FVector& ExistingTree : SpruceLocations)
+								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
+							if (bTooClose) continue;
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
+							if (bTooClose) continue;
+
+							FHitResult FlowerHit;
+							if (!TraceSpruceGround(Candidate, FlowerHit)) continue;
+							const float TargetHeight = SpruceRandom.FRandRange(180.f, 240.f);
+							const FVector Scale(TargetHeight / (2.f * RhododendronBounds.BoxExtent.Z));
+							const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, FlowerHit.ImpactNormal);
+							const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
+								FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
+							const FVector MeshBottom(RhododendronBounds.Origin.X, RhododendronBounds.Origin.Y,
+								RhododendronBounds.Origin.Z - RhododendronBounds.BoxExtent.Z);
+							const FVector Location = FlowerHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+							IslandRhododendrons->AddInstance(FTransform(Rotation, Location, Scale), true);
+							RhododendronLocations.Add(FlowerHit.ImpactPoint);
+							++GroundCoverFlowerCount;
+						}
+					}
 				}
-			UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings) and %d broadleaf shrubs in %d groves after %d bounded traces."),
-				GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+			UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
+				GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroundCoverFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
 	}
 	}
@@ -723,6 +798,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowBBaseTransforms.Reset(ShoreGroundPlantLowB->GetInstanceCount());
 	IslandSpruceBaseTransforms.Reset(IslandSpruce ? IslandSpruce->GetInstanceCount() : 0);
 	IslandShrubBaseTransforms.Reset(IslandShrubs ? IslandShrubs->GetInstanceCount() : 0);
+	IslandRhododendronBaseTransforms.Reset(IslandRhododendrons ? IslandRhododendrons->GetInstanceCount() : 0);
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -765,6 +841,12 @@ void AIslandWeather::InitializeGroundCover()
 			FTransform Transform;
 			if (IslandShrubs->GetInstanceTransform(Index, Transform, false)) IslandShrubBaseTransforms.Add(Transform);
 		}
+	if (IslandRhododendrons)
+		for (int32 Index = 0; Index < IslandRhododendrons->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (IslandRhododendrons->GetInstanceTransform(Index, Transform, false)) IslandRhododendronBaseTransforms.Add(Transform);
+		}
 	auto BuildSwayCells = [](const TArray<FTransform>& Baselines, int32 FirstBaseline, int32 InstanceCount,
 		TMap<FIntPoint, TArray<int32>>& OutCells)
 	{
@@ -783,6 +865,7 @@ void AIslandWeather::InitializeGroundCover()
 	BuildSwayCells(ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells);
 	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
 	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
+	BuildSwayCells(IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells);
 	BuildSwayCells(IslandSpruceBaseTransforms, 0, IslandSpruceBaseTransforms.Num(), SpruceCells);
 
 	const bool bVisible = GroundCoverInstanceCount > 0;
@@ -794,6 +877,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowB->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
+	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(GroundCoverFlowerCount > 0, true);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
@@ -808,8 +892,10 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowB) { ShoreGroundPlantLowB->ClearInstances(); ShoreGroundPlantLowB->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
+	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
+	IslandRhododendronBaseTransforms.Reset();
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
 	ShoreGroundPlantBaseTransforms.Reset();
@@ -822,6 +908,7 @@ void AIslandWeather::ClearGroundCover()
 	SwayedGroundPlantLowAIndices.Reset();
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
+	SwayedRhododendronIndices.Reset();
 	ShoreGrassACells.Reset();
 	ShoreGrassBCells.Reset();
 	ShoreGrassCCells.Reset();
@@ -829,12 +916,14 @@ void AIslandWeather::ClearGroundCover()
 	GroundPlantLowACells.Reset();
 	GroundPlantLowBCells.Reset();
 	ShrubCells.Reset();
+	RhododendronCells.Reset();
 	SwayedSpruceIndices.Reset();
 	SpruceCells.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
+	GroundCoverFlowerCount = 0;
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverSwayUpdateAccumulator = 0.f;
@@ -956,6 +1045,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells, SwayedGroundPlantLowAIndices);
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
 	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
+	UpdateSpecies(IslandRhododendrons, IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells, SwayedRhododendronIndices);
 	UpdateSpruceSway(FocusPoints, FoliageSwayFocusRadius);
 }
 
