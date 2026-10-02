@@ -4,8 +4,12 @@
 #include "IslandArrangement.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "ProceduralMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
@@ -13,6 +17,209 @@
 #include "HAL/PlatformTime.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRavenAgentAI, Log, All);
+
+namespace
+{
+	struct FRavenProcMeshData
+	{
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		TArray<FVector> Normals;
+		TArray<FVector2D> UVs;
+		TArray<FLinearColor> Colors;
+		TArray<FProcMeshTangent> Tangents;
+	};
+
+	static bool IsRavenVisualPawn(const APawn* Pawn)
+	{
+		if (!Pawn) return false;
+		if (Pawn->GetClass()->GetName().Contains(TEXT("Raven"), ESearchCase::IgnoreCase)) return true;
+		const AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(Pawn);
+		return Agent && Agent->DisplayName.Contains(TEXT("Raven"), ESearchCase::IgnoreCase);
+	}
+
+	static void AppendDoubleSidedTriangle(FRavenProcMeshData& Data, const FVector& A, const FVector& B, const FVector& C)
+	{
+		const FVector Normal = FVector::CrossProduct(B - A, C - A).GetSafeNormal();
+		const int32 Base = Data.Vertices.Num();
+		for (const FVector& Vertex : { A, B, C })
+		{
+			Data.Vertices.Add(Vertex);
+			Data.Normals.Add(Normal);
+			Data.UVs.Add(FVector2D::ZeroVector);
+			Data.Colors.Add(FLinearColor::White);
+		}
+		Data.Triangles.Append({ Base, Base + 1, Base + 2, Base + 2, Base + 1, Base });
+	}
+
+	static void AppendEllipsoid(FRavenProcMeshData& Data, const FVector& Center, const FVector& Radii,
+		int32 Segments = 12, int32 Rings = 8)
+	{
+		const int32 Base = Data.Vertices.Num();
+		for (int32 Ring = 0; Ring <= Rings; ++Ring)
+		{
+			const float Latitude = -0.5f * PI + PI * static_cast<float>(Ring) / static_cast<float>(Rings);
+			const float CosLatitude = FMath::Cos(Latitude);
+			const float SinLatitude = FMath::Sin(Latitude);
+			for (int32 Segment = 0; Segment <= Segments; ++Segment)
+			{
+				const float Longitude = 2.f * PI * static_cast<float>(Segment) / static_cast<float>(Segments);
+				const FVector Unit(CosLatitude * FMath::Cos(Longitude), CosLatitude * FMath::Sin(Longitude), SinLatitude);
+				Data.Vertices.Add(Center + Unit * Radii);
+				Data.Normals.Add(FVector(Unit.X / FMath::Max(Radii.X, 0.01f), Unit.Y / FMath::Max(Radii.Y, 0.01f),
+					Unit.Z / FMath::Max(Radii.Z, 0.01f)).GetSafeNormal());
+				Data.UVs.Add(FVector2D(static_cast<float>(Segment) / Segments, static_cast<float>(Ring) / Rings));
+				Data.Colors.Add(FLinearColor::White);
+			}
+		}
+		const int32 Row = Segments + 1;
+		for (int32 Ring = 0; Ring < Rings; ++Ring)
+			for (int32 Segment = 0; Segment < Segments; ++Segment)
+			{
+				const int32 A = Base + Ring * Row + Segment;
+				const int32 B = A + 1;
+				const int32 C = A + Row;
+				const int32 D = C + 1;
+				Data.Triangles.Append({ A, B, D, A, D, C, D, B, A, C, D, A });
+			}
+	}
+
+	static void AppendRavenWing(FRavenProcMeshData& Data, float Side)
+	{
+		const FVector Outline[] = {
+			FVector(0.f, 0.f, 0.f), FVector(27.f, 22.f, 1.f), FVector(38.f, 53.f, 0.f),
+			FVector(31.f, 88.f, -1.f), FVector(3.f, 112.f, -3.f), FVector(-30.f, 96.f, -3.f),
+			FVector(-57.f, 67.f, -1.f), FVector(-50.f, 42.f, 0.f), FVector(-27.f, 17.f, 1.f)
+		};
+		FVector Center = FVector::ZeroVector;
+		for (const FVector& Point : Outline) Center += FVector(Point.X, Point.Y * Side, Point.Z + 1.5f);
+		Center /= UE_ARRAY_COUNT(Outline);
+		for (int32 Index = 0; Index < UE_ARRAY_COUNT(Outline); ++Index)
+		{
+			FVector A = FVector(Outline[Index].X, Outline[Index].Y * Side, Outline[Index].Z + 1.5f);
+			FVector B = FVector(Outline[(Index + 1) % UE_ARRAY_COUNT(Outline)].X,
+				Outline[(Index + 1) % UE_ARRAY_COUNT(Outline)].Y * Side,
+				Outline[(Index + 1) % UE_ARRAY_COUNT(Outline)].Z + 1.5f);
+			AppendDoubleSidedTriangle(Data, Center, A, B);
+			AppendDoubleSidedTriangle(Data, Center - FVector(0.f, 0.f, 3.f), B - FVector(0.f, 0.f, 3.f), A - FVector(0.f, 0.f, 3.f));
+		}
+		// Slender primaries break the outer edge into feather tips instead of one flat slab.
+		for (int32 Feather = 0; Feather < 6; ++Feather)
+		{
+			const float T = static_cast<float>(Feather) / 5.f;
+			const FVector Root(-20.f - T * 18.f, Side * (38.f + T * 10.f), 1.f);
+			const FVector Tip(-44.f + T * 16.f, Side * (106.f - T * 17.f), -2.f);
+			AppendDoubleSidedTriangle(Data, Root, Tip, Root + FVector(7.f, Side * 5.f, 0.f));
+		}
+	}
+
+	static UMaterialInstanceDynamic* MakeRavenMaterial(UObject* Outer, const FLinearColor& Color)
+	{
+		static UMaterialInterface* BasicMaterial = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		UMaterialInstanceDynamic* Material = BasicMaterial ? UMaterialInstanceDynamic::Create(BasicMaterial, Outer) : nullptr;
+		if (Material)
+		{
+			Material->SetVectorParameterValue(TEXT("Color"), Color);
+			Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
+		}
+		return Material;
+	}
+
+	static UProceduralMeshComponent* AddRavenMesh(ACharacter* Raven, USceneComponent* Parent, FName Name,
+		FRavenProcMeshData&& Data, UMaterialInterface* Material)
+	{
+		if (!Raven || !Parent || Data.Vertices.IsEmpty() || Data.Triangles.IsEmpty()) return nullptr;
+		UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(Raven, Name, RF_Transient);
+		if (!Mesh) return nullptr;
+		Raven->AddInstanceComponent(Mesh);
+		Mesh->SetupAttachment(Parent);
+		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Mesh->SetCanEverAffectNavigation(false);
+		Mesh->SetGenerateOverlapEvents(false);
+		Mesh->bUseAsyncCooking = false;
+		Mesh->CreateMeshSection_LinearColor(0, Data.Vertices, Data.Triangles, Data.Normals, Data.UVs, Data.Colors, Data.Tangents, false);
+		if (Material) Mesh->SetMaterial(0, Material);
+		Mesh->RegisterComponent();
+		return Mesh;
+	}
+
+	static void EnsureProceduralRavenAppearance(APawn* Pawn)
+	{
+		ACharacter* Raven = Cast<ACharacter>(Pawn);
+		if (!IsRavenVisualPawn(Pawn) || !Raven || !Raven->GetMesh() ||
+			Raven->FindComponentByClass<UProceduralMeshComponent>()) return;
+
+		USkeletalMeshComponent* PlaceholderBody = Raven->GetMesh();
+		PlaceholderBody->SetVisibility(false, false);
+		PlaceholderBody->SetHiddenInGame(true, false);
+		TArray<UStaticMeshComponent*> PlaceholderParts;
+		Raven->GetComponents<UStaticMeshComponent>(PlaceholderParts);
+		for (UStaticMeshComponent* Part : PlaceholderParts)
+			if (Part)
+			{
+				// This pawn uses the runtime bird silhouette below; hide every old static-mesh
+				// placeholder part, not just components whose names happen to identify a wing.
+				Part->SetVisibility(false, false);
+				Part->SetHiddenInGame(true, false);
+			}
+
+		USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenProceduralVisualRoot"), RF_Transient);
+		Raven->AddInstanceComponent(VisualRoot);
+		VisualRoot->SetupAttachment(PlaceholderBody);
+		VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation());
+		VisualRoot->SetRelativeRotation(FRotator::ZeroRotator);
+		VisualRoot->SetRelativeScale3D(FVector::OneVector);
+		VisualRoot->RegisterComponent();
+
+		FRavenProcMeshData Body;
+		AppendEllipsoid(Body, FVector(-1.f, 0.f, -2.f), FVector(41.f, 22.f, 23.f));
+		AppendEllipsoid(Body, FVector(17.f, 0.f, -1.f), FVector(27.f, 19.f, 23.f));
+		AppendEllipsoid(Body, FVector(34.f, 0.f, 20.f), FVector(17.f, 15.f, 17.f));
+		AppendEllipsoid(Body, FVector(-39.f, 0.f, -7.f), FVector(21.f, 13.f, 12.f));
+		AppendEllipsoid(Body, FVector(2.f, -10.f, -29.f), FVector(4.f, 4.f, 13.f));
+		AppendEllipsoid(Body, FVector(2.f, 10.f, -29.f), FVector(4.f, 4.f, 13.f));
+		AppendEllipsoid(Body, FVector(7.f, -13.f, -38.f), FVector(11.f, 3.f, 3.f));
+		AppendEllipsoid(Body, FVector(7.f, 13.f, -38.f), FVector(11.f, 3.f, 3.f));
+		UMaterialInstanceDynamic* BodyMaterial = MakeRavenMaterial(Raven, FLinearColor(0.012f, 0.018f, 0.028f, 1.f));
+		AddRavenMesh(Raven, VisualRoot, TEXT("RavenBodyMesh"), MoveTemp(Body), BodyMaterial);
+
+		FRavenProcMeshData Beak;
+		const FVector BeakBaseA(46.f, -7.f, 23.f), BeakBaseB(46.f, 7.f, 23.f), BeakBaseC(46.f, 6.f, 14.f), BeakBaseD(46.f, -6.f, 14.f);
+		const FVector BeakTip(72.f, 0.f, 11.f);
+		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseB, BeakTip);
+		AppendDoubleSidedTriangle(Beak, BeakBaseB, BeakBaseC, BeakTip);
+		AppendDoubleSidedTriangle(Beak, BeakBaseC, BeakBaseD, BeakTip);
+		AppendDoubleSidedTriangle(Beak, BeakBaseD, BeakBaseA, BeakTip);
+		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseD, BeakBaseC);
+		AppendDoubleSidedTriangle(Beak, BeakBaseA, BeakBaseC, BeakBaseB);
+		AddRavenMesh(Raven, VisualRoot, TEXT("RavenBeakMesh"), MoveTemp(Beak), MakeRavenMaterial(Raven, FLinearColor(0.055f, 0.065f, 0.08f, 1.f)));
+
+		FRavenProcMeshData Eyes;
+		AppendEllipsoid(Eyes, FVector(40.f, -13.4f, 22.f), FVector(4.f, 2.1f, 4.f), 10, 6);
+		AppendEllipsoid(Eyes, FVector(40.f, 13.4f, 22.f), FVector(4.f, 2.1f, 4.f), 10, 6);
+		AddRavenMesh(Raven, VisualRoot, TEXT("RavenEyeMesh"), MoveTemp(Eyes), MakeRavenMaterial(Raven, FLinearColor(0.5f, 0.31f, 0.08f, 1.f)));
+
+		FRavenProcMeshData Pupils;
+		AppendEllipsoid(Pupils, FVector(41.5f, -15.1f, 22.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
+		AppendEllipsoid(Pupils, FVector(41.5f, 15.1f, 22.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
+		AddRavenMesh(Raven, VisualRoot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
+
+		for (const float Side : { -1.f, 1.f })
+		{
+			USceneComponent* WingPivot = NewObject<USceneComponent>(Raven,
+				Side < 0.f ? TEXT("RavenLeftWingPivot") : TEXT("RavenRightWingPivot"), RF_Transient);
+			Raven->AddInstanceComponent(WingPivot);
+			WingPivot->SetupAttachment(VisualRoot);
+			WingPivot->SetRelativeLocation(FVector(1.f, Side * 15.f, 7.f));
+			WingPivot->RegisterComponent();
+			FRavenProcMeshData Wing;
+			AppendRavenWing(Wing, Side);
+			AddRavenMesh(Raven, WingPivot, Side < 0.f ? TEXT("RavenLeftWingFeathers") : TEXT("RavenRightWingFeathers"),
+				MoveTemp(Wing), MakeRavenMaterial(Raven, FLinearColor(0.018f, 0.029f, 0.048f, 1.f)));
+		}
+	}
+}
 
 ARavenAgentAIController::ARavenAgentAIController()
 {
@@ -32,6 +239,7 @@ bool ARavenAgentAIController::CanRest() const
 void ARavenAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	EnsureProceduralRavenAppearance(InPawn);
 	CacheWingComponents(InPawn);
 	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(InPawn))
 		if (Agent->RestPresentation) Agent->RestPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
@@ -48,6 +256,21 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 
 	TArray<USceneComponent*> Components;
 	Raven->GetComponents<USceneComponent>(Components);
+	for (USceneComponent* Component : Components)
+	{
+		if (!Component) continue;
+		const FString ComponentName = Component->GetName();
+		if (ComponentName == TEXT("RavenLeftWingPivot"))
+		{
+			LeftWing = Component;
+			LeftWingRestRotation = Component->GetRelativeRotation();
+		}
+		else if (ComponentName == TEXT("RavenRightWingPivot"))
+		{
+			RightWing = Component;
+			RightWingRestRotation = Component->GetRelativeRotation();
+		}
+	}
 	for (USceneComponent* Component : Components)
 	{
 		if (!Component) continue;
