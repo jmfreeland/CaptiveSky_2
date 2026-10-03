@@ -9,6 +9,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMinnowTest, "CaptiveSky2.Agent.TidepoolMinnows",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -55,14 +56,47 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	School->Weather = Weather;
+	School->ConfigureAppearance();
 	Weather->RefreshNightEcology();
 	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->DayMinnowSchool.Get() == School);
 	TestTrue(TEXT("The school is wild life, not a landmark, pet, or nest site"),
 		School->ActorHasTag(TEXT("IslandLife")) && School->ActorHasTag(TEXT("MinnowSchool")) &&
 		!School->ActorHasTag(TEXT("IslandLandmark")) && !School->ActorHasTag(TEXT("RavenNestSite")));
 	TestEqual(TEXT("The shallow-water school has a small bounded population"), School->Fish.Num(), 5);
-	for (UStaticMeshComponent* Minnow : School->Fish)
-		TestTrue(TEXT("Minnows are visual-only and nonblocking"), Minnow && Minnow->GetStaticMesh() && Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+	TestEqual(TEXT("Each fish has one articulated-looking tail fin"), School->Tails.Num(), School->Fish.Num());
+	TArray<FLinearColor> FishColors;
+	for (int32 Index = 0; Index < School->Fish.Num(); ++Index)
+	{
+		UStaticMeshComponent* Minnow = School->Fish[Index];
+		UStaticMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
+		TestTrue(TEXT("Minnows are visual-only and nonblocking"), Minnow && Minnow->GetStaticMesh() && Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
+		TestTrue(TEXT("Tail fins are visible meshes without collision or shadows"), Tail && Tail->GetStaticMesh() && Tail->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Tail->CastShadow);
+		UMaterialInstanceDynamic* FishMaterial = Minnow ? Cast<UMaterialInstanceDynamic>(Minnow->GetMaterial(0)) : nullptr;
+		if (FishMaterial)
+		{
+			const FLinearColor FishColor = FishMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			FishColors.Add(FishColor);
+			TestTrue(TEXT("Each tail shares its fish's stable color"), Tail && Tail->GetMaterial(0) == FishMaterial);
+		}
+	}
+	TestEqual(TEXT("Every fish receives an individual visual color"), FishColors.Num(), School->Fish.Num());
+	int32 DistinctColorCount = 0;
+	for (int32 Index = 0; Index < FishColors.Num(); ++Index)
+	{
+		bool bSeenColor = false;
+		for (int32 PriorIndex = 0; PriorIndex < Index; ++PriorIndex)
+			if (FishColors[Index].Equals(FishColors[PriorIndex], 0.001f)) { bSeenColor = true; break; }
+		if (!bSeenColor) ++DistinctColorCount;
+	}
+	TestEqual(TEXT("The small school uses stable, distinct natural color variants"), DistinctColorCount, School->Fish.Num());
+	if (School->Tails.Num() == School->Fish.Num())
+	{
+		const FRotator StableTailPose = School->Tails[0]->GetRelativeRotation();
+		School->Tick(0.f);
+		TestTrue(TEXT("Repeated update at the same swim phase keeps a stable tail pose"), School->Tails[0]->GetRelativeRotation().Equals(StableTailPose, 0.001f));
+		School->Tick(0.2f);
+		TestFalse(TEXT("Tail fins wag visibly as the fish swim"), School->Tails[0]->GetRelativeRotation().Equals(StableTailPose, 0.25f));
+	}
 
 	School->Tick(0.35f);
 	const FVector BeforeScatter = [&School]()

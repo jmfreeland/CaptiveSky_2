@@ -22,6 +22,7 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 	BaseShapeMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
 
 	Fish.Reserve(FishCount);
+	Tails.Reserve(FishCount);
 	for (int32 Index = 0; Index < FishCount; ++Index)
 	{
 		const FName ComponentName(*FString::Printf(TEXT("Minnow_%d"), Index));
@@ -32,6 +33,16 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 		Minnow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Minnow->SetCastShadow(false);
 		Fish.Add(Minnow);
+
+		const FName TailName(*FString::Printf(TEXT("MinnowTail_%d"), Index));
+		UStaticMeshComponent* Tail = CreateDefaultSubobject<UStaticMeshComponent>(TailName);
+		Tail->SetupAttachment(Minnow);
+		Tail->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
+		Tail->SetRelativeLocation(FVector(-0.9f, 0.f, 0.f));
+		Tail->SetRelativeScale3D(FVector(0.28f, 0.18f, 0.45f));
+		Tail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Tail->SetCastShadow(false);
+		Tails.Add(Tail);
 	}
 }
 
@@ -43,17 +54,31 @@ void AIslandTidepoolMinnows::BeginPlay()
 		Weather = *It;
 		break;
 	}
+	ConfigureAppearance();
+	UpdateSchool(0.f);
+}
+
+void AIslandTidepoolMinnows::ConfigureAppearance()
+{
 	if (BaseShapeMaterial)
 	{
-		UMaterialInstanceDynamic* Silver = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
-		if (Silver)
+		static const FLinearColor SchoolPalette[FishCount] =
 		{
-			Silver->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.42f, 0.68f, 0.76f));
-			for (UStaticMeshComponent* Minnow : Fish)
-				if (Minnow) Minnow->SetMaterial(0, Silver);
+			FLinearColor(0.42f, 0.68f, 0.76f),
+			FLinearColor(0.54f, 0.72f, 0.74f),
+			FLinearColor(0.60f, 0.70f, 0.62f),
+			FLinearColor(0.72f, 0.73f, 0.66f),
+			FLinearColor(0.44f, 0.61f, 0.72f)
+		};
+		for (int32 Index = 0; Index < Fish.Num(); ++Index)
+		{
+			UMaterialInstanceDynamic* FishMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			if (!FishMaterial) continue;
+			FishMaterial->SetVectorParameterValue(TEXT("Color"), SchoolPalette[Index % FishCount]);
+			if (Fish[Index]) Fish[Index]->SetMaterial(0, FishMaterial);
+			if (Tails.IsValidIndex(Index) && Tails[Index]) Tails[Index]->SetMaterial(0, FishMaterial);
 		}
 	}
-	UpdateSchool(0.f);
 }
 
 void AIslandTidepoolMinnows::RespondToQuietObservation(const FVector& ObserverLocation)
@@ -140,6 +165,12 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 		Facing += ScatterDirection * (ScatterAlpha * 1.2f);
 		if (!Facing.IsNearlyZero())
 			Minnow->SetRelativeRotation(FRotator(0.f, Facing.Rotation().Yaw, 0.f));
+
+		if (Tails.IsValidIndex(Index) && Tails[Index])
+		{
+			const float TailBeat = FMath::Sin(ElapsedSeconds * 8.f + Index * 1.35f);
+			Tails[Index]->SetRelativeRotation(FRotator(0.f, TailBeat * 16.f * TuckScale, TailBeat * 3.f));
+		}
 	}
 }
 

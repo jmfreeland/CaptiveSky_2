@@ -33,6 +33,8 @@ private:
 	static constexpr int32 FishCount = 5;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UStaticMeshComponent>> Fish;
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TArray<TObjectPtr<UStaticMeshComponent>> Tails;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseShapeMaterial;
 	TWeakObjectPtr<AIslandWeather> Weather;
@@ -47,6 +49,7 @@ private:
 
 	float GetScatterAlpha() const;
 	float GetSurfacePulseAlpha() const;
+	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
 	void UpdateSchool(float RainIntensity);
 };
