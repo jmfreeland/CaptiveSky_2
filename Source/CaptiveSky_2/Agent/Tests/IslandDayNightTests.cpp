@@ -66,10 +66,27 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("The starfield has six progressive twilight groups"), Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount);
 		int32 ProceduralStarVertices = 0;
+		float SmallestStarWidth = TNumericLimits<float>::Max();
+		float LargestStarWidth = 0.f;
 		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
 			if (const FProcMeshSection* Section = Clock->Starfield->GetProcMeshSection(SectionIndex))
+			{
 				ProceduralStarVertices += Section->ProcVertexBuffer.Num();
+				for (int32 VertexIndex = 0; VertexIndex + 3 < Section->ProcVertexBuffer.Num(); VertexIndex += 4)
+				{
+					const float StarWidth = FVector::Dist(Section->ProcVertexBuffer[VertexIndex].Position,
+						Section->ProcVertexBuffer[VertexIndex + 1].Position);
+					SmallestStarWidth = FMath::Min(SmallestStarWidth, StarWidth);
+					LargestStarWidth = FMath::Max(LargestStarWidth, StarWidth);
+				}
+			}
 		TestEqual(TEXT("The seeded starfield contains the complete fixed population"), ProceduralStarVertices, AIslandDayNight::NightStarCount * 4);
+		const float MinimumStarPixelsAt1080p = (SmallestStarWidth / AIslandDayNight::NightStarShellRadius) *
+			(180.f / PI) * (1920.f / 90.f);
+		TestTrue(TEXT("Gameplay-scale star cards are no longer sub-pixel at 1080p/90-degree FOV"), MinimumStarPixelsAt1080p >= 1.f);
+		TestTrue(TEXT("Random star cards remain within the authored size envelope"),
+			SmallestStarWidth >= AIslandDayNight::NightStarHalfSizeMin * 2.f &&
+			LargestStarWidth <= AIslandDayNight::NightStarHalfSizeMax * 2.f);
 	}
 	Clock->CurrentHour = 12.f;
 	Clock->DayNumber = 1;

@@ -881,13 +881,29 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandShrubs->IsVisible());
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
-		TestTrue(TEXT("Sparse rhododendron accents reach open meadows while preserving nonblocking woodland placement"),
+		int32 MeadowFlowerInstanceCount = 0;
+		int32 MeadowFlowerBaselineCount = 0;
+		bool bMeadowFlowersAreNonblocking = PreviewWeather->IslandMeadowFlowers.Num() == AIslandWeather::MeadowFlowerSpeciesCount;
+		for (int32 SpeciesIndex = 0; SpeciesIndex < PreviewWeather->IslandMeadowFlowers.Num(); ++SpeciesIndex)
+		{
+			const UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = PreviewWeather->IslandMeadowFlowers[SpeciesIndex];
+			MeadowFlowerInstanceCount += FlowerSpecies ? FlowerSpecies->GetInstanceCount() : 0;
+			MeadowFlowerBaselineCount += PreviewWeather->IslandMeadowFlowerBaseTransforms.IsValidIndex(SpeciesIndex)
+				? PreviewWeather->IslandMeadowFlowerBaseTransforms[SpeciesIndex].Num() : 0;
+			bMeadowFlowersAreNonblocking &= FlowerSpecies && FlowerSpecies->GetStaticMesh() &&
+				FlowerSpecies->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+				!FlowerSpecies->CanEverAffectNavigation() && FlowerSpecies->IsVisible();
+		}
+		TestTrue(TEXT("Fab meadow flowers and separate woodland rhododendrons stay within the capped nonblocking population"),
+			MeadowFlowerInstanceCount > 250 && MeadowFlowerInstanceCount <= 512 &&
 			PreviewWeather->GroundCoverFlowerCount > 1500 && PreviewWeather->GroundCoverFlowerCount <= 2100 &&
-			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount &&
+			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount - MeadowFlowerInstanceCount &&
 			PreviewWeather->IslandRhododendrons->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
-			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
+			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible() &&
+			bMeadowFlowersAreNonblocking);
 		TestEqual(TEXT("Every flowering rhododendron has an immutable wind-sway baseline"),
-			PreviewWeather->IslandRhododendronBaseTransforms.Num(), PreviewWeather->GroundCoverFlowerCount);
+			PreviewWeather->IslandRhododendronBaseTransforms.Num(), PreviewWeather->GroundCoverFlowerCount - MeadowFlowerInstanceCount);
+		TestEqual(TEXT("Every Fab meadow flower has an immutable wind-sway baseline"), MeadowFlowerBaselineCount, MeadowFlowerInstanceCount);
 		TestTrue(TEXT("Tideglass wet-edge planting stays capped and nonblocking"),
 			TideglassPoolCount > 0 && PreviewWeather->GroundCoverWetlandCount > 0 &&
 			PreviewWeather->GroundCoverWetlandCount <= TideglassPoolCount * 10 &&
@@ -1120,7 +1136,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
 			MatureSpruceCount, SaplingCount, PreviewWeather->GroundCoverShrubCount));
-		AddInfo(FString::Printf(TEXT("Woodland understorey adds %d nonblocking flowering rhododendrons."), PreviewWeather->GroundCoverFlowerCount));
+		AddInfo(FString::Printf(TEXT("Woodland understorey adds %d nonblocking rhododendrons and %d Fab meadow flowers."),
+			PreviewWeather->GroundCoverFlowerCount - MeadowFlowerInstanceCount, MeadowFlowerInstanceCount));
 		if (bGroundCoverSwayPreview)
 		{
 			AActor* Tideglass = nullptr;

@@ -138,6 +138,26 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->InitializeGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
+	TestEqual(TEXT("Three collisionless HISM components carry the new Fab meadow flowers"),
+		Weather->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
+	const TCHAR* MeadowFlowerPaths[AIslandWeather::MeadowFlowerSpeciesCount] = {
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_17_01.flower_17_01") };
+	for (int32 SpeciesIndex = 0; SpeciesIndex < Weather->IslandMeadowFlowers.Num(); ++SpeciesIndex)
+	{
+		UStaticMesh* MeadowFlowerMesh = LoadObject<UStaticMesh>(nullptr, MeadowFlowerPaths[SpeciesIndex]);
+		TestNotNull(FString::Printf(TEXT("Fab meadow flower mesh %d is available"), SpeciesIndex), MeadowFlowerMesh);
+		TestNotNull(FString::Printf(TEXT("Fab meadow flower HISM %d is present"), SpeciesIndex), Weather->IslandMeadowFlowers[SpeciesIndex].Get());
+		if (Weather->IslandMeadowFlowers[SpeciesIndex])
+		{
+			TestTrue(TEXT("Imported flowers stay nonblocking and outside navigation"),
+				Weather->IslandMeadowFlowers[SpeciesIndex]->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+				!Weather->IslandMeadowFlowers[SpeciesIndex]->CanEverAffectNavigation());
+			TestEqual(FString::Printf(TEXT("Fab meadow flower HISM %d uses its matching imported mesh"), SpeciesIndex),
+				Weather->IslandMeadowFlowers[SpeciesIndex]->GetStaticMesh().Get(), MeadowFlowerMesh);
+		}
+	}
 	const FBox SpruceLocalBounds = Weather->IslandSpruce->GetStaticMesh()->GetBoundingBox();
 	const float SpruceMeshHeight = SpruceLocalBounds.GetSize().Z;
 	TestTrue(TEXT("The fixture can inspect the loaded spruce crown bounds"), SpruceMeshHeight > KINDA_SMALL_NUMBER);
@@ -185,6 +205,25 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Spatial patches use all six existing species with a reasonably balanced distribution"),
 		MinimumSpeciesCells >= 2 && MaximumSpeciesCells <= 14);
+	const FVector FlowerPatchProbe(-100500.f, 100500.f, 0.f);
+	TestEqual(TEXT("A meadow flower patch selects the same species for the same seed and cell"),
+		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71), AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71));
+	TestEqual(TEXT("Nearby meadow flowers share a botanical color patch"),
+		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71),
+		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71));
+	int32 MeadowFlowerSpeciesCounts[AIslandWeather::MeadowFlowerSpeciesCount] = {};
+	for (int32 X = 0; X < 12; ++X)
+		for (int32 Y = 0; Y < 12; ++Y)
+			++MeadowFlowerSpeciesCounts[AIslandWeather::SelectMeadowFlowerVariant(FVector(X * 2000.f, Y * 2000.f, 0.f), 71)];
+	int32 MinimumFlowerPatches = MAX_int32;
+	int32 MaximumFlowerPatches = 0;
+	for (int32 Count : MeadowFlowerSpeciesCounts)
+	{
+		MinimumFlowerPatches = FMath::Min(MinimumFlowerPatches, Count);
+		MaximumFlowerPatches = FMath::Max(MaximumFlowerPatches, Count);
+	}
+	TestTrue(TEXT("All three imported flower forms occupy balanced, spatially coherent meadow patches"),
+		MinimumFlowerPatches >= 30 && MaximumFlowerPatches <= 60);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +

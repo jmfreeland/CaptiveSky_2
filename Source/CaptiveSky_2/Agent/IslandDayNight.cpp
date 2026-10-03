@@ -79,7 +79,6 @@ void AIslandDayNight::OnConstruction(const FTransform& Transform)
 void AIslandDayNight::BuildStarfield()
 {
 	if (!Starfield || !StarMaterial || Starfield->GetNumSections() > 0) return;
-	constexpr float ShellRadius = 2000000.f; // 20 km, beyond the island weather layer.
 	TArray<FVector> Vertices[NightStarSectionCount];
 	TArray<int32> Triangles[NightStarSectionCount];
 	TArray<FVector> Normals[NightStarSectionCount];
@@ -98,8 +97,10 @@ void AIslandDayNight::BuildStarfield()
 		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(Direction, FVector::RightVector).GetSafeNormal();
 		const FVector Up = FVector::CrossProduct(Right, Direction).GetSafeNormal();
 		const FVector Normal = -Direction;
-		const float HalfSize = Random.FRandRange(350.f, 900.f);
-		const FVector Center = Direction * ShellRadius;
+		// The previous 3.5–9 m half-sizes projected to mostly sub-pixel cards at
+		// this 20 km shell, so even 1,200 stars disappeared in ordinary captures.
+		const float HalfSize = Random.FRandRange(NightStarHalfSizeMin, NightStarHalfSizeMax);
+		const FVector Center = Direction * NightStarShellRadius;
 		const int32 SectionIndex = Random.RandRange(0, NightStarSectionCount - 1);
 		const int32 FirstVertex = Vertices[SectionIndex].Num();
 		Vertices[SectionIndex].Add(Center - Right * HalfSize - Up * HalfSize);

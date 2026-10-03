@@ -44,6 +44,10 @@ public:
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
 	static constexpr int32 NightStarCount = 1200;
 	static constexpr int32 NightStarSectionCount = 6;
+	/** The sky-shell radius and card half-size keep stars above a pixel at gameplay scale. */
+	static constexpr float NightStarShellRadius = 2000000.f;
+	static constexpr float NightStarHalfSizeMin = 1200.f;
+	static constexpr float NightStarHalfSizeMax = 2400.f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
 	UProceduralMeshComponent* Starfield = nullptr;

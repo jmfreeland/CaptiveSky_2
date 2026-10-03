@@ -121,6 +121,25 @@ AIslandWeather::AIslandWeather()
 	IslandRhododendrons->SetCastShadow(false);
 	IslandRhododendrons->bReceivesDecals = false;
 	IslandRhododendrons->SetVisibility(false);
+	IslandMeadowFlowers.Reserve(MeadowFlowerSpeciesCount);
+	IslandMeadowFlowerBaseTransforms.SetNum(MeadowFlowerSpeciesCount);
+	SwayedMeadowFlowerIndices.SetNum(MeadowFlowerSpeciesCount);
+	MeadowFlowerCells.SetNum(MeadowFlowerSpeciesCount);
+	const FName MeadowFlowerComponentNames[MeadowFlowerSpeciesCount] =
+		{ TEXT("IslandMeadowFlowerA"), TEXT("IslandMeadowFlowerB"), TEXT("IslandMeadowFlowerC") };
+	for (int32 SpeciesIndex = 0; SpeciesIndex < MeadowFlowerSpeciesCount; ++SpeciesIndex)
+	{
+		UHierarchicalInstancedStaticMeshComponent* MeadowFlower =
+			CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(MeadowFlowerComponentNames[SpeciesIndex]);
+		MeadowFlower->SetupAttachment(RootComponent);
+		MeadowFlower->SetMobility(EComponentMobility::Movable);
+		MeadowFlower->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		MeadowFlower->SetCanEverAffectNavigation(false);
+		MeadowFlower->SetCastShadow(false);
+		MeadowFlower->bReceivesDecals = false;
+		MeadowFlower->SetVisibility(false);
+		IslandMeadowFlowers.Add(MeadowFlower);
+	}
 	IslandCattails = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandCattails"));
 	IslandCattails->SetupAttachment(RootComponent);
 	IslandCattails->SetMobility(EComponentMobility::Movable);
@@ -151,6 +170,9 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowBMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerA(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerB(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerC(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_17_01.flower_17_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CattailMesh(TEXT("/Game/Plants/Meshes/Typha_latifolia_LD.Typha_latifolia_LD"));
 	if (GrassMeshA.Succeeded()) ShoreGrassA->SetStaticMesh(GrassMeshA.Object);
 	if (GrassMeshB.Succeeded()) ShoreGrassB->SetStaticMesh(GrassMeshB.Object);
@@ -161,6 +183,9 @@ AIslandWeather::AIslandWeather()
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
+	if (MeadowFlowerA.Succeeded()) IslandMeadowFlowers[0]->SetStaticMesh(MeadowFlowerA.Object);
+	if (MeadowFlowerB.Succeeded()) IslandMeadowFlowers[1]->SetStaticMesh(MeadowFlowerB.Object);
+	if (MeadowFlowerC.Succeeded()) IslandMeadowFlowers[2]->SetStaticMesh(MeadowFlowerC.Object);
 	if (CattailMesh.Succeeded()) IslandCattails->SetStaticMesh(CattailMesh.Object);
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RainMaterial(TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	if (RainMaterial.Succeeded()) RainStreaks->SetMaterial(0, RainMaterial.Object);
@@ -243,6 +268,21 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	return static_cast<int32>(Hash % 9u);
 }
 
+int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed)
+{
+	// Keep flower color/shape in coarse 18 m patches, not an alternating per-instance mix.
+	constexpr float FlowerPatchSize = 1800.f;
+	const uint32 CellX = static_cast<uint32>(FMath::FloorToInt(Position.X / FlowerPatchSize));
+	const uint32 CellY = static_cast<uint32>(FMath::FloorToInt(Position.Y / FlowerPatchSize));
+	uint32 Hash = CellX * 0x8da6b343u ^ CellY * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
+	Hash ^= Hash >> 16;
+	Hash *= 0x7feb352du;
+	Hash ^= Hash >> 15;
+	Hash *= 0x846ca68bu;
+	Hash ^= Hash >> 16;
+	return static_cast<int32>(Hash % MeadowFlowerSpeciesCount);
+}
+
 FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 	double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
 {
@@ -301,10 +341,15 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandShrubs->ClearInstances();
 	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
+	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
+		if (MeadowFlower) MeadowFlower->ClearInstances();
 	if (IslandCattails) IslandCattails->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
+	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();
+	for (TArray<int32>& Indices : SwayedMeadowFlowerIndices) Indices.Reset();
+	for (TMap<FIntPoint, TArray<int32>>& Cells : MeadowFlowerCells) Cells.Reset();
 	SwayedShoreGrassAIndices.Reset();
 	SwayedShoreGrassBIndices.Reset();
 	SwayedShoreGrassCIndices.Reset();
@@ -892,6 +937,7 @@ void AIslandWeather::InitializeGroundCover()
 				const int32 GroveFlowerCount = GroundCoverFlowerCount;
 				int32 MeadowFlowerTraceCount = 0;
 				int32 MeadowFlowerPatchCount = 0;
+				int32 MeadowFlowerSpeciesCounts[MeadowFlowerSpeciesCount] = {};
 				constexpr int32 MeadowFlowerCandidateSites = 512;
 				const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
 					? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
@@ -930,24 +976,32 @@ void AIslandWeather::InitializeGroundCover()
 								FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 								FlowerHit.GetActor() != IslandLandscape || FlowerHit.ImpactNormal.Z < 0.72f || FlowerHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
 
-							const float TargetHeight = MeadowFlowerRandom.FRandRange(135.f, 185.f);
-							const FVector Scale(TargetHeight / (2.f * RhododendronBounds.BoxExtent.Z));
+							const int32 SpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
+							UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers.IsValidIndex(SpeciesIndex)
+								? IslandMeadowFlowers[SpeciesIndex] : nullptr;
+							const FBoxSphereBounds FlowerBounds = FlowerSpecies && FlowerSpecies->GetStaticMesh()
+								? FlowerSpecies->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
+							if (!FlowerSpecies || FlowerBounds.BoxExtent.Z <= KINDA_SMALL_NUMBER) continue;
+							const float TargetHeight = MeadowFlowerRandom.FRandRange(55.f, 90.f);
+							const FVector Scale(TargetHeight / (2.f * FlowerBounds.BoxExtent.Z));
 							const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, FlowerHit.ImpactNormal);
 							const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
 								FMath::DegreesToRadians(MeadowFlowerRandom.FRandRange(0.f, 360.f)));
-							const FVector MeshBottom(RhododendronBounds.Origin.X, RhododendronBounds.Origin.Y,
-								RhododendronBounds.Origin.Z - RhododendronBounds.BoxExtent.Z);
+							const FVector MeshBottom(FlowerBounds.Origin.X, FlowerBounds.Origin.Y,
+								FlowerBounds.Origin.Z - FlowerBounds.BoxExtent.Z);
 							const FVector Location = FlowerHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
-							IslandRhododendrons->AddInstance(FTransform(Rotation, Location, Scale), true);
+							FlowerSpecies->AddInstance(FTransform(Rotation, Location, Scale), true);
 							RhododendronLocations.Add(FlowerHit.ImpactPoint);
 							++GroundCoverFlowerCount;
 							++MeadowFlowerPatchCount;
+							++MeadowFlowerSpeciesCounts[SpeciesIndex];
 							bPlacedMeadowFlower = true;
 						}
 					}
 				}
-				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d flowering rhododendrons across %d sampled sites after %d bounded traces."),
-					MeadowFlowerPatchCount, MeadowFlowerCandidateSites, MeadowFlowerTraceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d pale stem, %d broad-petal, %d yellow) across %d sampled sites after %d bounded traces."),
+					MeadowFlowerPatchCount, MeadowFlowerSpeciesCounts[0], MeadowFlowerSpeciesCounts[1], MeadowFlowerSpeciesCounts[2],
+					MeadowFlowerCandidateSites, MeadowFlowerTraceCount);
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
@@ -963,6 +1017,9 @@ void AIslandWeather::InitializeGroundCover()
 	IslandShrubBaseTransforms.Reset(IslandShrubs ? IslandShrubs->GetInstanceCount() : 0);
 	IslandRhododendronBaseTransforms.Reset(IslandRhododendrons ? IslandRhododendrons->GetInstanceCount() : 0);
 	IslandCattailBaseTransforms.Reset(IslandCattails ? IslandCattails->GetInstanceCount() : 0);
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num(); ++SpeciesIndex)
+		IslandMeadowFlowerBaseTransforms[SpeciesIndex].Reset(IslandMeadowFlowers[SpeciesIndex]
+			? IslandMeadowFlowers[SpeciesIndex]->GetInstanceCount() : 0);
 	for (int32 Index = 0; Index < ShoreGrassA->GetInstanceCount(); ++Index)
 	{
 		FTransform Transform;
@@ -1011,6 +1068,14 @@ void AIslandWeather::InitializeGroundCover()
 			FTransform Transform;
 			if (IslandRhododendrons->GetInstanceTransform(Index, Transform, false)) IslandRhododendronBaseTransforms.Add(Transform);
 		}
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num(); ++SpeciesIndex)
+		if (IslandMeadowFlowers[SpeciesIndex])
+			for (int32 Index = 0; Index < IslandMeadowFlowers[SpeciesIndex]->GetInstanceCount(); ++Index)
+			{
+				FTransform Transform;
+				if (IslandMeadowFlowers[SpeciesIndex]->GetInstanceTransform(Index, Transform, false))
+					IslandMeadowFlowerBaseTransforms[SpeciesIndex].Add(Transform);
+			}
 	if (IslandCattails)
 		for (int32 Index = 0; Index < IslandCattails->GetInstanceCount(); ++Index)
 		{
@@ -1036,6 +1101,9 @@ void AIslandWeather::InitializeGroundCover()
 	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
 	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
 	BuildSwayCells(IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells);
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowerBaseTransforms.Num(); ++SpeciesIndex)
+		BuildSwayCells(IslandMeadowFlowerBaseTransforms[SpeciesIndex], 0,
+			IslandMeadowFlowerBaseTransforms[SpeciesIndex].Num(), MeadowFlowerCells[SpeciesIndex]);
 	BuildSwayCells(IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells);
 	BuildSwayCells(IslandSpruceBaseTransforms, 0, IslandSpruceBaseTransforms.Num(), SpruceCells);
 
@@ -1048,7 +1116,9 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowB->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
-	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(GroundCoverFlowerCount > 0, true);
+	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
+	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
+		if (MeadowFlower) MeadowFlower->SetVisibility(MeadowFlower->GetInstanceCount() > 0, true);
 	if (IslandCattails) IslandCattails->SetVisibility(GroundCoverWetlandCount > 0, true);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
@@ -1065,10 +1135,13 @@ void AIslandWeather::ClearGroundCover()
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
 	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
+	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
+		if (MeadowFlower) { MeadowFlower->ClearInstances(); MeadowFlower->SetVisibility(false, true); }
 	if (IslandCattails) { IslandCattails->ClearInstances(); IslandCattails->SetVisibility(false, true); }
 	IslandSpruceBaseTransforms.Reset();
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
+	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();
 	IslandCattailBaseTransforms.Reset();
 	ShoreGrassABaseTransforms.Reset();
 	ShoreGrassBBaseTransforms.Reset();
@@ -1083,6 +1156,7 @@ void AIslandWeather::ClearGroundCover()
 	SwayedGroundPlantLowBIndices.Reset();
 	SwayedShrubIndices.Reset();
 	SwayedRhododendronIndices.Reset();
+	for (TArray<int32>& Indices : SwayedMeadowFlowerIndices) Indices.Reset();
 	SwayedCattailIndices.Reset();
 	ShoreGrassACells.Reset();
 	ShoreGrassBCells.Reset();
@@ -1092,6 +1166,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundPlantLowBCells.Reset();
 	ShrubCells.Reset();
 	RhododendronCells.Reset();
+	for (TMap<FIntPoint, TArray<int32>>& Cells : MeadowFlowerCells) Cells.Reset();
 	CattailCells.Reset();
 	SwayedSpruceIndices.Reset();
 	SpruceCells.Reset();
@@ -1223,6 +1298,12 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
 	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
 	UpdateSpecies(IslandRhododendrons, IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells, SwayedRhododendronIndices);
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num() &&
+		SpeciesIndex < IslandMeadowFlowerBaseTransforms.Num() && SpeciesIndex < MeadowFlowerCells.Num() &&
+		SpeciesIndex < SwayedMeadowFlowerIndices.Num(); ++SpeciesIndex)
+		UpdateSpecies(IslandMeadowFlowers[SpeciesIndex], IslandMeadowFlowerBaseTransforms[SpeciesIndex], 0,
+			IslandMeadowFlowerBaseTransforms[SpeciesIndex].Num(), MeadowFlowerCells[SpeciesIndex],
+			SwayedMeadowFlowerIndices[SpeciesIndex]);
 	UpdateSpecies(IslandCattails, IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells, SwayedCattailIndices);
 	UpdateSpruceSway(FocusPoints, FoliageSwayFocusRadius);
 }

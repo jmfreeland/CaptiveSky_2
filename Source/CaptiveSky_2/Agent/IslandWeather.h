@@ -63,6 +63,8 @@ public:
 	double WeatherTimeOffset = 0.0;
 	/** Storms add up to this fraction on top of the usual wind. */
 	static constexpr float StormWindBoost = 0.9f;
+	/** Number of visually distinct Fab flower meshes used for the capped meadow accents. */
+	static constexpr int32 MeadowFlowerSpeciesCount = 3;
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
@@ -198,6 +200,8 @@ private:
 		TArray<FTransform>& OutTransforms);
 	/** Select a stable species for a world-space botanical patch; 0..2 are plants and 3..5 are grasses. */
 	static int32 SelectGroundCoverVariant(const FVector& Position, int32 Seed);
+	/** Select one stable Fab flower species for a world-space meadow patch. */
+	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
@@ -253,4 +257,9 @@ private:
 	int32 GroundCoverWetlandCount = 0;
 	TArray<int32> SwayedCattailIndices;
 	TMap<FIntPoint, TArray<int32>> CattailCells;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
+	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> IslandMeadowFlowers;
+	TArray<TArray<FTransform>> IslandMeadowFlowerBaseTransforms;
+	TArray<TArray<int32>> SwayedMeadowFlowerIndices;
+	TArray<TMap<FIntPoint, TArray<int32>>> MeadowFlowerCells;
 };
