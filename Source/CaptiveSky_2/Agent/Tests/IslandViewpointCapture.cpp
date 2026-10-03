@@ -844,7 +844,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		for (TActorIterator<AActor> It(Island); It; ++It)
 			if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("TideglassPool"))) ++TideglassPoolCount;
 		TestTrue(TEXT("The Island landscape receives at least one separated meadow patch"), PreviewWeather->GroundCoverMeadowInstanceCount > 0);
-		TestTrue(TEXT("The Island uses the actual 512-patch meadow budget rather than counting candidate centers twice"),
+		TestTrue(TEXT("The Island uses the bounded landscape meadow budget rather than counting candidate centers twice"),
 			PreviewWeather->GroundCoverMeadowInstanceCount >= 850000);
 		const int32 IslandPlantCount = PreviewWeather->ShoreGroundPlants->GetInstanceCount() + PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount() +
 			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount();

@@ -525,11 +525,13 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
-		constexpr int32 MeadowPatchCount = 512;
+		constexpr int32 MeadowPatchCount = 768;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		constexpr int32 MeadowClumpsPerPatch = 1920;
+		constexpr int32 MeadowClumpsPerPatch = 1280;
+		constexpr int32 MeadowPatchProbeCount = 5040;
 		constexpr float MeadowPatchInnerRadius = 250.f;
 		constexpr float MeadowPatchOuterRadius = 1600.f;
+		constexpr float LandscapeMeadowPatchOuterRadius = 2200.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
@@ -539,12 +541,12 @@ void AIslandWeather::InitializeGroundCover()
 		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
 		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
 		auto AddMeadowPatch = [this, &MeadowCenters, &MeadowRandom, &MeadowTraceCount, &TraceTop, &TraceBottom, &PlaceFoliage,
-			&Query, MeadowClumpsPerPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, SeaLevel](FVector Center)
+			&Query, MeadowClumpsPerPatch, MeadowPatchInnerRadius, SeaLevel](FVector Center, float PatchOuterRadius)
 		{
 			MeadowCenters.Add(Center);
 			TArray<FTransform> PatchOffsets;
 			const int32 PatchSeed = static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ (0x3e5a93b7u + MeadowCenters.Num() * 7919u));
-			BuildGroundCoverOffsets(PatchSeed, MeadowClumpsPerPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, PatchOffsets);
+			BuildGroundCoverOffsets(PatchSeed, MeadowClumpsPerPatch, MeadowPatchInnerRadius, PatchOuterRadius, PatchOffsets);
 			for (int32 ClumpIndex = 0; ClumpIndex < PatchOffsets.Num(); ++ClumpIndex)
 			{
 				const FVector PatchCandidate = MeadowCenters.Last() + PatchOffsets[ClumpIndex].GetLocation();
@@ -586,12 +588,12 @@ void AIslandWeather::InitializeGroundCover()
 					if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
 				FVector MeadowCenter;
 				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-				AddMeadowPatch(MeadowCenter);
+				AddMeadowPatch(MeadowCenter, MeadowPatchOuterRadius);
 				++AddedForAnchor;
 			}
 		}
 		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
-		for (int32 Probe = 0; Probe < 3360 && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
+		for (int32 Probe = 0; Probe < MeadowPatchProbeCount && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
 		{
 			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
 				MeadowRandom.FRandRange(BoundsOrigin.Y - BoundsExtent.Y, BoundsOrigin.Y + BoundsExtent.Y), BoundsOrigin.Z);
@@ -604,7 +606,9 @@ void AIslandWeather::InitializeGroundCover()
 				if (FVector::Dist2D(Candidate, ExistingCenter) < MeadowCenterSpacing) { bNearOtherPatch = true; break; }
 			FVector MeadowCenter;
 			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-			AddMeadowPatch(MeadowCenter);
+			// Wider, overlapping landscape patches soften the bare gaps without increasing the fixed
+			// million-instance budget; anchor-side verges keep their smaller authored radius above.
+			AddMeadowPatch(MeadowCenter, LandscapeMeadowPatchOuterRadius);
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
 		// The patch population is recorded separately from the closer anchor rings for capture diagnostics.
