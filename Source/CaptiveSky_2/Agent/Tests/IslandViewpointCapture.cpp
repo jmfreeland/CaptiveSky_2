@@ -869,8 +869,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			PreviewWeather->IslandShrubs->IsVisible());
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
-		TestTrue(TEXT("Flowering rhododendrons remain a sparse accent with nonblocking woodland placement"),
-			PreviewWeather->GroundCoverFlowerCount > 480 && PreviewWeather->GroundCoverFlowerCount <= 1500 &&
+		TestTrue(TEXT("Sparse rhododendron accents reach open meadows while preserving nonblocking woodland placement"),
+			PreviewWeather->GroundCoverFlowerCount > 1500 && PreviewWeather->GroundCoverFlowerCount <= 1900 &&
 			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount &&
 			PreviewWeather->IslandRhododendrons->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
@@ -967,7 +967,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				continue;
 			}
 			const float FlowerHeight = FlowerTransform.GetScale3D().Z * 2.f * RhododendronBounds.BoxExtent.Z;
-			bRhododendronsStayInsideHeightBand &= FlowerHeight >= 179.9f && FlowerHeight <= 240.1f;
+			bRhododendronsStayInsideHeightBand &= FlowerHeight >= 134.9f && FlowerHeight <= 240.1f;
 			const FVector PlantingPoint = FlowerTransform.TransformPosition(RhododendronBottomOffset);
 			for (const FVector& Anchor : WoodlandClearanceAnchors)
 			{
@@ -995,7 +995,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			}
 			RhododendronPlantingPoints.Add(PlantingPoint);
 		}
-		TestTrue(TEXT("Flowering rhododendrons stay in the authored 1.8–2.4 m size band"), bRhododendronsStayInsideHeightBand);
+		TestTrue(TEXT("Flowering rhododendrons stay in the authored 1.35–2.4 m size band"), bRhododendronsStayInsideHeightBand);
 		AddInfo(FString::Printf(TEXT("Rhododendron minimum clearances in cm: landmark %.1f, tree %.1f, shrub %.1f, flower %.1f (%d plants)"),
 			MinRhododendronLandmarkClearance, MinRhododendronTreeClearance, MinRhododendronShrubClearance,
 			MinRhododendronSpacing, RhododendronPlantingPoints.Num()));

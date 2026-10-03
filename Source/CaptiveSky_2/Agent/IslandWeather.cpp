@@ -593,6 +593,7 @@ void AIslandWeather::InitializeGroundCover()
 			}
 		}
 		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
+		const int32 FirstLandscapeMeadowPatch = MeadowCenters.Num();
 		for (int32 Probe = 0; Probe < MeadowPatchProbeCount && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
 		{
 			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
@@ -853,8 +854,70 @@ void AIslandWeather::InitializeGroundCover()
 						}
 					}
 				}
-			UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
-				GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroundCoverFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+				const int32 GroveFlowerCount = GroundCoverFlowerCount;
+				int32 MeadowFlowerTraceCount = 0;
+				int32 MeadowFlowerPatchCount = 0;
+				const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
+					? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
+				if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
+				{
+					// Break up open grass with an occasional wind-reactive flowering shrub. Only broad
+					// landscape patches participate; anchor verges retain their intentionally open read.
+					constexpr int32 FlowerEveryLandscapePatch = 2;
+					constexpr int32 MaxFlowerTracesPerPatch = 12;
+					constexpr float FlowerPatchInnerRadius = 650.f;
+					constexpr float FlowerPatchOuterRadius = 1450.f;
+					constexpr float FlowerMinSpacing = 475.f;
+					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
+					for (int32 PatchIndex = FirstLandscapeMeadowPatch;
+						PatchIndex < MeadowCenters.Num(); PatchIndex += FlowerEveryLandscapePatch)
+					{
+						bool bPlacedMeadowFlower = false;
+						for (int32 Attempt = 0; Attempt < MaxFlowerTracesPerPatch && !bPlacedMeadowFlower; ++Attempt)
+						{
+							const float Angle = MeadowFlowerRandom.FRandRange(0.f, 2.f * PI);
+							const float Radius = MeadowFlowerRandom.FRandRange(FlowerPatchInnerRadius, FlowerPatchOuterRadius);
+							const FVector Candidate = MeadowCenters[PatchIndex] + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+							bool bTooClose = false;
+							for (const FVector& Exclusion : ExclusionLocations)
+								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
+							if (bTooClose) continue;
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerMinSpacing) { bTooClose = true; break; }
+							if (!bTooClose)
+								for (const FVector& ExistingTree : SpruceLocations)
+									if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
+							if (!bTooClose)
+								for (const FVector& ExistingShrub : ShrubLocations)
+									if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
+							if (bTooClose) continue;
+
+							FHitResult FlowerHit;
+							++MeadowFlowerTraceCount;
+							if (!GetWorld()->LineTraceSingleByChannel(FlowerHit,
+								FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+								FlowerHit.GetActor() != IslandLandscape || FlowerHit.ImpactNormal.Z < 0.72f || FlowerHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
+
+							const float TargetHeight = MeadowFlowerRandom.FRandRange(135.f, 185.f);
+							const FVector Scale(TargetHeight / (2.f * RhododendronBounds.BoxExtent.Z));
+							const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, FlowerHit.ImpactNormal);
+							const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
+								FMath::DegreesToRadians(MeadowFlowerRandom.FRandRange(0.f, 360.f)));
+							const FVector MeshBottom(RhododendronBounds.Origin.X, RhododendronBounds.Origin.Y,
+								RhododendronBounds.Origin.Z - RhododendronBounds.BoxExtent.Z);
+							const FVector Location = FlowerHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+							IslandRhododendrons->AddInstance(FTransform(Rotation, Location, Scale), true);
+							RhododendronLocations.Add(FlowerHit.ImpactPoint);
+							++GroundCoverFlowerCount;
+							++MeadowFlowerPatchCount;
+							bPlacedMeadowFlower = true;
+						}
+					}
+				}
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d flowering rhododendrons across %d patches after %d bounded traces."),
+					MeadowFlowerPatchCount, MeadowFlowerPatchCount, MeadowFlowerTraceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
+					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
 	}
 	}
