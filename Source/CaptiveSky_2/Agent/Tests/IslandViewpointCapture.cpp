@@ -859,10 +859,11 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The denser Island meadow accepts at least 1.6 million terrain-filtered instances"),
 			PreviewWeather->GroundCoverMeadowInstanceCount >= 1600000);
 		const int32 IslandPlantCount = PreviewWeather->ShoreGroundPlants->GetInstanceCount() + PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount() +
-			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount();
-		TestTrue(TEXT("Broadleaf ground plants occupy about one-third of the Island scatter without expanding its total budget"),
-			PreviewWeather->GroundCoverInstanceCount > 0 && IslandPlantCount * 100 >= PreviewWeather->GroundCoverInstanceCount * 25 &&
-			IslandPlantCount * 100 <= PreviewWeather->GroundCoverInstanceCount * 42);
+			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount() + PreviewWeather->ShoreGroundPlantLowC->GetInstanceCount() +
+			PreviewWeather->ShoreGroundPlantLowD->GetInstanceCount();
+		TestTrue(TEXT("Five ground-plant forms occupy their intended share of Island scatter without expanding its total budget"),
+			PreviewWeather->GroundCoverInstanceCount > 0 && IslandPlantCount * 100 >= PreviewWeather->GroundCoverInstanceCount * 37 &&
+			IslandPlantCount * 100 <= PreviewWeather->GroundCoverInstanceCount * 54);
 		TestTrue(TEXT("Landscape and landmark instances stay within the bounded 1,920,684-instance budget"),
 			PreviewWeather->GroundCoverMeadowInstanceCount <= 1920000 && PreviewWeather->GroundCoverInstanceCount <= 1920684);
 		TestTrue(TEXT("Existing interactive-spruce forest mesh is available"),
@@ -1131,10 +1132,11 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Spruce minimum inter-tree clearance in cm: %.1f (%d instances)"), MinSpruceSpacing, SprucePlantingPoints.Num()));
 		TestTrue(TEXT("Mature spruce and saplings preserve their distinct minimum planting spacings"), bSpruceRespectsSpacing);
 		UHierarchicalInstancedStaticMeshComponent* GrassC = PreviewWeather->FindShoreGrassC();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d ground plants), including %d exposed-hillside patch instances, %d spruce trees (%d mature + %d saplings), and %d broadleaf understory shrubs."),
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d + %d + %d ground plants), including %d exposed-hillside patch instances, %d spruce trees (%d mature + %d saplings), and %d broadleaf understory shrubs."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), GrassC ? GrassC->GetInstanceCount() : 0,
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
-			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
+			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowC->GetInstanceCount(),
+			PreviewWeather->ShoreGroundPlantLowD->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
 			MatureSpruceCount, SaplingCount, PreviewWeather->GroundCoverShrubCount));
 		AddInfo(FString::Printf(TEXT("Woodland understorey adds %d nonblocking rhododendrons and %d Fab meadow flowers."),
 			PreviewWeather->GroundCoverFlowerCount - MeadowFlowerInstanceCount, MeadowFlowerInstanceCount));
@@ -1188,6 +1190,8 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlants, PreviewWeather->ShoreGroundPlantBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowA, PreviewWeather->ShoreGroundPlantLowABaseTransforms);
 			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowB, PreviewWeather->ShoreGroundPlantLowBBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowC, PreviewWeather->ShoreGroundPlantLowCBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->ShoreGroundPlantLowD, PreviewWeather->ShoreGroundPlantLowDBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandShrubs, PreviewWeather->IslandShrubBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandRhododendrons, PreviewWeather->IslandRhododendronBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandCattails, PreviewWeather->IslandCattailBaseTransforms);

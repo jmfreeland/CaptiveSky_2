@@ -235,6 +235,8 @@ private:
 	TArray<int32> SwayedGroundPlantIndices;
 	TArray<int32> SwayedGroundPlantLowAIndices;
 	TArray<int32> SwayedGroundPlantLowBIndices;
+	TArray<int32> SwayedGroundPlantLowCIndices;
+	TArray<int32> SwayedGroundPlantLowDIndices;
 	TArray<int32> SwayedShrubIndices;
 	TMap<FIntPoint, TArray<int32>> ShoreGrassACells;
 	TMap<FIntPoint, TArray<int32>> ShoreGrassBCells;
@@ -242,6 +244,8 @@ private:
 	TMap<FIntPoint, TArray<int32>> GroundPlantCells;
 	TMap<FIntPoint, TArray<int32>> GroundPlantLowACells;
 	TMap<FIntPoint, TArray<int32>> GroundPlantLowBCells;
+	TMap<FIntPoint, TArray<int32>> GroundPlantLowCCells;
+	TMap<FIntPoint, TArray<int32>> GroundPlantLowDCells;
 	TMap<FIntPoint, TArray<int32>> ShrubCells;
 	int32 GroundCoverSwayLastUpdatedInstanceCount = 0;
 	TArray<int32> SwayedSpruceIndices;
@@ -262,4 +266,8 @@ private:
 	TArray<TArray<FTransform>> IslandMeadowFlowerBaseTransforms;
 	TArray<TArray<int32>> SwayedMeadowFlowerIndices;
 	TArray<TMap<FIntPoint, TArray<int32>>> MeadowFlowerCells;
+	TArray<FTransform> ShoreGroundPlantLowCBaseTransforms;
+	TArray<FTransform> ShoreGroundPlantLowDBaseTransforms;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowC;
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowD;
 };

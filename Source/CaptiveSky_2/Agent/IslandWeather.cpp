@@ -97,6 +97,22 @@ AIslandWeather::AIslandWeather()
 	ShoreGroundPlantLowB->SetCastShadow(false);
 	ShoreGroundPlantLowB->bReceivesDecals = false;
 	ShoreGroundPlantLowB->SetVisibility(false);
+	ShoreGroundPlantLowC = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGroundPlantLowC"));
+	ShoreGroundPlantLowC->SetupAttachment(RootComponent);
+	ShoreGroundPlantLowC->SetMobility(EComponentMobility::Movable);
+	ShoreGroundPlantLowC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGroundPlantLowC->SetCanEverAffectNavigation(false);
+	ShoreGroundPlantLowC->SetCastShadow(false);
+	ShoreGroundPlantLowC->bReceivesDecals = false;
+	ShoreGroundPlantLowC->SetVisibility(false);
+	ShoreGroundPlantLowD = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ShoreGroundPlantLowD"));
+	ShoreGroundPlantLowD->SetupAttachment(RootComponent);
+	ShoreGroundPlantLowD->SetMobility(EComponentMobility::Movable);
+	ShoreGroundPlantLowD->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ShoreGroundPlantLowD->SetCanEverAffectNavigation(false);
+	ShoreGroundPlantLowD->SetCastShadow(false);
+	ShoreGroundPlantLowD->bReceivesDecals = false;
+	ShoreGroundPlantLowD->SetVisibility(false);
 	IslandSpruce = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandSpruce"));
 	IslandSpruce->SetupAttachment(RootComponent);
 	IslandSpruce->SetMobility(EComponentMobility::Movable);
@@ -168,6 +184,8 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_05_01.ground_05_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowAMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_01.ground_01_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowBMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_01_02.ground_01_02"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowCMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_06_01.ground_06_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowDMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_12_01.ground_12_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerA(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"));
@@ -180,6 +198,8 @@ AIslandWeather::AIslandWeather()
 	if (GroundPlantMesh.Succeeded()) ShoreGroundPlants->SetStaticMesh(GroundPlantMesh.Object);
 	if (GroundPlantLowAMesh.Succeeded()) ShoreGroundPlantLowA->SetStaticMesh(GroundPlantLowAMesh.Object);
 	if (GroundPlantLowBMesh.Succeeded()) ShoreGroundPlantLowB->SetStaticMesh(GroundPlantLowBMesh.Object);
+	if (GroundPlantLowCMesh.Succeeded()) ShoreGroundPlantLowC->SetStaticMesh(GroundPlantLowCMesh.Object);
+	if (GroundPlantLowDMesh.Succeeded()) ShoreGroundPlantLowD->SetStaticMesh(GroundPlantLowDMesh.Object);
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
@@ -262,10 +282,9 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	Hash ^= Hash >> 15;
 	Hash *= 0x846ca68bu;
 	Hash ^= Hash >> 16;
-	// Three broadleaf variants share one slot each; the three grass meshes share two slots each.
-	// The resulting 1:2 broadleaf-to-grass balance keeps the same six silhouettes, but lets
-	// fine grasses carry more of the landscape than the taller, more occluding leaves.
-	return static_cast<int32>(Hash % 9u);
+	// Five broadleaf forms share one slot each; the three grass meshes share two slots each.
+	// The resulting 5:6 broadleaf-to-grass balance adds understorey variety without adding instances.
+	return static_cast<int32>(Hash % 11u);
 }
 
 int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed)
@@ -328,9 +347,10 @@ FTransform AIslandWeather::CalculateSpruceSway(const FTransform& BaseTransform, 
 void AIslandWeather::InitializeGroundCover()
 {
 	UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC();
-	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB || !IslandShrubs ||
+	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB || !ShoreGroundPlantLowC || !ShoreGroundPlantLowD || !IslandShrubs ||
 		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh() || !GrassC->GetStaticMesh() || !ShoreGroundPlants->GetStaticMesh() ||
-		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh() || !IslandShrubs->GetStaticMesh()) return;
+		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh() || !ShoreGroundPlantLowC->GetStaticMesh() ||
+		!ShoreGroundPlantLowD->GetStaticMesh() || !IslandShrubs->GetStaticMesh()) return;
 	bGroundCoverInitialized = true;
 	ShoreGrassA->ClearInstances();
 	ShoreGrassB->ClearInstances();
@@ -338,6 +358,8 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlants->ClearInstances();
 	ShoreGroundPlantLowA->ClearInstances();
 	ShoreGroundPlantLowB->ClearInstances();
+	ShoreGroundPlantLowC->ClearInstances();
+	ShoreGroundPlantLowD->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandShrubs->ClearInstances();
 	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
@@ -356,6 +378,8 @@ void AIslandWeather::InitializeGroundCover()
 	SwayedGroundPlantIndices.Reset();
 	SwayedGroundPlantLowAIndices.Reset();
 	SwayedGroundPlantLowBIndices.Reset();
+	SwayedGroundPlantLowCIndices.Reset();
+	SwayedGroundPlantLowDIndices.Reset();
 	SwayedShrubIndices.Reset();
 	SwayedRhododendronIndices.Reset();
 	SwayedCattailIndices.Reset();
@@ -392,9 +416,10 @@ void AIslandWeather::InitializeGroundCover()
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
 		// Each 7 m world patch selects one existing mesh, preventing per-instance alternation.
 		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed);
-		if (SpeciesVariant < 3)
+		if (SpeciesVariant < 5)
 		{
-			Species = SpeciesVariant == 0 ? ShoreGroundPlants : SpeciesVariant == 1 ? ShoreGroundPlantLowA : ShoreGroundPlantLowB;
+			Species = SpeciesVariant == 0 ? ShoreGroundPlants : SpeciesVariant == 1 ? ShoreGroundPlantLowA :
+				SpeciesVariant == 2 ? ShoreGroundPlantLowB : SpeciesVariant == 3 ? ShoreGroundPlantLowC : ShoreGroundPlantLowD;
 			const FBoxSphereBounds PlantBounds = Species->GetStaticMesh()->GetBounds();
 			const float PlantHalfHeight = FMath::Max(1.f, PlantBounds.BoxExtent.Z);
 			const float HeightScale = 90.f / (2.f * PlantHalfHeight);
@@ -407,7 +432,7 @@ void AIslandWeather::InitializeGroundCover()
 		}
 		else
 		{
-			const int32 GrassVariant = (SpeciesVariant - 3) / 2;
+			const int32 GrassVariant = (SpeciesVariant - 5) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
@@ -1013,6 +1038,8 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantBaseTransforms.Reset(ShoreGroundPlants->GetInstanceCount());
 	ShoreGroundPlantLowABaseTransforms.Reset(ShoreGroundPlantLowA->GetInstanceCount());
 	ShoreGroundPlantLowBBaseTransforms.Reset(ShoreGroundPlantLowB->GetInstanceCount());
+	ShoreGroundPlantLowCBaseTransforms.Reset(ShoreGroundPlantLowC->GetInstanceCount());
+	ShoreGroundPlantLowDBaseTransforms.Reset(ShoreGroundPlantLowD->GetInstanceCount());
 	IslandSpruceBaseTransforms.Reset(IslandSpruce ? IslandSpruce->GetInstanceCount() : 0);
 	IslandShrubBaseTransforms.Reset(IslandShrubs ? IslandShrubs->GetInstanceCount() : 0);
 	IslandRhododendronBaseTransforms.Reset(IslandRhododendrons ? IslandRhododendrons->GetInstanceCount() : 0);
@@ -1049,6 +1076,16 @@ void AIslandWeather::InitializeGroundCover()
 	{
 		FTransform Transform;
 		if (ShoreGroundPlantLowB->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowBBaseTransforms.Add(Transform);
+	}
+	for (int32 Index = 0; Index < ShoreGroundPlantLowC->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGroundPlantLowC->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowCBaseTransforms.Add(Transform);
+	}
+	for (int32 Index = 0; Index < ShoreGroundPlantLowD->GetInstanceCount(); ++Index)
+	{
+		FTransform Transform;
+		if (ShoreGroundPlantLowD->GetInstanceTransform(Index, Transform, false)) ShoreGroundPlantLowDBaseTransforms.Add(Transform);
 	}
 	if (IslandSpruce)
 		for (int32 Index = 0; Index < IslandSpruce->GetInstanceCount(); ++Index)
@@ -1099,6 +1136,8 @@ void AIslandWeather::InitializeGroundCover()
 	BuildSwayCells(ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num(), GroundPlantCells);
 	BuildSwayCells(ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells);
 	BuildSwayCells(ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells);
+	BuildSwayCells(ShoreGroundPlantLowCBaseTransforms, 0, ShoreGroundPlantLowCBaseTransforms.Num(), GroundPlantLowCCells);
+	BuildSwayCells(ShoreGroundPlantLowDBaseTransforms, 0, ShoreGroundPlantLowDBaseTransforms.Num(), GroundPlantLowDCells);
 	BuildSwayCells(IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells);
 	BuildSwayCells(IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells);
 	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowerBaseTransforms.Num(); ++SpeciesIndex)
@@ -1114,6 +1153,8 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlants->SetVisibility(bVisible, true);
 	ShoreGroundPlantLowA->SetVisibility(bVisible, true);
 	ShoreGroundPlantLowB->SetVisibility(bVisible, true);
+	ShoreGroundPlantLowC->SetVisibility(bVisible, true);
+	ShoreGroundPlantLowD->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
@@ -1132,6 +1173,8 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlants) { ShoreGroundPlants->ClearInstances(); ShoreGroundPlants->SetVisibility(false, true); }
 	if (ShoreGroundPlantLowA) { ShoreGroundPlantLowA->ClearInstances(); ShoreGroundPlantLowA->SetVisibility(false, true); }
 	if (ShoreGroundPlantLowB) { ShoreGroundPlantLowB->ClearInstances(); ShoreGroundPlantLowB->SetVisibility(false, true); }
+	if (ShoreGroundPlantLowC) { ShoreGroundPlantLowC->ClearInstances(); ShoreGroundPlantLowC->SetVisibility(false, true); }
+	if (ShoreGroundPlantLowD) { ShoreGroundPlantLowD->ClearInstances(); ShoreGroundPlantLowD->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
 	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
@@ -1148,12 +1191,16 @@ void AIslandWeather::ClearGroundCover()
 	ShoreGroundPlantBaseTransforms.Reset();
 	ShoreGroundPlantLowABaseTransforms.Reset();
 	ShoreGroundPlantLowBBaseTransforms.Reset();
+	ShoreGroundPlantLowCBaseTransforms.Reset();
+	ShoreGroundPlantLowDBaseTransforms.Reset();
 	SwayedShoreGrassAIndices.Reset();
 	SwayedShoreGrassBIndices.Reset();
 	SwayedShoreGrassCIndices.Reset();
 	SwayedGroundPlantIndices.Reset();
 	SwayedGroundPlantLowAIndices.Reset();
 	SwayedGroundPlantLowBIndices.Reset();
+	SwayedGroundPlantLowCIndices.Reset();
+	SwayedGroundPlantLowDIndices.Reset();
 	SwayedShrubIndices.Reset();
 	SwayedRhododendronIndices.Reset();
 	for (TArray<int32>& Indices : SwayedMeadowFlowerIndices) Indices.Reset();
@@ -1164,6 +1211,8 @@ void AIslandWeather::ClearGroundCover()
 	GroundPlantCells.Reset();
 	GroundPlantLowACells.Reset();
 	GroundPlantLowBCells.Reset();
+	GroundPlantLowCCells.Reset();
+	GroundPlantLowDCells.Reset();
 	ShrubCells.Reset();
 	RhododendronCells.Reset();
 	for (TMap<FIntPoint, TArray<int32>>& Cells : MeadowFlowerCells) Cells.Reset();
@@ -1296,6 +1345,8 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(ShoreGroundPlants, ShoreGroundPlantBaseTransforms, 0, ShoreGroundPlantBaseTransforms.Num(), GroundPlantCells, SwayedGroundPlantIndices);
 	UpdateSpecies(ShoreGroundPlantLowA, ShoreGroundPlantLowABaseTransforms, 0, ShoreGroundPlantLowABaseTransforms.Num(), GroundPlantLowACells, SwayedGroundPlantLowAIndices);
 	UpdateSpecies(ShoreGroundPlantLowB, ShoreGroundPlantLowBBaseTransforms, 0, ShoreGroundPlantLowBBaseTransforms.Num(), GroundPlantLowBCells, SwayedGroundPlantLowBIndices);
+	UpdateSpecies(ShoreGroundPlantLowC, ShoreGroundPlantLowCBaseTransforms, 0, ShoreGroundPlantLowCBaseTransforms.Num(), GroundPlantLowCCells, SwayedGroundPlantLowCIndices);
+	UpdateSpecies(ShoreGroundPlantLowD, ShoreGroundPlantLowDBaseTransforms, 0, ShoreGroundPlantLowDBaseTransforms.Num(), GroundPlantLowDCells, SwayedGroundPlantLowDIndices);
 	UpdateSpecies(IslandShrubs, IslandShrubBaseTransforms, 0, IslandShrubBaseTransforms.Num(), ShrubCells, SwayedShrubIndices);
 	UpdateSpecies(IslandRhododendrons, IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells, SwayedRhododendronIndices);
 	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num() &&
