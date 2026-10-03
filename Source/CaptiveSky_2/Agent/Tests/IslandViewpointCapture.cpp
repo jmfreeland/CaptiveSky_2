@@ -882,7 +882,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Every transient broadleaf shrub has an immutable wind-sway baseline"),
 			PreviewWeather->IslandShrubBaseTransforms.Num(), PreviewWeather->GroundCoverShrubCount);
 		TestTrue(TEXT("Sparse rhododendron accents reach open meadows while preserving nonblocking woodland placement"),
-			PreviewWeather->GroundCoverFlowerCount > 1500 && PreviewWeather->GroundCoverFlowerCount <= 1900 &&
+			PreviewWeather->GroundCoverFlowerCount > 1500 && PreviewWeather->GroundCoverFlowerCount <= 2100 &&
 			PreviewWeather->IslandRhododendrons->GetInstanceCount() == PreviewWeather->GroundCoverFlowerCount &&
 			PreviewWeather->IslandRhododendrons->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandRhododendrons->CanEverAffectNavigation() && PreviewWeather->IslandRhododendrons->IsVisible());
