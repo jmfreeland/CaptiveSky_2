@@ -528,8 +528,8 @@ void AIslandWeather::InitializeGroundCover()
 		constexpr int32 MeadowPatchCount = 768;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
 		// The 30 FPS-gated views still show wide bare intervals between existing clumps.
-		// Add 25% more placements inside the same seeded patches without adding mesh types.
-		constexpr int32 MeadowClumpsPerPatch = 1600;
+		// Add another 25% of placements inside the same seeded patches without adding mesh types.
+		constexpr int32 MeadowClumpsPerPatch = 2000;
 		constexpr int32 MeadowPatchProbeCount = 5040;
 		constexpr float MeadowPatchInnerRadius = 250.f;
 		constexpr float MeadowPatchOuterRadius = 1600.f;
