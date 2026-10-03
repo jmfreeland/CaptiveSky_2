@@ -4,6 +4,7 @@
 #include "Engine/DirectionalLight.h"
 #include "Engine/Engine.h"
 #include "Engine/SkyLight.h"
+#include "ProceduralMeshComponent.h"
 #include "IslandDayNight.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandWeather.h"
@@ -60,13 +61,46 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Sky->GetLightComponent()->SetMobility(EComponentMobility::Movable);
 	Clock->Sun = Sun;
 	Clock->Sky = Sky;
+	TestNotNull(TEXT("The shared clock owns a procedural starfield"), Clock->Starfield);
+	if (Clock->Starfield)
+	{
+		TestEqual(TEXT("The starfield has six progressive twilight groups"), Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount);
+		int32 ProceduralStarVertices = 0;
+		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
+			if (const FProcMeshSection* Section = Clock->Starfield->GetProcMeshSection(SectionIndex))
+				ProceduralStarVertices += Section->ProcVertexBuffer.Num();
+		TestEqual(TEXT("The seeded starfield contains the complete fixed population"), ProceduralStarVertices, AIslandDayNight::NightStarCount * 4);
+	}
 	Clock->CurrentHour = 12.f;
 	Clock->DayNumber = 1;
 	Clock->DaySunIntensity = 10.f;
+	Clock->UpdateLighting();
+	bool bNoStarGroupsAtNoon = true;
+	if (Clock->Starfield)
+		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
+		{
+			const FProcMeshSection* Section = Clock->Starfield->GetProcMeshSection(SectionIndex);
+			bNoStarGroupsAtNoon &= Section && !Section->bSectionVisible;
+		}
+	TestTrue(TEXT("Daylight keeps all star groups hidden"), bNoStarGroupsAtNoon);
 	TestEqual(TEXT("Default moon illumination is tuned for a visible but dark night"), Clock->MoonIntensity, 1.5f);
 	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
+	Clock->CurrentHour = 18.5f;
+	Clock->UpdateLighting();
+	int32 VisibleStarGroupsAtDusk = 0;
+	if (Clock->Starfield)
+		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
+			if (const FProcMeshSection* Section = Clock->Starfield->GetProcMeshSection(SectionIndex); Section && Section->bSectionVisible)
+				++VisibleStarGroupsAtDusk;
+	TestTrue(TEXT("Twilight reveals only the first portion of the star groups"),
+		VisibleStarGroupsAtDusk > 0 && VisibleStarGroupsAtDusk < AIslandDayNight::NightStarSectionCount);
 	Clock->CurrentHour = 0.f;
 	Clock->UpdateLighting();
+	bool bFirstTwilightGroupVisible = false;
+	if (Clock->Starfield)
+		if (const FProcMeshSection* FirstStarGroup = Clock->Starfield->GetProcMeshSection(0))
+			bFirstTwilightGroupVisible = FirstStarGroup->bSectionVisible;
+	TestTrue(TEXT("The first star group appears after sunset"), bFirstTwilightGroupVisible);
 	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);
 	const FString NewMoonDescription = Clock->DescribeTime();
@@ -105,6 +139,14 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->DayNumber = 15;
 	Clock->MoonIntensity = 1.5f;
 	Clock->UpdateLighting();
+	bool bAllStarGroupsVisible = true;
+	if (Clock->Starfield)
+		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
+		{
+			const FProcMeshSection* Section = Clock->Starfield->GetProcMeshSection(SectionIndex);
+			bAllStarGroupsVisible &= Section && Section->bSectionVisible;
+		}
+	TestTrue(TEXT("A dark full-moon midnight reveals every star group"), bAllStarGroupsVisible);
 	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
 	TestTrue(TEXT("A clear near-full-moon midnight keeps moonlight active"), FMath::IsNearlyEqual(Clock->Moon->Intensity,
 		Clock->MoonIntensity * AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour), 0.001f));

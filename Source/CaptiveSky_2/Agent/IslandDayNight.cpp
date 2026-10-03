@@ -6,6 +6,9 @@
 #include "Components/SkyLightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/SkyLight.h"
+#include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
@@ -19,6 +22,15 @@ AIslandDayNight::AIslandDayNight()
 	Moon->bAtmosphereSunLight = true;
 	Moon->AtmosphereSunLightIndex = 1;
 	Moon->SetLightColor(FLinearColor(0.55f, 0.68f, 1.f));
+	Starfield = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("NightStars"));
+	Starfield->SetupAttachment(RootComponent);
+	Starfield->SetMobility(EComponentMobility::Movable);
+	Starfield->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Starfield->SetCanEverAffectNavigation(false);
+	Starfield->SetCastShadow(false);
+	Starfield->bReceivesDecals = false;
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> StarsMaterial(TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
+	if (StarsMaterial.Succeeded()) StarMaterial = StarsMaterial.Object;
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.1f;
 }
@@ -60,7 +72,74 @@ void AIslandDayNight::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	CurrentHour = WrapHour(StartHour);
+	BuildStarfield();
 	UpdateLighting();
+}
+
+void AIslandDayNight::BuildStarfield()
+{
+	if (!Starfield || !StarMaterial || Starfield->GetNumSections() > 0) return;
+	constexpr float ShellRadius = 2000000.f; // 20 km, beyond the island weather layer.
+	TArray<FVector> Vertices[NightStarSectionCount];
+	TArray<int32> Triangles[NightStarSectionCount];
+	TArray<FVector> Normals[NightStarSectionCount];
+	TArray<FVector2D> UVs[NightStarSectionCount];
+	TArray<FColor> Colors[NightStarSectionCount];
+	TArray<FProcMeshTangent> Tangents[NightStarSectionCount];
+	FRandomStream Random(0x51A7F13);
+
+	for (int32 StarIndex = 0; StarIndex < NightStarCount; ++StarIndex)
+	{
+		const float Z = Random.FRandRange(-1.f, 1.f);
+		const float Azimuth = Random.FRandRange(0.f, 2.f * PI);
+		const float Ring = FMath::Sqrt(FMath::Max(0.f, 1.f - Z * Z));
+		const FVector Direction(Ring * FMath::Cos(Azimuth), Ring * FMath::Sin(Azimuth), Z);
+		FVector Right = FVector::CrossProduct(Direction, FVector::UpVector).GetSafeNormal();
+		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(Direction, FVector::RightVector).GetSafeNormal();
+		const FVector Up = FVector::CrossProduct(Right, Direction).GetSafeNormal();
+		const FVector Normal = -Direction;
+		const float HalfSize = Random.FRandRange(350.f, 900.f);
+		const FVector Center = Direction * ShellRadius;
+		const int32 SectionIndex = Random.RandRange(0, NightStarSectionCount - 1);
+		const int32 FirstVertex = Vertices[SectionIndex].Num();
+		Vertices[SectionIndex].Add(Center - Right * HalfSize - Up * HalfSize);
+		Vertices[SectionIndex].Add(Center + Right * HalfSize - Up * HalfSize);
+		Vertices[SectionIndex].Add(Center + Right * HalfSize + Up * HalfSize);
+		Vertices[SectionIndex].Add(Center - Right * HalfSize + Up * HalfSize);
+		Triangles[SectionIndex].Add(FirstVertex);
+		Triangles[SectionIndex].Add(FirstVertex + 1);
+		Triangles[SectionIndex].Add(FirstVertex + 2);
+		Triangles[SectionIndex].Add(FirstVertex);
+		Triangles[SectionIndex].Add(FirstVertex + 2);
+		Triangles[SectionIndex].Add(FirstVertex + 3);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Normals[SectionIndex].Add(Normal);
+		UVs[SectionIndex].Add(FVector2D(0.f, 0.f));
+		UVs[SectionIndex].Add(FVector2D(1.f, 0.f));
+		UVs[SectionIndex].Add(FVector2D(1.f, 1.f));
+		UVs[SectionIndex].Add(FVector2D(0.f, 1.f));
+		const bool bWarmStar = Random.FRand() < 0.12f;
+		const FLinearColor Tint = bWarmStar ? FLinearColor(1.f, 0.79f, 0.60f) : FLinearColor(0.72f, 0.86f, 1.f);
+		const FColor Color = (Tint * Random.FRandRange(0.35f, 1.f)).ToFColor(true);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Colors[SectionIndex].Add(Color);
+		const FProcMeshTangent Tangent(Right, false);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Tangents[SectionIndex].Add(Tangent);
+	}
+
+	for (int32 SectionIndex = 0; SectionIndex < NightStarSectionCount; ++SectionIndex)
+	{
+		Starfield->CreateMeshSection(SectionIndex, Vertices[SectionIndex], Triangles[SectionIndex], Normals[SectionIndex],
+			UVs[SectionIndex], Colors[SectionIndex], Tangents[SectionIndex], false);
+		Starfield->SetMaterial(SectionIndex, StarMaterial);
+		Starfield->SetMeshSectionVisible(SectionIndex, false);
+	}
+}
+
+void AIslandDayNight::UpdateStarfieldVisibility(float SolarElevation)
+{
+	if (!Starfield) return;
+	constexpr float StarThresholds[NightStarSectionCount] = { -0.03f, -0.08f, -0.13f, -0.18f, -0.24f, -0.31f };
+	for (int32 SectionIndex = 0; SectionIndex < NightStarSectionCount; ++SectionIndex)
+		Starfield->SetMeshSectionVisible(SectionIndex, SolarElevation <= StarThresholds[SectionIndex]);
 }
 
 void AIslandDayNight::BeginPlay()
@@ -140,6 +219,7 @@ void AIslandDayNight::UpdateLighting()
 	}
 	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
 	const float LunarIlluminationAmount = LunarIllumination(DayNumber, CurrentHour);
+	UpdateStarfieldVisibility(Height);
 	// New moon follows the sun below the horizon; full moon travels opposite it.
 	// Intermediate phases therefore shift the moon's rise and set through the night.
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));

@@ -4,8 +4,8 @@
 #include "GameFramework/Actor.h"
 #include "IslandDayNight.generated.h"
 
-class ADirectionalLight;
-class ASkyLight;
+class ADirectionalLight; class UMaterialInterface;
+class ASkyLight; class UProceduralMeshComponent;
 class UDirectionalLightComponent;
 
 /** Shared Island clock; drives the existing atmosphere sun and a separate moon light. */
@@ -41,8 +41,12 @@ public:
 	static constexpr float NightSkylightFloor = 2.5f;
 	/** Approximate synodic month used for the repeating Island moon-light cycle. */
 	static constexpr double LunarCycleDays = 29.53059;
+	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
+	static constexpr int32 NightStarCount = 1200;
+	static constexpr int32 NightStarSectionCount = 6;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
+	UProceduralMeshComponent* Starfield = nullptr;
 
 	static float WrapHour(double Hour);
 	static float SunHeight(float Hour);
@@ -61,6 +65,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 private:
 	float SecondsSinceSave = 0.f;
+	UMaterialInterface* StarMaterial = nullptr;
+	void BuildStarfield();
+	void UpdateStarfieldVisibility(float SolarElevation);
 	void PersistHour();
 	friend class FIslandClockTest;
 	friend class FIslandClockPersistenceTest;
