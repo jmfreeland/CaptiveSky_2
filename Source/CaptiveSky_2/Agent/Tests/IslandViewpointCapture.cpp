@@ -346,7 +346,8 @@ namespace
 	{
 	public:
 		FIslandViewpointCaptureCommand(UWorld* InWorld, TArray<FIslandViewpoint> InViewpoints, float InHour, FIntPoint InSize, FString InDirectory,
-		FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, int32 InOriginalDayNumber, TArray<TWeakObjectPtr<AActor>> InPreviewActors,
+		FAutomationTestBase* InTest, AIslandDayNight* InClock, float InOriginalStartHour, int32 InOriginalDayNumber, int32 InPreviewDayNumber,
+		TArray<TWeakObjectPtr<AActor>> InPreviewActors,
 			AIslandWeather* InGroundCoverWeather, bool bInClearGroundCover, TArray<FLandscapePreviewBackup> InLandscapeBackups,
 			TArray<FReusedLandscapeMIDBackup> InReusedLandscapeInstances, bool bInCompareLandscapeWetness,
 			bool bInPuddlePreview,
@@ -354,7 +355,7 @@ namespace
 			FTideglassWeatherPreview InTideglassWeatherPreview)
 			: PreviewActors(MoveTemp(InPreviewActors)), World(InWorld), Viewpoints(MoveTemp(InViewpoints)), Hour(InHour), Size(InSize),
 			  Test(InTest), Clock(InClock), GroundCoverWeather(InGroundCoverWeather), BaseDirectory(MoveTemp(InDirectory)), Directory(BaseDirectory),
-			  OriginalStartHour(InOriginalStartHour), OriginalDayNumber(InOriginalDayNumber), bClearGroundCover(bInClearGroundCover),
+			  OriginalStartHour(InOriginalStartHour), OriginalDayNumber(InOriginalDayNumber), PreviewDayNumber(InPreviewDayNumber), bClearGroundCover(bInClearGroundCover),
 			  LandscapeBackups(MoveTemp(InLandscapeBackups)), ReusedLandscapeInstances(MoveTemp(InReusedLandscapeInstances)),
 			  LandscapePreviewInstances(MoveTemp(InLandscapePreviewInstances)), bCompareLandscapeWetness(bInCompareLandscapeWetness),
 			  bPuddlePreview(bInPuddlePreview), TideglassWeatherPreview(MoveTemp(InTideglassWeatherPreview))
@@ -371,13 +372,18 @@ namespace
 				bStarted = true;
 				for (TActorIterator<AIslandDayNight> It(World.Get()); It; ++It)
 				{
-					// Preview lighting at the requested hour, exactly as editing Start Hour would; restored afterwards.
+					// Preview the requested clock state; Start Hour and Island day are restored after capture.
 					if (!Clock.IsValid())
 					{
 						Clock = *It;
 						OriginalStartHour = It->StartHour;
 					}
 					It->StartHour = Hour;
+					if (PreviewDayNumber > 0)
+					{
+						It->DayNumber = PreviewDayNumber;
+						Test->TestEqual(TEXT("The rendered viewpoint uses the requested Island day"), It->DayNumber, PreviewDayNumber);
+					}
 					It->OnConstruction(It->GetActorTransform());
 					break;
 				}
@@ -563,6 +569,7 @@ namespace
 		FString Directory;
 		float OriginalStartHour = 9.f;
 		int32 OriginalDayNumber = 1;
+		int32 PreviewDayNumber = 0;
 		int32 Index = 0;
 		int32 Frames = 0;
 		double MeasuredCaptureStartSeconds = 0.0;
@@ -1490,7 +1497,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	}
 	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,
-		PreviewClock, OriginalStartHour, OriginalDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
+		PreviewClock, OriginalStartHour, OriginalDayNumber, PreviewDayNumber, MoveTemp(PreviewActors), PreviewWeather, bGroundCoverPreview,
 		MoveTemp(LandscapeBackups), MoveTemp(ReusedLandscapeInstances), bCompareLandscapeWetness, bPuddlePreview,
 		MoveTemp(LandscapePreviewInstances), MoveTemp(TideglassWeather)));
 	if (bLandmarkRockPreview)
