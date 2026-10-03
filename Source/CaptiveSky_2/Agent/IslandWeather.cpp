@@ -237,7 +237,10 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	Hash ^= Hash >> 15;
 	Hash *= 0x846ca68bu;
 	Hash ^= Hash >> 16;
-	return static_cast<int32>(Hash % 6u);
+	// Three broadleaf variants share one slot each; the three grass meshes share two slots each.
+	// The resulting 1:2 broadleaf-to-grass balance keeps the same six silhouettes, but lets
+	// fine grasses carry more of the landscape than the taller, more occluding leaves.
+	return static_cast<int32>(Hash % 9u);
 }
 
 FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
@@ -342,8 +345,7 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Scale = FVector(JitterScale * 2.7f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-		// Each 7 m world patch selects one of three broadleafs or grasses, preventing an
-		// alternating per-instance mix while keeping the existing even species balance.
+		// Each 7 m world patch selects one existing mesh, preventing per-instance alternation.
 		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed);
 		if (SpeciesVariant < 3)
 		{
@@ -360,7 +362,7 @@ void AIslandWeather::InitializeGroundCover()
 		}
 		else
 		{
-			const int32 GrassVariant = SpeciesVariant - 3;
+			const int32 GrassVariant = (SpeciesVariant - 3) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
@@ -435,9 +437,11 @@ void AIslandWeather::InitializeGroundCover()
 				const float HeightFromMarker = GroundHit.ImpactPoint.Z - Landmark->GetActorLocation().Z;
 				if (HeightFromMarker < -700.f || HeightFromMarker > 100.f) continue;
 				FHitResult OverheadHit;
-				const FVector OpenSkyStart = GroundHit.ImpactPoint + FVector(0.f, 0.f, 25.f);
+				constexpr float RoofEdgeFoliageClearance = 45.f;
+				const FVector OpenSkyStart = GroundHit.ImpactPoint + FVector(0.f, 0.f, RoofEdgeFoliageClearance + 5.f);
 				const FVector OpenSkyEnd = OpenSkyStart + FVector(0.f, 0.f, 8000.f);
-				if (GetWorld()->LineTraceSingleByChannel(OverheadHit, OpenSkyStart, OpenSkyEnd, ECC_WorldStatic, Query)) continue;
+				if (GetWorld()->SweepSingleByChannel(OverheadHit, OpenSkyStart, OpenSkyEnd, FQuat::Identity,
+					ECC_WorldStatic, FCollisionShape::MakeSphere(RoofEdgeFoliageClearance), Query)) continue;
 			}
 
 			PlaceFoliage(GroundHit, Offset, Index);

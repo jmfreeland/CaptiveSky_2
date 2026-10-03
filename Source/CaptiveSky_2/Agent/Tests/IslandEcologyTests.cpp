@@ -144,7 +144,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nearby plants within one botanical patch share a species"),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(200.f, -300.f, 0.f), 71));
-	int32 SpeciesCounts[6] = {};
+	int32 SpeciesCounts[9] = {};
 	for (int32 X = 0; X < 8; ++X)
 		for (int32 Y = 0; Y < 8; ++Y)
 			++SpeciesCounts[AIslandWeather::SelectGroundCoverVariant(FVector(X * 2500.f + 900.f, Y * 2500.f + 900.f, 0.f), 71)];
@@ -156,14 +156,14 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		MaximumSpeciesCells = FMath::Max(MaximumSpeciesCells, Count);
 	}
 	TestTrue(TEXT("Spatial patches use all six existing species with a reasonably balanced distribution"),
-		MinimumSpeciesCells >= 4 && MaximumSpeciesCells <= 18);
+		MinimumSpeciesCells >= 2 && MaximumSpeciesCells <= 14);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
 		Weather->ShoreGroundPlantLowB->GetInstanceCount();
-	TestTrue(TEXT("Leafy ground plants make up about half of the fixed-budget vegetation mix"),
-		Weather->GroundCoverInstanceCount > 0 && FixturePlantCount * 100 >= Weather->GroundCoverInstanceCount * 40 &&
-		FixturePlantCount * 100 <= Weather->GroundCoverInstanceCount * 60);
+	TestTrue(TEXT("Broadleaf ground plants make up roughly one-third of the fixed-budget vegetation mix"),
+		Weather->GroundCoverInstanceCount > 0 && FixturePlantCount * 100 >= Weather->GroundCoverInstanceCount * 25 &&
+		FixturePlantCount * 100 <= Weather->GroundCoverInstanceCount * 42);
 	TestEqual(TEXT("The fixture has no landscape or sea plane, so no global meadow patches are generated"), Weather->GroundCoverMeadowInstanceCount, 0);
 	for (UHierarchicalInstancedStaticMeshComponent* LowPlant : {Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB})
 	{
@@ -348,6 +348,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			RecoveredPose.GetRotation().Equals(UnoccupiedWindPose.GetRotation(), 0.001f));
 		Walker->Destroy();
 	}
+	// Drop the destroyed walker's last proximity bend before sampling idempotence.
+	Weather->UpdateGroundCoverSway();
 	auto CaptureTransforms = [](UHierarchicalInstancedStaticMeshComponent* Grass, TArray<FTransform>& OutTransforms)
 	{
 		OutTransforms.Reset(Grass->GetInstanceCount());
@@ -403,6 +405,28 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		bRepeatedSwayIsStable &= FirstSwayPlantsLowB[Index].Equals(SecondSwayPlantsLowB[Index], 0.001f);
 	for (int32 Index = 0; Index < FMath::Min(FirstSwayShrubs.Num(), SecondSwayShrubs.Num()); ++Index)
 		bRepeatedSwayIsStable &= FirstSwayShrubs[Index].Equals(SecondSwayShrubs[Index], 0.001f);
+	if (!bRepeatedSwayIsStable)
+	{
+		auto LogFirstMismatch = [this](const TCHAR* Species, const TArray<FTransform>& Before, const TArray<FTransform>& After)
+		{
+			for (int32 Index = 0; Index < FMath::Min(Before.Num(), After.Num()); ++Index)
+				if (!Before[Index].Equals(After[Index], 0.001f))
+				{
+					AddInfo(FString::Printf(TEXT("First sway mismatch in %s[%d]: translation %.4f cm, rotation %.4f degrees, scale %.5f."),
+						Species, Index, FVector::Distance(Before[Index].GetLocation(), After[Index].GetLocation()),
+						FMath::RadiansToDegrees(Before[Index].GetRotation().AngularDistance(After[Index].GetRotation())),
+						FVector::Distance(Before[Index].GetScale3D(), After[Index].GetScale3D())));
+					return;
+				}
+		};
+		LogFirstMismatch(TEXT("grass A"), FirstSwayA, SecondSwayA);
+		LogFirstMismatch(TEXT("grass B"), FirstSwayB, SecondSwayB);
+		LogFirstMismatch(TEXT("grass C"), FirstSwayC, SecondSwayC);
+		LogFirstMismatch(TEXT("broadleaf"), FirstSwayPlants, SecondSwayPlants);
+		LogFirstMismatch(TEXT("low plant A"), FirstSwayPlantsLowA, SecondSwayPlantsLowA);
+		LogFirstMismatch(TEXT("low plant B"), FirstSwayPlantsLowB, SecondSwayPlantsLowB);
+		LogFirstMismatch(TEXT("understory shrub"), FirstSwayShrubs, SecondSwayShrubs);
+	}
 	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
 	const int32 GroundCoverCountAfterFirstInitialization = Weather->GroundCoverInstanceCount;
 	Weather->InitializeGroundCover();
