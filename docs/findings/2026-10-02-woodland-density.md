@@ -16,14 +16,20 @@ in the existing 512 meadow patches, and `CaptiveSky2.Visual.Viewpoints` passed. 
 Game run at the same 400-grove population shut down normally with zero model requests. Those results
 are the comparison baseline only; they do not validate the new 500-grove source.
 
-The 500-grove source change and corresponding population-bound assertions are pending UE compilation
-and a fresh RHI capture. To make safe progress while UBT is stalled, the changed
+The 500-grove source change and corresponding population-bound assertions are pending a fresh UBT
+build. To make safe progress while UBT is stalled, the changed
 `IslandWeather.cpp` and `IslandViewpointCapture.cpp` translation units were compiled separately with
 the scratch project's preserved MSVC 14.44 response files and engine `Source` working directory.
 Both produced scratch-only object files and SARIF reports with empty `results` arrays:
 `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/ManualObjectCompile_20261002/`.
-This confirms translation-unit compilation only; the objects were not linked into the editor module
-and the 500-grove runtime/capture assertions were not run.
+This confirms translation-unit compilation only; the objects were not linked into the editor module.
+
+On 2026-10-03, the connected UE 5.8.3 editor ran `CaptiveSky2.Visual.Viewpoints` with a real RHI and
+passed in 17.05 seconds with no test errors. This exercised the 500-grove population-bound, sapling,
+spacing, collision, and navigation assertions and saved all nine viewpoint frames to
+`Saved/Viewpoints/2026-10-03_090731_h17.0/`. The capture is a useful visual check, not packaged
+performance evidence. The run used the already-open editor, so it does not replace a fresh UBT build
+or prove that the current source was newly linked into that process.
 
 On 2026-10-02 the isolated `Build.bat CaptiveSky_2Editor Win64 Development`
 invocation with `-WaitMutex` emitted only its launch line and no UBT log or build artifacts for over
