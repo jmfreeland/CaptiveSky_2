@@ -45,6 +45,29 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, SlightlyDifferentWind), 0);
 	TestEqual(TEXT("Malformed perch samples safely produce no candidate"),
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, IncompleteWindSamples), INDEX_NONE);
+	const TArray<int32> OpenPerches = { 0, 0 };
+	const TArray<int32> CoveredAlternative = { 0, 4 };
+	const TArray<int32> SlightCoverDifference = { 2, 3 };
+	const TArray<int32> EquallyCovered = { 4, 4 };
+	const TArray<int32> MissingCoverSamples = { 0 };
+	TestEqual(TEXT("Heavy rain favors a clearly better overhead-cover clue"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 50.f, 0.8f,
+			PerchOptions, ShelteredWind, CoveredAlternative), 1);
+	TestEqual(TEXT("A light shower preserves the wind-aware choice"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 50.f, 0.2f,
+			PerchOptions, ShelteredWind, CoveredAlternative), 0);
+	TestEqual(TEXT("One extra probe is too weak to override the wind-aware choice"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 50.f, 0.8f,
+			PerchOptions, ShelteredWind, SlightCoverDifference), 0);
+	TestEqual(TEXT("Wind and distance remain decisive among similarly covered roosts"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 160.f, 0.8f,
+			PerchOptions, ShelteredWind, EquallyCovered), 1);
+	TestEqual(TEXT("No cover at any candidate preserves the wind-aware choice"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 50.f, 0.8f,
+			PerchOptions, ShelteredWind, OpenPerches), 0);
+	TestEqual(TEXT("Mismatched overhead samples safely fall back to the wind-aware rule"),
+		ARavenAgentAIController::SelectWeatherAwarePerch(FVector::ZeroVector, 50.f, 0.8f,
+			PerchOptions, ShelteredWind, MissingCoverSamples), 0);
 	const FVector Origin(0.f, 0.f, 600.f);
 	const TArray<FVector> CruiseCandidates = { FVector(0.f, 0.f, 900.f), FVector(800.f, 0.f, 900.f), FVector(-800.f, 0.f, 900.f) };
 	const TArray<FVector> VisibleLandmarks = { FVector(2000.f, 0.f, 900.f) };

@@ -697,6 +697,7 @@ bool ARavenAgentAIController::BeginPerch()
 	TArray<AActor*> CandidatePerches;
 	TArray<FVector> CandidateLocations;
 	TArray<float> CandidateWindSpeeds;
+	TArray<int32> CandidateOverheadCoverProbeCounts;
 	AIslandWeather* Weather = nullptr;
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
@@ -709,10 +710,12 @@ bool ARavenAgentAIController::BeginPerch()
 		CandidatePerches.Add(*It);
 		CandidateLocations.Add(It->GetActorLocation());
 		CandidateWindSpeeds.Add(Weather ? Weather->GetLocalWind(It->GetActorLocation(), GetPawn()).Size() : 0.f);
+		CandidateOverheadCoverProbeCounts.Add(CountOverheadCoverProbes(*It));
 	}
 	const float CurrentWindSpeed = Weather ? Weather->GetLocalWind(GetPawn()->GetActorLocation(), GetPawn()).Size() : 0.f;
-	const int32 PreferredIndex = SelectWindAwarePerch(GetPawn()->GetActorLocation(), CurrentWindSpeed,
-		CandidateLocations, CandidateWindSpeeds);
+	const float RainIntensity = Weather ? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) : 0.f;
+	const int32 PreferredIndex = SelectWeatherAwarePerch(GetPawn()->GetActorLocation(), CurrentWindSpeed, RainIntensity,
+		CandidateLocations, CandidateWindSpeeds, CandidateOverheadCoverProbeCounts);
 	AActor* BestPerch = CandidatePerches.IsValidIndex(PreferredIndex) ? CandidatePerches[PreferredIndex] : nullptr;
 	return BeginPerchAt(BestPerch);
 }
@@ -757,6 +760,40 @@ int32 ARavenAgentAIController::SelectWindAwarePerch(const FVector& Origin, float
 	return CalmestScore + MinimumUsefulShelterGain < NearestScore ? CalmestIndex : NearestIndex;
 }
 
+int32 ARavenAgentAIController::SelectWeatherAwarePerch(const FVector& Origin, float CurrentWindSpeed, float RainIntensity,
+	const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds,
+	const TArray<int32>& OverheadCoverProbeCounts)
+{
+	if (PerchLocations.IsEmpty() || PerchLocations.Num() != PerchWindSpeeds.Num()) return INDEX_NONE;
+	const int32 WindPreferredIndex = SelectWindAwarePerch(Origin, CurrentWindSpeed, PerchLocations, PerchWindSpeeds);
+	if (WindPreferredIndex == INDEX_NONE || PerchLocations.Num() != OverheadCoverProbeCounts.Num() ||
+		RainIntensity < 0.55f)
+		return WindPreferredIndex;
+
+	// A short overhead line-of-sight sample is only a local cover clue. In a strong shower,
+	// use it only when the alternative has at least two more hits (40% more sampled points),
+	// then let the existing wind/distance rule choose among similarly covered sites.
+	const int32 MinimumUsefulCoverGain = 2;
+	int32 BestCoverCount = OverheadCoverProbeCounts[WindPreferredIndex];
+	for (const int32 Count : OverheadCoverProbeCounts) BestCoverCount = FMath::Max(BestCoverCount, Count);
+	if (BestCoverCount - OverheadCoverProbeCounts[WindPreferredIndex] < MinimumUsefulCoverGain)
+		return WindPreferredIndex;
+
+	TArray<FVector> BetterCoveredLocations;
+	TArray<float> BetterCoveredWindSpeeds;
+	TArray<int32> OriginalIndices;
+	for (int32 Index = 0; Index < PerchLocations.Num(); ++Index)
+	{
+		if (OverheadCoverProbeCounts[Index] < BestCoverCount - 1) continue;
+		BetterCoveredLocations.Add(PerchLocations[Index]);
+		BetterCoveredWindSpeeds.Add(PerchWindSpeeds[Index]);
+		OriginalIndices.Add(Index);
+	}
+	const int32 CoveredChoice = SelectWindAwarePerch(Origin, CurrentWindSpeed,
+		BetterCoveredLocations, BetterCoveredWindSpeeds);
+	return OriginalIndices.IsValidIndex(CoveredChoice) ? OriginalIndices[CoveredChoice] : WindPreferredIndex;
+}
+
 bool ARavenAgentAIController::HasSuitablePerchSupport(const AActor* Site, FHitResult* OutSupport) const
 {
 	if (!Site || !GetWorld() || !GetPawn()) return false;
@@ -783,18 +820,26 @@ bool ARavenAgentAIController::RequestPerch(FName PerchTag)
 FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 {
 	if (!Site || !GetWorld() || !GetPawn()) return TEXT("Roost conditions cannot be assessed without a visible site and embodied raven.");
-	const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn());
-	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
-	const float CapsuleRadius = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 30.f;
-	const FVector SiteLocation = Site->GetActorLocation();
-
-	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenRoostAssessment), false, GetPawn());
-	Query.AddIgnoredActor(Site);
 	FHitResult Support;
 	const bool bHasSuitableSupport = HasSuitablePerchSupport(Site, &Support);
 
+	const int32 OverheadBlockCount = CountOverheadCoverProbes(Site);
+
+	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry; this is only a local rain-cover clue, not proof of waterproof shelter. The probe does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
+		bHasSuitableSupport ? TEXT("an upward-facing support surface is currently beneath the marker") : TEXT("suitable upward-facing support was not confirmed beneath the marker"),
+		OverheadBlockCount);
+}
+
+int32 ARavenAgentAIController::CountOverheadCoverProbes(const AActor* Site) const
+{
+	if (!Site || !GetWorld() || !GetPawn()) return 0;
+	const ACharacter* RavenCharacter = Cast<ACharacter>(GetPawn());
+	const float HalfHeight = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+	const float CapsuleRadius = RavenCharacter ? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleRadius() : 30.f;
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenRoostOverheadCover), false, GetPawn());
+	Query.AddIgnoredActor(Site);
 	const float ProbeSpread = FMath::Min(CapsuleRadius * 0.65f, 30.f);
-	const FVector HeadHeight = SiteLocation + FVector(0.f, 0.f, HalfHeight + 5.f);
+	const FVector HeadHeight = Site->GetActorLocation() + FVector(0.f, 0.f, HalfHeight + 5.f);
 	const FVector ProbeOffsets[] = {
 		FVector::ZeroVector,
 		FVector(ProbeSpread, 0.f, 0.f), FVector(-ProbeSpread, 0.f, 0.f),
@@ -808,10 +853,7 @@ FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 			HeadHeight + Offset + FVector(0.f, 0.f, 300.f), ECC_Visibility, Query))
 			++OverheadBlockCount;
 	}
-
-	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry; this is only a local rain-cover clue, not proof of waterproof shelter. The probe does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
-		bHasSuitableSupport ? TEXT("an upward-facing support surface is currently beneath the marker") : TEXT("suitable upward-facing support was not confirmed beneath the marker"),
-		OverheadBlockCount);
+	return OverheadBlockCount;
 }
 
 AActor* ARavenAgentAIController::FindPerchedNestSite() const

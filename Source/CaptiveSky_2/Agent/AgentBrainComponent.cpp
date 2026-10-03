@@ -231,7 +231,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearbyBeings += TEXT(" ") + LocalWeather->DescribeWindShelterAt(It->GetActorLocation(), Owner);
 				if (LocalWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) >= 0.55f)
-					NearbyBeings += TEXT(" A strong shower is passing, but overhead rain cover is not measured by this wind check.");
+					NearbyBeings += TEXT(" A strong shower is passing; compare the short overhead-cover clues at other visible roosts, but do not assume any clue guarantees dryness.");
 			}
 			else NearbyBeings += TEXT(" No IslandWeather actor is active, so local wind shelter cannot be assessed.");
 			++VisibleRoosts;
@@ -630,7 +630,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. "
 		"At the inn counter, build target GuestBook may use \"intent\" for one short line in the shared guest book; other residents can read it, so do not write private secrets there. Writing is optional and limited to one line per Island day. "
-		"If your body can use a visible nearby roost, in rough weather you may consider its described current wind shelter and choose to move there before resting; this is your choice, not an automatic requirement. The wind check does not prove overhead rain cover or perch support, and only a completed physical action confirms arrival. "
+		"If your body can use a visible nearby roost, in rough weather you may consider its measured wind shelter and short overhead-cover clue before choosing where to perch or rest. During a strong shower, one site with clearly more overhead probe hits may offer some cover, but this small local sample does not prove dryness, branch strength, or safety. This is your choice, not an automatic requirement, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "

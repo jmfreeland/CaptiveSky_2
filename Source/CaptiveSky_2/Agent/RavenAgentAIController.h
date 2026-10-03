@@ -125,8 +125,12 @@ private:
 	bool BeginPerch();
 	bool BeginPerchAt(AActor* Perch);
 	bool HasSuitablePerchSupport(const AActor* Site, FHitResult* OutSupport = nullptr) const;
+	int32 CountOverheadCoverProbes(const AActor* Site) const;
 	static int32 SelectWindAwarePerch(const FVector& Origin, float CurrentWindSpeed,
 		const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds);
+	static int32 SelectWeatherAwarePerch(const FVector& Origin, float CurrentWindSpeed, float RainIntensity,
+		const TArray<FVector>& PerchLocations, const TArray<float>& PerchWindSpeeds,
+		const TArray<int32>& OverheadCoverProbeCounts);
 	void SetGrounded();
 	void CacheWingComponents(APawn* Raven);
 	void UpdateWingAnimation(float DeltaSeconds);
