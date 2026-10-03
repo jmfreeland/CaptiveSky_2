@@ -525,30 +525,29 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
-		constexpr int32 MeadowPatchCount = 1024;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		// Spread the same 1.92-million candidate budget across more of the Island instead
-		// of deepening already-planted patches; the 30 FPS capture gate remains in force.
-		constexpr int32 MeadowClumpsPerPatch = 1875;
-		constexpr int32 MeadowPatchProbeCount = 8400;
+		constexpr int32 MeadowCandidatesPerAnchorPatch = 1875;
+		// Keep the established bounded budget, but sample broad landscape cover over a terrain-cell mask
+		// rather than clustering it inside visible 30 m circles.
+		constexpr int32 MeadowCandidateBudget = 1920000;
+		constexpr int32 MaxMeadowTerrainCells = 40000;
+		constexpr float MinimumMeadowTerrainCellSize = 1000.f;
 		constexpr float MeadowPatchInnerRadius = 250.f;
 		constexpr float MeadowPatchOuterRadius = 1600.f;
-		constexpr float LandscapeMeadowPatchOuterRadius = 3000.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
 		constexpr float LandmarkPatchMinSpacing = 1200.f;
-		constexpr float MeadowCenterSpacing = 1700.f;
 		int32 MeadowTraceCount = 0;
 		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
 		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
 		auto AddMeadowPatch = [this, &MeadowCenters, &MeadowRandom, &MeadowTraceCount, &TraceTop, &TraceBottom, &PlaceFoliage,
-			&Query, MeadowClumpsPerPatch, MeadowPatchInnerRadius, SeaLevel](FVector Center, float PatchOuterRadius)
+			&Query, MeadowCandidatesPerAnchorPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, SeaLevel](FVector Center)
 		{
 			MeadowCenters.Add(Center);
 			TArray<FTransform> PatchOffsets;
 			const int32 PatchSeed = static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ (0x3e5a93b7u + MeadowCenters.Num() * 7919u));
-			BuildGroundCoverOffsets(PatchSeed, MeadowClumpsPerPatch, MeadowPatchInnerRadius, PatchOuterRadius, PatchOffsets);
+			BuildGroundCoverOffsets(PatchSeed, MeadowCandidatesPerAnchorPatch, MeadowPatchInnerRadius, MeadowPatchOuterRadius, PatchOffsets);
 			for (int32 ClumpIndex = 0; ClumpIndex < PatchOffsets.Num(); ++ClumpIndex)
 			{
 				const FVector PatchCandidate = MeadowCenters.Last() + PatchOffsets[ClumpIndex].GetLocation();
@@ -571,11 +570,11 @@ void AIslandWeather::InitializeGroundCover()
 			return true;
 		};
 
-		// Keep part of the patch budget in the actual landmark sightlines, outside each close-up verge.
-		for (int32 AnchorIndex = 0; AnchorIndex < ExclusionLocations.Num() && MeadowCenters.Num() < MeadowPatchCount; ++AnchorIndex)
+		// Keep the close landmark verges and their established ring scatter unchanged.
+		for (int32 AnchorIndex = 0; AnchorIndex < ExclusionLocations.Num(); ++AnchorIndex)
 		{
 			int32 AddedForAnchor = 0;
-			for (int32 Attempt = 0; Attempt < AnchorPatchesPerLandmark * 24 && AddedForAnchor < AnchorPatchesPerLandmark && MeadowCenters.Num() < MeadowPatchCount; ++Attempt)
+			for (int32 Attempt = 0; Attempt < AnchorPatchesPerLandmark * 24 && AddedForAnchor < AnchorPatchesPerLandmark; ++Attempt)
 			{
 				const float Angle = MeadowRandom.FRandRange(0.f, 2.f * PI);
 				const float Radius = MeadowRandom.FRandRange(LandmarkPatchMinRadius, LandmarkPatchMaxRadius);
@@ -590,33 +589,63 @@ void AIslandWeather::InitializeGroundCover()
 					if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
 				FVector MeadowCenter;
 				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-				AddMeadowPatch(MeadowCenter, MeadowPatchOuterRadius);
+				AddMeadowPatch(MeadowCenter);
 				++AddedForAnchor;
 			}
 		}
-		// The remaining patches use bounded, seeded samples over the rest of the island footprint.
-		const int32 FirstLandscapeMeadowPatch = MeadowCenters.Num();
-		for (int32 Probe = 0; Probe < MeadowPatchProbeCount && MeadowCenters.Num() < MeadowPatchCount; ++Probe)
+		const int32 LandscapeCandidateCount = FMath::Max(0,
+			MeadowCandidateBudget - MeadowCenters.Num() * MeadowCandidatesPerAnchorPatch);
+		const float LandscapeWidth = FMath::Max(1.f, BoundsExtent.X * 2.f);
+		const float LandscapeHeight = FMath::Max(1.f, BoundsExtent.Y * 2.f);
+		const float TerrainCellSize = FMath::Max(MinimumMeadowTerrainCellSize,
+			FMath::Sqrt((LandscapeWidth * LandscapeHeight) / static_cast<float>(MaxMeadowTerrainCells)));
+		const int32 TerrainCellColumns = FMath::Max(1, FMath::CeilToInt(LandscapeWidth / TerrainCellSize));
+		const int32 TerrainCellRows = FMath::Max(1, FMath::CeilToInt(LandscapeHeight / TerrainCellSize));
+		const float TerrainCellWidth = LandscapeWidth / TerrainCellColumns;
+		const float TerrainCellHeight = LandscapeHeight / TerrainCellRows;
+		TArray<FVector> ValidMeadowTerrainCells;
+		ValidMeadowTerrainCells.Reserve(FMath::Min(MaxMeadowTerrainCells, TerrainCellColumns * TerrainCellRows));
+		// Build a coarse, seeded-friendly land mask so broad scatter is distributed over eligible ground,
+		// rather than repeatedly painting dense islands around randomly chosen centers.
+		for (int32 CellY = 0; CellY < TerrainCellRows; ++CellY)
+			for (int32 CellX = 0; CellX < TerrainCellColumns; ++CellX)
+			{
+				const FVector Candidate(BoundsOrigin.X - BoundsExtent.X + (CellX + 0.5f) * TerrainCellWidth,
+					BoundsOrigin.Y - BoundsExtent.Y + (CellY + 0.5f) * TerrainCellHeight, BoundsOrigin.Z);
+				bool bNearAnchor = false;
+				for (const FVector& Exclusion : ExclusionLocations)
+					if (FVector::Dist2D(Candidate, Exclusion) < MeadowCenterExclusionRadius) { bNearAnchor = true; break; }
+				if (bNearAnchor) continue;
+				FHitResult CellHit;
+				++MeadowTraceCount;
+				if (!GetWorld()->LineTraceSingleByChannel(CellHit,
+					FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+					!Cast<ALandscapeProxy>(CellHit.GetActor()) || CellHit.ImpactNormal.Z < 0.72f || CellHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
+				ValidMeadowTerrainCells.Add(FVector(Candidate.X, Candidate.Y, CellHit.ImpactPoint.Z));
+			}
+		const float HalfTerrainCellWidth = TerrainCellWidth * 0.5f;
+		const float HalfTerrainCellHeight = TerrainCellHeight * 0.5f;
+		for (int32 CandidateIndex = 0; CandidateIndex < LandscapeCandidateCount && !ValidMeadowTerrainCells.IsEmpty(); ++CandidateIndex)
 		{
-			const FVector Candidate(MeadowRandom.FRandRange(BoundsOrigin.X - BoundsExtent.X, BoundsOrigin.X + BoundsExtent.X),
-				MeadowRandom.FRandRange(BoundsOrigin.Y - BoundsExtent.Y, BoundsOrigin.Y + BoundsExtent.Y), BoundsOrigin.Z);
+			const FVector& Cell = ValidMeadowTerrainCells[MeadowRandom.RandRange(0, ValidMeadowTerrainCells.Num() - 1)];
+			const FVector Candidate(Cell.X + MeadowRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
+				Cell.Y + MeadowRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
 			bool bNearAnchor = false;
 			for (const FVector& Exclusion : ExclusionLocations)
 				if (FVector::Dist2D(Candidate, Exclusion) < MeadowCenterExclusionRadius) { bNearAnchor = true; break; }
 			if (bNearAnchor) continue;
-			bool bNearOtherPatch = false;
-			for (const FVector& ExistingCenter : MeadowCenters)
-				if (FVector::Dist2D(Candidate, ExistingCenter) < MeadowCenterSpacing) { bNearOtherPatch = true; break; }
-			FVector MeadowCenter;
-			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-			// Broad, overlapping landscape patches soften detached circular edges without increasing
-			// the fixed million-instance budget; anchor-side verges keep their smaller radius above.
-			AddMeadowPatch(MeadowCenter, LandscapeMeadowPatchOuterRadius);
+			FHitResult CandidateHit;
+			++MeadowTraceCount;
+			if (!GetWorld()->LineTraceSingleByChannel(CandidateHit,
+				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+				!Cast<ALandscapeProxy>(CandidateHit.GetActor()) || CandidateHit.ImpactNormal.Z < 0.72f || CandidateHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
+			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
+				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
+			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
-		// The patch population is recorded separately from the closer anchor rings for capture diagnostics.
-		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter placed %d patches with %d ground-cover instances after %d bounded traces."),
-			MeadowCenters.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount);
+		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter sampled %d valid terrain cells and placed %d ground-cover instances after %d bounded traces (budget %d)."),
+			ValidMeadowTerrainCells.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount, MeadowCandidateBudget);
 
 		// Add a few distant spruce groves to break up the low meadow skyline. These are decorative
 		// HISM instances well outside landmark clearances; they never collide or affect navigation.
@@ -651,7 +680,7 @@ void AIslandWeather::InitializeGroundCover()
 						FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) &&
 						Hit.GetActor() == IslandLandscape && Hit.ImpactNormal.Z >= 0.82f && Hit.ImpactPoint.Z >= SeaLevel + 600.f;
 				};
-				for (int32 GroveIndex = 0; GroveIndex < SpruceGroveCount && GroveIndex < MeadowPatchCount; ++GroveIndex)
+				for (int32 GroveIndex = 0; GroveIndex < SpruceGroveCount; ++GroveIndex)
 				{
 					FVector GroveCenter = FVector::ZeroVector;
 					bool bFoundGroveCenter = false;
@@ -859,27 +888,24 @@ void AIslandWeather::InitializeGroundCover()
 				const int32 GroveFlowerCount = GroundCoverFlowerCount;
 				int32 MeadowFlowerTraceCount = 0;
 				int32 MeadowFlowerPatchCount = 0;
+				constexpr int32 MeadowFlowerCandidateSites = 512;
 				const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
 					? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
 				if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 				{
-					// Break up open grass with an occasional wind-reactive flowering shrub. Only broad
-					// landscape patches participate; anchor verges retain their intentionally open read.
-					constexpr int32 FlowerEveryLandscapePatch = 2;
-					constexpr int32 MaxFlowerTracesPerPatch = 12;
-					constexpr float FlowerPatchInnerRadius = 650.f;
-					constexpr float FlowerPatchOuterRadius = 1450.f;
+					// Scatter a sparse, bounded pool of flower candidates through the same valid-terrain
+					// mask as the meadow, rather than tying accents to broad-grass patch centers.
+					constexpr int32 MaxFlowerAttemptsPerSite = 3;
 					constexpr float FlowerMinSpacing = 475.f;
 					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
-					for (int32 PatchIndex = FirstLandscapeMeadowPatch;
-						PatchIndex < MeadowCenters.Num(); PatchIndex += FlowerEveryLandscapePatch)
+					for (int32 SiteIndex = 0; SiteIndex < MeadowFlowerCandidateSites && !ValidMeadowTerrainCells.IsEmpty(); ++SiteIndex)
 					{
 						bool bPlacedMeadowFlower = false;
-						for (int32 Attempt = 0; Attempt < MaxFlowerTracesPerPatch && !bPlacedMeadowFlower; ++Attempt)
+						for (int32 Attempt = 0; Attempt < MaxFlowerAttemptsPerSite && !bPlacedMeadowFlower; ++Attempt)
 						{
-							const float Angle = MeadowFlowerRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = MeadowFlowerRandom.FRandRange(FlowerPatchInnerRadius, FlowerPatchOuterRadius);
-							const FVector Candidate = MeadowCenters[PatchIndex] + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+							const FVector& Cell = ValidMeadowTerrainCells[MeadowFlowerRandom.RandRange(0, ValidMeadowTerrainCells.Num() - 1)];
+							const FVector Candidate(Cell.X + MeadowFlowerRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
+								Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
 							bool bTooClose = false;
 							for (const FVector& Exclusion : ExclusionLocations)
 								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
@@ -916,8 +942,8 @@ void AIslandWeather::InitializeGroundCover()
 						}
 					}
 				}
-				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d flowering rhododendrons across %d patches after %d bounded traces."),
-					MeadowFlowerPatchCount, MeadowFlowerPatchCount, MeadowFlowerTraceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d flowering rhododendrons across %d sampled sites after %d bounded traces."),
+					MeadowFlowerPatchCount, MeadowFlowerCandidateSites, MeadowFlowerTraceCount);
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
