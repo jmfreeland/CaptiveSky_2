@@ -527,7 +527,9 @@ void AIslandWeather::InitializeGroundCover()
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
 		constexpr int32 MeadowPatchCount = 768;
 		constexpr int32 AnchorPatchesPerLandmark = 12;
-		constexpr int32 MeadowClumpsPerPatch = 1280;
+		// The 30 FPS-gated views still show wide bare intervals between existing clumps.
+		// Add 25% more placements inside the same seeded patches without adding mesh types.
+		constexpr int32 MeadowClumpsPerPatch = 1600;
 		constexpr int32 MeadowPatchProbeCount = 5040;
 		constexpr float MeadowPatchInnerRadius = 250.f;
 		constexpr float MeadowPatchOuterRadius = 1600.f;
