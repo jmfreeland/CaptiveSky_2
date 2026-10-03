@@ -25,11 +25,21 @@ Both produced scratch-only object files and SARIF reports with empty `results` a
 This confirms translation-unit compilation only; the objects were not linked into the editor module.
 
 On 2026-10-03, the connected UE 5.8.3 editor ran `CaptiveSky2.Visual.Viewpoints` with a real RHI and
-passed in 17.05 seconds with no test errors. This exercised the 500-grove population-bound, sapling,
-spacing, collision, and navigation assertions and saved all nine viewpoint frames to
-`Saved/Viewpoints/2026-10-03_090731_h17.0/`. The capture is a useful visual check, not packaged
-performance evidence. The run used the already-open editor, so it does not replace a fresh UBT build
-or prove that the current source was newly linked into that process.
+passed in 17.05 seconds with no test errors, saving all nine configured frames to
+`Saved/Viewpoints/2026-10-03_090731_h17.0/`. A later audit found the editor command line did not
+include `-ViewpointGroundCover`; that flag gates the real-Island ground-cover initialization and the
+500-grove population/spacing assertions. Therefore this run verifies the map/camera/render capture
+path only. Its images do not prove the 500-grove source was loaded, nor do they validate vegetation
+placement or packaged performance. The ground-cover-enabled capture and a fresh UBT build remain
+pending.
+
+The same live editor also passed `CaptiveSky2.Agent.GroundCover` and
+`CaptiveSky2.Agent.NightEcology` (0.41 seconds total, no errors or warnings). These are useful
+fixture/regression checks, but they do not populate the real Island with the 500-grove scatter.
+`Scripts/Capture-Viewpoints.ps1 -GroundCover` is the supported real-Island RHI route; its documented
+workflow requires the project editor to be closed. It has not been run while the user's editor is
+open. The in-editor Live Coding compile tool also reported that Live Coding is disabled for this
+session.
 
 On 2026-10-02 the isolated `Build.bat CaptiveSky_2Editor Win64 Development`
 invocation with `-WaitMutex` emitted only its launch line and no UBT log or build artifacts for over
