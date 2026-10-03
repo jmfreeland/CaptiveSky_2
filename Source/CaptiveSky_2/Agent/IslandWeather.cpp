@@ -1289,6 +1289,73 @@ void AIslandWeather::ClearGroundCoverPreview()
 	ClearGroundCover();
 }
 
+int32 AIslandWeather::CountSpruceCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const
+{
+	if (!IslandSpruce || !IslandSpruce->GetStaticMesh() || ProbeStarts.IsEmpty() || ProbeStarts.Num() != ProbeEnds.Num()) return 0;
+	const FBox LocalBounds = IslandSpruce->GetStaticMesh()->GetBoundingBox();
+	if (!LocalBounds.IsValid || LocalBounds.GetSize().Z <= KINDA_SMALL_NUMBER) return 0;
+	TArray<uint8> Covered;
+	Covered.Init(0, ProbeStarts.Num());
+	int32 CoveredCount = 0;
+	for (int32 TreeIndex = 0; TreeIndex < IslandSpruce->GetInstanceCount() && CoveredCount < Covered.Num(); ++TreeIndex)
+	{
+		FTransform TreeTransform;
+		if (!IslandSpruce->GetInstanceTransform(TreeIndex, TreeTransform, true)) continue;
+		const FBox WorldBounds = LocalBounds.TransformBy(TreeTransform);
+		// Saplings and shrubs remain visible species, but are too short to count as rain-cover crowns.
+		if (WorldBounds.GetSize().Z < 900.f) continue;
+		const float SearchRadius = FMath::Max(WorldBounds.GetExtent().X, WorldBounds.GetExtent().Y) + 30.f;
+		for (int32 ProbeIndex = 0; ProbeIndex < Covered.Num(); ++ProbeIndex)
+		{
+			if (Covered[ProbeIndex] || FVector::DistSquared2D(TreeTransform.GetLocation(), ProbeStarts[ProbeIndex]) > FMath::Square(SearchRadius)) continue;
+			if (!DoesSpruceCrownCoverProbeSegment(LocalBounds, TreeTransform, ProbeStarts[ProbeIndex], ProbeEnds[ProbeIndex])) continue;
+			Covered[ProbeIndex] = 1;
+			++CoveredCount;
+		}
+	}
+	return CoveredCount;
+}
+
+bool AIslandWeather::DoesSpruceCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
+	const FVector& ProbeStart, const FVector& ProbeEnd)
+{
+	if (!LocalMeshBounds.IsValid || ProbeStart.ContainsNaN() || ProbeEnd.ContainsNaN() ||
+		TreeTransform.ContainsNaN() || LocalMeshBounds.GetSize().Z <= KINDA_SMALL_NUMBER) return false;
+
+	// A restrained upper-crown envelope avoids treating the trunk/lower branches as a roof.
+	const FVector Center = LocalMeshBounds.GetCenter();
+	FVector Extent = LocalMeshBounds.GetExtent();
+	Extent.X *= 0.8f;
+	Extent.Y *= 0.8f;
+	FBox CrownBounds(Center - Extent, Center + Extent);
+	CrownBounds.Min.Z = LocalMeshBounds.Min.Z + LocalMeshBounds.GetSize().Z * 0.56f;
+
+	const FVector LocalStart = TreeTransform.InverseTransformPosition(ProbeStart);
+	const FVector LocalEnd = TreeTransform.InverseTransformPosition(ProbeEnd);
+	const FVector Delta = LocalEnd - LocalStart;
+	float TMin = 0.f;
+	float TMax = 1.f;
+	for (int32 Axis = 0; Axis < 3; ++Axis)
+	{
+		const float StartValue = LocalStart[Axis];
+		const float DeltaValue = Delta[Axis];
+		const float MinValue = CrownBounds.Min[Axis];
+		const float MaxValue = CrownBounds.Max[Axis];
+		if (FMath::Abs(DeltaValue) <= KINDA_SMALL_NUMBER)
+		{
+			if (StartValue < MinValue || StartValue > MaxValue) return false;
+			continue;
+		}
+		float Entry = (MinValue - StartValue) / DeltaValue;
+		float Exit = (MaxValue - StartValue) / DeltaValue;
+		if (Entry > Exit) Swap(Entry, Exit);
+		TMin = FMath::Max(TMin, Entry);
+		TMax = FMath::Min(TMax, Exit);
+		if (TMin > TMax) return false;
+	}
+	return true;
+}
+
 void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	PersistWeatherTime();

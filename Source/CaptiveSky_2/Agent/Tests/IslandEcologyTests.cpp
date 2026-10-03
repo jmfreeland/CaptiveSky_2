@@ -138,6 +138,34 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->InitializeGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
+	const FBox SpruceLocalBounds = Weather->IslandSpruce->GetStaticMesh()->GetBoundingBox();
+	const float SpruceMeshHeight = SpruceLocalBounds.GetSize().Z;
+	TestTrue(TEXT("The fixture can inspect the loaded spruce crown bounds"), SpruceMeshHeight > KINDA_SMALL_NUMBER);
+	if (SpruceMeshHeight > KINDA_SMALL_NUMBER)
+	{
+		auto MakeCrownProbe = [&SpruceLocalBounds](const FTransform& TreeTransform, TArray<FVector>& Starts, TArray<FVector>& Ends)
+		{
+			const float ProbeLocalZ = SpruceLocalBounds.Min.Z + SpruceLocalBounds.GetSize().Z * 0.62f;
+			const FVector ProbeLocalXY(SpruceLocalBounds.GetCenter().X, SpruceLocalBounds.GetCenter().Y, ProbeLocalZ);
+			Starts.Add(TreeTransform.TransformPosition(ProbeLocalXY));
+			Ends.Add(TreeTransform.TransformPosition(ProbeLocalXY + FVector(0.f, 0.f, SpruceLocalBounds.GetSize().Z * 0.12f)));
+		};
+		const FTransform MatureTree(FRotator::ZeroRotator, FVector(14000.f, 0.f, 0.f), FVector(1200.f / SpruceMeshHeight));
+		Weather->IslandSpruce->AddInstance(MatureTree, true);
+		TArray<FVector> MatureProbeStarts, MatureProbeEnds;
+		MakeCrownProbe(MatureTree, MatureProbeStarts, MatureProbeEnds);
+		TestEqual(TEXT("The collisionless mature spruce HISM contributes a crown-cover clue"),
+			Weather->CountSpruceCrownCoverProbes(MatureProbeStarts, MatureProbeEnds), 1);
+		TestEqual(TEXT("Spruce remains non-colliding for the canopy query"),
+			Weather->IslandSpruce->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		const FTransform Sapling(FRotator::ZeroRotator, FVector(17000.f, 0.f, 0.f), FVector(500.f / SpruceMeshHeight));
+		Weather->IslandSpruce->AddInstance(Sapling, true);
+		TArray<FVector> SaplingProbeStarts, SaplingProbeEnds;
+		MakeCrownProbe(Sapling, SaplingProbeStarts, SaplingProbeEnds);
+		TestEqual(TEXT("A short spruce sapling does not count as overhead shelter"),
+			Weather->CountSpruceCrownCoverProbes(SaplingProbeStarts, SaplingProbeEnds), 0);
+		Weather->IslandSpruce->ClearInstances();
+	}
 	const FVector SpeciesPatchProbe(-100500.f, 100500.f, 0.f);
 	TestEqual(TEXT("Ground-cover species selection repeats for the same seed and world position"),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71), AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71));

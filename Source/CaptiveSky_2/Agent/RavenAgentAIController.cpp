@@ -825,7 +825,7 @@ FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 
 	const int32 OverheadBlockCount = CountOverheadCoverProbes(Site);
 
-	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry; this is only a local rain-cover clue, not proof of waterproof shelter. The probe does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
+	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry or crossed a conservative mature-spruce upper-crown envelope; this is only a local rain-cover clue, not proof of waterproof shelter. The canopy envelope is approximate and does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
 		bHasSuitableSupport ? TEXT("an upward-facing support surface is currently beneath the marker") : TEXT("suitable upward-facing support was not confirmed beneath the marker"),
 		OverheadBlockCount);
 }
@@ -846,12 +846,25 @@ int32 ARavenAgentAIController::CountOverheadCoverProbes(const AActor* Site) cons
 		FVector(0.f, ProbeSpread, 0.f), FVector(0.f, -ProbeSpread, 0.f)
 	};
 	int32 OverheadBlockCount = 0;
+	TArray<FVector> UncoveredStarts;
+	TArray<FVector> UncoveredEnds;
 	for (const FVector& Offset : ProbeOffsets)
 	{
+		const FVector ProbeStart = HeadHeight + Offset;
+		const FVector ProbeEnd = ProbeStart + FVector(0.f, 0.f, 300.f);
 		FHitResult Overhead;
-		if (GetWorld()->LineTraceSingleByChannel(Overhead, HeadHeight + Offset,
-			HeadHeight + Offset + FVector(0.f, 0.f, 300.f), ECC_Visibility, Query))
+		if (GetWorld()->LineTraceSingleByChannel(Overhead, ProbeStart, ProbeEnd, ECC_Visibility, Query))
 			++OverheadBlockCount;
+		else
+		{
+			UncoveredStarts.Add(ProbeStart);
+			UncoveredEnds.Add(ProbeEnd);
+		}
+	}
+	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+	{
+		OverheadBlockCount += It->CountSpruceCrownCoverProbes(UncoveredStarts, UncoveredEnds);
+		break;
 	}
 	return OverheadBlockCount;
 }
