@@ -9,6 +9,7 @@
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
@@ -23,6 +24,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 	{
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));
 		if (Target->ActorHasTag(TEXT("TidepoolCrab"))) return FName(TEXT("TidepoolCrab"));
+		if (Target->ActorHasTag(TEXT("TideglassDragonfly"))) return FName(TEXT("TideglassDragonfly"));
 		if (Target->ActorHasTag(TEXT("MinnowSchool"))) return FName(TEXT("MinnowSchool"));
 		return NAME_None;
 	}
@@ -145,6 +147,12 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	{
 		if (AIslandTidepoolCrab* Crab = Cast<AIslandTidepoolCrab>(Target)) Crab->RespondToQuietObservation(Observer->GetActorLocation());
 		OutFact = TEXT("You quietly watched a small shore crab. It scuttled a short way toward cover, paused, then resumed its usual Tideglass path. It remains wild and independent; you did not touch, catch, or claim it, and nothing persistent changed.");
+		return true;
+	}
+	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("TideglassDragonfly")))
+	{
+		if (AIslandTideglassDragonfly* Dragonfly = Cast<AIslandTideglassDragonfly>(Target)) Dragonfly->RespondToQuietObservation(Observer->GetActorLocation());
+		OutFact = TEXT("You quietly watched a Tideglass dragonfly hover above the shore. It darted a little way off, then resumed circling near the pool; it remains wild and independent. You did not touch, catch, or claim it, and nothing persistent changed.");
 		return true;
 	}
 	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("MinnowSchool")))

@@ -466,17 +466,20 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 		AActor* NearestFirefly = nullptr;
 		AActor* NearestTidepoolCrab = nullptr;
+		AActor* NearestDragonfly = nullptr;
 		AActor* NearestMinnowSchool = nullptr;
 		float FireflyDistanceSquared = FMath::Square(1800.f);
 		float TidepoolCrabDistanceSquared = FMath::Square(1800.f);
+		float DragonflyDistanceSquared = FMath::Square(1800.f);
 		float MinnowSchoolDistanceSquared = FMath::Square(1800.f);
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (It->IsHidden()) continue;
 			const bool bFirefly = It->ActorHasTag(TEXT("Firefly"));
 			const bool bTidepoolCrab = It->ActorHasTag(TEXT("TidepoolCrab"));
+			const bool bDragonfly = It->ActorHasTag(TEXT("TideglassDragonfly"));
 			const bool bMinnowSchool = It->ActorHasTag(TEXT("MinnowSchool"));
-			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab && !bMinnowSchool)) continue;
+			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab && !bDragonfly && !bMinnowSchool)) continue;
 			const float DistanceSquared = FVector::DistSquared(Location, It->GetActorLocation());
 			if (DistanceSquared > FMath::Square(1800.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeVisibility), false, Owner);
@@ -493,6 +496,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearestTidepoolCrab = *It;
 				TidepoolCrabDistanceSquared = DistanceSquared;
 			}
+			if (bDragonfly && DistanceSquared <= DragonflyDistanceSquared)
+			{
+				NearestDragonfly = *It;
+				DragonflyDistanceSquared = DistanceSquared;
+			}
 			if (bMinnowSchool && DistanceSquared <= MinnowSchoolDistanceSquared)
 			{
 				NearestMinnowSchool = *It;
@@ -505,6 +513,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			NearbyBeings += FString::Printf(TEXT(" A small school of minnows is circling in the Tideglass shallows, about %.0f metres away. They are wild, not companions or movement targets. If the school is within four metres, you may Interact with target MinnowSchool to watch quietly; the fish will scatter briefly and regroup. Do not touch, catch, or claim them."), FMath::Sqrt(MinnowSchoolDistanceSquared) / 100.f);
 		if (NearestTidepoolCrab)
 			NearbyBeings += FString::Printf(TEXT(" A small shore crab is scuttling independently near TideglassPool, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TidepoolCrab to watch quietly; it may scuttle away, and should not be touched, caught, or claimed."), FMath::Sqrt(TidepoolCrabDistanceSquared) / 100.f);
+		if (NearestDragonfly)
+			NearbyBeings += FString::Printf(TEXT(" A dragonfly with translucent wings is hovering above the Tideglass shore, about %.0f metres away. It is wild, not a companion or movement target. If it is within four metres, you may Interact with target TideglassDragonfly to watch quietly; it may dart aside and return to its pool-side flight. Do not touch, catch, or claim it."), FMath::Sqrt(DragonflyDistanceSquared) / 100.f);
 		bool bSawWindRipple = false;
 		bool bSawRainRipple = false;
 		for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It && !(bSawWindRipple && bSawRainRipple); ++It)

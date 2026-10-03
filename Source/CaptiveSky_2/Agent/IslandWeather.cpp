@@ -8,6 +8,7 @@
 #include "IslandFirefly.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
 #include "Components/VolumetricCloudComponent.h"
@@ -1513,6 +1514,9 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 		if (Crab.IsValid()) Crab->Destroy();
 	DayCrabs.Reset();
+	for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
+		if (Dragonfly.IsValid()) Dragonfly->Destroy();
+	DayDragonflies.Reset();
 	if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
 	DayMinnowSchool.Reset();
 	Super::EndPlay(EndPlayReason);
@@ -1919,6 +1923,7 @@ void AIslandWeather::RefreshNightEcology()
 {
 	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
 	DayCrabs.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolCrab>& Crab) { return !Crab.IsValid(); });
+	DayDragonflies.RemoveAll([](const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly) { return !Dragonfly.IsValid(); });
 	if (!DayMinnowSchool.IsValid()) DayMinnowSchool.Reset();
 	if (!GetWorld()) return;
 
@@ -1950,6 +1955,9 @@ void AIslandWeather::RefreshNightEcology()
 		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 			if (Crab.IsValid()) Crab->Destroy();
 		DayCrabs.Reset();
+		for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
+			if (Dragonfly.IsValid()) Dragonfly->Destroy();
+		DayDragonflies.Reset();
 		if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
 		DayMinnowSchool.Reset();
 		return;
@@ -2000,6 +2008,12 @@ void AIslandWeather::RefreshNightEcology()
 
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 		if (Crab.IsValid()) Crab->SetSheltered(!bDay);
+	if (!bDay)
+	{
+		for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
+			if (Dragonfly.IsValid()) Dragonfly->Destroy();
+		DayDragonflies.Reset();
+	}
 
 	if (bDay)
 	{
@@ -2018,6 +2032,22 @@ void AIslandWeather::RefreshNightEcology()
 
 	if (!bDay)
 		return;
+	constexpr int32 DragonflyPopulation = 3;
+	while (DayDragonflies.Num() < DragonflyPopulation)
+	{
+		const int32 Index = DayDragonflies.Num();
+		const float Angle = 2.f * PI * static_cast<float>(Index) / static_cast<float>(DragonflyPopulation);
+		const FVector Offset(FMath::Cos(Angle) * 340.f, FMath::Sin(Angle) * 340.f, 180.f + 35.f * (Index % 2));
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		if (AIslandTideglassDragonfly* Dragonfly = GetWorld()->SpawnActor<AIslandTideglassDragonfly>(Habitat->GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParameters))
+		{
+			Dragonfly->SetColorVariant(Index);
+			DayDragonflies.Add(Dragonfly);
+		}
+		else
+			break;
+	}
 	constexpr int32 DayPopulation = 2;
 	while (DayCrabs.Num() < DayPopulation)
 	{

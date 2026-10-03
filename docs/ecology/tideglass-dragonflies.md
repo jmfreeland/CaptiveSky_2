@@ -1,0 +1,11 @@
+# Tideglass Dragonflies
+
+Three wild dragonflies patrol close to the Tideglass shore from 06:00 until dusk. Each has a slim three-part body, four independently fluttering wings, and one of three stable moss-green, blue-green, or copper color morphs. They fly in small local loops, drift gently with local wind, slow in heavy rain, and steer around solid world geometry. Their body and wing meshes are primitive stand-ins rather than final insect art.
+
+Residents can notice the nearest visible dragonfly within 18 metres. If one is close and in clear view, Aster or the raven may choose `Interact` with target `TideglassDragonfly` to watch; it darts a short way off and resumes its pool-side flight. This is a brief, reversible response. Dragonflies are never movement targets, companions, collectables, or saved entities, and observation makes no model request or persistent world change.
+
+`AIslandWeather::RefreshNightEcology` owns their bounded population alongside the existing daylight crabs and minnows. Repeated refreshes reuse the three actors; dusk removes them, and the next daylight refresh creates a new small population. Their collision is disabled and they cast no shadows, so they cannot obstruct residents, the raven, or navigation.
+
+## UE 5.8.3 validation (2026-10-04)
+
+The isolated `Codex_UnderstoryVerify_20261002` editor target compiled and linked with the new dragonfly class, weather lifecycle, interaction resolver, resident awareness, and ecology assertions. The focused `CaptiveSky2.Agent.NightEcology` automation passed, covering the three-actor cap, daily emergence/dusk removal and dawn return, three distinct colors, collisionless body parts and wings, bounded wind/rain response, resident interaction routing, quiet startle-and-return behavior, and all pre-existing firefly, crab, and foliage checks. Build log: [UE 5.8.3 build](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_TideglassDragonfly_20261004_Build.log); test log: [NightEcology automation](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_TideglassDragonfly_NightEcology_20261004.log). This automation used a no-render fixture; in-world visual and performance screening remain to be done. No primary Island map or Content asset was modified.

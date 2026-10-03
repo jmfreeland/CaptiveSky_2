@@ -9,6 +9,7 @@ class AIslandFirefly;
 class AIslandLightning;
 class AIslandTidepoolCrab;
 class AIslandTidepoolMinnows;
+class AIslandTideglassDragonfly;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UHierarchicalInstancedStaticMeshComponent;
@@ -111,6 +112,7 @@ private:
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
+	TArray<TWeakObjectPtr<AIslandTideglassDragonfly>> DayDragonflies;
 	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
 	TArray<FTransform> ShoreGrassABaseTransforms;
 	TArray<FTransform> ShoreGrassBBaseTransforms;

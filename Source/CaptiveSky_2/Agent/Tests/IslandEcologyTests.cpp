@@ -6,6 +6,7 @@
 #include "IslandInteractionUtility.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
@@ -608,6 +609,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Local wind gently nudges the firefly drift"), AIslandFirefly::WindDisplacement(FVector(100.f, 0.f, 0.f)).Equals(FVector(12.f, 0.f, 0.f)));
 	TestTrue(TEXT("Strong gust displacement stays bounded"), AIslandFirefly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(30.f, 0.f, 0.f)));
 	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
+	TestTrue(TEXT("Still air adds no dragonfly drift"), AIslandTideglassDragonfly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
+	TestTrue(TEXT("Dragonfly drift stays bounded in a strong gust"), AIslandTideglassDragonfly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(54.f, 0.f, 0.f)));
+	TestTrue(TEXT("Dry conditions leave dragonfly movement unchanged"), FMath::IsNearlyEqual(AIslandTideglassDragonfly::RainMovementScale(0.f), 1.f));
+	TestTrue(TEXT("Heavy rain slows but does not stop dragonfly movement"), AIslandTideglassDragonfly::RainMovementScale(1.f) > 0.f && AIslandTideglassDragonfly::RainMovementScale(1.f) < 1.f);
+	TestTrue(TEXT("Dragonfly rain response is smooth and monotonic"), AIslandTideglassDragonfly::RainMovementScale(0.8f) < AIslandTideglassDragonfly::RainMovementScale(0.45f));
 	TestTrue(TEXT("Dry conditions leave crab roaming unchanged"), FMath::IsNearlyEqual(AIslandTidepoolCrab::RainMovementScale(0.f), 1.f));
 	TestTrue(TEXT("Heavy rain reduces but does not stop crab roaming"), AIslandTidepoolCrab::RainMovementScale(1.f) > 0.f && AIslandTidepoolCrab::RainMovementScale(1.f) < 1.f);
 	TestTrue(TEXT("Crab rain response changes smoothly and monotonically"), AIslandTidepoolCrab::RainMovementScale(0.75f) < AIslandTidepoolCrab::RainMovementScale(0.45f));
@@ -809,6 +815,31 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Tidepool crab geometry cannot block the world"), It->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
+	int32 DragonflyPopulation = 0;
+	TArray<FLinearColor> DragonflyColors;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It)
+	{
+		++DragonflyPopulation;
+		TestTrue(TEXT("Dragonfly is wild ambient life, not a landmark"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TideglassDragonfly")) && !It->ActorHasTag(TEXT("IslandLandmark")));
+		TestTrue(TEXT("Day dragonfly patrol stays near and above Tideglass"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 700.f && It->GetActorLocation().Z > Habitat->GetActorLocation().Z + 100.f);
+		TestEqual(TEXT("Dragonfly has a distinct four-wing silhouette"), It->Wings.Num(), 4);
+		TestTrue(TEXT("Dragonfly has head, thorax, and elongated abdomen meshes"), It->Head && It->Thorax && It->Abdomen);
+		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
+		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
+		if (BodyMaterial) DragonflyColors.Add(BodyMaterial->K2_GetVectorParameterValue(TEXT("Color")));
+		for (UStaticMeshComponent* Part : It->Wings)
+			TestTrue(TEXT("Dragonfly wing meshes are collisionless and shadowless"), Part && Part->GetStaticMesh() && Part->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Part->CastShadow);
+	}
+	TestEqual(TEXT("Three daytime dragonflies form a small bounded population"), DragonflyPopulation, 3);
+	int32 DistinctDragonflyColorCount = 0;
+	for (int32 Index = 0; Index < DragonflyColors.Num(); ++Index)
+	{
+		bool bColorSeen = false;
+		for (int32 PriorIndex = 0; PriorIndex < Index; ++PriorIndex)
+			if (DragonflyColors[Index].Equals(DragonflyColors[PriorIndex], 0.001f)) { bColorSeen = true; break; }
+		if (!bColorSeen) ++DistinctDragonflyColorCount;
+	}
+	TestEqual(TEXT("Each dragonfly receives a distinct stable natural color morph"), DistinctDragonflyColorCount, 3);
 	AIslandTidepoolCrab* RainSensitiveCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(3500.f, 5000.f, 600.f), FRotator::ZeroRotator, Spawn);
 	if (TestNotNull(TEXT("Shore crab weather-response tester spawned"), RainSensitiveCrab))
 	{
@@ -837,6 +868,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	CrabPopulation = 0;
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
 	TestEqual(TEXT("Shore crabs remain active in the late afternoon"), CrabPopulation, 2);
+	DragonflyPopulation = 0;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
+	TestEqual(TEXT("Dragonflies remain active in late afternoon"), DragonflyPopulation, 3);
 
 	Clock->CurrentHour = 20.f;
 	Weather->RefreshNightEcology();
@@ -880,6 +914,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
+	DragonflyPopulation = 0;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
+	TestEqual(TEXT("The daytime dragonfly population leaves at dusk"), DragonflyPopulation, 0);
 	TestEqual(TEXT("One independently spawned night firefly inhabits the route within chime range"), StoneSideFireflies, 1);
 	NightStonesHabitat->Tags.Remove(TEXT("ListeningStones"));
 	NightStonesHabitat->Tags.Remove(TEXT("IslandLandmark"));
@@ -961,6 +998,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Daylight resumes each resident's local routine"), It->IsActorTickEnabled());
 	}
 	TestEqual(TEXT("The same shore-crab residents re-emerge at midday"), CrabPopulation, 2);
+	DragonflyPopulation = 0;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
+	TestEqual(TEXT("Three dragonflies return when daytime resumes"), DragonflyPopulation, 3);
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabResidents)
 		TestTrue(TEXT("Each original crab actor survives and resumes in place"), Crab.IsValid() && !Crab->IsSheltered());
 
@@ -969,10 +1009,16 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	Population = 0;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It) ++Population;
 	TestEqual(TEXT("Fireflies leave during the twilight transition"), Population, 0);
+	DragonflyPopulation = 0;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
+	TestEqual(TEXT("Dragonflies do not appear before dawn"), DragonflyPopulation, 0);
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
 		TestTrue(TEXT("Crabs remain concealed before their 06:00 emergence"), It->IsSheltered());
 	Clock->CurrentHour = 6.f;
 	Weather->RefreshNightEcology();
+	DragonflyPopulation = 0;
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
+	TestEqual(TEXT("Three dragonflies return at the 06:00 daylight boundary"), DragonflyPopulation, 3);
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabResidents)
 		TestTrue(TEXT("Crabs re-emerge at 06:00 as their original residents"), Crab.IsValid() && !Crab->IsSheltered());
 
@@ -1197,6 +1243,23 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A low but distant flight does not startle a shore crab"),
 			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 		Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	}
+	AIslandTideglassDragonfly* WatchableDragonfly = World->SpawnActor<AIslandTideglassDragonfly>(TestPoolLocation + FVector(100.f, 0.f, 160.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A nearby wild dragonfly spawns for a quiet observation"), WatchableDragonfly);
+	if (WatchableDragonfly)
+	{
+		WatchableDragonfly->HomeLocation = WatchableDragonfly->GetActorLocation();
+		Observer->SetActorLocation(TestPoolLocation);
+		Controller->InspectTarget(TEXT("TideglassDragonfly"));
+		TestTrue(TEXT("Quiet inspection makes the dragonfly briefly dart away"), WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
+		TestTrue(TEXT("The interaction target resolver exposes dragonflies to visitors and residents"), IslandInteractionUtility::GetTargetTag(WatchableDragonfly) == FName(TEXT("TideglassDragonfly")));
+		FString DragonflyFact;
+		TestTrue(TEXT("A direct quiet observation is accepted without an agent-only capability"), IslandInteractionUtility::Perform(Observer, WatchableDragonfly, DragonflyFact));
+		TestTrue(TEXT("Observation preserves the dragonfly's wild, nonpersistent status"), DragonflyFact.Contains(TEXT("wild and independent")) && DragonflyFact.Contains(TEXT("nothing persistent changed")));
+		TestTrue(TEXT("Repeated quiet attention only refreshes the short natural startle response"), WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
+		WatchableDragonfly->Tick(2.f);
+		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		WatchableDragonfly->Destroy();
 	}
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(TestPoolLocation + FVector(80.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	WindTarget->SetActorLocation(TestPoolLocation + FVector(220.f, 0.f, 0.f));
