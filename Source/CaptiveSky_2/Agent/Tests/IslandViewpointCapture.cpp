@@ -465,12 +465,17 @@ namespace
 				const double MeasuredSeconds = FMath::Max(0.001, FPlatformTime::Seconds() - MeasuredCaptureStartSeconds);
 				const double CaptureFramesPerSecond = (Frames - CaptureWarmupFrames) / MeasuredSeconds;
 				const bool bGameplayScaleView = FVector::Dist(View.From, View.LookAt) <= 10000.f;
+				constexpr double MinimumGameplayScaleCaptureFPS = 30.0;
 				Test->AddInfo(FString::Printf(TEXT("%s: dense ground-cover SceneCapture throughput %.2f FPS over %d measured frames after %d warmup frames."),
 					*View.Name, CaptureFramesPerSecond, Frames - CaptureWarmupFrames, CaptureWarmupFrames));
 				if (!bGameplayScaleView)
 					Test->AddInfo(TEXT("This high-altitude overview is outside the gameplay-scale 100 m performance gate; its capture rate is diagnostic only."));
-				else if (CaptureFramesPerSecond < 10.0)
-					Test->AddInfo(TEXT("Low capture throughput is diagnostic only: this offscreen automation sample can include editor/render-thread stalls and is not a gameplay frame-rate benchmark."));
+				else
+				{
+					Test->TestTrue(FString::Printf(TEXT("%s gameplay-scale ground-cover capture sustains the %.0f FPS minimum"),
+						*View.Name, MinimumGameplayScaleCaptureFPS), CaptureFramesPerSecond >= MinimumGameplayScaleCaptureFPS);
+					Test->AddInfo(TEXT("This offscreen capture is a conservative foliage-performance screen, not a gameplay, packaged-build, or target-hardware frame-rate guarantee."));
+				}
 			}
 			TArray<FColor> Pixels;
 			if (Target->GameThread_GetRenderTargetResource()->ReadPixels(Pixels) && Pixels.Num() == Size.X * Size.Y)
