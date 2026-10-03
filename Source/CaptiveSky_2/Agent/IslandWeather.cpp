@@ -531,7 +531,7 @@ void AIslandWeather::InitializeGroundCover()
 		constexpr int32 MeadowPatchProbeCount = 5040;
 		constexpr float MeadowPatchInnerRadius = 250.f;
 		constexpr float MeadowPatchOuterRadius = 1600.f;
-		constexpr float LandscapeMeadowPatchOuterRadius = 2200.f;
+		constexpr float LandscapeMeadowPatchOuterRadius = 3000.f;
 		constexpr float MeadowCenterExclusionRadius = 5500.f;
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
@@ -607,8 +607,8 @@ void AIslandWeather::InitializeGroundCover()
 				if (FVector::Dist2D(Candidate, ExistingCenter) < MeadowCenterSpacing) { bNearOtherPatch = true; break; }
 			FVector MeadowCenter;
 			if (bNearOtherPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-			// Wider, overlapping landscape patches soften the bare gaps without increasing the fixed
-			// million-instance budget; anchor-side verges keep their smaller authored radius above.
+			// Broad, overlapping landscape patches soften detached circular edges without increasing
+			// the fixed million-instance budget; anchor-side verges keep their smaller radius above.
 			AddMeadowPatch(MeadowCenter, LandscapeMeadowPatchOuterRadius);
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
