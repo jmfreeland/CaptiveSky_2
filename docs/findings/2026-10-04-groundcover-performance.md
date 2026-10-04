@@ -166,3 +166,26 @@ compilation, leaving that full-view comparison pending.
 Close-view captures: `2026-10-04_055700_h12.0/02a_TideglassGroundDetail.png` (1.8x) and
 `2026-10-04_060126_h12.0/02a_TideglassGroundDetail.png` (2.7x), under
 `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/`.
+
+## Spruce far-cull trial (2026-10-04, unresolved)
+
+A clean UE 5.8.3 scratch UBT build succeeded (125 actions). The focused
+`CaptiveSky2.Agent.GroundCover` automation passed against the scratch trial and verified the
+250–400 m assertion. Its log is
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_GroundCover_memoryddc.log`.
+
+At noon with dense ground cover, the first trial capture reported p95 32.04 FPS at `02_Tideglass`
+and 43.71 FPS at `02a_TideglassGroundDetail` (50 valid samples each; both above the 30 FPS screen).
+The original 350–550 m baseline capture reported 48.61 and 51.97 FPS respectively. A further trial
+run after the baseline, however, failed at `02_Tideglass` (2.78 FPS, only 43 valid intervals) while
+the detail view measured 41.30 FPS. UE reported hundreds of first-use D3D12 PSO hitches in these
+short captures, so this spread is not a reliable A/B performance comparison. The two saved
+Tideglass overview images also look effectively the same and do not meaningfully expose the spruce
+fade band; they cannot settle midground continuity.
+
+The main tree is left on the original 350–550 m fade; the ecology assertion has been aligned to
+that value. The incremental UE 5.8.3 scratch build and `CaptiveSky2.Agent.GroundCover` test passed
+for this baseline. No trial code is retained. The evidence does not establish that the shorter
+fade improves performance, and the current views are not spruce-visible enough to judge its
+continuity. Revisit only with a stable spruce-visible viewpoint and a capture setup that avoids
+first-use PSO contamination. The live editor and saved map were not edited.
