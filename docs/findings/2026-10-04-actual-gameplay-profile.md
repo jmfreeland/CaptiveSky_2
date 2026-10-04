@@ -88,3 +88,39 @@ process diagnosis. They were not terminated. The scratch-only diagnostic source
 was reverted, so no uncompiled change remains. Resume the matched sway A/B when
 the engine-root XML-config mutex is available; no performance fix, compile, or
 A/B pass is claimed yet.
+
+## PIE foliage/RHI follow-up (Claude findings, 2026-10-04)
+
+Claude's current PIE notes report about 79 ms/frame at 1080p (roughly 12.7 FPS),
+while the editor viewport itself runs near 60 FPS. Hiding ground cover recovers
+about 50–60 ms; trees alone are comparatively inexpensive. Resolution scale,
+hardware ray tracing, Virtual Shadow Maps, Lumen, water, and cull-distance
+changes did not materially improve that PIE result. This points to CPU/RHI work
+associated with the large foliage instance/component population, but is not a
+species-level attribution.
+
+An experimental Nanite-foliage configuration (`r.Nanite.Foliage=True` with
+Voxelize shape preservation on eleven foliage meshes) measured about 84 ms/frame,
+so it did not improve on the roughly 79 ms baseline. `ground_06_01` and
+`ground_12_01` are the only ground-cover meshes noted as not yet Nanite-enabled;
+their status is a candidate for a controlled test, not evidence that enabling
+Nanite will help. Do not generalize from mesh capability or instance counts.
+
+These PIE observations are separate from the 1600x900 standalone `-game`
+spectator CSV above, which measured 262.72 ms median frame time and implicated
+both `TickActors` and the render-thread skinning extension. The test mode,
+resolution, instrumentation, and captured workload are not matched, and the
+thread-level descriptions differ; treat them as two unresolved runtime profiles,
+not as a single reconciled diagnosis. The PIE visibility ablation is the clearest
+current evidence that ground cover dominates its own test, while its detailed
+RHI/render-thread mechanism remains unverified.
+
+When a safe UE 5.8.3 test session is available, first repeat a warmed PIE baseline
+and ground-cover-hidden pair at the same camera, resolution, duration, and
+scalability settings. Capture Game, Render, RHI, and GPU timings plus component
+and instance counts, and repeat each condition to expose variance. Then test
+one structural change at a time (for example, consolidating compatible HISM
+components or a reversible density control) against the 30 FPS floor and the
+full habitat composition. Avoid another global cull-distance sweep or Nanite
+foliage trial without a specific, measurable hypothesis. No source change,
+build, or runtime validation is claimed for this follow-up.
