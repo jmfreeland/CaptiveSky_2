@@ -10,6 +10,8 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "IslandPoolRippleEffect.h"
 #include "RavenAgentAIController.h"
+#include "HAL/PlatformTime.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMovementTest, "CaptiveSky2.Agent.ResidentApproach",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -121,6 +123,10 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
 		if (!It->ActorHasTag(TEXT("RainImpact"))) ++RippleCount;
 	TestEqual(TEXT("The successful follow-up creates one transient pool ripple"), RippleCount, 1);
+	TestFalse(TEXT("A real successful inspection removes that landmark's explicit-wander curiosity bonus during its cooldown"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Target, Controller->InspectedUntil, FPlatformTime::Seconds()));
+	TestFalse(TEXT("The inherited walker/flight curiosity gate uses the resident controller's real inspection history"),
+		Controller->CanFollowWanderCuriosityToward(Target, FPlatformTime::Seconds()));
 
 	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	ReportBlockedMove();
@@ -202,5 +208,68 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(-1500.f, 0.f, 0.f), FVector::ZeroVector, VisibleLandmarks), 0.f);
 	TestTrue(TEXT("Wander stop tolerance allows capsule overlap at navigation endpoints"),
 		AAutonomousAgentAIController::WanderAcceptanceRadius > 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentWanderCuriosityTest, "CaptiveSky2.Agent.WanderCuriosity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAgentWanderCuriosityTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Curiosity fixture world exists"), World)) return false;
+	AActor* Landmark = World->SpawnActor<AActor>();
+	if (!TestNotNull(TEXT("Curiosity fixture landmark exists"), Landmark)) { World->DestroyWorld(false); return false; }
+	USceneComponent* Root = NewObject<USceneComponent>(Landmark);
+	Landmark->SetRootComponent(Root);
+	Root->RegisterComponent();
+	Landmark->SetActorLocation(FVector(2000.f, 0.f, 0.f));
+	Landmark->Tags = {TEXT("IslandLandmark"), TEXT("TideglassPool")};
+	TMap<FName, double> Inspections;
+	const double Now = 100.0;
+	TestTrue(TEXT("An identified, visible, uninspected static landmark may attract curiosity"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, Now));
+	Inspections.Add(TEXT("TideglassPool"), 400.0);
+	TestFalse(TEXT("An inspected landmark stays out of the curiosity bonus while its cooldown is active"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, Now));
+	TestTrue(TEXT("Inspection history is individual, not a global ban on another resident's curiosity"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, Now));
+	TestTrue(TEXT("A landmark becomes interesting again exactly at cooldown expiry"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, 400.0));
+	TestFalse(TEXT("A landmark stays suppressed just before expiry"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, 399.99));
+	TArray<FVector> EligiblePositions;
+	if (AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, Now)) EligiblePositions.Add(Landmark->GetActorLocation());
+	TestEqual(TEXT("A recently inspected landmark supplies no progress bonus to a wander candidate"),
+		AAutonomousAgentAIController::WanderLandmarkProgressScore(FVector(1500.f, 0.f, 0.f), FVector::ZeroVector, EligiblePositions), 0.f);
+	Inspections.Reset();
+	Inspections.Add(TEXT("WindArch"), 400.0);
+	TestTrue(TEXT("Inspecting a different landmark does not suppress this one"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, Now));
+	Landmark->SetActorHiddenInGame(true);
+	TestFalse(TEXT("Hidden landmark geometry cannot become an unseen curiosity attractor"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, Now));
+	Landmark->SetActorHiddenInGame(false);
+	Landmark->Tags = {TEXT("IslandLandmark")};
+	TestFalse(TEXT("Generic landmark metadata does not supply an invented target identifier"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, Now));
+	Landmark->Tags = {TEXT("TideglassPool")};
+	TestFalse(TEXT("An ordinary tagged actor is not silently promoted to a landmark"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, Now));
+	Landmark->Tags = {TEXT("IslandLandmark"), TEXT("IslandLife"), TEXT("Firefly")};
+	TestFalse(TEXT("A living creature is not a static landmark movement attractor"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, Now));
+	Landmark->Tags = {TEXT("IslandLandmark"), TEXT("TideglassPool")};
+	TestFalse(TEXT("An invalid clock cannot assert landmark eligibility"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, {}, std::numeric_limits<double>::quiet_NaN()));
+	Inspections.Add(TEXT("TideglassPool"), std::numeric_limits<double>::quiet_NaN());
+	TestTrue(TEXT("A malformed cooldown is not treated as permanent knowledge"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(Landmark, Inspections, Now));
+	TestFalse(TEXT("A missing landmark is not eligible"),
+		AAutonomousAgentAIController::IsWanderLandmarkEligible(nullptr, {}, Now));
+	World->DestroyWorld(false);
 	return true;
 }

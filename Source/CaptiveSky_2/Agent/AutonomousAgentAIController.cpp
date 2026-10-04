@@ -234,6 +234,20 @@ float AAutonomousAgentAIController::WanderLandmarkProgressScore(const FVector& C
 	}
 	return BestProgress * WanderLandmarkProgressWeight;
 }
+bool AAutonomousAgentAIController::IsWanderLandmarkEligible(const AActor* Landmark,
+	const TMap<FName, double>& RecentInspections, double Now)
+{
+	if (!IsValid(Landmark) || Landmark->IsHidden() || !Landmark->ActorHasTag(TEXT("IslandLandmark")) ||
+		!IslandInteractionUtility::IsMovementTargetAllowed(Landmark) || !FMath::IsFinite(Now)) return false;
+	const FName TargetTag = IslandInteractionUtility::GetTargetTag(Landmark);
+	if (TargetTag.IsNone()) return false;
+	const double* Until = RecentInspections.Find(TargetTag);
+	return !Until || !FMath::IsFinite(*Until) || *Until <= Now;
+}
+bool AAutonomousAgentAIController::CanFollowWanderCuriosityToward(const AActor* Landmark, double Now) const
+{
+	return IsWanderLandmarkEligible(Landmark, InspectedUntil, Now);
+}
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
 	if (!Navigation) return false;
@@ -637,9 +651,10 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			TArray<FVector> BestWanderPathPoints;
 			TArray<FVector> VisibleLandmarks;
 			VisibleLandmarks.Reserve(6);
+			const double CuriosityNow = FPlatformTime::Seconds();
 			for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks.Num() < 6; ++It)
 			{
-				if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 ||
+				if (!CanFollowWanderCuriosityToward(*It, CuriosityNow) ||
 					FVector::DistSquared(Origin, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
 				FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(AgentWanderLandmarkVisibility), false, ControlledPawn);
 				VisibilityParams.AddIgnoredActor(*It);

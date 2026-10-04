@@ -493,9 +493,10 @@ FVector ARavenAgentAIController::MakeCruiseTarget(bool bForceCuriosityForProbe) 
 	{
 		VisibleLandmarks.Reserve(6);
 		VisibleLandmarkNames.Reserve(6);
+		const double CuriosityNow = FPlatformTime::Seconds();
 		for (TActorIterator<AActor> It(World); It && VisibleLandmarks.Num() < 6; ++It)
 		{
-			if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 ||
+			if (!CanFollowWanderCuriosityToward(*It, CuriosityNow) ||
 				FVector::DistSquared(Origin, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
 
 			FCollisionQueryParams VisibilityParams(SCENE_QUERY_STAT(RavenWanderLandmarkVisibility), false, GetPawn());

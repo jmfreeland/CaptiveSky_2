@@ -71,6 +71,8 @@ public:
 	/** Rewards a wander candidate only when it moves toward a currently visible nearby landmark. */
 	static float WanderLandmarkProgressScore(const FVector& Candidate, const FVector& Origin,
 		const TArray<FVector>& VisibleLandmarks);
+	/** Hidden, unidentified or recently inspected landmarks do not attract an explicit wander. */
+	static bool IsWanderLandmarkEligible(const AActor* Landmark, const TMap<FName, double>& RecentInspections, double Now);
 	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
 	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 
@@ -78,6 +80,7 @@ public:
 	static double BackgroundDelay(int32 Repeats, double BaseSeconds);
 
 protected:
+	bool CanFollowWanderCuriosityToward(const AActor* Landmark, double Now) const;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;
 
