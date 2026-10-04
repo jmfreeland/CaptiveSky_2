@@ -1420,6 +1420,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (MapWeather && MapCloud && AuthoredCloudMaterial && bHasCloudCoverageParameter && bHasCloudDensityParameter && bHasStormCloudsParameter)
 		{
 			const int32 SavedWeatherSeed = MapWeather->WeatherSeed;
+			const double SavedNextCloudDiscoveryTime = MapWeather->NextCloudDiscoveryTime;
 			float MinimumCover = 2.f;
 			float MaximumCover = -1.f;
 			int32 ClearSeed = 0;
@@ -1440,6 +1441,10 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			}
 			TestTrue(TEXT("Saved weather seed space includes both dry and rainy cloud states"), MinimumRain < 0.01f && MaximumRain > 0.25f);
 			MapWeather->WeatherSeed = ClearSeed;
+			// Editor-world time can remain nearly static between automation reruns. The prior run
+			// restores the cloud references, but cloud discovery's one-second throttle is runtime-only
+			// state; clear it so this test can deterministically recreate the transient material.
+			MapWeather->NextCloudDiscoveryTime = 0.0;
 			MapWeather->UpdateCloudRendering();
 			UMaterialInstanceDynamic* WeatherCloudMID = Cast<UMaterialInstanceDynamic>(MapCloud->GetMaterial());
 			TestNotNull(TEXT("Weather creates a transient dynamic instance of the authored cloud material"), WeatherCloudMID);
@@ -1481,6 +1486,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			MapWeather->bHasCloudDensityParameter = false;
 			MapWeather->bHasStormCloudsParameter = false;
 			MapWeather->WeatherSeed = SavedWeatherSeed;
+			MapWeather->NextCloudDiscoveryTime = SavedNextCloudDiscoveryTime;
 		}
 		if (HabitatMarker)
 		{
