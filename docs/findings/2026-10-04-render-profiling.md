@@ -131,7 +131,39 @@ conditions were not exhaustively held constant.
 override reports effective value 1 and refuses before profiler/automation start.
 The editor exited within the one-minute external deadline.
 
-Audit per-mesh distance-field sizes/atlas updates next. Foliage already disables
+### Atlas and asset audit
+
+`-ProfileDistanceFieldAtlas` requests engine `r.DistanceFields.LogAtlasStats=2`
+at startup and when a SceneCapture actor first exists during each test run.
+The latter matters: an initial attempt requesting the second snapshot only after
+test completion got no dump because the capture had already been destroyed.
+Do not interpret a requested snapshot as a received one.
+
+- `Codex_DFAtlasAudit_20261004.log`: initial 20-asset snapshot, 8.0 MB atlas,
+  7.7 MB free. Capture passed at 53.74 FPS p95, normal exit. The end-of-test
+  snapshot did not materialize; this run does not establish populated-scene size.
+- `Codex_DFAtlasCaptureAudit_20261004.log`: verified **active-capture** snapshot
+  lists 38 assets in an 8.0 MB atlas (256 MB target maximum), 7.2 MB free and
+  0.3 MB block allocator waste. Largest listed resident asset is spruce_half_01
+  at 0.20 MB, 2 loaded / 3 wanted mips, mip0 dimensions 91x77x126. PCG_Tree_02
+  and PCG_Tree_03 each list 0.06 MB, PCG_Tree_01 0.04 MB. Tiny plants/props
+  rounded to 0.00 MB are **not** proven to have no distance-field data.
+- This active-capture run failed the gate: 27.79 FPS p95 / 25.70 FPS wall
+  throughput, 50/50 valid intervals; normal editor exit. CSV
+  `Profile(20261004_160328).csv`, 1173 frames, shows whole-capture
+  PrepareDistanceFieldScene max 4570.70 ms / sum 15732.60 ms, game-thread
+  EventWait max 4533.94 ms, FrameTime max 6399.78 ms. The CSV AtlasMB counter
+  never exceeded 8. Map fingerprint remained the matched baseline hash above.
+
+These data argue against a capacity-driven atlas overflow as the principal stall
+in this sample. They do not measure CPU instance-registration cost, identify the
+slow operation inside PrepareDistanceFieldScene, or prove which mesh is responsible.
+The test reports 1,780,040 ground-cover instances; next investigate instance/update
+handling with reversible component-level diagnostics rather than trimming the
+vegetation or rebuilding asset distance fields without evidence. Atlas auditing
+itself is instrumentation and not a production performance configuration.
+
+Foliage already disables
 CastShadow; the primitive distance-field-lighting flag is documented as effective
 only when CastShadow is true, so toggling that flag alone is not an evidenced fix.
 

@@ -6,6 +6,7 @@ Launch UnrealEditor-Cmd with -ExecutePythonScript=<this path> -RenderOffscreen
 Use -ProfileRepeats=2 for a same-process cold/warmed comparison (bounded to 1..3).
 Use -ProfileDisableDistanceFields only to verify a startup diagnostic ablation,
 not acceptance. r.DistanceFields is read-only at runtime; supply a startup override.
+Use -ProfileDistanceFieldAtlas to request engine atlas and SDF asset statistics.
 The existing test still owns all safety/performance gates and pass/fail results.
 No map saves, gameplay, resident turns or persistent settings changes.
 """
@@ -19,12 +20,15 @@ import unreal
 TIME_LIMIT_SECONDS = 180.0
 command_line = unreal.SystemLibrary.get_command_line()
 disable_distance_fields = bool(re.search(r"(?:^|\s)-ProfileDisableDistanceFields(?=\s|$)", command_line))
+audit_distance_fields = bool(re.search(r"(?:^|\s)-ProfileDistanceFieldAtlas(?=\s|$)", command_line))
+if disable_distance_fields and audit_distance_fields:
+    raise ValueError("Cannot audit the enabled distance-field atlas while disabling distance fields")
 match = re.search(r"(?:^|\s)-ProfileRepeats=(\d+)(?=\s|$)", command_line)
 REPEATS = int(match.group(1)) if match else 1
 if not 1 <= REPEATS <= 3:
     raise ValueError("ProfileRepeats must be between 1 and 3")
 state = {"started": time.monotonic(), "last_tick": time.monotonic(), "seen_running": False,
-         "stopped": None, "handle": None, "run": 1}
+         "stopped": None, "handle": None, "run": 1, "atlas_capture_requested": False}
 
 
 def console(command):
@@ -52,6 +56,12 @@ def on_tick(delta_seconds):
             return
         running = unreal.AutomationLibrary.are_automated_tests_running()
         state["seen_running"] |= running
+        if audit_distance_fields and running and not state["atlas_capture_requested"]:
+            world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+            if unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SceneCapture2D):
+                state["atlas_capture_requested"] = True
+                unreal.log("[RenderProfile] ATLAS AUDIT: active SceneCapture snapshot requested")
+                console("r.DistanceFields.LogAtlasStats 2")
         if wall_gap >= 0.1:
             unreal.log("[RenderProfile] STALL frame={} elapsed={:.3f}s wall_gap={:.3f}s engine_delta={:.3f}s tests_running={}".format(
                 unreal.SystemLibrary.get_frame_count(), now - state["started"], wall_gap, delta_seconds, running))
@@ -62,6 +72,7 @@ def on_tick(delta_seconds):
             if state["run"] < REPEATS:
                 state["run"] += 1
                 state["seen_running"] = False
+                state["atlas_capture_requested"] = False
                 unreal.log("[RenderProfile] REPEAT run={} frame={}; retain previous test result".format(
                     state["run"], unreal.SystemLibrary.get_frame_count()))
                 console("Automation RunTests CaptiveSky2.Visual.Viewpoints")
@@ -85,6 +96,9 @@ try:
             raise RuntimeError("Distance-field ablation refused: startup r.DistanceFields is {}, expected 0".format(actual))
         unreal.log_warning("[RenderProfile] ABLATION VERIFIED: startup r.DistanceFields=0; not a quality acceptance run")
     console("r.DistanceFields")
+    if audit_distance_fields:
+        unreal.log("[RenderProfile] ATLAS AUDIT: engine r.DistanceFields.LogAtlasStats=2")
+        console("r.DistanceFields.LogAtlasStats 2")
     console("csvprofile start")
     state["handle"] = unreal.register_slate_post_tick_callback(on_tick)
     console("Automation RunTests CaptiveSky2.Visual.Viewpoints")
