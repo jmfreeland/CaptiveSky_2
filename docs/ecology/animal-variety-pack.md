@@ -19,13 +19,15 @@ were copied from the neighboring CaptiveSky UE 5.8 project. All are in CaptiveSk
 | Pig | 42 | 168,191,043 bytes | `SK_Pig` loads; 6,588 vertices, four LODs, two material slots. Animations include looking around, sniffing, chewing, resting, and running. |
 | Wolf | 47 | 133,163,689 bytes | `SK_Wolf`, skeleton, physics asset, and animation sequences load; 10,105 triangles and 34 bones. Idle-look (10 s), walk (1 s), run (0.53 s), and sleep sequences are present. |
 
-The Crow's default material renders as a dark, legible bird in the asset thumbnail. The Wolf's
-skeletal-mesh thumbnail appears untextured grey, although its two material slots resolve and the
-`M_Wolf` material thumbnail renders its base texture; confirm the full character appearance in a
-real-RHI scene before using it. The asset dependency walk also reports a set of duplicate legacy
-texture paths at `/Game/Crow/Textures` and `/Game/Wolf/Textures` that are not present in this
-project; no linker or missing-object warning appeared in the editor log during these loads, but the
-references warrant review before integration.
+Current UE 5.8 asset-thumbnail captures show visible coloration on the Crow, stag, and Wolf meshes;
+the doe, fox, and pig mesh thumbnails appear monochrome grey. Their skeletal meshes still report
+the expected two material assignments, and separate thumbnails of `M_DeerDoe`, `M_Fox`, and `M_Pig`
+show textured material previews. This discrepancy makes the thumbnail result inconclusive for the
+doe/fox/pig: inspect them in a real-RHI level before integration rather than reassigning materials
+blindly. The dependency walk reports duplicate legacy texture paths outside
+`/Game/AnimalVarietyPack/` for several pack materials (including `/Game/Crow/Textures` and
+`/Game/Wolf/Textures`). No linker or missing-object warning appeared during the earlier Crow/Wolf
+loads; review those duplicate references if runtime warnings appear.
 
 No animal actor, map placement, AI, or agent identity/personality was added in this pass. The
 procedural Raven remains intact. The next visual prototype should compare the rigged Crow against
