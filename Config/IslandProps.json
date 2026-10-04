@@ -1,0 +1,13 @@
+{
+  "_comment": "Generated Tripo props placed into the Island map by Scripts/Place-IslandProps.py. asset = folder name under /Game/Generated/Tripo (made by Scripts/Tripo.py + Import-TripoAsset.py). x, y in cm; z is dropped onto the ground and z_offset adds to it; yaw in degrees. Edit and re-run: the script rebuilds every actor tagged TripoProp and touches nothing else.",
+  "props": [
+    {"id": "InnLanternPost_East", "asset": "LanternPost", "x": -99840, "y": 103770, "yaw": 90},
+    {"id": "InnLanternPost_West", "asset": "LanternPost", "x": -100290, "y": 103870, "yaw": -90},
+    {"id": "InnBarrels", "asset": "BarrelCluster", "x": -99580, "y": 102965, "yaw": 14},
+    {"id": "InnFirewood", "asset": "FirewoodStack", "x": -100500, "y": 102430, "yaw": 14},
+    {"id": "InnPathSign", "asset": "SignPost", "x": -100000, "y": 104500, "yaw": 90},
+    {"id": "TideglassBench", "asset": "DriftwoodBench", "x": -100200, "y": 100300, "yaw": 0},
+    {"id": "StonesCairn", "asset": "StoneCairn", "x": -101750, "y": 101900, "yaw": 30},
+    {"id": "ShoreBoat", "asset": "UpturnedBoat", "x": -95900, "y": 119800, "yaw": 20, "z_offset": 25}
+  ]
+}
