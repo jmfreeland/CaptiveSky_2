@@ -72,7 +72,19 @@ thread scopes independently before changing density. Keep a 30 FPS minimum and
 verify the full, visually rich vegetation composition before accepting any
 tradeoff.
 
-The diagnostic code change was not retained: the scratch UBT build waited on
-Unreal's shared build mutex before creating its UBT log and was cancelled as
-Codex's own waiting shell. Other inaccessible `dotnet` processes were left
-untouched. No performance fix, compile, or A/B pass is claimed here.
+The diagnostic code change was not retained because it could not be built. Both
+a normal `Build.bat ... -WaitMutex` probe and an isolated-scratch
+`Build.bat ... -NoMutex` probe remained blocked before UBT created its log; only
+Codex's own waiting shells were stopped. No editor/game process was running.
+
+UE 5.8 source inspection explains why `-NoMutex` is not a safe bypass here:
+`UnrealBuildTool.cs` skips the main single-instance mutex, but
+`XmlConfig.ReadConfigFiles` acquires a separate mutex keyed to the shared engine
+root before that point. Two existing `dotnet.exe` processes (PIDs 40100 and
+52284; created 2026-09-29 and 2026-10-01) remain, but even elevated read-only
+process queries cannot reveal their executable paths, command lines, or owners.
+This makes the XML-config mutex the likely blocker, not a confirmed owner or
+process diagnosis. They were not terminated. The scratch-only diagnostic source
+was reverted, so no uncompiled change remains. Resume the matched sway A/B when
+the engine-root XML-config mutex is available; no performance fix, compile, or
+A/B pass is claimed yet.
