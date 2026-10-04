@@ -19,19 +19,41 @@ were copied from the neighboring CaptiveSky UE 5.8 project. All are in CaptiveSk
 | Pig | 42 | 168,191,043 bytes | `SK_Pig` loads; 6,588 vertices, four LODs, two material slots. Animations include looking around, sniffing, chewing, resting, and running. |
 | Wolf | 47 | 133,163,689 bytes | `SK_Wolf`, skeleton, physics asset, and animation sequences load; 10,105 triangles and 34 bones. Idle-look (10 s), walk (1 s), run (0.53 s), and sleep sequences are present. |
 
-Current UE 5.8 asset-thumbnail captures show visible coloration on the Crow, stag, and Wolf meshes;
-the doe, fox, and pig mesh thumbnails appear monochrome grey. Their skeletal meshes still report
-the expected two material assignments, and separate thumbnails of `M_DeerDoe`, `M_Fox`, and `M_Pig`
-show textured material previews. This discrepancy makes the thumbnail result inconclusive for the
-doe/fox/pig: inspect them in a real-RHI level before integration rather than reassigning materials
-blindly. The dependency walk reports duplicate legacy texture paths outside
-`/Game/AnimalVarietyPack/` for several pack materials (including `/Game/Crow/Textures` and
+Fresh UE 5.8.3 `CaptureAssetImage` renders show visible coloration on all five rigs. New captures of
+`SK_DeerDoe`, `SK_Fox`, and `SK_Pig` on 2026-10-04 resolve the earlier grey-thumbnail discrepancy;
+no material reassignment was needed. These isolated real-RHI asset previews confirm that the meshes
+and assigned materials load and render, but do not establish their appearance at gameplay scale,
+under Island lighting, or in a packaged build. The dependency walk reports duplicate legacy texture
+paths outside `/Game/AnimalVarietyPack/` for several pack materials (including `/Game/Crow/Textures` and
 `/Game/Wolf/Textures`). No linker or missing-object warning appeared during the earlier Crow/Wolf
 loads; review those duplicate references if runtime warnings appear.
 
-No animal actor, map placement, AI, or agent identity/personality was added in this pass. The
-procedural Raven remains intact. The next visual prototype should compare the rigged Crow against
-the procedural Raven at gameplay scale, preserving the current Raven's locomotion states and
-reversible fallback. A first ecosystem pass should use a small, bounded population of ambient
-wildlife with no LLM calls; if any animal later becomes a conscious named resident, give it an
-explicit memory/personality directory and request budget. Preserve the shared request safeguards.
+The first wildlife source prototype is one transient, non-conscious stag near Wind Arch. It uses
+the pack's stag mesh and graze/walk/run/sleep loops, wanders within a 7 m home radius, rests on the
+existing day/night clock, and offers only a quiet, reversible observation response. `IslandLife`
+wildlife is not a resident movement target for either Aster or the Raven; no LLM calls, persistent
+facts, or ownership are involved. The automation fixture is in
+`Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`. This prototype has not yet compiled or
+run in the editor, and no actor has been placed in or saved to the map. The procedural Raven remains
+intact. Next, validate this class and spawn path in UE 5.8.3, then compare the rigged Crow against the
+procedural Raven at gameplay scale while preserving the Raven's locomotion states and reversible
+fallback. If any animal later becomes a conscious named resident, give it an explicit
+memory/personality directory and request budget. Preserve the shared request safeguards.
+
+The current editor tests are definitively against an old module:
+`Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` is timestamped 2026-10-01 09:18, while the ecology
+test source is from 2026-10-04 04:50 and the
+wildlife/weather source is from 2026-10-04 07:17 onward. In that stale module,
+`CaptiveSky2.Agent.NightEcology` fails at the assertion that weather creates a transient dynamic
+cloud-material instance; the map has `VolumetricCloud_0` with
+`/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst`. The test's cleanup restores the
+authored material after probing. `CaptiveSky2.Agent.SessionSafety` passed in the same stale module,
+so neither result validates the current source.
+
+A fresh UE 5.8.3 build was attempted in an isolated project copy under
+`Saved/CompileScratch/Codex_DeerBuild_20261004/Project`, leaving the open editor and its binary
+untouched. UBT produced no diagnostics or intermediate files after five minutes, and its launched
+process remained idle; that process was stopped. An older unidentified `dotnet` process remains, so
+the build mutex was not bypassed and no other process was touched. Rebuild and rerun both tests, then
+inspect the weather pass before changing the cloud asset or weakening the assertion. The stag test
+and its runtime spawn path remain unverified until a current-source build is available.
