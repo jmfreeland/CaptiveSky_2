@@ -27,6 +27,8 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	const float NextNewMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays - 29.0) * 24.0);
 	TestTrue(TEXT("Day one begins at a new moon"), FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(1, 0.f), 0.001f));
 	TestTrue(TEXT("A quarter cycle has half illumination"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(8, QuarterMoonHour), 0.5f, 0.001f));
+	TestEqual(TEXT("A new moon still lights the night"), AIslandDayNight::MoonlightScale(0.f), AIslandDayNight::NewMoonLightFloor);
+	TestEqual(TEXT("A full moon gives full moonlight"), AIslandDayNight::MoonlightScale(1.f), 1.f);
 	TestTrue(TEXT("Half a lunar cycle reaches a full moon"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(15, FullMoonHour), 1.f, 0.001f));
 	TestTrue(TEXT("The 29.53-day cycle returns continuously to new moon"),
 		FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(30, NextNewMoonHour), 0.001f));
@@ -62,6 +64,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->Sun = Sun;
 	Clock->Sky = Sky;
 	TestNotNull(TEXT("The shared clock owns a procedural starfield"), Clock->Starfield);
+	TestNotNull(TEXT("The shared clock owns a night fill light"), Clock->Starlight.Get());
 	if (Clock->Starfield)
 	{
 		TestEqual(TEXT("The starfield has six progressive twilight groups"), Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount);
@@ -118,6 +121,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		if (const FProcMeshSection* FirstStarGroup = Clock->Starfield->GetProcMeshSection(0))
 			bFirstTwilightGroupVisible = FirstStarGroup->bSectionVisible;
 	TestTrue(TEXT("The first star group appears after sunset"), bFirstTwilightGroupVisible);
+	if (Clock->Starlight)
+	{
+		TestTrue(TEXT("A new-moon midnight is still lit by the night fill"), Clock->Starlight->Intensity > 0.f);
+		TestTrue(TEXT("The night fill shines down from the sky, not up from below the horizon"), Clock->Starlight->GetForwardVector().Z < 0.f);
+		TestFalse(TEXT("The night fill casts no shadows"), Clock->Starlight->CastShadows);
+	}
 	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);
 	const FString NewMoonDescription = Clock->DescribeTime();
@@ -166,7 +175,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A dark full-moon midnight reveals every star group"), bAllStarGroupsVisible);
 	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
 	TestTrue(TEXT("A clear near-full-moon midnight keeps moonlight active"), FMath::IsNearlyEqual(Clock->Moon->Intensity,
-		Clock->MoonIntensity * AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour), 0.001f));
+		Clock->MoonIntensity * AIslandDayNight::MoonlightScale(AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour)), 0.001f));
 	TestTrue(TEXT("The ambient sky retains the tested low-light visibility floor"),
 		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,
 			AIslandDayNight::NightSkylightFloor * AIslandDayNight::CloudSkylightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));

@@ -22,6 +22,13 @@ AIslandDayNight::AIslandDayNight()
 	Moon->bAtmosphereSunLight = true;
 	Moon->AtmosphereSunLightIndex = 1;
 	Moon->SetLightColor(FLinearColor(0.55f, 0.68f, 1.f));
+	Starlight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("Starlight"));
+	Starlight->SetupAttachment(RootComponent);
+	Starlight->SetMobility(EComponentMobility::Movable);
+	Starlight->SetRelativeRotation(FRotator(-50.f, 215.f, 0.f));
+	Starlight->SetLightColor(FLinearColor(0.5f, 0.62f, 1.f));
+	Starlight->SetCastShadows(false);
+	Starlight->SetIntensity(0.f);
 	Starfield = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("NightStars"));
 	Starfield->SetupAttachment(RootComponent);
 	Starfield->SetMobility(EComponentMobility::Movable);
@@ -56,6 +63,11 @@ float AIslandDayNight::LunarIllumination(int32 IslandDay, float IslandHour)
 {
 	const float PhaseAngle = LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI;
 	return 0.5f - 0.5f * FMath::Cos(PhaseAngle);
+}
+
+float AIslandDayNight::MoonlightScale(float LunarIlluminationAmount)
+{
+	return FMath::Lerp(NewMoonLightFloor, 1.f, FMath::Clamp(LunarIlluminationAmount, 0.f, 1.f));
 }
 
 float AIslandDayNight::CloudSunlightTransmission(float CloudCover)
@@ -224,8 +236,9 @@ void AIslandDayNight::UpdateLighting()
 	// New moon follows the sun below the horizon; full moon travels opposite it.
 	// Intermediate phases therefore shift the moon's rise and set through the night.
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
-	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * LunarIlluminationAmount *
+	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
 		FMath::SmoothStep(0.02f, 0.25f, -Height));
+	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * FMath::SmoothStep(0.02f, 0.25f, -Height));
 	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
 }
 

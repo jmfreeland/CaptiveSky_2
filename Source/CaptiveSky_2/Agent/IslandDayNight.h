@@ -39,6 +39,8 @@ public:
 	float MoonIntensity = 1.5f;
 	/** Fixed-exposure night lighting needs a stronger sky fill for the Island terrain to remain readable. */
 	static constexpr float NightSkylightFloor = 2.5f;
+	/** Share of full-moon light the moon keeps at new moon (starlit night) so the Island never goes pitch black. */
+	static constexpr float NewMoonLightFloor = 0.45f;
 	/** Approximate synodic month used for the repeating Island moon-light cycle. */
 	static constexpr double LunarCycleDays = 29.53059;
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
@@ -50,12 +52,19 @@ public:
 	static constexpr float NightStarHalfSizeMax = 2400.f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
+	/** Dim, shadowless sky fill that stays above the horizon all night. The true moon sits below it for much of the cycle (a new moon never rises at night), so on its own it left the Island black. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
+	TObjectPtr<UDirectionalLightComponent> Starlight;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Lighting", meta=(ClampMin="0"))
+	float StarlightIntensity = 1.2f;
 	UProceduralMeshComponent* Starfield = nullptr;
 
 	static float WrapHour(double Hour);
 	static float SunHeight(float Hour);
 	static float LunarPhaseProgress(int32 IslandDay, float IslandHour);
 	static float LunarIllumination(int32 IslandDay, float IslandHour);
+	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
+	static float MoonlightScale(float LunarIlluminationAmount);
 	static float CloudSunlightTransmission(float CloudCover);
 	static float CloudSkylightTransmission(float CloudCover);
 	FString DescribeTime() const;
