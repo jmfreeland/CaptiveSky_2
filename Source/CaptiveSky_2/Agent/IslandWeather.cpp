@@ -44,12 +44,14 @@ namespace
 	{
 		if (!Component) return;
 		Component->SetCullDistances(FadeStartCm, CullEndCm);
-		// Diagnostic only: verify whether these non-shadowing instances still incur
-		// distance-field scene work. Do not reduce density or alter the default look.
-		if (FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageNoDistanceFields")))
+		// These shadowless foliage instances otherwise still enter the distance-field
+		// scene in UE 5.8.3, causing multi-second preparation stalls. Keep all meshes
+		// and cull ranges; exclude only their distance-field lighting participation.
+		const bool bLegacyDistanceFields = FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageDistanceFields"));
+		Component->SetAffectDistanceFieldLighting(bLegacyDistanceFields);
+		if (bLegacyDistanceFields)
 		{
-			Component->SetAffectDistanceFieldLighting(false);
-			UE_LOG(LogIslandWeather, Display, TEXT("Foliage DF diagnostic: %s CastShadow=%d AffectDistanceFieldLighting=%d"),
+			UE_LOG(LogIslandWeather, Display, TEXT("Foliage DF rollback: %s CastShadow=%d AffectDistanceFieldLighting=%d"),
 				*Component->GetName(), Component->CastShadow, Component->bAffectDistanceFieldLighting);
 		}
 	}

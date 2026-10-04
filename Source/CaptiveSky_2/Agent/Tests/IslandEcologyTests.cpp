@@ -22,6 +22,9 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/InputComponent.h"
 #include "Components/VolumetricCloudComponent.h"
@@ -55,6 +58,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const IConsoleVariable* GlobalDistanceFields = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DistanceFields"));
+	const int32 GlobalDistanceFieldsBefore = GlobalDistanceFields ? GlobalDistanceFields->GetInt() : -1;
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	ATargetPoint* Tideglass = World->SpawnActor<ATargetPoint>(FVector(0.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
 	ATargetPoint* ListeningStones = World->SpawnActor<ATargetPoint>(FVector(3500.f, 0.f, 300.f), FRotator::ZeroRotator, Spawn);
@@ -84,6 +89,18 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherFoliageComponents;
 	Weather->GetComponents(WeatherFoliageComponents);
+	TestEqual(TEXT("All current foliage component groups are covered by the rendering contract"), WeatherFoliageComponents.Num(), 22);
+	const bool bExpectedFoliageDistanceFields = FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageDistanceFields"));
+	for (const UHierarchicalInstancedStaticMeshComponent* Component : WeatherFoliageComponents)
+	{
+		if (!TestNotNull(TEXT("Foliage rendering-contract component exists"), Component)) continue;
+		TestEqual(FString::Printf(TEXT("%s uses targeted foliage distance-field policy"), *Component->GetName()),
+			bool(Component->bAffectDistanceFieldLighting), bExpectedFoliageDistanceFields);
+		TestFalse(FString::Printf(TEXT("%s remains shadowless"), *Component->GetName()), bool(Component->CastShadow));
+		TestFalse(FString::Printf(TEXT("%s remains nonblocking for navigation"), *Component->GetName()), Component->CanEverAffectNavigation());
+	}
+	if (TestNotNull(TEXT("Global distance-field renderer setting exists"), GlobalDistanceFields))
+		TestEqual(TEXT("Foliage initialization preserves global distance-field rendering"), GlobalDistanceFields->GetInt(), GlobalDistanceFieldsBefore);
 	auto CheckCullRange = [this, &WeatherFoliageComponents](FName ComponentName, int32 ExpectedStart, int32 ExpectedEnd)
 	{
 		UHierarchicalInstancedStaticMeshComponent* Component = nullptr;

@@ -174,7 +174,8 @@ an empirically verified component flag.
 Added opt-in `-IslandFoliageNoDistanceFields` in `SetFoliageCullRange`, which sets
 `AffectDistanceFieldLighting=false` on the existing foliage HISM components before
 registration. It does not hide instances, alter culling, remove species, disable
-the global renderer feature, or save assets. Normal launch defaults are unchanged.
+the global renderer feature, or save assets. At this experiment milestone, normal
+launch defaults were unchanged; subsequent promotion is recorded below.
 Per-component constructor logs confirm both CastShadow and AffectDistanceFieldLighting
 are zero in the opt-in run. These logs are initialization evidence, not a full
 post-serialization component audit.
@@ -203,7 +204,7 @@ is not solved by the component flag.
 
 This is strong evidence for foliage distance-field participation/update overhead
 despite disabled shadows, rather than atlas capacity or an oversized single asset.
-Keep the change opt-in until wider views and visual conditions are validated.
+The experiment was kept opt-in until wider views and visual conditions were validated.
 
 `Codex_FoliageDFWide_20261004.log` subsequently passed all nine 17:00 cameras
 with the opt-in flag, normal global distance fields and no CSV instrumentation.
@@ -215,5 +216,54 @@ loss. The Tideglass detail camera sits inside a dense grass clump, so it is not
 a useful highlight composition and should be repositioned in a separate camera
 work item. Additional lighting conditions and automated component invariants
 remain before promoting this experiment to a default.
+
+### Midday/night comparison and default promotion
+
+Before changing the default, paired unprofiled 11:00 Wind Arch and 20:00 firefly
+captures used the same unchanged map and old opt-in DLL:
+
+| Camera/hour | Legacy p95 FPS | Foliage-only exclusion p95 FPS |
+| --- | --- | --- |
+| Wind Arch / 11:00 | 15.89, failed | 39.40, passed |
+| Stones/firefly / 20:00 | 28.27, failed | 43.28, passed |
+
+All four had 50/50 valid intervals and normal editor exits. Logs are
+`Codex_FoliageLight11Baseline_20261004.log`, `Codex_FoliageLight11NoDF_20261004.log`,
+`Codex_FoliageLight20Baseline_20261004.log`, `Codex_FoliageLight20NoDF_20261004.log`.
+Images were inspected in `2026-10-04_161902_h11.0`, `2026-10-04_162006_h11.0`,
+`2026-10-04_162059_h20.0`, `2026-10-04_162202_h20.0`. No obvious vegetation loss
+or landmark-lighting failure was found. Night framing/foliage presentation differs
+slightly, so this is not a pixel-identical night-lighting claim.
+
+The source now excludes the existing shadowless foliage groups from distance-field
+lighting by default. All meshes, densities, cull distances, collision/navigation
+policy, resident behavior and real-time/request safeguards are unchanged. Global
+distance-field rendering stays enabled for other geometry. For a process-only
+rollback/comparison, use `-IslandFoliageDistanceFields` to restore the old component
+flags. The former `-IslandFoliageNoDistanceFields` is no longer needed; normal launch
+now uses that policy.
+
+GroundCover regression coverage checks all 22 current HISM groups, their expected
+distance-field flag in default/rollback modes, shadowless/non-nav-affecting behavior,
+and preservation of the global renderer variable across weather construction.
+Existing scatter/species/cull/clearance assertions remain.
+
+The main build compiled the edits but twice failed linking against an editor-locked
+main DLL. No editor was terminated. An independently built copy of current source
+in the owned scratch project succeeded (25 actions, 20.89 seconds). The main editor
+still needs a successful main build/restart to load this policy; a private-build
+result does not silently update its already loaded DLL.
+
+Private-build acceptance:
+
+- `Codex_FoliagePolicyDefault_20261004.log`: GroundCover passed with no policy flags.
+- `Codex_FoliagePolicyRollback_20261004.log`: GroundCover passed with
+  `-IslandFoliageDistanceFields`, exercising the opposite component expectation.
+- `Codex_FoliagePolicyViews_20261004.log`: all nine default 17:00 views passed,
+  ground-level p95 53.53..57.67 FPS, survey 48.02 FPS; all 50/50 valid intervals.
+  Images in `2026-10-04_163124_h17.0`. Map fingerprint unchanged. All three
+  owned editors exited normally. A main editor was active during this validation;
+  these are private-world tests, not a guarantee of hardware isolation or sustained
+  gameplay performance. Real-time play limits and model-request limits remain intact.
 
 CSV command background: [Epic CSV profiler documentation](https://dev.epicgames.com/documentation/unreal-engine/csv-profiler?application_version=4.27).
