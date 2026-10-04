@@ -329,7 +329,7 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float
 	}
 }
 
-int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed)
+int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure)
 {
 	// Coarse, stable species patches make mixed cover read as small plant communities rather than
 	// alternating individual tufts. A 2D world grid keeps the selection independent of trace order.
@@ -344,7 +344,23 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	Hash ^= Hash >> 16;
 	// Five broadleaf forms share one slot each; the three grass meshes share two slots each.
 	// The resulting 5:6 broadleaf-to-grass balance adds understorey variety without adding instances.
-	return static_cast<int32>(Hash % 11u);
+	const int32 Variant = static_cast<int32>(Hash % 11u);
+	const float PatchExposureThreshold = static_cast<float>((Hash >> 8) % 1024u) / 1024.f;
+	if (Variant < 5 && FMath::Clamp(Exposure, 0.f, 1.f) > PatchExposureThreshold)
+		return 5 + 2 * static_cast<int32>((Hash >> 18) % 3u);
+	return Variant;
+}
+
+float AIslandWeather::CalculateGroundCoverExposure(const FVector& Position, const TArray<FVector>& ExposedAnchors,
+	const TArray<FVector>& OtherAnchors)
+{
+	float ExposedDistanceSquared = TNumericLimits<float>::Max();
+	for (const FVector& Anchor : ExposedAnchors)
+		ExposedDistanceSquared = FMath::Min(ExposedDistanceSquared, FVector::DistSquared2D(Position, Anchor));
+	if (ExposedDistanceSquared >= FMath::Square(6500.f)) return 0.f;
+	for (const FVector& Anchor : OtherAnchors)
+		if (FVector::DistSquared2D(Position, Anchor) <= ExposedDistanceSquared) return 0.f;
+	return FMath::Clamp((6500.f - FMath::Sqrt(ExposedDistanceSquared)) / 1500.f, 0.f, 1.f);
 }
 
 int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed)
@@ -470,7 +486,16 @@ void AIslandWeather::InitializeGroundCover()
 		if (bIgnoreActor) Query.AddIgnoredActor(*IgnoreIt);
 	}
 
-	auto PlaceFoliage = [this, GrassC](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false)
+	TArray<FVector> ExposedHabitatAnchors;
+	TArray<FVector> OtherHabitatAnchors;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("WindArch")))
+			ExposedHabitatAnchors.Add(It->GetActorLocation());
+		else if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")))
+			OtherHabitatAnchors.Add(It->GetActorLocation());
+	}
+	auto PlaceFoliage = [this, GrassC, &ExposedHabitatAnchors, &OtherHabitatAnchors](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false)
 	{
 		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
 		const FQuat Rotation = AlignToGround * Offset.GetRotation();
@@ -481,7 +506,10 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
 		// Each 7 m world patch selects one existing mesh, preventing per-instance alternation.
-		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed);
+		// A 50 m exposed core feathers into the shared meadow over another 15 m.
+		// Nearby wet/social landmarks keep their own habitat: the closest anchor owns the patch.
+		const float Exposure = CalculateGroundCoverExposure(GroundHit.ImpactPoint, ExposedHabitatAnchors, OtherHabitatAnchors);
+		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed, Exposure);
 		if (bWindArch && SpeciesVariant >= 5 && Index % 4 == 0 && IslandFestuca && IslandFestuca->GetStaticMesh())
 		{
 			Species = IslandFestuca;

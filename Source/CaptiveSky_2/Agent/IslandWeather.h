@@ -206,8 +206,11 @@ private:
 	static void BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms);
 	static void BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float InnerRadius, float OuterRadius,
 		TArray<FTransform>& OutTransforms);
-	/** Select a stable species for a world-space botanical patch; 0..2 are plants and 3..5 are grasses. */
-	static int32 SelectGroundCoverVariant(const FVector& Position, int32 Seed);
+	/** Stable botanical patch: 0..4 broadleaf, 5..10 grass. Exposure shifts patches toward grass without extra candidates. */
+	static int32 SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure = 0.f);
+	/** Closest landmark owns the zone; the exposed core feathers between 50 and 65 metres. */
+	static float CalculateGroundCoverExposure(const FVector& Position, const TArray<FVector>& ExposedAnchors,
+		const TArray<FVector>& OtherAnchors);
 	/** Select one stable Fab flower species for a world-space meadow patch. */
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */

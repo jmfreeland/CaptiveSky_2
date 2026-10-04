@@ -225,6 +225,38 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(200.f, -300.f, 0.f), 71));
 	int32 SpeciesCounts[11] = {};
+	int32 ExposedGrassCounts[3] = {};
+	const TArray<FVector> ExposedAnchors = {FVector::ZeroVector};
+	const TArray<FVector> NoOtherAnchors;
+	TestEqual(TEXT("Exposure is absent without an exposed landmark"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector::ZeroVector, NoOtherAnchors, NoOtherAnchors), 0.f);
+	TestEqual(TEXT("The 50 metre exposed core is fully grass dominated"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector(5000.f, 0.f, 900.f), ExposedAnchors, NoOtherAnchors), 1.f);
+	TestEqual(TEXT("The habitat feathers halfway at 57.5 metres"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector(5750.f, 0.f, 0.f), ExposedAnchors, NoOtherAnchors), 0.5f);
+	TestEqual(TEXT("The exposed habitat ends at 65 metres"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector(6500.f, 0.f, 0.f), ExposedAnchors, NoOtherAnchors), 0.f);
+	const TArray<FVector> WetEdgeAnchors = {FVector(4000.f, 0.f, 0.f)};
+	TestEqual(TEXT("A nearer wet or social landmark retains its original meadow cover"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector(3500.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
+	TestEqual(TEXT("Equal-distance habitat ownership preserves the non-exposed habitat"),
+		AIslandWeather::CalculateGroundCoverExposure(FVector(2000.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
+	for (int32 X = -8; X < 8; ++X)
+		for (int32 Y = -8; Y < 8; ++Y)
+		{
+			const FVector Position(X * 700.f + 100.f, Y * 700.f + 100.f, 0.f);
+			const int32 ExposedVariant = AIslandWeather::SelectGroundCoverVariant(Position, 71, 1.f);
+			TestTrue(TEXT("Fully exposed botanical patches select only grass"), ExposedVariant >= 5 && ExposedVariant <= 10);
+			++ExposedGrassCounts[(ExposedVariant - 5) / 2];
+			TestEqual(TEXT("Exposure below zero preserves the original meadow"),
+				AIslandWeather::SelectGroundCoverVariant(Position, 71, -1.f), AIslandWeather::SelectGroundCoverVariant(Position, 71));
+			TestEqual(TEXT("Exposure above one is bounded"),
+				AIslandWeather::SelectGroundCoverVariant(Position, 71, 2.f), ExposedVariant);
+			const int32 TransitionVariant = AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.5f);
+			TestTrue(TEXT("Feathered exposure retains an existing species slot"), TransitionVariant >= 0 && TransitionVariant <= 10);
+		}
+	TestTrue(TEXT("Exposed habitat retains all three grass forms"),
+		ExposedGrassCounts[0] > 0 && ExposedGrassCounts[1] > 0 && ExposedGrassCounts[2] > 0);
 	for (int32 X = 0; X < 8; ++X)
 		for (int32 Y = 0; Y < 8; ++Y)
 			++SpeciesCounts[AIslandWeather::SelectGroundCoverVariant(FVector(X * 2500.f + 900.f, Y * 2500.f + 900.f, 0.f), 71)];
@@ -266,9 +298,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
 		Weather->ShoreGroundPlantLowB->GetInstanceCount() + Weather->ShoreGroundPlantLowC->GetInstanceCount() + Weather->ShoreGroundPlantLowD->GetInstanceCount();
-	TestTrue(TEXT("Five broadleaf ground-plant forms share the fixed-budget vegetation mix without multiplying instances"),
-		Weather->GroundCoverInstanceCount > 0 && FixturePlantCount * 100 >= Weather->GroundCoverInstanceCount * 25 &&
-		FixturePlantCount * 100 <= Weather->GroundCoverInstanceCount * 54);
+	TestTrue(TEXT("Mixed habitats retain broadleaf cover within the fixed vegetation budget"),
+		FixturePlantCount > 0 && FixturePlantCount * 100 <= Weather->GroundCoverInstanceCount * 54);
 	TestEqual(TEXT("The fixture has no landscape or sea plane, so no global meadow patches are generated"), Weather->GroundCoverMeadowInstanceCount, 0);
 	for (UHierarchicalInstancedStaticMeshComponent* LowPlant : {Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB,
 		Weather->ShoreGroundPlantLowC, Weather->ShoreGroundPlantLowD})
@@ -335,6 +366,33 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Transient foliage populates the WindArch approach"), WindArchApproachGrass > 0 && WindArchApproachGrass <= 288);
 	TestEqual(TEXT("WindArch landmark center remains open"), WindArchCenterGrass, 0);
+	int32 WindArchBroadleafCount = 0;
+	for (UHierarchicalInstancedStaticMeshComponent* Plant : {Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(),
+		Weather->ShoreGroundPlantLowB.Get(), Weather->ShoreGroundPlantLowC.Get(), Weather->ShoreGroundPlantLowD.Get()})
+		for (int32 Index = 0; Index < Plant->GetInstanceCount(); ++Index)
+		{
+			FTransform Transform;
+			if (Plant->GetInstanceTransform(Index, Transform, true) &&
+				FVector::Dist2D(Transform.GetLocation(), WindArch->GetActorLocation()) < 1250.f) ++WindArchBroadleafCount;
+		}
+	TestEqual(TEXT("WindArch exposed verge materializes grasses rather than woodland broadleaf cover"), WindArchBroadleafCount, 0);
+	const int32 MixedHabitatCount = Weather->GroundCoverInstanceCount - WindArchApproachGrass - Weather->IslandFestuca->GetInstanceCount();
+	// Compare the other verges against the same fixture without the exposed landmark,
+	// rather than prescribing a global ratio for three small, unevenly sampled patches.
+	WindArch->Tags.Remove(TEXT("WindArch"));
+	AIslandWeather* MixedHabitatBaseline = World->SpawnActor<AIslandWeather>(Spawn);
+	if (MixedHabitatBaseline) MixedHabitatBaseline->InitializeGroundCover();
+	WindArch->Tags.Add(TEXT("WindArch"));
+	if (TestNotNull(TEXT("Non-exposed habitat baseline spawned"), MixedHabitatBaseline))
+	{
+		TestEqual(TEXT("Exposed habitat leaves the other landmark placement counts unchanged"),
+			MixedHabitatCount, MixedHabitatBaseline->GroundCoverInstanceCount);
+		const int32 BaselinePlants = MixedHabitatBaseline->ShoreGroundPlants->GetInstanceCount() +
+			MixedHabitatBaseline->ShoreGroundPlantLowA->GetInstanceCount() + MixedHabitatBaseline->ShoreGroundPlantLowB->GetInstanceCount() +
+			MixedHabitatBaseline->ShoreGroundPlantLowC->GetInstanceCount() + MixedHabitatBaseline->ShoreGroundPlantLowD->GetInstanceCount();
+		TestEqual(TEXT("Exposed habitat leaves other landmark broadleaf counts unchanged"), FixturePlantCount, BaselinePlants);
+		MixedHabitatBaseline->Destroy();
+	}
 	TestTrue(TEXT("Festuca replaces a bounded share of the WindArch approach placements"),
 		Weather->IslandFestuca->GetInstanceCount() > 0 && Weather->IslandFestuca->GetInstanceCount() < WindArchApproachGrass);
 	TestEqual(TEXT("Each wind-driven grass and ground-plant species retains an immutable baseline for every instance"),
