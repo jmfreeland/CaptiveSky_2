@@ -1,0 +1,10 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "PlantFactory Imported Content Support",
+  "Description": "Content-only mount for locally restored original PlantFactory material functions. No vendor executable modules.",
+  "Category": "Imported Content",
+  "EnabledByDefault": true,
+  "CanContainContent": true
+}
