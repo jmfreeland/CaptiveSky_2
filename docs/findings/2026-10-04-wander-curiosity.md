@@ -8,10 +8,10 @@ The common eligibility check is used by both `AAutonomousAgentAIController` and 
 
 ## Evidence and validation
 
-Deterministic automation coverage checks visibility, landmark identity, living-actor exclusion, per-resident history, cooldown expiry, and malformed timestamps. The blocked-move integration fixture performs a real Tideglass inspection and checks that the controller-level gate then rejects that landmark. Raven flight target selection retains its existing tests for curiosity and random fallback.
+Deterministic automation coverage checks visibility, landmark identity, living-actor exclusion, per-resident history, cooldown expiry, and malformed timestamps. The blocked-move integration fixture performs a real Tideglass inspection and checks that the controller-level gate then rejects that landmark. Raven flight target selection checks curiosity and random fallback.
 
-The isolated UE 5.8.3 editor target compiled and linked successfully on 2026-10-04. The follow-up automation-test launch was rejected by Codex's usage-limit approval service before execution, so no result is claimed for this revision. The open main editor has not loaded the updated module; it needs a normal editor restart/build before live behavior can be observed. No LLM-driven wandering run has verified changes in resident behavior yet.
+The isolated UE 5.8.3 editor target compiled and linked successfully. On 2026-10-04, bounded no-model editor runs passed `WanderCuriosity`, `BlockedGroundMoveApproach`, `ResidentWanderPaths`, `RavenPerch`, and `SessionSafety` (each reported `Result={Success}`). The movement fixture uses the raven controller subclass, so the inherited controller gate is exercised with actual inspection history; the raven perch suite covers the existing aerial curiosity/fallback selection. No LLM-driven wandering run has yet verified changes in resident behavior.
 
 ## Next check
 
-After loading the new module, run a short, bounded no-model movement test and then a capped live observation. Confirm that a resident's own recent inspection no longer pulls its wander toward that landmark, while another resident can still be curious about it. Preserve the existing session request limits and the 30-minute real-time play ceiling.
+After loading the new module in the main editor, run a capped live observation. Confirm that a resident's own recent inspection no longer pulls its wander toward that landmark, while another resident can still be curious about it. Preserve the existing session request limits and the 30-minute real-time play ceiling.
