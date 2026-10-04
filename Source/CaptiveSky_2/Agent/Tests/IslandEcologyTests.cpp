@@ -113,13 +113,14 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TestEqual(FString::Printf(TEXT("%s foliage fade-start distance"), *ComponentName.ToString()), ActualStart, ExpectedStart);
 		TestEqual(FString::Printf(TEXT("%s foliage cull-end distance"), *ComponentName.ToString()), ActualEnd, ExpectedEnd);
 	};
-	CheckCullRange(TEXT("ShoreGrassA"), 2500, 4500);
-	CheckCullRange(TEXT("ShoreGroundPlantLowD"), 2500, 4500);
-	CheckCullRange(TEXT("IslandMeadowFlowerA"), 2500, 4500);
+	CheckCullRange(TEXT("ShoreGrassA"), 6000, 9000);
+	CheckCullRange(TEXT("ShoreGroundPlantLowD"), 6000, 9000);
+	CheckCullRange(TEXT("IslandMeadowFlowerA"), 6000, 9000);
 	CheckCullRange(TEXT("IslandShrubs"), 8000, 14000);
 	CheckCullRange(TEXT("IslandSpruce"), 35000, 55000);
-	CheckCullRange(TEXT("IslandFestuca"), 2500, 4500);
-	CheckCullRange(TEXT("IslandPhalaris"), 3500, 5500);
+	CheckCullRange(TEXT("IslandFestuca"), 6000, 9000);
+	CheckCullRange(TEXT("IslandPhalaris"), 6000, 9000);
+	CheckCullRange(TEXT("IslandCattails"), 6000, 9000);
 
 	Tideglass->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
 	ListeningStones->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};

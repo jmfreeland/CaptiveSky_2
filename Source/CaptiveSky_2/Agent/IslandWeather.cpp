@@ -43,6 +43,21 @@ namespace
 	void SetFoliageCullRange(UHierarchicalInstancedStaticMeshComponent* Component, int32 FadeStartCm, int32 CullEndCm)
 	{
 		if (!Component) return;
+		int32 DetailRangeCm = 0;
+		if (CullEndCm <= 9000 && FParse::Value(FCommandLine::Get(), TEXT("IslandFoliageDetailRangeCm="), DetailRangeCm))
+		{
+			if (DetailRangeCm >= 4500 && DetailRangeCm <= 15000)
+			{
+				FadeStartCm = DetailRangeCm * 2 / 3;
+				CullEndCm = DetailRangeCm;
+				UE_LOG(LogIslandWeather, Display, TEXT("Foliage detail-range preview: %s fade=%d cull=%d cm"),
+					*Component->GetName(), FadeStartCm, CullEndCm);
+			}
+			else
+			{
+				UE_LOG(LogIslandWeather, Warning, TEXT("Ignoring foliage detail-range preview outside 4500..15000 cm"));
+			}
+		}
 		Component->SetCullDistances(FadeStartCm, CullEndCm);
 		// These shadowless foliage instances otherwise still enter the distance-field
 		// scene in UE 5.8.3, causing multi-second preparation stalls. Keep all meshes
@@ -206,21 +221,21 @@ AIslandWeather::AIslandWeather()
 	IslandPhalaris->bReceivesDecals = false;
 	IslandPhalaris->SetVisibility(false);
 
-	// Keep the already-bounded scatter's finer silhouettes close to gameplay, then let broad
-	// understory and mature tree shapes carry the midground. The isolated 1600x900 capture
-	// gates this wider balance at 30 FPS p95; overly tight ranges make the Island look bare.
+	// Keep fine silhouettes through the near midground without adding any instances.
+	// With foliage excluded from distance-field lighting, the 90 m trial passed all
+	// 1600x900 capture views and visibly filled the previously bare band near Tideglass.
 	for (UHierarchicalInstancedStaticMeshComponent* GroundDetail : {
 		ShoreGrassA, ShoreGrassB, ShoreGroundPlants, ShoreGroundPlantLowA, ShoreGroundPlantLowB,
 		ShoreGroundPlantLowC, ShoreGroundPlantLowD})
-		SetFoliageCullRange(GroundDetail, 2500, 4500);
-	SetFoliageCullRange(ShoreGrassC, 2500, 4500);
+		SetFoliageCullRange(GroundDetail, 6000, 9000);
+	SetFoliageCullRange(ShoreGrassC, 6000, 9000);
 	SetFoliageCullRange(IslandShrubs, 8000, 14000);
 	SetFoliageCullRange(IslandRhododendrons, 8000, 14000);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
-		SetFoliageCullRange(MeadowFlower, 2500, 4500);
-	SetFoliageCullRange(IslandCattails, 3500, 5500);
-	SetFoliageCullRange(IslandFestuca, 2500, 4500);
-	SetFoliageCullRange(IslandPhalaris, 3500, 5500);
+		SetFoliageCullRange(MeadowFlower, 6000, 9000);
+	SetFoliageCullRange(IslandCattails, 6000, 9000);
+	SetFoliageCullRange(IslandFestuca, 6000, 9000);
+	SetFoliageCullRange(IslandPhalaris, 6000, 9000);
 	SetFoliageCullRange(IslandSpruce, 35000, 55000);
 
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
