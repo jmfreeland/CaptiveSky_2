@@ -6,6 +6,7 @@
 #include "IslandArrangement.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandFirefly.h"
+#include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
@@ -22,6 +23,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 	if (Target->IsA<AIslandArrangement>()) return FName(TEXT("IslandArrangement"));
 	if (Target->ActorHasTag(TEXT("IslandLife")))
 	{
+		if (Target->ActorHasTag(TEXT("WoodlandDeer"))) return FName(TEXT("WoodlandDeer"));
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));
 		if (Target->ActorHasTag(TEXT("TidepoolCrab"))) return FName(TEXT("TidepoolCrab"));
 		if (Target->ActorHasTag(TEXT("TideglassDragonfly"))) return FName(TEXT("TideglassDragonfly"));
@@ -33,6 +35,11 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 	for (const FName Tag : Target->Tags)
 		if (Tag != FName(TEXT("IslandLandmark")) && Tag != FName(TEXT("IslandLife"))) return Tag;
 	return NAME_None;
+}
+
+bool IslandInteractionUtility::IsMovementTargetAllowed(const AActor* Target)
+{
+	return IsValid(Target) && !Target->ActorHasTag(TEXT("IslandLife"));
 }
 
 bool IslandInteractionUtility::CanInteract(const AActor* Observer, const AActor* Target, float MaxRange)
@@ -141,6 +148,12 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	{
 		if (AIslandFirefly* Firefly = Cast<AIslandFirefly>(Target)) Firefly->RespondToQuietObservation();
 		OutFact = TEXT("You quietly watched a nearby firefly. Its glow briefly brightened within its ordinary pulse; it remains wild and independent. You did not touch, catch, or claim it, and it may drift away.");
+		return true;
+	}
+	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("WoodlandDeer")))
+	{
+		if (AIslandForestStag* Deer = Cast<AIslandForestStag>(Target)) Deer->RespondToQuietObservation(Observer->GetActorLocation());
+		OutFact = TEXT("A wild stag lifted its head, bounded a short way toward the nearby trees, then settled back into grazing. It remains independent; you did not touch, follow, feed, or claim it, and nothing persistent changed.");
 		return true;
 	}
 	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("TidepoolCrab")))

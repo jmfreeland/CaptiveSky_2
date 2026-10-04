@@ -35,12 +35,13 @@ animation displacement. It wanders within a 7 m home radius, rests on the existi
 and offers only a quiet, reversible observation response. `IslandLife`
 wildlife is not a resident movement target for either Aster or the Raven; no LLM calls, persistent
 facts, or ownership are involved. The automation fixture is in
-`Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`. This prototype has not yet compiled or
-run in the editor, and no actor has been placed in or saved to the map. The procedural Raven remains
-intact. Next, validate this class and spawn path in UE 5.8.3, then compare the rigged Crow against the
-procedural Raven at gameplay scale while preserving the Raven's locomotion states and reversible
-fallback. If any animal later becomes a conscious named resident, give it an explicit
-memory/personality directory and request budget. Preserve the shared request safeguards.
+`Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`. The source and fixture now compile to
+scratch objects, but have not been linked into or run by the editor; no actor has been placed in or
+saved to the map. The procedural Raven remains intact. Next, link a current module and validate this
+class and spawn path in UE 5.8.3, then compare the rigged Crow against the procedural Raven at gameplay
+scale while preserving the Raven's locomotion states and reversible fallback. If any animal later
+becomes a conscious named resident, give it an explicit memory/personality directory and request
+budget. Preserve the shared request safeguards.
 
 The current editor tests are definitively against an old module:
 `Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` is timestamped 2026-10-01 09:18, while the ecology
@@ -60,8 +61,14 @@ the build mutex was not bypassed and no other process was touched. Rebuild and r
 inspect the weather pass before changing the cloud asset or weakening the assertion. The stag test
 and its runtime spawn path remain unverified until a current-source build is available.
 
-A direct VS 2022 compile using the existing Unreal response file also cannot validate these changes
-yet: it resolves `IslandWeather.generated.h` from 2026-09-28, whose generated UCLASS prolog is for
-line 32, while the current `IslandWeather.h` declares the class at line 34. The compile stops at
-that stale UHT mapping. Do not hand-edit generated headers; regenerate them with UHT before using
-response-file compiles as source evidence.
+On 2026-10-04, UHT was run against a scratch copy of the editor manifest with the new stag header
+added and all project-module generated output redirected to `Saved/CompileScratch/Codex_UHT_20261004`.
+It succeeded in 94 seconds, leaving the editor's generated files, binary, and map untouched. VS 2022
+then compiled eight current translation units to scratch objects using that fresh `IslandWeather`
+reflection output plus existing generated headers: `IslandForestStag.cpp`, its automation test,
+`IslandWeather.cpp`, `IslandEcologyTests.cpp`, `IslandInteractionUtility.cpp`,
+`AgentBrainComponent.cpp`, `AutonomousAgentAIController.cpp`, and `RavenAgentAIController.cpp`. This
+resolves the stale-UHT barrier for source compilation, but it is not a full module link and does not
+prove runtime behavior. The already-open editor still has the 2026-10-01 module; do not use its
+automation results as current-source evidence. Next, link a current module in isolation and run the
+stag/ecology tests without changing the live map or replacing the editor DLL.

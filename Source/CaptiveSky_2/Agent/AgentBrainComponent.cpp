@@ -465,10 +465,12 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			++VisibleInnBeds;
 		}
 		AActor* NearestFirefly = nullptr;
+		AActor* NearestWoodlandDeer = nullptr;
 		AActor* NearestTidepoolCrab = nullptr;
 		AActor* NearestDragonfly = nullptr;
 		AActor* NearestMinnowSchool = nullptr;
 		float FireflyDistanceSquared = FMath::Square(1800.f);
+		float WoodlandDeerDistanceSquared = FMath::Square(1800.f);
 		float TidepoolCrabDistanceSquared = FMath::Square(1800.f);
 		float DragonflyDistanceSquared = FMath::Square(1800.f);
 		float MinnowSchoolDistanceSquared = FMath::Square(1800.f);
@@ -476,10 +478,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		{
 			if (It->IsHidden()) continue;
 			const bool bFirefly = It->ActorHasTag(TEXT("Firefly"));
+			const bool bWoodlandDeer = It->ActorHasTag(TEXT("WoodlandDeer"));
 			const bool bTidepoolCrab = It->ActorHasTag(TEXT("TidepoolCrab"));
 			const bool bDragonfly = It->ActorHasTag(TEXT("TideglassDragonfly"));
 			const bool bMinnowSchool = It->ActorHasTag(TEXT("MinnowSchool"));
-			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bTidepoolCrab && !bDragonfly && !bMinnowSchool)) continue;
+			if (!It->ActorHasTag(TEXT("IslandLife")) || (!bFirefly && !bWoodlandDeer && !bTidepoolCrab && !bDragonfly && !bMinnowSchool)) continue;
 			const float DistanceSquared = FVector::DistSquared(Location, It->GetActorLocation());
 			if (DistanceSquared > FMath::Square(1800.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeVisibility), false, Owner);
@@ -490,6 +493,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearestFirefly = *It;
 				FireflyDistanceSquared = DistanceSquared;
+			}
+			if (bWoodlandDeer && DistanceSquared <= WoodlandDeerDistanceSquared)
+			{
+				NearestWoodlandDeer = *It;
+				WoodlandDeerDistanceSquared = DistanceSquared;
 			}
 			if (bTidepoolCrab && DistanceSquared <= TidepoolCrabDistanceSquared)
 			{
@@ -509,6 +517,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 		if (NearestFirefly)
 			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."), FMath::Sqrt(FireflyDistanceSquared) / 100.f);
+		if (NearestWoodlandDeer)
+			NearbyBeings += FString::Printf(TEXT(" A wild stag is grazing near the woodland edge by Wind Arch, about %.0f metres away. It is independent, not a companion or movement target; simply watching from a respectful distance is fine. If it is within four metres, you may Interact with target WoodlandDeer to observe quietly; it may bound a short way toward cover, then resume grazing. Do not follow, feed, touch, or claim it."), FMath::Sqrt(WoodlandDeerDistanceSquared) / 100.f);
 		if (NearestMinnowSchool)
 			NearbyBeings += FString::Printf(TEXT(" A small school of minnows is circling in the Tideglass shallows, about %.0f metres away. They are wild, not companions or movement targets. If the school is within four metres, you may Interact with target MinnowSchool to watch quietly; the fish will scatter briefly and regroup. Do not touch, catch, or claim them."), FMath::Sqrt(MinnowSchoolDistanceSquared) / 100.f);
 		if (NearestTidepoolCrab)

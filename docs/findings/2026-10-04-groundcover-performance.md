@@ -147,3 +147,22 @@ Logs: `Codex_TideglassGrassOnly_20261004.log`, `Codex_TideglassGroundPlantsOnly_
 `Codex_TideglassTreesOnly_20261004.log`, plus the earlier `Codex_TideglassMeadowOnly_20261004.log`,
 `Codex_TideglassMeadowUnderstory_20261004.log`, `Codex_TideglassWoodlandOnly_20261004.log`,
 `Codex_TideglassMeadowTrees_20261004.log`, and `Codex_TideglassSpecies_20261004.log`.
+
+## Ground-cover blade scale A/B (2026-10-04)
+
+The latest close-view image at the original 2.7x grass scale fills the entire frame with overlapping
+blades, obscuring the ground and the silhouettes of nearby plants. In the same Tideglass detail
+view with the meadow-and-tree layer subset, reducing the grass multiplier to 1.8x opened visible
+ground between blades. The p95 throughput was 48.18 FPS at 1.8x (48/50 valid intervals) versus
+46.26 FPS at 2.7x (50/50), so this is a readability adjustment, not an established performance
+optimization. The existing placement count and spacing are unchanged.
+
+The focused `CaptiveSky2.Agent.GroundCover` test passed with 1.8x in the isolated UE 5.8.3 target.
+The broad, full-foliage Tideglass gate has not yet been rerun with this scale; do not infer that it
+clears 30 FPS from the subset capture. Its trial source setting is now 1.8x. A subsequent scratch
+build attempt waited on Unreal's build mutex while the main editor was open and was canceled before
+compilation, leaving that full-view comparison pending.
+
+Close-view captures: `2026-10-04_055700_h12.0/02a_TideglassGroundDetail.png` (1.8x) and
+`2026-10-04_060126_h12.0/02a_TideglassGroundDetail.png` (2.7x), under
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/`.

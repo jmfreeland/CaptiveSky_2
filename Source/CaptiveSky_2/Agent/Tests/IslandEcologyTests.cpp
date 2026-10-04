@@ -82,6 +82,28 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		World->DestroyWorld(false);
 		return false;
 	}
+	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherFoliageComponents;
+	Weather->GetComponents(WeatherFoliageComponents);
+	auto CheckCullRange = [this, &WeatherFoliageComponents](FName ComponentName, int32 ExpectedStart, int32 ExpectedEnd)
+	{
+		UHierarchicalInstancedStaticMeshComponent* Component = nullptr;
+		for (UHierarchicalInstancedStaticMeshComponent* Candidate : WeatherFoliageComponents)
+			if (Candidate && Candidate->GetFName() == ComponentName) { Component = Candidate; break; }
+		if (!TestNotNull(FString::Printf(TEXT("Ground-cover component %s exists"), *ComponentName.ToString()), Component)) return;
+		int32 ActualStart = 0;
+		int32 ActualEnd = 0;
+		Component->GetCullDistances(ActualStart, ActualEnd);
+		TestEqual(FString::Printf(TEXT("%s foliage fade-start distance"), *ComponentName.ToString()), ActualStart, ExpectedStart);
+		TestEqual(FString::Printf(TEXT("%s foliage cull-end distance"), *ComponentName.ToString()), ActualEnd, ExpectedEnd);
+	};
+	CheckCullRange(TEXT("ShoreGrassA"), 2500, 4500);
+	CheckCullRange(TEXT("ShoreGroundPlantLowD"), 2500, 4500);
+	CheckCullRange(TEXT("IslandMeadowFlowerA"), 2500, 4500);
+	CheckCullRange(TEXT("IslandShrubs"), 8000, 14000);
+	CheckCullRange(TEXT("IslandSpruce"), 35000, 55000);
+	CheckCullRange(TEXT("IslandFestuca"), 2500, 4500);
+	CheckCullRange(TEXT("IslandPhalaris"), 3500, 5500);
+
 	Tideglass->Tags = {TEXT("TideglassPool"), TEXT("IslandLandmark")};
 	ListeningStones->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
 	WindArch->Tags = {TEXT("WindArch"), TEXT("IslandLandmark")};
@@ -139,12 +161,21 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	Weather->InitializeGroundCover();
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
-	TestEqual(TEXT("Three collisionless HISM components carry the new Fab meadow flowers"),
+	TestTrue(TEXT("PlantFactory Festuca mesh and all six imported materials resolve"),
+		Weather->IslandFestuca->GetStaticMesh() && Weather->IslandFestuca->GetStaticMesh()->GetStaticMaterials().Num() == 6);
+	TestTrue(TEXT("PlantFactory Phalaris mesh and all five imported materials resolve"),
+		Weather->IslandPhalaris->GetStaticMesh() && Weather->IslandPhalaris->GetStaticMesh()->GetStaticMaterials().Num() == 5);
+	TestEqual(TEXT("Eight collisionless HISM components carry the expanded Fab meadow flower mix"),
 		Weather->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
 	const TCHAR* MeadowFlowerPaths[AIslandWeather::MeadowFlowerSpeciesCount] = {
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"),
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"),
-		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_17_01.flower_17_01") };
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_17_01.flower_17_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_08_01.flower_08_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_13_01.flower_13_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_20_01.flower_20_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_02_01.flower_02_01"),
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_03_01.flower_03_01") };
 	for (int32 SpeciesIndex = 0; SpeciesIndex < Weather->IslandMeadowFlowers.Num(); ++SpeciesIndex)
 	{
 		UStaticMesh* MeadowFlowerMesh = LoadObject<UStaticMesh>(nullptr, MeadowFlowerPaths[SpeciesIndex]);
@@ -223,8 +254,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		MinimumFlowerPatches = FMath::Min(MinimumFlowerPatches, Count);
 		MaximumFlowerPatches = FMath::Max(MaximumFlowerPatches, Count);
 	}
-	TestTrue(TEXT("All three imported flower forms occupy balanced, spatially coherent meadow patches"),
-		MinimumFlowerPatches >= 30 && MaximumFlowerPatches <= 60);
+	TestTrue(TEXT("All eight imported flower forms occupy balanced, spatially coherent meadow patches"),
+		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 28);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
@@ -253,7 +284,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->ShoreGroundPlants->GetInstanceCount(), Weather->ShoreGroundPlantLowA->GetInstanceCount(), Weather->ShoreGroundPlantLowB->GetInstanceCount(),
 		Weather->ShoreGroundPlantLowC->GetInstanceCount(), Weather->ShoreGroundPlantLowD->GetInstanceCount()));
 	int32 GrassInsidePoolClearance = 0;
-	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA.Get(), Weather->ShoreGrassB.Get(), GrassC, Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(), Weather->ShoreGroundPlantLowB.Get(), Weather->ShoreGroundPlantLowC.Get(), Weather->ShoreGroundPlantLowD.Get()})
+	for (UHierarchicalInstancedStaticMeshComponent* Grass : {Weather->ShoreGrassA.Get(), Weather->ShoreGrassB.Get(), GrassC, Weather->ShoreGroundPlants.Get(), Weather->ShoreGroundPlantLowA.Get(), Weather->ShoreGroundPlantLowB.Get(), Weather->ShoreGroundPlantLowC.Get(), Weather->ShoreGroundPlantLowD.Get(), Weather->IslandFestuca.Get()})
 	{
 		for (int32 Index = 0; Index < Grass->GetInstanceCount(); ++Index)
 		{
@@ -298,14 +329,18 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Transient foliage populates the WindArch approach"), WindArchApproachGrass > 0 && WindArchApproachGrass <= 288);
 	TestEqual(TEXT("WindArch landmark center remains open"), WindArchCenterGrass, 0);
+	TestTrue(TEXT("Festuca replaces a bounded share of the WindArch approach placements"),
+		Weather->IslandFestuca->GetInstanceCount() > 0 && Weather->IslandFestuca->GetInstanceCount() < WindArchApproachGrass);
 	TestEqual(TEXT("Each wind-driven grass and ground-plant species retains an immutable baseline for every instance"),
 		Weather->ShoreGrassABaseTransforms.Num() + Weather->ShoreGrassBBaseTransforms.Num() + Weather->ShoreGroundPlantBaseTransforms.Num() +
 		Weather->ShoreGroundPlantLowABaseTransforms.Num() + Weather->ShoreGroundPlantLowBBaseTransforms.Num() +
-		Weather->ShoreGroundPlantLowCBaseTransforms.Num() + Weather->ShoreGroundPlantLowDBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
+		Weather->ShoreGroundPlantLowCBaseTransforms.Num() + Weather->ShoreGroundPlantLowDBaseTransforms.Num() +
+		Weather->IslandFestucaBaseTransforms.Num(), Weather->GroundCoverInstanceCount);
 	TestEqual(TEXT("HISM populations match the reported transient ground-cover population"),
 		Weather->ShoreGrassA->GetInstanceCount() + Weather->ShoreGrassB->GetInstanceCount() + GrassC->GetInstanceCount() + Weather->ShoreGroundPlants->GetInstanceCount() +
 		Weather->ShoreGroundPlantLowA->GetInstanceCount() + Weather->ShoreGroundPlantLowB->GetInstanceCount() +
-		Weather->ShoreGroundPlantLowC->GetInstanceCount() + Weather->ShoreGroundPlantLowD->GetInstanceCount(), Weather->GroundCoverInstanceCount);
+		Weather->ShoreGroundPlantLowC->GetInstanceCount() + Weather->ShoreGroundPlantLowD->GetInstanceCount() +
+		Weather->IslandFestuca->GetInstanceCount(), Weather->GroundCoverInstanceCount);
 	TestTrue(TEXT("Ground cover stays nonblocking and off navigation"),
 		Weather->ShoreGrassA->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGrassB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
@@ -315,9 +350,12 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->ShoreGroundPlantLowB->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGroundPlantLowC->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		Weather->ShoreGroundPlantLowD->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		Weather->IslandFestuca->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+		Weather->IslandPhalaris->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 		!Weather->ShoreGrassA->CanEverAffectNavigation() && !Weather->ShoreGrassB->CanEverAffectNavigation() && !GrassC->CanEverAffectNavigation() && !Weather->ShoreGroundPlants->CanEverAffectNavigation() &&
 		!Weather->ShoreGroundPlantLowA->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowB->CanEverAffectNavigation() &&
-		!Weather->ShoreGroundPlantLowC->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowD->CanEverAffectNavigation());
+		!Weather->ShoreGroundPlantLowC->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowD->CanEverAffectNavigation() &&
+		!Weather->IslandFestuca->CanEverAffectNavigation() && !Weather->IslandPhalaris->CanEverAffectNavigation());
 	TestTrue(TEXT("All grass and ground-plant variants are visible around the landmarks and inn approach"),
 		Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible() && GrassC->IsVisible() && Weather->ShoreGroundPlants->IsVisible() &&
 		Weather->ShoreGrassA->GetInstanceCount() > 0 && Weather->ShoreGrassB->GetInstanceCount() > 0 && GrassC->GetInstanceCount() > 0 &&

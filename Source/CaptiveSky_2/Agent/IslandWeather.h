@@ -10,6 +10,7 @@ class AIslandLightning;
 class AIslandTidepoolCrab;
 class AIslandTidepoolMinnows;
 class AIslandTideglassDragonfly;
+class AIslandForestStag;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UHierarchicalInstancedStaticMeshComponent;
@@ -65,7 +66,7 @@ public:
 	/** Storms add up to this fraction on top of the usual wind. */
 	static constexpr float StormWindBoost = 0.9f;
 	/** Number of visually distinct Fab flower meshes used for the capped meadow accents. */
-	static constexpr int32 MeadowFlowerSpeciesCount = 3;
+	static constexpr int32 MeadowFlowerSpeciesCount = 8;
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;
@@ -114,6 +115,7 @@ private:
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
 	TArray<TWeakObjectPtr<AIslandTideglassDragonfly>> DayDragonflies;
 	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
+	TWeakObjectPtr<AIslandForestStag> WoodlandDeer;
 	TArray<FTransform> ShoreGrassABaseTransforms;
 	TArray<FTransform> ShoreGrassBBaseTransforms;
 	TArray<FTransform> ShoreGroundPlantBaseTransforms;
@@ -272,4 +274,14 @@ private:
 	TArray<FTransform> ShoreGroundPlantLowDBaseTransforms;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowC;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowD;
+	TArray<FTransform> IslandFestucaBaseTransforms;
+	TArray<FTransform> IslandPhalarisBaseTransforms;
+	TArray<int32> SwayedFestucaIndices;
+	TArray<int32> SwayedPhalarisIndices;
+	TMap<FIntPoint, TArray<int32>> FestucaCells;
+	TMap<FIntPoint, TArray<int32>> PhalarisCells;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandFestuca;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandPhalaris;
 };

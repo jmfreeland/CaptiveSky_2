@@ -14,6 +14,7 @@
 #include "EngineUtils.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandInteractionUtility.h"
 #include "AgentMemoryComponent.h"
 #include "HAL/PlatformTime.h"
 
@@ -1146,6 +1147,11 @@ void ARavenAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (!It->ActorHasTag(TargetTag)) continue;
+			if (!IslandInteractionUtility::IsMovementTargetAllowed(*It))
+			{
+				ReportAction(TEXT("Wildlife are not flight destinations. Watch from a respectful distance; do not chase, feed, touch, or claim them."));
+				return;
+			}
 			if (AAutonomousAgentCharacter* OtherResident = Cast<AAutonomousAgentCharacter>(*It); OtherResident && OtherResident != GetPawn())
 			{
 				const FVector RavenLocation = GetPawn()->GetActorLocation();

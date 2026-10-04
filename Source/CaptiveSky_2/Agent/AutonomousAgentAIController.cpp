@@ -457,7 +457,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(Target)) continue;
-		const bool bWildlifeTarget = Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab")) ||
+		const bool bWildlifeTarget = Target == FName(TEXT("WoodlandDeer")) || Target == FName(TEXT("Firefly")) || Target == FName(TEXT("TidepoolCrab")) ||
 			Target == FName(TEXT("TideglassDragonfly")) || Target == FName(TEXT("MinnowSchool"));
 		if (bWildlifeTarget && It->IsHidden()) continue;
 		if (bWildlifeTarget && FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f)) continue;
@@ -515,6 +515,7 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	else if (Target == FName(TEXT("TidepoolCrab"))) ReportAction(TEXT("No shore crab is close enough to watch quietly; return to the TideglassPool and look near its edge."));
 	else if (Target == FName(TEXT("TideglassDragonfly"))) ReportAction(TEXT("No Tideglass dragonfly is close enough to watch; look above the Tideglass shore during daylight and let it come near."));
 	else if (Target == FName(TEXT("MinnowSchool"))) ReportAction(TEXT("No minnow school is close enough to watch; return to TideglassPool and look into the shallows."));
+	else if (Target == FName(TEXT("WoodlandDeer"))) ReportAction(TEXT("No wild stag is close enough to watch; look near Wind Arch and keep a respectful distance."));
 	else ReportAction(TEXT("Inspection failed: that target does not exist in this level."));
 }
 
@@ -704,6 +705,11 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 
 		if (TargetActor)
 		{
+			if (!IslandInteractionUtility::IsMovementTargetAllowed(TargetActor))
+			{
+				ReportAction(TEXT("Wildlife are not movement targets. Observe from a respectful distance; interact quietly only when already close, and do not chase, feed, touch, or claim them."));
+				break;
+			}
 			if (Cast<AAutonomousAgentCharacter>(TargetActor) && TargetActor != ControlledPawn)
 			{
 				// Resident movement targets represent a willing approach, not a request to occupy
