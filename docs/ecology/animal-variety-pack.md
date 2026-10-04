@@ -59,3 +59,9 @@ process remained idle; that process was stopped. An older unidentified `dotnet` 
 the build mutex was not bypassed and no other process was touched. Rebuild and rerun both tests, then
 inspect the weather pass before changing the cloud asset or weakening the assertion. The stag test
 and its runtime spawn path remain unverified until a current-source build is available.
+
+A direct VS 2022 compile using the existing Unreal response file also cannot validate these changes
+yet: it resolves `IslandWeather.generated.h` from 2026-09-28, whose generated UCLASS prolog is for
+line 32, while the current `IslandWeather.h` declares the class at line 34. The compile stops at
+that stale UHT mapping. Do not hand-edit generated headers; regenerate them with UHT before using
+response-file compiles as source evidence.
