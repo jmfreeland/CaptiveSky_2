@@ -33,6 +33,7 @@ public class CaptiveSky_2 : ModuleRules
 			"DeveloperSettings",
 			"ImageCore",
 			"Landscape",
+			"Water",
 			"ProceduralMeshComponent"
 		});
 
