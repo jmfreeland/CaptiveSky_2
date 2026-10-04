@@ -28,6 +28,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Sound/SoundWaveProcedural.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -40,7 +42,16 @@ namespace
 {
 	void SetFoliageCullRange(UHierarchicalInstancedStaticMeshComponent* Component, int32 FadeStartCm, int32 CullEndCm)
 	{
-		if (Component) Component->SetCullDistances(FadeStartCm, CullEndCm);
+		if (!Component) return;
+		Component->SetCullDistances(FadeStartCm, CullEndCm);
+		// Diagnostic only: verify whether these non-shadowing instances still incur
+		// distance-field scene work. Do not reduce density or alter the default look.
+		if (FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageNoDistanceFields")))
+		{
+			Component->SetAffectDistanceFieldLighting(false);
+			UE_LOG(LogIslandWeather, Display, TEXT("Foliage DF diagnostic: %s CastShadow=%d AffectDistanceFieldLighting=%d"),
+				*Component->GetName(), Component->CastShadow, Component->bAffectDistanceFieldLighting);
+		}
 	}
 }
 

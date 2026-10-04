@@ -163,8 +163,57 @@ handling with reversible component-level diagnostics rather than trimming the
 vegetation or rebuilding asset distance fields without evidence. Atlas auditing
 itself is instrumentation and not a production performance configuration.
 
-Foliage already disables
-CastShadow; the primitive distance-field-lighting flag is documented as effective
-only when CastShadow is true, so toggling that flag alone is not an evidenced fix.
+Foliage already disables CastShadow. The primitive header documents the
+distance-field-lighting flag as effective only when CastShadow is true; the
+component-level experiment below nevertheless found materially different scene
+preparation behavior in this engine. Do not rely on that comment alone to dismiss
+an empirically verified component flag.
+
+### Foliage-only component experiment
+
+Added opt-in `-IslandFoliageNoDistanceFields` in `SetFoliageCullRange`, which sets
+`AffectDistanceFieldLighting=false` on the existing foliage HISM components before
+registration. It does not hide instances, alter culling, remove species, disable
+the global renderer feature, or save assets. Normal launch defaults are unchanged.
+Per-component constructor logs confirm both CastShadow and AffectDistanceFieldLighting
+are zero in the opt-in run. These logs are initialization evidence, not a full
+post-serialization component audit.
+
+UE 5.8.3 Development editor build succeeded (5 actions, 19.51 seconds). Both
+captures used that same rebuilt DLL, the same hour/camera/configuration and the
+same map fingerprint as above, with atlas instrumentation enabled.
+
+| Run | Ground cover | Atlas assets during capture | Capture p95 FPS | Whole-capture DF preparation max / sum |
+| --- | --- | --- | --- | --- |
+| Baseline | 1,780,040 meadow instances | 38 | 2.69, failed | 4871.32 / 16910.37 ms |
+| Opt-in foliage flag | 1,780,040 meadow instances | 20 | 56.22, passed | 4.42 / 25.35 ms |
+
+Logs: `Codex_FoliageDFBaseline_20261004.log` and
+`Codex_FoliageDFNoDF_20261004.log`. CSVs: `Profile(20261004_160933).csv`
+(1161 frames) and `Profile(20261004_161055).csv` (1159 frames). Both editors exited
+normally. Distance fields remained globally enabled (`r.DistanceFields=1`) in the
+opt-in run. Atlas remained 8 MB, with 7.4 MB free in its active snapshot.
+
+Visual inspection of the two Wind Arch images, folders
+`2026-10-04_161000_h17.0` and `2026-10-04_161122_h17.0`, found a consistent
+composition/landmark shading and no obvious missing vegetation. This is not a
+pixel-identity claim or an all-lighting-conditions clearance. Even the opt-in run
+still has a whole-lifecycle FrameTime max of 6464.83 ms; that broader loading stall
+is not solved by the component flag.
+
+This is strong evidence for foliage distance-field participation/update overhead
+despite disabled shadows, rather than atlas capacity or an oversized single asset.
+Keep the change opt-in until wider views and visual conditions are validated.
+
+`Codex_FoliageDFWide_20261004.log` subsequently passed all nine 17:00 cameras
+with the opt-in flag, normal global distance fields and no CSV instrumentation.
+Ground-level p95 throughputs 56.25..58.58 FPS; survey 57.36 FPS. Every camera
+reported 50/50 valid intervals and the editor exited normally. Output folder
+`2026-10-04_161355_h17.0`. Map hash stayed unchanged. Inspected the close
+Tideglass plant view, Listening Stones and inn exterior; no obvious vegetation
+loss. The Tideglass detail camera sits inside a dense grass clump, so it is not
+a useful highlight composition and should be repositioned in a separate camera
+work item. Additional lighting conditions and automated component invariants
+remain before promoting this experiment to a default.
 
 CSV command background: [Epic CSV profiler documentation](https://dev.epicgames.com/documentation/unreal-engine/csv-profiler?application_version=4.27).
