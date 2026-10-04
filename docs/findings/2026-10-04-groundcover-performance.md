@@ -219,3 +219,39 @@ Saved preference state therefore does not establish that this already-running se
 Live Coding. No editor preference, map, or Content asset was changed. Wait for a user-approved
 save/close/restart (or another safe UE 5.8.3 compile session), then build before running the test and
 the 11:00 Tideglass capture; do not force-close this editor to release the build mutex.
+
+### Fresh build and 11:00 validation (2026-10-04)
+
+The previously open editor was absent on the next process check. The main UE 5.8.3
+`CaptiveSky_2Editor Win64 Development` build completed successfully (nine actions, 36.74 s),
+without waiting on the earlier mutex. The freshly linked project module and module manifest
+were copied to the existing isolated test project. Its `CaptiveSky2.Agent.GroundCover` test
+passed with exit code 0; this fixture verifies culling, navigation/collision exclusion,
+bounded placement and wind behavior, but its constant assertions alone do not prove the
+flowering annulus exists on the Island landscape.
+
+The separate real-Island 11:00 capture supplies the placement evidence: the unchanged
+512-site budget produced 354 Fab flowers, including 17 placed from the 160 reserved
+Listening Stones sites, after 390 bounded terrain traces. The low reserved-site acceptance
+shows that the local terrain/clearance filters reject most candidates. This is a placement
+trial, not proof that the intended flower masses are visually legible.
+
+`CaptiveSky2.Visual.Viewpoints` passed with exit code 0. At 1600x900, following ten warmup
+frames, the broad `02_Tideglass` view measured 43.26 p95 FPS (51.77 wall-clock FPS) and the
+close `02a_TideglassGroundDetail` view measured 42.39 p95 FPS (51.51 wall-clock FPS), both
+with 50 valid / 50 raw intervals. This run clears the existing 30 FPS offscreen screen;
+earlier variability means it is not a general gameplay-performance guarantee.
+
+Visual inspection still shows a dense pale foreground, a largely bare middle distance,
+thin tree trunks/silhouettes, placeholder-looking landmark materials and no convincing
+wet-edge-to-meadow-to-woodland composition. The visual habitat milestone remains open.
+Before expanding instance counts, improve plant scale/material readability and meadow/
+woodland grouping, and consider broad-meadow fallback for rejected reserved flower sites.
+The user's new Megaplants library additions have not yet been inventoried or imported.
+
+Logs: `Saved/Logs/Codex_FlowerEdgeGroundCover_20261004.log` and
+`Saved/Logs/Codex_FlowerEdgeTideglass_20261004.log`. Images:
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/2026-10-04_141225_h11.0/`.
+The capture uses the current shared viewpoint source/configuration, mirrored into the
+isolated project. It starts no gameplay session and uses `-ViewpointNoWorldState`; no
+resident model turns were requested and no Island map or primary Content packages were saved.
