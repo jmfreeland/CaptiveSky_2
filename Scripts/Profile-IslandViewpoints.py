@@ -4,6 +4,8 @@ Launch UnrealEditor-Cmd with -ExecutePythonScript=<this path> -RenderOffscreen
 -csvGpuStats -csvCompression=0 and normal -Viewpoint* flags. Do NOT specify
 -TestExit: this controller stops and flushes the profiler before quitting the editor.
 Use -ProfileRepeats=2 for a same-process cold/warmed comparison (bounded to 1..3).
+Use -ProfileDisableDistanceFields only to verify a startup diagnostic ablation,
+not acceptance. r.DistanceFields is read-only at runtime; supply a startup override.
 The existing test still owns all safety/performance gates and pass/fail results.
 No map saves, gameplay, resident turns or persistent settings changes.
 """
@@ -15,7 +17,9 @@ import unreal
 
 
 TIME_LIMIT_SECONDS = 180.0
-match = re.search(r"(?:^|\s)-ProfileRepeats=(\d+)(?=\s|$)", unreal.SystemLibrary.get_command_line())
+command_line = unreal.SystemLibrary.get_command_line()
+disable_distance_fields = bool(re.search(r"(?:^|\s)-ProfileDisableDistanceFields(?=\s|$)", command_line))
+match = re.search(r"(?:^|\s)-ProfileRepeats=(\d+)(?=\s|$)", command_line)
 REPEATS = int(match.group(1)) if match else 1
 if not 1 <= REPEATS <= 3:
     raise ValueError("ProfileRepeats must be between 1 and 3")
@@ -75,6 +79,12 @@ def on_tick(delta_seconds):
 
 try:
     unreal.EditorPythonScripting.set_keep_python_script_alive(True)
+    if disable_distance_fields:
+        actual = unreal.SystemLibrary.get_console_variable_int_value("r.DistanceFields")
+        if actual != 0:
+            raise RuntimeError("Distance-field ablation refused: startup r.DistanceFields is {}, expected 0".format(actual))
+        unreal.log_warning("[RenderProfile] ABLATION VERIFIED: startup r.DistanceFields=0; not a quality acceptance run")
+    console("r.DistanceFields")
     console("csvprofile start")
     state["handle"] = unreal.register_slate_post_tick_callback(on_tick)
     console("Automation RunTests CaptiveSky2.Visual.Viewpoints")

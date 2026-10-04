@@ -83,10 +83,55 @@ nonfinite exclusion, and invalid-window rejection.
 
 ## Next investigation
 
-Run a session-only distance-field ablation paired with the unchanged baseline,
-with identical cameras and explicit process limits. Inspect both image quality
-and CPU scopes; do not persist a setting change as a fix. Audit per-mesh distance
-field sizes/atlas updates if the stall disappears. Foliage already disables
+### Rejected runtime ablation
+
+The first matched attempt was invalid as an ablation:
+`Codex_DFPairBaseline_20261004.log` and
+`Codex_DFPairNoDistanceFields_20261004.log` both report `r.DistanceFields=1`.
+The latter explicitly says the variable is read-only. Their p95 throughputs
+(36.45 and 53.12 FPS, both tests passed) therefore demonstrate variability with
+distance fields **still enabled**, not a benefit from disabling them. Both
+processes exited normally and the map SHA256 remained
+`3D1F2432A3D01D6E88C9CDF3D1B81FC7AEA312E7B64500F444FB8F1957E10AA8`.
+The baseline CSV `Profile(20261004_155114).csv` has 1143 frames; whole-capture
+PrepareDistanceFieldScene max 4469.94 ms / sum 15875.45 ms. Whole-capture
+statistics include loading/warmup and must not be treated as steady-state FPS.
+
+The diagnostic flag now **verifies** the effective startup value and refuses the
+run if it is not zero. For an actual process-only ablation, add both:
+
+```text
+-ProfileDisableDistanceFields -ini:Engine:[SystemSettings]:r.DistanceFields=0
+```
+
+This is a command-line configuration override, not an on-disk config change.
+See [Epic's configuration override documentation](https://dev.epicgames.com/documentation/en-us/unreal-engine/configuration-files-in-unreal-engine)
+and [distance-field variable reference](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-console-variables-reference).
+
+### Verified startup ablation
+
+`Codex_DFStartupAblation_20261004.log` verifies value 0, set by SystemSettingsIni.
+It passed at 56.44 FPS p95 / 59.59 FPS wall throughput, 50/50 valid intervals,
+then exited normally. Map fingerprint remained identical to the baseline above.
+CSV `Profile(20261004_155512).csv` has 1251 frames: whole-capture
+PrepareDistanceFieldScene max 0.05 ms / sum 0.92 ms, compared with baseline
+4469.94 ms / 15875.45 ms. Game-thread EventWait max 1632.98 ms / sum 2335.05 ms;
+FrameTime still reaches 6398.58 ms during the broader capture lifecycle.
+Disabling distance fields did not remove every startup stall.
+
+Visual inspection of baseline `2026-10-04_155141_h17.0` and ablation
+`2026-10-04_155541_h17.0` Wind Arch screenshots shows brighter inn panels,
+changed arch shading and a brighter rock in the ablation. That is a real quality
+difference; do not quietly deploy the toggle. This single sequential comparison
+supports targeting distance-field scene preparation, not a universal FPS promise
+or identification of the asset responsible. Other asset fingerprints and OS cache
+conditions were not exhaustively held constant.
+
+`Codex_DFAblationReject_20261004.log` validates the guard: flag without startup
+override reports effective value 1 and refuses before profiler/automation start.
+The editor exited within the one-minute external deadline.
+
+Audit per-mesh distance-field sizes/atlas updates next. Foliage already disables
 CastShadow; the primitive distance-field-lighting flag is documented as effective
 only when CastShadow is true, so toggling that flag alone is not an evidenced fix.
 
