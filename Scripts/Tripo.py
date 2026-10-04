@@ -195,7 +195,7 @@ def cmd_generate(args, key):
     if output.get("rendered_image_url"):
         download(output["rendered_image_url"], os.path.join(folder, "preview.png"))
     with open(os.path.join(folder, "meta.json"), "w", encoding="utf-8") as handle:
-        json.dump({"prompt": prompt, "model": args.model, "task_id": task_id, "credits": credits, "created": entry["time"], "request": body}, handle, indent=2)
+        json.dump({"prompt": prompt, "model": args.model, "task_id": task_id, "credits": credits, "created": entry["time"], "size_cm": args.size_cm, "request": body}, handle, indent=2)
     print("saved {} ({:.2f} credits; today {} tasks / {:.2f} credits)".format(folder, credits, ledger["tasks"], ledger["credits"]))
 
 
@@ -211,6 +211,7 @@ def main():
     gen.add_argument("--model", default=DEFAULT_MODEL)
     gen.add_argument("--negative-prompt")
     gen.add_argument("--face-limit", type=int, help="cap on triangles; lower is lighter for the game")
+    gen.add_argument("--size-cm", type=float, help="real-world length of the prop's longest side; Tripo returns every model about 1 m long, so the importer rescales to this")
     gen.add_argument("--no-texture", action="store_true", help="geometry only (cheaper)")
     gen.add_argument("--max-tasks", help="daily task cap (default {})".format(DEFAULT_MAX_TASKS))
     gen.add_argument("--max-credits", help="daily credit cap (default {})".format(int(DEFAULT_MAX_CREDITS)))
