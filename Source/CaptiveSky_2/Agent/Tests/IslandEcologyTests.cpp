@@ -256,6 +256,12 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("All eight imported flower forms occupy balanced, spatially coherent meadow patches"),
 		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 28);
+	TestTrue(TEXT("ListeningStones flower pockets stay outside the landmark clearing and within the 45 m flower fade range"),
+		AIslandWeather::ListeningStonesFlowerInnerRadius > 2600.f &&
+		AIslandWeather::ListeningStonesFlowerInnerRadius < AIslandWeather::ListeningStonesFlowerOuterRadius &&
+		AIslandWeather::ListeningStonesFlowerOuterRadius < 4500.f);
+	TestTrue(TEXT("The ListeningStones habitat receives a fixed, bounded share of the existing flower-site budget"),
+		AIslandWeather::ListeningStonesFlowerSiteCount > 0 && AIslandWeather::ListeningStonesFlowerSiteCount < 512);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +

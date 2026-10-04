@@ -67,6 +67,10 @@ public:
 	static constexpr float StormWindBoost = 0.9f;
 	/** Number of visually distinct Fab flower meshes used for the capped meadow accents. */
 	static constexpr int32 MeadowFlowerSpeciesCount = 8;
+	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
+	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
+	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
+	static constexpr float ListeningStonesFlowerOuterRadius = 4300.f;
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;

@@ -674,9 +674,18 @@ void AIslandWeather::InitializeGroundCover()
 		FVector BoundsOrigin, BoundsExtent;
 		IslandLandscape->GetActorBounds(false, BoundsOrigin, BoundsExtent);
 		TArray<FVector> ExclusionLocations;
+		FVector ListeningStonesLocation = FVector::ZeroVector;
+		bool bHasListeningStones = false;
 		for (TActorIterator<AActor> AnchorIt(GetWorld()); AnchorIt; ++AnchorIt)
+		{
 			if (AnchorIt->ActorHasTag(TEXT("IslandLandmark")) || AnchorIt->ActorHasTag(TEXT("InnDoorLantern")))
 				ExclusionLocations.Add(AnchorIt->GetActorLocation());
+			if (AnchorIt->ActorHasTag(TEXT("IslandLandmark")) && AnchorIt->ActorHasTag(TEXT("ListeningStones")))
+			{
+				ListeningStonesLocation = AnchorIt->GetActorLocation();
+				bHasListeningStones = true;
+			}
+		}
 		TArray<FVector> MeadowCenters;
 		const int32 GroundCoverBeforeMeadowPatches = GroundCoverInstanceCount;
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
@@ -1043,6 +1052,7 @@ void AIslandWeather::InitializeGroundCover()
 				const int32 GroveFlowerCount = GroundCoverFlowerCount;
 				int32 MeadowFlowerTraceCount = 0;
 				int32 MeadowFlowerPatchCount = 0;
+				int32 ListeningStonesMeadowFlowerCount = 0;
 				int32 MeadowFlowerSpeciesCounts[MeadowFlowerSpeciesCount] = {};
 				constexpr int32 MeadowFlowerCandidateSites = 512;
 				const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
@@ -1050,7 +1060,8 @@ void AIslandWeather::InitializeGroundCover()
 				if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 				{
 					// Scatter a sparse, bounded pool of flower candidates through the same valid-terrain
-					// mask as the meadow, rather than tying accents to broad-grass patch centers.
+					// mask as the meadow. Reserve a deterministic share for a visible ListeningStones
+					// annulus, so its flowering edge reads separately from the anonymous far meadow.
 					constexpr int32 MaxFlowerAttemptsPerSite = 3;
 					constexpr float FlowerMinSpacing = 475.f;
 					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
@@ -1059,9 +1070,21 @@ void AIslandWeather::InitializeGroundCover()
 						bool bPlacedMeadowFlower = false;
 						for (int32 Attempt = 0; Attempt < MaxFlowerAttemptsPerSite && !bPlacedMeadowFlower; ++Attempt)
 						{
-							const FVector& Cell = ValidMeadowTerrainCells[MeadowFlowerRandom.RandRange(0, ValidMeadowTerrainCells.Num() - 1)];
-							const FVector Candidate(Cell.X + MeadowFlowerRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
-								Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
+							FVector Candidate;
+							const bool bListeningStonesMeadowSite = bHasListeningStones && SiteIndex < AIslandWeather::ListeningStonesFlowerSiteCount;
+							if (bListeningStonesMeadowSite)
+							{
+								const float Angle = MeadowFlowerRandom.FRandRange(0.f, 2.f * PI);
+								const float Radius = MeadowFlowerRandom.FRandRange(AIslandWeather::ListeningStonesFlowerInnerRadius,
+									AIslandWeather::ListeningStonesFlowerOuterRadius);
+								Candidate = ListeningStonesLocation + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+							}
+							else
+							{
+								const FVector& Cell = ValidMeadowTerrainCells[MeadowFlowerRandom.RandRange(0, ValidMeadowTerrainCells.Num() - 1)];
+								Candidate = FVector(Cell.X + MeadowFlowerRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
+									Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
+							}
 							bool bTooClose = false;
 							for (const FVector& Exclusion : ExclusionLocations)
 								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
@@ -1100,13 +1123,14 @@ void AIslandWeather::InitializeGroundCover()
 							RhododendronLocations.Add(FlowerHit.ImpactPoint);
 							++GroundCoverFlowerCount;
 							++MeadowFlowerPatchCount;
+							if (bListeningStonesMeadowSite) ++ListeningStonesMeadowFlowerCount;
 							++MeadowFlowerSpeciesCounts[SpeciesIndex];
 							bPlacedMeadowFlower = true;
 						}
 					}
 				}
-				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig) across %d sampled sites after %d bounded traces."),
-					MeadowFlowerPatchCount, MeadowFlowerSpeciesCount,
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d in the ListeningStones meadow; %d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig) across %d sampled sites after %d bounded traces."),
+					MeadowFlowerPatchCount, ListeningStonesMeadowFlowerCount, MeadowFlowerSpeciesCount,
 					MeadowFlowerSpeciesCounts[0], MeadowFlowerSpeciesCounts[1], MeadowFlowerSpeciesCounts[2],
 					MeadowFlowerSpeciesCounts[3], MeadowFlowerSpeciesCounts[4], MeadowFlowerSpeciesCounts[5],
 					MeadowFlowerSpeciesCounts[6], MeadowFlowerSpeciesCounts[7],

@@ -189,3 +189,33 @@ for this baseline. No trial code is retained. The evidence does not establish th
 fade improves performance, and the current views are not spruce-visible enough to judge its
 continuity. Revisit only with a stable spruce-visible viewpoint and a capture setup that avoids
 first-use PSO contamination. The live editor and saved map were not edited.
+
+## Listening Stones flowering edge (2026-10-04, awaiting visual validation)
+
+The new worldbuilding direction calls for habitat composition around a Tideglass-to-Wind-Arch
+view rather than simply adding more anonymous foliage. As a first localized change, the existing
+512-site meadow-flower candidate budget now reserves 160 seeded sites for a 27.5–43 m annulus
+around the tagged Listening Stones. This sits outside the 26 m landmark exclusion and inside the
+45 m flower fade; existing 475 cm spacing, terrain/slope tests, species patching, and collisionless
+HISM rendering remain in force. If Listening Stones is absent, all sites retain the previous broad
+terrain-mask sampling. No foliage candidates or component instances were added to the fixed budget.
+
+`CaptiveSky2.Agent.GroundCover` now asserts the ring's clearance/fade relationship and bounded
+budget share. `git diff --check` passes. UE compilation and automation have **not** verified this
+trial: both the main-project and isolated-scratch UBT invocations waited on the live editor's
+compile mutex, so only those Codex-launched waiting processes were stopped. No screenshot or new
+FPS result exists yet. Keep the trial provisional until a fresh UE 5.8.3 build/test and 11:00
+Tideglass-view capture confirm the flowers land on the intended slope, read naturally, and preserve
+the broad-view 30 FPS p95 target.
+
+### Live-editor compile diagnostic (2026-10-04)
+
+The responsive UE 5.8.3 editor process (PID 6344, started 2026-10-01) remains open. Unreal MCP
+reports the saved `Editor > General > Live Coding` preference as enabled (`bEnabled=true`,
+`startup=AutomaticButHidden`), but its `CompileLiveCoding` call returns “Live Coding is not enabled
+for this session”; the current log has no `LogLiveCoding` entries. The ground-cover automation test
+is registered in the loaded editor module, but it has not been run as evidence for the new source.
+Saved preference state therefore does not establish that this already-running session initialized
+Live Coding. No editor preference, map, or Content asset was changed. Wait for a user-approved
+save/close/restart (or another safe UE 5.8.3 compile session), then build before running the test and
+the 11:00 Tideglass capture; do not force-close this editor to release the build mutex.
