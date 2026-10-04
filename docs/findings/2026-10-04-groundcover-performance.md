@@ -255,3 +255,52 @@ Logs: `Saved/Logs/Codex_FlowerEdgeGroundCover_20261004.log` and
 The capture uses the current shared viewpoint source/configuration, mirrored into the
 isolated project. It starts no gameplay session and uses `-ViewpointNoWorldState`; no
 resident model turns were requested and no Island map or primary Content packages were saved.
+
+## Broadleaf midground visibility (2026-10-04)
+
+The 11:00 baseline exposes a sharp loss of fine cover beyond 45 m. A bounded trial keeps
+fine grasses and the three older ground-plant forms at 25-45 m, while allowing the already
+imported `ground_06_01` rosette (137 LOD0 triangles) and `ground_12_01` upright broadleaf
+(362 LOD0 triangles) to remain through a 50-85 m fade/cull band. No placement density,
+species selection, transform scale, candidate ceiling or instance count changes.
+
+The main UE 5.8.3 build passed (seven actions, 15.56 s), and the isolated
+`CaptiveSky2.Agent.GroundCover` automation passed. The latter checks the actual component
+distances for both extended forms alongside collision/navigation exclusion, sway and clear
+behavior. The real-Island scatter remains 1,779,413 ground-cover instances, 354 meadow
+flowers, 14,727 trees, 15,063 shrubs and 1,487 woodland rhododendrons.
+
+The first 1600x900 11:00 trial capture passed: broad-view p95 44.20 FPS across 49 valid / 50
+raw intervals, close-view p95 56.78 across 50 / 50. Broad wall-clock throughput was only
+17.50 FPS because of the one excluded interval; this cannot be presented as uninterrupted
+gameplay performance. The same-hour baseline measured 43.26 broad / 42.39 close p95.
+The images show additional low broadleaf cover between the near meadow and shrub layer,
+but only a modest improvement. Pale patch colors, a still-bare farther slope and thin
+woodland silhouettes remain unresolved. This does not complete the ecological-band target.
+
+First trial log: `Saved/Logs/Codex_MidgroundTideglass_20261004.log`; images:
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/2026-10-04_142253_h11.0/`.
+The repeat failed the broad-view gate: 19.30 p95 FPS with 50 valid / 50 raw intervals
+(26.84 wall-clock FPS); the close view reached 52.05 p95 FPS with 50 / 50. Its startup
+also logged timed-out connectivity probes and multi-second automation deltas. Because all
+measured broad-view intervals were under one second, the failed p95 result cannot simply
+be dismissed as an excluded connectivity stall. The same-range results are inconsistent,
+so neither run proves a stable performance gain or a safe cost for the wider band.
+
+The 50-85 m trial is rejected. Production ranges and the ecology assertions were restored
+exactly to the committed baseline; no visibility-trial source change is retained. Repeat log:
+`Saved/Logs/Codex_MidgroundTideglassRepeat_20261004.log`; repeat images:
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/2026-10-04_142541_h11.0/`.
+Next, separate render cost from capture scheduling/first-use shader costs with a warmed
+same-view GPU/render-thread profile. Then compose lower-cost habitat groups across the
+middle distance rather than extending hundreds of thousands of broadleaf instances blindly.
+
+Restoration verification: both production/test files match the committed baseline exactly
+(`git diff --exit-code`), and the restored main UE 5.8.3 target built successfully (five
+actions, 17.52 s). The fresh restored module was copied back into the isolated project.
+Its same-view capture passed: broad p95 33.40 FPS with 49 valid / 50 raw intervals and close
+p95 56.72 with 50 / 50. Broad wall-clock throughput was 11.75 FPS; startup/capture stalls
+therefore still prevent a claim of stable interactive gameplay. The restored screenshot
+is under `2026-10-04_143109_h11.0/` in the same scratch Viewpoints directory; the log is
+`Saved/Logs/Codex_MidgroundBaselineRestore_20261004.log`. Only these findings are committed;
+the rejected source trial is absent from the shipped tree and freshly built main module.
