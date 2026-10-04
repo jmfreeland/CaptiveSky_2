@@ -259,6 +259,40 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::CalculateGroundCoverExposure(FVector(3500.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
 	TestEqual(TEXT("Equal-distance habitat ownership preserves the non-exposed habitat"),
 		AIslandWeather::CalculateGroundCoverExposure(FVector(2000.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
+	const TArray<FVector> NoCompetingHabitats;
+	TestEqual(TEXT("The pool margin begins at full wet-edge influence"),
+		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(500.f, 0.f, 0.f), FVector::ZeroVector,
+			NoCompetingHabitats, 500.f, 1500.f), 1.f);
+	TestEqual(TEXT("The wet-edge composition fades smoothly halfway into the meadow"),
+		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(1000.f, 0.f, 0.f), FVector::ZeroVector,
+			NoCompetingHabitats, 500.f, 1500.f), 0.5f);
+	TestEqual(TEXT("The wet-edge composition ends at its outer radius"),
+		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(1500.f, 0.f, 0.f), FVector::ZeroVector,
+			NoCompetingHabitats, 500.f, 1500.f), 0.f);
+	TestEqual(TEXT("A nearer or tied landmark keeps ownership of its own ground-cover patch"),
+		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(1000.f, 0.f, 0.f), FVector::ZeroVector,
+			{FVector(2000.f, 0.f, 0.f)}, 500.f, 1500.f), 0.f);
+	TestEqual(TEXT("An invalid zero-width wet-edge band has no influence"),
+		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(500.f, 0.f, 0.f), FVector::ZeroVector,
+			NoCompetingHabitats, 500.f, 500.f), 0.f);
+	int32 WetEdgeBroadleafPatches = 0;
+	for (int32 X = -8; X < 8; ++X)
+		for (int32 Y = -8; Y < 8; ++Y)
+		{
+			const FVector Position(X * 700.f + 100.f, Y * 700.f + 100.f, 0.f);
+			const int32 NormalSpecies = AIslandWeather::SelectGroundCoverVariant(Position, 71);
+			const int32 DryEdgeSpecies = AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 0.f);
+			const int32 WetEdgeSpecies = AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 1.f);
+			TestEqual(TEXT("A dry Tideglass margin retains its original deterministic meadow choice"), DryEdgeSpecies, NormalSpecies);
+			TestEqual(TEXT("Wetness never selects a species slot outside the existing foliage set"), WetEdgeSpecies >= 0 && WetEdgeSpecies <= 10, true);
+			if (WetEdgeSpecies < 5) ++WetEdgeBroadleafPatches;
+			TestEqual(TEXT("Wet-edge species remain coherent within a 7 m botanical patch"), WetEdgeSpecies,
+				AIslandWeather::SelectGroundCoverVariant(Position + FVector(200.f, 200.f, 0.f), 71, 0.f, 1.f));
+			TestEqual(TEXT("Wet-edge influence clamps above one"), WetEdgeSpecies,
+				AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 2.f));
+		}
+	TestTrue(TEXT("The wet edge measurably favours broadleaf cover without forcing a monoculture"),
+		WetEdgeBroadleafPatches > 120 && WetEdgeBroadleafPatches < 220);
 	for (int32 X = -8; X < 8; ++X)
 		for (int32 Y = -8; Y < 8; ++Y)
 		{
@@ -345,7 +379,12 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		{
 			FTransform Transform;
 			if (Grass->GetInstanceTransform(Index, Transform, true) && FVector::Dist2D(Transform.GetLocation(), Tideglass->GetActorLocation()) < PoolClearanceRadius)
+			{
 				++GrassInsidePoolClearance;
+				AddInfo(FString::Printf(TEXT("Pool-clearance violation: %s instance %d at %s (%.1f cm from marker)."),
+					*Grass->GetName(), Index, *Transform.GetLocation().ToCompactString(),
+					FVector::Dist2D(Transform.GetLocation(), Tideglass->GetActorLocation())));
+			}
 		}
 	}
 	TestEqual(TEXT("No ground-cover instance intrudes into the Tideglass water footprint or edge margin"), GrassInsidePoolClearance, 0);
