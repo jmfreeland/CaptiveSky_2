@@ -388,6 +388,22 @@ Residents notice the mist, and wet ground after rain. On a misty dawn Aster rema
 - `CaptiveSky2.Agent.IslandWeather`: spells, storm rarity, storms bringing rain, storm wind limits, saved weather continuing the same timeline, strike scheduling, thunder delay, bolt visibility, and what residents are told.
 - `CaptiveSky2.Agent.IslandEnvironment`: the mist rules, and fog thickening through a real height-fog component.
 
+### Light model tier and the chronicle (2026-09-29; documented 2026-10-04)
+
+**Light tier.** A resident's quiet, unprompted turn, where the only question is where to be, can go to a cheaper model. `AgentModelTier::NeedsFullModel` sends a turn to the full model if anyone is addressing the resident, if build options are available, if another being is within 6 m, or if something to interact with is within 4 m. Everything else is a light turn: it carries a short system prompt (`BuildLightSystemPrompt`: identity plus recent memory lines, no first-person image), and only `idle`, `wander`, `move_to` and `sleep` are honoured; any other action is dropped as idling. The tier is on when `LightModel` in `Config/DefaultGame.ini` (`[/Script/CaptiveSky_2.AgentLLMSettings]`) is non-empty; it is currently `gpt-5.4-nano`. `LightReasoningEffort` overrides the reasoning effort for light turns (empty means use `ReasoningEffort`). To turn the tier off, empty `LightModel`; to try another model for one run, pass `-CaptiveSkyLightModel=<name>`.
+
+Light requests count 0.2 of a full request against the shared hourly allowance and have their own UTC daily ceiling in `Saved/CaptiveSky/ModelBudget.json` (`ContinuousDailyLightRequests`, default 6000, hard cap 40000). The `Decision request for ...` log line prints the nearest being and affordance distances, so the 4 m / 6 m ranges can be tuned from a real session. Regression coverage is `CaptiveSky2.Agent.ModelTier` and `ModelTierWorldFacts`. Open: nobody has yet measured whether long sessions of light turns read differently from full ones, and the Innkeeper (at the hearth) and the raven (at build sites) mostly stay on the full model by design.
+
+**Chronicle.** `UIslandChronicleSubsystem` appends one JSON object per line to `WorldState/chronicle.jsonl` for everything worth watching: residents' decisions and speech, nests, curios, arrangements, guest-book entries, storms arriving and passing, new Island days, and session start and end. It never calls a model, residents never read it, and it is not memory; it exists for whoever is watching. Worlds without the subsystem (editor previews, test fixtures) record nothing. Each line has `t` (UTC), `day`, `clock`, `type`, optional `agent`, `text`, plus any type-specific fields. To read it:
+
+```
+python Scripts/Build-Chronicle.py                                   # Markdown to stdout, grouped by Island day
+python Scripts/Build-Chronicle.py --day 4 --out Saved/Chronicle/day4.md
+python Scripts/Build-Chronicle.py --html Saved/Chronicle/island.html  # standalone page
+```
+
+Speech and lasting changes are listed one by one; quiet walking about is folded into one line per resident. The script only reads the log. Coverage is `CaptiveSky2.Agent.IslandChronicle`.
+
 ### Open work, prioritized (2026-09-27)
 
 1. **Check memory retrieval in live play.** The in-game selector now prioritizes distinct non-dialogue memories, filters near-duplicates and limits recalled conversation lines. The UE 5.8.3 build and `CaptiveSky2.Agent.MemoryComponent` test pass; the analyzer mirrors those rules, with three local synthetic tests. A bounded before/after run remains unverified. Gameplay may send residents' stored memories, conversation context and first-person snapshots to `api.openai.com`, so run it only after explicit authorization for that data and destination. See `docs/findings/2026-09-27-memory-review.md`.
