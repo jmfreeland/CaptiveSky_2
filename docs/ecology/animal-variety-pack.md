@@ -28,9 +28,11 @@ paths outside `/Game/AnimalVarietyPack/` for several pack materials (including `
 `/Game/Wolf/Textures`). No linker or missing-object warning appeared during the earlier Crow/Wolf
 loads; review those duplicate references if runtime warnings appear.
 
-The first wildlife source prototype is one transient, non-conscious stag near Wind Arch. It uses
-the pack's stag mesh and graze/walk/run/sleep loops, wanders within a 7 m home radius, rests on the
-existing day/night clock, and offers only a quiet, reversible observation response. `IslandLife`
+The first wildlife source prototype is one transient, non-conscious stag near Wind Arch. Its
+graze/walk/run/sleep sequences resolve to the same `SK_DeerStag_Skeleton` as the mesh; all four
+have root motion disabled, so movement is deliberately bounded and driven by the actor rather than
+animation displacement. It wanders within a 7 m home radius, rests on the existing day/night clock,
+and offers only a quiet, reversible observation response. `IslandLife`
 wildlife is not a resident movement target for either Aster or the Raven; no LLM calls, persistent
 facts, or ownership are involved. The automation fixture is in
 `Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`. This prototype has not yet compiled or
