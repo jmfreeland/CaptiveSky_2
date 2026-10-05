@@ -117,6 +117,30 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 		CairnStones && CairnStones->GetStaticMesh() &&
 		((AuthoredRock && CairnStones->GetStaticMesh() == AuthoredRock) ||
 		(!AuthoredRock && CairnStones->GetStaticMesh()->GetName() == TEXT("Sphere"))));
+	if (AuthoredRock && CairnStones && CairnStones->GetStaticMesh() == AuthoredRock)
+	{
+		const FVector RockExtent = AuthoredRock->GetBounds().BoxExtent;
+		bool bMatchesBasicShapeDimensions = CairnStones->GetInstanceCount() == 3;
+		for (int32 Index = 0; Index < CairnStones->GetInstanceCount(); ++Index)
+		{
+			FTransform Instance;
+			if (!CairnStones->GetInstanceTransform(Index, Instance, false))
+			{
+				bMatchesBasicShapeDimensions = false;
+				continue;
+			}
+			const FVector PhysicalHalfExtent = RockExtent * Instance.GetScale3D();
+			bMatchesBasicShapeDimensions &= PhysicalHalfExtent.X <= 24.f &&
+				PhysicalHalfExtent.Y <= 20.5f && PhysicalHalfExtent.Z <= 5.5f;
+		}
+		TestTrue(TEXT("Irregular cairn rocks retain the modest physical size intended for the former engine-shape stones"), bMatchesBasicShapeDimensions);
+		FTransform BaseStone;
+		FTransform TopStone;
+		const bool bReadBase = CairnStones->GetInstanceTransform(0, BaseStone, false);
+		const bool bReadTop = CairnStones->GetInstanceTransform(2, TopStone, false);
+		TestTrue(TEXT("Even a young three-stone cairn visibly tapers toward its top"),
+			bReadBase && bReadTop && TopStone.GetScale3D().X < BaseStone.GetScale3D().X * 0.92f);
+	}
 	UMaterialInterface* AuthoredRockMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock"));
 	if (AuthoredRock && AuthoredRockMaterial)
 		TestTrue(TEXT("The authored rock material is applied without replacing the persistent curio record"), CairnStones && CairnStones->GetMaterial(0) == AuthoredRockMaterial);

@@ -32,3 +32,16 @@ The first attempts could not write to the host DDC/Zen and shader-worker temp di
 DDC and shader temp under the ignored scratch project (`-DDC-ForceMemoryCache`, process-local
 `TEMP`/`TMP`, and `-shaderworkingdir`) resolved that environment permission issue; no shared project
 asset or saved world state was changed.
+
+Renderer follow-up (2026-10-05): the close-up exposed that `SM_Rock`'s mesh bounds differ from the
+100 cm engine sphere the original per-instance scales were authored around. Curio rock instances
+now compensate against the selected mesh bounds, preserving those intended physical dimensions;
+the cairn also tapers faster from its base and overlaps layers slightly more. A focused regression
+checks the three-stone cairn's dimensions and visible taper. The isolated UE 5.8.3 build completed
+in five actions, `CaptiveSky2.Agent.IslandCurio` passed, and the one-view `CaptiveSky2.Visual.Viewpoints`
+capture passed. The [updated noon image](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/2026-10-05_192245_h12.0/Codex_CairnDetail.png)
+shows the smaller, tapered stack, but still has severe dark undersides in this low close-up. Treat
+that as a remaining lighting/material question—not a highlight pass—and recheck in a resident-scale
+view after the shared `M_Rock` wetness work settles. Evidence: [`Codex_CurioTaper_Build_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioTaper_Build_20261005.log),
+[`Codex_CurioTaper_Validation_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioTaper_Validation_20261005.log),
+and [`Codex_CurioTaper_Viewpoint_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioTaper_Viewpoint_20261005.log).

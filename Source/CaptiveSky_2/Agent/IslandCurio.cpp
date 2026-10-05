@@ -6,6 +6,20 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+	/** Keep authored meshes at the same physical size as the 100 cm engine sphere they replace. */
+	FVector MatchBasicSphereSize(const UStaticMeshComponent* Component, const FVector& SphereScale)
+	{
+		const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+		if (!Mesh) return SphereScale;
+		const FVector Extent = Mesh->GetBounds().BoxExtent;
+		if (Extent.X <= UE_SMALL_NUMBER || Extent.Y <= UE_SMALL_NUMBER || Extent.Z <= UE_SMALL_NUMBER)
+			return SphereScale;
+		return SphereScale * FVector(50.f / Extent.X, 50.f / Extent.Y, 50.f / Extent.Z);
+	}
+}
+
 AIslandCurio::AIslandCurio()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -87,18 +101,22 @@ void AIslandCurio::ShowRecord(const FIslandCurioRecord& Record)
 	{
 	case EIslandCurioKind::PaleStone:
 		// Mostly sunk into the ground: easy to walk past, noticeable up close.
-		Stones->AddInstance(FTransform(FRotator(0.f, Shape.FRandRange(0.f, 360.f), 0.f), Ground + FVector(0.f, 0.f, 2.f), FVector(0.24f, 0.17f, 0.07f)));
+		Stones->AddInstance(FTransform(FRotator(0.f, Shape.FRandRange(0.f, 360.f), 0.f), Ground + FVector(0.f, 0.f, 2.f),
+			MatchBasicSphereSize(Stones, FVector(0.24f, 0.17f, 0.07f))));
 		break;
 	case EIslandCurioKind::Cairn:
 	{
 		float Height = 0.f;
 		for (int32 Index = 0; Index < FMath::Clamp(Record.State, 0, CairnMaxStones); ++Index)
 		{
-			const float Width = FMath::Lerp(0.42f, 0.16f, Index / static_cast<float>(CairnMaxStones)) * Shape.FRandRange(0.9f, 1.1f);
+			const float Taper = FMath::Sqrt(Index / static_cast<float>(CairnMaxStones - 1));
+			const float Width = FMath::Lerp(0.42f, 0.16f, Taper) * Shape.FRandRange(0.9f, 1.1f);
 			const float Thickness = Shape.FRandRange(0.07f, 0.1f);
 			const FVector Offset(Shape.FRandRange(-2.5f, 2.5f), Shape.FRandRange(-2.5f, 2.5f), Height + Thickness * 50.f);
-			Stones->AddInstance(FTransform(FRotator(Shape.FRandRange(-4.f, 4.f), Shape.FRandRange(0.f, 360.f), 0.f), Ground + Offset, FVector(Width, Width * 0.85f, Thickness)));
-			Height += Thickness * 100.f * 0.85f;
+			const FVector SphereScale(Width, Width * 0.85f, Thickness);
+			Stones->AddInstance(FTransform(FRotator(Shape.FRandRange(-4.f, 4.f), Shape.FRandRange(0.f, 360.f), 0.f),
+				Ground + Offset, MatchBasicSphereSize(Stones, SphereScale)));
+			Height += Thickness * 100.f * 0.8f;
 		}
 		break;
 	}
