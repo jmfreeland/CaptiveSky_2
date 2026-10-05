@@ -28,3 +28,11 @@ weather assertions remain intact.
 In the connected main editor, the surrounding `IslandNest`, `TidepoolMinnows`, and
 `PersonalityConsolidation` checks also passed; only the pre-fix `NightEcology` run failed there.
 No main editor state, source runtime code, or Content/map asset was changed by verification.
+
+On 2026-10-05 the test was rerun against the current isolated scratch module
+(`Codex_UnderstoryVerify_20261002`, module timestamp 16:09) with `-NullRHI`, a separate data root,
+a 45-second real-time cap, and zero model requests. `CaptiveSky2.Agent.NightEcology` again passed;
+the log records three night fireflies distributed around Tideglass and Listening Stones. The previous
+cloud-material assertion failure is therefore resolved for current source, not just the stale editor
+module. Log: [`Codex_NightEcology_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_NightEcology_20261005.log).
+This remains headless automation rather than a visual check of the current Island in the main editor.

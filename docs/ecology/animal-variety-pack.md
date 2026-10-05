@@ -55,11 +55,14 @@ memory/personality directory and request budget. Preserve the shared request saf
 The main editor module remains older than source:
 `Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` is timestamped 2026-10-04 19:11. Do not treat automation
 run inside that editor as current-source evidence. `CaptiveSky2.Agent.NightEcology` previously failed
-in the stale module at the assertion that weather creates a transient dynamic cloud-material
-instance; the map has `VolumetricCloud_0` with
+in the stale module at the cloud-material assertion; a fresh run against the current scratch module
+passed on 2026-10-05 (see the [regression note](../findings/2026-10-04-night-ecology-regression.md)
+and [run log](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_NightEcology_20261005.log)). The current test also passes its
+Tideglass/Listening Stones firefly-placement checks. The earlier failure is resolved for current
+source, but no actor has been placed in or visually validated on the saved Island. The test's map
+fixture includes `VolumetricCloud_0` with
 `/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst`. Cleanup restores the authored
-material after probing. That failure remains unresolved against current source, and no actor has been
-placed in or visually validated on the saved map.
+material after probing.
 
 Earlier (2026-10-04), UHT succeeded against a scratch editor manifest and VS 2022 compiled eight
 current translation units to scratch objects, including `IslandForestStag.cpp`, its test,
