@@ -10,13 +10,19 @@ If Starter Content is unavailable, curio stones keep their tinted Basic Shape ma
 mesh. The open Seedpod and its husks are unchanged. The test asserts the authored mesh/material when
 available, the primitive fallback otherwise, and the cairn's collision/navigation invariants.
 
-This is a source-and-automation change only until the focused UE 5.8.3 test passes and a Game/PIE
-capture confirms the small cairn reads more naturally at resident viewing distance. The current
-shared-target compile is blocked by separate in-flight `IslandArrangement.h` errors; do not treat
-this visual improvement as runtime-validated yet.
+Validation update (2026-10-05): after cleaning only the isolated scratch project's stale generated
+UHT output, a normal UE 5.8.3 editor-target build completed successfully in 138 actions and linked
+`UnrealEditor-CaptiveSky_2.dll`. The earlier reflection-macro diagnostics mapped to stale generated
+line numbers; they were not a source error in Claude's in-flight `IslandArrangement.h` changes. The
+successful build emitted one unrelated `IslandWeather.cpp` C4996 deprecation warning.
 
-The changed `IslandCurio.cpp` translation unit compiled to an object with the UE 5.8.3 target response
-file and installed MSVC compiler. The changed automation translation unit could not be compiled
-because its existing `IslandWorldStateSubsystem` include chain reaches the same unrelated
-`IslandArrangement.h` errors. UHT, module linking, automation execution, and rendered inspection
-remain outstanding.
+The focused `CaptiveSky2.Agent.IslandCurio` automation test then ran in the isolated scratch editor
+and passed. Logs: [`Codex_CurioCleanBuild_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioCleanBuild_20261005.log)
+and [`Codex_CurioArtPass_Automation_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioArtPass_Automation_20261005.log).
+
+Rendered Game/PIE inspection is still outstanding, so the more natural reading of the small cairn
+at resident viewing distance is not yet visually confirmed. The automation verifies mesh/material
+selection and collision/navigation invariants, not the appearance of the authored asset in the map.
+An isolated offscreen capture was attempted, but the editor process could not write to the host's
+user DDC/Zen and shader-worker temporary directories and exited before loading the map. This is an
+environment permission limitation; no shared project asset or saved world state was changed.
