@@ -305,3 +305,41 @@ scratch profiling directory. The next implementation should preserve the full
 grass silhouette and investigate why three individually tolerable groups
 produce a high combined render-thread tail; do not remove or thin a species
 without an attributable optimization and a full-composition visual review.
+
+### Runtime mesh LOD and material capability audit (2026-10-05)
+
+A second bounded scratch Game run logged each populated HISM mesh's static LOD
+triangle counts, Nanite-enabled flag, and assigned materials' world-position-
+offset (WPO) capability. It completed the Island load and normal 45-second
+runtime cap with exit code 0. The audit did not change production assets,
+placement, or visibility. Full output: `Saved/Playtests/Codex_GrassAssetAudit_20261005/GrassAssetAudit_Game.log`.
+
+| Dominant group | Instances | LOD0→LOD3 triangles | Nanite | Any assigned material uses WPO |
+|---|---:|---|:---:|:---:|
+| `ShoreGrassA` / `grass_01_02_mesh` | 326,303 | 774→387→194→97 | yes | yes |
+| `ShoreGrassB` / `grass_01_03_mesh` | 324,716 | 1,200→600→300→150 | yes | no |
+| `ShoreGrassC` / `grass_01_04_mesh` | 331,772 | 422→211→106→64 | yes | yes |
+| `ShoreGroundPlants` / `ground_05_01` | 160,398 | 208→104→63→63 | yes | yes |
+| `ShoreGroundPlantLowA` / `ground_01_01` | 157,780 | 46→46→46→46 | yes | yes |
+| `ShoreGroundPlantLowB` / `ground_01_02` | 162,244 | 46→46→46→46 | yes | yes |
+| `ShoreGroundPlantLowC` / `ground_06_01` | 157,126 | 137→69→63→63 | no | yes |
+| `ShoreGroundPlantLowD` / `ground_12_01` | 160,231 | 362→181→91→63 | no | yes |
+
+The grass ablation's CPU-sway switch does not disable these material WPO paths:
+two grass materials and all five broadleaf groups still report WPO-capable
+materials. This is a useful separation to preserve in future tests; the prior
+GPU p95 remained under 18.9 ms, so the capability flag alone does not establish
+WPO as the frame-time bottleneck. Conversely, every grass mesh already has
+Nanite enabled, so “enable Nanite on grass” is not a viable next change. The
+two non-Nanite broadleaf meshes are not evidence for a production conversion;
+the earlier broader Nanite foliage experiment regressed the full scene.
+
+Static LOD0 triangle count also does not explain the isolated grass results:
+Grass B has the highest count but the lowest single-group p95, while Grass C
+has the lowest count and the highest p95. The runtime audit enumerates authored
+LOD data, not which Nanite clusters or instances contributed to each captured
+frame. Therefore neither a triangle-driven mesh simplification nor a blanket
+Nanite change is justified. Keep the full composition and investigate the
+combined HISM/Nanite instance-culling and render-thread path with a frame trace
+that attributes work to the three grass groups; any candidate must then be
+retested in the same all-visible Game view against the 30-FPS p95 goal.
