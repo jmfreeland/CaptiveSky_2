@@ -10,6 +10,8 @@ AIslandCurio::AIslandCurio()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CairnRock(TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicShapeMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	Stones = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Stones"));
 	Husks = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Husks"));
 	Seed = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Seed"));
@@ -20,6 +22,11 @@ AIslandCurio::AIslandCurio()
 		Part->SetCanEverAffectNavigation(false);
 		if (Sphere.Succeeded()) Part->SetStaticMesh(Sphere.Object);
 	}
+	if (CairnRock.Succeeded()) Stones->SetStaticMesh(CairnRock.Object);
+	// Keep both the authored rock treatment and the tinted engine-shape fallback useful.
+	// This is only a default component material; ShowRecord selects the textured material
+	// when Starter Content is available, without modifying any project asset.
+	if (BasicShapeMaterial.Succeeded()) Stones->SetMaterial(0, BasicShapeMaterial.Object);
 	Seed->SetVisibility(false);
 	Seed->SetCastShadow(false);
 	SeedGlow = CreateDefaultSubobject<UPointLightComponent>(TEXT("SeedGlow"));
@@ -52,7 +59,15 @@ void AIslandCurio::ChooseSurfaces()
 		if (UMaterialInstanceDynamic* Surface = Part->CreateAndSetMaterialInstanceDynamic(0))
 			Surface->SetVectorParameterValue(TEXT("Color"), Color);
 	};
-	Tint(Stones, Shown.Kind == EIslandCurioKind::PaleStone ? FLinearColor(0.78f, 0.77f, 0.72f) : FLinearColor(0.34f, 0.33f, 0.31f));
+	const bool bHasAuthoredRock = Stones && Stones->GetStaticMesh() &&
+		Stones->GetStaticMesh()->GetPathName() == TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
+	UMaterialInterface* RockMaterial = bHasAuthoredRock
+		? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock"), nullptr, LOAD_NoWarn | LOAD_Quiet)
+		: nullptr;
+	if (RockMaterial)
+		Stones->SetMaterial(0, RockMaterial);
+	else
+		Tint(Stones, Shown.Kind == EIslandCurioKind::PaleStone ? FLinearColor(0.78f, 0.77f, 0.72f) : FLinearColor(0.34f, 0.33f, 0.31f));
 	Tint(Husks, FLinearColor(0.18f, 0.22f, 0.10f));
 	Tint(Seed, FLinearColor(0.85f, 0.96f, 0.70f));
 }

@@ -5,12 +5,15 @@
 #include "IslandCurio.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/Paths.h"
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
@@ -100,6 +103,25 @@ bool FIslandCurioTest::RunTest(const FString& Parameters)
 		TestTrue(*FString::Printf(TEXT("%s rests on the ground"), *Curio.Id.ToString()), FMath::IsNearlyEqual(Curio.Location.Z, GroundTop, 1.f));
 		TestNotNull(*FString::Printf(TEXT("%s is visible"), *Curio.Id.ToString()), FindCurioActor(World, Curio.Id));
 	}
+	AIslandCurio* CairnVisual = FindCurioActor(World, TEXT("Cairn"));
+	UInstancedStaticMeshComponent* CairnStones = nullptr;
+	if (CairnVisual)
+	{
+		TArray<UInstancedStaticMeshComponent*> CurioMeshes;
+		CairnVisual->GetComponents<UInstancedStaticMeshComponent>(CurioMeshes);
+		for (UInstancedStaticMeshComponent* Mesh : CurioMeshes)
+			if (Mesh && Mesh->GetFName() == FName(TEXT("Stones"))) { CairnStones = Mesh; break; }
+	}
+	UStaticMesh* AuthoredRock = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
+	TestTrue(TEXT("Persistent cairn stones use the existing irregular rock mesh when available, otherwise the engine-shape fallback remains"),
+		CairnStones && CairnStones->GetStaticMesh() &&
+		((AuthoredRock && CairnStones->GetStaticMesh() == AuthoredRock) ||
+		(!AuthoredRock && CairnStones->GetStaticMesh()->GetName() == TEXT("Sphere"))));
+	UMaterialInterface* AuthoredRockMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock"));
+	if (AuthoredRock && AuthoredRockMaterial)
+		TestTrue(TEXT("The authored rock material is applied without replacing the persistent curio record"), CairnStones && CairnStones->GetMaterial(0) == AuthoredRockMaterial);
+	TestTrue(TEXT("Authored cairn visuals stay collisionless and do not affect navigation"),
+		CairnStones && CairnStones->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !CairnStones->CanEverAffectNavigation());
 	const FIslandCurioRecord* First = State->FindCurio(TEXT("PaleStone_1"));
 	const FIslandCurioRecord* Last = State->FindCurio(TEXT("PaleStone_6"));
 	const FIslandCurioRecord* Pod = State->FindCurio(TEXT("Seedpod"));
