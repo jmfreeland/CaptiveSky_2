@@ -80,6 +80,25 @@ The organic surface remains a non-colliding visual prototype without depth,
 temperature, water quality, swimming or shoreline blending. Keep the map material reversible and do
 not overwrite the authored sphere material.
 
+## Shore-stone presentation (2026-10-05)
+
+The four small pale spheres around the Tideglass pool were not water highlights: a read-only saved-map
+actor audit identified them as `TideglassPool_Stone_0..3`, static-mesh actors using
+`/Engine/BasicShapes/Sphere.Sphere` and the default Basic Shapes material. At Game/PIE start,
+`UIslandTideglassSubsystem` now adds transient `/Game/StarterContent/Props/SM_Rock` visuals at their
+existing bounds and hides the four placeholder meshes in game. Their saved transforms, collision,
+navigation role, and map data remain the authority; the presentation actors have no collision and are
+destroyed at teardown, when each proxy's previous hidden state is restored. If the complete four-proxy
+set or Starter Content rock mesh is unavailable, the subsystem leaves the saved placeholders alone.
+
+UE 5.8.3 validation: the editor target built successfully and
+`CaptiveSky2.Agent.IslandTideglass` passed with the rock asset loaded. The synthetic-world assertions
+check all four visuals, proxy collision preservation, collision-free rock actors, placement at the
+proxy bounds, and teardown restoration/removal. A bounded real-game screenshot attempt stalled during
+editor startup before map/game initialization and was stopped; no in-game visual confirmation is
+claimed yet. The automation log is
+`Saved/Logs/Codex_TideglassShoreStones_20261005.log`.
+
 ## Runtime lifecycle follow-up (2026-10-01)
 
 The `CaptiveSky2.Agent.IslandTideglass` regression starts its synthetic Game world with the normal

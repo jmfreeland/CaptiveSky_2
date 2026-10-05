@@ -5,12 +5,20 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "Engine/StaticMeshActor.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
 
 const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_Lively.M_TideglassPool_Lively");
+
+namespace
+{
+	constexpr TCHAR TideglassShoreStonePrefix[] = TEXT("TideglassPool_Stone_");
+	constexpr TCHAR TideglassRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
+	constexpr TCHAR TideglassRockMaterialPath[] = TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock");
+}
 
 bool UIslandTideglassSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
 {
@@ -174,6 +182,94 @@ void UIslandTideglassSubsystem::RestorePoolMaterial()
 	AppliedTo.Reset();
 }
 
+void UIslandTideglassSubsystem::ApplyShoreStonePresentation()
+{
+	UWorld* World = GetWorld();
+	if (!World || !ShoreStonePresentationActors.IsEmpty()) return;
+
+	AActor* PoolMarker = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("TideglassPool"))) { PoolMarker = *It; break; }
+	if (!PoolMarker) return;
+
+	TArray<AStaticMeshActor*> StoneProxies;
+	for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+	{
+		if (!It->GetName().Contains(TideglassShoreStonePrefix) ||
+			FVector::DistSquared(It->GetActorLocation(), PoolMarker->GetActorLocation()) > FMath::Square(500.f)) continue;
+		UStaticMeshComponent* Mesh = It->GetStaticMeshComponent();
+		if (!Mesh || !Mesh->GetStaticMesh() || Mesh->GetStaticMesh()->GetPathName() != TEXT("/Engine/BasicShapes/Sphere.Sphere")) continue;
+		StoneProxies.Add(*It);
+	}
+
+	// The saved four cardinal proxies remain authoritative for collision and navigation.
+	// Only their play-session visuals are exchanged, and only when the complete set is found.
+	if (StoneProxies.Num() != 4) return;
+	UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr, TideglassRockMeshPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!RockMesh)
+	{
+		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass shore-stone presentation skipped: could not load %s."), TideglassRockMeshPath);
+		return;
+	}
+	UMaterialInterface* RockMaterial = LoadObject<UMaterialInterface>(nullptr, TideglassRockMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	const FVector RockExtent = RockMesh->GetBounds().BoxExtent;
+	if (RockExtent.X <= UE_SMALL_NUMBER || RockExtent.Y <= UE_SMALL_NUMBER || RockExtent.Z <= UE_SMALL_NUMBER) return;
+
+	HiddenShoreStoneProxies.Reset();
+	PreviousShoreStoneHiddenStates.Reset();
+	ShoreStonePresentationActors.Reset();
+	for (AStaticMeshActor* Proxy : StoneProxies)
+	{
+		HiddenShoreStoneProxies.Add(Proxy);
+		PreviousShoreStoneHiddenStates.Add(Proxy->IsHidden());
+	}
+
+	for (AStaticMeshActor* Proxy : StoneProxies)
+	{
+		UStaticMeshComponent* ProxyMesh = Proxy->GetStaticMeshComponent();
+		const FVector TargetExtent = ProxyMesh->Bounds.BoxExtent;
+		const FVector RockScale(TargetExtent.X / RockExtent.X, TargetExtent.Y / RockExtent.Y, TargetExtent.Z / RockExtent.Z);
+		const FTransform VisualTransform(ProxyMesh->GetComponentRotation(), ProxyMesh->Bounds.Origin, RockScale);
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AStaticMeshActor* Presentation = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), VisualTransform, Spawn);
+		if (!Presentation || !Presentation->GetStaticMeshComponent())
+		{
+			if (Presentation) Presentation->Destroy();
+			RestoreShoreStonePresentation();
+			UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass shore-stone presentation could not create all four transient rocks."));
+			return;
+		}
+
+		UStaticMeshComponent* Visual = Presentation->GetStaticMeshComponent();
+		Visual->SetStaticMesh(RockMesh);
+		Visual->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Visual->SetCanEverAffectNavigation(false);
+		Visual->SetGenerateOverlapEvents(false);
+		Visual->SetCastShadow(true);
+		if (RockMaterial) Visual->SetMaterial(0, RockMaterial);
+		ShoreStonePresentationActors.Add(Presentation);
+		Proxy->SetActorHiddenInGame(true);
+	}
+
+	UE_LOG(LogIslandTideglass, Log, TEXT("Tideglass shore stones use four transient rough-rock visuals; original proxy collision and map data remain unchanged."));
+}
+
+void UIslandTideglassSubsystem::RestoreShoreStonePresentation()
+{
+	for (int32 Index = 0; Index < HiddenShoreStoneProxies.Num(); ++Index)
+		if (AStaticMeshActor* Proxy = HiddenShoreStoneProxies[Index].Get())
+			Proxy->SetActorHiddenInGame(PreviousShoreStoneHiddenStates.IsValidIndex(Index) ? PreviousShoreStoneHiddenStates[Index] : false);
+
+	for (const TWeakObjectPtr<AStaticMeshActor>& Actor : ShoreStonePresentationActors)
+		if (AStaticMeshActor* Presentation = Actor.Get()) Presentation->Destroy();
+
+	HiddenShoreStoneProxies.Reset();
+	PreviousShoreStoneHiddenStates.Reset();
+	ShoreStonePresentationActors.Reset();
+}
+
 void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
@@ -187,6 +283,8 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 	}
 	if (!bHasTideglassMarker) return;
+
+	ApplyShoreStonePresentation();
 
 	UMaterialInterface* Material = MaterialOverride
 		? MaterialOverride.Get()
@@ -207,5 +305,6 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 void UIslandTideglassSubsystem::Deinitialize()
 {
 	RestorePoolMaterial();
+	RestoreShoreStonePresentation();
 	Super::Deinitialize();
 }

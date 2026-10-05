@@ -45,12 +45,31 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 		Marker->Tags.AddUnique(TEXT("TideglassPool"));
 		AStaticMeshActor* SurfaceActor = World->SpawnActor<AStaticMeshActor>(FVector::ZeroVector, FRotator::ZeroRotator);
 		UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		TArray<AStaticMeshActor*> ShoreStoneProxies;
 		if (TestNotNull(TEXT("Synthetic pool surface actor spawns"), SurfaceActor) && TestNotNull(TEXT("Engine sphere mesh is available"), Sphere))
 		{
 			UStaticMeshComponent* Surface = SurfaceActor->GetStaticMeshComponent();
 			Surface->SetStaticMesh(Sphere);
 			SurfaceActor->SetActorScale3D(FVector(4.f, 4.f, 0.1f));
 			Surface->SetMaterial(0, AuthoredBlockout);
+
+			for (int32 Index = 0; Index < 4; ++Index)
+			{
+				const float Angle = Index * UE_PI * 0.5f;
+				FActorSpawnParameters Spawn;
+				Spawn.Name = *FString::Printf(TEXT("TideglassPool_Stone_%d"), Index);
+				AStaticMeshActor* Proxy = World->SpawnActor<AStaticMeshActor>(
+					FVector(FMath::Cos(Angle) * 320.f, FMath::Sin(Angle) * 320.f, 0.f), FRotator::ZeroRotator, Spawn);
+				if (Proxy)
+				{
+					Proxy->GetStaticMeshComponent()->SetStaticMesh(Sphere);
+					Proxy->SetActorScale3D(FVector(0.45f, 0.45f, 0.35f));
+					Proxy->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+					ShoreStoneProxies.Add(Proxy);
+				}
+			}
+			TestEqual(TEXT("All four synthetic shore-stone collision proxies spawn"), ShoreStoneProxies.Num(), 4);
+
 			TestTrue(TEXT("The subsystem finds the flattened sphere beside the tagged pool"), Tideglass->FindPoolSurface(World) == Surface);
 			UMaterialInterface* StartupMaterial = PoolWater ? PoolWater : PreviewWater;
 			Tideglass->MaterialOverride = PoolWater ? nullptr : PreviewWater;
@@ -74,6 +93,45 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 					RuntimeWater->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 				TestTrue(TEXT("The old sphere is hidden only while the procedural surface is active"), Surface->bHiddenInGame);
 			}
+
+			UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
+			if (RockMesh && ShoreStoneProxies.Num() == 4)
+			{
+				TArray<TWeakObjectPtr<AStaticMeshActor>> ShoreStoneVisuals;
+				TestEqual(TEXT("A complete set of four transient rough-rock visuals is created"),
+					Tideglass->ShoreStonePresentationActors.Num(), 4);
+				for (int32 Index = 0; Index < ShoreStoneProxies.Num(); ++Index)
+				{
+					AStaticMeshActor* Proxy = ShoreStoneProxies[Index];
+					TestTrue(FString::Printf(TEXT("Shore-stone proxy %d is hidden in game while its presentation is active"), Index),
+						Proxy->IsHidden());
+					TestEqual(FString::Printf(TEXT("Shore-stone proxy %d keeps its original collision"), Index),
+						Proxy->GetStaticMeshComponent()->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+					AStaticMeshActor* Visual = Tideglass->ShoreStonePresentationActors[Index].Get();
+					ShoreStoneVisuals.Add(Visual);
+					TestNotNull(FString::Printf(TEXT("Shore-stone visual %d exists"), Index), Visual);
+					if (!Visual) continue;
+					TestTrue(FString::Printf(TEXT("Shore-stone visual %d uses the rough-rock mesh"), Index),
+						Visual->GetStaticMeshComponent()->GetStaticMesh() == RockMesh);
+					TestEqual(FString::Printf(TEXT("Shore-stone visual %d adds no collision"), Index),
+						Visual->GetStaticMeshComponent()->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+					TestTrue(FString::Printf(TEXT("Shore-stone visual %d remains centered on its saved proxy"), Index),
+						Visual->GetActorLocation().Equals(Proxy->GetStaticMeshComponent()->Bounds.Origin, 1.f));
+				}
+				Tideglass->RestoreShoreStonePresentation();
+				for (int32 Index = 0; Index < ShoreStoneProxies.Num(); ++Index)
+				{
+					TestFalse(FString::Printf(TEXT("Shore-stone proxy %d is restored at teardown"), Index),
+						ShoreStoneProxies[Index]->IsHidden());
+					TestFalse(FString::Printf(TEXT("Transient shore-stone visual %d is destroyed at teardown"), Index),
+						ShoreStoneVisuals.IsValidIndex(Index) && ShoreStoneVisuals[Index].IsValid());
+				}
+			}
+			else
+			{
+				AddInfo(TEXT("Starter Content rock mesh is unavailable; reversible shore-stone presentation assertions were skipped."));
+			}
+
 			TestTrue(TEXT("Repeated runtime application is safe"), Tideglass->ApplyPoolMaterial(PreviewWater));
 			Tideglass->RestorePoolMaterial();
 			TestTrue(TEXT("Teardown restores the authored blockout material"), Surface->GetMaterial(0) == AuthoredBlockout);

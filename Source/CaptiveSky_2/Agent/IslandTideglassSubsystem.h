@@ -7,6 +7,7 @@
 class UMaterialInterface;
 class UMeshComponent;
 class UProceduralMeshComponent;
+class AStaticMeshActor;
 class UStaticMeshComponent;
 
 /** Applies a weather-responsive water surface to Tideglass for the play session only. */
@@ -39,12 +40,18 @@ public:
 
 private:
 	friend class FIslandTideglassSurfaceTest;
+	void ApplyShoreStonePresentation();
+	void RestoreShoreStonePresentation();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UProceduralMeshComponent> RuntimeSurface;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UStaticMeshComponent> BlockoutSurface;
+
+	TArray<TWeakObjectPtr<AStaticMeshActor>> HiddenShoreStoneProxies;
+	TArray<bool> PreviousShoreStoneHiddenStates;
+	TArray<TWeakObjectPtr<AStaticMeshActor>> ShoreStonePresentationActors;
 
 	TWeakObjectPtr<UMeshComponent> AppliedTo;
 	bool bBlockoutWasVisible = true;
