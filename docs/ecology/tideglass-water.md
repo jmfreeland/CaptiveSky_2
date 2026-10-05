@@ -131,3 +131,9 @@ process entries were not blocking this attempt. It failed while compiling unrela
 No runtime capture of the softened automatic ripples was produced. Leave the active arrangement
 work untouched; once its owner resolves the compile failure, rebuild and capture matched calm/rain
 Tideglass views before deciding whether the bright beads are gone or have another source.
+
+A follow-up with UBT's `-NoPCH` option reproduced the same `IslandArrangement.h` reflection-macro
+errors. It also forced a 136-action, non-unity rebuild and exposed unrelated missing-include errors
+in other translation units; the diagnostic was intentionally interrupted at action 35. This is not
+a complete no-PCH build or a source fix. Do not use `-NoPCH` as the validation workaround; resume
+with the normal target after the arrangement header issue is resolved.
