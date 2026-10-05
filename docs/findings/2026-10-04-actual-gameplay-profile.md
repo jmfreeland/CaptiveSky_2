@@ -219,10 +219,89 @@ only dominant cost. Do not reduce the project default radius based on this
 sweep; the close-range visual tradeoff has not earned the change.
 
 The next performance milestone should target the remaining foliage rendering
-cost while preserving full population and visibility: audit the number and
-layout of HISM components and measure a reversible per-mesh consolidation in a
-scratch copy, with repeated warmed captures. Keep the sway radius and visual
-behavior unchanged during that structural test so its effect is attributable.
+cost while preserving full population and visibility. A component-count audit
+below found only 22 HISM groups, so consolidation is not the leading hypothesis.
+Keep the sway radius and visual behavior unchanged while measuring the dominant
+species/layer cost in the same real Game view; use only scratch visibility
+ablations for diagnosis, then optimize the measured group without reducing the
+full-scene composition.
 Evidence: `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_143226).csv`
 and `Profile(20261005_143929).csv`; logs are in
 `Saved/Playtests/Codex_SwayRadius1500/` and `Saved/Playtests/Codex_SwayRadius750/`.
+
+### Runtime HISM population audit (2026-10-05)
+
+A one-shot diagnostic in the isolated scratch `AIslandWeather::Tick` enumerated
+every world actor and its HISM components after the Island had initialized.
+The standalone Game log reports 22 nonempty HISM components and 1,812,286
+instances total; all 22 components belong to `IslandWeather_0`. The apparent
+`~120+ HISM` count in the earlier handoff note is not borne out by this direct
+world audit. The ground-cover actor already batches one HISM component per
+species/mesh group, so there is little evidenced component-consolidation
+headroom.
+
+Three grass meshes account for 982,791 instances (54.2%); five ground-plant
+meshes account for 797,779 (44.0%). Together these eight components represent
+98.2% of the total. Trees, shrubs, rhododendrons, flowers, and wetland accents
+make up the remaining 1.8%. `ground_05_01` is the sole duplicated mesh path, in
+`ShoreGroundPlants` and `IslandShrubs`; their different cull/interaction roles
+make merging them an unattractive first test. The audited counts match the
+current code's 22 transient ground-cover components, and no primary Content or
+map assets were changed.
+
+Log: `Saved/Playtests/Codex_HismAudit_20261005/HismAudit_Game.log`. The
+diagnostic code was scratch-only, the 45-second Game session exited normally,
+and no Unreal Editor/Game/Live Coding process remained afterward. The direct
+population evidence changes the next step: profile the three grass and five
+ground-plant groups in the real Game path before attempting mesh or component
+consolidation.
+
+### Real-Game foliage visibility ablation (2026-10-05)
+
+Using the same scratch module, 1600x900 Tideglass camera, and 200-frame CSV
+capture, I hid HISM groups only for diagnosis and disabled
+CPU-driven sway in every condition. All 22 components and all 1,812,286
+instances remained allocated; only visibility changed. Two all-visible runs
+provide a repeatability check, while the group and species runs isolate render
+cost without conflating it with the transform-update result above.
+
+| Visible HISM groups | Instances visible | Frame time p50 / p95 | Render Thread p50 / p95 | GPU p50 / p95 |
+|---|---:|---:|---:|---:|
+| All, repeat 1 | 1,812,286 | 14.89 / 95.16 ms | 14.78 / 95.17 ms | 12.36 / 18.85 ms |
+| All, repeat 2 | 1,812,286 | 14.63 / 95.48 ms | 14.54 / 96.08 ms | 12.32 / 17.23 ms |
+| Three grass groups | 982,791 | 12.95 / 95.39 ms | 12.92 / 95.45 ms | 10.35 / 16.52 ms |
+| Five broadleaf ground-plant groups | 797,779 | 11.94 / 48.69 ms | 11.98 / 48.78 ms | 9.11 / 14.21 ms |
+| Remaining 14 groups | 31,716 | 10.43 / 28.98 ms | 10.46 / 40.30 ms | 8.17 / 12.91 ms |
+
+The three grass species were then isolated individually:
+
+| Grass component / mesh | Instances | Frame time p50 / p95 | GPU p50 / p95 |
+|---|---:|---:|---:|
+| `ShoreGrassA` / `grass_01_02_mesh` | 326,303 | 10.86 / 40.92 ms | 8.76 / 13.18 ms |
+| `ShoreGrassB` / `grass_01_03_mesh` | 324,716 | 10.62 / 35.23 ms | 8.56 / 13.35 ms |
+| `ShoreGrassC` / `grass_01_04_mesh` | 331,772 | 10.88 / 42.71 ms | 8.65 / 13.54 ms |
+
+The two all-visible sway-disabled runs reproduce the same ~95 ms p95 tail.
+Grass alone nearly reproduces it; broadleaf ground plants alone have a smaller
+tail, and the remaining vegetation alone is below the 33.3 ms 30-FPS frame
+budget in this short sample. No individual grass species explains the whole
+grass-group result: the combined three are materially worse at p95 than any
+one alone. With GPU p95 below 18 ms even in the full scene, this points to
+CPU/render-thread work or interaction among the dense grass HISM groups, not a
+GPU-throughput limit by itself. It does not yet identify a specific engine
+scope or prove that grass removal is an acceptable solution.
+
+All visibility variants retained full placement, spacing, collision and
+navigation settings; the hidden layers are not a candidate production state.
+The first Grass-B process stalled in Unreal platform-validation startup before
+loading the map; only that scratch editor process and its matching UBT child
+were stopped. A fresh retry completed, as did Grass C. All completed capture
+logs are under `Saved/Playtests/Codex_HismSolo_20261005/`; the CSVs are
+`Profile(20261005_141620).csv`, `Profile(20261005_145521).csv`,
+`Profile(20261005_145700).csv`, `Profile(20261005_145835).csv`,
+`Profile(20261005_150112).csv`, `Profile(20261005_150507).csv`,
+`Profile(20261005_151253).csv`, and `Profile(20261005_151518).csv` in the
+scratch profiling directory. The next implementation should preserve the full
+grass silhouette and investigate why three individually tolerable groups
+produce a high combined render-thread tail; do not remove or thin a species
+without an attributable optimization and a full-composition visual review.
