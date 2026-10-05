@@ -899,7 +899,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A strong shower creates one Tideglass water impact"), RainRippleCount, 1);
 	if (RainRipple)
 	{
-		TestTrue(TEXT("Rain water response is subtler than a deliberate pool interaction"), RainRipple->PeakLightIntensity < 55.f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
+		TestTrue(TEXT("Automatic rain glints are much dimmer than a deliberate pool interaction"), RainRipple->PeakLightIntensity <= 3.5f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
 		int32 ActorsBeforeRepeat = 0;
 		for (TActorIterator<AActor> It(World); It; ++It) ++ActorsBeforeRepeat;
 		Weather->UpdateRainRendering();
@@ -1202,6 +1202,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (Ripple)
 	{
 		TestEqual(TEXT("Ripple uses eight overlapping light points"), Ripple->RippleLights.Num(), 8);
+		TestEqual(TEXT("Deliberate inspection keeps its stronger expressive ripple"), Ripple->PeakLightIntensity, 55.f);
 		Ripple->Tick(0.8f);
 		TestTrue(TEXT("Ripple light ring expands across the pool midway through its life"), FMath::IsNearlyEqual(Ripple->RippleLights[0]->GetRelativeLocation().Size2D(), 81.f, 0.5f));
 		Controller->InspectTarget(TEXT("TideglassPool"));

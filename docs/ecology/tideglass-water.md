@@ -108,3 +108,15 @@ packaged-performance benchmark or autonomous resident behavior test.
 Logs: `Saved/Logs/Codex_TideglassLifecycle_Elevated_20261001.log`,
 `Saved/Logs/Codex_TideglassRuntimeVisual_Elevated_20261001.log`, and
 `Saved/Logs/Codex_TideglassOverhead_Elevated_20261001.log`.
+
+## Weather-glint art-direction pass (2026-10-05)
+
+The 2026-10-05 in-game Tideglass frame shows bright, bead-like highlights around the water.
+`AIslandPoolRippleEffect` is a strong source candidate: each automatic rain/wind event arranges
+eight moving point lights into a ring. Their radii and lifetime were already bounded, but weather
+peaks of 18 (rain) and 14 (strong wind) can compete with the pool and its shoreline. Automatic
+rain now peaks at 3.5 and wind at 1.25–4.5; deliberate resident/player inspection retains its
+55-intensity ripple so an intentional action remains legible. Regression assertions distinguish
+the soft ambient cue from the stronger deliberate response. This is source-level evidence, not yet
+a confirmed visual fix: the updated scratch module and matched calm/rain captures still need to run
+before claiming the orbs are resolved.

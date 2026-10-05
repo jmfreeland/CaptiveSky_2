@@ -159,7 +159,7 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		if (It->ActorHasTag(TEXT("WindImpact")))
 		{
 			++WindRippleCount;
-			TestTrue(TEXT("Wind ripple is quieter than a deliberate pool interaction"), It->PeakLightIntensity < 18.f);
+			TestTrue(TEXT("Ambient wind ripple glints stay subtle"), It->PeakLightIntensity <= 4.5f);
 			TestTrue(TEXT("Wind ripple lifetime is bounded"), It->DurationSeconds > 0.f && It->DurationSeconds <= 2.2f);
 		}
 	TestEqual(TEXT("One local gust creates one finite pool response"), WindRippleCount, 1);

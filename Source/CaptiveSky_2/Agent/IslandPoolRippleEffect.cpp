@@ -35,7 +35,9 @@ void AIslandPoolRippleEffect::ConfigureAsRainImpact()
 {
 	DurationSeconds = 1.15f;
 	SurfaceRadius = 68.f;
-	PeakLightIntensity = 18.f;
+	// Weather is atmosphere, not an interaction cue: keep its reflected glints soft enough
+	// that they do not read as bright floating beads around the pool.
+	PeakLightIntensity = 3.5f;
 	Tags.AddUnique(TEXT("RainImpact"));
 }
 
@@ -44,7 +46,7 @@ void AIslandPoolRippleEffect::ConfigureAsWindImpact(float HorizontalWindSpeed)
 	const float Activity = WindRippleActivity(HorizontalWindSpeed);
 	DurationSeconds = FMath::Lerp(1.25f, 2.2f, Activity);
 	SurfaceRadius = FMath::Lerp(58.f, 112.f, Activity);
-	PeakLightIntensity = FMath::Lerp(5.f, 14.f, Activity);
+	PeakLightIntensity = FMath::Lerp(1.25f, 4.5f, Activity);
 	Tags.AddUnique(TEXT("WindImpact"));
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
 }
