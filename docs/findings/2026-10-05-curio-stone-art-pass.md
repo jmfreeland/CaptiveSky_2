@@ -20,9 +20,15 @@ The focused `CaptiveSky2.Agent.IslandCurio` automation test then ran in the isol
 and passed. Logs: [`Codex_CurioCleanBuild_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioCleanBuild_20261005.log)
 and [`Codex_CurioArtPass_Automation_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CurioArtPass_Automation_20261005.log).
 
-Rendered Game/PIE inspection is still outstanding, so the more natural reading of the small cairn
-at resident viewing distance is not yet visually confirmed. The automation verifies mesh/material
-selection and collision/navigation invariants, not the appearance of the authored asset in the map.
-An isolated offscreen capture was attempted, but the editor process could not write to the host's
-user DDC/Zen and shader-worker temporary directories and exited before loading the map. This is an
-environment permission limitation; no shared project asset or saved world state was changed.
+An isolated offscreen `CaptiveSky2.Visual.Viewpoints` capture then passed at both noon and 17:00,
+using the scratch project's own read-only world-state fixture with agent thinking disabled. The
+[noon close-up](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Viewpoints/2026-10-05_185612_h12.0/Codex_CairnDetail.png)
+confirms the irregular mesh and authored material render. At this very close angle the pile reads
+larger and more shadow-contrasted than intended; this is a diagnostic, not a final highlight or a
+PIE/playtest confirmation. A resident-scale shot in the saved map is still needed before treating
+the visual pass as settled. Log: [`Codex_CairnDetail_Noon_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_CairnDetail_Noon_20261005.log).
+
+The first attempts could not write to the host DDC/Zen and shader-worker temp directories. Keeping
+DDC and shader temp under the ignored scratch project (`-DDC-ForceMemoryCache`, process-local
+`TEMP`/`TMP`, and `-shaderworkingdir`) resolved that environment permission issue; no shared project
+asset or saved world state was changed.
