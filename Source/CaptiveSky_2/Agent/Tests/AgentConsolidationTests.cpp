@@ -149,6 +149,8 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 		EvolvedPrompt.Contains(TEXT("Evolving evidence-bound tendencies")) && EvolvedPrompt.Contains(TEXT("Curiosity: strengthening")));
 	TestFalse(TEXT("The prompt receives a concise tendency, not private history evidence IDs"),
 		EvolvedPrompt.Contains(TEXT("evidence_memory_ids")));
+	TestEqual(TEXT("Reading tendencies for a prompt does not duplicate the live overlay"),
+		Consolidation->GetEvolvingTendencies().Num(), UAgentConsolidationComponent::MaximumAdjustmentsPerSleep);
 	UAgentConsolidationComponent* Reloaded = NewObject<UAgentConsolidationComponent>(Resident);
 	Resident->AddInstanceComponent(Reloaded);
 	Reloaded->RegisterComponent();
@@ -172,6 +174,7 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 	const FString FailedResponse = FString(TEXT("{\"reflection\":\"The unsaved thought must not alter who I am.\",\"personality_adjustments\":[")) +
 		TEXT("{\"trait\":\"Curiosity\",\"direction\":\"soften\",\"amount\":0.02,\"reason\":\"This reason must roll back.\",\"evidence_memory_ids\":[\"lived-memory-1\"]},") +
 		MakeAdjustment(TEXT("Patience"), TEXT("strengthen"), TEXT("lived-memory-1")) + TEXT("]}");
+	AddExpectedError(TEXT("Sleep consolidation could not be persisted"), EAutomationExpectedErrorFlags::Contains, 1);
 	TestFalse(TEXT("A failed overlay save rejects the consolidation transaction"), Consolidation->ApplyConsolidationResponse(FailedResponse, Memories));
 	TestEqual(TEXT("A failed save restores the prior in-memory tendency count"), Consolidation->Tendencies.Num(),
 		UAgentConsolidationComponent::MaximumAdjustmentsPerSleep);

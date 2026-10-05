@@ -352,6 +352,7 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 		UE_LOG(LogAgentConsolidation, Warning, TEXT("Consolidation response was not valid JSON."));
 		return false;
 	}
+	EnsureStateLoaded();
 	TSet<FString> ValidEvidenceIds;
 	for (const FAgentMemoryRecord& Memory : Memories) ValidEvidenceIds.Add(Memory.Id);
 
