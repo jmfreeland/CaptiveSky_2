@@ -907,7 +907,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A strong shower creates one Tideglass water impact"), RainRippleCount, 1);
 	if (RainRipple)
 	{
-		TestTrue(TEXT("Automatic rain glints are much dimmer than a deliberate pool interaction"), RainRipple->PeakLightIntensity <= 3.5f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
+		TestTrue(TEXT("Automatic rain glints remain soft beside a deliberate pool interaction"), RainRipple->PeakLightIntensity <= 0.75f && RainRipple->SurfaceRadius < 150.f && RainRipple->DurationSeconds < 1.6f);
 		int32 ActorsBeforeRepeat = 0;
 		for (TActorIterator<AActor> It(World); It; ++It) ++ActorsBeforeRepeat;
 		Weather->UpdateRainRendering();

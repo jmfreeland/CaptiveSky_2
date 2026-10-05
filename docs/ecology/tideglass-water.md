@@ -111,15 +111,16 @@ Logs: `Saved/Logs/Codex_TideglassLifecycle_Elevated_20261001.log`,
 
 ## Weather-glint art-direction pass (2026-10-05)
 
-The 2026-10-05 in-game Tideglass frame shows bright, bead-like highlights around the water.
-`AIslandPoolRippleEffect` is a strong source candidate: each automatic rain/wind event arranges
-eight moving point lights into a ring. Their radii and lifetime were already bounded, but weather
-peaks of 18 (rain) and 14 (strong wind) can compete with the pool and its shoreline. Automatic
-rain now peaks at 3.5 and wind at 1.25–4.5; deliberate resident/player inspection retains its
-55-intensity ripple so an intentional action remains legible. Regression assertions distinguish
-the soft ambient cue from the stronger deliberate response. This is source-level evidence, not yet
-a confirmed visual fix: the updated scratch module and matched calm/rain captures still need to run
-before claiming the orbs are resolved.
+The 2026-10-05 in-game Tideglass frame shows bright, bead-like highlights around the water
+([highlight capture](../../Saved/Playtests/Codex_HighlightReview_20261005_Full/Screenshots/005_Tideglass.png)).
+`AIslandPoolRippleEffect` is a plausible source: each automatic rain/wind event arranges eight
+moving point lights into a ring. The source had already reduced automatic peaks from 18 to 3.5 for
+rain and 14 to 4.5 for strong wind, but the capture does not record its loaded module revision, so
+it cannot prove those values were active. As a reversible follow-up, automatic peaks are now
+reduced to 0.75 and 1.35. Deliberate resident/player inspection keeps its 55-intensity ripple so an
+intentional action remains legible. Regression assertions preserve that distinction. The numeric
+change is not a confirmed visual fix: rebuild and capture matched calm/rain views before deciding
+whether these lights caused the orbs or whether the ambient cue is now too faint.
 
 ### Build follow-up
 
@@ -137,3 +138,40 @@ errors. It also forced a 136-action, non-unity rebuild and exposed unrelated mis
 in other translation units; the diagnostic was intentionally interrupted at action 35. This is not
 a complete no-PCH build or a source fix. Do not use `-NoPCH` as the validation workaround; resume
 with the normal target after the arrangement header issue is resolved.
+
+A later `Build.bat` probe used the isolated scratch project with the editor absent. Its UBT child
+remained alive for about two minutes with 0.14 seconds of CPU time, waiting threads, no compiler
+children, and no fresh project log. The command was interrupted; this establishes a startup stall,
+not its owner or exact mutex. The two inaccessible zero-thread `dotnet` process entries remain.
+
+Direct compilation did succeed once the cached MSVC response files were invoked from UE's
+`Engine/Source` working directory: `IslandPoolRippleEffect.cpp`, `IslandWeatherTests.cpp`, and
+`IslandEcologyTests.cpp` all compiled into an isolated output folder. Earlier `/Y-` and VS 14.38
+attempts failed because they used the wrong working directory or PCH compiler, respectively. A
+manual full-module link using the current scratch response then failed with 23 unresolved project
+symbols, including ForestStag, TideglassDragonfly, ListeningStonePresentation, and
+WindArchPresentation methods. The scratch module, PDB, and replaced object files were restored and
+SHA-256 checked against their backups. This diagnostic is superseded by the later successful
+working-tree UE 5.8.3 build below.
+
+At 22:07 on 2026-10-05, a normal UE 5.8.3 `Build.bat` invocation targeted the actual working-tree
+project. The sandboxed UBT process stalled while accessing its default log area; a direct `-Help`
+probe exposed `UnauthorizedAccessException` enumerating `C:\Users\freel\AppData\Local\UnrealBuildTool`.
+An approved elevated build then completed all 17 actions, including the real module link, in 68.91 s.
+Headless `NightEcology` and `IslandWeather` automations both passed. `IslandLichen` reached its
+assertions but failed only `Dusk is part way` at 19:00: the current night curve is already fully on
+by then, so the test's dusk sample is mistimed (18:30 is a valid transitional sample). Claude owns
+that test and the day/night implementation. See
+`Saved/Logs/Codex_TideglassGlint_Automation_20261005.log`,
+`Saved/Logs/Codex_IslandWeatherGlint_20261005.log`, and
+`Saved/Logs/Codex_IslandLichen_20261005.log`. These tests used `-NullRHI`.
+
+Two bounded real-game captures followed the build with `-CaptiveSkyDisableAgentThinking`, a
+one-request cap, and isolated data roots. The clear/unforced run stopped at 120.3 real seconds
+with zero model requests; its Tideglass frame is
+`Saved/Playtests/Codex_Highlight_Tideglass_20261005/Screenshots/002_TideglassPool.png` (Day 1,
+17:06). A separate forced-storm run stopped at 60.0 seconds with zero requests; its Tideglass
+frame is `Saved/Playtests/Codex_TideglassStorm_20261005/Screenshots/005_Tideglass.png` (Day 1,
+17:24). Both frames still show several bright, floating sphere-like highlights, so the art pass
+has not resolved the visible issue. They use different routes/times and do not isolate ripple
+intensity; the spheres' source remains unconfirmed. Do not present these as a matched visual fix.
