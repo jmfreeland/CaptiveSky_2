@@ -120,3 +120,14 @@ rain now peaks at 3.5 and wind at 1.25–4.5; deliberate resident/player inspect
 the soft ambient cue from the stronger deliberate response. This is source-level evidence, not yet
 a confirmed visual fix: the updated scratch module and matched calm/rain captures still need to run
 before claiming the orbs are resolved.
+
+### Build follow-up
+
+The bounded UE 5.8.3 scratch build reached its compile actions, so the two inaccessible `dotnet`
+process entries were not blocking this attempt. It failed while compiling unrelated current
+`IslandArrangement.h` changes owned in the coordination table: MSVC reported C4430 on the two
+`GENERATED_BODY()` lines and C4430/C2143 around `UCLASS()` and `AIslandArrangement`. The full log is
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_TideglassGlintBuild_20261005.log`.
+No runtime capture of the softened automatic ripples was produced. Leave the active arrangement
+work untouched; once its owner resolves the compile failure, rebuild and capture matched calm/rain
+Tideglass views before deciding whether the bright beads are gone or have another source.
