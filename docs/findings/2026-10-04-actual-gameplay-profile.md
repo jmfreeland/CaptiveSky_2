@@ -343,3 +343,47 @@ Nanite change is justified. Keep the full composition and investigate the
 combined HISM/Nanite instance-culling and render-thread path with a frame trace
 that attributes work to the three grass groups; any candidate must then be
 retested in the same all-visible Game view against the 30-FPS p95 goal.
+
+### CPU foliage sway and scene-culling cost (2026-10-05)
+
+The all-visible frame trace now attributes the large CPU cost to the animated
+instance-transform path, not static mesh triangle count alone. In the scratch
+copy, the production `FoliageSwayFocusRadius` was set to 3000 cm, matching the
+current main-source value, and the update interval remained 0.1 seconds. A
+matched trace-only diagnostic at 750 cm was also run, as was a 750 cm run with
+the scratch-only `-IslandDisableGroundCoverSway` flag. All kept the same
+1600x900 camera, 22 HISM groups and 1,812,286 instances; each Game session was
+capped at 45 seconds and made zero model requests.
+
+Across the 25–55 second stable trace window, the aggregated worker timer
+`SceneCulling_Post_UpdateInstances` averaged 59.28 ms per update at 750 cm
+(139 updates) and 124.98 ms at 3000 cm (82 updates). With CPU transform sway
+disabled, it averaged 0.75 ms (1,252 updates). On the render thread,
+`SceneCulling_Update_FinalizeAndClear` averaged 64.71 ms per update at 750 cm
+and 137.18 ms at 3000 cm; the observed maximum `WaitForVisibilityTasks` was
+125.7 ms at 750 cm. These are traced inclusive scope timings, so worker values
+must not be summed as frame latency; the comparison is for identifying the
+workload that scales with CPU sway. Trace instrumentation also adds substantial
+overhead, so its frame-rate numbers are not used as gameplay benchmarks.
+
+A separate untraced 200-frame CSV at 750 cm completed in the same bounded Game
+run. It measured frame-time p50/p95 of 142.65/251.88 ms, Render Thread
+151.87/194.72 ms, and GPU 18.09/20.88 ms. The earlier all-visible,
+CPU-sway-disabled untraced pair was 14.63/95.48 ms frame p50/p95. This confirms
+that the 750 cm CPU-sway candidate is not a viable production setting and that
+CPU instance transforms are a major added cost; the 3000 cm default is worse
+in the matched trace. Neither radius meets the 30-FPS p95 target, and no
+vegetation or wind behavior was changed in the primary project.
+
+Next optimization should retain wind-driven motion and close resident/character
+brush response while avoiding repeated `UpdateInstanceTransform` calls across a
+large camera radius. Verify that the existing WPO-capable materials visibly
+provide ambient wind, then prototype a much smaller CPU interaction footprint
+in scratch and compare both motion quality and untraced 200-frame p50/p95.
+Do not simply ship the sway-off diagnostic or adopt 750 cm without a visual
+review; preserve full population and require the full all-visible p95 to move
+toward 33.3 ms.
+
+Evidence: `Saved/Playtests/Codex_GrassRenderTrace_20261005/` (the three `.utrace`
+files, per-thread Insights exports, and bounded Game logs) and
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_160449).csv`.
