@@ -142,3 +142,87 @@ and representative resident/foliage ticks. Do not prioritize per-frame
 transform-update spikes as the explanation for the slowest frames without a
 new measurement. The 30 FPS gameplay target and complete habitat-composition
 requirement remain unchanged.
+
+## Ground-cover sway A/B (2026-10-05)
+
+A matched, bounded standalone Game-mode pair was run from an isolated UE 5.8.3
+scratch project at the same 1600x900 Tideglass midday view. Both captures used
+the same 200-frame CSV profile, disabled agent thinking and Python, and created
+1,780,040 ground-cover instances. The only test change was the scratch-only
+`-IslandDisableGroundCoverSway` diagnostic. That switch skips the periodic
+CPU transform updates for ground cover and resident-brush sway; it preserves
+instance placement and visibility. It is not enabled in the project source or
+by default. `IslandWeather.cpp` in the scratch copy was built successfully
+with UE 5.8.3 before the ablation capture.
+
+| Measure | Sway enabled p50 / p95 | Sway disabled p50 / p95 |
+|---|---:|---:|
+| Frame time | 164.82 / 292.37 ms | 14.89 / 95.16 ms* |
+| Game Thread | 141.75 / 273.22 ms | 5.59 / 20.44 ms |
+| Render Thread | 145.77 / 175.62 ms | 14.78 / 95.17 ms |
+| GPU | 22.40 / 25.61 ms | 12.36 / 18.85 ms |
+| `TickActors` exclusive | 102.36 / 137.87 ms | 0.33 / 1.50 ms |
+| `STAT_SkinningSceneExtension` exclusive | 93.54 / 119.02 ms | 0.09 / 0.13 ms |
+
+\* The disabled capture had 201 numeric `FrameTime` entries for the 200-frame
+capture; p50/p95 are reported from those rows as recorded. Both profiles also
+contain extreme hitch outliers, so neither the median nor this short capture
+should be read as a sustained gameplay FPS guarantee. The enabled and disabled
+captures had comparable GPU-scene population (median 2.31M instances in each),
+and the diagnostic log confirms the ground-cover count was unchanged.
+
+The large collapse in `TickActors` and skinning-extension time is strong
+evidence that this CPU transform/sway path dominates the measured cost in this
+capture. With sway disabled, the median frame time is comfortably below the
+33.3 ms 30-FPS budget, but p95 remains 95 ms and therefore still fails the
+target under hitchy frames. The visual effect was disabled, so this is a
+diagnostic upper bound rather than an acceptable shipped fix. The earlier
+correlation check remains relevant: transform-update count did not predict the
+slowest frames within the sway-enabled capture, even though removing the whole
+update path dramatically improved this paired run.
+
+Next, preserve nearby wind and resident-brush response while eliminating
+per-frame CPU updates across the full ground-cover population. Prefer a
+material/GPU-driven wind path, or a tightly bounded view-/interaction-local
+update set, and validate both in warmed repeated captures. Keep full placement
+and visibility, the 30-FPS minimum, and the visual habitat composition as
+acceptance criteria. Logs and CSVs are under
+`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Playtests/Codex_SwayAblation/`
+and `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/`.
+
+### Retained-radius sweep (2026-10-05)
+
+To test whether a smaller active sway neighborhood preserves close-up life while
+reducing transform work, two additional standalone Game captures used scratch
+builds with normal sway enabled and the same 1600x900 Tideglass midday view.
+The only source difference between these trials was the scratch constant for
+`FoliageSwayFocusRadius` (1500 cm, then 750 cm); the 3000 cm production source
+was not changed. Each CSV contains 200 valid frame rows. Because UBT stalled
+before creating its log, the scratch translation unit was compiled with the
+cached UE 5.8.3 response files and the scratch module was linked directly; no
+project module or content was rebuilt in place.
+
+| Active sway radius | Frame time p50 / p95 | Game Thread p50 / p95 | Render Thread p50 / p95 | `TickActors` p50 / p95 | Transform updates p50 / p95 |
+|---:|---:|---:|---:|---:|---:|
+| 30 m, baseline | 164.82 / 292.37 ms | 141.75 / 273.22 ms | 145.77 / 175.62 ms | 102.36 / 137.87 ms | 28,391 / 28,392 |
+| 15 m | 111.07 / 205.34 ms | 41.15 / 110.49 ms | 103.31 / 170.34 ms | 17.25 / 36.26 ms | 0 / 5,650 |
+| 7.5 m | 120.64 / 228.71 ms | 27.92 / 106.56 ms | 132.56 / 177.91 ms | 4.95 / 32.44 ms | 161 / 1,495 |
+
+Both trials retained the same 1.78M ground-cover placements and GPU time stayed
+near 22–23 ms p50. The narrower radii reduce `TickActors` and transform-update
+counts, but do not approach the 33.3 ms frame-time budget. The 7.5 m capture is
+slower overall than the 15 m capture despite fewer updates; this short,
+outlier-heavy sample is too variable to rank those radii as production choices.
+The sway-disabled run remains much faster, confirming CPU transform updates
+are a meaningful cost, but these retained-radius trials show they are not the
+only dominant cost. Do not reduce the project default radius based on this
+sweep; the close-range visual tradeoff has not earned the change.
+
+The next performance milestone should target the remaining foliage rendering
+cost while preserving full population and visibility: audit the number and
+layout of HISM components and measure a reversible per-mesh consolidation in a
+scratch copy, with repeated warmed captures. Keep the sway radius and visual
+behavior unchanged during that structural test so its effect is attributable.
+Evidence: `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_143226).csv`
+and `Profile(20261005_143929).csv`; logs are in
+`Saved/Playtests/Codex_SwayRadius1500/` and `Saved/Playtests/Codex_SwayRadius750/`.
