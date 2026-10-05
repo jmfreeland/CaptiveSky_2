@@ -78,6 +78,86 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Tideglass %s-axis pool obstruction: %s."), AxisNames[AxisIndex], bHitPool ? TEXT("yes") : TEXT("no")));
 	}
 
+	// Tideglass is not a route-shortening site, so screen a small, deterministic set of
+	// opposite-bank corridors around the other authored landmarks. This only reports
+	// candidates; it does not create markers, alter navigation, or bless a construction site.
+	struct FCrossingCandidate
+	{
+		float BypassDistance = 0.f;
+		FString Description;
+	};
+	TArray<FCrossingCandidate> Candidates;
+	const FVector RadialAxes[] = { FVector(1.f, 0.f, 0.f), FVector(0.f, 1.f, 0.f) };
+	const TCHAR* RadialAxisNames[] = { TEXT("X"), TEXT("Y") };
+	const float ProbeRadii[] = { 1500.f, 3000.f, 4500.f };
+	for (TActorIterator<AActor> It(Island); It; ++It)
+	{
+		AActor* Landmark = *It;
+		if (!Landmark->ActorHasTag(TEXT("IslandLandmark")) || Landmark->ActorHasTag(TEXT("TideglassPool"))) continue;
+
+		FString LandmarkId = Landmark->GetName();
+		for (const FName Tag : Landmark->Tags)
+		{
+			if (Tag != FName(TEXT("IslandLandmark")) && Tag != FName(TEXT("IslandLife")))
+			{
+				LandmarkId = Tag.ToString();
+				break;
+			}
+		}
+
+		for (int32 AxisIndex = 0; AxisIndex < UE_ARRAY_COUNT(RadialAxes); ++AxisIndex)
+		{
+			for (const float Radius : ProbeRadii)
+			{
+				const FVector Axis = RadialAxes[AxisIndex];
+				FNavLocation BankA, BankB;
+				const FVector DesiredA = Landmark->GetActorLocation() - Axis * Radius;
+				const FVector DesiredB = Landmark->GetActorLocation() + Axis * Radius;
+				const FVector ProjectionExtent(450.f, 450.f, 1200.f);
+				if (!Navigation->ProjectPointToNavigation(DesiredA, BankA, ProjectionExtent) ||
+					!Navigation->ProjectPointToNavigation(DesiredB, BankB, ProjectionExtent)) continue;
+
+				const float ChordLength = FVector::Dist2D(BankA.Location, BankB.Location);
+				if (ChordLength < 1000.f) continue;
+				const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Island, BankA.Location, BankB.Location);
+				if (!Path || !Path->IsValid() || Path->IsPartial()) continue;
+
+				const float PathLength = Path->GetPathLength();
+				const float BypassDistance = PathLength - ChordLength;
+				if (BypassDistance < 500.f || PathLength / ChordLength < 1.2f) continue;
+
+				FHitResult Hit;
+				FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandCrossingCandidateAudit), true);
+				Query.AddIgnoredActor(Landmark);
+				const FVector TraceOffset(0.f, 0.f, 100.f);
+				const bool bHit = Island->LineTraceSingleByChannel(Hit, BankA.Location + TraceOffset,
+					BankB.Location + TraceOffset, ECC_Visibility, Query);
+				if (!bHit) continue;
+
+				const FString Obstacle = Hit.GetActor() ? Hit.GetActor()->GetName() : TEXT("unknown component");
+				Candidates.Add({ BypassDistance, FString::Printf(
+					TEXT("%s %s-axis radius %.0f cm: banks %s / %s; direct chord %.1f m, current nav route %.1f m (%.2fx), trace hits %s."),
+					*LandmarkId, RadialAxisNames[AxisIndex], Radius, *BankA.Location.ToString(), *BankB.Location.ToString(),
+					ChordLength / 100.f, PathLength / 100.f, PathLength / ChordLength, *Obstacle) });
+			}
+		}
+	}
+
+	Candidates.Sort([](const FCrossingCandidate& A, const FCrossingCandidate& B)
+	{
+		return A.BypassDistance > B.BypassDistance;
+	});
+	if (Candidates.IsEmpty())
+	{
+		AddInfo(TEXT("No landmark-centred corridor passed the conservative screen (complete nav route, >1.2x detour, >5 m bypass, blocked direct visibility). This bounded screen does not prove there is no suitable crossing elsewhere."));
+	}
+	else
+	{
+		const int32 ReportedCount = FMath::Min(5, Candidates.Num());
+		AddInfo(FString::Printf(TEXT("Top %d read-only crossing-site candidates (manual water/terrain/footprint review and a later traversal probe are still required):"), ReportedCount));
+		for (int32 Index = 0; Index < ReportedCount; ++Index) AddInfo(Candidates[Index].Description);
+	}
+
 	AddInfo(bAnyCompleteRoute
 		? TEXT("Audit only records the existing route and a straight trace. A crossing is viable only if a completed span later proves a shorter route and physical traversal.")
 		: TEXT("No complete opposite-bank route was found; this pool is not yet a validated resident-project site."));
