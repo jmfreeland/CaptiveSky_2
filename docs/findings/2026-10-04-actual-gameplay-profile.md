@@ -387,3 +387,32 @@ toward 33.3 ms.
 Evidence: `Saved/Playtests/Codex_GrassRenderTrace_20261005/` (the three `.utrace`
 files, per-thread Insights exports, and bounded Game logs) and
 `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_160449).csv`.
+
+### Strictly local 180 cm sway profile (2026-10-05)
+
+A follow-up untraced 200-frame capture used the same all-visible 1600x900
+Tideglass midday Game view, with the scratch-only `FoliageSwayFocusRadius`
+reduced to 180 cm. The full 1,812,286-instance population remained in place,
+and the run completed normally within its 45-second real-time cap. This radius
+matches the existing close resident-brush interaction scale, but it was applied
+to the scratch CPU-sway path only; the production source remains unchanged.
+
+| Measure | 180 cm p50 / p95 | 750 cm p50 / p95 |
+|---|---:|---:|
+| Frame time | 14.12 / 129.57 ms | 142.65 / 251.88 ms |
+| Game Thread | 5.66 / 37.85 ms | — |
+| Render Thread | 13.89 / 112.73 ms | 151.87 / 194.72 ms |
+| GPU | 10.36 / 15.43 ms | 18.09 / 20.88 ms |
+
+At 180 cm, median frame time is near the sway-disabled median and dramatically
+better than the 750 cm condition, while preserving immediate CPU interaction
+near the camera. Its 129.57 ms p95 still misses the 33.3 ms 30-FPS target, so
+this is a promising interaction radius, not a complete performance fix. The
+high p95 tail also means the median alone is not evidence of a shippable result.
+No visual comparison was captured, and the presence of WPO-capable materials
+does not establish that ambient wind remains visibly convincing when the CPU
+radius is this small. Review the full habitat at this setting, verify the wind
+motion in-game, and profile the remaining hitch tail before changing production.
+
+Evidence: `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_161032).csv` and
+`Saved/Playtests/Codex_GrassSway180_Untraced_20261005/`.
