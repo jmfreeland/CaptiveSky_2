@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "IslandCurio.h"
 #include "TimerManager.h"
 #include "IslandWeather.generated.h"
 
@@ -211,6 +212,8 @@ private:
 	/** Closest landmark owns the zone; the exposed core feathers between 50 and 65 metres. */
 	static float CalculateGroundCoverExposure(const FVector& Position, const TArray<FVector>& ExposedAnchors,
 		const TArray<FVector>& OtherAnchors);
+	/** Keep a resident-scale open patch around lasting curios so meadow cover cannot bury them. */
+	static bool IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind);
 	/** Fade a Tideglass wet-edge habitat into the meadow unless another landmark owns the patch. */
 	static float CalculateGroundCoverWetEdgeMoisture(const FVector& Position, const FVector& TideglassAnchor,
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);

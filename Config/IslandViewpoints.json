@@ -192,6 +192,25 @@
 			"fov": 50,
 			"min_height": -1,
 			"night_fireflies": true
+		},
+		{
+			"name": "06_CairnResidentScale",
+			"from": {
+				"at": [
+					-101141.688,
+					98987.866,
+					2889.199
+				]
+			},
+			"look": {
+				"at": [
+					-101391.688,
+					99337.866,
+					2744.199
+				]
+			},
+			"fov": 52,
+			"min_height": -1
 		}
 	]
 }

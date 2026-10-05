@@ -544,11 +544,18 @@ namespace
 					PreviewActors.Add(Actor);
 				}
 			for (const FIslandCurioRecord& Curio : Reader->GetCurios())
+			{
+				bool bAlreadyPreviewed = false;
+				for (TActorIterator<AIslandCurio> It(World.Get()); It; ++It)
+					if (It->ActorHasTag(Curio.Id)) { bAlreadyPreviewed = true; break; }
+				if (bAlreadyPreviewed) continue;
 				if (AIslandCurio* Actor = World->SpawnActor<AIslandCurio>(Curio.Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance), FRotator::ZeroRotator, Spawn))
 				{
+					Actor->Tags.Insert(Curio.Id, 0);
 					Actor->ShowRecord(Curio);
 					PreviewActors.Add(Actor);
 				}
+			}
 			for (const FIslandArrangementSite& Site : Reader->GetArrangementSites())
 				if (AIslandArrangement* Actor = World->SpawnActor<AIslandArrangement>(Site.Location, FRotator::ZeroRotator, Spawn))
 				{
@@ -837,6 +844,28 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 	}
 	if (bGroundCoverPreview)
 	{
+		// Seed transient curio previews before foliage so resident-scale captures exercise the
+		// same persistent-object clearances as play. The latent capture command will reuse these.
+		if (!FParse::Param(FCommandLine::Get(), TEXT("ViewpointNoWorldState")))
+		{
+			const FString StatePath = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState") / (Island->GetMapName() + TEXT(".json")));
+			UIslandWorldStateSubsystem* CurioReader = NewObject<UIslandWorldStateSubsystem>(GetTransientPackage());
+			if (FPaths::FileExists(StatePath) && CurioReader->ReadStateFile(StatePath))
+			{
+				FActorSpawnParameters Spawn;
+				Spawn.ObjectFlags |= RF_Transient;
+				Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				for (const FIslandCurioRecord& Curio : CurioReader->GetCurios())
+					if (AIslandCurio* Actor = Island->SpawnActor<AIslandCurio>(
+						Curio.Location + FVector(0.f, 0.f, AIslandCurio::GroundClearance), FRotator::ZeroRotator, Spawn))
+					{
+						Actor->Tags.Insert(Curio.Id, 0);
+						Actor->ShowRecord(Curio);
+						PreviewActors.Add(Actor);
+					}
+				AddInfo(FString::Printf(TEXT("Preloaded %d read-only curio preview(s) before ground-cover scatter."), CurioReader->GetCurios().Num()));
+			}
+		}
 		if (!PreviewWeather)
 			for (TActorIterator<AIslandWeather> It(Island); It; ++It) { PreviewWeather = *It; break; }
 		if (!PreviewWeather)

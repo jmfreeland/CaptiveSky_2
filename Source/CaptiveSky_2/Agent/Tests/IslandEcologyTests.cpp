@@ -259,6 +259,14 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::CalculateGroundCoverExposure(FVector(3500.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
 	TestEqual(TEXT("Equal-distance habitat ownership preserves the non-exposed habitat"),
 		AIslandWeather::CalculateGroundCoverExposure(FVector(2000.f, 0.f, 0.f), ExposedAnchors, WetEdgeAnchors), 0.f);
+	TestTrue(TEXT("The cairn keeps a small, human-scale open patch"),
+		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(200.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::Cairn));
+	TestFalse(TEXT("The cairn clearance does not erase the surrounding meadow"),
+		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(220.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::Cairn));
+	TestTrue(TEXT("An open seed pod remains visible above nearby grass"),
+		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(160.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::SeedPod));
+	TestFalse(TEXT("Small trail stones clear only their immediate footprint"),
+		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(70.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::PaleStone));
 	const TArray<FVector> NoCompetingHabitats;
 	TestEqual(TEXT("The pool margin begins at full wet-edge influence"),
 		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(500.f, 0.f, 0.f), FVector::ZeroVector,

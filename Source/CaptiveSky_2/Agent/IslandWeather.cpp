@@ -317,7 +317,9 @@ void AIslandWeather::BeginPlay()
 	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
 		WeatherTimeOffset = WorldState->GetSavedWeatherSeconds().Get(0.0);
 	SecondsSinceWeatherSave = 0.f;
-	InitializeGroundCover();
+	// Persistent records are loaded by UIslandWorldStateSubsystem::OnWorldBeginPlay,
+	// after actor BeginPlay. Defer one tick so scatter sees the saved curio locations.
+	GetWorldTimerManager().SetTimerForNextTick(this, &AIslandWeather::InitializeGroundCover);
 	InitializeWeatherAmbience();
 	UpdateCloudRendering();
 	UpdateRainRendering();
@@ -394,6 +396,14 @@ float AIslandWeather::CalculateGroundCoverExposure(const FVector& Position, cons
 	for (const FVector& Anchor : OtherAnchors)
 		if (FVector::DistSquared2D(Position, Anchor) <= ExposedDistanceSquared) return 0.f;
 	return FMath::Clamp((6500.f - FMath::Sqrt(ExposedDistanceSquared)) / 1500.f, 0.f, 1.f);
+}
+
+bool AIslandWeather::IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind)
+{
+	if (Position.ContainsNaN() || CurioPosition.ContainsNaN()) return false;
+	const float ClearanceRadius = Kind == EIslandCurioKind::Cairn ? 210.f :
+		Kind == EIslandCurioKind::SeedPod ? 170.f : 65.f;
+	return FVector::DistSquared2D(Position, CurioPosition) < FMath::Square(ClearanceRadius);
 }
 
 float AIslandWeather::CalculateGroundCoverWetEdgeMoisture(const FVector& Position, const FVector& TideglassAnchor,
@@ -547,8 +557,19 @@ void AIslandWeather::InitializeGroundCover()
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")))
 			OtherHabitatAnchors.Add(It->GetActorLocation());
 	}
-	auto PlaceFoliage = [this, GrassC, &ExposedHabitatAnchors, &OtherHabitatAnchors](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
+	TArray<FIslandCurioRecord> ScatterCurios;
+	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		ScatterCurios = WorldState->GetCurios();
+	// Editor capture fixtures materialize saved curios as transient actors, without a runtime
+	// world-state subsystem. Use those records too so resident-scale previews match gameplay.
+	if (ScatterCurios.IsEmpty())
+		for (TActorIterator<AIslandCurio> It(GetWorld()); It; ++It)
+			ScatterCurios.Add(It->GetRecord());
+	UE_LOG(LogIslandWeather, Log, TEXT("Ground-cover scatter keeps clearances around %d curio(s)."), ScatterCurios.Num());
+	auto PlaceFoliage = [this, GrassC, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
+		for (const FIslandCurioRecord& Curio : ScatterCurios)
+			if (IsWithinCurioGroundCoverClearance(GroundHit.ImpactPoint, Curio.Location, Curio.Kind)) return;
 		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
 		const FQuat Rotation = AlignToGround * Offset.GetRotation();
 		const float JitterScale = Offset.GetScale3D().X;
