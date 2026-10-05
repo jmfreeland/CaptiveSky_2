@@ -124,3 +124,21 @@ components or a reversible density control) against the 30 FPS floor and the
 full habitat composition. Avoid another global cull-distance sweep or Nanite
 foliage trial without a specific, measurable hypothesis. No source change,
 build, or runtime validation is claimed for this follow-up.
+
+## Existing CSV time-series check (2026-10-05)
+
+A read-only check of the 200 numeric rows in the standalone profile above found
+that `FrameTime` had a Pearson correlation of 0.688 with `GameThreadTime`, 0.198
+with `RenderThreadTime`, -0.168 with `RHIThreadTime`, and 0.314 with `GPUTime`.
+`NumInstanceTransformUpdates` had a correlation of -0.154 with `FrameTime`; its
+median was 28,193 over all rows versus 28,232 among the 20 slowest frames. Thus,
+the large update count remains a plausible steady cost, but its per-frame
+variation does not explain the worst-frame variation in this capture. This
+single instrumented run is noisy evidence, not a causal profiler result.
+
+The next paired Game-mode capture should retain the sway ablation as a test of
+steady cost, but also capture a warmed Game Thread profile around `TickActors`
+and representative resident/foliage ticks. Do not prioritize per-frame
+transform-update spikes as the explanation for the slowest frames without a
+new measurement. The 30 FPS gameplay target and complete habitat-composition
+requirement remain unchanged.
