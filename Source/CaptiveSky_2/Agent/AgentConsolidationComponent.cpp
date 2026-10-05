@@ -156,11 +156,8 @@ void UAgentConsolidationComponent::StartConsolidation()
 		FinishSleep();
 		return;
 	}
-	TArray<FAgentMemoryRecord> Memories = Memory->GetMemoriesSince(LastConsolidatedAt);
-	if (Memories.Num() > MaximumMemoriesPerConsolidation)
-	{
-		Memories.RemoveAt(0, Memories.Num() - MaximumMemoriesPerConsolidation);
-	}
+	const TArray<FAgentMemoryRecord> Memories = FilterConsolidationEvidence(
+		Memory->GetMemoriesSince(LastConsolidatedAt), MaximumMemoriesPerConsolidation);
 	if (Memories.IsEmpty())
 	{
 		FinishSleep();
@@ -323,6 +320,28 @@ FString UAgentConsolidationComponent::BuildConsolidationPrompt(const TArray<FAge
 	return Prompt;
 }
 
+TArray<FAgentMemoryRecord> UAgentConsolidationComponent::FilterConsolidationEvidence(
+	const TArray<FAgentMemoryRecord>& Memories, const int32 MaximumMemories)
+{
+	TArray<FAgentMemoryRecord> EligibleMemories;
+	for (const FAgentMemoryRecord& Memory : Memories)
+	{
+		// Keep the synthesis as durable autobiographical memory, but never let it recursively
+		// justify another personality change merely because it is newer than the watermark.
+		if (Memory.Type == EAgentMemoryType::Reflection && Memory.Tags.Contains(TEXT("consolidation")))
+		{
+			continue;
+		}
+		EligibleMemories.Add(Memory);
+	}
+	const int32 BoundedMaximum = FMath::Max(0, MaximumMemories);
+	if (EligibleMemories.Num() > BoundedMaximum)
+	{
+		EligibleMemories.RemoveAt(0, EligibleMemories.Num() - BoundedMaximum);
+	}
+	return EligibleMemories;
+}
+
 bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& ResponseText,
 	const TArray<FAgentMemoryRecord>& Memories)
 {
@@ -338,6 +357,18 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 
 	FString Reflection;
 	Root->TryGetStringField(TEXT("reflection"), Reflection);
+	const TArray<FAgentPersonalityTendency> PreviousTendencies = Tendencies;
+	const int32 PreviousRevision = Revision;
+	const FDateTime PreviousLastConsolidatedAt = LastConsolidatedAt;
+	struct FPendingHistoryEvent
+	{
+		FString TraitName;
+		float PreviousStrength = 0.f;
+		float NewStrength = 0.f;
+		FString Reason;
+		TArray<FString> EvidenceIds;
+	};
+	TArray<FPendingHistoryEvent> PendingHistoryEvents;
 	int32 AppliedCount = 0;
 	TSet<FString> AdjustedTraitsThisSleep;
 	const TArray<TSharedPtr<FJsonValue>>* Adjustments = nullptr;
@@ -394,12 +425,32 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 			Existing->LastReason = Reason;
 			Existing->EvidenceMemoryIds = EvidenceIds;
 			AdjustedTraitsThisSleep.Add(NormalizedTrait);
-			AppendHistory(Existing->Name, PreviousStrength, Existing->Strength, Reason, EvidenceIds);
+			FPendingHistoryEvent& HistoryEvent = PendingHistoryEvents.AddDefaulted_GetRef();
+			HistoryEvent.TraitName = Existing->Name;
+			HistoryEvent.PreviousStrength = PreviousStrength;
+			HistoryEvent.NewStrength = Existing->Strength;
+			HistoryEvent.Reason = Reason;
+			HistoryEvent.EvidenceIds = EvidenceIds;
 			++AppliedCount;
 		}
 	}
 
 	++Revision;
+	LastConsolidatedAt = FDateTime::UtcNow();
+	if (!SaveState())
+	{
+		// The persisted overlay is authoritative: a failed atomic save must not leave an
+		// in-memory personality or history entry that claims a change which was not saved.
+		Tendencies = PreviousTendencies;
+		Revision = PreviousRevision;
+		LastConsolidatedAt = PreviousLastConsolidatedAt;
+		UE_LOG(LogAgentConsolidation, Error, TEXT("Sleep consolidation could not be persisted; personality changes were discarded."));
+		return false;
+	}
+
+	for (const FPendingHistoryEvent& Event : PendingHistoryEvents)
+		AppendHistory(Event.TraitName, Event.PreviousStrength, Event.NewStrength, Event.Reason, Event.EvidenceIds);
+
 	if (!Reflection.IsEmpty())
 	{
 		if (UAgentMemoryComponent* Memory = GetOwner() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr)
@@ -408,12 +459,8 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 				{ TEXT("sleep"), TEXT("consolidation") }));
 		}
 	}
-	// Advance the watermark after writing the derived reflection. Otherwise that reflection is
-	// newer than the watermark and can become the only "new experience" at the next sleep,
-	// allowing personality evolution to recursively feed on its own previous synthesis.
-	LastConsolidatedAt = FDateTime::UtcNow();
 	UE_LOG(LogAgentConsolidation, Log, TEXT("Sleep consolidation applied %d personality adjustment(s)."), AppliedCount);
-	return SaveState();
+	return true;
 }
 
 bool UAgentConsolidationComponent::SaveState() const

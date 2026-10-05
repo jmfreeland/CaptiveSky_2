@@ -67,6 +67,31 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 	Evidence.Timestamp = FDateTime::UtcNow();
 	Evidence.Importance = 0.7f;
 	const TArray<FAgentMemoryRecord> Memories = { Evidence };
+	FAgentMemoryRecord ConsolidationReflection = Evidence;
+	ConsolidationReflection.Id = TEXT("derived-consolidation-reflection");
+	ConsolidationReflection.Type = EAgentMemoryType::Reflection;
+	ConsolidationReflection.Tags.Add(TEXT("consolidation"));
+	ConsolidationReflection.Timestamp = Evidence.Timestamp + FTimespan::FromSeconds(30.0);
+	FAgentMemoryRecord OrdinaryReflection = Evidence;
+	OrdinaryReflection.Id = TEXT("ordinary-reflection");
+	OrdinaryReflection.Type = EAgentMemoryType::Reflection;
+	OrdinaryReflection.Tags.Reset();
+	OrdinaryReflection.Timestamp = Evidence.Timestamp + FTimespan::FromSeconds(10.0);
+	FAgentMemoryRecord RecentObservation = Evidence;
+	RecentObservation.Id = TEXT("lived-memory-2");
+	RecentObservation.Timestamp = Evidence.Timestamp + FTimespan::FromSeconds(20.0);
+	const TArray<FAgentMemoryRecord> CandidateMemories = { Evidence, OrdinaryReflection, RecentObservation, ConsolidationReflection };
+	const TArray<FAgentMemoryRecord> EligibleMemories = UAgentConsolidationComponent::FilterConsolidationEvidence(CandidateMemories, 40);
+	TestEqual(TEXT("Consolidation excludes its own tagged reflection from future evidence"), EligibleMemories.Num(), 3);
+	TestFalse(TEXT("The derived reflection is absent from eligible evidence"),
+		EligibleMemories.ContainsByPredicate([](const FAgentMemoryRecord& Record)
+			{ return Record.Id == TEXT("derived-consolidation-reflection"); }));
+	TestTrue(TEXT("An ordinary reflection remains eligible autobiographical evidence"),
+		EligibleMemories.ContainsByPredicate([](const FAgentMemoryRecord& Record)
+			{ return Record.Id == TEXT("ordinary-reflection"); }));
+	const TArray<FAgentMemoryRecord> CappedMemories = UAgentConsolidationComponent::FilterConsolidationEvidence(CandidateMemories, 2);
+	TestTrue(TEXT("The memory cap retains the newest eligible evidence after filtering"),
+		CappedMemories.Num() == 2 && CappedMemories[0].Id == OrdinaryReflection.Id && CappedMemories[1].Id == RecentObservation.Id);
 	auto MakeAdjustment = [](const TCHAR* Trait, const TCHAR* Direction, const TCHAR* EvidenceId)
 	{
 		return FString::Printf(TEXT("{\"trait\":\"%s\",\"direction\":\"%s\",\"amount\":0.2,\"reason\":\"A lived observation supports this small tendency.\",\"evidence_memory_ids\":[\"%s\"]}"),
@@ -120,6 +145,47 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 	Reloaded->RegisterComponent();
 	TestEqual(TEXT("A later awake instance reloads the bounded personality overlay"), Reloaded->GetEvolvingTendencies().Num(),
 		UAgentConsolidationComponent::MaximumAdjustmentsPerSleep);
+
+	FString StateBeforeFailedSave;
+	FString HistoryBeforeFailedSave;
+	TestTrue(TEXT("The committed personality overlay can be read before the failure probe"),
+		FFileHelper::LoadFileToString(StateBeforeFailedSave, *Consolidation->GetPersonalityStatePath()));
+	TestTrue(TEXT("The committed personality history can be read before the failure probe"),
+		FFileHelper::LoadFileToString(HistoryBeforeFailedSave, *Consolidation->GetPersonalityHistoryPath()));
+	const int32 RevisionBeforeFailedSave = Consolidation->Revision;
+	const FDateTime WatermarkBeforeFailedSave = Consolidation->LastConsolidatedAt;
+	const FAgentPersonalityTendency* CuriosityBeforeFailedSave = Consolidation->Tendencies.FindByPredicate(
+		[](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Equals(TEXT("Curiosity"), ESearchCase::IgnoreCase); });
+	TestNotNull(TEXT("The existing tendency is available before the failure probe"), CuriosityBeforeFailedSave);
+	const FAgentPersonalityTendency CuriositySnapshot = CuriosityBeforeFailedSave ? *CuriosityBeforeFailedSave : FAgentPersonalityTendency();
+	const FString FailedSaveBlocker = Consolidation->GetPersonalityStatePath() + TEXT(".tmp");
+	TestTrue(TEXT("The persistence failure fixture creates its temporary-path blocker"), IFileManager::Get().MakeDirectory(*FailedSaveBlocker, true));
+	const FString FailedResponse = FString(TEXT("{\"reflection\":\"The unsaved thought must not alter who I am.\",\"personality_adjustments\":[")) +
+		TEXT("{\"trait\":\"Curiosity\",\"direction\":\"soften\",\"amount\":0.02,\"reason\":\"This reason must roll back.\",\"evidence_memory_ids\":[\"lived-memory-1\"]},") +
+		MakeAdjustment(TEXT("Patience"), TEXT("strengthen"), TEXT("lived-memory-1")) + TEXT("]}");
+	TestFalse(TEXT("A failed overlay save rejects the consolidation transaction"), Consolidation->ApplyConsolidationResponse(FailedResponse, Memories));
+	TestEqual(TEXT("A failed save restores the prior in-memory tendency count"), Consolidation->Tendencies.Num(),
+		UAgentConsolidationComponent::MaximumAdjustmentsPerSleep);
+	TestFalse(TEXT("An unsaved tendency is absent from the in-memory personality"),
+		Consolidation->Tendencies.ContainsByPredicate([](const FAgentPersonalityTendency& Tendency)
+			{ return Tendency.Name.Equals(TEXT("Patience"), ESearchCase::IgnoreCase); }));
+	const FAgentPersonalityTendency* CuriosityAfterFailedSave = Consolidation->Tendencies.FindByPredicate(
+		[](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Equals(TEXT("Curiosity"), ESearchCase::IgnoreCase); });
+	TestTrue(TEXT("A failed save restores an existing tendency's strength and evidence metadata"),
+		CuriosityAfterFailedSave &&
+		FMath::IsNearlyEqual(CuriosityAfterFailedSave->Strength, CuriositySnapshot.Strength) &&
+		CuriosityAfterFailedSave->LastReason == CuriositySnapshot.LastReason &&
+		CuriosityAfterFailedSave->EvidenceMemoryIds == CuriositySnapshot.EvidenceMemoryIds);
+	TestEqual(TEXT("A failed save restores the prior personality revision"), Consolidation->Revision, RevisionBeforeFailedSave);
+	TestTrue(TEXT("A failed save restores the previous consolidation watermark"), Consolidation->LastConsolidatedAt == WatermarkBeforeFailedSave);
+	FString StateAfterFailedSave;
+	FString HistoryAfterFailedSave;
+	TestTrue(TEXT("The failed save preserves the previous overlay file"),
+		FFileHelper::LoadFileToString(StateAfterFailedSave, *Consolidation->GetPersonalityStatePath()) && StateAfterFailedSave == StateBeforeFailedSave);
+	TestTrue(TEXT("The failed save does not append a misleading personality history event"),
+		FFileHelper::LoadFileToString(HistoryAfterFailedSave, *Consolidation->GetPersonalityHistoryPath()) && HistoryAfterFailedSave == HistoryBeforeFailedSave);
+	TestEqual(TEXT("The failed save does not leave behind its sleep reflection"), Memory->GetMemoryCount(), 1);
+	IFileManager::Get().DeleteDirectory(*FailedSaveBlocker, false, true);
 
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);

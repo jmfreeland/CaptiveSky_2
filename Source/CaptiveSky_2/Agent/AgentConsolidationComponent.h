@@ -109,6 +109,8 @@ private:
 	void AppendPendingSleepExperience();
 	void FinishSleep();
 	void EnsureStateLoaded();
+	static TArray<FAgentMemoryRecord> FilterConsolidationEvidence(const TArray<FAgentMemoryRecord>& Memories,
+		int32 MaximumMemories);
 	bool ApplyConsolidationResponse(const FString& ResponseText, const TArray<FAgentMemoryRecord>& Memories);
 	bool SaveState() const;
 	void AppendHistory(const FString& TraitName, float PreviousStrength, float NewStrength,
