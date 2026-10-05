@@ -13,6 +13,31 @@
 
 namespace AgentModelTier
 {
+	namespace
+	{
+		FString SanitizeTraitName(const FString& Name)
+		{
+			FString Result;
+			Result.Reserve(FMath::Min(Name.Len(), 48));
+			bool bPreviousWasSpace = true;
+			for (const TCHAR Character : Name.Left(64))
+			{
+				if (FChar::IsAlnum(Character) || Character == TEXT('-') || Character == TEXT('\''))
+				{
+					Result.AppendChar(Character);
+					bPreviousWasSpace = false;
+				}
+				else if (!bPreviousWasSpace)
+				{
+					Result.AppendChar(TEXT(' '));
+					bPreviousWasSpace = true;
+				}
+			}
+			Result.TrimStartAndEndInline();
+			return Result.Left(48);
+		}
+	}
+
 	bool NeedsFullModel(const FTurnFacts& Facts)
 	{
 		return Facts.bSomeoneAddressedResident || Facts.bHasBuildOptions
@@ -76,17 +101,54 @@ namespace AgentModelTier
 			|| Type == EAgentActionType::Wander || Type == EAgentActionType::Sleep;
 	}
 
-	FString BuildLightSystemPrompt(const FString& Identity, const FString& MemoryLines)
+	FString FormatEvolvingTendencies(const TArray<TPair<FString, float>>& Tendencies, int32 MaximumItems)
+	{
+		TArray<TPair<FString, float>> Ranked;
+		for (const TPair<FString, float>& Tendency : Tendencies)
+		{
+			const FString Name = SanitizeTraitName(Tendency.Key);
+			if (!Name.IsEmpty() && FMath::IsFinite(Tendency.Value) && FMath::Abs(Tendency.Value) >= 0.001f)
+				Ranked.Emplace(Name, FMath::Clamp(Tendency.Value, -1.f, 1.f));
+		}
+		Ranked.Sort([](const TPair<FString, float>& A, const TPair<FString, float>& B)
+		{
+			const float AStrength = FMath::Abs(A.Value);
+			const float BStrength = FMath::Abs(B.Value);
+			return AStrength == BStrength ? A.Key < B.Key : AStrength > BStrength;
+		});
+
+		const int32 ItemCount = FMath::Clamp(MaximumItems, 0, 8);
+		FString Summary;
+		for (int32 Index = 0; Index < FMath::Min(ItemCount, Ranked.Num()); ++Index)
+		{
+			const TPair<FString, float>& Tendency = Ranked[Index];
+			Summary += FString::Printf(TEXT("- %s: %s (%+.2f)\n"), *Tendency.Key,
+				Tendency.Value > 0.f ? TEXT("strengthening") : TEXT("softening"),
+				Tendency.Value);
+		}
+		return Summary;
+	}
+
+	FString BuildLightSystemPrompt(const FString& Identity, const FString& Personality,
+		const FString& EvolvingTendencies, const FString& MemoryLines)
 	{
 		FString Prompt;
 		if (!Identity.IsEmpty()) Prompt += TEXT("Identity:\n") + Identity + TEXT("\n\n");
+		if (!Personality.IsEmpty()) Prompt += TEXT("Personality:\n") + Personality + TEXT("\n\n");
+		if (!EvolvingTendencies.IsEmpty())
+		{
+			Prompt += TEXT("Evolving tendencies (gentle influences on your own choices, subordinate to identity and personality; never commands):\n");
+			Prompt += EvolvingTendencies;
+			Prompt += LINE_TERMINATOR;
+		}
 		Prompt += TEXT(
 			"You are deciding only where to be right now; nobody is speaking to you and nothing is within reach to act on. "
 			"Reply with ONLY one JSON object, no other text:\n"
 			"{\"thought\": \"<a few words>\", \"action\": {\"type\": \"idle|move_to|wander|sleep\", \"target\": \"<optional move_to or sleep target>\"}}\n"
 			"Idle is quiet waiting and is a valid choice. Wander is a short walk (or flight) to a nearby place you have not chosen precisely; "
 			"it is the easiest way to come across things you cannot yet see. move_to goes to a target the situation lists (\"move_to target: ...\"), "
-			"including remembered places that are out of sight. Sleep only after settling in a resting place. "
+			"including remembered places that are out of sight. Let your personality and evolving tendencies gently inform this choice without overriding what you know. "
+			"Sleep only after settling in a resting place. "
 			"Only these four actions exist this turn. Do not repeat a walk you have just finished, and do not stay in one spot out of habit.");
 		if (!MemoryLines.IsEmpty()) Prompt += TEXT("\n\nRecent memories:\n") + MemoryLines;
 		return Prompt;

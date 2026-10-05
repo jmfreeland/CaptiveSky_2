@@ -39,7 +39,12 @@ namespace AgentModelTier
 	/** The only actions a light turn may take; anything else is dropped as idling. */
 	CAPTIVESKY_2_API bool IsLightAction(EAgentActionType Type);
 
-	CAPTIVESKY_2_API FString BuildLightSystemPrompt(const FString& Identity, const FString& MemoryLines);
+	/** Compact, deterministic summary of the strongest changed tendencies, with a hard prompt-size cap. */
+	CAPTIVESKY_2_API FString FormatEvolvingTendencies(const TArray<TPair<FString, float>>& Tendencies,
+		int32 MaximumItems = 6);
+
+	CAPTIVESKY_2_API FString BuildLightSystemPrompt(const FString& Identity, const FString& Personality,
+		const FString& EvolvingTendencies, const FString& MemoryLines);
 
 	/** "2026-09-28 20:51": prompt-friendly time without seconds, milliseconds or zone noise. */
 	CAPTIVESKY_2_API FString CompactTimestamp(const FDateTime& Time);

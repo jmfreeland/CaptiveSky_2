@@ -29,6 +29,21 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
+namespace
+{
+	FString BuildEvolvingPersonalitySummary(const AActor* Owner)
+	{
+		const UAgentConsolidationComponent* Consolidation = Owner
+			? Owner->FindComponentByClass<UAgentConsolidationComponent>() : nullptr;
+		if (!Consolidation) return FString();
+
+		TArray<TPair<FString, float>> Tendencies;
+		for (const FAgentPersonalityTendency& Tendency : Consolidation->GetEvolvingTendencies())
+			Tendencies.Emplace(Tendency.Name, Tendency.Strength);
+		return AgentModelTier::FormatEvolvingTendencies(Tendencies);
+	}
+}
+
 UAgentBrainComponent::UAgentBrainComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -588,7 +603,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		{
 			const FString Identity = MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd();
 			const FString Personality = MemoryComp->LoadAgentDocument(TEXT("personality.md")).TrimStartAndEnd();
-			const FString EvolvingPersonality = MemoryComp->LoadAgentDocument(TEXT("personality_evolution.json")).TrimStartAndEnd();
+			const FString EvolvingPersonality = BuildEvolvingPersonalitySummary(Owner);
 			if (!Identity.IsEmpty())
 			{
 				Prompt += TEXT("Identity:\n") + Identity;
@@ -812,7 +827,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		Request.ModelOverride = LightModel;
 		Request.ReasoningEffortOverride = AgentModelTier::LightReasoningEffort();
 		Request.SystemPrompt = AgentModelTier::BuildLightSystemPrompt(
-			MemoryComp ? MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd() : FString(), MemoryLines);
+			MemoryComp ? MemoryComp->LoadAgentDocument(TEXT("identity.md")).TrimStartAndEnd() : FString(),
+			MemoryComp ? MemoryComp->LoadAgentDocument(TEXT("personality.md")).TrimStartAndEnd() : FString(),
+			BuildEvolvingPersonalitySummary(Owner), MemoryLines);
 	}
 	else Request.SystemPrompt = BuildSystemPrompt(RelevantMemories);
 	UE_LOG(LogAgentBrain, Log, TEXT("Decision request for %s: %s tier (system prompt %d chars%s; nearest being %d cm, thing %d cm)."),

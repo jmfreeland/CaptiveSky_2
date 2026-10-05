@@ -102,6 +102,7 @@ private:
 	friend class FIslandGuestBookTest;
 	friend class FAgentLingeringTest;
 	friend class FAgentPlacesTest;
+	friend class FAgentConsolidationTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.

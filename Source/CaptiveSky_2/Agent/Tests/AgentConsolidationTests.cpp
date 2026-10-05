@@ -2,6 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 #include "AgentDataPaths.h"
+#include "AgentBrainComponent.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "Engine/Engine.h"
@@ -140,6 +141,14 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 		SavedMemories.ContainsByPredicate([](const FAgentMemoryRecord& Record)
 			{ return Record.Type == EAgentMemoryType::Reflection && Record.Text.Contains(TEXT("storm pass")); }));
 	TestTrue(TEXT("The bounded derived personality state was saved atomically"), FPaths::FileExists(Consolidation->GetPersonalityStatePath()));
+	UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Resident);
+	Resident->AddInstanceComponent(Brain);
+	Brain->RegisterComponent();
+	const FString EvolvedPrompt = Brain->BuildSystemPrompt({});
+	TestTrue(TEXT("The next full thought receives the persisted evolving tendency"),
+		EvolvedPrompt.Contains(TEXT("Evolving evidence-bound tendencies")) && EvolvedPrompt.Contains(TEXT("Curiosity: strengthening")));
+	TestFalse(TEXT("The prompt receives a concise tendency, not private history evidence IDs"),
+		EvolvedPrompt.Contains(TEXT("evidence_memory_ids")));
 	UAgentConsolidationComponent* Reloaded = NewObject<UAgentConsolidationComponent>(Resident);
 	Resident->AddInstanceComponent(Reloaded);
 	Reloaded->RegisterComponent();

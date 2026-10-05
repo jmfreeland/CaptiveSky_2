@@ -43,8 +43,24 @@ bool FAgentModelTierTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Interacting is not"), IsLightAction(EAgentActionType::Interact));
 	TestFalse(TEXT("Building is not"), IsLightAction(EAgentActionType::Build));
 
-	const FString Prompt = BuildLightSystemPrompt(TEXT("You are Aster."), TEXT("- [2026-09-28 20:51] I walked to the cairn.\n"));
+	const TArray<TPair<FString, float>> Tendencies = {
+		{ TEXT("Curiosity"), 0.03f }, { TEXT("Patience"), -0.03f }, { TEXT("Wonder"), 0.01f },
+		{ FString(), 0.9f }, { TEXT("Stillness"), 0.f }
+	};
+	const FString TendencySummary = FormatEvolvingTendencies(Tendencies, 2);
+	TestTrue(TEXT("The bounded tendency summary includes the strongest evolving trait"), TendencySummary.Contains(TEXT("Curiosity")));
+	TestTrue(TEXT("The bounded tendency summary preserves the direction of a softened tendency"), TendencySummary.Contains(TEXT("Patience: softening")));
+	TestFalse(TEXT("The item limit omits weaker tendencies"), TendencySummary.Contains(TEXT("Wonder")));
+	TestFalse(TEXT("Empty or unchanged traits are omitted"), TendencySummary.Contains(TEXT("Stillness")));
+	TestEqual(TEXT("A zero item budget produces no tendency context"), FormatEvolvingTendencies(Tendencies, 0), FString());
+
+	const FString Prompt = BuildLightSystemPrompt(TEXT("You are Aster."), TEXT("Patient, curious, and gentle."),
+		TendencySummary, TEXT("- [2026-09-28 20:51] I walked to the cairn.\n"));
 	TestTrue(TEXT("The light prompt names the resident"), Prompt.Contains(TEXT("You are Aster.")));
+	TestTrue(TEXT("The light prompt includes authored personality"), Prompt.Contains(TEXT("Patient, curious, and gentle.")));
+	TestTrue(TEXT("The light prompt includes evolving tendency context"), Prompt.Contains(TEXT("Curiosity: strengthening")));
+	TestTrue(TEXT("Evolving tendencies remain gentle influences rather than commands"),
+		Prompt.Contains(TEXT("subordinate to identity and personality; never commands")));
 	TestTrue(TEXT("The light prompt offers only the four quiet actions"), Prompt.Contains(TEXT("idle|move_to|wander|sleep")));
 	TestFalse(TEXT("The light prompt does not offer speech"), Prompt.Contains(TEXT("|speak")));
 	TestTrue(TEXT("The light prompt carries recent memories"), Prompt.Contains(TEXT("I walked to the cairn.")));
