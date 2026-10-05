@@ -8,6 +8,7 @@
 #include "IslandFirefly.h"
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
+#include "IslandListeningStonePresentation.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandTideglassDragonfly.h"
@@ -191,6 +192,8 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		if (Chime)
 		{
 			Chime->BeginChime(LocalWind.Size2D());
+			if (UIslandListeningStonePresentationSubsystem* Presentation = World->GetSubsystem<UIslandListeningStonePresentationSubsystem>())
+				Presentation->NotifyChime(LocalWind.Size2D());
 			for (TActorIterator<AIslandFirefly> FireflyIt(World); FireflyIt; ++FireflyIt)
 			{
 				if (FireflyIt->RespondToSoftChime(Chime) &&

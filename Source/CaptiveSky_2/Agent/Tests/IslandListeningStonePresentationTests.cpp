@@ -1,0 +1,136 @@
+#include "Misc/AutomationTest.h"
+#include "Agent/IslandListeningStonePresentation.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/TargetPoint.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStonePresentationTest, "CaptiveSky2.Agent.ListeningStonePresentation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
+{
+	UWorld* Island = nullptr;
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+	{
+		UWorld* Candidate = Context.World();
+		if (Context.WorldType == EWorldType::Editor && Candidate && Candidate->GetMapName() == TEXT("Island"))
+		{
+			Island = Candidate;
+			break;
+		}
+	}
+	if (Island)
+	{
+		AActor* Marker = nullptr;
+		TArray<AStaticMeshActor*> Proxies;
+		TestTrue(TEXT("The saved Island resolves its tagged Listening Stones and three cube proxies"),
+			UIslandListeningStonePresentationSubsystem::FindStoneProxies(Island, Marker, Proxies));
+		TestEqual(TEXT("The saved landmark has exactly three visual proxies"), Proxies.Num(), 3);
+		for (const AStaticMeshActor* Proxy : Proxies)
+		{
+			if (Proxy)
+				AddInfo(FString::Printf(TEXT("Saved Listening Stone %s at %s, extent %s"), *Proxy->GetActorLabel(),
+					*Proxy->GetActorLocation().ToCompactString(), *Proxy->GetStaticMeshComponent()->Bounds.BoxExtent.ToCompactString()));
+		}
+	}
+	else AddInfo(TEXT("The editor Island is not loaded; saved-map proxy recognition was not exercised."));
+
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false)
+		.ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Listening Stones fixture world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+
+	ATargetPoint* Marker = World->SpawnActor<ATargetPoint>(FVector::ZeroVector, FRotator::ZeroRotator);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UStaticMesh* Rock = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
+	if (!TestNotNull(TEXT("Synthetic Listening Stones marker spawns"), Marker) || !TestNotNull(TEXT("Engine cube resolves"), Cube) ||
+		!TestNotNull(TEXT("Starter Content rock resolves"), Rock))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Marker->Tags = {TEXT("ListeningStones"), TEXT("IslandLandmark")};
+
+	const FVector Locations[] = { FVector(-250.f, -100.f, 150.f), FVector(-250.f, 200.f, 112.f), FVector(200.f, 100.f, 134.f) };
+	const float HalfHeights[] = { 151.f, 112.f, 134.f };
+	TArray<AStaticMeshActor*> Proxies;
+	TArray<ECollisionEnabled::Type> OriginalCollision;
+	TArray<bool> OriginalNavigation;
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(Locations); ++Index)
+	{
+		AStaticMeshActor* Proxy = World->SpawnActor<AStaticMeshActor>(Locations[Index], FRotator::ZeroRotator);
+		if (!TestNotNull(FString::Printf(TEXT("Stone proxy %d spawns"), Index), Proxy)) continue;
+		Proxy->GetStaticMeshComponent()->SetStaticMesh(Cube);
+		Proxy->SetActorScale3D(FVector(0.8f, 0.7f, HalfHeights[Index] / 50.f));
+		Proxies.Add(Proxy);
+		OriginalCollision.Add(Proxy->GetStaticMeshComponent()->GetCollisionEnabled());
+		OriginalNavigation.Add(Proxy->GetStaticMeshComponent()->CanEverAffectNavigation());
+	}
+	if (Proxies.Num() != 3)
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Proxies[1]->SetActorHiddenInGame(true);
+
+	World->BeginPlay();
+	UIslandListeningStonePresentationSubsystem* Subsystem = World->GetSubsystem<UIslandListeningStonePresentationSubsystem>();
+	TestNotNull(TEXT("Game world has the transient landmark subsystem"), Subsystem);
+	AListeningStonePresentation* Presentation = nullptr;
+	for (TActorIterator<AListeningStonePresentation> It(World); It; ++It) { Presentation = *It; break; }
+	TestNotNull(TEXT("Game start creates a transient stone presentation"), Presentation);
+	if (Presentation)
+	{
+		TestEqual(TEXT("Three monolith forms match the three blockout proxies"), Presentation->GetStoneCount(), 3);
+		TestTrue(TEXT("Replacement render component is collisionless"), Presentation->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Replacement forms do not affect navigation"), Presentation->Stones->CanEverAffectNavigation());
+		TestTrue(TEXT("Existing Starter Content rock is used"), Presentation->Stones->GetStaticMesh() == Rock);
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			FTransform Instance;
+			TestTrue(FString::Printf(TEXT("Stone form %d has a fitted transform"), Index), Presentation->Stones->GetInstanceTransform(Index, Instance, true));
+			TestTrue(FString::Printf(TEXT("Stone form %d stays centered on its proxy bounds"), Index),
+				Instance.GetLocation().Equals(Proxies[Index]->GetStaticMeshComponent()->Bounds.Origin, 1.f));
+			TestEqual(FString::Printf(TEXT("Proxy %d collision setting is unchanged"), Index),
+				Proxies[Index]->GetStaticMeshComponent()->GetCollisionEnabled(), OriginalCollision[Index]);
+			TestEqual(FString::Printf(TEXT("Proxy %d navigation setting is unchanged"), Index),
+				Proxies[Index]->GetStaticMeshComponent()->CanEverAffectNavigation(), OriginalNavigation[Index]);
+		}
+	}
+	TestTrue(TEXT("Presentation hides the map visuals only in Game"), Proxies[0]->IsHidden() && Proxies[1]->IsHidden() && Proxies[2]->IsHidden());
+
+	if (Subsystem && Presentation)
+	{
+		Subsystem->NotifyChime(180.f);
+		TestTrue(TEXT("A chime starts a finite stone resonance"), Presentation->IsActorTickEnabled() && Presentation->GetResonanceRemaining() > 2.7f);
+		TestTrue(TEXT("Resonance lights are briefly visible"), Presentation->ResonanceLights[0]->IsVisible() && Presentation->ResonanceLights[1]->IsVisible() && Presentation->ResonanceLights[2]->IsVisible());
+		Presentation->Tick(2.9f);
+		TestFalse(TEXT("The resonance stops ticking after its bounded duration"), Presentation->IsActorTickEnabled());
+		TestFalse(TEXT("The resonance lights switch off after the chime"), Presentation->ResonanceLights[0]->IsVisible() || Presentation->ResonanceLights[1]->IsVisible() || Presentation->ResonanceLights[2]->IsVisible());
+		Subsystem->RestorePresentation();
+	}
+	TestFalse(TEXT("An initially visible map proxy restores visible"), Proxies[0]->IsHidden());
+	TestTrue(TEXT("An initially hidden map proxy stays hidden"), Proxies[1]->IsHidden());
+	TestFalse(TEXT("The third proxy restores visible"), Proxies[2]->IsHidden());
+	bool bPresentationRemains = false;
+	for (TActorIterator<AListeningStonePresentation> It(World); It; ++It) bPresentationRemains = true;
+	TestFalse(TEXT("Transient presentation actor is destroyed on restore"), bPresentationRemains);
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
