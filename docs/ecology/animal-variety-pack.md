@@ -35,40 +35,37 @@ animation displacement. It wanders within a 7 m home radius, rests on the existi
 and offers only a quiet, reversible observation response. `IslandLife`
 wildlife is not a resident movement target for either Aster or the Raven; no LLM calls, persistent
 facts, or ownership are involved. The automation fixture is in
-`Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`. The source and fixture now compile to
-scratch objects, but have not been linked into or run by the editor; no actor has been placed in or
-saved to the map. The procedural Raven remains intact. Next, link a current module and validate this
-class and spawn path in UE 5.8.3, then compare the rigged Crow against the procedural Raven at gameplay
-scale while preserving the Raven's locomotion states and reversible fallback. If any animal later
-becomes a conscious named resident, give it an explicit memory/personality directory and request
-budget. Preserve the shared request safeguards.
+`Source/CaptiveSky_2/Agent/Tests/IslandForestStagTests.cpp`.
 
-The current editor tests are definitively against an old module:
-`Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` is timestamped 2026-10-01 09:18, while the ecology
-test source is from 2026-10-04 04:50 and the
-wildlife/weather source is from 2026-10-04 07:17 onward. In that stale module,
-`CaptiveSky2.Agent.NightEcology` fails at the assertion that weather creates a transient dynamic
-cloud-material instance; the map has `VolumetricCloud_0` with
-`/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst`. The test's cleanup restores the
-authored material after probing. `CaptiveSky2.Agent.SessionSafety` passed in the same stale module,
-so neither result validates the current source.
+On 2026-10-05 the current isolated UE 5.8.3 scratch module
+(`Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Binaries/Win64/UnrealEditor-CaptiveSky_2.dll`,
+timestamp 16:09) passed `CaptiveSky2.Agent.WoodlandDeer` with a separate 45-second play cap, zero
+model requests, `-NullRHI`, and an isolated data root. The fixture verifies the imported mesh and
+four matching animations, disabled root motion and collision, wildlife/target eligibility, respectful
+inspection, a startle response bounded to the 7 m home radius, and reversible night rest. Log:
+[`Codex_WoodlandDeer_20261005.log`](../../Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Logs/Codex_WoodlandDeer_20261005.log).
+UE/EOS also emitted blocked outbound-connectivity warnings during startup; the automation still
+completed, and the explicit zero-model-request cap remained in force.
+This proves the actor and interaction fixture in the current scratch build, not its appearance or
+spawn location in the saved Island. The procedural Raven remains intact. Next, compare the rigged Crow
+against the procedural Raven at gameplay scale while preserving the Raven's locomotion states and
+reversible fallback. If any animal later becomes a conscious named resident, give it an explicit
+memory/personality directory and request budget. Preserve the shared request safeguards.
 
-A fresh UE 5.8.3 build was attempted in an isolated project copy under
-`Saved/CompileScratch/Codex_DeerBuild_20261004/Project`, leaving the open editor and its binary
-untouched. UBT produced no diagnostics or intermediate files after five minutes, and its launched
-process remained idle; that process was stopped. An older unidentified `dotnet` process remains, so
-the build mutex was not bypassed and no other process was touched. Rebuild and rerun both tests, then
-inspect the weather pass before changing the cloud asset or weakening the assertion. The stag test
-and its runtime spawn path remain unverified until a current-source build is available.
+The main editor module remains older than source:
+`Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` is timestamped 2026-10-04 19:11. Do not treat automation
+run inside that editor as current-source evidence. `CaptiveSky2.Agent.NightEcology` previously failed
+in the stale module at the assertion that weather creates a transient dynamic cloud-material
+instance; the map has `VolumetricCloud_0` with
+`/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst`. Cleanup restores the authored
+material after probing. That failure remains unresolved against current source, and no actor has been
+placed in or visually validated on the saved map.
 
-On 2026-10-04, UHT was run against a scratch copy of the editor manifest with the new stag header
-added and all project-module generated output redirected to `Saved/CompileScratch/Codex_UHT_20261004`.
-It succeeded in 94 seconds, leaving the editor's generated files, binary, and map untouched. VS 2022
-then compiled eight current translation units to scratch objects using that fresh `IslandWeather`
-reflection output plus existing generated headers: `IslandForestStag.cpp`, its automation test,
-`IslandWeather.cpp`, `IslandEcologyTests.cpp`, `IslandInteractionUtility.cpp`,
-`AgentBrainComponent.cpp`, `AutonomousAgentAIController.cpp`, and `RavenAgentAIController.cpp`. This
-resolves the stale-UHT barrier for source compilation, but it is not a full module link and does not
-prove runtime behavior. The already-open editor still has the 2026-10-01 module; do not use its
-automation results as current-source evidence. Next, link a current module in isolation and run the
-stag/ecology tests without changing the live map or replacing the editor DLL.
+Earlier (2026-10-04), UHT succeeded against a scratch editor manifest and VS 2022 compiled eight
+current translation units to scratch objects, including `IslandForestStag.cpp`, its test,
+`IslandWeather.cpp`, and related interaction/prompt sources. A later isolated module link was
+completed for the 2026-10-05 scratch tests described above. Those tests validate the stag fixture and
+personality consolidation, not the weather spawn path, cloud pass, live model behavior, target-hardware
+performance, or visual quality. Next, run the ecology/weather suite against a current isolated build,
+then inspect the stag and cloud behavior in the live Island before comparing Crow and Raven at
+gameplay scale.
