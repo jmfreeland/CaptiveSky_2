@@ -731,3 +731,44 @@ Evidence: `Saved/Logs/Codex_RHIThreadOnNoShots_SwayOff_20261006.log`,
 `Saved/Logs/Codex_RHIThreadOnNoShotsRepeat_20261006.log`. Their `.utrace` files
 and per-thread, frame, timer, and wait-event CSV exports are alongside the
 initial traces.
+
+### Bounded current Tideglass Game sample (2026-10-07)
+
+Two standalone Game runs used `Scripts/Start-Spectator.ps1`, the five-entry
+Tideglass-only camera file, unique isolated `-DataRoot` folders,
+`-DisableAgentThinking`, and explicit short play/request caps. Neither changed
+source, Content assets, or the normal saved-world state.
+
+The first run lasted 120 seconds and captured a 300-frame CSV, but one
+`002_Tideglass` screenshot was encoded during the 6.26-second sample. Prior
+trace work shows screenshot encoding can cause large hitches, so its
+467.60 ms maximum and four >100 ms frames are contaminated and are not used as
+clean gameplay metrics. It did verify runtime Tideglass water/shore visuals and
+produced [`012_Tideglass.png`](../Saved/Playtests/Codex_PerfBaseline_20261007/Screenshots/012_Tideglass.png).
+
+The follow-up disabled both screenshots and Python, kept agent thinking
+disabled, used a 60-second realtime / one-request cap, and sampled 600 frames
+for 9.53 seconds beginning ten seconds after spectator startup. It ended
+normally after 60.2 seconds with zero model requests and no Python startup
+tracebacks.
+
+| Track | Mean | p50 | p95 | Maximum | >33.3 ms | >100 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Frame | 15.88 ms | 14.62 ms | 24.76 ms | 47.86 ms | 11 / 600 | 0 / 600 |
+| Game thread | 5.81 ms | 5.31 ms | 6.70 ms | 41.40 ms | 2 / 600 | 0 / 600 |
+| Render thread | 15.66 ms | 14.62 ms | 19.08 ms | 47.96 ms | 9 / 600 | 0 / 600 |
+| GPU | 12.88 ms | 11.95 ms | 16.99 ms | 18.16 ms | 0 / 600 | 0 / 600 |
+
+For this fixed spectator view, the p95 frame time corresponds to about 40.4
+FPS, with no >100 ms hitch in the clean sample. The render thread is the largest
+regular track, while the GPU is also a significant cost. The window/system
+resolution settled at 1600×900 before sampling (startup initially logged
+1280×720). This still is not a player-controlled moving run: the camera repeats
+the Tideglass framing and agent thinking is disabled. The result therefore does
+not overturn the older 8–13-FPS PIE report or establish 30 FPS for the whole
+Island. A matched 1080p moving-play trace remains the next useful comparison.
+
+Logs: [`Codex_PerfBaseline_20261007.log`](../Saved/Logs/Codex_PerfBaseline_20261007.log)
+and [`Codex_PerfNoShot_20261007.log`](../Saved/Logs/Codex_PerfNoShot_20261007.log).
+The screenshot-free 600-frame CSV is
+`Saved/Profiling/CSV/Profile(20261007_004028).csv`.
