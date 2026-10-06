@@ -542,3 +542,51 @@ population.
 Evidence: `Saved/Logs/Codex_SeaTraceWarm_20261006.log`,
 `Saved/Profiling/Traces/Codex_SeaTraceWarm_20261006.utrace`, and the Insights
 exports under the current user's temporary directory.
+
+### Matched dynamic-GI diagnostic (2026-10-06)
+
+A second 30-second Insights frame window repeated the same standalone Game view,
+camera, resolution, 180 cm capture-only foliage sway radius, full
+1,779,877-instance ground-cover population, 45-second settle delay, and warmed
+DDC. The only runtime setting changed was
+`r.DynamicGlobalIlluminationMethod=0`, applied by the new opt-in
+`-DisableDynamicGlobalIllumination` flag in `Start-Spectator.ps1`. The log
+confirms the CVar was set to zero; project defaults were not changed. Agent
+thinking/Python were disabled and the run exited normally at 120.1 seconds with
+zero model requests. The selected frame-event tracks each span 30.0 seconds.
+
+An earlier GI-off pilot used the production 3000 cm sway radius rather than
+180 cm, so it is excluded from the matched comparison below.
+
+| Frame track | GI | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Game Thread | On | 15.89 ms | 111.30 ms | 129.15 ms | 160.58 ms | 250 / 932 | 107 / 932 |
+| Game Thread | Off | 15.73 ms | 59.20 ms | 79.22 ms | 478.16 ms | 228 / 1141 | 11 / 1141 |
+| Render Thread | On | 15.64 ms | 108.36 ms | 115.30 ms | 160.44 ms | 240 / 935 | 119 / 935 |
+| Render Thread | Off | 14.76 ms | 61.84 ms | 85.78 ms | 471.24 ms | 228 / 1142 | 11 / 1142 |
+| GPU frame track | On | 15.81 ms | 102.91 ms | 110.02 ms | 157.30 ms | 240 / 931 | 73 / 931 |
+| GPU frame track | Off | 14.85 ms | 59.56 ms | 78.06 ms | 471.86 ms | 223 / 1141 | 11 / 1141 |
+
+The GI-off p95 is about 43–46% lower and >100 ms frames fell sharply, while
+the p50 barely changed. In the GI-on trace, Lumen scene primitive update scopes
+reached 149.89 ms (`BeginUpdateLumenSceneTasks`) and 147.52 ms
+(`UpdateLumenScenePrimitives`); those Lumen update timers were absent in the
+off trace. This is strong evidence that dynamic-GI scene updates account for a
+large part of the long hitch tail in this capture, not proof that turning off
+GI is a shippable fix. The off run still misses the 33.3 ms p95 budget and has
+one ~478 ms outlier; skinning and scene-culling/GPU-scene work also remain
+visible (about 68–73 ms maxima in the off trace).
+
+The off screenshot looks flatter and patchier, but the captures used separate
+isolated world-state roots, so procedural scatter and lighting are not a clean
+visual A/B. Review the screenshots and repeat with an identical deterministic
+world-state seed before drawing an appearance conclusion. Keep dynamic GI on in
+the project. Next, investigate ways to reduce Lumen's per-frame primitive
+update churn while retaining its indirect lighting, then compare repeated
+on/off samples and the same seeded scenic view against both the 30-FPS p95
+target and full habitat presentation.
+
+Evidence: `Saved/Logs/Codex_LumenOffTrace180_20261006.log`,
+`Saved/Profiling/Traces/Codex_LumenOffTrace180_20261006.utrace`,
+`Playtests/Codex_SeaTraceWarm_20261006/Screenshots/001_Tideglass.png`, and
+`Playtests/Codex_LumenOffTrace180_20261006/Screenshots/001_Tideglass.png`.

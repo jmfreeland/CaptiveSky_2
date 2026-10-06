@@ -47,6 +47,7 @@ param(
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
 	[switch]$DisableGroundCoverSway,
+	[switch]$DisableDynamicGlobalIllumination,
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
 	[switch]$Continuous,
@@ -129,6 +130,7 @@ if ($PSBoundParameters.ContainsKey("CSVProfileDelaySeconds")) {
 if ($PSBoundParameters.ContainsKey("FoliageSwayRadiusCm")) {
 	$execCommands += "CaptiveSky.Island.FoliageSwayFocusRadiusCm $FoliageSwayRadiusCm"
 }
+if ($DisableDynamicGlobalIllumination) { $execCommands += "r.DynamicGlobalIlluminationMethod 0" }
 if ($execCommands.Count -gt 0) { $arguments += "-ExecCmds=$($execCommands -join ',')" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
