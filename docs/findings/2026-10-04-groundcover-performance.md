@@ -317,17 +317,32 @@ existing CPU ground-cover sway path and default game behavior are unchanged. The
 automation passed and checks the published values; this establishes parameter wiring, not
 that the asset interprets heading units or produces a visually correct response.
 
-A real game-mode preview was attempted with CPU ground-cover sway disabled, agent thinking
-and Python disabled, one maximum model request, an isolated data/cache directory, and a
-90-second realtime cap. Its log stopped during engine startup immediately after Slate
-initialization, before map/world initialization, screenshots, or the delayed CSV profile.
-No game process remained at the follow-up process check. The Unreal Editor process was
-running, but the desktop connection exposed no app windows, so no visual inspection was
-possible. This is an incomplete preview, not a gameplay failure or a successful wind result.
+The bounded UE 5.8.3 game preview eventually completed after a long cold shader/PSO startup.
+It ran with CPU ground-cover sway disabled, agent thinking and Python disabled, one maximum
+model request, isolated data/cache directories, and a 90-second realtime cap; it exited
+normally at the cap. The paired baseline used the same settings and viewpoint without the
+material-wind flag and also exited normally. Both captured 200 CSV frames, all with frame
+intervals under one second, from the 1600x900 Tideglass view on an RTX 4080 Laptop GPU.
 
-Keep the bridge opt-in. When a visible/launchable UE 5.8.3 game session is available, run a
-matched pair at the same Tideglass viewpoint, hour, and seeded world state: CPU sway disabled
-in both, material wind disabled for the baseline and enabled for the trial. Inspect close
-foliage motion and the 11:00 composition, then compare uncontended p95 frame intervals. Confirm
-the direction convention from the material graph/runtime response before considering enabling
-this path by default. Preserve the existing bounded-session safeguards for both captures.
+| Capture | Frame-time median | Frame-time p95 | Render-thread p95 | GPU p95 | p95 throughput |
+|---|---:|---:|---:|---:|---:|
+| CPU sway off, material wind off | 14.89 ms | 20.31 ms | 19.22 ms | 17.49 ms | 49.23 FPS |
+| CPU sway off, material wind on | 14.84 ms | 18.06 ms | 18.50 ms | 16.95 ms | 55.38 FPS |
+
+These single captures both clear the 30 FPS p95 screen for this one view, but are not a
+packaged-game or broad-scene guarantee. The small difference is not evidence that enabling
+material wind improves performance; the useful result is that no obvious render-cost penalty
+appeared in this sample. Logs are `Saved/Logs/Codex_FoliageMaterialWind_Game_20261006.log`
+and `Saved/Logs/Codex_FoliageMaterialWind_Baseline_Game_20261006.log`; CSVs are
+`Saved/Profiling/CSV/Profile(20261006_104426).csv` and
+`Saved/Profiling/CSV/Profile(20261006_105631).csv`. The paired `002_Tideglass.png` captures
+are in `Playtests/Codex_FoliageMaterialWind_20261006/Screenshots/` and
+`Playtests/Codex_FoliageMaterialWind_Baseline_20261006/Screenshots/`. They show the same
+composition, but static images (with the profiler counter visible)
+do not establish that the foliage moves naturally or that the material’s heading convention
+is correct.
+
+Keep the bridge opt-in. The next visual check should inspect the PN material graph or capture
+the same close foliage at a fixed camera over time with known headings, then verify direction
+and amplitude. Preserve the existing bounded-session safeguards; repeat the A/B only if a
+stable render-cost comparison is needed.
