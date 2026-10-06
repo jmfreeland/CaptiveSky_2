@@ -24,6 +24,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -DisableOcclusionQueries -DataRoot Saved/Playtests/OcclusionOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/OcclusionOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/OcclusionOff.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -DisableOcclusionQueries -DisableRHIThread -DataRoot Saved/Playtests/RHIThreadOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RHIThreadOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RHIThreadOff.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/WarmProfile -MaxRealtimeSeconds 180 -MaxModelRequests 1 -ScreenshotDirectory Playtests/WarmProfile/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -CSVProfileDelaySeconds 45
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/RenderTrace -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RenderTrace/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RenderTrace.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
@@ -49,6 +50,7 @@ param(
 	[switch]$DisablePython,
 	[switch]$DisableGroundCoverSway,
 	[switch]$DisableOcclusionQueries,
+	[switch]$DisableRHIThread,
 	[switch]$DisableDynamicGlobalIllumination,
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
@@ -133,6 +135,7 @@ if ($PSBoundParameters.ContainsKey("FoliageSwayRadiusCm")) {
 	$execCommands += "CaptiveSky.Island.FoliageSwayFocusRadiusCm $FoliageSwayRadiusCm"
 }
 if ($DisableOcclusionQueries) { $execCommands += "r.AllowOcclusionQueries 0" }
+if ($DisableRHIThread) { $execCommands += "r.RHIThread.Enable 0" }
 if ($DisableDynamicGlobalIllumination) { $execCommands += "r.DynamicGlobalIlluminationMethod 0" }
 if ($execCommands.Count -gt 0) { $arguments += "-ExecCmds=$($execCommands -join ',')" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }

@@ -678,3 +678,46 @@ Evidence: `Saved/Logs/Codex_OcclusionOff_SwayOff_20261006.log`,
 `Saved/Profiling/Traces/Codex_OcclusionOff_SwayOff_20261006.utrace`, and the
 frame/wait exports in that trace directory; the baseline exports are under the
 current user's temporary directory.
+
+### Matched RHI-thread ablation (capture-only; 2026-10-06)
+
+To follow the remaining `GameThreadWaitForTask` path, added the diagnostic
+`-DisableRHIThread` switch to `Scripts/Start-Spectator.ps1`. It appends
+`r.RHIThread.Enable 0` to the launch `-ExecCmds`; the runtime log confirms the
+RHI thread was disabled. This is a capture-only option, not a project default.
+
+The first RHI-off capture included screenshots, and its largest hitch aligned
+with `ScreenshotTracing_Execute`/PNG compression. It is excluded from this
+comparison. These two screenshot-free captures instead used the same Tideglass
+camera, 1600x900 resolution, Lumen-on scene, 180 cm sway radius, full ground
+cover, disabled CPU sway and occlusion queries, 45-second settle, and 30-second
+trace. Both runs reached the 120-second safety cap with zero model requests.
+Their DataRoots were separate, so this is a matched-settings diagnostic rather
+than a seed-identical A/B.
+
+| Frame track | RHI thread | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Game | On | 15.28 ms | 17.90 ms | 27.02 ms | 481.85 ms | 11 / 1620 | 11 / 1620 |
+| Game | Off | 21.49 ms | 24.93 ms | 26.37 ms | 38.50 ms | 1 / 1385 | 0 / 1385 |
+| Render | On | 15.32 ms | 18.13 ms | 34.83 ms | 478.24 ms | 17 / 1620 | 11 / 1620 |
+| Render | Off | 21.50 ms | 24.93 ms | 26.44 ms | 37.80 ms | 1 / 1385 | 0 / 1385 |
+| GPU frame track | On | 14.21 ms | 19.58 ms | 21.29 ms | 476.99 ms | 11 / 1621 | 11 / 1621 |
+| GPU frame track | Off | 22.09 ms | 26.61 ms | 28.30 ms | 31.87 ms | 0 / 1387 | 0 / 1387 |
+
+In the RHI-off trace, `GameThreadWaitForTask` and `Sync_RenderingThread` max
+out at about 23 ms, and `WaitForVisibilityTasks` at 1.82 ms. The RHI-on
+counterpart had a ~478 ms `GameThreadWaitForTask`/`Sync_RenderingThread` event
+and a ~454 ms `SyncPoint_Wait`. The screenshot-free RHI-off sample therefore
+supports the hypothesis that this synchronization path causes the rare
+half-second hitch, while also showing a clear steady-state cost: p50 rises by
+about 6–8 ms and p95 by about 7–9 ms. It is not a production fix or a 30-FPS
+guarantee; one run per condition, independent procedural placement, and a single
+remaining ~38 ms frame limit the conclusion. Keep the RHI thread enabled in
+production. Next, identify what makes the RHI-thread synchronization occasionally
+block for hundreds of milliseconds, then repeat both conditions before changing
+runtime defaults.
+
+Evidence: `Saved/Logs/Codex_RHIThreadOnNoShots_SwayOff_20261006.log`,
+`Saved/Logs/Codex_RHIThreadOffNoShots_SwayOff_20261006.log`, the matching
+`.utrace` files under `Saved/Profiling/Traces/`, and the per-thread, frame,
+timer, and wait-event CSV exports in the same directory.
