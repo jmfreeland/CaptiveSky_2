@@ -305,34 +305,38 @@ is under `2026-10-04_143109_h11.0/` in the same scratch Viewpoints directory; th
 `Saved/Logs/Codex_MidgroundBaselineRestore_20261004.log`. Only these findings are committed;
 the rejected source trial is absent from the shipped tree and freshly built main module.
 
-## Opt-in Fab foliage wind bridge (2026-10-06, visual validation pending)
+## Weather-driven Fab foliage wind bridge (2026-10-06, visual validation pending)
 
 The project’s Fab foliage materials include `PN_WindAnimation` and use the shared
 `PN_WindParameters` collection. The UE 5.8.3 `CaptiveSky2.Agent.IslandEnvironment` automation
 loaded that real collection and confirmed its scalar inputs are named `WindDirection` and
-`WindStrength` (defaults 0 and 1). A source-side prototype publishes the simulated ambient
-wind heading and normalized strength to those inputs, but only when
-`-IslandEnableFoliageMaterialWind` is supplied (or a test collection override is set). The
-existing CPU ground-cover sway path and default game behavior are unchanged. The focused
-automation passed and checks the published values; this establishes parameter wiring, not
-that the asset interprets heading units or produces a visually correct response.
+`WindStrength` (defaults 0 and 1). Before this change, those Fab defaults drove built-in WPO
+animation at fixed heading 0 and full strength. The weather-driven bridge now publishes
+simulated ambient heading and normalized strength during normal play. Pass
+`-IslandDisableFoliageMaterialWind` to restore the Fab fixed defaults, or supply a test
+collection override to force publication in a fixture. CPU ground-cover sway remains a
+separate behavior. The focused automation passed and checks default/opt-out selection and the
+published values; this establishes parameter wiring, not that the parent material maps heading
+correctly or looks natural.
 
 The bounded UE 5.8.3 game preview eventually completed after a long cold shader/PSO startup.
 It ran with CPU ground-cover sway disabled, agent thinking and Python disabled, one maximum
 model request, isolated data/cache directories, and a 90-second realtime cap; it exited
 normally at the cap. The paired baseline used the same settings and viewpoint without the
-material-wind flag and also exited normally. Both captured 200 CSV frames, all with frame
+weather-wind flag and also exited normally. Both captured 200 CSV frames, all with frame
 intervals under one second, from the 1600x900 Tideglass view on an RTX 4080 Laptop GPU.
 
 | Capture | Frame-time median | Frame-time p95 | Render-thread p95 | GPU p95 | p95 throughput |
 |---|---:|---:|---:|---:|---:|
-| CPU sway off, material wind off | 14.89 ms | 20.31 ms | 19.22 ms | 17.49 ms | 49.23 FPS |
-| CPU sway off, material wind on | 14.84 ms | 18.06 ms | 18.50 ms | 16.95 ms | 55.38 FPS |
+| CPU sway off, fixed Fab defaults (`WindDirection=0`, `WindStrength=1`) | 14.89 ms | 20.31 ms | 19.22 ms | 17.49 ms | 49.23 FPS |
+| CPU sway off, weather-driven Fab values | 14.84 ms | 18.06 ms | 18.50 ms | 16.95 ms | 55.38 FPS |
 
 These single captures both clear the 30 FPS p95 screen for this one view, but are not a
-packaged-game or broad-scene guarantee. The small difference is not evidence that enabling
-material wind improves performance; the useful result is that no obvious render-cost penalty
-appeared in this sample. Logs are `Saved/Logs/Codex_FoliageMaterialWind_Game_20261006.log`
+packaged-game or broad-scene guarantee. This is a comparison of weather-driven MPC updates
+against the Fab’s fixed default values—not wind enabled versus disabled. The small difference
+is not evidence of a speedup; the useful result is that no obvious render-cost penalty from
+the weather-driven updates appeared in this sample. Logs are
+`Saved/Logs/Codex_FoliageMaterialWind_Game_20261006.log`
 and `Saved/Logs/Codex_FoliageMaterialWind_Baseline_Game_20261006.log`; CSVs are
 `Saved/Profiling/CSV/Profile(20261006_104426).csv` and
 `Saved/Profiling/CSV/Profile(20261006_105631).csv`. The paired `002_Tideglass.png` captures
@@ -351,7 +355,8 @@ completed its graph enumeration, but the Python commandlet raised an access viol
 shutdown (`Saved/Logs/Codex_PNWindGraph3_20261006.log`); treat the emitted graph data as
 diagnostic evidence, not a clean commandlet pass. No Content asset was changed.
 
-Keep the bridge opt-in. The next visual check should inspect the PN material graph or capture
+The weather-driven bridge is now default-on, with `-IslandDisableFoliageMaterialWind` as a
+reversible opt-out. The next visual check should inspect the parent PN material graph or capture
 the same close foliage at a fixed camera over time with known headings, then verify direction
 and amplitude. Preserve the existing bounded-session safeguards; repeat the A/B only if a
 stable render-cost comparison is needed.

@@ -95,6 +95,12 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	}
 
 	// Pure rules first.
+	TestTrue(TEXT("Weather-driven Fab foliage wind is enabled by default"),
+		UIslandEnvironmentSubsystem::ShouldPublishWeatherDrivenFoliageWind(false, false));
+	TestFalse(TEXT("The opt-out preserves the Fab collection's fixed defaults"),
+		UIslandEnvironmentSubsystem::ShouldPublishWeatherDrivenFoliageWind(true, false));
+	TestTrue(TEXT("A test collection override still enables weather-driven publication"),
+		UIslandEnvironmentSubsystem::ShouldPublishWeatherDrivenFoliageWind(true, true));
 	float Wet = 0.f;
 	for (int32 Second = 0; Second < 60; ++Second) Wet = UIslandEnvironmentSubsystem::StepWetness(Wet, 1.f, 0.5f, 0.f, 1.f);
 	TestTrue(TEXT("A minute of heavy rain soaks the ground"), FMath::IsNearlyEqual(Wet, 1.f));

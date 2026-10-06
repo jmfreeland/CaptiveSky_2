@@ -47,13 +47,14 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	Collection = CollectionOverride ? CollectionOverride.Get() : LoadObject<UMaterialParameterCollection>(nullptr, CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
-	bFoliageMaterialWindEnabled = FParse::Param(FCommandLine::Get(), TEXT("IslandEnableFoliageMaterialWind")) || FoliageWindCollectionOverride != nullptr;
+	bFoliageMaterialWindEnabled = ShouldPublishWeatherDrivenFoliageWind(
+		FParse::Param(FCommandLine::Get(), TEXT("IslandDisableFoliageMaterialWind")), FoliageWindCollectionOverride != nullptr);
 	if (bFoliageMaterialWindEnabled)
 	{
 		FoliageWindCollection = FoliageWindCollectionOverride ? FoliageWindCollectionOverride.Get()
 			: LoadObject<UMaterialParameterCollection>(nullptr, FoliageWindCollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 		if (!FoliageWindCollection)
-			UE_LOG(LogTemp, Warning, TEXT("Island foliage material wind was requested, but its PN_WindParameters collection could not be loaded."));
+			UE_LOG(LogTemp, Warning, TEXT("Weather-driven foliage wind is unavailable because PN_WindParameters could not be loaded; Fab asset defaults remain active."));
 	}
 	UseWetLandscapeGraph();
 	InitializeLandscapeMaterials();

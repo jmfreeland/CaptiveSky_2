@@ -47,9 +47,14 @@ public:
 	static const TCHAR* FoliageWindCollectionPath;
 	static const TArray<FName>& ScalarParameterNames();
 	static const FName WindDirectionParameter;
-	/** The Fab collection encodes heading as a scalar angle in radians, not a direction vector. */
+	/** The Fab collection exposes WindDirection as a scalar; this publisher supplies radians from Atan2. */
 	static const FName FoliageWindDirectionParameter;
 	static const FName FoliageWindStrengthParameter;
+	/** Weather-driven foliage wind is the normal runtime behavior; the opt-out restores Fab's fixed MPC defaults. */
+	static bool ShouldPublishWeatherDrivenFoliageWind(bool bDisabledByCommandLine, bool bHasCollectionOverride)
+	{
+		return !bDisabledByCommandLine || bHasCollectionOverride;
+	}
 	static const FName LandscapeWetnessParameter;
 	/** Wet-ground variant of the landscape graph, built by Scripts/Create-LandscapeWetMaterial.py; an optional local asset. */
 	static const TCHAR* WetLandscapeMaterialPath;
