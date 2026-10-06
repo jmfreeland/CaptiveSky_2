@@ -360,3 +360,40 @@ reversible opt-out. The next visual check should inspect the parent PN material 
 the same close foliage at a fixed camera over time with known headings, then verify direction
 and amplitude. Preserve the existing bounded-session safeguards; repeat the A/B only if a
 stable render-cost comparison is needed.
+
+## CPU sway radius diagnostic (2026-10-06)
+
+Two additional warmed, 120-second standalone Game runs used the same 1600x900
+Tideglass view, 45-second CSV delay, 200-frame profile, isolated playtest data
+roots, and a one-request cap (zero model requests were made). Both retained
+1,779,877 ground-cover instances. The first used a 180 cm CPU sway radius; the
+second disabled CPU ground-cover sway entirely while retaining material-driven
+Fab wind. After excluding CSV section/header rows, their 200-frame profiles
+measured:
+
+| Diagnostic | Frame p50 / p95 | Game Thread p50 / p95 | Render Thread p50 / p95 | GPU p50 / p95 | Skinning p50 / p95 | Transform updates p50 / p95 |
+|---|---:|---:|---:|---:|---:|---:|
+| 180 cm CPU sway radius | 16.96 / 108.78 ms | 4.84 / 14.91 ms | 16.35 / 110.10 ms | 13.74 / 18.13 ms | 0.07 / 51.15 ms | 0 / 26 |
+| CPU ground-cover sway disabled | 14.92 / 17.79 ms | 4.34 / 5.37 ms | 14.76 / 18.37 ms | 12.05 / 17.16 ms | 0.07 / 0.10 ms | 0 / 0 |
+
+The disabled-sway capture clears the 33.3 ms p95 screen for this one view;
+the 180 cm capture does not. This is not a matched causal A/B: they ran as
+separate game processes with independently moving residents/animals and
+different isolated world-state roots. In the 180 cm run, episodic skinning and
+render-thread spikes coincide with the long frame tail, while the control does
+not reproduce them. Do not attribute the difference to sway, and do not infer
+that reducing the radius fixes the hitch. This also agrees with the earlier
+delayed 180 cm profile, which missed 30 FPS p95 by a wide margin.
+
+Accordingly, the attempted 180 cm production default was withdrawn; the
+existing 3000 cm default and full resident/gust response remain unchanged.
+These runs establish a useful control and a profiling lead, not a production
+performance result. Next capture a repeatable Unreal Insights trace with the
+resident/animal poses controlled, then test sway on/off in the same persistent
+world process and composition before altering the visual behavior.
+
+Evidence: `Saved/Logs/Codex_FoliageSwayRadius180_Warm_20261006.log`,
+`Saved/Logs/Codex_FoliageSwayOff_Warm_20261006.log`,
+`Saved/Profiling/CSV/Profile(20261006_194237).csv`, and
+`Saved/Profiling/CSV/Profile(20261006_194656).csv`. Both runs used the existing
+real-time/request safeguard settings and terminated normally.
