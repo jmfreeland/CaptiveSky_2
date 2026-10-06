@@ -688,36 +688,46 @@ RHI thread was disabled. This is a capture-only option, not a project default.
 
 The first RHI-off capture included screenshots, and its largest hitch aligned
 with `ScreenshotTracing_Execute`/PNG compression. It is excluded from this
-comparison. These two screenshot-free captures instead used the same Tideglass
-camera, 1600x900 resolution, Lumen-on scene, 180 cm sway radius, full ground
-cover, disabled CPU sway and occlusion queries, 45-second settle, and 30-second
-trace. Both runs reached the 120-second safety cap with zero model requests.
-Their DataRoots were separate, so this is a matched-settings diagnostic rather
-than a seed-identical A/B.
+comparison. Four screenshot-free captures (two per setting) used the same
+Tideglass camera, 1600x900 resolution, Lumen-on scene, 180 cm sway radius, full
+ground cover, disabled CPU sway and occlusion queries, 45-second settle, and
+30-second trace. All runs reached the 120-second safety cap with zero model
+requests. Their DataRoots were separate, so this is a matched-settings
+diagnostic rather than a seed-identical A/B.
 
-| Frame track | RHI thread | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Game | On | 15.28 ms | 17.90 ms | 27.02 ms | 481.85 ms | 11 / 1620 | 11 / 1620 |
-| Game | Off | 21.49 ms | 24.93 ms | 26.37 ms | 38.50 ms | 1 / 1385 | 0 / 1385 |
-| Render | On | 15.32 ms | 18.13 ms | 34.83 ms | 478.24 ms | 17 / 1620 | 11 / 1620 |
-| Render | Off | 21.50 ms | 24.93 ms | 26.44 ms | 37.80 ms | 1 / 1385 | 0 / 1385 |
-| GPU frame track | On | 14.21 ms | 19.58 ms | 21.29 ms | 476.99 ms | 11 / 1621 | 11 / 1621 |
-| GPU frame track | Off | 22.09 ms | 26.61 ms | 28.30 ms | 31.87 ms | 0 / 1387 | 0 / 1387 |
+| Frame track | Capture | RHI thread | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| Game | Initial | On | 15.28 ms | 17.90 ms | 27.02 ms | 481.85 ms | 11 / 1620 | 11 / 1620 |
+| Game | Initial | Off | 21.49 ms | 24.93 ms | 26.37 ms | 38.50 ms | 1 / 1385 | 0 / 1385 |
+| Game | Repeat | On | 14.69 ms | 16.69 ms | 22.23 ms | 478.15 ms | 11 / 1689 | 11 / 1689 |
+| Game | Repeat | Off | 20.85 ms | 23.89 ms | 25.93 ms | 444.57 ms | 2 / 1409 | 1 / 1409 |
+| Render | Initial | On | 15.32 ms | 18.13 ms | 34.83 ms | 478.24 ms | 17 / 1620 | 11 / 1620 |
+| Render | Initial | Off | 21.50 ms | 24.93 ms | 26.44 ms | 37.80 ms | 1 / 1385 | 0 / 1385 |
+| Render | Repeat | On | 14.70 ms | 17.51 ms | 33.42 ms | 475.90 ms | 17 / 1689 | 11 / 1689 |
+| Render | Repeat | Off | 20.87 ms | 23.89 ms | 25.67 ms | 444.62 ms | 2 / 1409 | 1 / 1409 |
+| GPU frame track | Initial | On | 14.21 ms | 19.58 ms | 21.29 ms | 476.99 ms | 11 / 1621 | 11 / 1621 |
+| GPU frame track | Initial | Off | 22.09 ms | 26.61 ms | 28.30 ms | 31.87 ms | 0 / 1387 | 0 / 1387 |
+| GPU frame track | Repeat | On | 13.69 ms | 19.14 ms | 20.14 ms | 470.82 ms | 11 / 1690 | 11 / 1690 |
+| GPU frame track | Repeat | Off | 21.24 ms | 25.47 ms | 27.28 ms | 452.06 ms | 1 / 1410 | 1 / 1410 |
 
-In the RHI-off trace, `GameThreadWaitForTask` and `Sync_RenderingThread` max
-out at about 23 ms, and `WaitForVisibilityTasks` at 1.82 ms. The RHI-on
-counterpart had a ~478 ms `GameThreadWaitForTask`/`Sync_RenderingThread` event
-and a ~454 ms `SyncPoint_Wait`. The screenshot-free RHI-off sample therefore
-supports the hypothesis that this synchronization path causes the rare
-half-second hitch, while also showing a clear steady-state cost: p50 rises by
-about 6–8 ms and p95 by about 7–9 ms. It is not a production fix or a 30-FPS
-guarantee; one run per condition, independent procedural placement, and a single
-remaining ~38 ms frame limit the conclusion. Keep the RHI thread enabled in
-production. Next, identify what makes the RHI-thread synchronization occasionally
-block for hundreds of milliseconds, then repeat both conditions before changing
-runtime defaults.
+Both RHI-on traces reproduced 11 frames above 100 ms in the 30-second window,
+with maxima around 0.48 seconds. The initial RHI-off run had none, but its repeat
+had one ~445 ms frame: `GameThreadWaitForTask`/`Sync_RenderingThread` reached
+~440 ms, and `SyncPoint_Wait` reached ~386 ms. The repeat hitch overlapped a
+`FNodeClassRegistry::RegisterNodeInternal` scope, so it may be a separate
+one-off initialization event; it proves that disabling the RHI thread does not
+eliminate every long synchronization stall. `WaitForVisibilityTasks` remained
+short (under 2 ms) in both RHI-off traces. Across both pairs, RHI-off increased
+the steady-state p50 by about 6–8 ms and p95 by about 6–8 ms, while the tail
+event count was lower but not zero. Two runs per setting are still a small,
+seed-varying sample. This is not a production fix or a 30-FPS guarantee; keep
+the RHI thread enabled in production. Next, repeat longer and identify the
+remaining task/sync-point stall before changing runtime defaults.
 
 Evidence: `Saved/Logs/Codex_RHIThreadOnNoShots_SwayOff_20261006.log`,
 `Saved/Logs/Codex_RHIThreadOffNoShots_SwayOff_20261006.log`, the matching
-`.utrace` files under `Saved/Profiling/Traces/`, and the per-thread, frame,
-timer, and wait-event CSV exports in the same directory.
+`.utrace` files under `Saved/Profiling/Traces/`, plus repeat logs
+`Saved/Logs/Codex_RHIThreadOffNoShotsRepeat2_20261006.log` and
+`Saved/Logs/Codex_RHIThreadOnNoShotsRepeat_20261006.log`. Their `.utrace` files
+and per-thread, frame, timer, and wait-event CSV exports are alongside the
+initial traces.
