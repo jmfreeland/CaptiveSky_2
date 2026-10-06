@@ -590,3 +590,45 @@ Evidence: `Saved/Logs/Codex_LumenOffTrace180_20261006.log`,
 `Saved/Profiling/Traces/Codex_LumenOffTrace180_20261006.utrace`,
 `Playtests/Codex_SeaTraceWarm_20261006/Screenshots/001_Tideglass.png`, and
 `Playtests/Codex_LumenOffTrace180_20261006/Screenshots/001_Tideglass.png`.
+
+### Lumen-on CPU-sway ablation (2026-10-06)
+
+A third delayed 30-second trace kept dynamic GI on and the full 1,779,877
+ground-cover instances visible, but used the existing capture-only
+`-IslandDisableGroundCoverSway` diagnostic. That skips periodic CPU instance
+transform updates for ground-cover and resident-brush sway without removing or
+hiding the plants. The camera, 1600x900 resolution, 180 cm radius, 45-second
+settle, warmed DDC, 120-second play cap, and zero-request safety settings were
+otherwise held constant. The selected frame tracks span 30.0 seconds.
+
+| Frame track | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Game Thread | 14.57 ms | 17.61 ms | 454.95 ms | 483.85 ms | 18 / 1504 | 18 / 1504 |
+| Render Thread | 14.25 ms | 19.00 ms | 454.35 ms | 479.92 ms | 18 / 1508 | 18 / 1508 |
+| GPU frame track | 13.55 ms | 19.15 ms | 453.28 ms | 479.78 ms | 18 / 1505 | 18 / 1505 |
+
+With Lumen still enabled, the maximum `UpdateLumenScenePrimitives` scope fell
+from 147.52 ms to 0.228 ms; `BeginUpdateLumenSceneTasks` fell from 149.89 ms to
+6.11 ms. Scene-culling and GPU-scene maxima fell from roughly 79–89 ms to
+0.13–0.26 ms. The Game/Render/GPU p95s were under 20 ms, unlike either the
+Lumen-on sway-active trace (~103–111 ms) or the matched Lumen-off trace
+(~59–62 ms). This strongly implicates the periodic CPU instance-transform
+updates in the expensive Lumen/scene-culling workload, and shows that removing
+GI is not necessary to reach the p95 budget in this diagnostic.
+
+However, 18 frames (~1.2%) still had ~0.45–0.48 second stalls. Event-level
+exports show 17 of those 18 frames overlapping all three
+`WaitForVisibilityTasks`, `RHIGetRenderQueryResult_GPU_Wait`, and
+`GPUBound_WaitingForGPUForOcclusionQueries_SeeGPUTrack`; `GameThreadWaitForTask`
+overlaps all 18. A separate intermittent render-query/visibility stall thus
+remains after sway-related scene-update work is removed. This one instrumented
+capture does not establish a production 30-FPS guarantee. Keep the full
+population and Lumen on; next prototype GPU/material wind for ambient motion
+while preserving the small near-character response, then test the remaining
+occlusion-query wait independently. Verify plant motion and the full habitat
+visually before considering any production sway change.
+
+Evidence: `Saved/Logs/Codex_SwayOffLumenOn_20261006.log`,
+`Saved/Profiling/Traces/Codex_SwayOffLumenOn_20261006.utrace`, and the Insights
+exports under the current user's temporary directory; aligned wait-event
+exports confirmed the intermittent occlusion/visibility overlaps.
