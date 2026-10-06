@@ -37,8 +37,12 @@
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
 static constexpr float GroundCoverSwayCellSize = 1500.f;
 static TAutoConsoleVariable<float> CVarIslandFoliageSwayFocusRadiusCm(
-	TEXT("CaptiveSky.Island.FoliageSwayFocusRadiusCm"), 3000.f,
-	TEXT("Radius in centimeters around the camera, residents, and local gusts where foliage and spruce instance transforms are updated. Clamped to 100..3000 cm."),
+	TEXT("CaptiveSky.Island.FoliageSwayFocusRadiusCm"), 100.f,
+	TEXT("Radius in centimeters around the camera, residents, and local gusts where foliage and spruce instance transforms are updated. Defaults to a local 100 cm focus; clamped to 100..3000 cm."),
+	ECVF_Default);
+static TAutoConsoleVariable<float> CVarIslandFoliageSwayUpdateIntervalSeconds(
+	TEXT("CaptiveSky.Island.FoliageSwayUpdateIntervalSeconds"), 1.f,
+	TEXT("Seconds between CPU foliage and spruce instance-transform sway updates. Clamped to 0.1..2.0 seconds; material wind remains continuous."),
 	ECVF_Default);
 
 namespace
@@ -1793,7 +1797,8 @@ void AIslandWeather::Tick(float DeltaSeconds)
 	UpdateWindPoolResponse();
 	UpdateWeatherAmbience(DeltaSeconds);
 	GroundCoverSwayUpdateAccumulator += FMath::Max(0.f, DeltaSeconds);
-	constexpr float GroundCoverSwayUpdateInterval = 0.1f;
+	const float GroundCoverSwayUpdateInterval = FMath::Clamp(
+		CVarIslandFoliageSwayUpdateIntervalSeconds.GetValueOnGameThread(), 0.1f, 2.f);
 	if (GroundCoverSwayUpdateAccumulator >= GroundCoverSwayUpdateInterval)
 	{
 		GroundCoverSwayUpdateAccumulator = FMath::Fmod(GroundCoverSwayUpdateAccumulator, GroundCoverSwayUpdateInterval);

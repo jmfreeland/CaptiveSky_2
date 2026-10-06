@@ -25,6 +25,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/ScopeExit.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/InputComponent.h"
 #include "Components/VolumetricCloudComponent.h"
@@ -86,6 +87,34 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 		return false;
+	}
+	IConsoleVariable* SwayFocusRadius = IConsoleManager::Get().FindConsoleVariable(TEXT("CaptiveSky.Island.FoliageSwayFocusRadiusCm"));
+	const float PreviousFocusRadius = SwayFocusRadius ? SwayFocusRadius->GetFloat() : 100.f;
+	ON_SCOPE_EXIT
+	{
+		if (SwayFocusRadius) SwayFocusRadius->Set(PreviousFocusRadius, ECVF_SetByCode);
+	};
+	if (TestNotNull(TEXT("CPU foliage sway focus-radius CVar is registered"), SwayFocusRadius))
+		// Existing fixture interactions rely on seeing distant local gust markers; keep that
+		// expectation independent of the intentionally tighter runtime default.
+		SwayFocusRadius->Set(3000.f, ECVF_SetByCode);
+	IConsoleVariable* SwayUpdateInterval = IConsoleManager::Get().FindConsoleVariable(TEXT("CaptiveSky.Island.FoliageSwayUpdateIntervalSeconds"));
+	if (TestNotNull(TEXT("CPU foliage sway update interval CVar is registered"), SwayUpdateInterval))
+	{
+		const float PreviousInterval = SwayUpdateInterval->GetFloat();
+		Weather->GroundCoverSwayUpdateAccumulator = 0.f;
+		SwayUpdateInterval->Set(1.f, ECVF_SetByCode);
+		Weather->Tick(0.4f);
+		TestTrue(TEXT("CPU foliage sway waits for its configured one-second interval"),
+			FMath::IsNearlyEqual(Weather->GroundCoverSwayUpdateAccumulator, 0.4f));
+		Weather->Tick(0.5f);
+		TestTrue(TEXT("CPU foliage sway retains elapsed time below the configured interval"),
+			FMath::IsNearlyEqual(Weather->GroundCoverSwayUpdateAccumulator, 0.9f));
+		Weather->Tick(0.2f);
+		TestTrue(TEXT("CPU foliage sway updates when the interval elapses and retains only its fractional remainder"),
+			FMath::IsNearlyEqual(Weather->GroundCoverSwayUpdateAccumulator, 0.1f, 0.001f));
+		SwayUpdateInterval->Set(PreviousInterval, ECVF_SetByCode);
+		Weather->GroundCoverSwayUpdateAccumulator = 0.f;
 	}
 	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherFoliageComponents;
 	Weather->GetComponents(WeatherFoliageComponents);

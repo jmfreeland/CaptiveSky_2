@@ -47,6 +47,7 @@ param(
 	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
 	[ValidateRange(1, 1800)][Nullable[int]]$CSVProfileDelaySeconds,
 	[ValidateRange(100, 3000)][Nullable[int]]$FoliageSwayRadiusCm,
+	[ValidateRange(0.1, 2.0)][Nullable[double]]$FoliageSwayUpdateIntervalSeconds,
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
 	[switch]$DisableGroundCoverSway,
@@ -136,6 +137,10 @@ if ($PSBoundParameters.ContainsKey("CSVProfileDelaySeconds")) {
 }
 if ($PSBoundParameters.ContainsKey("FoliageSwayRadiusCm")) {
 	$execCommands += "CaptiveSky.Island.FoliageSwayFocusRadiusCm $FoliageSwayRadiusCm"
+}
+if ($PSBoundParameters.ContainsKey("FoliageSwayUpdateIntervalSeconds")) {
+	$interval = ([double]$FoliageSwayUpdateIntervalSeconds).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
+	$execCommands += "CaptiveSky.Island.FoliageSwayUpdateIntervalSeconds $interval"
 }
 if ($DisableOcclusionQueries) { $execCommands += "r.AllowOcclusionQueries 0" }
 if ($DisableRHIThread) { $execCommands += "r.RHIThread.Enable 0" }

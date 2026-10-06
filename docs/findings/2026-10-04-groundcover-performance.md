@@ -385,15 +385,81 @@ not reproduce them. Do not attribute the difference to sway, and do not infer
 that reducing the radius fixes the hitch. This also agrees with the earlier
 delayed 180 cm profile, which missed 30 FPS p95 by a wide margin.
 
-Accordingly, the attempted 180 cm production default was withdrawn; the
-existing 3000 cm default and full resident/gust response remain unchanged.
-These runs establish a useful control and a profiling lead, not a production
-performance result. Next capture a repeatable Unreal Insights trace with the
-resident/animal poses controlled, then test sway on/off in the same persistent
-world process and composition before altering the visual behavior.
+At that point, the attempted 180 cm production default was withdrawn and the
+3000 cm default retained because the 200-frame captures were unpaired. The
+later controlled cadence traces below supersede that provisional decision.
 
 Evidence: `Saved/Logs/Codex_FoliageSwayRadius180_Warm_20261006.log`,
 `Saved/Logs/Codex_FoliageSwayOff_Warm_20261006.log`,
 `Saved/Profiling/CSV/Profile(20261006_194237).csv`, and
 `Saved/Profiling/CSV/Profile(20261006_194656).csv`. Both runs used the existing
 real-time/request safeguard settings and terminated normally.
+
+## Controlled CPU-sway cadence and radius traces (2026-10-06)
+
+The later captures used the same 1600x900 Tideglass motion-probe view, persistent
+isolated data root (`Saved/Playtests/FoliageHitchTrace_20261006`), and shader/DDC
+paths. Each trace began after a 45-second warmup and recorded 30 seconds. The
+spectator had agent thinking disabled, a 120-second runtime cap and a one-request
+maximum; all runs exited normally and made zero model requests. The world and
+animals advanced between separate processes, so these are sequential same-view
+comparisons, not frame-for-frame paired replays. The first broad-radius trace began
+from a colder cache than the later trials; the high-cost tail nevertheless repeats
+in the radius-180/0.1-second profile and is visible in the smaller-radius tests.
+
+Finite positive game-thread frame events from the Insights exports give:
+
+| CPU transform focus radius / update interval | Frames | Game p50 / p95 / p99 | Render p95 | Game frames >33.3 / >100 ms | 30 FPS p95 |
+|---|---:|---:|---:|---:|---|
+| Sway disabled; material wind retained | 1,977 | 14.7 / 18.6 / 22.9 ms | 18.6 ms | 5 / 1 | pass |
+| 180 cm / 0.1 s (previous cadence) | 883 | 15.2 / 126.6 / 147.9 ms | 117.1 ms | 223 / 105 | fail |
+| 180 cm / 1 s | 1,429 | 14.6 / 60.4 / 125.2 ms | 60.4 ms | 78 / 35 | fail |
+| 180 cm / 2 s | 1,618 | 14.8 / 20.3 / 113.3 ms | 19.7 ms | 52 / 22 | pass, but delayed updates remain a concern |
+| 100 cm / 0.1 s | 1,277 | 16.1 / 36.8 / 450.2 ms | 41.5 ms | 115 / 18 | fail |
+| 100 cm / 0.5 s | 1,429 | 15.5 / 33.0 / 47.7 ms | 33.4 ms | 72 / 15 | marginal; render misses |
+| 100 cm / 1 s (explicit override) | 1,492 | 15.4 / 19.9 / 90.5 ms | 19.9 ms | 42 / 15 | pass |
+| 100 cm / 1 s (new defaults, no overrides) | 1,639 | 14.9 / 22.0 / 39.7 ms | 22.1 ms | 40 / 11 | pass |
+| 100 cm / 1 s (no screenshot capture) | 1,387 | 15.6 / 21.5 / 452.5 ms | 21.9 ms | 44 / 17 | p95 pass; large synchronized outliers |
+
+The repeated 180 cm traces show why radius alone was insufficient: reducing the
+update rate from 10 Hz to 1 Hz cut game p95 from 126.6 to 60.4 ms, still failing
+the gate. The 100 cm / 1 s setting kept game and render p95 below 23 ms in both
+default captures, with and without screenshot capture. However, the no-screenshot
+capture contained 17 frames over 100 ms (452.5 ms p99), versus 11 in the
+screenshot capture (39.7 ms p99). Game, render, and GPU each recorded 17 >100 ms
+events in the no-screenshot trace; all game events aligned with render events
+within 20 ms and 15 of 17 aligned with GPU events. This tail is not isolated to
+CPU foliage updates and may include a system-wide/runtime stall. The repeated
+p95 result supports the cadence as a mitigation, but these outliers mean frame
+pacing is not solved and the tail needs a cleaner controlled replay. By contrast,
+100 cm / 0.5 s sits on the 33.3 ms boundary and misses on the render thread.
+
+The Insights timer statistics also show the update-linked render tail shrinking:
+at 180 cm / 0.1 s, `UpdateLumenScenePrimitives` reached 130.3 ms, `AddLumenPrimitives`
+79.5 ms and skinning-view updates 92.5 ms. In the no-override 100 cm / 1 s repeat,
+their maxima were 36.7, 22.5 and 20.3 ms respectively. `IslandWeather` itself
+averaged under 0.3 ms in the passing repeat; the expensive work is downstream
+scene-primitive/Lumen/skinning processing rather than its overall tick.
+
+Accordingly, production defaults now use a 100 cm CPU-transform focus and a
+1-second update interval. The command-line/CVar overrides remain available for
+diagnostics, and the separate Fab material WPO wind remains continuous. Resident
+and gust transforms still update locally; there is no claim that this cadence
+removes occasional stutter or guarantees the same result in a packaged game or a
+different gameplay composition. The existing ground-cover automation now sets
+its own fixture radius and verifies interval accumulation/remainder behavior.
+The UE 5.8.3 build and `CaptiveSky2.Agent.GroundCover` pass with the new defaults.
+
+Trace logs: `Codex_FoliageHitchSway180Trace_20261006.log`,
+`Codex_FoliageHitchSway180_1Hz_20261006.log`,
+`Codex_FoliageHitchSway180_2Hz_20261006.log`,
+`Codex_FoliageHitchSway100_0_1s_20261006.log`,
+`Codex_FoliageHitchSway100_0_5s_20261006.log`,
+`Codex_FoliageHitchSwayDefault100_1s_20261006.log`, and
+`Codex_FoliageHitchSwayDefault100_1s_NoShots_20261006.log` under `Saved/Logs/`.
+The raw `.utrace` captures are under `Saved/Profiling/Traces/`; timing CSV exports
+were written to the local temporary directory. One trace artifact is named
+`Sway180_2Hz`, but that run used a **2.0-second interval** (0.5 updates/second).
+Screenshots are in the corresponding `Playtests/FoliageSway*/Screenshots/`
+directories. They retain the same lush placement; static images do not verify
+animation smoothness.
