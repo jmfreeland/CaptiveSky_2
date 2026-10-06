@@ -80,7 +80,7 @@ The organic surface remains a non-colliding visual prototype without depth,
 temperature, water quality, swimming or shoreline blending. Keep the map material reversible and do
 not overwrite the authored sphere material.
 
-## Shore-stone presentation (2026-10-05)
+## Shore-stone presentation (2026-10-05; Game verification 2026-10-06)
 
 The four small pale spheres around the Tideglass pool were not water highlights: a read-only saved-map
 actor audit identified them as `TideglassPool_Stone_0..3`, static-mesh actors using
@@ -91,13 +91,23 @@ navigation role, and map data remain the authority; the presentation actors have
 destroyed at teardown, when each proxy's previous hidden state is restored. If the complete four-proxy
 set or Starter Content rock mesh is unavailable, the subsystem leaves the saved placeholders alone.
 
-UE 5.8.3 validation: the editor target built successfully and
-`CaptiveSky2.Agent.IslandTideglass` passed with the rock asset loaded. The synthetic-world assertions
-check all four visuals, proxy collision preservation, collision-free rock actors, placement at the
-proxy bounds, and teardown restoration/removal. A bounded real-game screenshot attempt stalled during
-editor startup before map/game initialization and was stopped; no in-game visual confirmation is
-claimed yet. The automation log is
-`Saved/Logs/Codex_TideglassShoreStones_20261005.log`.
+The first implementation matched the editor labels as runtime object names. Automation passed because
+its synthetic actors used those same explicit names, but the saved Island instantiates them in Game as
+`StaticMeshActor_11..14`; the four pale spheres therefore remained visible. A runtime scan confirmed
+that the pool itself is a much larger sphere and the four proxies have world-space bounds extents of
+22.5 x 22.5 x 17.5 cm. Selection now uses the exact engine sphere mesh and a maximum world-space bound
+extent of 25 cm within 500 cm of the Tideglass marker, avoiding the editor-label/runtime-name mismatch
+and excluding the flattened pool surface. The regression test now leaves object names generated, like
+the real Game world.
+
+UE 5.8.3 validation: the editor target built, `CaptiveSky2.Agent.IslandTideglass` passed with generated
+object names, all four rough-rock visuals, proxy collision preservation, collision-free visuals, and
+teardown restoration/removal. A bounded real Game capture then logged that all four visuals were
+applied and showed the pool without the pale spheres. Screenshot:
+`Playtests/Codex_TideglassRocksFixed_20261006/Screenshots/002_Tideglass.png`. Runtime evidence is in
+`Saved/Logs/Codex_TideglassScan_20261006.log` and
+`Saved/Logs/Codex_TideglassRocksFixed_20261006.log`; the automation result is in
+`Saved/Logs/Codex_TideglassRuntimeNames_20261006.log`.
 
 ## Runtime lifecycle follow-up (2026-10-01)
 

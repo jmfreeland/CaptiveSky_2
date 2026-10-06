@@ -56,10 +56,8 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			for (int32 Index = 0; Index < 4; ++Index)
 			{
 				const float Angle = Index * UE_PI * 0.5f;
-				FActorSpawnParameters Spawn;
-				Spawn.Name = *FString::Printf(TEXT("TideglassPool_Stone_%d"), Index);
 				AStaticMeshActor* Proxy = World->SpawnActor<AStaticMeshActor>(
-					FVector(FMath::Cos(Angle) * 320.f, FMath::Sin(Angle) * 320.f, 0.f), FRotator::ZeroRotator, Spawn);
+					FVector(FMath::Cos(Angle) * 320.f, FMath::Sin(Angle) * 320.f, 0.f), FRotator::ZeroRotator);
 				if (Proxy)
 				{
 					Proxy->GetStaticMeshComponent()->SetStaticMesh(Sphere);

@@ -15,7 +15,6 @@ const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_T
 
 namespace
 {
-	constexpr TCHAR TideglassShoreStonePrefix[] = TEXT("TideglassPool_Stone_");
 	constexpr TCHAR TideglassRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
 	constexpr TCHAR TideglassRockMaterialPath[] = TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock");
 }
@@ -195,16 +194,25 @@ void UIslandTideglassSubsystem::ApplyShoreStonePresentation()
 	TArray<AStaticMeshActor*> StoneProxies;
 	for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
 	{
-		if (!It->GetName().Contains(TideglassShoreStonePrefix) ||
-			FVector::DistSquared(It->GetActorLocation(), PoolMarker->GetActorLocation()) > FMath::Square(500.f)) continue;
+		const float DistanceToPool = FVector::Distance(It->GetActorLocation(), PoolMarker->GetActorLocation());
+		if (DistanceToPool > 500.f) continue;
 		UStaticMeshComponent* Mesh = It->GetStaticMeshComponent();
 		if (!Mesh || !Mesh->GetStaticMesh() || Mesh->GetStaticMesh()->GetPathName() != TEXT("/Engine/BasicShapes/Sphere.Sphere")) continue;
+		// Editor labels are not stable UObject names in Game; identify these four authored proxies
+		// by their small sphere bounds while excluding the much larger flattened pool surface.
+		if (Mesh->Bounds.BoxExtent.GetMax() > 25.f) continue;
 		StoneProxies.Add(*It);
 	}
 
 	// The saved four cardinal proxies remain authoritative for collision and navigation.
 	// Only their play-session visuals are exchanged, and only when the complete set is found.
-	if (StoneProxies.Num() != 4) return;
+	if (StoneProxies.Num() != 4)
+	{
+		UE_LOG(LogIslandTideglass, Warning,
+			TEXT("Tideglass shore-stone presentation skipped: matched %d of the expected 4 proxies near marker %s."),
+			StoneProxies.Num(), *PoolMarker->GetName());
+		return;
+	}
 	UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr, TideglassRockMeshPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 	if (!RockMesh)
 	{
