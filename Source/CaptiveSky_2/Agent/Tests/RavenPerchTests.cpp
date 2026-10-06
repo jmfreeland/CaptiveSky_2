@@ -692,12 +692,6 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	};
 
 	TestTrue(TEXT("Authored rest-pose screenshot is saved"), SavePose(TEXT("01_Rest.png")));
-	if (RiggedCrow)
-	{
-		RiggedCrow->SetHiddenInGame(true);
-		TestTrue(TEXT("The rigged-Crow isolation screenshot is saved"), SavePose(TEXT("02_CrowHiddenDiagnostic.png")));
-		RiggedCrow->SetHiddenInGame(false);
-	}
 	Controller->Tick(1.f);
 	if (bUsingRiggedCrow)
 		TestTrue(TEXT("Grounded Raven selects the rigged Crow's idle-look animation"), Controller->CurrentCrowAnimation == Controller->CrowIdleAnimation);

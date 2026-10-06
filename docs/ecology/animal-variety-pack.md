@@ -79,7 +79,11 @@ The transient Raven now prefers `SK_Crow` when the optional pack is present, map
 fly/landing animations to the existing Raven locomotion states, and retains the procedural fallback.
 The imported rig is visual-only for collision and navigation. Current UE 5.8.3 editor-target build,
 Raven perch/flight automation, and the real-RHI Raven pose capture pass. The pose test verifies that
-`M_Crow` resolves `T_Crow_BaseColor`; nevertheless, the game-world capture still reads as a pale,
-near-white bird at gameplay scale. Material/lighting appearance and a live-editor visual review remain
-open, so this is not yet a polished Raven. The copied content remains in ignored `Content/`, outside
-Git.
+`M_Crow` resolves `T_Crow_BaseColor`. A source/UV check found the mesh samples dark albedo (about RGB
+66); a representative body pixel is RGB 88 in the deferred Base Color capture but RGB 203, 197, 184
+in the final lit capture. Setting only the diagnostic capture's exposure bias to zero brings that
+pixel to RGB 159, 149, 130. The material and texture wiring therefore work; the pale gameplay-scale
+appearance is coming from the Island's light/exposure response, not missing Crow textures. The actual
+light/exposure fix and live-editor visual review remain open, so this is not yet a polished Raven.
+The diagnostic images are in `Saved/Viewpoints/RavenWingMotion_/20261006_141548/`; the copied content
+remains in ignored `Content/`, outside Git.
