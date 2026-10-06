@@ -734,7 +734,7 @@ initial traces.
 
 ### Bounded current Tideglass Game sample (2026-10-07)
 
-Two standalone Game runs used `Scripts/Start-Spectator.ps1`, the five-entry
+Three standalone Game runs used `Scripts/Start-Spectator.ps1`, the five-entry
 Tideglass-only camera file, unique isolated `-DataRoot` folders,
 `-DisableAgentThinking`, and explicit short play/request caps. Neither changed
 source, Content assets, or the normal saved-world state.
@@ -746,29 +746,40 @@ trace work shows screenshot encoding can cause large hitches, so its
 clean gameplay metrics. It did verify runtime Tideglass water/shore visuals and
 produced [`012_Tideglass.png`](../Saved/Playtests/Codex_PerfBaseline_20261007/Screenshots/012_Tideglass.png).
 
-The follow-up disabled both screenshots and Python, kept agent thinking
-disabled, used a 60-second realtime / one-request cap, and sampled 600 frames
-for 9.53 seconds beginning ten seconds after spectator startup. It ended
-normally after 60.2 seconds with zero model requests and no Python startup
-tracebacks.
+The clean follow-ups disabled screenshots, Python, and agent thinking, used
+unique `-DataRoot` folders and one-request hard limits, and sampled 600 frames
+after a ten-second startup delay. The 1600×900 run had a 60-second realtime cap
+and ended after 60.2 seconds; the 1920×1080 run had a 90-second cap and ended
+after 90.2 seconds. Both used the same Tideglass camera, and both ended with
+zero model requests and no Python startup tracebacks. The 1080p launch uses new
+`-WindowWidth` / `-WindowHeight` options on `Start-Spectator.ps1`; the runtime
+log confirms 1920×1080 before its sample.
 
-| Track | Mean | p50 | p95 | Maximum | >33.3 ms | >100 ms |
-|---|---:|---:|---:|---:|---:|---:|
-| Frame | 15.88 ms | 14.62 ms | 24.76 ms | 47.86 ms | 11 / 600 | 0 / 600 |
-| Game thread | 5.81 ms | 5.31 ms | 6.70 ms | 41.40 ms | 2 / 600 | 0 / 600 |
-| Render thread | 15.66 ms | 14.62 ms | 19.08 ms | 47.96 ms | 9 / 600 | 0 / 600 |
-| GPU | 12.88 ms | 11.95 ms | 16.99 ms | 18.16 ms | 0 / 600 | 0 / 600 |
+| Window | Track | Mean | p50 | p95 | Maximum | Frames >33.3 ms |
+|---|---|---:|---:|---:|---:|---:|
+| 1600×900 | Frame | 15.88 ms | 14.62 ms | 24.76 ms | 47.86 ms | 11 / 600 |
+| 1600×900 | Game thread | 5.81 ms | 5.31 ms | 6.70 ms | 41.40 ms | 2 / 600 |
+| 1600×900 | Render thread | 15.66 ms | 14.62 ms | 19.08 ms | 47.96 ms | 9 / 600 |
+| 1600×900 | GPU | 12.88 ms | 11.95 ms | 16.99 ms | 18.16 ms | 0 / 600 |
+| 1920×1080 | Frame | 16.75 ms | 15.25 ms | 26.33 ms | 54.89 ms | 13 / 600 |
+| 1920×1080 | Game thread | 6.02 ms | 5.43 ms | 7.04 ms | 41.65 ms | 1 / 600 |
+| 1920×1080 | Render thread | 16.50 ms | 15.23 ms | 21.09 ms | 53.97 ms | 11 / 600 |
+| 1920×1080 | GPU | 13.44 ms | 12.38 ms | 18.00 ms | 18.74 ms | 0 / 600 |
 
-For this fixed spectator view, the p95 frame time corresponds to about 40.4
-FPS, with no >100 ms hitch in the clean sample. The render thread is the largest
-regular track, while the GPU is also a significant cost. The window/system
-resolution settled at 1600×900 before sampling (startup initially logged
-1280×720). This still is not a player-controlled moving run: the camera repeats
-the Tideglass framing and agent thinking is disabled. The result therefore does
-not overturn the older 8–13-FPS PIE report or establish 30 FPS for the whole
-Island. A matched 1080p moving-play trace remains the next useful comparison.
+The hardware logged for the 1080p sample is an NVIDIA GeForce RTX 4080 Laptop
+GPU. Both fixed-view p95 frame times are below 33.3 ms (about 40.4 FPS at
+1600×900 and 38.0 FPS at 1920×1080); neither clean sample had a frame above
+100 ms. The render thread is the largest regular track, with GPU time also
+significant. These results meet the p95 30-FPS threshold for this Tideglass
+spectator framing on this PC, not for arbitrary play: the camera repeats one
+composition, agent thinking is disabled, and the measurements do not include
+player-controlled movement. The earlier 8–13-FPS PIE result is still
+unexplained; compare its exact camera, viewport, and settings before declaring
+the gameplay issue resolved.
 
-Logs: [`Codex_PerfBaseline_20261007.log`](../Saved/Logs/Codex_PerfBaseline_20261007.log)
-and [`Codex_PerfNoShot_20261007.log`](../Saved/Logs/Codex_PerfNoShot_20261007.log).
-The screenshot-free 600-frame CSV is
-`Saved/Profiling/CSV/Profile(20261007_004028).csv`.
+Logs: [`Codex_PerfBaseline_20261007.log`](../Saved/Logs/Codex_PerfBaseline_20261007.log),
+[`Codex_PerfNoShot_20261007.log`](../Saved/Logs/Codex_PerfNoShot_20261007.log),
+and [`Codex_Perf1080p_20261007.log`](../Saved/Logs/Codex_Perf1080p_20261007.log).
+The screenshot-free 1600×900 and 1920×1080 CSVs are
+`Saved/Profiling/CSV/Profile(20261007_004028).csv` and
+`Saved/Profiling/CSV/Profile(20261007_004449).csv`.

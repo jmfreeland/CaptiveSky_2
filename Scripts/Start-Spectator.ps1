@@ -19,6 +19,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -ScreenshotDirectory Screenshots/Spectator/ReturnCheck
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
+./Scripts/Start-Spectator.ps1 -Windowed -WindowWidth 1920 -WindowHeight 1080 -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/1080pProfile -MaxRealtimeSeconds 60 -MaxModelRequests 1 -CSVProfileFrames 600 -CSVProfileDelaySeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
@@ -33,6 +34,8 @@ back to normal control.
 #>
 param(
 	[switch]$Windowed,
+	[ValidateRange(640, 3840)][int]$WindowWidth = 1600,
+	[ValidateRange(480, 2160)][int]$WindowHeight = 900,
 	[switch]$Shots,
 	[string]$ScreenshotDirectory,
 	[string]$ViewpointFile,
@@ -99,7 +102,7 @@ if (-not [string]::IsNullOrWhiteSpace($TraceProfileFile)) {
 
 $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
 $execCommands = @()
-if ($Windowed) { $arguments += @("-windowed", "-ResX=1600", "-ResY=900") } else { $arguments += "-fullscreen" }
+if ($Windowed) { $arguments += @("-windowed", "-ResX=$WindowWidth", "-ResY=$WindowHeight") } else { $arguments += "-fullscreen" }
 if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot; use -ScreenshotDirectory to isolate runs
 if (-not [string]::IsNullOrWhiteSpace($ScreenshotDirectory)) { $arguments += "-SpectatorScreenshotDir=$ScreenshotDirectory" }
 if (-not [string]::IsNullOrWhiteSpace($ViewpointFile)) {
