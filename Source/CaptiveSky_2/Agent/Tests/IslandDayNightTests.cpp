@@ -22,6 +22,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Sun rises at six"), FMath::IsNearlyZero(AIslandDayNight::SunHeight(6)));
 	TestTrue(TEXT("Sun overhead at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12), 1.f));
 	TestTrue(TEXT("Sun below horizon at midnight"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(0), -1.f));
+	TestEqual(TEXT("A high daytime sun receives no artificial twilight fill"), AIslandDayNight::TwilightFillAmount(12.f), 0.f);
+	TestTrue(TEXT("Low golden-hour sun receives a partial, bounded cool fill"),
+		AIslandDayNight::TwilightFillAmount(17.5f) > 0.f && AIslandDayNight::TwilightFillAmount(17.5f) < 1.f &&
+		AIslandDayNight::TwilightFillStrength <= 0.6f);
+	TestTrue(TEXT("The twilight fill reaches full strength only near the horizon"),
+		AIslandDayNight::TwilightFillAmount(18.f) > AIslandDayNight::TwilightFillAmount(17.5f));
 	const float QuarterMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.25 - 7.0) * 24.0);
 	const float FullMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.5 - 14.0) * 24.0);
 	const float NextNewMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays - 29.0) * 24.0);
@@ -126,6 +132,17 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A new-moon midnight is still lit by the night fill"), Clock->Starlight->Intensity > 0.f);
 		TestTrue(TEXT("The night fill shines down from the sky, not up from below the horizon"), Clock->Starlight->GetForwardVector().Z < 0.f);
 		TestFalse(TEXT("The night fill casts no shadows"), Clock->Starlight->CastShadows);
+		Clock->CurrentHour = 17.5f;
+		Clock->UpdateLighting();
+		const float ExpectedTwilightFill = Clock->StarlightIntensity * AIslandDayNight::TwilightFillStrength *
+			AIslandDayNight::TwilightFillAmount(Clock->CurrentHour);
+		TestTrue(TEXT("The shadowless sky fill softly lifts the low-sun transition"),
+			FMath::IsNearlyEqual(Clock->Starlight->Intensity, ExpectedTwilightFill, 0.001f) && ExpectedTwilightFill > 0.f);
+		Clock->CurrentHour = 12.f;
+		Clock->UpdateLighting();
+		TestTrue(TEXT("The sky fill turns fully off again at noon"), Clock->Starlight->Intensity <= 0.001f);
+		Clock->CurrentHour = 0.f;
+		Clock->UpdateLighting();
 	}
 	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);

@@ -57,6 +57,11 @@ float AIslandDayNight::NightAmount(float Hour)
 	return FMath::SmoothStep(0.02f, 0.25f, -SunHeight(Hour));
 }
 
+float AIslandDayNight::TwilightFillAmount(float Hour)
+{
+	return 1.f - FMath::SmoothStep(-0.02f, 0.34f, SunHeight(Hour));
+}
+
 float AIslandDayNight::LunarPhaseProgress(int32 IslandDay, float IslandHour)
 {
 	const double ElapsedDays = static_cast<double>(FMath::Max(1, IslandDay) - 1) +
@@ -243,7 +248,8 @@ void AIslandDayNight::UpdateLighting()
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
 		NightAmount(CurrentHour));
-	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * NightAmount(CurrentHour));
+	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
+	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
 	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
 }
 
