@@ -76,6 +76,10 @@ struct FIslandArrangementSite
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	int32 Day = 1;
 
+	/** Island day the fallen-twig bundle was last gathered; an empty site renews on a later Island day. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Forage")
+	int32 ForageGatheredDay = 0;
+
 	/** Public lineage: an observed earlier work that genuinely influenced this transformed form. */
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	FName InfluenceSiteId;

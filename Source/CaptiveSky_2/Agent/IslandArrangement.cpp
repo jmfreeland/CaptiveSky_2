@@ -161,12 +161,9 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 	SetActorTickEnabled(false);
 	LichenLevel = 0.f;
 	LichenLight->SetIntensity(0.f);
-	if (Site.bHasWork)
-	{
-		bForageAvailable = false;
-		ForageTwigs->ClearInstances();
-	}
-	else ShowForageTwigs();
+	bForageAvailable = !Site.bHasWork && Site.ForageGatheredDay < Today;
+	if (bForageAvailable) ShowForageTwigs();
+	else ForageTwigs->ClearInstances();
 	if (!Site.bHasWork) return;
 	if (!Surface) Surface = Stones->CreateAndSetMaterialInstanceDynamic(0);
 	CurrentTint = WeatheredTint(Today - Site.Day);

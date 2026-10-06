@@ -148,6 +148,8 @@ public:
 
 	const TArray<FIslandArrangementSite>& GetArrangementSites() const { return ArrangementSites; }
 	const FIslandArrangementSite* FindArrangementSite(FName Id) const;
+	/** Persists one visible twig bundle gathered from an empty site; a site renews once a later Island day begins. */
+	bool GatherArrangementTwigs(FName SiteId, const FString& AgentId, int32 Today);
 	/** Records a resident's first unobstructed sighting of public work; title and intent remain private. */
 	bool RecordArrangementObservation(FName SiteId, const FString& AgentId);
 	static bool ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm);

@@ -199,6 +199,8 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 				!(*Object)->TryGetArrayField(TEXT("location"), Where) || Where->Num() != 3) continue;
 			Site.Id = FName(*Id);
 			Site.Location = FVector((*Where)[0]->AsNumber(), (*Where)[1]->AsNumber(), (*Where)[2]->AsNumber());
+			(*Object)->TryGetNumberField(TEXT("forage_gathered_day"), Site.ForageGatheredDay);
+			Site.ForageGatheredDay = FMath::Max(0, Site.ForageGatheredDay);
 			const TSharedPtr<FJsonObject>* Work = nullptr;
 			if ((*Object)->TryGetObjectField(TEXT("work"), Work) && (*Work)->TryGetStringField(TEXT("form"), Form) && ParseArrangementForm(Form, Site.Form))
 			{
@@ -297,6 +299,7 @@ bool UIslandWorldStateSubsystem::Save() const
 		Object->SetStringField(TEXT("id"), Site.Id.ToString());
 		Object->SetArrayField(TEXT("location"), {
 			MakeShared<FJsonValueNumber>(Site.Location.X), MakeShared<FJsonValueNumber>(Site.Location.Y), MakeShared<FJsonValueNumber>(Site.Location.Z) });
+		Object->SetNumberField(TEXT("forage_gathered_day"), Site.ForageGatheredDay);
 		if (Site.bHasWork)
 		{
 			const TSharedRef<FJsonObject> Work = MakeShared<FJsonObject>();
@@ -726,6 +729,27 @@ static FAutoConsoleCommandWithWorld GIslandForgetCuriosCommand(
 const FIslandArrangementSite* UIslandWorldStateSubsystem::FindArrangementSite(FName Id) const
 {
 	return ArrangementSites.FindByPredicate([Id](const FIslandArrangementSite& Site) { return Site.Id == Id; });
+}
+
+bool UIslandWorldStateSubsystem::GatherArrangementTwigs(FName SiteId, const FString& AgentId, int32 Today)
+{
+	if (bStorageUnreadable || Today < 1 || AgentId.IsEmpty()) return false;
+	FIslandArrangementSite* Site = ArrangementSites.FindByPredicate([SiteId](const FIslandArrangementSite& Existing) { return Existing.Id == SiteId; });
+	if (!Site || Site->bHasWork || Site->ForageGatheredDay >= Today) return false;
+
+	const int32 PreviousGatheredDay = Site->ForageGatheredDay;
+	Site->ForageGatheredDay = Today;
+	if (!Save())
+	{
+		Site->ForageGatheredDay = PreviousGatheredDay;
+		return false;
+	}
+
+	RefreshArrangementActor(*Site);
+	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("forage"), AgentId,
+		FString::Printf(TEXT("gathered the fallen twig bundle at %s; the empty site can renew on a later Island day."), *SiteId.ToString()),
+		{ { TEXT("site"), SiteId.ToString() }, { TEXT("day"), FString::FromInt(Today) } });
+	return true;
 }
 
 bool UIslandWorldStateSubsystem::RecordArrangementObservation(FName SiteId, const FString& AgentId)

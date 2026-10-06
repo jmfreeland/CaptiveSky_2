@@ -909,7 +909,7 @@ FString ARavenAgentAIController::DescribeBuildOptions() const
 	if (!GetPawn() || !GetWorld()) return FString();
 	if (LocomotionState == ERavenLocomotionState::Grounded && !bCarryingTwigs)
 		return FindForageableTwigPatch()
-			? TEXT("A small visible pile of fallen twigs lies beside you; you may gather its bundle into your beak (build target: GatherTwigs). The pile will be gone afterward, and carrying twigs does not oblige you to build anything.")
+			? TEXT("A small visible pile of fallen twigs lies beside you; you may gather its bundle into your beak (build target: GatherTwigs). This site yields at most one bundle per Island day and can renew when the day advances; carrying twigs does not oblige you to build anything.")
 			: TEXT("There are no fallen twigs within reach here. Fly to a listed open-ground ArrangingGround site with a visible twig pile, land, and look there; gathering is optional.");
 	FString Result = bCarryingTwigs ? TEXT(" You are carrying a small bundle of fallen twigs.") : FString();
 	const AActor* Site = FindPerchedNestSite();
@@ -934,13 +934,20 @@ void ARavenAgentAIController::Build(FName Target)
 		if (LocomotionState != ERavenLocomotionState::Grounded) { ReportAction(TEXT("Twigs can only be gathered while standing on the ground. Nothing was gathered.")); return; }
 		if (bCarryingTwigs) { ReportAction(TEXT("You are already carrying a bundle of twigs; there is no room in your beak for more.")); return; }
 		AIslandArrangement* Patch = FindForageableTwigPatch();
-		if (!Patch || !Patch->GatherForageableTwigs())
+		UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		const UAgentMemoryComponent* Memory = GetPawn() ? GetPawn()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+		const FString AgentId = Memory ? Memory->GetResolvedAgentId() : (GetPawn() ? GetPawn()->GetName() : FString());
+		const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+		if (!Patch || !Patch->HasForageableTwigs() || !WorldState ||
+			!WorldState->GatherArrangementTwigs(Patch->GetSiteId(), AgentId, Today))
 		{
-			ReportAction(TEXT("There are no fallen twigs within reach here; no bundle was gathered. Find another open-ground site with a visible twig pile."));
+			ReportAction(TEXT("There are no available fallen twigs within reach here, or this site's bundle was already gathered today; no bundle was gathered. Find another open-ground site with a visible twig pile."));
 			return;
 		}
+		// Keep this observed patch visually honest too if a fixture or map contains a second actor with the same site ID.
+		Patch->GatherForageableTwigs();
 		bCarryingTwigs = true;
-		ReportAction(TEXT("GatherTwigs: You gathered the visible fallen-twig bundle into your beak; that small pile is gone. Nothing else was found, and nothing has been built yet."));
+		ReportAction(TEXT("GatherTwigs: You gathered the visible fallen-twig bundle into your beak; the site is depleted until a later Island day. Nothing else was found, and nothing has been built yet."));
 		return;
 	}
 	AActor* Site = FindPerchedNestSite();

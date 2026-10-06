@@ -44,6 +44,13 @@ namespace
 			if (It->ActorHasTag(FName(*(TEXT("Nest_") + SiteTag.ToString())))) ++Count;
 		return Count;
 	}
+
+	AIslandArrangement* FindArrangementActor(UWorld* World, FName SiteId)
+	{
+		for (TActorIterator<AIslandArrangement> It(World); It; ++It)
+			if (It->GetSiteId() == SiteId) return *It;
+		return nullptr;
+	}
 }
 
 bool FIslandNestTest::RunTest(const FString& Parameters)
@@ -81,13 +88,23 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	FIslandArrangementSite StartForageSite;
 	StartForageSite.Id = TEXT("ArrangingGround_TestStart");
 	StartForageSite.Location = FVector::ZeroVector;
+	State->ArrangementSites.Add(StartForageSite);
 	AIslandArrangement* StartForagePatch = World->SpawnActor<AIslandArrangement>(StartForageSite.Location, FRotator::ZeroRotator);
-	if (StartForagePatch) StartForagePatch->ShowSite(StartForageSite, 1);
+	if (StartForagePatch)
+	{
+		State->ArrangementActors.Add(StartForageSite.Id, StartForagePatch);
+		StartForagePatch->ShowSite(StartForageSite, 1);
+	}
 	FIslandArrangementSite OccludedForageSite;
 	OccludedForageSite.Id = TEXT("ArrangingGround_TestOccluded");
 	OccludedForageSite.Location = FVector(200.f, 0.f, 0.f);
+	State->ArrangementSites.Add(OccludedForageSite);
 	AIslandArrangement* OccludedForagePatch = World->SpawnActor<AIslandArrangement>(OccludedForageSite.Location, FRotator::ZeroRotator);
-	if (OccludedForagePatch) OccludedForagePatch->ShowSite(OccludedForageSite, 1);
+	if (OccludedForagePatch)
+	{
+		State->ArrangementActors.Add(OccludedForageSite.Id, OccludedForagePatch);
+		OccludedForagePatch->ShowSite(OccludedForageSite, 1);
+	}
 	AActor* ForageOccluder = World->SpawnActor<AActor>();
 	UBoxComponent* ForageOccluderBox = NewObject<UBoxComponent>(ForageOccluder);
 	ForageOccluder->SetRootComponent(ForageOccluderBox);
@@ -120,7 +137,7 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Gathering again cannot create a bundle after the visible pile is depleted"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	Decide(TEXT("GatherTwigs"));
 	TestFalse(TEXT("A depleted patch refuses another bundle"), Controller->bCarryingTwigs);
-	TestTrue(TEXT("The refusal says no visible twigs remain nearby"), Controller->DescribeActionState().Contains(TEXT("no fallen twigs")));
+	TestTrue(TEXT("The refusal says no visible twigs remain nearby"), Controller->DescribeActionState().Contains(TEXT("no available fallen twigs")));
 	TestTrue(TEXT("An occluded nearby pile is not offered or consumed"), OccludedForagePatch && OccludedForagePatch->HasForageableTwigs() &&
 		!Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	ForageOccluderBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -173,7 +190,8 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	const FString BystanderView = BystanderBrain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby resident can come across the nest"), BystanderView.Contains(TEXT("A small nest of woven twigs")) && BystanderView.Contains(TEXT("2 of 5 layers")));
 	TestTrue(TEXT("The maker is not revealed to someone who did not see it"), BystanderView.Contains(TEXT("did not see who made it")) && !BystanderView.Contains(Raven->GetName()));
-	TestFalse(TEXT("Build targets are not offered to a body that cannot use them"), BystanderView.Contains(TEXT("build target")));
+	TestFalse(TEXT("A non-raven is not offered the Raven-only forage or nest targets"),
+		BystanderView.Contains(TEXT("build target: GatherTwigs")) || BystanderView.Contains(TEXT("build target: TestNestRoost")));
 	Controller->UnPossess();
 	DestroyNestWorld(World);
 
@@ -199,6 +217,21 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Nest = State->FindNest(Site);
 	TestTrue(TEXT("Nest persists across sessions"), Nest && Nest->Layers == 2 && Nest->Builders.Num() == 1);
 	TestEqual(TEXT("Persisted nest is visible again"), CountNestActors(World, Site), 1);
+	const AIslandArrangement* RestoredStartForage = FindArrangementActor(World, StartForageSite.Id);
+	const AIslandArrangement* RestoredOccludedForage = FindArrangementActor(World, OccludedForageSite.Id);
+	TestTrue(TEXT("Gathered bundles remain depleted after reopening the same Island day"),
+		RestoredStartForage && !RestoredStartForage->HasForageableTwigs() &&
+		RestoredOccludedForage && !RestoredOccludedForage->HasForageableTwigs());
+	for (const FName TestSiteId : { StartForageSite.Id, OccludedForageSite.Id })
+	{
+		if (TWeakObjectPtr<AIslandArrangement>* Actor = State->ArrangementActors.Find(TestSiteId))
+			if (Actor->IsValid()) Actor->Get()->Destroy();
+		State->ArrangementActors.Remove(TestSiteId);
+	}
+	TestEqual(TEXT("Temporary forage fixtures are removed before the nest continuation"),
+		State->ArrangementSites.RemoveAll([&StartForageSite, &OccludedForageSite](const FIslandArrangementSite& Entry)
+			{ return Entry.Id == StartForageSite.Id || Entry.Id == OccludedForageSite.Id; }), 2);
+	TestTrue(TEXT("Fixture cleanup preserves the remaining nest state"), State->Save());
 	TestEqual(TEXT("Third layer"), State->AddNestLayer(Site, FVector::ZeroVector, TEXT("Other")), 3);
 	TestEqual(TEXT("Later contributors are recorded alongside the first"), State->FindNest(Site)->Builders.Num(), 2);
 	TestTrue(TEXT("Original location is kept when others add to it"), !State->FindNest(Site)->Location.IsNearlyZero());
@@ -220,7 +253,11 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	FarForageSite.Location = FVector(2600.f, 0.f, 0.f);
 	State->ArrangementSites.Add(FarForageSite);
 	AIslandArrangement* FarForagePatch = World->SpawnActor<AIslandArrangement>(FarForageSite.Location, FRotator::ZeroRotator);
-	if (FarForagePatch) FarForagePatch->ShowSite(FarForageSite, 1);
+	if (FarForagePatch)
+	{
+		State->ArrangementActors.Add(FarForageSite.Id, FarForagePatch);
+		FarForagePatch->ShowSite(FarForageSite, 1);
+	}
 	AActor* Occluder = World->SpawnActor<AActor>();
 	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
 	Occluder->SetRootComponent(OccluderBox);
@@ -263,6 +300,26 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Decide(TEXT("GatherTwigs"));
 	TestTrue(*FString::Printf(TEXT("The raven gathers the material after choosing to land (%s)"), *Controller->DescribeActionState()),
 		Controller->bCarryingTwigs && FarForagePatch && !FarForagePatch->HasForageableTwigs() && FarForagePatch->GetVisibleForageTwigCount() == 0);
+	const FIslandArrangementSite* GatheredFarSite = State->FindArrangementSite(FarForageSite.Id);
+	TestNotNull(TEXT("The gathered source site remains in canonical world state"), GatheredFarSite);
+	if (GatheredFarSite) TestEqual(TEXT("Gathering records the Island day at the source site"), GatheredFarSite->ForageGatheredDay, 1);
+	TestFalse(TEXT("The same site cannot be gathered twice on the same Island day"), State->GatherArrangementTwigs(FarForageSite.Id, TEXT("Raven"), 1));
+	TestTrue(TEXT("The next Island day renews forage at empty sites"), State->SaveClock(12.f, 2) && FarForagePatch->HasForageableTwigs());
+	TestTrue(TEXT("A renewed bundle can be gathered on the new Island day"), State->GatherArrangementTwigs(FarForageSite.Id, TEXT("Raven"), 2));
+	TestFalse(TEXT("The renewed site still yields only one bundle that day"), State->GatherArrangementTwigs(FarForageSite.Id, TEXT("Raven"), 2));
+	DestroyNestWorld(World);
+
+	// Forage depletion survives a restart, then renews when the saved Island day advances.
+	World = CreateNestWorld(StateFile);
+	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	World->BeginPlay();
+	AIslandArrangement* ReloadedForage = FindArrangementActor(World, FarForageSite.Id);
+	TestNotNull(TEXT("The saved forage site is visible after restart"), ReloadedForage);
+	if (ReloadedForage)
+	{
+		TestFalse(TEXT("The day-two bundle remains depleted after restart"), ReloadedForage->HasForageableTwigs());
+		TestTrue(TEXT("A further Island day restores the fallen-twig bundle"), State->SaveClock(12.f, 3) && ReloadedForage->HasForageableTwigs());
+	}
 	DestroyNestWorld(World);
 
 	// An unreadable file is never overwritten by a later save.
