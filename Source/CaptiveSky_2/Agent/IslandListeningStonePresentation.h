@@ -9,6 +9,7 @@ class AStaticMeshActor;
 class UInstancedStaticMeshComponent;
 class UPointLightComponent;
 class UStaticMesh;
+class AIslandWeather;
 
 /** Collisionless, transient render forms and a short-lived resonance at the Listening Stones. */
 UCLASS()
@@ -20,7 +21,9 @@ public:
 	AListeningStonePresentation();
 	int32 GetStoneCount() const;
 	void BeginResonance(float WindSpeed);
-	float GetResonanceRemaining() const { return FMath::Max(0.f, ResonanceDuration - ResonanceElapsed); }
+	float GetResonanceRemaining() const { return bIsResonating ? FMath::Max(0.f, ResonanceDuration - ResonanceElapsed) : 0.f; }
+	/** Natural resonance is reserved for a meaningful, rising outdoor gust, not steady background wind. */
+	static bool ShouldResonateForWind(float PreviousSpeed, float CurrentSpeed);
 
 private:
 	friend class UIslandListeningStonePresentationSubsystem;
@@ -32,8 +35,18 @@ private:
 	float ResonanceElapsed = 0.f;
 	float ResonanceDuration = 2.8f;
 	float SampledWindSpeed = 0.f;
+	bool bIsResonating = false;
+	float AmbientWindCheckAccumulator = 0.f;
+	float LastAmbientWindSpeed = 0.f;
+	double LastAmbientChimeAt = -1000.0;
+	bool bHasAmbientWindSample = false;
+	TWeakObjectPtr<AIslandWeather> Weather;
 	bool BuildStoneForms(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
 		const TArray<AStaticMeshActor*>& Proxies);
+	virtual void BeginPlay() override;
+	void CheckForNaturalGust(float DeltaSeconds);
+	void ObserveAmbientWind(float CurrentSpeed);
+	void BeginNaturalResonance(float WindSpeed);
 	virtual void Tick(float DeltaSeconds) override;
 };
 

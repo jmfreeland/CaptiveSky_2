@@ -1,0 +1,9 @@
+# Listening Stones natural gust resonance (2026-10-06)
+
+The transient Game/PIE Listening Stones presentation now listens for a rising local wind event. A once-per-second sample must reach at least 90 cm/s and rise at least 45 cm/s from the previous sample. A qualifying onset briefly lights the three stones and plays the existing spatialized procedural chime, using local wind speed for its pitch. Every natural or resident-triggered chime starts the same 45-second quiet period. Steady wind, small changes, falling wind, and invalid samples do not trigger it.
+
+The effect is transient: it writes no world state, changes no map actor, and makes no agent or model request. The presentation performs a lightweight 0.1-second actor tick so the visual resonance can remain smooth; actual wind sampling is limited to once per second, and the tick remains active only while the transient presentation exists in Game/PIE.
+
+Validation: the UE 5.8.3 `CaptiveSky_2Editor` target built successfully. Headless `CaptiveSky2.Agent.ListeningStonePresentation` passed in a `-NullRHI -NoSound -DisablePython -DDC-ForceMemoryCache` run. The test covers the gust threshold, rejection of steady/weak/falling/non-finite samples, transient actor creation and cooldown, visual expiry, and restoration of the original map proxies. Log: [`Codex_NaturalStoneResonance_20261006_retry.log`](../../Saved/Logs/Codex_NaturalStoneResonance_20261006_retry.log).
+
+The first headless launch stopped before running tests because the sandbox could not write to the configured installed Derived Data Cache. The in-memory DDC retry completed normally. This proves the deterministic trigger and transient lifecycle, not the audible mix, visual readability, real Island wind frequency, frame-time impact, or behavior in a packaged build. Review those in the interactive UE 5.8.3 editor when it is available; tune the thresholds only against a bounded, matched listening/capture check.

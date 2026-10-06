@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "Agent/IslandListeningStonePresentation.h"
+#include "Agent/IslandListeningStonesChime.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -9,12 +10,19 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStonePresentationTest, "CaptiveSky2.Agent.ListeningStonePresentation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 {
+	TestTrue(TEXT("A clear rising gust can awaken the Listening Stones"), AListeningStonePresentation::ShouldResonateForWind(70.f, 120.f));
+	TestFalse(TEXT("Steady wind does not repeatedly chime"), AListeningStonePresentation::ShouldResonateForWind(120.f, 121.f));
+	TestFalse(TEXT("A small gust below the audible wind threshold stays quiet"), AListeningStonePresentation::ShouldResonateForWind(20.f, 80.f));
+	TestFalse(TEXT("A falling wind does not trigger a new resonance"), AListeningStonePresentation::ShouldResonateForWind(160.f, 100.f));
+	TestFalse(TEXT("Non-finite wind samples cannot trigger ambience"), AListeningStonePresentation::ShouldResonateForWind(std::numeric_limits<float>::quiet_NaN(), 150.f));
+
 	UWorld* Island = nullptr;
 	for (const FWorldContext& Context : GEngine->GetWorldContexts())
 	{
@@ -115,11 +123,27 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 
 	if (Subsystem && Presentation)
 	{
+		TestEqual(TEXT("Natural wind monitoring stays on with no resonance active"), Presentation->GetResonanceRemaining(), 0.f);
+		Presentation->ObserveAmbientWind(70.f);
+		TestEqual(TEXT("The first wind sample establishes a quiet baseline"), Presentation->GetResonanceRemaining(), 0.f);
+		Presentation->ObserveAmbientWind(120.f);
+		TestTrue(TEXT("A rising natural gust starts the transient stone resonance"), Presentation->GetResonanceRemaining() > 2.7f);
+		int32 NaturalChimeCount = 0;
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++NaturalChimeCount;
+		TestEqual(TEXT("A natural gust creates one finite chime actor"), NaturalChimeCount, 1);
+		Presentation->ObserveAmbientWind(40.f);
+		Presentation->ObserveAmbientWind(120.f);
+		int32 ChimeCountDuringCooldown = 0;
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCountDuringCooldown;
+		TestEqual(TEXT("A second gust cannot retrigger during the resonance and cooldown"), ChimeCountDuringCooldown, 1);
+		Presentation->Tick(2.9f);
+		TestEqual(TEXT("Natural resonance lights expire without persistent state"), Presentation->GetResonanceRemaining(), 0.f);
 		Subsystem->NotifyChime(180.f);
 		TestTrue(TEXT("A chime starts a finite stone resonance"), Presentation->IsActorTickEnabled() && Presentation->GetResonanceRemaining() > 2.7f);
 		TestTrue(TEXT("Resonance lights are briefly visible"), Presentation->ResonanceLights[0]->IsVisible() && Presentation->ResonanceLights[1]->IsVisible() && Presentation->ResonanceLights[2]->IsVisible());
 		Presentation->Tick(2.9f);
-		TestFalse(TEXT("The resonance stops ticking after its bounded duration"), Presentation->IsActorTickEnabled());
+		TestTrue(TEXT("The lightweight wind watch remains active after the bounded resonance"), Presentation->IsActorTickEnabled());
+		TestEqual(TEXT("The bounded resonance has fully elapsed"), Presentation->GetResonanceRemaining(), 0.f);
 		TestFalse(TEXT("The resonance lights switch off after the chime"), Presentation->ResonanceLights[0]->IsVisible() || Presentation->ResonanceLights[1]->IsVisible() || Presentation->ResonanceLights[2]->IsVisible());
 		Subsystem->RestorePresentation();
 	}
