@@ -51,6 +51,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandListeningStonePresentationTest;
 	friend class FIslandViewpointCaptureTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> GlowingBody;

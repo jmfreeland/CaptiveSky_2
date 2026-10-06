@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "Agent/AgentBrainComponent.h"
+#include "Agent/IslandFirefly.h"
 #include "Agent/IslandListeningStonePresentation.h"
 #include "Agent/IslandListeningStonesChime.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -139,7 +140,24 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			NaturalChime = *It;
 		}
 		TestEqual(TEXT("A natural gust creates one finite chime actor"), NaturalChimeCount, 1);
-	ATargetPoint* Resident = World->SpawnActor<ATargetPoint>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
+		AIslandFirefly* NearbyFirefly = World->SpawnActor<AIslandFirefly>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
+		AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(
+			FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f), FRotator::ZeroRotator);
+		if (NearbyFirefly)
+		{
+			NearbyFirefly->CheckForNearbyStoneChime();
+			TestTrue(TEXT("A nearby firefly notices the natural chime and lifts its glow pulse"), NearbyFirefly->ChimeResponseRemaining > 0.f);
+			TestEqual(TEXT("The firefly remembers which transient tone it answered"), NearbyFirefly->RespondedChimes.Num(), 1);
+		}
+		else AddError(TEXT("A nearby firefly is required to verify natural chime response."));
+		if (DistantFirefly)
+		{
+			DistantFirefly->CheckForNearbyStoneChime();
+			TestTrue(TEXT("A firefly beyond the acoustic radius does not respond"), DistantFirefly->ChimeResponseRemaining <= 0.f);
+		}
+		else AddError(TEXT("A distant firefly is required to verify acoustic range."));
+
+		ATargetPoint* Resident = World->SpawnActor<ATargetPoint>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
 		UAgentBrainComponent* ResidentBrain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
 		if (Resident && ResidentBrain)
 		{
