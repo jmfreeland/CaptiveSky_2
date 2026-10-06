@@ -342,6 +342,15 @@ composition, but static images (with the profiler counter visible)
 do not establish that the foliage moves naturally or that the material’s heading convention
 is correct.
 
+Read-only UE 5.8.3 Python inspection loaded the Fab `PN_WindAnimation` function and enumerated
+109 graph expressions. It exposes a scalar input named `Wind Gust Angle Rotation`, includes
+sine/cosine expressions, and outputs `World Position Offset`. The separate MPC exposes scalar
+`WindDirection` and `WindStrength` parameters. This supports a scalar-angle bridge but does not
+prove how the parent foliage materials map `WindDirection` into that function input. The script
+completed its graph enumeration, but the Python commandlet raised an access violation during
+shutdown (`Saved/Logs/Codex_PNWindGraph3_20261006.log`); treat the emitted graph data as
+diagnostic evidence, not a clean commandlet pass. No Content asset was changed.
+
 Keep the bridge opt-in. The next visual check should inspect the PN material graph or capture
 the same close foliage at a fixed camera over time with known headings, then verify direction
 and amplitude. Preserve the existing bounded-session safeguards; repeat the A/B only if a
