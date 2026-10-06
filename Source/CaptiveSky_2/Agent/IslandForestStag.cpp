@@ -4,7 +4,9 @@
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
+#include "IslandLightning.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIslandForestStag::AIslandForestStag()
@@ -62,6 +64,24 @@ void AIslandForestStag::BeginGrazing()
 	MoveSpeed = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
+}
+
+void AIslandForestStag::CheckForNearbyThunder()
+{
+	if (!GetWorld()) return;
+
+	constexpr float AudibleThunderRadius = 120000.f;
+	for (TActorIterator<AIslandLightning> It(GetWorld()); It; ++It)
+	{
+		if (LastHeardThunder.Get() == *It || !It->HasThunderReached(GetActorLocation())) continue;
+		const FVector StrikeLocation = It->GetStrikeGroundLocation();
+		if (FVector::DistSquared2D(GetActorLocation(), StrikeLocation) > FMath::Square(AudibleThunderRadius)) continue;
+
+		LastHeardThunder = *It;
+		if (bResting) SetResting(false);
+		RespondToQuietObservation(StrikeLocation);
+		return;
+	}
 }
 
 bool AIslandForestStag::FindGround(const FVector& NearPoint, FVector& OutGround) const
@@ -138,8 +158,15 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 void AIslandForestStag::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (bResting || !GetWorld()) return;
+	if (!GetWorld()) return;
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
+	ThunderCheckRemaining -= Delta;
+	if (ThunderCheckRemaining <= 0.f)
+	{
+		ThunderCheckRemaining = 0.35f;
+		CheckForNearbyThunder();
+	}
+	if (bResting) return;
 	if (!bMoving)
 	{
 		ActivityRemaining -= Delta;

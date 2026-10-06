@@ -53,9 +53,18 @@ bool AIslandLightning::HasBolt() const
 	return Bolt->GetInstanceCount() > 0;
 }
 
+bool AIslandLightning::HasThunderReached(const FVector& ListenerLocation) const
+{
+	if (!bStrikeIssued) return false;
+	const float ListenerDelay = FVector::Dist2D(StrikeGroundLocation, ListenerLocation) / SoundSpeed;
+	return Elapsed >= ListenerDelay;
+}
+
 void AIslandLightning::Strike(const FVector& Ground, const FVector& Listener, int32 Seed)
 {
 	StrikeSeed = Seed;
+	StrikeGroundLocation = Ground;
+	bStrikeIssued = true;
 	FRandomStream Random(Seed);
 	const float Distance = FVector::Dist2D(Ground, Listener);
 	// The flash lights the sky between the strike and the viewer, well above the ground.

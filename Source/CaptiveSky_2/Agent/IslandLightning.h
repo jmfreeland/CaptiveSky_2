@@ -31,6 +31,10 @@ public:
 
 	/** Ground is where the bolt lands; Listener is where thunder is heard from (the viewer). */
 	void Strike(const FVector& Ground, const FVector& Listener, int32 Seed);
+	/** Ground point for nearby ecology to assess the strike's local audible range. */
+	const FVector& GetStrikeGroundLocation() const { return StrikeGroundLocation; }
+	/** Whether sound from this strike has reached a particular listener's location. */
+	bool HasThunderReached(const FVector& ListenerLocation) const;
 
 	/** Flash brightness now, 0..1: three quick pulses, then dark. */
 	static float FlashAt(float SecondsSinceStrike);
@@ -58,10 +62,12 @@ private:
 	TObjectPtr<USoundWaveProcedural> ThunderWave;
 
 	float Elapsed = 0.f;
+	FVector StrikeGroundLocation = FVector::ZeroVector;
 	float ThunderDelay = 0.f;
 	float ThunderVolume = 0.f;
 	float Lifetime = 8.f;
 	int32 StrikeSeed = 0;
+	bool bStrikeIssued = false;
 	bool bThundered = false;
 
 	void StartThunder();

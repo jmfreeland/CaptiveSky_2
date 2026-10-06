@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "AgentBrainComponent.h"
 #include "IslandForestStag.h"
+#include "IslandLightning.h"
 #include "IslandInteractionUtility.h"
 #include "Animation/AnimSequence.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -93,6 +94,61 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A resting wild animal is not forced into a new action"), Deer->IsStartled());
 	Deer->SetResting(false);
 	TestFalse(TEXT("Daylight returns the stag to its ordinary routine"), Deer->IsResting());
+
+	AIslandLightning* NearbyStrike = World->SpawnActor<AIslandLightning>(Spawn);
+	if (!TestNotNull(TEXT("A nearby storm strike can be observed by local ecology"), NearbyStrike))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	const FVector NearbyGround(50000.f, 0.f, 0.f);
+	NearbyStrike->Strike(NearbyGround, FVector(150000.f, 0.f, 0.f), 418);
+	const float StagThunderDelay = FVector::Dist2D(NearbyGround, Deer->GetActorLocation()) / AIslandLightning::SoundSpeed;
+	TestFalse(TEXT("The stag cannot hear sound before its own strike-to-listener travel time"),
+		NearbyStrike->HasThunderReached(Deer->GetActorLocation()));
+	TestTrue(TEXT("The distant player listener has a longer thunder delay than the nearby stag"),
+		NearbyStrike->GetThunderDelay() > StagThunderDelay);
+	NearbyStrike->Tick(StagThunderDelay - 0.1f);
+	Deer->ThunderCheckRemaining = 0.f;
+	Deer->Tick(0.36f);
+	TestTrue(TEXT("A nearby stag does not startle before sound reaches its location"), !Deer->IsStartled());
+	NearbyStrike->Tick(0.2f);
+	TestTrue(TEXT("Thunder has reached the stag before it reaches the more distant player"),
+		NearbyStrike->HasThunderReached(Deer->GetActorLocation()) && !NearbyStrike->HasThundered());
+	Deer->BeginGrazing();
+	Deer->ThunderCheckRemaining = 0.f;
+	Deer->Tick(0.36f);
+	TestTrue(TEXT("The stag briefly startles from the audible nearby thunder"), Deer->IsStartled());
+	const FVector AwayFromStrike = (Deer->GetActorLocation() - NearbyStrike->GetStrikeGroundLocation()).GetSafeNormal2D();
+	TestTrue(TEXT("The stag moves away from the nearby strike within its bounded home range"),
+		FVector::DotProduct((Deer->TargetLocation - Deer->HomeLocation).GetSafeNormal2D(), AwayFromStrike) > 0.9f &&
+		FVector::Dist2D(Deer->HomeLocation, Deer->TargetLocation) <= 700.f);
+	const float StartleRemaining = Deer->ActivityRemaining;
+	Deer->ThunderCheckRemaining = 0.f;
+	Deer->Tick(0.36f);
+	TestTrue(TEXT("One lingering thunder actor causes only one brief startle"), Deer->ActivityRemaining < StartleRemaining);
+
+	Deer->BeginGrazing();
+	AIslandLightning* DistantStrike = World->SpawnActor<AIslandLightning>(Spawn);
+	if (TestNotNull(TEXT("A distant storm strike can be compared independently"), DistantStrike))
+	{
+		DistantStrike->Strike(FVector(150000.f, 0.f, 0.f), FVector::ZeroVector, 419);
+		DistantStrike->Tick(DistantStrike->GetThunderDelay() + 0.1f);
+		Deer->ThunderCheckRemaining = 0.f;
+		Deer->Tick(0.36f);
+		TestTrue(TEXT("Thunder beyond the local audible radius does not startle the stag"), !Deer->IsStartled());
+	}
+	Deer->SetResting(true);
+	AIslandLightning* WakingStrike = World->SpawnActor<AIslandLightning>(Spawn);
+	if (TestNotNull(TEXT("A nearby clap can wake a resting stag"), WakingStrike))
+	{
+		WakingStrike->Strike(FVector(60000.f, 0.f, 0.f), FVector::ZeroVector, 420);
+		WakingStrike->Tick(WakingStrike->GetThunderDelay() + 0.1f);
+		Deer->ThunderCheckRemaining = 0.f;
+		Deer->Tick(0.36f);
+		TestTrue(TEXT("An audible close thunderclap gently wakes and startles the stag"), !Deer->IsResting() && Deer->IsStartled());
+	}
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
