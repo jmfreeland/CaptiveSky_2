@@ -1,5 +1,10 @@
 #include "IslandArrangement.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "IslandDayNight.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
+#include "Materials/MaterialInterface.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -18,6 +23,29 @@ AIslandArrangement::AIslandArrangement()
 	ForageTwigs->SetCanEverAffectNavigation(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (TwigMesh.Succeeded()) ForageTwigs->SetStaticMesh(TwigMesh.Object);
+	Lichen = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Lichen"));
+	Lichen->SetupAttachment(Stones);
+	Lichen->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Lichen->SetCanEverAffectNavigation(false);
+	Lichen->SetCastShadow(false);
+	Lichen->SetVisibility(false);
+	if (Sphere.Succeeded())
+	{
+		Lichen->SetStaticMesh(Sphere.Object);
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> Emissive(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+		if (Emissive.Succeeded()) Lichen->SetMaterial(0, Emissive.Object);
+	}
+	LichenLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("LichenLight"));
+	LichenLight->SetupAttachment(Stones);
+	LichenLight->SetMobility(EComponentMobility::Movable);
+	LichenLight->SetLightColor(FLinearColor(0.35f, 1.f, 0.75f));
+	LichenLight->SetAttenuationRadius(260.f);
+	LichenLight->SetCastShadows(false);
+	LichenLight->SetIntensity(0.f);
+	LichenLight->SetRelativeLocation(FVector(0.f, 0.f, 28.f));
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	PrimaryActorTick.TickInterval = 0.5f;
 	Tags.AddUnique(TEXT("IslandArrangement"));
 	Tags.AddUnique(TEXT("AgentMade"));
 }
@@ -38,6 +66,41 @@ FLinearColor AIslandArrangement::WeatheredTint(int32 AgeDays)
 {
 	const float Weathering = FMath::Clamp(AgeDays / static_cast<float>(DaysToWeather), 0.f, 1.f);
 	return FMath::Lerp(FLinearColor(0.74f, 0.72f, 0.67f), FLinearColor(0.27f, 0.33f, 0.2f), Weathering);
+}
+
+float AIslandArrangement::LichenGlow(int32 AgeDays)
+{
+	return FMath::SmoothStep(static_cast<float>(DaysToWeather), static_cast<float>(DaysToWeather + DaysToGlow), static_cast<float>(AgeDays));
+}
+
+int32 AIslandArrangement::GetVisibleLichenCount() const
+{
+	return Lichen ? Lichen->GetInstanceCount() : 0;
+}
+
+float AIslandArrangement::GetLichenLightIntensity() const
+{
+	return LichenLight ? LichenLight->Intensity : 0.f;
+}
+
+void AIslandArrangement::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UpdateLichen();
+}
+
+void AIslandArrangement::UpdateLichen()
+{
+	if (!DayNight.IsValid() && GetWorld())
+		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It) { DayNight = *It; break; }
+	// Age keeps advancing with the clock during a long session; without a clock the shown day stands.
+	const int32 Today = DayNight.IsValid() ? DayNight->DayNumber : ShownDay;
+	const float Night = DayNight.IsValid() ? AIslandDayNight::NightAmount(DayNight->CurrentHour) : 0.f;
+	const float Age = bHasWork ? LichenGlow(Today - WorkDay) : 0.f;
+	LichenLevel = Age * Night;
+	Lichen->SetVisibility(Age > 0.f);
+	LichenLight->SetIntensity(LichenLightIntensity * LichenLevel);
+	if (LichenSurface) LichenSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.02f, 0.11f, 0.07f) * LichenLevel);
 }
 
 int32 AIslandArrangement::GetVisibleStoneCount() const
@@ -91,6 +154,13 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 	SiteId = Site.Id;
 	Tags.AddUnique(Site.Id);
 	Stones->ClearInstances();
+	Lichen->ClearInstances();
+	bHasWork = Site.bHasWork;
+	WorkDay = Site.Day;
+	ShownDay = Today;
+	SetActorTickEnabled(false);
+	LichenLevel = 0.f;
+	LichenLight->SetIntensity(0.f);
 	if (Site.bHasWork)
 	{
 		bForageAvailable = false;
@@ -159,4 +229,19 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 			Place(FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Answer.FRandRange(105.f, 120.f), Answer.FRandRange(0.1f, 0.14f));
 		}
 	}
+	// One lichen patch per stone, set on its crown. It stays hidden until the work is old enough to glow.
+	if (!LichenSurface) LichenSurface = Lichen->CreateAndSetMaterialInstanceDynamic(0);
+	FRandomStream Growth(Site.Seed ^ 0x1c4e3a);
+	for (int32 Index = 0; Index < Stones->GetInstanceCount(); ++Index)
+	{
+		FTransform Stone;
+		Stones->GetInstanceTransform(Index, Stone, false);
+		const FVector Scale = Stone.GetScale3D();
+		const float Reach = 50.f * Scale.X * 0.35f;
+		const FVector Crown = Stone.GetLocation() + FVector(Growth.FRandRange(-Reach, Reach), Growth.FRandRange(-Reach, Reach), 50.f * Scale.Z * 0.82f);
+		const float Patch = Scale.X * Growth.FRandRange(0.28f, 0.42f);
+		Lichen->AddInstance(FTransform(FRotator(0.f, Growth.FRandRange(0.f, 360.f), 0.f), Crown, FVector(Patch, Patch * 0.8f, 0.018f)));
+	}
+	SetActorTickEnabled(true);
+	UpdateLichen();
 }

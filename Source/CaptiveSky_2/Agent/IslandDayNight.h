@@ -61,6 +61,8 @@ public:
 
 	static float WrapHour(double Hour);
 	static float SunHeight(float Hour);
+	/** 0 by day, ramping to 1 once the sun is well below the horizon; the same ramp that fades the moon and starlight in. */
+	static float NightAmount(float Hour);
 	static float LunarPhaseProgress(int32 IslandDay, float IslandHour);
 	static float LunarIllumination(int32 IslandDay, float IslandHour);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
