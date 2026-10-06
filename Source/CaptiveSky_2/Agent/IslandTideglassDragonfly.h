@@ -53,7 +53,10 @@ private:
 	float MotionRate = 1.f;
 	float WingPhase = 0.f;
 	float ScatterRemaining = 0.f;
+	float RavenFlybyCooldownRemaining = 0.f;
+	float RavenCheckRemaining = 0.f;
 	int32 ColorVariant = 0;
 	void ConfigureAppearance();
+	void CheckForLowRavenFlyby();
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 };

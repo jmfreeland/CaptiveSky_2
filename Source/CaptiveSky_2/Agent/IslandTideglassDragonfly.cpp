@@ -6,6 +6,7 @@
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -128,6 +129,31 @@ void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& Observe
 	ScatterRemaining = 1.6f;
 }
 
+void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
+{
+	if (!GetWorld() || ScatterRemaining > 0.f || RavenFlybyCooldownRemaining > 0.f) return;
+
+	constexpr float FlybyRadius = 425.f;
+	constexpr float MinimumHeight = 120.f;
+	constexpr float MaximumHeight = 480.f;
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
+		const APawn* Raven = It->GetPawn();
+		if (!IsValid(Raven)) continue;
+
+		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
+		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight || Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
+			continue;
+
+		// A close, low wing shadow sends the dragonfly briefly sideways; it resumes its
+		// independent pool-side patrol without pursuing, attacking, or persisting a change.
+		RespondToQuietObservation(Raven->GetActorLocation());
+		RavenFlybyCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 FVector AIslandTideglassDragonfly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
 {
 	UWorld* World = GetWorld();
@@ -154,6 +180,13 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	const float Time = GetWorld()->GetTimeSeconds();
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
+	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	RavenCheckRemaining -= SafeDelta;
+	if (RavenCheckRemaining <= 0.f)
+	{
+		RavenCheckRemaining = 0.35f;
+		CheckForLowRavenFlyby();
+	}
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float MoveScale = RainMovementScale(Rain);
 	const float MotionTime = Time * MotionRate;

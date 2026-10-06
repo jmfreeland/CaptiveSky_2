@@ -1456,6 +1456,34 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Repeated quiet attention only refreshes the short natural startle response"), WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+
+		const FVector DragonflyLocation = WatchableDragonfly->GetActorLocation();
+		const FVector LowFlybyLocation = DragonflyLocation + FVector(-200.f, 0.f, 250.f);
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
+		Observer->SetActorLocation(LowFlybyLocation);
+		WatchableDragonfly->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A nearby low raven pass triggers a short dragonfly dart"),
+			WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
+		const FVector AwayFromRaven = (DragonflyLocation - LowFlybyLocation).GetSafeNormal2D();
+		TestTrue(TEXT("The dragonfly darts away from the low wing shadow"),
+			FVector::DotProduct(WatchableDragonfly->ScatterDirection, AwayFromRaven) > 0.95f);
+		TestEqual(TEXT("A close pass starts an eight-second response cooldown"), WatchableDragonfly->RavenFlybyCooldownRemaining, 8.f);
+
+		WatchableDragonfly->ScatterRemaining = 0.f;
+		WatchableDragonfly->CheckForLowRavenFlyby();
+		TestTrue(TEXT("The same hovering raven cannot retrigger the dart during cooldown"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		WatchableDragonfly->RavenFlybyCooldownRemaining = 0.f;
+		Observer->SetActorLocation(DragonflyLocation + FVector(-200.f, 0.f, 700.f));
+		WatchableDragonfly->CheckForLowRavenFlyby();
+		TestTrue(TEXT("High raven flight stays outside the dragonfly's disturbance band"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		Observer->SetActorLocation(DragonflyLocation + FVector(-600.f, 0.f, 250.f));
+		WatchableDragonfly->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A low but distant raven does not disturb the dragonfly"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		Controller->LocomotionState = ERavenLocomotionState::Perched;
+		Observer->SetActorLocation(LowFlybyLocation);
+		WatchableDragonfly->CheckForLowRavenFlyby();
+		TestTrue(TEXT("A perched raven does not disturb the airborne dragonfly"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 		WatchableDragonfly->Destroy();
 	}
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(TestPoolLocation + FVector(80.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);

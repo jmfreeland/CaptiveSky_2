@@ -1,0 +1,5 @@
+# Tideglass dragonflies answer a low raven flyby (2026-10-06)
+
+The daytime dragonflies above Tideglass now notice a nearby raven only while its controller reports that it is flying. A pass within 4.25 m and 1.2–4.8 m above the dragonfly briefly sends it darting away, then it resumes its independent local loop. One response is allowed every eight seconds; high, distant, or perched ravens do not trigger it. The dragonfly polls at about 2.9 Hz, consistent with the other local wildlife flyby checks.
+
+Validation: the UE 5.8.3 `CaptiveSky_2Editor` target built successfully, then `CaptiveSky2.Agent.NightEcology` passed with exit code 0. The fixture covers a close low pass, away direction, repeat suppression, high and distant passes, and a perched raven. Log: [`Codex_DragonflyRavenFlyby_20261006.log`](../../Saved/Logs/Codex_DragonflyRavenFlyby_20261006.log). This is a reversible movement accent only: it does not create a predator attack, pursue the raven, make a model request, or persist world state. Runtime flight appearance still needs an interactive UE 5.8.3 check.
