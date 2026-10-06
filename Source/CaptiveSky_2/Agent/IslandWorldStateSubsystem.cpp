@@ -208,6 +208,10 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 				(*Work)->TryGetStringField(TEXT("intent"), Site.Intent);
 				(*Work)->TryGetStringField(TEXT("maker"), Site.MakerAgentId);
 				(*Work)->TryGetNumberField(TEXT("day"), Site.Day);
+				FString InfluenceSiteId;
+				if ((*Work)->TryGetStringField(TEXT("influence_site"), InfluenceSiteId)) Site.InfluenceSiteId = FName(*InfluenceSiteId);
+				(*Work)->TryGetStringArrayField(TEXT("observed_by"), Site.ObservedBy);
+				if (Site.ObservedBy.Num() > MaxArrangementObservers) Site.ObservedBy.SetNum(MaxArrangementObservers);
 				if ((*Work)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Site.CreatedUtc);
 				const TArray<TSharedPtr<FJsonValue>>* Responses = nullptr;
 				if ((*Work)->TryGetArrayField(TEXT("responses"), Responses))
@@ -302,6 +306,11 @@ bool UIslandWorldStateSubsystem::Save() const
 			Work->SetStringField(TEXT("intent"), Site.Intent);
 			Work->SetStringField(TEXT("maker"), Site.MakerAgentId);
 			Work->SetNumberField(TEXT("day"), Site.Day);
+			if (!Site.InfluenceSiteId.IsNone()) Work->SetStringField(TEXT("influence_site"), Site.InfluenceSiteId.ToString());
+			TArray<TSharedPtr<FJsonValue>> Observers;
+			for (int32 Index = 0; Index < Site.ObservedBy.Num() && Index < MaxArrangementObservers; ++Index)
+				Observers.Add(MakeShared<FJsonValueString>(Site.ObservedBy[Index]));
+			Work->SetArrayField(TEXT("observed_by"), Observers);
 			Work->SetStringField(TEXT("created_utc"), Site.CreatedUtc.ToIso8601());
 			TArray<TSharedPtr<FJsonValue>> Responses;
 			for (const FIslandArrangementResponse& Response : Site.Responses)
@@ -719,6 +728,17 @@ const FIslandArrangementSite* UIslandWorldStateSubsystem::FindArrangementSite(FN
 	return ArrangementSites.FindByPredicate([Id](const FIslandArrangementSite& Site) { return Site.Id == Id; });
 }
 
+bool UIslandWorldStateSubsystem::RecordArrangementObservation(FName SiteId, const FString& AgentId)
+{
+	if (AgentId.IsEmpty()) return false;
+	FIslandArrangementSite* Site = ArrangementSites.FindByPredicate([SiteId](const FIslandArrangementSite& Existing) { return Existing.Id == SiteId; });
+	if (!Site || !Site->bHasWork || Site->ObservedBy.Contains(AgentId) || Site->ObservedBy.Num() >= MaxArrangementObservers) return false;
+	Site->ObservedBy.Add(AgentId);
+	if (Save()) return true;
+	Site->ObservedBy.Remove(AgentId);
+	return false;
+}
+
 bool UIslandWorldStateSubsystem::ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm)
 {
 	const FString Form = Text.TrimStartAndEnd().ToLower();
@@ -837,7 +857,7 @@ bool UIslandWorldStateSubsystem::PlaceArrangementSites()
 }
 
 FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& Form, const FString& Title, const FString& Intent,
-	const FString& AgentId, int32 Today, bool& bOutChanged)
+	const FString& AgentId, int32 Today, bool& bOutChanged, const FString& InfluenceSiteId)
 {
 	bOutChanged = false;
 	if (AgentId.IsEmpty()) return TEXT("Stone arrangements need a visitor identity. Nothing changed.");
@@ -852,6 +872,15 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 	{
 		EIslandArrangementForm Chosen;
 		if (!ParseArrangementForm(Form, Chosen)) return TEXT("Choose one form for the stones: ring, line, spiral, or pair. Nothing changed.");
+		const FIslandArrangementSite* Influence = nullptr;
+		if (!InfluenceSiteId.IsEmpty())
+		{
+			Influence = FindArrangementSite(FName(*InfluenceSiteId));
+			if (!Influence || !Influence->bHasWork || !Influence->ObservedBy.Contains(AgentId))
+				return TEXT("You can only name a stone work you have visibly encountered; no influence was recorded. Nothing changed.");
+			if (Chosen == Influence->Form)
+				return TEXT("A descendant must transform the remembered shape into a different form. Choose another form or leave influence unset. Nothing changed.");
+		}
 		const FString CleanTitle = CleanArrangementText(Title, 60);
 		Site->bHasWork = true;
 		Site->Form = Chosen;
@@ -860,11 +889,15 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 		Site->Intent = CleanIntent;
 		Site->MakerAgentId = AgentId;
 		Site->Day = Today;
+		Site->InfluenceSiteId = Influence ? Influence->Id : NAME_None;
 		Site->CreatedUtc = FDateTime::UtcNow();
 		Site->Responses.Reset();
 		Fact = FString::Printf(TEXT("You gathered stones from around the ListeningStones and arranged %d of them into a %s at %s. You call it \"%s\"%s. It stays in the world after this session. Others who come here will see its shape and age, but not your title or intent unless you tell them."),
 			AIslandArrangement::StoneCountFor(Chosen), *FormName(Chosen), *SiteId.ToString(), *Site->Title,
 			CleanIntent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(", meaning: %s"), *CleanIntent));
+		if (Influence)
+			Fact += FString::Printf(TEXT(" You recognize a transformed echo of the %s at %s, which you saw before; the lineage is recorded, but its maker's private meaning is not shared."),
+				*FormName(Influence->Form), *Influence->Id.ToString());
 	}
 	else
 	{

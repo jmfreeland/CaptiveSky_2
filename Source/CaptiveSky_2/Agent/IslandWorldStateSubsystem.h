@@ -81,6 +81,7 @@ public:
 	static constexpr int32 MaxNestLayers = 5;
 	static constexpr int32 MaxGuestBookEntries = 24;
 	static constexpr int32 MaxGuestBookLineLength = 180;
+	static constexpr int32 MaxArrangementObservers = 32;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -147,6 +148,8 @@ public:
 
 	const TArray<FIslandArrangementSite>& GetArrangementSites() const { return ArrangementSites; }
 	const FIslandArrangementSite* FindArrangementSite(FName Id) const;
+	/** Records a resident's first unobstructed sighting of public work; title and intent remain private. */
+	bool RecordArrangementObservation(FName SiteId, const FString& AgentId);
 	static bool ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm);
 	static FString FormName(EIslandArrangementForm Form);
 
@@ -157,7 +160,7 @@ public:
 	 * lasting change was saved.
 	 */
 	FString ArrangeStones(FName SiteId, const FString& Form, const FString& Title, const FString& Intent,
-		const FString& AgentId, int32 Today, bool& bOutChanged);
+		const FString& AgentId, int32 Today, bool& bOutChanged, const FString& InfluenceSiteId = FString());
 	/** Whether this identity has already made a work or response on this Island day. */
 	bool HasArrangedStonesToday(const FString& AgentId, int32 Today) const;
 

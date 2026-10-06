@@ -76,6 +76,14 @@ struct FIslandArrangementSite
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	int32 Day = 1;
 
+	/** Public lineage: an observed earlier work that genuinely influenced this transformed form. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	FName InfluenceSiteId;
+
+	/** Stable resident IDs who have visibly encountered this work; bounded by the world-state subsystem. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	TArray<FString> ObservedBy;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	FDateTime CreatedUtc;
 

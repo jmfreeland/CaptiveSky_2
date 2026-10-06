@@ -555,7 +555,7 @@ void AAutonomousAgentAIController::ArrangeStones(const FAgentDecision& Decision)
 	UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
 	bool bChanged = false;
 	const FString Fact = WorldState->ArrangeStones(SiteId, Decision.Form, Decision.Title, Decision.Intent,
-		Memory ? Memory->GetResolvedAgentId() : Body->GetName(), UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), bChanged);
+		Memory ? Memory->GetResolvedAgentId() : Body->GetName(), UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), bChanged, Decision.Influence);
 	ReportAction(SiteId.ToString() + TEXT(": ") + Fact);
 	if (bChanged && Memory)
 		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, SiteId.ToString() + TEXT(": ") + Fact, 0.65f, {TEXT("action-result"), TEXT("arrangement"), SiteId.ToString()}));

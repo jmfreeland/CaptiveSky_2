@@ -167,7 +167,7 @@ void UAgentBrainComponent::RememberPlace(FName Target, const FString& Label, con
 
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
 {
-	const AActor* Owner = GetOwner();
+	AActor* Owner = GetOwner();
 	const FVector Location = Owner ? Owner->GetActorLocation() : FVector::ZeroVector;
 	FString NearbyBeings;
 	TSet<FName> NoticedNow;
@@ -252,9 +252,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			++VisibleRoosts;
 		}
 		if (RavenRoostController) NearbyBeings += RavenRoostController->DescribeBuildOptions();
-		if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
 		{
-			const UAgentMemoryComponent* OwnMemory = Owner->FindComponentByClass<UAgentMemoryComponent>();
+			UAgentMemoryComponent* OwnMemory = Owner->FindComponentByClass<UAgentMemoryComponent>();
 			const FString OwnId = OwnMemory ? OwnMemory->GetResolvedAgentId() : FString();
 			for (const FIslandNestRecord& Nest : WorldState->GetNests())
 			{
@@ -369,6 +369,17 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				// form and location; the maker's title and intent remain private to their own view.
 				RememberPlace(Site.Id, TEXT("a stone ") + UIslandWorldStateSubsystem::FormName(Site.Form), Site.Location);
 				NoticedNow.Add(Site.Id);
+				const bool bFirstSight = !OwnId.IsEmpty() && WorldState->RecordArrangementObservation(Site.Id, OwnId);
+				if (bFirstSight && OwnMemory)
+				{
+					FString Observation = TEXT("You saw a stone ") + UIslandWorldStateSubsystem::FormName(Site.Form) + TEXT(" at ") + Site.Id.ToString() +
+						TEXT(". You know its visible shape and place, but not who made it or what they meant.");
+					if (const FIslandArrangementSite* Source = WorldState->FindArrangementSite(Site.InfluenceSiteId); Source && Source->bHasWork)
+						Observation += FString::Printf(TEXT(" Its public lineage says it transforms the %s at %s."),
+							*UIslandWorldStateSubsystem::FormName(Source->Form), *Source->Id.ToString());
+					OwnMemory->AppendMemory(OwnMemory->MakeMemory(EAgentMemoryType::Observation, Observation,
+						0.48f, { TEXT("arrangement"), TEXT("motif"), Site.Id.ToString() }));
+				}
 				const int32 Age = Today - Site.Day;
 				const TCHAR* Weathering = Age <= 0 ? TEXT("freshly placed") : Age < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
 				if (!OwnId.IsEmpty() && Site.MakerAgentId == OwnId)
@@ -382,6 +393,10 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				const FIslandArrangementResponse* Own = Site.Responses.FindByPredicate([&OwnId](const FIslandArrangementResponse& Response) { return !OwnId.IsEmpty() && Response.AgentId == OwnId; });
 				NearbyBeings += FString::Printf(TEXT(" Someone has arranged %d %s stones here into a %s. You do not know who made it or what they meant."),
 					AIslandArrangement::StoneCountFor(Site.Form), Weathering, *UIslandWorldStateSubsystem::FormName(Site.Form));
+				if (const FIslandArrangementSite* Source = WorldState->FindArrangementSite(Site.InfluenceSiteId); Source && Source->bHasWork)
+					NearbyBeings += FString::Printf(TEXT(" Its public lineage records this as a transformation of the %s at %s; the maker's private title and intent remain unknown."),
+						*UIslandWorldStateSubsystem::FormName(Source->Form), *Source->Id.ToString());
+				NearbyBeings += FString::Printf(TEXT(" If its visible shape genuinely stays with you, you may later let it influence a different form at empty ground by naming \"%s\" in the optional \"influence\" field; this records a transformed echo, not a copy. There is no obligation to continue it."), *SiteName);
 				if (Own)
 					NearbyBeings += FString::Printf(TEXT(" The small arc of stones beside it is your response%s."), Own->Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (you meant: %s)"), *Own->Intent));
 				else if (Site.Responses.Num() < AIslandArrangement::MaxResponses)
@@ -663,7 +678,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
-		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. "
+		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. If an observed earlier stone work genuinely influenced a new arrangement, you may also add its exact visible site ID in \"influence\"; choose a different form so the new work transforms rather than copies it. Influence is optional and never a duty. "
 		"At the inn counter, build target GuestBook may use \"intent\" for one short line in the shared guest book; other residents can read it, so do not write private secrets there. Writing is optional and limited to one line per Island day. "
 		"If your body can use a visible nearby roost, in rough weather you may consider its measured wind shelter and short overhead-cover clue before choosing where to perch or rest. During a strong shower, one site with clearly more overhead probe hits may offer some cover, but this small local sample does not prove dryness, branch strength, or safety. This is your choice, not an automatic requirement, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
@@ -990,6 +1005,7 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("form"), Decision.Form);
 		(*ActionObj)->TryGetStringField(TEXT("title"), Decision.Title);
 		(*ActionObj)->TryGetStringField(TEXT("intent"), Decision.Intent);
+		(*ActionObj)->TryGetStringField(TEXT("influence"), Decision.Influence);
 	}
 
 	Decision.bValid = true;

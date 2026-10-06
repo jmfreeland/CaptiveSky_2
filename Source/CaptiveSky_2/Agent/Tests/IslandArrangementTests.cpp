@@ -90,10 +90,12 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	const FString BystanderAgentId = TEXT("ArrangementBystander_") + TestSuffix;
 	const FString ArrangerAgentId = TEXT("ArrangementMaker_") + TestSuffix;
 	const FString EmptySiteObserverAgentId = TEXT("EmptyArrangementObserver_") + TestSuffix;
+	const FString LineageObserverAgentId = TEXT("LineageObserver_") + TestSuffix;
 	FScopedArrangementAgentData AgentDataCleanup;
 	AgentDataCleanup.Track(BystanderAgentId);
 	AgentDataCleanup.Track(ArrangerAgentId);
 	AgentDataCleanup.Track(EmptySiteObserverAgentId);
+	AgentDataCleanup.Track(LineageObserverAgentId);
 	auto DescribeFrom = [](UWorld* World, const FVector& Where, const FString& AgentId)
 	{
 		ACharacter* Body = World->SpawnActor<ACharacter>(Where, FRotator::ZeroRotator);
@@ -197,6 +199,8 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	// Others see the shape and age, never the maker, title, or intent.
 	const FString Bystander = DescribeFrom(World, First.Location + FVector(0, 200, 100), BystanderAgentId);
 	TestTrue(*FString::Printf(TEXT("A bystander sees a fresh ring (%s)"), *Bystander), Bystander.Contains(TEXT("arranged 9 freshly placed stones here into a ring")));
+	TestTrue(TEXT("A first unobstructed sighting becomes bounded, persisted cultural evidence"),
+		State->FindArrangementSite(TEXT("ArrangingGround_1"))->ObservedBy.Contains(BystanderAgentId));
 	TestFalse(TEXT("The title and intent stay private"), Bystander.Contains(TEXT("Evening")) || Bystander.Contains(TEXT("chime carries")));
 	TestTrue(TEXT("A bystander is invited to respond"), Bystander.Contains(TEXT("respond by setting a few small stones")));
 	const FString RememberedWork = DescribeFrom(World, First.Location + FVector(2000.f, 0.f, 100.f), BystanderAgentId);
@@ -204,6 +208,27 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		RememberedWork.Contains(TEXT("You remember a stone ring")) && RememberedWork.Contains(TEXT("move_to target: ArrangingGround_1")));
 	TestFalse(TEXT("A remembered public work still reveals neither its private title nor intent"),
 		RememberedWork.Contains(TEXT("Evening")) || RememberedWork.Contains(TEXT("chime carries")));
+	bool bInfluenceChanged = true;
+	const FString UnseenInfluence = State->ArrangeStones(TEXT("ArrangingGround_4"), TEXT("spiral"), TEXT("Borrowed shape"), TEXT(""),
+		EmptySiteObserverAgentId, -10, bInfluenceChanged, TEXT("ArrangingGround_1"));
+	TestFalse(TEXT("An unobserved public work cannot be claimed as inspiration"), bInfluenceChanged);
+	TestTrue(TEXT("A rejected inspiration leaves the destination empty"), !State->FindArrangementSite(TEXT("ArrangingGround_4"))->bHasWork);
+	TestTrue(TEXT("The rejection explains why the source cannot be cited"), UnseenInfluence.Contains(TEXT("visibly encountered")));
+	const FString Untransformed = State->ArrangeStones(TEXT("ArrangingGround_4"), TEXT("ring"), TEXT("Same shape"), TEXT(""),
+		BystanderAgentId, -10, bInfluenceChanged, TEXT("ArrangingGround_1"));
+	TestFalse(TEXT("A lineage must transform rather than duplicate the source form"), bInfluenceChanged);
+	TestTrue(TEXT("The unchanged form is rejected clearly"), Untransformed.Contains(TEXT("different form")));
+	const FString Descendant = State->ArrangeStones(TEXT("ArrangingGround_4"), TEXT("spiral"), TEXT("A turning echo"), TEXT("For another return"),
+		BystanderAgentId, -10, bInfluenceChanged, TEXT("ArrangingGround_1"));
+	const FIslandArrangementSite* DescendantWork = State->FindArrangementSite(TEXT("ArrangingGround_4"));
+	TestTrue(TEXT("A resident can make a different-form descendant from remembered sight"), bInfluenceChanged && Descendant.Contains(TEXT("transformed echo")) &&
+		DescendantWork && DescendantWork->InfluenceSiteId == FName(TEXT("ArrangingGround_1")) && DescendantWork->Form == EIslandArrangementForm::Spiral);
+	const FString LineageView = DescendantWork
+		? DescribeFrom(World, DescendantWork->Location + FVector(150.f, 0.f, 100.f), LineageObserverAgentId)
+		: FString();
+	TestTrue(TEXT("A later observer can follow the public motif lineage without learning private intent"),
+		LineageView.Contains(TEXT("transformation of the ring at ArrangingGround_1")) &&
+		!LineageView.Contains(TEXT("For another return")) && !LineageView.Contains(TEXT("A turning echo")));
 
 	// A second resident answers it.
 	ACharacter* Responder = World->SpawnActor<ACharacter>(First.Location + FVector(-120, 0, 100), FRotator::ZeroRotator);
@@ -320,6 +345,10 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	const FIslandArrangementSite* RestoredVisitorWork = State->FindArrangementSite(TEXT("ArrangingGround_2"));
 	TestTrue(TEXT("The visitor's work survives a new Island session"), RestoredVisitorWork && RestoredVisitorWork->MakerAgentId == TEXT("Visitor") &&
 		RestoredVisitorWork->Form == EIslandArrangementForm::Spiral && RestoredVisitorWork->Title == TEXT("A visitor's turning mark"));
+	const FIslandArrangementSite* RestoredDescendant = State->FindArrangementSite(TEXT("ArrangingGround_4"));
+	TestTrue(TEXT("The observed-source evidence and transformed lineage survive a new Island session"),
+		Restored && Restored->ObservedBy.Contains(BystanderAgentId) && RestoredDescendant &&
+		RestoredDescendant->InfluenceSiteId == FName(TEXT("ArrangingGround_1")) && RestoredDescendant->MakerAgentId == BystanderAgentId);
 	TestTrue(TEXT("The visitor's daily limit follows their persistent contribution"), State->HasArrangedStonesToday(TEXT("Visitor"), 1));
 	TestTrue(TEXT("The restored work is visible"), FindArrangementActor(World, TEXT("ArrangingGround_1")) && FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 9 + 2 * AIslandArrangement::StonesPerResponse);
 	TestTrue(TEXT("Developer reset forgets arrangements"), State->ForgetArrangements() && State->GetArrangementSites().Num() == 0 && !FindArrangementActor(World, TEXT("ArrangingGround_1")));

@@ -68,6 +68,8 @@ make → perceive → value → remember → imitate → transform → teach →
 
 **Smallest practical implementation:** add one motif descriptor/influence record to existing arrangements and allow one later arrangement to choose a previously perceived motif as an influence.
 
+**Implementation progress (2026-10-06):** the first bounded transmission step is represented in the canonical arrangement records. An unobstructed first sighting records the observer (up to 32 residents per work) and a private memory containing only visible form and site; title and intent remain private. A later arrangement may name an exact observed source, but the world-state validator rejects unseen sources and same-form copies. Descendants store their source site ID, and later observers can read that public lineage without learning the maker's private meaning. Validation: the full UE 5.8.3 editor target built successfully, and headless `CaptiveSky2.Agent.IslandArrangement` plus `IslandArrangementInspection` both passed on 2026-10-06; see [`Codex_IslandArrangement_Lineage_20261006.log`](../Saved/Logs/Codex_IslandArrangement_Lineage_20261006.log). This proves deterministic persistence and prompt-facing behavior, not that residents will choose to carry motifs forward in real play, nor that the actual Island presentation reads beautifully. Social teaching, resident valuation, and a richer visual motif language remain future work.
+
 **First visual milestone:** an old weathered spiral at Listening Stones, a younger transformed descendant elsewhere, and a small derivative motif near a traveled social location. Better stone materials, moss/lichen and careful placement should make lineage visually legible without UI.
 
 ## Concept art — The first crossing becomes a place
