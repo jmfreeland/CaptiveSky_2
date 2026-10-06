@@ -206,6 +206,8 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			{
 				Site.bHasWork = true;
 				(*Work)->TryGetNumberField(TEXT("seed"), Site.Seed);
+				(*Work)->TryGetNumberField(TEXT("motif_seed"), Site.MotifSeed);
+				if (Site.MotifSeed == 0) Site.MotifSeed = Site.Seed;
 				(*Work)->TryGetStringField(TEXT("title"), Site.Title);
 				(*Work)->TryGetStringField(TEXT("intent"), Site.Intent);
 				(*Work)->TryGetStringField(TEXT("maker"), Site.MakerAgentId);
@@ -305,6 +307,7 @@ bool UIslandWorldStateSubsystem::Save() const
 			const TSharedRef<FJsonObject> Work = MakeShared<FJsonObject>();
 			Work->SetStringField(TEXT("form"), FormName(Site.Form));
 			Work->SetNumberField(TEXT("seed"), Site.Seed);
+			Work->SetNumberField(TEXT("motif_seed"), Site.MotifSeed != 0 ? Site.MotifSeed : Site.Seed);
 			Work->SetStringField(TEXT("title"), Site.Title);
 			Work->SetStringField(TEXT("intent"), Site.Intent);
 			Work->SetStringField(TEXT("maker"), Site.MakerAgentId);
@@ -914,6 +917,7 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 		Site->MakerAgentId = AgentId;
 		Site->Day = Today;
 		Site->InfluenceSiteId = Influence ? Influence->Id : NAME_None;
+		Site->MotifSeed = Influence ? (Influence->MotifSeed != 0 ? Influence->MotifSeed : Influence->Seed) : Site->Seed;
 		Site->CreatedUtc = FDateTime::UtcNow();
 		Site->Responses.Reset();
 		Fact = FString::Printf(TEXT("You gathered stones from around the ListeningStones and arranged %d of them into a %s at %s. You call it \"%s\"%s. It stays in the world after this session. Others who come here will see its shape and age, but not your title or intent unless you tell them."),

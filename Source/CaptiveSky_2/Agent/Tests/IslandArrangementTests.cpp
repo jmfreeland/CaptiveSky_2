@@ -13,6 +13,7 @@
 #include "IslandInteractionUtility.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -193,6 +194,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Intent is kept in the maker's words"), Work && Work->Intent == TEXT("To mark where the chime carries farthest"));
 	AIslandArrangement* Visible = FindArrangementActor(World, TEXT("ArrangingGround_1"));
 	TestTrue(TEXT("The ring is visible with its stones"), Visible && Visible->GetVisibleStoneCount() == AIslandArrangement::StoneCountFor(EIslandArrangementForm::Ring));
+	TestEqual(TEXT("A new work carries one small, visible three-stone signature"), Visible ? Visible->GetVisibleMotifCount() : 0, 3);
 	Maker->SetActorLocation(Sites[1].Location + FVector(120, 0, 100));
 	TestTrue(TEXT("One arrangement per resident per Island day"), Arrange(MakerController, TEXT("ArrangingGround_2"), TEXT("line"), TEXT("Again"), TEXT("")).Contains(TEXT("already arranged stones today")));
 
@@ -223,6 +225,21 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	const FIslandArrangementSite* DescendantWork = State->FindArrangementSite(TEXT("ArrangingGround_4"));
 	TestTrue(TEXT("A resident can make a different-form descendant from remembered sight"), bInfluenceChanged && Descendant.Contains(TEXT("transformed echo")) &&
 		DescendantWork && DescendantWork->InfluenceSiteId == FName(TEXT("ArrangingGround_1")) && DescendantWork->Form == EIslandArrangementForm::Spiral);
+	const AIslandArrangement* DescendantActor = FindArrangementActor(World, TEXT("ArrangingGround_4"));
+	bool bSharedMotifTransformsMatch = Visible && DescendantActor && Visible->MotifStones && DescendantActor->MotifStones &&
+		Visible->MotifStones->GetInstanceCount() == 3 && DescendantActor->MotifStones->GetInstanceCount() == 3;
+	if (bSharedMotifTransformsMatch)
+	{
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			FTransform SourceMark, DescendantMark;
+			Visible->MotifStones->GetInstanceTransform(Index, SourceMark, false);
+			DescendantActor->MotifStones->GetInstanceTransform(Index, DescendantMark, false);
+			bSharedMotifTransformsMatch &= SourceMark.Equals(DescendantMark, 0.01f);
+		}
+	}
+	TestTrue(TEXT("A transformed descendant visibly repeats its source's stable motif in the new arrangement"),
+		DescendantWork && DescendantWork->MotifSeed == Work->MotifSeed && bSharedMotifTransformsMatch);
 	const FString LineageView = DescendantWork
 		? DescribeFrom(World, DescendantWork->Location + FVector(150.f, 0.f, 100.f), LineageObserverAgentId)
 		: FString();
@@ -349,6 +366,23 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The observed-source evidence and transformed lineage survive a new Island session"),
 		Restored && Restored->ObservedBy.Contains(BystanderAgentId) && RestoredDescendant &&
 		RestoredDescendant->InfluenceSiteId == FName(TEXT("ArrangingGround_1")) && RestoredDescendant->MakerAgentId == BystanderAgentId);
+	const AIslandArrangement* RestoredSourceActor = FindArrangementActor(World, TEXT("ArrangingGround_1"));
+	const AIslandArrangement* RestoredDescendantActor = FindArrangementActor(World, TEXT("ArrangingGround_4"));
+	bool bRestoredMotifsMatch = RestoredSourceActor && RestoredDescendantActor &&
+		RestoredSourceActor->MotifStones && RestoredDescendantActor->MotifStones &&
+		RestoredSourceActor->MotifStones->GetInstanceCount() == 3 && RestoredDescendantActor->MotifStones->GetInstanceCount() == 3;
+	if (bRestoredMotifsMatch)
+	{
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			FTransform SourceMark, DescendantMark;
+			RestoredSourceActor->MotifStones->GetInstanceTransform(Index, SourceMark, false);
+			RestoredDescendantActor->MotifStones->GetInstanceTransform(Index, DescendantMark, false);
+			bRestoredMotifsMatch &= SourceMark.Equals(DescendantMark, 0.01f);
+		}
+	}
+	TestTrue(TEXT("The lineage's shared visual motif survives serialization and materialization"),
+		Restored && RestoredDescendant && Restored->MotifSeed == RestoredDescendant->MotifSeed && bRestoredMotifsMatch);
 	TestTrue(TEXT("The visitor's daily limit follows their persistent contribution"), State->HasArrangedStonesToday(TEXT("Visitor"), 1));
 	TestTrue(TEXT("The restored work is visible"), FindArrangementActor(World, TEXT("ArrangingGround_1")) && FindArrangementActor(World, TEXT("ArrangingGround_1"))->GetVisibleStoneCount() == 9 + 2 * AIslandArrangement::StonesPerResponse);
 	TestTrue(TEXT("Developer reset forgets arrangements"), State->ForgetArrangements() && State->GetArrangementSites().Num() == 0 && !FindArrangementActor(World, TEXT("ArrangingGround_1")));

@@ -237,6 +237,8 @@ Evidence and privacy follow the rest of the world model:
 
 `AIslandArrangement` draws the work with flattened engine spheres, no collision, tinted from pale fresh stone toward moss over seven Island days; this is a code-only stand-in for proper weathering materials. To start over, run `Island.ForgetArrangements` during play; fresh empty grounds are placed the next time play begins.
 
+Each work also carries a small pale three-stone mark. A transformed descendant stores the same stable motif seed as the work it cites, so those three local transforms recur even when the main form changes. This gives residents a concrete physical clue to lineage; whether the mark reads clearly at normal gameplay distance still needs a live visual review.
+
 When a resident sees completed work, they privately keep a neutral label and its exact site as an optional return place. The label names only the visible stone form; it never stores or repeats another maker's private title or intent. Empty arranging grounds are not remembered as discoveries.
 
 `CaptiveSky2.Agent.IslandArrangement` covers:
@@ -244,6 +246,7 @@ When a resident sees completed work, they privately keep a neutral label and its
 - how close a resident must be, and form validation;
 - text cleanup;
 - the daily and response limits;
+- the shared visual motif on transformed descendants, including serialization and rematerialization;
 - privacy in perception, and makers recognizing their own work;
 - remembering only completed public work by its neutral stone form, with an optional exact return target once it is out of sight;
 - weathering;

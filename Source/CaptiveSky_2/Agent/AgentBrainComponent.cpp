@@ -395,7 +395,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					AIslandArrangement::StoneCountFor(Site.Form), Weathering, *UIslandWorldStateSubsystem::FormName(Site.Form));
 				if (const FIslandArrangementSite* Source = WorldState->FindArrangementSite(Site.InfluenceSiteId); Source && Source->bHasWork)
 					NearbyBeings += FString::Printf(TEXT(" Its public lineage records this as a transformation of the %s at %s; the maker's private title and intent remain unknown."),
-						*UIslandWorldStateSubsystem::FormName(Source->Form), *Source->Id.ToString());
+						*UIslandWorldStateSubsystem::FormName(Source->Form), *Source->Id.ToString()) + TEXT(" The same small pale three-stone mark is visible on both works.");
 				NearbyBeings += FString::Printf(TEXT(" If its visible shape genuinely stays with you, you may later let it influence a different form at empty ground by naming \"%s\" in the optional \"influence\" field; this records a transformed echo, not a copy. There is no obligation to continue it."), *SiteName);
 				if (Own)
 					NearbyBeings += FString::Printf(TEXT(" The small arc of stones beside it is your response%s."), Own->Intent.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (you meant: %s)"), *Own->Intent));

@@ -62,6 +62,10 @@ struct FIslandArrangementSite
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	int32 Seed = 0;
 
+	/** Stable visible motif seed shared by a work and any descendants that transform it. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	int32 MotifSeed = 0;
+
 	/** The maker's own title and intent; only the maker is reminded of these. */
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	FString Title;
@@ -124,6 +128,7 @@ public:
 
 	void ShowSite(const FIslandArrangementSite& Site, int32 Today);
 	int32 GetVisibleStoneCount() const;
+	int32 GetVisibleMotifCount() const;
 	int32 GetVisibleForageTwigCount() const;
 	bool HasForageableTwigs() const;
 	bool GatherForageableTwigs();
@@ -142,6 +147,9 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> Stones;
 
 	UPROPERTY(VisibleAnywhere, Category = "Island|Arrangement")
+	TObjectPtr<UInstancedStaticMeshComponent> MotifStones;
+
+	UPROPERTY(VisibleAnywhere, Category = "Island|Arrangement")
 	TObjectPtr<UInstancedStaticMeshComponent> Lichen;
 
 	UPROPERTY(VisibleAnywhere, Category = "Island|Arrangement")
@@ -155,6 +163,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> Surface;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> MotifSurface;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> ForageSurface;
@@ -171,6 +182,7 @@ private:
 
 	void UpdateLichen();
 	friend class FIslandLichenTest;
+	friend class FIslandArrangementTest;
 
 	void ShowForageTwigs();
 };

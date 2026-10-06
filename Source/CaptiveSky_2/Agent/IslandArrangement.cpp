@@ -17,6 +17,14 @@ AIslandArrangement::AIslandArrangement()
 	Stones->SetCanEverAffectNavigation(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (Sphere.Succeeded()) Stones->SetStaticMesh(Sphere.Object);
+	MotifStones = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MotifStones"));
+	MotifStones->SetupAttachment(Stones);
+	MotifStones->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MotifStones->SetCanEverAffectNavigation(false);
+	MotifStones->SetCastShadow(false);
+	if (Sphere.Succeeded()) MotifStones->SetStaticMesh(Sphere.Object);
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (BasicMaterial.Succeeded()) MotifStones->SetMaterial(0, BasicMaterial.Object);
 	ForageTwigs = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("ForageTwigs"));
 	ForageTwigs->SetupAttachment(Stones);
 	ForageTwigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -108,6 +116,11 @@ int32 AIslandArrangement::GetVisibleStoneCount() const
 	return Stones->GetInstanceCount();
 }
 
+int32 AIslandArrangement::GetVisibleMotifCount() const
+{
+	return MotifStones ? MotifStones->GetInstanceCount() : 0;
+}
+
 int32 AIslandArrangement::GetVisibleForageTwigCount() const
 {
 	return ForageTwigs ? ForageTwigs->GetInstanceCount() : 0;
@@ -154,6 +167,7 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 	SiteId = Site.Id;
 	Tags.AddUnique(Site.Id);
 	Stones->ClearInstances();
+	MotifStones->ClearInstances();
 	Lichen->ClearInstances();
 	bHasWork = Site.bHasWork;
 	WorkDay = Site.Day;
@@ -214,6 +228,24 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 				FVector(FMath::Cos(Facing) * 45.f * Side, FMath::Sin(Facing) * 45.f * Side, Thickness * 50.f + Level * 7.f), FVector(Size, Size * 0.85f, Thickness)));
 		}
 		break;
+	}
+	// A small pale three-stone mark is the visible motif carried through a creative lineage.
+	// It is stable across sessions and deliberately separate from the main work's shape seed.
+	if (!MotifSurface) MotifSurface = MotifStones->CreateAndSetMaterialInstanceDynamic(0);
+	if (MotifSurface) MotifSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.77f, 0.65f));
+	FRandomStream Motif(Site.MotifSeed != 0 ? Site.MotifSeed : Site.Seed);
+	const float MotifAngle = Motif.FRandRange(0.f, 2.f * PI);
+	const FVector2D MotifAxis(FMath::Cos(MotifAngle), FMath::Sin(MotifAngle));
+	const FVector2D MotifSide(-MotifAxis.Y, MotifAxis.X);
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		const float Along = (Index - 1) * 17.f;
+		const float Across = (Index == 1 ? 0.f : (Index == 0 ? -1.f : 1.f)) * 5.f;
+		const float Thickness = Motif.FRandRange(0.045f, 0.06f);
+		const FVector2D Mark = MotifAxis * (58.f + Along) + MotifSide * Across;
+		const float Size = Motif.FRandRange(0.08f, 0.105f);
+		MotifStones->AddInstance(FTransform(FRotator(0.f, Motif.FRandRange(0.f, 360.f), 0.f),
+			FVector(Mark.X, Mark.Y, Thickness * 35.f), FVector(Size, Size * Motif.FRandRange(0.72f, 0.9f), Thickness)));
 	}
 	// Each response is a small arc of stones set just outside the original work.
 	for (int32 Response = 0; Response < FMath::Min(Site.Responses.Num(), MaxResponses); ++Response)
