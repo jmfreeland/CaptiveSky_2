@@ -616,35 +616,65 @@ Lumen-on sway-active trace (~103–111 ms) or the matched Lumen-off trace
 updates in the expensive Lumen/scene-culling workload, and shows that removing
 GI is not necessary to reach the p95 budget in this diagnostic.
 
-However, 18 frames (~1.2%) still had ~0.45–0.48 second stalls. Event-level
-exports show 17 of those 18 frames overlapping all three
-`WaitForVisibilityTasks`, `RHIGetRenderQueryResult_GPU_Wait`, and
+However, 18 frames (~1.2%) still had ~0.45–0.48 second stalls. In this
+sway-off/Lumen-on baseline, event-level exports show 17 of those 18 frames
+overlapping all three `WaitForVisibilityTasks`,
+`RHIGetRenderQueryResult_GPU_Wait`, and
 `GPUBound_WaitingForGPUForOcclusionQueries_SeeGPUTrack`; `GameThreadWaitForTask`
-overlaps all 18. A separate intermittent render-query/visibility stall thus
-remains after sway-related scene-update work is removed. This one instrumented
-capture does not establish a production 30-FPS guarantee. Keep the full
-population and Lumen on; next prototype GPU/material wind for ambient motion
-while preserving the small near-character response, then test the remaining
-occlusion-query wait independently. Verify plant motion and the full habitat
-visually before considering any production sway change.
+overlaps all 18. The controlled query-off ablation below removes the
+query/visibility waits but leaves most of the long frame stalls, so this is not
+the remaining root cause by itself. These captures do not establish a
+production 30-FPS guarantee. Keep the full population and Lumen on; next trace
+the remaining `GameThreadWaitForTask` / task synchronization path, then
+prototype GPU/material wind for ambient motion while preserving the small
+near-character response. Verify plant motion and the full habitat visually
+before considering any production sway change.
 
 Evidence: `Saved/Logs/Codex_SwayOffLumenOn_20261006.log`,
 `Saved/Profiling/Traces/Codex_SwayOffLumenOn_20261006.utrace`, and the Insights
 exports under the current user's temporary directory; aligned wait-event
 exports confirmed the intermittent occlusion/visibility overlaps.
 
-### Occlusion-query ablation setup (2026-10-06; capture not completed)
+### Matched occlusion-query ablation (2026-10-06)
 
 Added the capture-only `-DisableOcclusionQueries` option to
 `Scripts/Start-Spectator.ps1`. It sends `r.AllowOcclusionQueries 0` through
 `-ExecCmds`; the UE 5.8.3 `RendererSettings.h` source confirms that CVar
 controls hardware occlusion queries. No project default was changed.
 
-The first matched attempt remained in `ValidatePlatforms` because UnrealBuildTool
-could not access its usual user-local log directory in the sandbox. After
-re-running with that access, Unreal initialized platform and shader modules but
-exited before loading the Island; there is no trace file or runtime CVar
-confirmation. This is not a measured ablation and says nothing about whether
-occlusion queries cause the residual stalls. Repeat the 120-second-capped capture
-with agent thinking disabled and a one-request ceiling from a working UE 5.8.3
-launch path before drawing any performance conclusion.
+This 30-second Insights window used the same 1600x900 Tideglass viewpoint,
+Lumen-on state, 180 cm focus-radius setting, full ground-cover population,
+45-second in-world settle, and CPU-sway-disabled diagnostic as the previous
+trace. Agent thinking and Python were disabled. The runtime log confirms
+`r.AllowOcclusionQueries = "false"`; the session ended normally at its
+120.2-second safety cap with zero model requests. This was the first launch
+after a cold shader cache, which made startup unusually long; shader-compile
+workers were no longer present before the measured window. Separate DataRoots
+mean the procedural placements were not seed-identical, so treat this as a
+matched-settings diagnostic rather than a deterministic image A/B.
+
+| Frame track | Queries | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Game | On | 14.57 ms | 17.61 ms | 454.95 ms | 483.85 ms | 18 / 1504 | 18 / 1504 |
+| Game | Off | 14.64 ms | 16.94 ms | 23.49 ms | 479.61 ms | 14 / 1617 | 14 / 1617 |
+| Render | On | 14.25 ms | 19.00 ms | 454.35 ms | 479.92 ms | 18 / 1508 | 18 / 1508 |
+| Render | Off | 14.65 ms | 17.04 ms | 35.47 ms | 479.50 ms | 20 / 1617 | 14 / 1617 |
+| GPU frame track | On | 13.55 ms | 19.15 ms | 453.28 ms | 479.78 ms | 18 / 1505 | 18 / 1505 |
+| GPU frame track | Off | 13.65 ms | 19.21 ms | 21.92 ms | 475.44 ms | 14 / 1618 | 14 / 1618 |
+
+The query-specific `RHIGetRenderQueryResult_GPU_Wait` and
+`GPUBound_WaitingForGPUForOcclusionQueries_SeeGPUTrack` events present in the
+baseline do not appear in the query-off window. `WaitForVisibilityTasks` fell
+from a 474.04 ms maximum (10.63 ms average) to 0.58 ms maximum (0.016 ms
+average). That confirms the switch isolates and removes those waits, but the
+overall p95 is essentially unchanged and 14 frames still stall for 0.46–0.48
+seconds. `GameThreadWaitForTask` remains at 476.71 ms max; the trace also shows
+`FTaskBase::WaitWithNamedThreadsSupport` / `SyncPoint_Wait` reaching ~453 ms.
+The next diagnosis should follow that remaining synchronization path. Do not
+disable occlusion queries in production on this result: it removes one wait
+class but does not fix the hitch tail and may increase rendering work.
+
+Evidence: `Saved/Logs/Codex_OcclusionOff_SwayOff_20261006.log`,
+`Saved/Profiling/Traces/Codex_OcclusionOff_SwayOff_20261006.utrace`, and the
+frame/wait exports in that trace directory; the baseline exports are under the
+current user's temporary directory.
