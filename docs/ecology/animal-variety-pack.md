@@ -87,3 +87,11 @@ appearance is coming from the Island's light/exposure response, not missing Crow
 light/exposure fix and live-editor visual review remain open, so this is not yet a polished Raven.
 The diagnostic images are in `Saved/Viewpoints/RavenWingMotion_/20261006_141548/`; the copied content
 remains in ignored `Content/`, outside Git.
+
+An A/B check of the proposed project-wide exposure change used matched 21:00 Island captures with
+the original bias `+1` and experimental bias `0`. Zero bias makes the grass and shoreline nearly
+black and hides most ground detail; `+1` preserves readable vegetation, water, and cloud detail.
+The project default is therefore restored to `+1`. This rules out a global exposure change as the
+Raven fix: continue with a localized Crow material or light response that does not darken the whole
+night landscape. Paired captures: `Saved/Viewpoints/2026-10-06_142822_h21.0/` (zero) and
+`Saved/Viewpoints/2026-10-06_143348_h21.0/` (+1).
