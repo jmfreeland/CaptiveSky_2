@@ -8,6 +8,18 @@ Both sessions ended at 120.2 real seconds with zero model requests; the 17:00
 clock lived only under its separate `Saved/Playtests/Codex_GoldenHourHighlights_20261006`
 data root. This was a visual review, not a frame-rate measurement.
 
+A later controlled spot-check reused the exact `WindArchOverlook` camera and
+`-ViewpointGroundCover -ViewpointNoWorldState` settings, changing only the hour:
+[12:00](../../Saved/Viewpoints/2026-10-06_170622_h12.0/04_WindArchOverlook.png)
+and [17:00](../../Saved/Viewpoints/2026-10-06_170207_h17.0/04_WindArchOverlook.png).
+The daylight frame shows that the landscape material is present and the ground
+cover is legible; the evening frame's near-black foreground is chiefly the
+stronger tree/arch shadow at this angle. This pair is sufficient reason not to
+brighten or replace the global landscape material to solve this single-view
+lighting problem. It is still an editor-world SceneCapture, not a gameplay
+lighting or frame-rate test; its separate dense SceneCapture timing screen read
+55.50 FPS, which is not evidence of the 30 FPS gameplay floor.
+
 ## What the images show
 
 - The Island already has very dense, tall near-ground cover at Tideglass and the
@@ -25,6 +37,11 @@ data root. This was a visual review, not a frame-rate measurement.
   useful mood reference, not evidence that the current foreground lighting is
   balanced. Do not compensate by changing the global day/night cycle from this
   single pass.
+- Both controlled spot-checks show the blue blockout Wind Arch. That is expected
+  for this editor-world SceneCapture: `UIslandWindArchPresentationSubsystem`
+  installs its transient rock replacement only in Game/PIE. The shots therefore
+  cannot judge the in-game stonework presentation; use an actual PIE/Game frame
+  for that decision.
 
 ## Next visual pass
 
