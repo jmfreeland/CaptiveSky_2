@@ -1483,6 +1483,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		Observer->SetActorLocation(LowFlybyLocation);
 		WatchableDragonfly->CheckForLowRavenFlyby();
 		TestTrue(TEXT("A perched raven does not disturb the airborne dragonfly"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
+		WatchableDragonfly->ScatterRemaining = 0.f;
+		WatchableDragonfly->RavenFlybyCooldownRemaining = 0.f;
+		WatchableDragonfly->RavenCheckRemaining = 0.f;
+		Observer->SetActorLocation(LowFlybyLocation);
+		WatchableDragonfly->Tick(0.36f);
+		TestTrue(TEXT("Periodic dragonfly sensing notices a low raven pass without a direct trigger"),
+			WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->RavenFlybyCooldownRemaining > 0.f);
 		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 		WatchableDragonfly->Destroy();
 	}
