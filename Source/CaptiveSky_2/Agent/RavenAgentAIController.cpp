@@ -17,6 +17,8 @@
 #include "IslandInteractionUtility.h"
 #include "AgentMemoryComponent.h"
 #include "HAL/PlatformTime.h"
+#include "Animation/AnimSequence.h"
+#include "Engine/SkeletalMesh.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRavenAgentAI, Log, All);
 
@@ -118,7 +120,10 @@ namespace
 	static UMaterialInstanceDynamic* MakeRavenMaterial(UObject* Outer, const FLinearColor& Color)
 	{
 		static UMaterialInterface* BasicMaterial = LoadObject<UMaterialInterface>(nullptr,
-			TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+			TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
+		if (!BasicMaterial)
+			BasicMaterial = LoadObject<UMaterialInterface>(nullptr,
+				TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 		UMaterialInstanceDynamic* Material = BasicMaterial ? UMaterialInstanceDynamic::Create(BasicMaterial, Outer) : nullptr;
 		if (Material)
 		{
@@ -165,6 +170,81 @@ namespace
 				Part->SetVisibility(false, false);
 				Part->SetHiddenInGame(true, false);
 			}
+
+		// Prefer the free, rigged Crow when it is present in this checkout. The procedural
+		// raven below remains a runtime fallback for projects without the optional pack.
+		USkeletalMesh* CrowAsset = LoadObject<USkeletalMesh>(nullptr,
+			TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (CrowAsset)
+		{
+			USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenRiggedVisualRoot"), RF_Transient);
+			Raven->AddInstanceComponent(VisualRoot);
+			VisualRoot->SetupAttachment(PlaceholderBody);
+			VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation());
+			VisualRoot->SetRelativeRotation(FRotator::ZeroRotator);
+			VisualRoot->SetRelativeScale3D(FVector::OneVector);
+			VisualRoot->RegisterComponent();
+
+			USkeletalMeshComponent* CrowBody = NewObject<USkeletalMeshComponent>(Raven, TEXT("RavenRiggedCrowBody"), RF_Transient);
+			Raven->AddInstanceComponent(CrowBody);
+			CrowBody->SetupAttachment(VisualRoot);
+			CrowBody->SetSkeletalMesh(CrowAsset);
+			CrowBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			CrowBody->SetCanEverAffectNavigation(false);
+			CrowBody->SetGenerateOverlapEvents(false);
+			CrowBody->SetCastShadow(true);
+			CrowBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			const FBoxSphereBounds Bounds = CrowAsset->GetBounds();
+			const float HorizontalSpan = 2.f * FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y);
+			const float Scale = HorizontalSpan > 1.f ? FMath::Clamp(112.f / HorizontalSpan, 0.25f, 3.f) : 1.f;
+			CrowBody->SetRelativeScale3D(FVector(Scale));
+			CrowBody->SetRelativeLocation(FVector(0.f, 0.f, -Bounds.Origin.Z * Scale));
+			CrowBody->RegisterComponent();
+			// Retain the authored feather material and its in-pack texture dependencies.
+			if (UMaterialInterface* CrowMaterial = LoadObject<UMaterialInterface>(nullptr,
+				TEXT("/Game/AnimalVarietyPack/Crow/Materials/M_Crow.M_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+				CrowBody->SetMaterial(0, CrowMaterial);
+
+			// Carrying is a real action state; keep its small visual attached to the head
+			// bone when available, but never let it affect movement or navigation.
+			FName CarryBone = NAME_None;
+			FName HeadBone = NAME_None;
+			const FReferenceSkeleton& RefSkeleton = CrowAsset->GetRefSkeleton();
+			for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); ++BoneIndex)
+			{
+				const FName BoneName = RefSkeleton.GetBoneName(BoneIndex);
+				const FString LowerBoneName = BoneName.ToString().ToLower();
+				if (HeadBone.IsNone() && LowerBoneName.Contains(TEXT("head"))) HeadBone = BoneName;
+				if (LowerBoneName.Contains(TEXT("beak")) || LowerBoneName.Contains(TEXT("bill")))
+				{
+					CarryBone = BoneName;
+					break;
+				}
+			}
+			if (CarryBone.IsNone()) CarryBone = HeadBone;
+			UInstancedStaticMeshComponent* Twigs = NewObject<UInstancedStaticMeshComponent>(Raven, TEXT("RavenCarriedTwigs"), RF_Transient);
+			Raven->AddInstanceComponent(Twigs);
+			Twigs->SetupAttachment(CrowBody, CarryBone);
+			Twigs->SetRelativeLocation(CarryBone == HeadBone ? FVector(1.5f, 0.f, -1.f) : FVector(0.5f, 0.f, 0.f));
+			if (UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+			{
+				Twigs->SetStaticMesh(TwigMesh);
+				Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.16f, 0.075f, 0.025f, 1.f)));
+				const FTransform TwigTransforms[] = {
+					FTransform(FRotator(82.f, 0.f, -7.f), FVector(17.f, -2.5f, -4.f), FVector(0.025f, 0.025f, 0.18f)),
+					FTransform(FRotator(88.f, 5.f, 8.f), FVector(17.f, 0.f, -5.f), FVector(0.025f, 0.025f, 0.18f)),
+					FTransform(FRotator(76.f, -4.f, 12.f), FVector(16.f, 2.5f, -3.f), FVector(0.025f, 0.025f, 0.18f))
+				};
+				for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
+			}
+			Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Twigs->SetCanEverAffectNavigation(false);
+			Twigs->SetGenerateOverlapEvents(false);
+			Twigs->SetVisibility(false, false);
+			Twigs->SetHiddenInGame(true, false);
+			Twigs->RegisterComponent();
+			return;
+		}
 
 		USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenProceduralVisualRoot"), RF_Transient);
 		Raven->AddInstanceComponent(VisualRoot);
@@ -281,11 +361,65 @@ void ARavenAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 	EnsureProceduralRavenAppearance(InPawn);
+	CacheCrowAnimations(InPawn);
 	CacheWingComponents(InPawn);
 	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(InPawn))
 		if (Agent->RestPresentation) Agent->RestPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
 	HomeAltitude = InPawn ? InPawn->GetActorLocation().Z + TakeoffHeight : 0.f;
 	SetGrounded();
+}
+
+void ARavenAgentAIController::CacheCrowAnimations(APawn* Raven)
+{
+	RiggedCrowBody.Reset();
+	CrowIdleAnimation = nullptr;
+	CrowHopAnimation = nullptr;
+	CrowTakeoffAnimation = nullptr;
+	CrowFlyAnimation = nullptr;
+	CrowLandingAnimation = nullptr;
+	CurrentCrowAnimation = nullptr;
+	if (!Raven) return;
+	TArray<USkeletalMeshComponent*> Meshes;
+	Raven->GetComponents<USkeletalMeshComponent>(Meshes);
+	for (USkeletalMeshComponent* Mesh : Meshes)
+		if (Mesh && Mesh->GetFName() == TEXT("RavenRiggedCrowBody")) { RiggedCrowBody = Mesh; break; }
+	if (!RiggedCrowBody.IsValid()) return;
+	CrowIdleAnimation = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AnimalVarietyPack/Crow/Animations/ANIM_Crow_IdleLookAround.ANIM_Crow_IdleLookAround"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	CrowHopAnimation = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AnimalVarietyPack/Crow/Animations/ANIM_Crow_Hop.ANIM_Crow_Hop"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	CrowTakeoffAnimation = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AnimalVarietyPack/Crow/Animations/ANIM_Crow_TakeOff.ANIM_Crow_TakeOff"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	CrowFlyAnimation = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AnimalVarietyPack/Crow/Animations/ANIM_Crow_Fly.ANIM_Crow_Fly"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	CrowLandingAnimation = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/AnimalVarietyPack/Crow/Animations/ANIM_Crow_Landing.ANIM_Crow_Landing"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UpdateCrowAnimation();
+}
+
+void ARavenAgentAIController::UpdateCrowAnimation()
+{
+	USkeletalMeshComponent* Crow = RiggedCrowBody.Get();
+	if (!Crow) return;
+	UAnimSequence* Desired = CrowIdleAnimation;
+	bool bLoop = true;
+	switch (LocomotionState)
+	{
+	case ERavenLocomotionState::Hopping:
+		if (CrowHopAnimation) { Desired = CrowHopAnimation; bLoop = false; }
+		break;
+	case ERavenLocomotionState::TakingOff:
+		if (CrowTakeoffAnimation) { Desired = CrowTakeoffAnimation; bLoop = false; }
+		break;
+	case ERavenLocomotionState::Flying:
+		if (CrowFlyAnimation) Desired = CrowFlyAnimation;
+		break;
+	case ERavenLocomotionState::Landing:
+		if (CrowLandingAnimation) { Desired = CrowLandingAnimation; bLoop = false; }
+		break;
+	default:
+		break;
+	}
+	if (Desired && CurrentCrowAnimation != Desired)
+	{
+		CurrentCrowAnimation = Desired;
+		Crow->PlayAnimation(Desired, bLoop);
+	}
 }
 
 void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
@@ -1210,6 +1344,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	UpdateWingAnimation(DeltaSeconds);
 	UpdateHeadAnimation(DeltaSeconds);
 	UpdateCarriedTwigVisual();
+	UpdateCrowAnimation();
 	if (IsResting()) return;
 
 	if (LocomotionState == ERavenLocomotionState::Hopping)

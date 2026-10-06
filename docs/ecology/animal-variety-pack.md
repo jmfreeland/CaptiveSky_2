@@ -72,3 +72,14 @@ personality consolidation, not the weather spawn path, cloud pass, live model be
 performance, or visual quality. Next, run the ecology/weather suite against a current isolated build,
 then inspect the stag and cloud behavior in the live Island before comparing Crow and Raven at
 gameplay scale.
+
+## Rigged Raven visual milestone (2026-10-06)
+
+The transient Raven now prefers `SK_Crow` when the optional pack is present, maps its idle/hop/takeoff/
+fly/landing animations to the existing Raven locomotion states, and retains the procedural fallback.
+The imported rig is visual-only for collision and navigation. Current UE 5.8.3 editor-target build,
+Raven perch/flight automation, and the real-RHI Raven pose capture pass. The pose test verifies that
+`M_Crow` resolves `T_Crow_BaseColor`; nevertheless, the game-world capture still reads as a pale,
+near-white bird at gameplay scale. Material/lighting appearance and a live-editor visual review remain
+open, so this is not yet a polished Raven. The copied content remains in ignored `Content/`, outside
+Git.

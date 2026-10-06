@@ -6,6 +6,8 @@
 
 class AIslandArrangement;
 class UInstancedStaticMeshComponent;
+class UAnimSequence;
+class USkeletalMeshComponent;
 UENUM(BlueprintType)
 enum class ERavenLocomotionState : uint8
 {
@@ -99,6 +101,19 @@ private:
 	TWeakObjectPtr<UObject> RightWing;
 	TWeakObjectPtr<UObject> RavenHeadPivot;
 	TWeakObjectPtr<UInstancedStaticMeshComponent> CarriedTwigVisual;
+	TWeakObjectPtr<USkeletalMeshComponent> RiggedCrowBody;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CrowIdleAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CrowHopAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CrowTakeoffAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CrowFlyAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CrowLandingAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> CurrentCrowAnimation;
 	FRotator LeftWingRestRotation = FRotator::ZeroRotator;
 	FRotator RightWingRestRotation = FRotator::ZeroRotator;
 	FRotator LeftWingFlightRotation = FRotator::ZeroRotator;
@@ -133,6 +148,8 @@ private:
 		const TArray<int32>& OverheadCoverProbeCounts);
 	void SetGrounded();
 	void CacheWingComponents(APawn* Raven);
+	void CacheCrowAnimations(APawn* Raven);
+	void UpdateCrowAnimation();
 	void UpdateWingAnimation(float DeltaSeconds);
 	void UpdateHeadAnimation(float DeltaSeconds);
 	void UpdateCarriedTwigVisual();
