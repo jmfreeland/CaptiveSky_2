@@ -632,3 +632,19 @@ Evidence: `Saved/Logs/Codex_SwayOffLumenOn_20261006.log`,
 `Saved/Profiling/Traces/Codex_SwayOffLumenOn_20261006.utrace`, and the Insights
 exports under the current user's temporary directory; aligned wait-event
 exports confirmed the intermittent occlusion/visibility overlaps.
+
+### Occlusion-query ablation setup (2026-10-06; capture not completed)
+
+Added the capture-only `-DisableOcclusionQueries` option to
+`Scripts/Start-Spectator.ps1`. It sends `r.AllowOcclusionQueries 0` through
+`-ExecCmds`; the UE 5.8.3 `RendererSettings.h` source confirms that CVar
+controls hardware occlusion queries. No project default was changed.
+
+The first matched attempt remained in `ValidatePlatforms` because UnrealBuildTool
+could not access its usual user-local log directory in the sandbox. After
+re-running with that access, Unreal initialized platform and shader modules but
+exited before loading the Island; there is no trace file or runtime CVar
+confirmation. This is not a measured ablation and says nothing about whether
+occlusion queries cause the residual stalls. Repeat the 120-second-capped capture
+with agent thinking disabled and a one-request ceiling from a working UE 5.8.3
+launch path before drawing any performance conclusion.
