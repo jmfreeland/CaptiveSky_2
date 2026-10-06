@@ -92,11 +92,15 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	const FString ArrangerAgentId = TEXT("ArrangementMaker_") + TestSuffix;
 	const FString EmptySiteObserverAgentId = TEXT("EmptyArrangementObserver_") + TestSuffix;
 	const FString LineageObserverAgentId = TEXT("LineageObserver_") + TestSuffix;
+	const FString TaughtLearnerAgentId = TEXT("TaughtArrangementLearner_") + TestSuffix;
+	const FString SecondLearnerAgentId = TEXT("SecondArrangementLearner_") + TestSuffix;
 	FScopedArrangementAgentData AgentDataCleanup;
 	AgentDataCleanup.Track(BystanderAgentId);
 	AgentDataCleanup.Track(ArrangerAgentId);
 	AgentDataCleanup.Track(EmptySiteObserverAgentId);
 	AgentDataCleanup.Track(LineageObserverAgentId);
+	AgentDataCleanup.Track(TaughtLearnerAgentId);
+	AgentDataCleanup.Track(SecondLearnerAgentId);
 	auto DescribeFrom = [](UWorld* World, const FVector& Where, const FString& AgentId)
 	{
 		ACharacter* Body = World->SpawnActor<ACharacter>(Where, FRotator::ZeroRotator);
@@ -205,6 +209,20 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		State->FindArrangementSite(TEXT("ArrangingGround_1"))->ObservedBy.Contains(BystanderAgentId));
 	TestFalse(TEXT("The title and intent stay private"), Bystander.Contains(TEXT("Evening")) || Bystander.Contains(TEXT("chime carries")));
 	TestTrue(TEXT("A bystander is invited to respond"), Bystander.Contains(TEXT("respond by setting a few small stones")));
+	TestTrue(TEXT("The bystander knows the visible work after seeing it"), State->HasArrangementKnowledge(TEXT("ArrangingGround_1"), BystanderAgentId));
+	TestFalse(TEXT("A resident who only saw an empty site cannot teach a work"),
+		State->RecordArrangementTeaching(TEXT("ArrangingGround_1"), EmptySiteObserverAgentId, TaughtLearnerAgentId, 1));
+	TestTrue(TEXT("A resident may pass the public work along in a conversation"),
+		State->RecordArrangementTeaching(TEXT("ArrangingGround_1"), BystanderAgentId, TaughtLearnerAgentId, 2));
+	TestTrue(TEXT("A resident who learned through conversation may pass it along again"),
+		State->RecordArrangementTeaching(TEXT("ArrangingGround_1"), TaughtLearnerAgentId, SecondLearnerAgentId, 3));
+	TestTrue(TEXT("Teaching creates knowledge without pretending the learner saw the work"),
+		State->HasArrangementKnowledge(TEXT("ArrangingGround_1"), TaughtLearnerAgentId) &&
+		!State->FindArrangementSite(TEXT("ArrangingGround_1"))->ObservedBy.Contains(TaughtLearnerAgentId));
+	const FString LearnedWork = DescribeFrom(World, First.Location + FVector(2200.f, 0.f, 100.f), TaughtLearnerAgentId);
+	TestTrue(TEXT("A learner remembers the teacher and public form/site without receiving private intent"),
+		LearnedWork.Contains(BystanderAgentId) && LearnedWork.Contains(TEXT("public form of a stone ring")) &&
+		LearnedWork.Contains(TEXT("not a work you have seen")) && !LearnedWork.Contains(TEXT("Evening")) && !LearnedWork.Contains(TEXT("chime carries")));
 	const FString RememberedWork = DescribeFrom(World, First.Location + FVector(2000.f, 0.f, 100.f), BystanderAgentId);
 	TestTrue(TEXT("A bystander privately remembers a completed arrangement after walking out of sight"),
 		RememberedWork.Contains(TEXT("You remember a stone ring")) && RememberedWork.Contains(TEXT("move_to target: ArrangingGround_1")));
@@ -215,7 +233,7 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		EmptySiteObserverAgentId, -10, bInfluenceChanged, TEXT("ArrangingGround_1"));
 	TestFalse(TEXT("An unobserved public work cannot be claimed as inspiration"), bInfluenceChanged);
 	TestTrue(TEXT("A rejected inspiration leaves the destination empty"), !State->FindArrangementSite(TEXT("ArrangingGround_4"))->bHasWork);
-	TestTrue(TEXT("The rejection explains why the source cannot be cited"), UnseenInfluence.Contains(TEXT("visibly encountered")));
+	TestTrue(TEXT("The rejection explains why the source cannot be cited"), UnseenInfluence.Contains(TEXT("seen or learned about")));
 	const FString Untransformed = State->ArrangeStones(TEXT("ArrangingGround_4"), TEXT("ring"), TEXT("Same shape"), TEXT(""),
 		BystanderAgentId, -10, bInfluenceChanged, TEXT("ArrangingGround_1"));
 	TestFalse(TEXT("A lineage must transform rather than duplicate the source form"), bInfluenceChanged);
@@ -366,6 +384,12 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The observed-source evidence and transformed lineage survive a new Island session"),
 		Restored && Restored->ObservedBy.Contains(BystanderAgentId) && RestoredDescendant &&
 		RestoredDescendant->InfluenceSiteId == FName(TEXT("ArrangingGround_1")) && RestoredDescendant->MakerAgentId == BystanderAgentId);
+	TestTrue(TEXT("Conversation-taught evidence survives a new Island session without becoming a sighting"),
+		Restored && Restored->Lessons.ContainsByPredicate([&TaughtLearnerAgentId, &BystanderAgentId](const FIslandArrangementLesson& Lesson)
+			{ return Lesson.LearnerAgentId == TaughtLearnerAgentId && Lesson.TeacherAgentId == BystanderAgentId && Lesson.Day == 2; }) &&
+		Restored->Lessons.ContainsByPredicate([&SecondLearnerAgentId, &TaughtLearnerAgentId](const FIslandArrangementLesson& Lesson)
+			{ return Lesson.LearnerAgentId == SecondLearnerAgentId && Lesson.TeacherAgentId == TaughtLearnerAgentId && Lesson.Day == 3; }) &&
+		!Restored->ObservedBy.Contains(TaughtLearnerAgentId) && !Restored->ObservedBy.Contains(SecondLearnerAgentId));
 	const AIslandArrangement* RestoredSourceActor = FindArrangementActor(World, TEXT("ArrangingGround_1"));
 	const AIslandArrangement* RestoredDescendantActor = FindArrangementActor(World, TEXT("ArrangingGround_4"));
 	bool bRestoredMotifsMatch = RestoredSourceActor && RestoredDescendantActor &&
@@ -473,6 +497,16 @@ bool FIslandArrangementInspectionTest::RunTest(const FString& Parameters)
 	State->ArrangeStones(TEXT("ArrangingGround_2"), TEXT("line"), TEXT("Private descendant title"), TEXT("Private descendant intent"),
 		ObserverId, 1, bDescendantCreated, TEXT("ArrangingGround_1"));
 	TestTrue(TEXT("The resident can transform the source only after its explicit inspection persisted a sighting"), bDescendantCreated);
+	const FString LearnerId = TEXT("TaughtInspector_" ) + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	TestTrue(TEXT("An inspector who saw the source can teach its public form to another resident"),
+		State->RecordArrangementTeaching(TEXT("ArrangingGround_1"), ObserverId, LearnerId, 1));
+	TestFalse(TEXT("The learner's knowledge remains distinct from direct inspection"),
+		State->FindArrangementSite(TEXT("ArrangingGround_1"))->ObservedBy.Contains(LearnerId));
+	bool bTaughtDescendantCreated = false;
+	State->ArrangeStones(TEXT("ArrangingGround_3"), TEXT("pair"), TEXT("Heard turning"), TEXT("A spoken echo"),
+		LearnerId, 1, bTaughtDescendantCreated, TEXT("ArrangingGround_1"));
+	TestTrue(TEXT("A listener may transform a taught source into a different form"), bTaughtDescendantCreated &&
+		State->FindArrangementSite(TEXT("ArrangingGround_3"))->InfluenceSiteId == FName(TEXT("ArrangingGround_1")));
 	AIslandArrangement* DescendantActor = FindArrangementActor(World, TEXT("ArrangingGround_2"));
 	const FIslandArrangementSite* Descendant = State->FindArrangementSite(TEXT("ArrangingGround_2"));
 	if (Observer && DescendantActor) Observer->SetActorLocation(DescendantActor->GetActorLocation() + FVector(0.f, 200.f, 100.f));

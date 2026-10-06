@@ -216,6 +216,31 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 				if ((*Work)->TryGetStringField(TEXT("influence_site"), InfluenceSiteId)) Site.InfluenceSiteId = FName(*InfluenceSiteId);
 				(*Work)->TryGetStringArrayField(TEXT("observed_by"), Site.ObservedBy);
 				if (Site.ObservedBy.Num() > MaxArrangementObservers) Site.ObservedBy.SetNum(MaxArrangementObservers);
+				TSet<FString> KnownArrangementKnowledge;
+				if (!Site.MakerAgentId.IsEmpty()) KnownArrangementKnowledge.Add(Site.MakerAgentId);
+				for (const FString& ObserverId : Site.ObservedBy) KnownArrangementKnowledge.Add(ObserverId);
+				const TArray<TSharedPtr<FJsonValue>>* LessonValues = nullptr;
+				if ((*Work)->TryGetArrayField(TEXT("lessons"), LessonValues))
+				{
+					for (const TSharedPtr<FJsonValue>& LessonValue : *LessonValues)
+					{
+						const TSharedPtr<FJsonObject>* LessonObject = nullptr;
+						if (Site.Lessons.Num() >= MaxArrangementLessons || !LessonValue.IsValid() || !LessonValue->TryGetObject(LessonObject)) continue;
+						FIslandArrangementLesson Lesson;
+						(*LessonObject)->TryGetStringField(TEXT("teacher"), Lesson.TeacherAgentId);
+						(*LessonObject)->TryGetStringField(TEXT("learner"), Lesson.LearnerAgentId);
+						(*LessonObject)->TryGetNumberField(TEXT("day"), Lesson.Day);
+						Lesson.Day = FMath::Max(1, Lesson.Day);
+						const bool bDuplicateLearner = Site.Lessons.ContainsByPredicate([&Lesson](const FIslandArrangementLesson& Existing)
+							{ return Existing.LearnerAgentId == Lesson.LearnerAgentId; });
+						if (!Lesson.TeacherAgentId.IsEmpty() && !Lesson.LearnerAgentId.IsEmpty() &&
+							Lesson.TeacherAgentId != Lesson.LearnerAgentId && KnownArrangementKnowledge.Contains(Lesson.TeacherAgentId) && !bDuplicateLearner)
+						{
+							KnownArrangementKnowledge.Add(Lesson.LearnerAgentId);
+							Site.Lessons.Add(MoveTemp(Lesson));
+						}
+					}
+				}
 				if ((*Work)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Site.CreatedUtc);
 				const TArray<TSharedPtr<FJsonValue>>* Responses = nullptr;
 				if ((*Work)->TryGetArrayField(TEXT("responses"), Responses))
@@ -317,6 +342,17 @@ bool UIslandWorldStateSubsystem::Save() const
 			for (int32 Index = 0; Index < Site.ObservedBy.Num() && Index < MaxArrangementObservers; ++Index)
 				Observers.Add(MakeShared<FJsonValueString>(Site.ObservedBy[Index]));
 			Work->SetArrayField(TEXT("observed_by"), Observers);
+			TArray<TSharedPtr<FJsonValue>> Lessons;
+			for (int32 Index = 0; Index < Site.Lessons.Num() && Index < MaxArrangementLessons; ++Index)
+			{
+				const FIslandArrangementLesson& Lesson = Site.Lessons[Index];
+				const TSharedRef<FJsonObject> LessonObject = MakeShared<FJsonObject>();
+				LessonObject->SetStringField(TEXT("teacher"), Lesson.TeacherAgentId);
+				LessonObject->SetStringField(TEXT("learner"), Lesson.LearnerAgentId);
+				LessonObject->SetNumberField(TEXT("day"), Lesson.Day);
+				Lessons.Add(MakeShared<FJsonValueObject>(LessonObject));
+			}
+			Work->SetArrayField(TEXT("lessons"), Lessons);
 			Work->SetStringField(TEXT("created_utc"), Site.CreatedUtc.ToIso8601());
 			TArray<TSharedPtr<FJsonValue>> Responses;
 			for (const FIslandArrangementResponse& Response : Site.Responses)
@@ -766,6 +802,34 @@ bool UIslandWorldStateSubsystem::RecordArrangementObservation(FName SiteId, cons
 	return false;
 }
 
+bool UIslandWorldStateSubsystem::HasArrangementKnowledge(FName SiteId, const FString& AgentId) const
+{
+	if (AgentId.IsEmpty()) return false;
+	const FIslandArrangementSite* Site = FindArrangementSite(SiteId);
+	return Site && Site->bHasWork && (Site->MakerAgentId == AgentId || Site->ObservedBy.Contains(AgentId) ||
+		Site->Lessons.ContainsByPredicate([&AgentId](const FIslandArrangementLesson& Lesson)
+			{ return Lesson.LearnerAgentId == AgentId; }));
+}
+
+bool UIslandWorldStateSubsystem::RecordArrangementTeaching(FName SiteId, const FString& TeacherAgentId,
+	const FString& LearnerAgentId, int32 Today)
+{
+	if (TeacherAgentId.IsEmpty() || LearnerAgentId.IsEmpty() || TeacherAgentId == LearnerAgentId ||
+		!HasArrangementKnowledge(SiteId, TeacherAgentId) || HasArrangementKnowledge(SiteId, LearnerAgentId))
+	{
+		return false;
+	}
+	FIslandArrangementSite* Site = ArrangementSites.FindByPredicate([SiteId](const FIslandArrangementSite& Existing) { return Existing.Id == SiteId; });
+	if (!Site || Site->Lessons.Num() >= MaxArrangementLessons) return false;
+	FIslandArrangementLesson& Lesson = Site->Lessons.AddDefaulted_GetRef();
+	Lesson.TeacherAgentId = TeacherAgentId;
+	Lesson.LearnerAgentId = LearnerAgentId;
+	Lesson.Day = FMath::Max(1, Today);
+	if (Save()) return true;
+	Site->Lessons.Pop();
+	return false;
+}
+
 bool UIslandWorldStateSubsystem::ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm)
 {
 	const FString Form = Text.TrimStartAndEnd().ToLower();
@@ -903,8 +967,8 @@ FString UIslandWorldStateSubsystem::ArrangeStones(FName SiteId, const FString& F
 		if (!InfluenceSiteId.IsEmpty())
 		{
 			Influence = FindArrangementSite(FName(*InfluenceSiteId));
-			if (!Influence || !Influence->bHasWork || !Influence->ObservedBy.Contains(AgentId))
-				return TEXT("You can only name a stone work you have visibly encountered; no influence was recorded. Nothing changed.");
+			if (!Influence || !HasArrangementKnowledge(Influence->Id, AgentId))
+				return TEXT("You can only cite a stone work you have seen or learned about from another resident; no influence was recorded. Nothing changed.");
 			if (Chosen == Influence->Form)
 				return TEXT("A descendant must transform the remembered shape into a different form. Choose another form or leave influence unset. Nothing changed.");
 		}

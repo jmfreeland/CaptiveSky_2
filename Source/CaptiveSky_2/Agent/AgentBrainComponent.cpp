@@ -345,6 +345,18 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 			// Ground residents notice arranging grounds nearby; a raven can spot a landing site from farther away.
 			int32 NoticedSites = 0;
+			int32 LearnedWorks = 0;
+			for (const FIslandArrangementSite& Site : WorldState->GetArrangementSites())
+			{
+				if (LearnedWorks >= 3 || OwnId.IsEmpty() || !Site.bHasWork || Site.MakerAgentId == OwnId ||
+					Site.ObservedBy.Contains(OwnId)) continue;
+				const FIslandArrangementLesson* Lesson = Site.Lessons.FindByPredicate([&OwnId](const FIslandArrangementLesson& Entry)
+					{ return Entry.LearnerAgentId == OwnId; });
+				if (!Lesson) continue;
+				NearbyBeings += FString::Printf(TEXT(" In a conversation, %s told you about the public form of a stone %s at %s. This is something you heard about, not a work you have seen; its maker's title and intent remain unknown. If its shape stays with you, you may optionally transform it into a different form at empty ground by naming that exact site ID in the influence field."),
+					*Lesson->TeacherAgentId, *UIslandWorldStateSubsystem::FormName(Site.Form), *Site.Id.ToString());
+				++LearnedWorks;
+			}
 			for (const FIslandArrangementSite& Site : WorldState->GetArrangementSites())
 			{
 				if (NoticedSites >= 3) break;
@@ -670,12 +682,13 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"For move_to, interact, build, and land, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
 		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
 		"The land action is for the raven only: while perched or flying, use land with a listed ArrangingGround target to fly there and descend onto that verified open-ground site. It creates nothing. Foraging for twigs is optional; after a confirmed landing, the raven may build with GatherTwigs. Do not use land while already grounded or for a roost or any other target. "
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
+		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. If an observed earlier stone work genuinely influenced a new arrangement, you may also add its exact visible site ID in \"influence\"; choose a different form so the new work transforms rather than copies it. Influence is optional and never a duty. "
@@ -1006,6 +1019,7 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("title"), Decision.Title);
 		(*ActionObj)->TryGetStringField(TEXT("intent"), Decision.Intent);
 		(*ActionObj)->TryGetStringField(TEXT("influence"), Decision.Influence);
+		(*ActionObj)->TryGetStringField(TEXT("teach_arrangement"), Decision.TeachArrangement);
 	}
 
 	Decision.bValid = true;

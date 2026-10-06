@@ -82,6 +82,7 @@ public:
 	static constexpr int32 MaxGuestBookEntries = 24;
 	static constexpr int32 MaxGuestBookLineLength = 180;
 	static constexpr int32 MaxArrangementObservers = 32;
+	static constexpr int32 MaxArrangementLessons = 32;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -152,6 +153,10 @@ public:
 	bool GatherArrangementTwigs(FName SiteId, const FString& AgentId, int32 Today);
 	/** Records a resident's first unobstructed sighting of public work; title and intent remain private. */
 	bool RecordArrangementObservation(FName SiteId, const FString& AgentId);
+	/** Records a bounded lesson passed by a resident who knows the work's visible form; does not mark it seen. */
+	bool RecordArrangementTeaching(FName SiteId, const FString& TeacherAgentId, const FString& LearnerAgentId, int32 Today);
+	/** True only if the resident made, saw, or was taught about this work. */
+	bool HasArrangementKnowledge(FName SiteId, const FString& AgentId) const;
 	static bool ParseArrangementForm(const FString& Text, EIslandArrangementForm& OutForm);
 	static FString FormName(EIslandArrangementForm Form);
 

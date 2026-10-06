@@ -27,6 +27,10 @@ struct FAgentSocialUtterance
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	FString Speech;
 
+	/** Optional public arrangement site intentionally shared in this line. */
+	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
+	FString TeachArrangementSiteId;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	int32 TurnIndex = 1;
 };
@@ -94,7 +98,7 @@ private:
 	void TryBeginPendingUtterance();
 	void TryBeginSpontaneousConversation(const FAgentDecision& Decision);
 	void DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
-		const FString& ConversationId, int32 TurnIndex);
+		const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId = FString());
 
 	UFUNCTION()
 	void HandleDecisionReady(const FAgentDecision& Decision);

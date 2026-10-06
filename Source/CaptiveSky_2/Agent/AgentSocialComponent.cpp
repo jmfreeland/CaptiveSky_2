@@ -8,6 +8,7 @@
 #include "AgentRelationshipComponent.h"
 #include "AgentSocialSubsystem.h"
 #include "AutonomousAgentCharacter.h"
+#include "IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/Guid.h"
@@ -221,6 +222,15 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		FinishAutomaticConversation(Sender, Utterance.ConversationId, true);
 		return;
 	}
+	if (!Utterance.TeachArrangementSiteId.IsEmpty())
+	{
+		if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		{
+			WorldState->RecordArrangementTeaching(FName(*Utterance.TeachArrangementSiteId),
+				Utterance.SenderAgentId, OwnMemory->GetResolvedAgentId(),
+				UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+		}
+	}
 	PendingUtterances.Add(Utterance);
 }
 
@@ -273,7 +283,8 @@ void UAgentSocialComponent::HandleDecisionReady(const FAgentDecision& Decision)
 		if (Decision.bValid && Decision.ActionType == EAgentActionType::Speak && !Decision.Speech.IsEmpty() &&
 			CompletedUtterance.TurnIndex < MaximumConversationTurns && IsWithinSpeakingRange(Sender))
 		{
-			DeliverSpeech(Sender, Decision.Speech, CompletedUtterance.ConversationId, CompletedUtterance.TurnIndex + 1);
+			DeliverSpeech(Sender, Decision.Speech, CompletedUtterance.ConversationId, CompletedUtterance.TurnIndex + 1,
+				Decision.TeachArrangement);
 		}
 		else
 		{
@@ -319,12 +330,12 @@ void UAgentSocialComponent::TryBeginSpontaneousConversation(const FAgentDecision
 	if (TryReserveAutomaticConversation(RecipientSocial, OwnMemory->GetResolvedAgentId(),
 		RecipientMemory->GetResolvedAgentId(), ConversationId))
 	{
-		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1);
+		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement);
 	}
 }
 
 void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
-	const FString& ConversationId, int32 TurnIndex)
+	const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId)
 {
 	AAutonomousAgentCharacter* Speaker = GetAgentOwner();
 	if (!Speaker || !Recipient || Speech.IsEmpty() || !IsWithinSpeakingRange(Recipient))
@@ -368,6 +379,7 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	Utterance.SenderAgentId = SpeakerId;
 	Utterance.SenderDisplayName = SpeakerName;
 	Utterance.Speech = Speech;
+	Utterance.TeachArrangementSiteId = TeachArrangementSiteId;
 	Utterance.TurnIndex = TurnIndex;
 	if (IsConversationAtTurnLimit(TurnIndex))
 	{

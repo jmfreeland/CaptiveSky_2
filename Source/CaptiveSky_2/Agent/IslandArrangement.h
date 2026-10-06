@@ -36,6 +36,22 @@ struct FIslandArrangementResponse
 	FString Intent;
 };
 
+/** A resident-to-resident account of who taught whom about a public work's visible form. */
+USTRUCT(BlueprintType)
+struct FIslandArrangementLesson
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	FString TeacherAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	FString LearnerAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	int32 Day = 1;
+};
+
 /**
  * One level patch of ground near the ListeningStones where a resident may arrange stones.
  * A site holds at most one work; later residents may add a few responses around it.
@@ -91,6 +107,10 @@ struct FIslandArrangementSite
 	/** Stable resident IDs who have visibly encountered this work; bounded by the world-state subsystem. */
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	TArray<FString> ObservedBy;
+
+	/** Bounded, attributed verbal transmission; never confused with firsthand observation. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
+	TArray<FIslandArrangementLesson> Lessons;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Arrangement")
 	FDateTime CreatedUtc;

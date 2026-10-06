@@ -97,9 +97,8 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString Speech;
 
-	// Optional build details for stone arrangements: a form (ring|line|spiral|pair), the maker's
-	// own short title and intent, and an optional exact observed source site for transformed lineage.
-	// Ignored by every other action.
+	// Optional action-specific arrangement metadata. Form, title, intent, and Influence are for Build;
+	// TeachArrangement is for a nearby resident conversation opened with Speak.
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString Form;
 
@@ -112,4 +111,8 @@ struct FAgentDecision
 	/** Optional exact source site for a transformed arrangement; validated against recorded sighting. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString Influence;
+
+	/** Optional exact public arrangement shared during nearby resident conversation. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString TeachArrangement;
 };
