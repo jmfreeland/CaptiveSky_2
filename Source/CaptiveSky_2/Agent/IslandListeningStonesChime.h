@@ -7,7 +7,7 @@
 class UAudioComponent;
 class USoundWaveProcedural;
 
-/** A quiet, finite procedural resonance played only when a resident inspects ListeningStones. */
+/** A quiet, finite procedural resonance triggered by a natural gust or resident interaction at ListeningStones. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandListeningStonesChime : public AActor
 {
