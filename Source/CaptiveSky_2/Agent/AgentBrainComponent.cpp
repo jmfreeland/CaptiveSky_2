@@ -26,6 +26,7 @@
 #include "IslandWorldStateSubsystem.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandInnHearthSubsystem.h"
+#include "IslandListeningStonesChime.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -199,6 +200,14 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
+	if (GetWorld())
+		for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
+		{
+			const FString HeardTone = It->DescribeForListener(Location);
+			if (HeardTone.IsEmpty()) continue;
+			NearbyBeings += TEXT(" ") + HeardTone;
+			break;
+		}
 	const ARavenAgentAIController* RavenRoostController = nullptr;
 	if (const APawn* Body = Cast<APawn>(Owner))
 	{

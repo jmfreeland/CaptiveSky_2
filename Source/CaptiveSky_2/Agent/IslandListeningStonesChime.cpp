@@ -34,6 +34,14 @@ void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed)
 	}
 }
 
+FString AIslandListeningStonesChime::DescribeForListener(const FVector& ListenerLocation) const
+{
+	const float Distance = FVector::Distance(GetActorLocation(), ListenerLocation);
+	if (ElapsedSeconds >= DurationSeconds || Distance > AudibleRadius) return FString();
+	return FString::Printf(TEXT("A soft, layered tone is fading from the ListeningStones, about %.0f metres away. It will pass on its own; it is not a puzzle or promised discovery."),
+		Distance / 100.f);
+}
+
 float AIslandListeningStonesChime::CalculateWindPitchRatio(float HorizontalWindSpeed)
 {
 	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;

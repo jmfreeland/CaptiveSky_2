@@ -90,6 +90,7 @@ protected:
 
 private:
 	friend class FAgentMemoryComponentTest;
+	friend class FIslandListeningStonePresentationTest;
 	friend class FRavenPerchTest;
 	friend class FIslandNestTest;
 	friend class FIslandCurioTest;

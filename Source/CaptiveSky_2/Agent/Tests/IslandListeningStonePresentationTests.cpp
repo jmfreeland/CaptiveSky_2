@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Agent/AgentBrainComponent.h"
 #include "Agent/IslandListeningStonePresentation.h"
 #include "Agent/IslandListeningStonesChime.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -96,6 +97,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	Proxies[1]->SetActorHiddenInGame(true);
 
 	World->BeginPlay();
+	Marker->Tags.Remove(TEXT("ListeningStones"));
+	Marker->Tags.Remove(TEXT("IslandLandmark"));
 	UIslandListeningStonePresentationSubsystem* Subsystem = World->GetSubsystem<UIslandListeningStonePresentationSubsystem>();
 	TestNotNull(TEXT("Game world has the transient landmark subsystem"), Subsystem);
 	AListeningStonePresentation* Presentation = nullptr;
@@ -129,13 +132,48 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		Presentation->ObserveAmbientWind(120.f);
 		TestTrue(TEXT("A rising natural gust starts the transient stone resonance"), Presentation->GetResonanceRemaining() > 2.7f);
 		int32 NaturalChimeCount = 0;
-		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++NaturalChimeCount;
+		AIslandListeningStonesChime* NaturalChime = nullptr;
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+		{
+			++NaturalChimeCount;
+			NaturalChime = *It;
+		}
 		TestEqual(TEXT("A natural gust creates one finite chime actor"), NaturalChimeCount, 1);
+	ATargetPoint* Resident = World->SpawnActor<ATargetPoint>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
+		UAgentBrainComponent* ResidentBrain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
+		if (Resident && ResidentBrain)
+		{
+			Resident->AddInstanceComponent(ResidentBrain);
+			ResidentBrain->RegisterComponent();
+			FAgentConversationContext NoMessageContext;
+			const FString NearbySituation = ResidentBrain->BuildSituationSummary(NoMessageContext);
+			TestTrue(TEXT("A nearby resident's situation includes the fading Listening Stones tone"),
+				NearbySituation.Contains(TEXT("soft, layered tone is fading from the ListeningStones")) && NearbySituation.Contains(TEXT("5 metres away")));
+			Resident->SetActorLocation(FVector(1200.f, 0.f, 0.f));
+			const FString DistantSituation = ResidentBrain->BuildSituationSummary(NoMessageContext);
+			TestFalse(TEXT("A resident outside the audible radius gets no tone in their situation"),
+				DistantSituation.Contains(TEXT("soft, layered tone is fading from the ListeningStones")));
+		}
+		else
+		{
+			AddError(TEXT("A resident and brain component are required to verify ephemeral sound perception."));
+		}
+		if (NaturalChime)
+		{
+			const FString NearbyTone = NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f));
+			TestTrue(TEXT("A nearby resident can notice the fading local tone"), NearbyTone.Contains(TEXT("ListeningStones")) && NearbyTone.Contains(TEXT("5 metres away")));
+			TestTrue(TEXT("A resident beyond the sound radius gets no tone fact"), NaturalChime->DescribeForListener(FVector(1200.f, 0.f, 0.f)).IsEmpty());
+		}
 		Presentation->ObserveAmbientWind(40.f);
 		Presentation->ObserveAmbientWind(120.f);
 		int32 ChimeCountDuringCooldown = 0;
 		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCountDuringCooldown;
 		TestEqual(TEXT("A second gust cannot retrigger during the resonance and cooldown"), ChimeCountDuringCooldown, 1);
+		if (NaturalChime)
+		{
+			NaturalChime->Tick(2.9f);
+			TestTrue(TEXT("Residents stop receiving the sound fact after the tone fades"), NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f)).IsEmpty());
+		}
 		Presentation->Tick(2.9f);
 		TestEqual(TEXT("Natural resonance lights expire without persistent state"), Presentation->GetResonanceRemaining(), 0.f);
 		Subsystem->NotifyChime(180.f);

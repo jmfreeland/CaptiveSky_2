@@ -1,0 +1,7 @@
+# Listening Stones tone awareness (2026-10-06)
+
+While a Listening Stones chime actor is active, a resident's next situation summary now includes a factual description of the fading tone only if the resident is within its 11 m audible radius. The line describes a brief local sound and explicitly avoids implying a puzzle, reward, or promised discovery. The resident can choose to investigate or move on; no action is forced. The fact disappears when the tone expires, and no world or memory state is written.
+
+Validation: the UE 5.8.3 `CaptiveSky_2Editor` target built successfully. Headless `CaptiveSky2.Agent.ListeningStonePresentation` passed with `-NullRHI -NoSound -DisablePython -DDC-ForceMemoryCache`. It verifies the wind-onset event creates one chime, the cooldown prevents immediate repeats, a nearby resident's actual situation summary includes the tone and distance, a resident outside the sound radius receives no such fact, and the fact expires with the sound. Log: [`Codex_NaturalStoneAwareness_20261006_final.log`](../../Saved/Logs/Codex_NaturalStoneAwareness_20261006_final.log).
+
+This does not create an extra resident/model request; it only enriches context during an already-started decision. The provider-free test verifies deterministic awareness, not whether residents will choose to visit the landmark during play, or whether the sound mix and resonance are attractive in the interactive Island. Those still need an in-editor listen/look check.

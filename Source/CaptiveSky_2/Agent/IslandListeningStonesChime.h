@@ -19,12 +19,15 @@ public:
 	static constexpr float AttenuationFalloffDistance = 750.f;
 	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
 	void BeginChime(float HorizontalWindSpeed = 0.f);
+	/** Short-lived listener fact for nearby resident situation summaries; empty outside the audible window. */
+	FString DescribeForListener(const FVector& ListenerLocation) const;
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandListeningStonePresentationTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TObjectPtr<UAudioComponent> AudioComponent;
 	UPROPERTY(Transient)
