@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "NavigationPath.h"
+#include "NavigationData.h"
 #include "NavigationSystem.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandCrossingSiteAuditTest, "CaptiveSky2.Agent.CrossingSiteAudit",
@@ -32,11 +33,15 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("The saved Island has its Tideglass blockout footprint"), Pool)) return false;
 
 	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(Island);
-	if (!Navigation || !Navigation->GetDefaultNavDataInstance())
+	ANavigationData* NavData = Navigation ? Navigation->GetDefaultNavDataInstance() : nullptr;
+	if (!Navigation || !NavData)
 	{
 		AddInfo(TEXT("The saved Island has no ready nav data; crossing-site suitability remains unknown."));
 		return true;
 	}
+	const FBox NavBounds = NavData->GetBounds();
+	AddInfo(FString::Printf(TEXT("Saved Island nav bounds: %s to %s (%.1f m x %.1f m)."),
+		*NavBounds.Min.ToString(), *NavBounds.Max.ToString(), NavBounds.GetSize().X / 100.f, NavBounds.GetSize().Y / 100.f));
 
 	const FVector Center = Pool->Bounds.Origin;
 	const FVector Extent = Pool->Bounds.BoxExtent;
@@ -95,6 +100,11 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 	};
 	const TCHAR* RadialAxisNames[] = { TEXT("E-W"), TEXT("NE-SW"), TEXT("N-S"), TEXT("NW-SE") };
 	const float ProbeRadii[] = { 750.f, 1000.f, 1500.f, 2250.f, 3000.f };
+	TArray<FVector> LandmarkCenters;
+	for (TActorIterator<AActor> It(Island); It; ++It)
+		if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("IslandInn")))
+			LandmarkCenters.Add(It->GetActorLocation());
+
 	for (TActorIterator<AActor> It(Island); It; ++It)
 	{
 		AActor* Landmark = *It;
@@ -178,13 +188,87 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	// Landmark-centred probes alone can miss useful spaces between landmarks. Cover the
+	// walkable extent with a coarse 15 m grid, retaining the same bank length, route-detour,
+	// and obstruction checks. This is a shortlist pass, not an exhaustive geometric proof.
+	constexpr float GridMargin = 3000.f;
+	constexpr float GridSpacing = 1500.f;
+	const float GridMinX = NavBounds.Min.X + GridMargin;
+	const float GridMaxX = NavBounds.Max.X - GridMargin;
+	const float GridMinY = NavBounds.Min.Y + GridMargin;
+	const float GridMaxY = NavBounds.Max.Y - GridMargin;
+	const float GridZ = NavBounds.GetCenter().Z;
+	const FVector GridProjectionExtent(450.f, 450.f, 1500.f);
+	for (float X = GridMinX; X <= GridMaxX; X += GridSpacing)
+	{
+		for (float Y = GridMinY; Y <= GridMaxY; Y += GridSpacing)
+		{
+			const FVector GridCenter(X, Y, GridZ);
+			for (int32 AxisIndex = 0; AxisIndex < UE_ARRAY_COUNT(RadialAxes); ++AxisIndex)
+			{
+				const FVector Axis = RadialAxes[AxisIndex];
+				for (const float Radius : ProbeRadii)
+				{
+					FNavLocation BankA, BankB;
+					if (!Navigation->ProjectPointToNavigation(GridCenter - Axis * Radius, BankA, GridProjectionExtent) ||
+						!Navigation->ProjectPointToNavigation(GridCenter + Axis * Radius, BankB, GridProjectionExtent)) continue;
+					const float ChordLength = FVector::Dist2D(BankA.Location, BankB.Location);
+					if (ChordLength < 1000.f) continue;
+					const UNavigationPath* Path = Navigation->FindPathToLocationSynchronously(Island, BankA.Location, BankB.Location);
+					if (!Path || !Path->IsValid() || Path->IsPartial()) continue;
+					const float PathLength = Path->GetPathLength();
+					const float BypassDistance = PathLength - ChordLength;
+					if (BypassDistance < 500.f || PathLength / ChordLength < 1.2f) continue;
+
+					FHitResult Hit;
+					FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandCrossingGridAudit), true);
+					const FVector TraceOffset(0.f, 0.f, 100.f);
+					if (!Island->LineTraceSingleByChannel(Hit, BankA.Location + TraceOffset,
+						BankB.Location + TraceOffset, ECC_Visibility, Query)) continue;
+					const UStaticMeshComponent* ObstacleMesh = Cast<UStaticMeshComponent>(Hit.GetComponent());
+					AActor* ObstacleActor = Hit.GetActor();
+					if (!ObstacleMesh || !ObstacleMesh->CanEverAffectNavigation() ||
+						ObstacleMesh->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block || !ObstacleActor ||
+						ObstacleActor->ActorHasTag(TEXT("IslandLandmark")) || ObstacleActor->ActorHasTag(TEXT("IslandInn")) ||
+						ObstacleActor->ActorHasTag(TEXT("IslandLife"))) continue;
+					bool bNearLandmark = false;
+					for (const FVector& LandmarkCenter : LandmarkCenters)
+						bNearLandmark |= FVector::Dist2D(Hit.ImpactPoint, LandmarkCenter) < 500.f;
+					if (bNearLandmark) continue;
+
+					const FString ObstacleName = ObstacleActor->GetName();
+					const FString ObstacleAsset = ObstacleMesh->GetStaticMesh()
+						? ObstacleMesh->GetStaticMesh()->GetPathName() : TEXT("no static mesh");
+					FString ObstacleLabel = ObstacleName;
+					FString ObstacleTags;
+					for (const FName Tag : ObstacleActor->Tags)
+					{
+						if (!ObstacleTags.IsEmpty()) ObstacleTags += TEXT(",");
+						ObstacleTags += Tag.ToString();
+					}
+					if (ObstacleTags.IsEmpty()) ObstacleTags = TEXT("none");
+#if WITH_EDITOR
+					ObstacleLabel = ObstacleActor->GetActorLabel();
+#endif
+					const FString ObstacleDetails = FString::Printf(TEXT("%s [%s] (%s; nav-relevant yes; blocks pawn yes; tags %s)"),
+						*ObstacleLabel, *ObstacleName, *ObstacleAsset, *ObstacleTags);
+					Candidates.Add({ BypassDistance, FString::Printf(
+						TEXT("Nav grid center X=%.0f Y=%.0f, %s bearing radius %.0f cm: banks %s / %s; direct chord %.1f m, current nav route %.1f m (%.2fx), trace hits %s at %s."),
+						X, Y, RadialAxisNames[AxisIndex], Radius, *BankA.Location.ToString(), *BankB.Location.ToString(),
+						ChordLength / 100.f, PathLength / 100.f, PathLength / ChordLength,
+						*ObstacleDetails, *Hit.ImpactPoint.ToString()) });
+				}
+			}
+		}
+	}
+
 	Candidates.Sort([](const FCrossingCandidate& A, const FCrossingCandidate& B)
 	{
 		return A.BypassDistance > B.BypassDistance;
 	});
 	if (Candidates.IsEmpty())
 	{
-		AddInfo(TEXT("No landmark-centred corridor passed the conservative screen (complete nav route, >1.2x detour, >5 m bypass, blocked direct visibility, and a pedestrian-blocking navigation-relevant static mesh outside landmark/building/wildlife space and at least 5 m from its landmark). This bounded screen does not prove there is no suitable crossing elsewhere."));
+		AddInfo(TEXT("No sampled corridor passed the conservative screen (complete nav route, >1.2x detour, >5 m bypass, blocked direct visibility, and a pedestrian-blocking navigation-relevant static mesh outside landmark/building/wildlife space and at least 5 m from a landmark). This bounded screen does not prove there is no suitable crossing elsewhere."));
 	}
 	else
 	{
