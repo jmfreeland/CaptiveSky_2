@@ -97,6 +97,9 @@ private:
 	float SincePoll = 0.f;
 	int32 ShotIndex = 0;
 	bool bShotCaptured = false;
+	int32 CSVProfileFrames = 0;
+	double CSVProfileStartAt = 0.0;
+	bool bCSVProfileStarted = false;
 	FString WorldStateSignature;
 	TSharedPtr<STextBlock> CaptionText;
 	TSharedPtr<SWidget> CaptionWidget;

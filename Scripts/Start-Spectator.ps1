@@ -23,6 +23,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/WarmProfile -MaxRealtimeSeconds 180 -MaxModelRequests 1 -ScreenshotDirectory Playtests/WarmProfile/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -CSVProfileDelaySeconds 45
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
@@ -37,6 +38,7 @@ param(
 	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
 	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
 	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
+	[ValidateRange(1, 1800)][Nullable[int]]$CSVProfileDelaySeconds,
 	[ValidateRange(100, 3000)][Nullable[int]]$FoliageSwayRadiusCm,
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
@@ -97,7 +99,11 @@ if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }
 if ($ForceMemoryDDC) { $arguments += "-DDC-ForceMemoryCache" }
 if (-not [string]::IsNullOrWhiteSpace($ShaderWorkingDir)) { $arguments += "-shaderworkingdir=$ShaderWorkingDir" }
 if (-not [string]::IsNullOrWhiteSpace($LocalDataCachePath)) { $arguments += "-LocalDataCachePath=$LocalDataCachePath" }
-if ($PSBoundParameters.ContainsKey("CSVProfileFrames")) {
+if ($PSBoundParameters.ContainsKey("CSVProfileDelaySeconds")) {
+	if (-not $PSBoundParameters.ContainsKey("CSVProfileFrames")) { throw "-CSVProfileDelaySeconds requires -CSVProfileFrames." }
+	$arguments += "-SpectatorCSVProfileFrames=$CSVProfileFrames"
+	$arguments += "-SpectatorCSVProfileDelaySeconds=$CSVProfileDelaySeconds"
+} elseif ($PSBoundParameters.ContainsKey("CSVProfileFrames")) {
 	$execCommands += "csvprofile frames=$CSVProfileFrames"
 	$execCommands += "stat unit"
 }

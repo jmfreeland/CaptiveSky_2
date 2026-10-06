@@ -448,3 +448,47 @@ and nearby character response.
 Evidence: `Saved/Profiling/CSV/Profile(20261006_060409).csv`,
 `Saved/Logs/Codex_FoliageSwayRadius180_20261006.log`, and
 `Playtests/Codex_FoliageSwayRadius180_20261006/Screenshots/002_Tideglass.png`.
+
+### Delayed steady-state sample (2026-10-06)
+
+The spectator now has an opt-in delayed CSV capture so a fixed Game-mode view can
+settle before measurement without console input: pass both
+`-CSVProfileFrames 200` and `-CSVProfileDelaySeconds 45` to
+`Scripts/Start-Spectator.ps1`. The delay uses real elapsed time from spectator
+startup; the existing immediate-capture option remains unchanged. The
+`CaptiveSky_2Editor` target built successfully, and the standalone Game log
+confirms the delayed command was accepted at 45.0 seconds and wrote exactly 200
+frames in 8.23 seconds.
+
+This repeated the same 1600x900 Tideglass view with the capture-only 180 cm sway
+radius, agent thinking/Python disabled, and the full vegetation population
+intact. After omitting the first 20 CSV rows for comparison with the prior
+profiles, the remaining 180 rows measured:
+
+| Measure | p50 | p95 | Max |
+|---|---:|---:|---:|
+| Frame time | 17.63 ms | 144.07 ms | 167.13 ms |
+| Game Thread | 5.99 ms | 30.74 ms | 54.83 ms |
+| Render Thread | 15.63 ms | 118.93 ms | 144.27 ms |
+| GPU | 14.77 ms | 20.57 ms | 21.43 ms |
+| `STAT_SkinningSceneExtension` | 0.08 ms | 67.00 ms | 98.71 ms |
+| Render-thread `RDG` | 0.41 ms | 54.62 ms | 57.91 ms |
+| Render-thread `RenderOther` | 2.54 ms | 37.98 ms | 55.06 ms |
+| `NumInstanceTransformUpdates` | 0 | 23 | 24 |
+
+The capture reports zero ordinary PSO misses in the measured rows (the two
+PSO-on-hitch counters are unavailable and read -1). This weakens, but does not
+fully rule out, PSO compilation as the cause of the tail. More importantly, the
+delayed sample reproduces the prior result: 180 cm sway is not a performance
+fix, and its 144 ms p95 is over four times the 33.3 ms frame budget for the
+30-FPS minimum. Render Thread time dominates while GPU p95 remains near 21 ms;
+the named skinning and RDG scopes are leads, not proof of a single cause. Do not
+change the production 3000 cm radius or remove vegetation on this evidence.
+
+Next, capture a short CPU/GPU Unreal Insights trace around a delayed sample to
+attribute the render-thread spikes before changing the full-composition
+foliage/wind path.
+
+Evidence: `Saved/Profiling/CSV/Profile(20261006_064724).csv`,
+`Saved/Logs/Codex_FoliageDelayedCSV_20261006.log`, and
+`Playtests/Codex_FoliageDelayedCSV_20261006/Screenshots/001_Tideglass.png`.

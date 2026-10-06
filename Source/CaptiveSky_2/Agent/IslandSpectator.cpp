@@ -10,6 +10,7 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/PlatformTime.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -170,6 +171,15 @@ void AIslandSpectatorDirector::BeginSpectating(APlayerController* Player)
 {
 	UWorld* World = GetWorld();
 	if (!World || !Player) return;
+	int32 RequestedCSVFrames = 0;
+	double CSVDelaySeconds = 0.0;
+	if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorCSVProfileFrames="), RequestedCSVFrames) &&
+		FParse::Value(FCommandLine::Get(), TEXT("SpectatorCSVProfileDelaySeconds="), CSVDelaySeconds) && RequestedCSVFrames > 0)
+	{
+		CSVProfileFrames = FMath::Clamp(RequestedCSVFrames, 1, 2000);
+		CSVProfileStartAt = FPlatformTime::Seconds() + FMath::Clamp(FMath::IsFinite(CSVDelaySeconds) ? CSVDelaySeconds : 60.0, 1.0, 1800.0);
+		UE_LOG(LogIslandSpectator, Log, TEXT("Will start a %d-frame CSV profile %.1f real seconds after spectator startup."), CSVProfileFrames, CSVProfileStartAt - FPlatformTime::Seconds());
+	}
 	Viewer = Player;
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
@@ -415,6 +425,13 @@ void AIslandSpectatorDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!Viewer.IsValid() || !Camera) return;
+	if (CSVProfileFrames > 0 && !bCSVProfileStarted && FPlatformTime::Seconds() >= CSVProfileStartAt)
+	{
+		bCSVProfileStarted = true;
+		const FString Command = FString::Printf(TEXT("csvprofile frames=%d"), CSVProfileFrames);
+		const bool bCommandAccepted = GEngine && GEngine->Exec(GetWorld(), *Command);
+		UE_LOG(LogIslandSpectator, Log, TEXT("Delayed CSV profile command %s: %s"), bCommandAccepted ? TEXT("accepted") : TEXT("rejected"), *Command);
+	}
 	Elapsed += DeltaSeconds;
 	const float Alpha = FMath::SmoothStep(0.f, 1.f, FMath::Clamp(Elapsed / FMath::Max(1.f, Current.Duration), 0.f, 1.f));
 	const FVector Location = FMath::Lerp(Current.From, Current.To, Alpha);
