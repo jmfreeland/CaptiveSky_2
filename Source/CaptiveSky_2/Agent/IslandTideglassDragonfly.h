@@ -5,6 +5,7 @@
 #include "IslandTideglassDragonfly.generated.h"
 
 class UStaticMeshComponent;
+class UProceduralMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class AIslandWeather;
@@ -39,7 +40,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Abdomen;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
-	TArray<TObjectPtr<UStaticMeshComponent>> Wings;
+	TArray<TObjectPtr<UProceduralMeshComponent>> Wings;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseMaterial;
 	UPROPERTY(Transient)

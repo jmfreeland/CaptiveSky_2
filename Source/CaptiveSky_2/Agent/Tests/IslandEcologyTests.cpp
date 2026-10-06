@@ -17,6 +17,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/AudioComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
@@ -1023,8 +1024,21 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
 		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
 		if (BodyMaterial) DragonflyColors.Add(BodyMaterial->K2_GetVectorParameterValue(TEXT("Color")));
-		for (UStaticMeshComponent* Part : It->Wings)
-			TestTrue(TEXT("Dragonfly wing meshes are collisionless and shadowless"), Part && Part->GetStaticMesh() && Part->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Part->CastShadow);
+		for (UProceduralMeshComponent* Wing : It->Wings)
+		{
+			const FProcMeshSection* Section = Wing ? Wing->GetProcMeshSection(0) : nullptr;
+			TestTrue(TEXT("Each dragonfly wing is a generated two-sided surface"),
+				Wing && Wing->GetNumSections() == 1 && Section &&
+				Section->ProcVertexBuffer.Num() >= 100 && Section->ProcIndexBuffer.Num() >= 200);
+			bool bFiniteWingGeometry = Section && !Section->SectionLocalBox.ContainsNaN();
+			if (Section)
+				for (const FProcMeshVertex& Vertex : Section->ProcVertexBuffer)
+					bFiniteWingGeometry &= FMath::IsFinite(Vertex.Position.X) && FMath::IsFinite(Vertex.Position.Y) && FMath::IsFinite(Vertex.Position.Z);
+			TestTrue(TEXT("Generated wing bounds and vertices remain finite at the tapered tips"), bFiniteWingGeometry);
+			TestTrue(TEXT("Generated wings are collisionless, shadowless, and excluded from navigation"),
+				Wing && Wing->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Wing->CastShadow &&
+				!Wing->CanEverAffectNavigation());
+		}
 	}
 	TestEqual(TEXT("Three daytime dragonflies form a small bounded population"), DragonflyPopulation, 3);
 	int32 DistinctDragonflyColorCount = 0;

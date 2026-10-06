@@ -6,6 +6,7 @@
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "ProceduralMeshComponent.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -13,6 +14,84 @@
 
 namespace
 {
+	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep)
+	{
+		if (!Wing) return;
+
+		constexpr int32 LengthSegments = 10;
+		constexpr int32 WidthSegments = 4;
+		constexpr int32 SurfaceVertexCount = (LengthSegments + 1) * (WidthSegments + 1);
+		constexpr float Length = 33.f;
+		constexpr float MaximumHalfWidth = 4.4f;
+
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		TArray<FVector> Normals;
+		TArray<FVector2D> UVs;
+		TArray<FLinearColor> Colors;
+		TArray<FProcMeshTangent> Tangents;
+		Vertices.Reserve(SurfaceVertexCount * 2);
+		Normals.Reserve(SurfaceVertexCount * 2);
+		UVs.Reserve(SurfaceVertexCount * 2);
+		Colors.Reserve(SurfaceVertexCount * 2);
+		Tangents.Reserve(SurfaceVertexCount * 2);
+		Triangles.Reserve(LengthSegments * WidthSegments * 12);
+
+		for (int32 Surface = 0; Surface < 2; ++Surface)
+		{
+			for (int32 LengthIndex = 0; LengthIndex <= LengthSegments; ++LengthIndex)
+			{
+				const float Along = static_cast<float>(LengthIndex) / LengthSegments;
+				const float Arch = FMath::Max(0.f, FMath::Sin(Along * PI));
+				const float CenterX = Sweep * Arch + 1.5f * Along;
+				const float HalfWidth = MaximumHalfWidth * FMath::Pow(Arch, 0.72f);
+				for (int32 WidthIndex = 0; WidthIndex <= WidthSegments; ++WidthIndex)
+				{
+					const float Across = -1.f + 2.f * WidthIndex / WidthSegments;
+					Vertices.Emplace(CenterX + Across * HalfWidth, Side * Along * Length,
+						Surface == 0 ? 0.35f * Arch : -0.35f * Arch);
+					Normals.Emplace(0.f, 0.f, Surface == 0 ? 1.f : -1.f);
+					UVs.Emplace(Along, (Across + 1.f) * 0.5f);
+					Colors.Emplace(FLinearColor::White);
+					Tangents.Emplace(FVector(1.f, 0.f, 0.f), false);
+				}
+			}
+
+			const int32 SurfaceOffset = Surface * SurfaceVertexCount;
+			for (int32 LengthIndex = 0; LengthIndex < LengthSegments; ++LengthIndex)
+			{
+				for (int32 WidthIndex = 0; WidthIndex < WidthSegments; ++WidthIndex)
+				{
+					const int32 A = SurfaceOffset + LengthIndex * (WidthSegments + 1) + WidthIndex;
+					const int32 B = A + WidthSegments + 1;
+					const int32 C = B + 1;
+					const int32 D = A + 1;
+					const bool bFaceUp = (Side > 0.f) == (Surface == 0);
+					if (bFaceUp)
+					{
+						Triangles.Add(A);
+						Triangles.Add(C);
+						Triangles.Add(B);
+						Triangles.Add(A);
+						Triangles.Add(D);
+						Triangles.Add(C);
+					}
+					else
+					{
+						Triangles.Add(A);
+						Triangles.Add(B);
+						Triangles.Add(C);
+						Triangles.Add(A);
+						Triangles.Add(C);
+						Triangles.Add(D);
+					}
+				}
+			}
+		}
+
+		Wing->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+	}
+
 	const FLinearColor DragonflyBodyColors[] = {
 		FLinearColor(0.13f, 0.26f, 0.12f), // moss green
 		FLinearColor(0.10f, 0.24f, 0.28f), // blue-green
@@ -54,10 +133,13 @@ AIslandTideglassDragonfly::AIslandTideglassDragonfly()
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		const bool bLeft = Index % 2 == 0;
-		UStaticMeshComponent* Wing = MakeBodyPart(
-			*FString::Printf(TEXT("Wing_%d"), Index),
-			FVector(Index < 2 ? 2.f : -4.f, bLeft ? -5.f : 5.f, 1.7f),
-			FVector(Index < 2 ? 0.105f : 0.085f, 0.025f, 0.0045f));
+		UProceduralMeshComponent* Wing = CreateDefaultSubobject<UProceduralMeshComponent>(
+			FName(*FString::Printf(TEXT("Wing_%d"), Index)));
+		Wing->SetupAttachment(RootComponent);
+		Wing->SetRelativeLocation(FVector(Index < 2 ? 2.f : -4.f, bLeft ? -5.f : 5.f, 1.7f));
+		Wing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Wing->SetCanEverAffectNavigation(false);
+		Wing->SetCastShadow(false);
 		Wing->SetRelativeRotation(FRotator(0.f, bLeft ? -12.f : 12.f, 0.f));
 		Wings.Add(Wing);
 	}
@@ -104,6 +186,8 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 	WingMaterials.SetNum(Wings.Num());
 	for (int32 Index = 0; Index < Wings.Num(); ++Index)
 	{
+		if (Wings[Index] && Wings[Index]->GetNumSections() == 0)
+			BuildWingSurface(Wings[Index], Index % 2 == 0 ? -1.f : 1.f, Index < 2 ? 1.7f : -1.7f);
 		if (!WingMaterials[Index]) WingMaterials[Index] = UMaterialInstanceDynamic::Create(BaseMaterial, this);
 		if (!WingMaterials[Index]) continue;
 		WingMaterials[Index]->SetVectorParameterValue(TEXT("Color"), DragonflyWingColors[ColorVariant]);
