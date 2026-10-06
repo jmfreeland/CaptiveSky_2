@@ -2,6 +2,7 @@
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "AgentMemoryComponent.h"
 #include "IslandGuestBook.h"
 #include "IslandArrangement.h"
 #include "IslandInnHearthSubsystem.h"
@@ -98,8 +99,12 @@ bool IslandInteractionUtility::CanInspect(const AActor* Observer, const AActor* 
 
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentInspect), false, Observer);
 	Query.AddIgnoredActor(Target);
+	FVector End = Target->GetActorLocation();
+	// Arrangement actors sit at ground level. Aim a little above the stones/site marker so
+	// the ground surface at the actor origin does not occlude an otherwise clear inspection.
+	if (Target->IsA<AIslandArrangement>()) End += FVector(0.f, 0.f, 50.f);
 	FHitResult Hit;
-	return !Observer->GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Query);
+	return !Observer->GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), End, ECC_Visibility, Query);
 }
 
 bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString& OutFact)
@@ -271,7 +276,7 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	if (TargetTag == FName(TEXT("IslandArrangement")))
 	{
 		const AIslandArrangement* Arrangement = Cast<AIslandArrangement>(Target);
-		const UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+		UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 		const FIslandArrangementSite* Site = Arrangement && State ? State->FindArrangementSite(Arrangement->GetSiteId()) : nullptr;
 		if (!Site)
 		{
@@ -289,6 +294,17 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		const TCHAR* Weathering = AgeDays <= 0 ? TEXT("freshly placed") : AgeDays < 4 ? TEXT("a little weathered") : TEXT("mossy and settled");
 		OutFact = FString::Printf(TEXT("You looked closely at a %s made from %d small stones; it is %s. %d small arcs of stones answer it. The maker, title, and private meaning are not visible here. Looking changes nothing; the separate build action is how a resident can leave a response."),
 			*UIslandWorldStateSubsystem::FormName(Site->Form), AIslandArrangement::StoneCountFor(Site->Form), Weathering, Site->Responses.Num());
+		if (const FIslandArrangementSite* Source = State->FindArrangementSite(Site->InfluenceSiteId); Source && Source->bHasWork)
+		{
+			OutFact += FString::Printf(TEXT(" Its public three-stone mark and recorded lineage link it to the earlier %s at %s; the maker's private title and intent remain unknown."),
+				*UIslandWorldStateSubsystem::FormName(Source->Form), *Source->Id.ToString());
+		}
+		// A resident's close, explicit inspection is also a real first sighting. Persist only
+		// bounded encounter evidence; the work's title and intent remain private to its maker.
+		if (const UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>())
+		{
+			State->RecordArrangementObservation(Site->Id, Memory->GetResolvedAgentId());
+		}
 		return true;
 	}
 

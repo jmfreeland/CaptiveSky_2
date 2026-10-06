@@ -24,6 +24,6 @@ namespace IslandInteractionUtility
 	/** Resident inspection perception: actor-to-actor visibility, retaining hidden landmark markers. */
 	CAPTIVESKY_2_API bool CanInspect(const AActor* Observer, const AActor* Target, float MaxRange = DefaultInteractionRange);
 
-	/** Perform a short response after the caller validates perception; this never changes saved world state. */
+	/** Perform a short response after the caller validates perception; a resident may record a first arrangement sighting. */
 	CAPTIVESKY_2_API bool Perform(AActor* Observer, AActor* Target, FString& OutFact);
 }

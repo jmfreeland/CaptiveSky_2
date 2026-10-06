@@ -435,7 +435,15 @@ bool FIslandArrangementInspectionTest::RunTest(const FString& Parameters)
 	World->BeginPlay();
 	const FIslandArrangementSite* EmptySite = State->FindArrangementSite(TEXT("ArrangingGround_1"));
 	AIslandArrangement* VisibleWork = FindArrangementActor(World, TEXT("ArrangingGround_1"));
-	AActor* Observer = EmptySite ? World->SpawnActor<AActor>(EmptySite->Location + FVector(0.f, 200.f, 100.f), FRotator::ZeroRotator) : nullptr;
+	ACharacter* Observer = EmptySite ? World->SpawnActor<ACharacter>(EmptySite->Location + FVector(0.f, 200.f, 100.f), FRotator::ZeroRotator) : nullptr;
+	const FString ObserverId = TEXT("DirectArrangementInspector");
+	if (Observer)
+	{
+		UAgentMemoryComponent* Memory = NewObject<UAgentMemoryComponent>(Observer);
+		Memory->AgentId = ObserverId;
+		Observer->AddInstanceComponent(Memory);
+		Memory->RegisterComponent();
+	}
 	FString Fact;
 	TestTrue(TEXT("An observer can inspect an empty arranging site"), EmptySite && VisibleWork && Observer &&
 		IslandInteractionUtility::Perform(Observer, VisibleWork, Fact));
@@ -448,14 +456,37 @@ bool FIslandArrangementInspectionTest::RunTest(const FString& Parameters)
 	const FIslandArrangementSite* Work = State->FindArrangementSite(TEXT("ArrangingGround_1"));
 	VisibleWork = FindArrangementActor(World, TEXT("ArrangingGround_1"));
 	Fact.Reset();
-	const bool bInspectedWork = Work && VisibleWork && Observer && IslandInteractionUtility::Perform(Observer, VisibleWork, Fact);
+	const bool bInspectedWork = Work && VisibleWork && Observer && IslandInteractionUtility::CanInspect(Observer, VisibleWork) &&
+		IslandInteractionUtility::Perform(Observer, VisibleWork, Fact);
 	TestTrue(TEXT("An observer can inspect visible completed work"), bInspectedWork);
 	TestTrue(TEXT("Inspection reports only public form, weathering, and response count"),
 		Fact.Contains(TEXT("spiral")) && Fact.Contains(TEXT("freshly placed")) && Fact.Contains(TEXT("0 small arcs")) &&
 		Fact.Contains(TEXT("Looking changes nothing")));
+	Work = State->FindArrangementSite(TEXT("ArrangingGround_1"));
+	TestTrue(TEXT("A resident's explicit visible inspection records the work as encountered"),
+		Work && Work->ObservedBy.Contains(ObserverId));
 	TestFalse(TEXT("Inspection withholds the maker, title, and private intent"),
 		Fact.Contains(TEXT("InspectionMaker")) || Fact.Contains(TEXT("Private title")) || Fact.Contains(TEXT("Private intent")));
 	TestTrue(TEXT("Read-only inspection adds no persistent response"), Work && Work->Responses.IsEmpty());
+
+	bool bDescendantCreated = false;
+	State->ArrangeStones(TEXT("ArrangingGround_2"), TEXT("line"), TEXT("Private descendant title"), TEXT("Private descendant intent"),
+		ObserverId, 1, bDescendantCreated, TEXT("ArrangingGround_1"));
+	TestTrue(TEXT("The resident can transform the source only after its explicit inspection persisted a sighting"), bDescendantCreated);
+	AIslandArrangement* DescendantActor = FindArrangementActor(World, TEXT("ArrangingGround_2"));
+	const FIslandArrangementSite* Descendant = State->FindArrangementSite(TEXT("ArrangingGround_2"));
+	if (Observer && DescendantActor) Observer->SetActorLocation(DescendantActor->GetActorLocation() + FVector(0.f, 200.f, 100.f));
+	Fact.Reset();
+	const bool bInspectedDescendant = Descendant && DescendantActor && Observer && IslandInteractionUtility::CanInspect(Observer, DescendantActor) &&
+		IslandInteractionUtility::Perform(Observer, DescendantActor, Fact);
+	TestTrue(TEXT("The resident can inspect the transformed work directly"), bInspectedDescendant);
+	TestTrue(TEXT("Inspection explains its public source lineage"),
+		Fact.Contains(TEXT("public three-stone mark")) && Fact.Contains(TEXT("spiral at ArrangingGround_1")));
+	TestFalse(TEXT("Public lineage inspection still withholds its maker and private meaning"),
+		Fact.Contains(ObserverId) || Fact.Contains(TEXT("Private descendant title")) || Fact.Contains(TEXT("Private descendant intent")));
+	Descendant = State->FindArrangementSite(TEXT("ArrangingGround_2"));
+	TestTrue(TEXT("Direct inspection records cultural evidence for the descendant too"),
+		Descendant && Descendant->ObservedBy.Contains(ObserverId));
 
 	DestroyArrangementWorld(World);
 	IFileManager::Get().Delete(*StateFile, false, true, true);
