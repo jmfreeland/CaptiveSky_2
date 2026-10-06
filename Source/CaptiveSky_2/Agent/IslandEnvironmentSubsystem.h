@@ -44,8 +44,12 @@ class CAPTIVESKY_2_API UIslandEnvironmentSubsystem : public UTickableWorldSubsys
 
 public:
 	static const TCHAR* CollectionPath;
+	static const TCHAR* FoliageWindCollectionPath;
 	static const TArray<FName>& ScalarParameterNames();
 	static const FName WindDirectionParameter;
+	/** The Fab collection encodes heading as a scalar angle in radians, not a direction vector. */
+	static const FName FoliageWindDirectionParameter;
+	static const FName FoliageWindStrengthParameter;
 	static const FName LandscapeWetnessParameter;
 	/** Wet-ground variant of the landscape graph, built by Scripts/Create-LandscapeWetMaterial.py; an optional local asset. */
 	static const TCHAR* WetLandscapeMaterialPath;
@@ -53,6 +57,9 @@ public:
 	/** Tests supply a transient collection here; empty uses CollectionPath. */
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> CollectionOverride;
+	/** Optional transient override for the Fab foliage wind collection, used by automation fixtures. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialParameterCollection> FoliageWindCollectionOverride;
 
 	float GetRainIntensity() const { return RainIntensity; }
 	float GetWetness() const { return Wetness; }
@@ -100,6 +107,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> Collection;
 	UPROPERTY(Transient)
+	TObjectPtr<UMaterialParameterCollection> FoliageWindCollection;
+	UPROPERTY(Transient)
 	TArray<FIslandLandscapeMaterialBackup> LandscapeMaterialBackups;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInterface>> LandscapeOriginalMaterials;
@@ -128,6 +137,8 @@ private:
 	float BaseFogDensity = 0.f;
 	float BaseFogFalloff = 0.f;
 	FVector Wind = FVector::ZeroVector;
+	FVector FoliageWind = FVector::ZeroVector;
+	bool bFoliageMaterialWindEnabled = false;
 	bool bWetnessInitialized = false;
 	bool bLandscapeMaterialsInitialized = false;
 	float LastAppliedLandscapeWetness = -1.f;

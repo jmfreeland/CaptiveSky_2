@@ -9,9 +9,11 @@
 #include "LandscapeProxy.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Misc/CommandLine.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/Parse.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceConstant.h"
@@ -21,7 +23,10 @@
 #endif
 
 const TCHAR* UIslandEnvironmentSubsystem::CollectionPath = TEXT("/Game/Environment/MPC_IslandEnvironment.MPC_IslandEnvironment");
+const TCHAR* UIslandEnvironmentSubsystem::FoliageWindCollectionPath = TEXT("/Game/PN_FoliageCollection/Materials/PN_WindParameters.PN_WindParameters");
 const FName UIslandEnvironmentSubsystem::WindDirectionParameter(TEXT("WindDirection"));
+const FName UIslandEnvironmentSubsystem::FoliageWindDirectionParameter(TEXT("WindDirection"));
+const FName UIslandEnvironmentSubsystem::FoliageWindStrengthParameter(TEXT("WindStrength"));
 const FName UIslandEnvironmentSubsystem::LandscapeWetnessParameter(TEXT("Ground Wetness"));
 const TCHAR* UIslandEnvironmentSubsystem::WetLandscapeMaterialPath = TEXT("/Game/Materials/M_Island_Textured_Wet.M_Island_Textured_Wet");
 
@@ -42,6 +47,14 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	Collection = CollectionOverride ? CollectionOverride.Get() : LoadObject<UMaterialParameterCollection>(nullptr, CollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	bFoliageMaterialWindEnabled = FParse::Param(FCommandLine::Get(), TEXT("IslandEnableFoliageMaterialWind")) || FoliageWindCollectionOverride != nullptr;
+	if (bFoliageMaterialWindEnabled)
+	{
+		FoliageWindCollection = FoliageWindCollectionOverride ? FoliageWindCollectionOverride.Get()
+			: LoadObject<UMaterialParameterCollection>(nullptr, FoliageWindCollectionPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!FoliageWindCollection)
+			UE_LOG(LogTemp, Warning, TEXT("Island foliage material wind was requested, but its PN_WindParameters collection could not be loaded."));
+	}
 	UseWetLandscapeGraph();
 	InitializeLandscapeMaterials();
 	// Mist works through the level's height fog; a level without one gets a faint one for the session.
@@ -319,6 +332,8 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	}
 	RainIntensity = CloudCover = Storm = LightningFlash = 0.f;
 	Wind = FVector::ZeroVector;
+	FoliageWind = FVector::ZeroVector;
+	float FoliageWindReferenceSpeed = 180.f;
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
 		if (!bHasViewpoint)
@@ -330,6 +345,8 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 		RainIntensity = FMath::Clamp(It->SampleRainIntensity(Now), 0.f, 1.f);
 		CloudCover = FMath::Clamp(It->SampleCloudCover(Now), 0.f, 1.f);
 		Wind = It->GetLocalWind(Viewpoint);
+		FoliageWind = It->SampleWind(Viewpoint, Now);
+		FoliageWindReferenceSpeed = FMath::Max(1.f, It->MaximumWindSpeed);
 		Storm = FMath::Clamp(It->SampleStormIntensity(Now), 0.f, 1.f);
 		LightningFlash = It->GetLightningFlash();
 		break;
@@ -354,6 +371,16 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 		if (Fog->GetComponent()->bEnableVolumetricFog != bVolumetric) Fog->GetComponent()->SetVolumetricFog(bVolumetric);
 	}
 	ApplyLandscapeWetness();
+	if (bFoliageMaterialWindEnabled && FoliageWindCollection)
+	{
+		if (UMaterialParameterCollectionInstance* FoliageInstance = World->GetParameterCollectionInstance(FoliageWindCollection))
+		{
+			const float DirectionRadians = FoliageWind.SizeSquared2D() <= SMALL_NUMBER ? 0.f : FMath::Atan2(FoliageWind.Y, FoliageWind.X);
+			FoliageInstance->SetScalarParameterValue(FoliageWindDirectionParameter, DirectionRadians);
+			FoliageInstance->SetScalarParameterValue(FoliageWindStrengthParameter,
+				FMath::Clamp(FoliageWind.Size2D() / FoliageWindReferenceSpeed, 0.f, 1.f));
+		}
+	}
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
 	if (!Instance) return;

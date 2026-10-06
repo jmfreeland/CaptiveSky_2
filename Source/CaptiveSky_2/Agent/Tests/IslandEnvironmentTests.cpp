@@ -51,6 +51,24 @@ namespace
 		}
 		return Added;
 	}
+
+	void EnsureFoliageWindParameters(UMaterialParameterCollection* Collection)
+	{
+		if (!Collection->ScalarParameters.ContainsByPredicate([](const FCollectionScalarParameter& Parameter)
+			{ return Parameter.ParameterName == UIslandEnvironmentSubsystem::FoliageWindStrengthParameter; }))
+		{
+			FCollectionScalarParameter& Parameter = Collection->ScalarParameters.AddDefaulted_GetRef();
+			Parameter.ParameterName = UIslandEnvironmentSubsystem::FoliageWindStrengthParameter;
+			Parameter.DefaultValue = 0.f;
+		}
+		if (!Collection->ScalarParameters.ContainsByPredicate([](const FCollectionScalarParameter& Parameter)
+			{ return Parameter.ParameterName == UIslandEnvironmentSubsystem::FoliageWindDirectionParameter; }))
+		{
+			FCollectionScalarParameter& Parameter = Collection->ScalarParameters.AddDefaulted_GetRef();
+			Parameter.ParameterName = UIslandEnvironmentSubsystem::FoliageWindDirectionParameter;
+			Parameter.DefaultValue = 0.f;
+		}
+	}
 }
 
 bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
@@ -61,6 +79,19 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("The saved shared collection now exposes the Indoors scalar"),
 			IslandCollection->ScalarParameters.ContainsByPredicate([](const FCollectionScalarParameter& Parameter) { return Parameter.ParameterName == TEXT("Indoors"); }));
+	}
+	UMaterialParameterCollection* FabWindCollection = LoadObject<UMaterialParameterCollection>(nullptr, UIslandEnvironmentSubsystem::FoliageWindCollectionPath);
+	TestNotNull(TEXT("The Fab foliage wind collection loads"), FabWindCollection);
+	if (FabWindCollection)
+	{
+		for (const FCollectionScalarParameter& Parameter : FabWindCollection->ScalarParameters)
+			AddInfo(FString::Printf(TEXT("Fab wind scalar: %s = %.4f"), *Parameter.ParameterName.ToString(), Parameter.DefaultValue));
+		for (const FCollectionVectorParameter& Parameter : FabWindCollection->VectorParameters)
+			AddInfo(FString::Printf(TEXT("Fab wind vector: %s = %s"), *Parameter.ParameterName.ToString(), *Parameter.DefaultValue.ToString()));
+		TestTrue(TEXT("Fab foliage exposes a wind-strength parameter"), FabWindCollection->ScalarParameters.ContainsByPredicate(
+			[](const FCollectionScalarParameter& Parameter) { return Parameter.ParameterName == UIslandEnvironmentSubsystem::FoliageWindStrengthParameter; }));
+		TestTrue(TEXT("Fab foliage exposes its scalar wind-heading parameter"), FabWindCollection->ScalarParameters.ContainsByPredicate(
+			[](const FCollectionScalarParameter& Parameter) { return Parameter.ParameterName == UIslandEnvironmentSubsystem::FoliageWindDirectionParameter; }));
 	}
 
 	// Pure rules first.
@@ -112,8 +143,11 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	// Then the published collection values, in a fixture world with its own transient collection.
 	UMaterialParameterCollection* Collection = NewObject<UMaterialParameterCollection>(GetTransientPackage());
 	EnsureEnvironmentParameters(Collection);
+	UMaterialParameterCollection* FoliageWindCollection = NewObject<UMaterialParameterCollection>(GetTransientPackage());
+	EnsureFoliageWindParameters(FoliageWindCollection);
 #if WITH_EDITOR
 	Collection->PostEditChange();
+	FoliageWindCollection->PostEditChange();
 #endif
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
@@ -121,6 +155,7 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
 	if (!TestNotNull(TEXT("Play worlds own an environment subsystem"), Environment)) { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); return false; }
 	Environment->CollectionOverride = Collection;
+	Environment->FoliageWindCollectionOverride = FoliageWindCollection;
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
@@ -183,6 +218,16 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	FLinearColor WindValue;
 	TestTrue(TEXT("Wind direction is published as a unit vector with speed"), Instance->GetVectorParameterValue(UIslandEnvironmentSubsystem::WindDirectionParameter, WindValue) &&
 		(FMath::IsNearlyZero(WindValue.A) || FMath::IsNearlyEqual(FVector(WindValue.R, WindValue.G, WindValue.B).Size(), 1.f, 0.01f)));
+	UMaterialParameterCollectionInstance* FoliageWindInstance = World->GetParameterCollectionInstance(FoliageWindCollection);
+	float FoliageWindStrength = -1.f;
+	float FoliageWindDirection = -999.f;
+	TestTrue(TEXT("The opt-in material path publishes bounded ambient wind strength"), FoliageWindInstance &&
+		FoliageWindInstance->GetScalarParameterValue(UIslandEnvironmentSubsystem::FoliageWindStrengthParameter, FoliageWindStrength) &&
+		FMath::IsNearlyEqual(FoliageWindStrength, FMath::Clamp(Environment->FoliageWind.Size2D() / FMath::Max(1.f, Weather->MaximumWindSpeed), 0.f, 1.f), 0.001f));
+	TestTrue(TEXT("The opt-in material path publishes ambient wind heading in radians"), FoliageWindInstance &&
+		FoliageWindInstance->GetScalarParameterValue(UIslandEnvironmentSubsystem::FoliageWindDirectionParameter, FoliageWindDirection) &&
+		FMath::IsNearlyEqual(FoliageWindDirection, Environment->FoliageWind.SizeSquared2D() <= SMALL_NUMBER
+			? 0.f : FMath::Atan2(Environment->FoliageWind.Y, Environment->FoliageWind.X), 0.001f));
 	// Mist drives the height fog: a fixture level without fog gets one, and forced mist thickens it.
 	TArray<AActor*> Fogs;
 	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It) Fogs.Add(*It);

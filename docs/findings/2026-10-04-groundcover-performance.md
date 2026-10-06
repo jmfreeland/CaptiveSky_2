@@ -304,3 +304,30 @@ therefore still prevent a claim of stable interactive gameplay. The restored scr
 is under `2026-10-04_143109_h11.0/` in the same scratch Viewpoints directory; the log is
 `Saved/Logs/Codex_MidgroundBaselineRestore_20261004.log`. Only these findings are committed;
 the rejected source trial is absent from the shipped tree and freshly built main module.
+
+## Opt-in Fab foliage wind bridge (2026-10-06, visual validation pending)
+
+The project’s Fab foliage materials include `PN_WindAnimation` and use the shared
+`PN_WindParameters` collection. The UE 5.8.3 `CaptiveSky2.Agent.IslandEnvironment` automation
+loaded that real collection and confirmed its scalar inputs are named `WindDirection` and
+`WindStrength` (defaults 0 and 1). A source-side prototype publishes the simulated ambient
+wind heading and normalized strength to those inputs, but only when
+`-IslandEnableFoliageMaterialWind` is supplied (or a test collection override is set). The
+existing CPU ground-cover sway path and default game behavior are unchanged. The focused
+automation passed and checks the published values; this establishes parameter wiring, not
+that the asset interprets heading units or produces a visually correct response.
+
+A real game-mode preview was attempted with CPU ground-cover sway disabled, agent thinking
+and Python disabled, one maximum model request, an isolated data/cache directory, and a
+90-second realtime cap. Its log stopped during engine startup immediately after Slate
+initialization, before map/world initialization, screenshots, or the delayed CSV profile.
+No game process remained at the follow-up process check. The Unreal Editor process was
+running, but the desktop connection exposed no app windows, so no visual inspection was
+possible. This is an incomplete preview, not a gameplay failure or a successful wind result.
+
+Keep the bridge opt-in. When a visible/launchable UE 5.8.3 game session is available, run a
+matched pair at the same Tideglass viewpoint, hour, and seeded world state: CPU sway disabled
+in both, material wind disabled for the baseline and enabled for the trial. Inspect close
+foliage motion and the 11:00 composition, then compare uncontended p95 frame intervals. Confirm
+the direction convention from the material graph/runtime response before considering enabling
+this path by default. Preserve the existing bounded-session safeguards for both captures.

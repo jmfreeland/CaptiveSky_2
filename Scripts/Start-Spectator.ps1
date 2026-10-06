@@ -26,6 +26,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -DisableOcclusionQueries -DataRoot Saved/Playtests/OcclusionOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/OcclusionOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/OcclusionOff.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -DisableOcclusionQueries -DisableRHIThread -DataRoot Saved/Playtests/RHIThreadOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RHIThreadOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RHIThreadOff.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/WarmProfile -MaxRealtimeSeconds 180 -MaxModelRequests 1 -ScreenshotDirectory Playtests/WarmProfile/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -CSVProfileDelaySeconds 45
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -EnableFoliageMaterialWind -DataRoot Saved/Playtests/MaterialWindPreview -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/MaterialWindPreview/Screenshots -ViewpointFile Config/TideglassMotionProbe.json
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/RenderTrace -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RenderTrace/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RenderTrace.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
@@ -49,6 +50,7 @@ param(
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
 	[switch]$DisableGroundCoverSway,
+	[switch]$EnableFoliageMaterialWind,
 	[switch]$DisableOcclusionQueries,
 	[switch]$DisableRHIThread,
 	[switch]$DisableDynamicGlobalIllumination,
@@ -114,6 +116,7 @@ if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-Spe
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($DisablePython) { $arguments += "-DisablePython" }
 if ($DisableGroundCoverSway) { $arguments += "-IslandDisableGroundCoverSway" }
+if ($EnableFoliageMaterialWind) { $arguments += "-IslandEnableFoliageMaterialWind" }
 if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }
 if ($ForceMemoryDDC) { $arguments += "-DDC-ForceMemoryCache" }
 if (-not [string]::IsNullOrWhiteSpace($ShaderWorkingDir)) { $arguments += "-shaderworkingdir=$ShaderWorkingDir" }
