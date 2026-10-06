@@ -3,6 +3,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -96,6 +97,20 @@ bool AIslandTidepoolMinnows::RespondToSurfaceRipple()
 	return true;
 }
 
+void AIslandTidepoolMinnows::CheckForNaturalSurfaceRipple()
+{
+	if (!GetWorld() || SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f) return;
+
+	constexpr float RippleResponseRadius = 250.f;
+	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact"))) continue;
+		if (FVector::DistSquared2D(GetActorLocation(), It->GetActorLocation()) > FMath::Square(RippleResponseRadius)) continue;
+		RespondToSurfaceRipple();
+		return;
+	}
+}
+
 float AIslandTidepoolMinnows::RainMovementScale(float RainIntensity)
 {
 	const float RainActivity = FMath::SmoothStep(0.35f, 0.85f, FMath::Clamp(RainIntensity, 0.f, 1.f));
@@ -182,6 +197,12 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	SurfacePulseRemaining = FMath::Max(0.f, SurfacePulseRemaining - SafeDelta);
 	SurfacePulseCooldownRemaining = FMath::Max(0.f, SurfacePulseCooldownRemaining - SafeDelta);
+	RippleCheckRemaining -= SafeDelta;
+	if (RippleCheckRemaining <= 0.f)
+	{
+		RippleCheckRemaining = 0.35f;
+		CheckForNaturalSurfaceRipple();
+	}
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)

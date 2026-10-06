@@ -2,6 +2,7 @@
 #include "AutonomousAgentAIController.h"
 #include "IslandDayNight.h"
 #include "IslandInteractionUtility.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
@@ -165,6 +166,55 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	FString DistantPoolFact;
 	TestTrue(TEXT("The pool itself still responds independently of who can see its fish"), IslandInteractionUtility::Perform(Visitor, Habitat, DistantPoolFact));
 	TestFalse(TEXT("A distant observer is not told the minnow school reacted to their interaction"), DistantPoolFact.Contains(TEXT("widened its circle of motion")));
+	CircleCenter = FVector::ZeroVector;
+	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+	CircleCenter /= School->Fish.Num();
+	float PreWindCircleRadius = 0.f;
+	for (UStaticMeshComponent* Minnow : School->Fish)
+		if (Minnow) PreWindCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
+	PreWindCircleRadius /= School->Fish.Num();
+
+	AIslandPoolRippleEffect* WindRipple = World->SpawnActor<AIslandPoolRippleEffect>(School->GetActorLocation() + FVector(40.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("A nearby wind ripple spawns beside the shallow school"), WindRipple))
+	{
+		WindRipple->ConfigureAsWindImpact(120.f);
+		School->RippleCheckRemaining = 0.f;
+		School->Tick(0.36f);
+		TestTrue(TEXT("A natural nearby wind ripple briefly widens the school"),
+			School->SurfacePulseRemaining > 0.f && School->SurfacePulseRemaining <= 1.2f);
+		School->Tick(0.3f);
+		CircleCenter = FVector::ZeroVector;
+		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+		CircleCenter /= School->Fish.Num();
+		ExpandedCircleRadius = 0.f;
+		for (UStaticMeshComponent* Minnow : School->Fish)
+			if (Minnow) ExpandedCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
+		ExpandedCircleRadius /= School->Fish.Num();
+		TestTrue(*FString::Printf(TEXT("The natural ripple produces readable widening (%.1f cm vs %.1f cm before; pulse alpha %.2f)"),
+			ExpandedCircleRadius, PreWindCircleRadius, School->GetSurfacePulseAlpha()),
+			ExpandedCircleRadius > PreWindCircleRadius * 1.4f);
+		WindRipple->Destroy();
+	}
+	School->Tick(3.f);
+	TestTrue(TEXT("The wind response settles back into the normal orbit"), FMath::IsNearlyZero(School->SurfacePulseRemaining));
+
+	AIslandPoolRippleEffect* DistantRainRipple = World->SpawnActor<AIslandPoolRippleEffect>(School->GetActorLocation() + FVector(700.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("A distant rain ripple spawns outside the school's reach"), DistantRainRipple))
+	{
+		DistantRainRipple->ConfigureAsRainImpact();
+		School->RippleCheckRemaining = 0.f;
+		School->Tick(0.36f);
+		TestTrue(TEXT("A distant natural rain ripple does not disturb the school"), FMath::IsNearlyZero(School->SurfacePulseRemaining));
+		DistantRainRipple->Destroy();
+	}
+	AIslandPoolRippleEffect* NearbyVisitorRipple = World->SpawnActor<AIslandPoolRippleEffect>(School->GetActorLocation() + FVector(40.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (TestNotNull(TEXT("An untyped nearby visitor ripple is distinguishable from weather"), NearbyVisitorRipple))
+	{
+		School->RippleCheckRemaining = 0.f;
+		School->Tick(0.36f);
+		TestTrue(TEXT("The ambient weather sensor ignores ordinary interaction ripples"), FMath::IsNearlyZero(School->SurfacePulseRemaining));
+		NearbyVisitorRipple->Destroy();
+	}
 
 	ARavenAgentAIController* FlybyController = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	ACharacter* RavenBody = World->SpawnActor<ACharacter>(School->GetActorLocation() + FVector(-300.f, 0.f, 1000.f), FRotator::ZeroRotator, Spawn);

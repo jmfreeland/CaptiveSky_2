@@ -42,6 +42,7 @@ private:
 	float ScatterRemaining = 0.f;
 	float SurfacePulseRemaining = 0.f;
 	float SurfacePulseCooldownRemaining = 0.f;
+	float RippleCheckRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
@@ -51,5 +52,6 @@ private:
 	float GetSurfacePulseAlpha() const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
+	void CheckForNaturalSurfaceRipple();
 	void UpdateSchool(float RainIntensity);
 };
