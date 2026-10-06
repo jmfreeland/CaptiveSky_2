@@ -41,13 +41,17 @@ private:
 	TObjectPtr<UAnimSequence> RunAnimation;
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimSequence> SleepAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> WakeAnimation;
 
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector TargetLocation = FVector::ZeroVector;
 	float ActivityRemaining = 0.f;
+	float WakeRemaining = 0.f;
 	float ThunderCheckRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
+	bool bWakingUp = false;
 	bool bStartled = false;
 	bool bResting = false;
 	TWeakObjectPtr<AIslandLightning> LastHeardThunder;

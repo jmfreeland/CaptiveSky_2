@@ -34,12 +34,15 @@ AIslandForestStag::AIslandForestStag()
 		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_Run.ANIM_DeerStag_Run"));
 	static ConstructorHelpers::FObjectFinder<UAnimSequence> SleepAsset(
 		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_Sleep.ANIM_DeerStag_Sleep"));
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> WakeAsset(
+		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_SleepToGoBackUp.ANIM_DeerStag_SleepToGoBackUp"));
 
 	if (MeshAsset.Succeeded()) DeerMesh->SetSkeletalMesh(MeshAsset.Object);
 	if (GrazeAsset.Succeeded()) GrazeAnimation = GrazeAsset.Object;
 	if (WalkAsset.Succeeded()) WalkAnimation = WalkAsset.Object;
 	if (RunAsset.Succeeded()) RunAnimation = RunAsset.Object;
 	if (SleepAsset.Succeeded()) SleepAnimation = SleepAsset.Object;
+	if (WakeAsset.Succeeded()) WakeAnimation = WakeAsset.Object;
 	DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 }
 
@@ -60,8 +63,10 @@ void AIslandForestStag::PlayLoop(UAnimSequence* Animation)
 void AIslandForestStag::BeginGrazing()
 {
 	bMoving = false;
+	bWakingUp = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
+	WakeRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
 }
@@ -116,6 +121,8 @@ bool AIslandForestStag::ChooseWanderTarget(FVector& OutTarget) const
 void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 {
 	if (bResting) return;
+	bWakingUp = false;
+	WakeRemaining = 0.f;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -148,11 +155,29 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	if (bResting == bShouldRest) return;
 	bResting = bShouldRest;
 	bMoving = false;
+	bWakingUp = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
-	if (bResting) PlayLoop(SleepAnimation);
-	else BeginGrazing();
+	WakeRemaining = 0.f;
+	if (bResting)
+	{
+		PlayLoop(SleepAnimation);
+	}
+	else if (WakeAnimation)
+	{
+		bWakingUp = true;
+		WakeRemaining = FMath::Max(0.05f, WakeAnimation->GetPlayLength());
+		if (DeerMesh)
+		{
+			DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			DeerMesh->PlayAnimation(WakeAnimation, false);
+		}
+	}
+	else
+	{
+		BeginGrazing();
+	}
 }
 
 void AIslandForestStag::Tick(float DeltaSeconds)
@@ -167,6 +192,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		CheckForNearbyThunder();
 	}
 	if (bResting) return;
+	if (bWakingUp)
+	{
+		WakeRemaining -= Delta;
+		if (WakeRemaining <= 0.f) BeginGrazing();
+		return;
+	}
 	if (!bMoving)
 	{
 		ActivityRemaining -= Delta;

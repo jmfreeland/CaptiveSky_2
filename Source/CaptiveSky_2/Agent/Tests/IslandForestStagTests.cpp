@@ -53,19 +53,20 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	}
 
 	TestTrue(TEXT("The imported stag mesh is assigned"), Deer->GetDeerMesh() && Deer->GetDeerMesh()->GetSkeletalMeshAsset());
-	TestTrue(TEXT("The imported graze, walk, run, and sleep animations resolve"),
-		Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation);
+	TestTrue(TEXT("The imported graze, walk, run, sleep, and wake animations resolve"),
+		Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation && Deer->WakeAnimation);
 	if (USkeletalMesh* StagMesh = Deer->GetDeerMesh() ? Deer->GetDeerMesh()->GetSkeletalMeshAsset() : nullptr)
 	{
 		USkeleton* StagSkeleton = StagMesh->GetSkeleton();
 		TestTrue(TEXT("Every assigned stag animation targets the mesh skeleton"), StagSkeleton &&
 			Deer->GrazeAnimation->GetSkeleton() == StagSkeleton && Deer->WalkAnimation->GetSkeleton() == StagSkeleton &&
-			Deer->RunAnimation->GetSkeleton() == StagSkeleton && Deer->SleepAnimation->GetSkeleton() == StagSkeleton);
+			Deer->RunAnimation->GetSkeleton() == StagSkeleton && Deer->SleepAnimation->GetSkeleton() == StagSkeleton &&
+			Deer->WakeAnimation->GetSkeleton() == StagSkeleton);
 	}
 	if (Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation)
 		TestFalse(TEXT("Stag locomotion animations have no root motion; bounded movement stays actor-driven"),
 			Deer->GrazeAnimation->HasRootMotion() || Deer->WalkAnimation->HasRootMotion() ||
-			Deer->RunAnimation->HasRootMotion() || Deer->SleepAnimation->HasRootMotion());
+			Deer->RunAnimation->HasRootMotion() || Deer->SleepAnimation->HasRootMotion() || Deer->WakeAnimation->HasRootMotion());
 	TestTrue(TEXT("The visible mesh is nonblocking"), Deer->GetDeerMesh()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 	Deer->HomeLocation = Deer->GetActorLocation();
 	TestTrue(TEXT("The stag is wild life, not a conscious agent or landmark"),
@@ -94,6 +95,12 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A resting wild animal is not forced into a new action"), Deer->IsStartled());
 	Deer->SetResting(false);
 	TestFalse(TEXT("Daylight returns the stag to its ordinary routine"), Deer->IsResting());
+	TestTrue(TEXT("Waking plays the sleep-to-standing transition before grazing"), Deer->bWakingUp && Deer->WakeRemaining > 0.f);
+	const float WakeDuration = Deer->WakeRemaining;
+	Deer->Tick(WakeDuration * 0.5f);
+	TestTrue(TEXT("The stag remains in its one-shot wake animation until it completes"), Deer->bWakingUp && Deer->WakeRemaining > 0.f);
+	Deer->Tick(WakeDuration);
+	TestFalse(TEXT("The stag returns to grazing after standing"), Deer->bWakingUp || Deer->IsResting());
 
 	AIslandLightning* NearbyStrike = World->SpawnActor<AIslandLightning>(Spawn);
 	if (!TestNotNull(TEXT("A nearby storm strike can be observed by local ecology"), NearbyStrike))
