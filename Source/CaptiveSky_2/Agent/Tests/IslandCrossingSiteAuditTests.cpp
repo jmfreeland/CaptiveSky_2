@@ -78,18 +78,23 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Tideglass %s-axis pool obstruction: %s."), AxisNames[AxisIndex], bHitPool ? TEXT("yes") : TEXT("no")));
 	}
 
-	// Tideglass is not a route-shortening site, so screen a small, deterministic set of
-	// opposite-bank corridors around the other authored landmarks. This only reports
-	// candidates; it does not create markers, alter navigation, or bless a construction site.
+	// Tideglass is not a route-shortening site, so screen a bounded, deterministic set of
+	// opposite-bank corridors around the other authored landmarks. Four orientations catch
+	// diagonal obstacles that an X/Y-only pass misses; short radii favor walkable crossings.
+	// This only reports candidates; it does not create markers, alter navigation, or bless a construction site.
 	struct FCrossingCandidate
 	{
 		float BypassDistance = 0.f;
 		FString Description;
 	};
 	TArray<FCrossingCandidate> Candidates;
-	const FVector RadialAxes[] = { FVector(1.f, 0.f, 0.f), FVector(0.f, 1.f, 0.f) };
-	const TCHAR* RadialAxisNames[] = { TEXT("X"), TEXT("Y") };
-	const float ProbeRadii[] = { 1500.f, 3000.f, 4500.f };
+	constexpr float Diagonal = 0.70710678f;
+	const FVector RadialAxes[] = {
+		FVector(1.f, 0.f, 0.f), FVector(Diagonal, Diagonal, 0.f),
+		FVector(0.f, 1.f, 0.f), FVector(-Diagonal, Diagonal, 0.f)
+	};
+	const TCHAR* RadialAxisNames[] = { TEXT("E-W"), TEXT("NE-SW"), TEXT("N-S"), TEXT("NW-SE") };
+	const float ProbeRadii[] = { 750.f, 1000.f, 1500.f, 2250.f, 3000.f };
 	for (TActorIterator<AActor> It(Island); It; ++It)
 	{
 		AActor* Landmark = *It;
@@ -134,11 +139,41 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 					BankB.Location + TraceOffset, ECC_Visibility, Query);
 				if (!bHit) continue;
 
-				const FString Obstacle = Hit.GetActor() ? Hit.GetActor()->GetName() : TEXT("unknown component");
+				const UStaticMeshComponent* ObstacleMesh = Cast<UStaticMeshComponent>(Hit.GetComponent());
+				AActor* ObstacleActor = Hit.GetActor();
+				if (!ObstacleMesh || !ObstacleMesh->CanEverAffectNavigation() ||
+					ObstacleMesh->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block || !ObstacleActor ||
+					ObstacleActor->ActorHasTag(TEXT("IslandLandmark")) || ObstacleActor->ActorHasTag(TEXT("IslandInn")) ||
+					ObstacleActor->ActorHasTag(TEXT("IslandLife")) ||
+					FVector::Dist2D(Hit.ImpactPoint, Landmark->GetActorLocation()) < 500.f) continue;
+
+				const FString ObstacleName = ObstacleActor->GetName();
+				const FString ObstacleAsset = ObstacleMesh && ObstacleMesh->GetStaticMesh()
+					? ObstacleMesh->GetStaticMesh()->GetPathName() : TEXT("no static mesh");
+				FString ObstacleLabel = ObstacleName;
+				FString ObstacleTags;
+				if (ObstacleActor)
+				{
+#if WITH_EDITOR
+					ObstacleLabel = ObstacleActor->GetActorLabel();
+#endif
+					for (const FName Tag : ObstacleActor->Tags)
+					{
+						if (!ObstacleTags.IsEmpty()) ObstacleTags += TEXT(",");
+						ObstacleTags += Tag.ToString();
+					}
+				}
+				if (ObstacleTags.IsEmpty()) ObstacleTags = TEXT("none");
+				const FString ObstacleDetails = FString::Printf(TEXT("%s [%s] (%s; nav-relevant %s; blocks pawn %s; tags %s)"),
+					*ObstacleLabel, *ObstacleName, *ObstacleAsset,
+					ObstacleMesh && ObstacleMesh->CanEverAffectNavigation() ? TEXT("yes") : TEXT("no"),
+					ObstacleMesh && ObstacleMesh->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block ? TEXT("yes") : TEXT("no"),
+					*ObstacleTags);
 				Candidates.Add({ BypassDistance, FString::Printf(
-					TEXT("%s %s-axis radius %.0f cm: banks %s / %s; direct chord %.1f m, current nav route %.1f m (%.2fx), trace hits %s."),
+					TEXT("%s %s bearing, radius %.0f cm: banks %s / %s; direct chord %.1f m, current nav route %.1f m (%.2fx), trace hits %s at %s."),
 					*LandmarkId, RadialAxisNames[AxisIndex], Radius, *BankA.Location.ToString(), *BankB.Location.ToString(),
-					ChordLength / 100.f, PathLength / 100.f, PathLength / ChordLength, *Obstacle) });
+					ChordLength / 100.f, PathLength / 100.f, PathLength / ChordLength,
+					*ObstacleDetails, *Hit.ImpactPoint.ToString()) });
 			}
 		}
 	}
@@ -149,7 +184,7 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 	});
 	if (Candidates.IsEmpty())
 	{
-		AddInfo(TEXT("No landmark-centred corridor passed the conservative screen (complete nav route, >1.2x detour, >5 m bypass, blocked direct visibility). This bounded screen does not prove there is no suitable crossing elsewhere."));
+		AddInfo(TEXT("No landmark-centred corridor passed the conservative screen (complete nav route, >1.2x detour, >5 m bypass, blocked direct visibility, and a pedestrian-blocking navigation-relevant static mesh outside landmark/building/wildlife space and at least 5 m from its landmark). This bounded screen does not prove there is no suitable crossing elsewhere."));
 	}
 	else
 	{
