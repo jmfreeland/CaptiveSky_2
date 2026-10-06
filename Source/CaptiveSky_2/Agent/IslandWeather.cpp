@@ -36,7 +36,10 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWeather, Log, All);
 static constexpr float GroundCoverSwayCellSize = 1500.f;
-static constexpr float FoliageSwayFocusRadius = 3000.f;
+static TAutoConsoleVariable<float> CVarIslandFoliageSwayFocusRadiusCm(
+	TEXT("CaptiveSky.Island.FoliageSwayFocusRadiusCm"), 3000.f,
+	TEXT("Radius in centimeters around the camera, residents, and local gusts where foliage and spruce instance transforms are updated. Clamped to 100..3000 cm."),
+	ECVF_Default);
 
 namespace
 {
@@ -1476,6 +1479,20 @@ void AIslandWeather::ClearGroundCover()
 void AIslandWeather::UpdateGroundCoverSway()
 {
 	if (!GetWorld() || !bGroundCoverInitialized) return;
+	if (FParse::Param(FCommandLine::Get(), TEXT("IslandDisableGroundCoverSway")))
+	{
+		static bool bReportedDiagnostic = false;
+		if (!bReportedDiagnostic)
+		{
+			UE_LOG(LogIslandWeather, Display,
+				TEXT("Foliage sway diagnostic active: all per-instance ground-cover and spruce transform updates are disabled; authored base transforms remain visible."));
+			bReportedDiagnostic = true;
+		}
+		GroundCoverSwayLastUpdatedInstanceCount = 0;
+		SpruceSwayLastUpdatedInstanceCount = 0;
+		return;
+	}
+	const float FocusRadius = FMath::Clamp(CVarIslandFoliageSwayFocusRadiusCm.GetValueOnGameThread(), 100.f, 3000.f);
 	const double Now = GetWorld()->GetTimeSeconds();
 	constexpr float ResidentPlantBendRadius = 180.f;
 	constexpr float ResidentPlantBendHeight = 140.f;
@@ -1503,7 +1520,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 	for (const FIslandTransientGust& Gust : TransientGusts)
 		if (Now >= Gust.StartedAt && Now < Gust.ExpiresAt) FocusPoints.Add(Gust.Center);
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
-	auto UpdateSpecies = [this, Now, &FocusPoints, &ResidentGroundPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
+	auto UpdateSpecies = [this, Now, FocusRadius, &FocusPoints, &ResidentGroundPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
 		int32 FirstBaseline, int32 InstanceCount, const TMap<FIntPoint, TArray<int32>>& SwayCells, TArray<int32>& PreviousSwayedIndices)
 	{
 		if (!Grass || InstanceCount <= 0 || FirstBaseline < 0 || FirstBaseline + InstanceCount > BaseTransforms.Num()) return;
@@ -1512,10 +1529,10 @@ void AIslandWeather::UpdateGroundCoverSway()
 		for (const FVector& Focus : FocusPoints)
 		{
 			const FVector LocalFocus = ComponentTransform.InverseTransformPosition(Focus);
-			const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
-			const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
-			const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
-			const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + FoliageSwayFocusRadius) / GroundCoverSwayCellSize);
+			const int32 MinCellX = FMath::FloorToInt((LocalFocus.X - FocusRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellX = FMath::FloorToInt((LocalFocus.X + FocusRadius) / GroundCoverSwayCellSize);
+			const int32 MinCellY = FMath::FloorToInt((LocalFocus.Y - FocusRadius) / GroundCoverSwayCellSize);
+			const int32 MaxCellY = FMath::FloorToInt((LocalFocus.Y + FocusRadius) / GroundCoverSwayCellSize);
 			for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX)
 				for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY)
 					if (const TArray<int32>* CellIndices = SwayCells.Find(FIntPoint(CellX, CellY)))
@@ -1529,7 +1546,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 			const FVector WorldLocation = ComponentTransform.TransformPosition(BaseTransforms[FirstBaseline + CurrentSwayedIndices[Index]].GetLocation());
 			bool bWithinSwayRange = false;
 			for (const FVector& Focus : FocusPoints)
-			if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(FoliageSwayFocusRadius)) { bWithinSwayRange = true; break; }
+			if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(FocusRadius)) { bWithinSwayRange = true; break; }
 			if (!bWithinSwayRange) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
 		}
 		TArray<int32> UpdateIndices = PreviousSwayedIndices;
@@ -1600,7 +1617,7 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(IslandCattails, IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells, SwayedCattailIndices);
 	UpdateSpecies(IslandFestuca, IslandFestucaBaseTransforms, 0, IslandFestucaBaseTransforms.Num(), FestucaCells, SwayedFestucaIndices);
 	UpdateSpecies(IslandPhalaris, IslandPhalarisBaseTransforms, 0, IslandPhalarisBaseTransforms.Num(), PhalarisCells, SwayedPhalarisIndices);
-	UpdateSpruceSway(FocusPoints, FoliageSwayFocusRadius);
+	UpdateSpruceSway(FocusPoints, FocusRadius);
 }
 
 void AIslandWeather::UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius)

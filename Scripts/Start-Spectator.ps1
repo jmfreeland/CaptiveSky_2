@@ -21,6 +21,8 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
@@ -29,10 +31,18 @@ param(
 	[switch]$Shots,
 	[string]$ScreenshotDirectory,
 	[string]$ViewpointFile,
+	[string]$LogPath,
+	[string]$ShaderWorkingDir,
+	[string]$LocalDataCachePath,
 	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
 	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
+	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
+	[ValidateRange(100, 3000)][Nullable[int]]$FoliageSwayRadiusCm,
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
+	[switch]$DisableGroundCoverSway,
+	[switch]$NoZenLocalFallback,
+	[switch]$ForceMemoryDDC,
 	[switch]$Continuous,
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
@@ -42,10 +52,29 @@ param(
 
 $ErrorActionPreference = "Stop"
 $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
+$projectRoot = Split-Path $project
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor.exe"
 if (-not (Test-Path $editor)) { throw "UnrealEditor.exe not found under $EngineDir; pass -EngineDir." }
 
+function Resolve-ProjectPath([string]$Path) {
+	if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
+	if ([System.IO.Path]::IsPathRooted($Path)) { return [System.IO.Path]::GetFullPath($Path) }
+	return [System.IO.Path]::GetFullPath((Join-Path $projectRoot $Path))
+}
+
+$ScreenshotDirectory = Resolve-ProjectPath $ScreenshotDirectory
+$DataRoot = Resolve-ProjectPath $DataRoot
+$ShaderWorkingDir = Resolve-ProjectPath $ShaderWorkingDir
+$LocalDataCachePath = Resolve-ProjectPath $LocalDataCachePath
+$LogPath = Resolve-ProjectPath $LogPath
+foreach ($outputDirectory in @($ScreenshotDirectory, $DataRoot, $ShaderWorkingDir, $LocalDataCachePath)) {
+	if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
+		New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+	}
+}
+
 $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
+$execCommands = @()
 if ($Windowed) { $arguments += @("-windowed", "-ResX=1600", "-ResY=900") } else { $arguments += "-fullscreen" }
 if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot; use -ScreenshotDirectory to isolate runs
 if (-not [string]::IsNullOrWhiteSpace($ScreenshotDirectory)) { $arguments += "-SpectatorScreenshotDir=$ScreenshotDirectory" }
@@ -58,13 +87,33 @@ if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
 	if (-not $Shots) { throw "-ViewpointHour requires -Shots; it is a capture-only clock override." }
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ViewpointHour requires an explicit isolated -DataRoot so the captured hour cannot overwrite your normal Island clock." }
 	$hour = ([double]$ViewpointHour).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
-	$arguments += "-ExecCmds=Island.Hour $hour"
+	$execCommands += "Island.Hour $hour"
 }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($DisablePython) { $arguments += "-DisablePython" }
+if ($DisableGroundCoverSway) { $arguments += "-IslandDisableGroundCoverSway" }
+if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }
+if ($ForceMemoryDDC) { $arguments += "-DDC-ForceMemoryCache" }
+if (-not [string]::IsNullOrWhiteSpace($ShaderWorkingDir)) { $arguments += "-shaderworkingdir=$ShaderWorkingDir" }
+if (-not [string]::IsNullOrWhiteSpace($LocalDataCachePath)) { $arguments += "-LocalDataCachePath=$LocalDataCachePath" }
+if ($PSBoundParameters.ContainsKey("CSVProfileFrames")) {
+	$execCommands += "csvprofile frames=$CSVProfileFrames"
+	$execCommands += "stat unit"
+}
+if ($PSBoundParameters.ContainsKey("FoliageSwayRadiusCm")) {
+	$execCommands += "CaptiveSky.Island.FoliageSwayFocusRadiusCm $FoliageSwayRadiusCm"
+}
+if ($execCommands.Count -gt 0) { $arguments += "-ExecCmds=$($execCommands -join ',')" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }
+
+$projectRoot = Split-Path $project
+if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
+	New-Item -ItemType Directory -Force -Path (Split-Path $LogPath) | Out-Null
+	$arguments += "-abslog=$LogPath"
+}
+
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }
 if ($PSBoundParameters.ContainsKey("MaxModelRequests")) { $arguments += "-CaptiveSkyMaxModelRequests=$MaxModelRequests" }
 if (-not $Continuous) { & $editor @arguments; return }

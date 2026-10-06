@@ -416,3 +416,35 @@ motion in-game, and profile the remaining hitch tail before changing production.
 
 Evidence: `Saved/CompileScratch/Codex_UnderstoryVerify_20261002/Project/Saved/Profiling/CSV/Profile(20261005_161032).csv` and
 `Saved/Playtests/Codex_GrassSway180_Untraced_20261005/`.
+
+### Main-tree local-sway capture (2026-10-06)
+
+The main-tree source now exposes `CaptiveSky.Island.FoliageSwayFocusRadiusCm` for
+bounded capture-time experiments. Its production default remains 3000 cm; the
+launcher override set 180 cm only for this test. A 200-frame standalone Game
+capture retained all 1,779,877 ground-cover placements at the same Tideglass
+view with agent thinking and Python disabled. After dropping the first 20
+warm-up rows, the remaining 180 rows measured:
+
+| Measure | p50 / p95 |
+|---|---:|
+| Frame time | 17.30 / 138.93 ms |
+| Game Thread | 6.12 / 28.48 ms |
+| Render Thread | 15.74 / 124.74 ms |
+| GPU | 14.59 / 19.02 ms |
+| `TickActors` exclusive | 0.51 / 16.13 ms |
+| `NumInstanceTransformUpdates` | 0 / 26 |
+
+This reproduces the low median of the earlier scratch-only 180 cm trial, but
+the 138.93 ms p95 still falls far short of the 33.3 ms budget for a 30-FPS
+minimum. The first screenshot was also taken during a 193.65 ms startup hitch;
+the next view showed 41.46 ms. Keep the 3000 cm production behavior unchanged,
+and treat 180 cm as an experiment rather than a performance fix. The capture
+demonstrates that substantially reducing CPU updates alone does not eliminate
+the render-thread hitch tail; next inspect a warmed frame trace for the source
+of those remaining stalls while preserving the full ground-cover population
+and nearby character response.
+
+Evidence: `Saved/Profiling/CSV/Profile(20261006_060409).csv`,
+`Saved/Logs/Codex_FoliageSwayRadius180_20261006.log`, and
+`Playtests/Codex_FoliageSwayRadius180_20261006/Screenshots/002_Tideglass.png`.
