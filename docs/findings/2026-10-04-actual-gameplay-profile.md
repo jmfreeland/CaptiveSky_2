@@ -492,3 +492,53 @@ foliage/wind path.
 Evidence: `Saved/Profiling/CSV/Profile(20261006_064724).csv`,
 `Saved/Logs/Codex_FoliageDelayedCSV_20261006.log`, and
 `Playtests/Codex_FoliageDelayedCSV_20261006/Screenshots/001_Tideglass.png`.
+
+### Warmed Game-mode CPU/GPU trace (2026-10-06)
+
+A delayed 30-second Unreal Insights trace was captured from the same 1600x900
+Tideglass standalone Game view, after 45 seconds of settling, with the full
+1,779,877 ground-cover placements and other vegetation still present. Agent
+thinking and Python were disabled. This was a warmed repeat without the
+force-memory DDC option; no ShaderCompileWorker processes were active during
+the capture. The session ended normally at its 120.1-second safety cap with
+zero model requests. This removes the shader-compile contention that affected
+the preceding retry, but it is still one instrumented run rather than a
+repeatable benchmark.
+
+The 30-second trace exported about 930 frame events per track. CPU and render
+frame medians were near 16 ms, but their p95s remained around 108–111 ms; the
+GPU frame-track p95 was 102.91 ms. Roughly 240–250 of 930 frames per track
+exceeded 33.3 ms. These frame-track intervals are not a measurement of GPU
+busy time, and the trace is not directly interchangeable with the earlier
+untraced CSV, but the long-tail hitch is plainly still present after warm-up.
+
+| Frame track | p50 | p95 | p99 | Max | >33.3 ms | >100 ms |
+|---|---:|---:|---:|---:|---:|---:|
+| Game Thread | 15.89 ms | 111.30 ms | 129.15 ms | 160.58 ms | 250 / 932 | 107 / 932 |
+| Render Thread | 15.64 ms | 108.36 ms | 115.30 ms | 160.44 ms | 240 / 935 | 119 / 935 |
+| GPU frame track | 15.81 ms | 102.91 ms | 110.02 ms | 157.30 ms | 240 / 931 | 73 / 931 |
+
+The strongest per-frame CPU leads were Lumen scene primitive updates (149.89 ms
+maximum for `FDeferredShadingSceneRenderer_BeginUpdateLumenSceneTasks`,
+147.52 ms for `UpdateLumenScenePrimitives`), render-thread skinning view data
+(89.58 ms), and scene-culling/GPU-scene instance work (about 79–89 ms maxima).
+These inclusive/task timings overlap and must not be added together; they
+identify what to isolate next, not a proven single cause. The new
+`IslandSeaState_ApplySea`, `IslandSeaState_RecomputeWaves`, and
+`IslandSeaState_RebuildGPUData` trace scopes each ran once during the sample;
+the first two took 0.005 ms and 0.004 ms respectively. That is too little to
+explain the observed hitch tail in this run, though one sample cannot rule out
+every weather transition.
+
+Next, repeat this delayed capture with only dynamic global illumination disabled
+at launch, leaving vegetation, camera, resolution, and other settings intact.
+Compare frame-track tails and the Lumen/scene-culling scopes. Keep that override
+diagnostic-only: prior PIE tests found no material Lumen FPS change, and any
+lighting tradeoff needs a visual review before it could be considered for the
+world. If Lumen does not materially shorten the tail, inspect the timing around
+the individual scene-culling/skinning tasks rather than reducing habitat
+population.
+
+Evidence: `Saved/Logs/Codex_SeaTraceWarm_20261006.log`,
+`Saved/Profiling/Traces/Codex_SeaTraceWarm_20261006.utrace`, and the Insights
+exports under the current user's temporary directory.

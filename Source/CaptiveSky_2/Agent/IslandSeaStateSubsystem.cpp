@@ -6,6 +6,7 @@
 #include "GerstnerWaterWaves.h"
 #include "HAL/IConsoleManager.h"
 #include "IslandWeather.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "WaterBodyComponent.h"
 #include "WaterBodyOceanActor.h"
 #include "WaterWaves.h"
@@ -54,6 +55,7 @@ bool UIslandSeaStateSubsystem::BindWaves(UGerstnerWaterWaves* InWaves)
 
 void UIslandSeaStateSubsystem::ApplySea(float InSea)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(IslandSeaState_ApplySea);
 	UGerstnerWaterWaves* Target = Waves.Get();
 	UGerstnerWaterWaveGeneratorSimple* Simple = Generator.Get();
 	if (!Target || !Simple) return;
@@ -63,9 +65,16 @@ void UIslandSeaStateSubsystem::ApplySea(float InSea)
 	Simple->MaxAmplitude = FMath::Max(AuthoredMaxAmplitude * Amplitude, 0.0001f);
 	Simple->SmallWaveSteepness = FMath::Clamp(AuthoredSmallSteepness * Steepness, 0.f, 1.f);
 	Simple->LargeWaveSteepness = FMath::Clamp(AuthoredLargeSteepness * Steepness, 0.f, 1.f);
-	Target->RecomputeWaves(false);
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(IslandSeaState_RecomputeWaves);
+		Target->RecomputeWaves(false);
+	}
 	if (GEngine)
-		if (UGerstnerWaterWaveSubsystem* GPU = GEngine->GetEngineSubsystem<UGerstnerWaterWaveSubsystem>()) GPU->RebuildGPUData();
+		if (UGerstnerWaterWaveSubsystem* GPU = GEngine->GetEngineSubsystem<UGerstnerWaterWaveSubsystem>())
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(IslandSeaState_RebuildGPUData);
+			GPU->RebuildGPUData();
+		}
 	AppliedSea = InSea;
 }
 

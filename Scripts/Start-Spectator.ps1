@@ -24,6 +24,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/WarmProfile -MaxRealtimeSeconds 180 -MaxModelRequests 1 -ScreenshotDirectory Playtests/WarmProfile/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -CSVProfileDelaySeconds 45
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/RenderTrace -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RenderTrace/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RenderTrace.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 #>
@@ -35,6 +36,9 @@ param(
 	[string]$LogPath,
 	[string]$ShaderWorkingDir,
 	[string]$LocalDataCachePath,
+	[string]$TraceProfileFile,
+	[ValidateRange(1, 1800)][Nullable[int]]$TraceProfileDelaySeconds,
+	[ValidateRange(5, 180)][Nullable[int]]$TraceProfileDurationSeconds,
 	[ValidateRange(1, 600)][Nullable[int]]$EstablishingSeconds,
 	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
 	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
@@ -74,6 +78,16 @@ foreach ($outputDirectory in @($ScreenshotDirectory, $DataRoot, $ShaderWorkingDi
 		New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 	}
 }
+if (-not [string]::IsNullOrWhiteSpace($TraceProfileFile)) {
+	$TraceProfileFile = Resolve-ProjectPath $TraceProfileFile
+	if (Test-Path -LiteralPath $TraceProfileFile) { throw "Trace output already exists; choose a new file: $TraceProfileFile" }
+	$traceDirectory = Split-Path -Parent $TraceProfileFile
+	if ($traceDirectory) { New-Item -ItemType Directory -Force -Path $traceDirectory | Out-Null }
+	if (-not $PSBoundParameters.ContainsKey("TraceProfileDelaySeconds")) { $TraceProfileDelaySeconds = 45 }
+	if (-not $PSBoundParameters.ContainsKey("TraceProfileDurationSeconds")) { $TraceProfileDurationSeconds = 30 }
+} elseif ($PSBoundParameters.ContainsKey("TraceProfileDelaySeconds") -or $PSBoundParameters.ContainsKey("TraceProfileDurationSeconds")) {
+	throw "-TraceProfileDelaySeconds and -TraceProfileDurationSeconds require -TraceProfileFile."
+}
 
 $arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
 $execCommands = @()
@@ -99,6 +113,11 @@ if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }
 if ($ForceMemoryDDC) { $arguments += "-DDC-ForceMemoryCache" }
 if (-not [string]::IsNullOrWhiteSpace($ShaderWorkingDir)) { $arguments += "-shaderworkingdir=$ShaderWorkingDir" }
 if (-not [string]::IsNullOrWhiteSpace($LocalDataCachePath)) { $arguments += "-LocalDataCachePath=$LocalDataCachePath" }
+if (-not [string]::IsNullOrWhiteSpace($TraceProfileFile)) {
+	$arguments += "-SpectatorTraceProfileFile=$TraceProfileFile"
+	$arguments += "-SpectatorTraceProfileDelaySeconds=$TraceProfileDelaySeconds"
+	$arguments += "-SpectatorTraceProfileDurationSeconds=$TraceProfileDurationSeconds"
+}
 if ($PSBoundParameters.ContainsKey("CSVProfileDelaySeconds")) {
 	if (-not $PSBoundParameters.ContainsKey("CSVProfileFrames")) { throw "-CSVProfileDelaySeconds requires -CSVProfileFrames." }
 	$arguments += "-SpectatorCSVProfileFrames=$CSVProfileFrames"

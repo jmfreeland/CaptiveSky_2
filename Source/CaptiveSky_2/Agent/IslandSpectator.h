@@ -100,6 +100,12 @@ private:
 	int32 CSVProfileFrames = 0;
 	double CSVProfileStartAt = 0.0;
 	bool bCSVProfileStarted = false;
+	FString TraceProfilePath;
+	double TraceProfileStartAt = 0.0;
+	double TraceProfileStopAt = 0.0;
+	int32 TraceProfileDurationSeconds = 0;
+	bool bTraceProfileStarted = false;
+	bool bTraceProfileActive = false;
 	FString WorldStateSignature;
 	TSharedPtr<STextBlock> CaptionText;
 	TSharedPtr<SWidget> CaptionWidget;

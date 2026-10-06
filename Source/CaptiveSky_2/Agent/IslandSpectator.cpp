@@ -19,6 +19,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "ProfilingDebugging/TraceAuxiliary.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Styling/CoreStyle.h"
@@ -180,6 +181,22 @@ void AIslandSpectatorDirector::BeginSpectating(APlayerController* Player)
 		CSVProfileStartAt = FPlatformTime::Seconds() + FMath::Clamp(FMath::IsFinite(CSVDelaySeconds) ? CSVDelaySeconds : 60.0, 1.0, 1800.0);
 		UE_LOG(LogIslandSpectator, Log, TEXT("Will start a %d-frame CSV profile %.1f real seconds after spectator startup."), CSVProfileFrames, CSVProfileStartAt - FPlatformTime::Seconds());
 	}
+	int32 TraceDelaySeconds = 45;
+	int32 TraceDurationSeconds = 30;
+	if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorTraceProfileFile="), TraceProfilePath) && !TraceProfilePath.IsEmpty())
+	{
+		FParse::Value(FCommandLine::Get(), TEXT("SpectatorTraceProfileDelaySeconds="), TraceDelaySeconds);
+		FParse::Value(FCommandLine::Get(), TEXT("SpectatorTraceProfileDurationSeconds="), TraceDurationSeconds);
+		TraceDelaySeconds = FMath::Clamp(TraceDelaySeconds, 1, 1800);
+		TraceDurationSeconds = FMath::Clamp(TraceDurationSeconds, 5, 180);
+		TraceProfileDurationSeconds = TraceDurationSeconds;
+		TraceProfilePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir(), TraceProfilePath);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(TraceProfilePath), true);
+		TraceProfileStartAt = FPlatformTime::Seconds() + TraceDelaySeconds;
+		TraceProfileStopAt = TraceProfileStartAt + TraceDurationSeconds;
+		UE_LOG(LogIslandSpectator, Log, TEXT("Will capture a %d-second CPU/GPU trace to %s, starting %.1f real seconds after spectator startup."),
+			TraceDurationSeconds, *TraceProfilePath, TraceProfileStartAt - FPlatformTime::Seconds());
+	}
 	Viewer = Player;
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
@@ -255,6 +272,12 @@ void AIslandSpectatorDirector::EndSpectating()
 
 void AIslandSpectatorDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (bTraceProfileActive)
+	{
+		bTraceProfileActive = false;
+		const bool bStopped = FTraceAuxiliary::Stop();
+		UE_LOG(LogIslandSpectator, Log, TEXT("Stopped delayed Insights trace during spectator shutdown (%s)."), bStopped ? TEXT("success") : TEXT("failure"));
+	}
 	if (Viewer.IsValid()) EndSpectating();
 	Super::EndPlay(EndPlayReason);
 }
@@ -425,6 +448,25 @@ void AIslandSpectatorDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (!Viewer.IsValid() || !Camera) return;
+	const double RealNow = FPlatformTime::Seconds();
+	if (!TraceProfilePath.IsEmpty() && !bTraceProfileStarted && RealNow >= TraceProfileStartAt)
+	{
+		bTraceProfileStarted = true;
+		FTraceAuxiliary::FOptions TraceOptions;
+		TraceOptions.bExcludeTail = true;
+		bTraceProfileActive = FTraceAuxiliary::Start(FTraceAuxiliary::EConnectionType::File, *TraceProfilePath,
+			TEXT("cpu,gpu,frame,bookmark"), &TraceOptions);
+		if (bTraceProfileActive) TraceProfileStopAt = RealNow + TraceProfileDurationSeconds;
+		UE_LOG(LogIslandSpectator, Log, TEXT("Delayed Insights trace %s: %s"),
+			bTraceProfileActive ? TEXT("started") : TEXT("failed to start"), *TraceProfilePath);
+	}
+	if (bTraceProfileActive && RealNow >= TraceProfileStopAt)
+	{
+		bTraceProfileActive = false;
+		const bool bStopped = FTraceAuxiliary::Stop();
+		UE_LOG(LogIslandSpectator, Log, TEXT("Delayed Insights trace %s: %s"),
+			bStopped ? TEXT("stopped") : TEXT("failed to stop"), *TraceProfilePath);
+	}
 	if (CSVProfileFrames > 0 && !bCSVProfileStarted && FPlatformTime::Seconds() >= CSVProfileStartAt)
 	{
 		bCSVProfileStarted = true;
