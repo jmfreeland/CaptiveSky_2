@@ -91,6 +91,7 @@ protected:
 private:
 	friend class AAutonomousAgentAIController;
 	friend class FIslandInnRestTest;
+	friend class FIslandNestTest;
 	friend class FAgentConsolidationTest;
 	static constexpr int32 MaximumAdjustmentsPerSleep = 3;
 	static constexpr float MaximumAdjustmentMagnitude = 0.03f;
@@ -101,11 +102,12 @@ private:
 	int32 Revision = 0;
 	TArray<FAgentPersonalityTendency> Tendencies;
 	FString PendingSleepExperience;
+	TArray<FString> PendingSleepExperienceTags;
 	bool bStateLoaded = false;
 
 	void SetConsciousState(EAgentConsciousState NewState);
 	void StartConsolidation();
-	void QueueSleepExperience(const FString& Experience);
+	void QueueSleepExperience(const FString& Experience, const TArray<FString>& Tags);
 	void AppendPendingSleepExperience();
 	void FinishSleep();
 	void EnsureStateLoaded();

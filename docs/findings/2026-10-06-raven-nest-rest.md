@@ -1,0 +1,7 @@
+# Raven nest rest as lived memory (2026-10-06)
+
+Sleeping at a persistent woven nest now queues a short observation for Raven's existing sleep lifecycle: the roost tag, whether Raven helped weave the nest, and its current layer count. The observation is appended only when the rest interval completes; waking early cancels it. Its tags identify sleep, rest, nest, and roost rather than inn shelter.
+
+This adds no sleep-duration, comfort, safety, or recovery bonus. A nest is not treated as waterproof shelter or as an assigned home, and the system makes no model call when the experience is queued. The memory becomes available to the existing sleep consolidation flow after rest completes, so it can inform slow personality reflection alongside other lived memories.
+
+The UE 5.8.3 `CaptiveSky_2Editor` target built successfully. The provider-free `CaptiveSky2.Agent.IslandNest` test passes with assertions for the remembered site/layer facts, nest-specific tags, and cancellation on early waking. The existing `CaptiveSky2.Agent.IslandInnRest` regression test also passes; it caught and prompted a correction to preserve the old perch-specific rest message when no nest exists. Logs: `Saved/Logs/Codex_RavenNestSleep_Final_20261006.log` and `Saved/Logs/Codex_RavenNestSleep_InnRest_20261006.log`. These are headless NullRHI behavior tests, not a visual/gameplay review; the interactive editor is still not open.

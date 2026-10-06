@@ -373,7 +373,7 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 			for (const FName Tag : BedAtRest->Tags)
 				if (Tag.ToString().StartsWith(TEXT("InnBed_"))) { BedName = Tag.ToString(); break; }
 			const FString MemoryText = FString::Printf(TEXT("I rested near %s at the Island inn. Its tagged roof was overhead and its walls met the current geometric enclosure check."), *BedName);
-			Rest->QueueSleepExperience(MemoryText);
+			Rest->QueueSleepExperience(MemoryText, { TEXT("sleep"), TEXT("rest"), TEXT("inn"), TEXT("shelter-geometry") });
 		}
 		ReportAction(bMemoryWillBeRecorded
 			? TEXT("Settled to sleep beside the tagged inn bed. A roof was overhead and the enclosing walls passed the current indoor-geometry check; the lived rest will be added to your memory when the rest interval completes. Waking early will cancel that note. That evidence does not promise warmth, complete dryness, comfort, or recovery; ordinary thoughts pause during sleep.")
@@ -382,6 +382,42 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	else if (BedAtRest)
 	{
 		ReportAction(TEXT("Settled to sleep near the tagged inn bed, but the roof-and-wall enclosure did not pass the current check. This will not be recorded as sheltered inn rest; ordinary thoughts pause during sleep."));
+	}
+	else if (Cast<ARavenAgentAIController>(this))
+	{
+		AActor* RestingNestSite = RequestedPerch;
+		if (!RestingNestSite)
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				if (It->ActorHasTag(TEXT("RavenPerch")) && It->ActorHasTag(TEXT("RavenNestSite")) &&
+					FVector::Dist2D(Body->GetActorLocation(), It->GetActorLocation()) <= 250.f &&
+					FMath::Abs(Body->GetActorLocation().Z - It->GetActorLocation().Z) <= 250.f)
+				{
+					RestingNestSite = *It;
+					break;
+				}
+		const UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+		const FName NestSiteTag = RestingNestSite && RestingNestSite->Tags.Num() > 0 ? RestingNestSite->Tags[0] : NAME_None;
+		const FIslandNestRecord* Nest = WorldState && RestingNestSite &&
+			RestingNestSite->ActorHasTag(TEXT("RavenPerch")) && RestingNestSite->ActorHasTag(TEXT("RavenNestSite"))
+			? WorldState->FindNest(NestSiteTag) : nullptr;
+		if (Nest)
+		{
+			UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
+			if (Memory)
+			{
+				const bool bHelpedWeave = Nest->Builders.Contains(Memory->GetResolvedAgentId());
+				const FString Experience = FString::Printf(TEXT("I slept at %s woven nest at %s; it had %d of %d layers. This is a place I rested, not proof of shelter or safety."),
+					bHelpedWeave ? TEXT("my") : TEXT("a"), *NestSiteTag.ToString(), Nest->Layers, UIslandWorldStateSubsystem::MaxNestLayers);
+				Rest->QueueSleepExperience(Experience, { TEXT("sleep"), TEXT("rest"), TEXT("nest"), TEXT("roost") });
+			}
+			ReportAction(Memory
+				? TEXT("Settled to sleep at the persistent woven nest beneath this roost. A memory of this rest will be kept only if the sleep finishes; waking early cancels it. The nest's presence is not evidence of shelter, safety, comfort, or recovery; ordinary thoughts pause during sleep.")
+				: TEXT("Settled to sleep at the persistent woven nest beneath this roost, but this body has no memory store. The nest's presence is not evidence of shelter, safety, comfort, or recovery; ordinary thoughts pause during sleep."));
+		}
+		else
+			ReportAction(RequestedPerch
+				? TEXT("Settled to sleep at the tagged perch. Ordinary thoughts pause during sleep; no sheltered inn rest was verified.")
+				: TEXT("Settled to sleep. Ordinary thoughts pause during sleep; no sheltered inn rest was verified."));
 	}
 	else
 	{

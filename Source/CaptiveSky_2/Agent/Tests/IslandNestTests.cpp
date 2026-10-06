@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
 #include "AgentBrainComponent.h"
+#include "AgentConsolidationComponent.h"
+#include "AgentMemoryComponent.h"
 #include "IslandArrangement.h"
 #include "IslandNest.h"
 #include "IslandWorldStateSubsystem.h"
@@ -55,7 +57,7 @@ namespace
 
 bool FIslandNestTest::RunTest(const FString& Parameters)
 {
-	// No gateway, model requests, or autobiographical memory in this fixture.
+	// No gateway or model requests. The test memory component only receives sleep data if the test explicitly completes consolidation.
 	const FString StateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("IslandNest") / TEXT("WorldState.json"));
 	IFileManager::Get().Delete(*StateFile, false, true, true);
 	const FName Site(TEXT("TestNestRoost"));
@@ -67,6 +69,14 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 
 	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0, 0, 100), FRotator::ZeroRotator);
 	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
+	UAgentConsolidationComponent* RavenRest = NewObject<UAgentConsolidationComponent>(Raven);
+	Raven->AddInstanceComponent(RavenRest);
+	RavenRest->RegisterComponent();
+	RavenRest->DefaultRestDurationSeconds = 120.f;
+	UAgentMemoryComponent* RavenMemory = NewObject<UAgentMemoryComponent>(Raven);
+	RavenMemory->AgentId = TEXT("Codex_IslandNestSleepTest");
+	Raven->AddInstanceComponent(RavenMemory);
+	RavenMemory->RegisterComponent();
 	AActor* Ground = World->SpawnActor<AActor>();
 	UBoxComponent* GroundBox = NewObject<UBoxComponent>(Ground);
 	Ground->SetRootComponent(GroundBox);
@@ -172,6 +182,21 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Nest is visual only and cannot alter perch support"), It->GetActorEnableCollision() == false || It->GetRootComponent()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 	}
 	TestTrue(TEXT("Raven still counts as perched on real support after weaving"), Controller->LocomotionState == ERavenLocomotionState::Perched);
+	FAgentDecision SleepAtNest;
+	SleepAtNest.bValid = true;
+	SleepAtNest.ActionType = EAgentActionType::Sleep;
+	SleepAtNest.ActionTarget = Site.ToString();
+	Controller->ActOnDecision(SleepAtNest);
+	TestFalse(TEXT("A raven can choose to sleep at its persistent woven nest"), RavenRest->IsAwake());
+	TestTrue(TEXT("A completed sleep queues only the grounded nest and layer facts for later memory"),
+		RavenRest->PendingSleepExperience.Contains(TEXT("my woven nest at TestNestRoost")) &&
+		RavenRest->PendingSleepExperience.Contains(TEXT("1 of 5 layers")) &&
+		RavenRest->PendingSleepExperienceTags.Contains(TEXT("nest")) &&
+		RavenRest->PendingSleepExperienceTags.Contains(TEXT("roost")) &&
+		!RavenRest->PendingSleepExperienceTags.Contains(TEXT("inn")));
+	RavenRest->WakeUp();
+	TestTrue(TEXT("Waking before the sleep interval finishes cancels the nest memory"),
+		RavenRest->IsAwake() && RavenRest->PendingSleepExperience.IsEmpty() && RavenRest->PendingSleepExperienceTags.IsEmpty());
 
 	Decide(Site.ToString());
 	TestTrue(TEXT("Weaving without twigs changes nothing"), Controller->DescribeActionState().Contains(TEXT("no twigs")) && State->FindNest(Site)->Layers == 1);
