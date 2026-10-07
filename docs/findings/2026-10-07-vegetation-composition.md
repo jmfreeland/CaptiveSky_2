@@ -204,3 +204,27 @@ more tiny foreground clumps. Compare the same 11:00 frames and a warm,
 screenshot-free 1080p profile before and after; retain the 30 FPS p95 target and
 recheck resident paths and collision/navigation clearances. See also the
 [worldbuilding priorities](../worldbuilding-ideas.md#2-replace-brute-force-foliage-density-with-ecological-compositions).
+
+## Current-runtime Tideglass composition (2026-10-08)
+
+A standalone UE 5.8.3 Game run captured one fixed 11:00 Tideglass-to-Listening
+Stones view at 1600×900. Agent thinking and Python were disabled, world data was
+isolated, the warm local DDC was reused, and the hard session caps were 75 real
+seconds and one model request. It ended normally after 75.3 seconds with zero
+requests. The [runtime frame](../../Playtests/Codex_TideglassCompositionCurrent_20261008/Screenshots/002_Composition__Current.png)
+shows the live pool material and transient stone forms, a nearby stag, two
+visible dragonflies, the Inn edge, and wet-edge vegetation together. The pool
+surface is readable in this Game view, and small wildlife gives the landmark
+some life without requiring a long resident session.
+
+The same composition still has an overly crowded foreground, a broad exposed
+brown slope, thin distant tree silhouettes, and a large cut-off Inn wall at
+the left edge. The runtime log reports ten nonblocking wet-edge placements, but
+this single frame does not establish their species mix or prove a designed
+wet-edge band. No frame-time sample was collected, so it provides no 30-FPS
+evidence. Log: [`Codex_TideglassCompositionCurrent_20261008.log`](../../Saved/Logs/Codex_TideglassCompositionCurrent_20261008.log).
+
+Next: keep the readable water and resident/wildlife scale, but recompose the
+same view to open a clear approach, improve mid-distance woodland mass, and
+avoid clipping the Inn. Then capture a matched standalone frame and a separate
+PIE traversal/performance sample before changing global foliage counts.
