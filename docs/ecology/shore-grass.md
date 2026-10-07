@@ -291,3 +291,29 @@ The real-D3D12-RHI viewpoint script then passed focused 17:00 Wind Arch and 12:0
 A separate actual Game spectator capture used an isolated world-data root, disabled resident thinking, a 60-second realtime cap, and a one-request hard ceiling. With a previously warmed local DDC, the Island became world-ready in 45.3 seconds; the run ended normally after 60.2 seconds with zero model requests. Runtime logs confirm Tideglass's water material, 1,779,877 landscape meadow instances, 359 Fab flower accents across eight species, and the raven/innkeeper actors. Ten Game screenshots were saved under `Playtests/Codex_RuntimeTideglassWarmDDC_20261007/Screenshots`; the isolated data root kept user world state separate, and the Island map was loaded but not saved. Two earlier attempts with fresh local caches timed out before world-ready at the launch script's 180-second startup guard, so the warm-cache run is a useful workaround, not proof of the cold-start root cause. Evidence: [bounded Game log](../../Saved/Logs/Codex_RuntimeTideglassWarmDDC_20261007.log).
 
 The runtime frames confirm that the water and ground-cover presentation are alive in Game, while also surfacing the next art targets: the Wind Arch pillars dominate and partly crop the current camera, and Tideglass still has a hard water/grass boundary. Keep those concerns separate from the test-only proxy preview; do not alter the user's saved viewpoint config without approval. Preserve the 30 FPS gameplay-scale gate.
+
+## Current Tideglass wet-edge working-tree check (2026-10-07)
+
+The current working tree's wet-edge version passed the focused
+`CaptiveSky2.Visual.Viewpoints` Tideglass run with `-NoWorldState`: it placed 7
+Typha and 3 Phalaris, with 559.6 cm minimum pool-edge clearance and 440.8 cm
+minimum shared spacing. The 30 FPS interactive startup gate stabilized at
+39.41 FPS; SceneCapture p95 was 36.76 FPS at Tideglass and 49.30 FPS in the
+ground-detail view. The transient editor preview still uses fallback white
+water and landmark proxies, so these figures and its image are not runtime-art
+evidence. The actual bounded Game capture shows the runtime water and wet-edge
+plants; its near-side planting still crowds the pool rim, and the distant
+midground remains a broad sparse brown band. Favor a narrower foreground
+planting/open approach plus a few readable middle-distance masses over raising
+the global density budget.
+
+A separate 1600×900 stationary Game profile at the same Tideglass view captured
+600 frames after a 15-second delay. FrameTime was p50 15.19 ms, p95 18.03 ms
+(about 55.5 FPS at p95), mean 15.63 ms, and max 42.05 ms. This single-view
+working-tree sample clears the 30 FPS p95 target, with a long-frame outlier; it
+does not prove traversal, PIE, packaged-build, or target-hardware performance.
+The bounded Game session ended normally after 60.2 seconds with zero model
+requests. These captures were made on `09bfdb7` plus local uncommitted changes
+to project config/weather and the viewpoint harness; no cause is attributed to
+the wet-edge species alone, and no user source edits were included in this
+documentation-only finding. Game screenshots: [Tideglass wet edge](../../Playtests/Codex_TideglassPhalarisCurrent_20261007/Screenshots/001_Tideglass_Wet_Edge_Current.png). Logs: [Game view](../../Saved/Logs/Codex_TideglassPhalarisCurrent_Game_20261007.log), [focused viewpoint automation](../../Saved/Logs/Codex_TideglassCurrentWIP_Visual_20261007.log), and [Game profile](../../Saved/Logs/Codex_TideglassPhalarisCurrent_Profile_20261007.log); CSV: [600-frame profile](../../Saved/Profiling/CSV/Profile%2820261007_205455%29.csv).
