@@ -51,6 +51,42 @@ previously reported 8–13 FPS moving-PIE result. The screenshot run itself had
 cold PSO-creation stalls and screenshot-encoding costs and is not used for
 frame-rate claims.
 
+## Repeat on the current built code (2026-10-07)
+
+A second screenshot-free standalone sample used the current editor-target
+binary, the same 1920×1080 spectator route, a 60-second warm-up, the existing
+warm `Saved/LocalDDC`, an isolated world-state root, disabled agent thinking and
+Python, a one-request ceiling, and a 180-second real-time cap. It ended normally
+after 180.2 seconds with zero model requests. The 600-frame CSV is
+[`Profile(20261007_065514).csv`](../../Saved/Profiling/CSV/Profile(20261007_065514).csv);
+the runtime log is [`Codex_RuntimeProfile_20261007.log`](../../Saved/Logs/Codex_RuntimeProfile_20261007.log).
+
+| Track | p50 | p95 | p99 | Max | Frames >33.3 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Frame time | 14.03 ms | 21.47 ms | 42.71 ms | 50.24 ms | 10 / 600 |
+| Game thread | 5.04 ms | 6.58 ms | 22.65 ms | 40.53 ms | — |
+| Render thread | 14.00 ms | 16.82 ms | 42.54 ms | 50.11 ms | — |
+| GPU | 9.54 ms | 11.76 ms | 12.29 ms | 13.00 ms | — |
+| RHI thread | 4.68 ms | 5.52 ms | 5.92 ms | 6.47 ms | — |
+
+The current runtime placed 1,779,877 ground-cover instances, 359 Fab flowers,
+14,727 spruce, 15,063 broadleaf shrubs, and 1,487 rhododendrons; the profiled
+view submitted about 2.51 million GPU-scene instances.
+`NumInstanceTransformUpdates` was 0 at p50/p95 and at most 1 in the sample. The
+ten frames over 33.3 ms had roughly 13–29 ms render-thread time while GPU time
+stayed around 11–12 ms. This points to a render/RHI-side tail in this standalone
+route, but the counters do not identify one cause. It does not prove a 30-FPS
+minimum: 10/600 frames exceeded that frame-time boundary, and p99 remained
+42.71 ms.
+
+This repeat confirms the earlier warmed standalone result on the current
+binary, but still cannot reconcile it with the separate 8–13 FPS PIE report:
+the modes, camera workload, and instrumentation are not matched. Avoid reducing
+vegetation or changing species budgets on this evidence alone. The next useful
+measurement is a paired, repeated PIE baseline and ground-cover-hidden profile
+at the same camera, resolution, warm-up, and scalability settings, followed by
+one structural ablation at a time. The editor was not available for that test.
+
 ## Next foliage pass
 
 Do not increase the global ground-cover budget based on these images. First
