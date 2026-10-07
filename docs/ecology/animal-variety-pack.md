@@ -119,10 +119,12 @@ the dark Crow from the East, West, North, and South viewpoints; they are in
 bird in the actual game. A later bounded capture used Unreal's temporary `DisableAllScreenMessages`
 command to hide the red texture-pool warning from the highlight image while retaining the spectator
 caption; all four shots are in `Saved/Playtests/Codex_CrowVisual_20261007/ScreenshotsHighlight/`.
-This is only a presentation toggle: the 1000 MB texture pool remains over budget by a few MB, and
-raising it through early `ExecCmds` or a command-line CVar was overridden by the active scalability
-profile. No project setting was changed. The earlier `ValidatePlatforms` launch stall did not
-reproduce in the successful editor build and Game run.
+This is only a presentation toggle: the texture pool remains over budget by a few MB, but no project
+setting was changed. UE 5.8.3's engine `BaseScalability.ini` sets `r.Streaming.PoolSize=1000` under
+`[TextureQuality@3]` (Epic), which is why both an early `ExecCmds` assignment and a command-line CVar
+were replaced when that profile applied. Do not raise the project-wide pool based solely on this
+12 GB GPU's 4–12 MB overage; evaluate across target GPUs first. The earlier `ValidatePlatforms`
+launch stall did not reproduce in the successful editor build and Game run.
 
 The earlier source/UV check found the Crow mesh samples dark albedo (about RGB 66); the original
 material's representative body pixel was RGB 88 in a deferred Base Color capture but RGB 203, 197, 184
