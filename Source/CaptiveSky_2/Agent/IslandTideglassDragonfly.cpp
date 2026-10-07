@@ -246,8 +246,15 @@ bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLoca
 		FMath::Abs(GetActorLocation().Z - RippleLocation.Z) > 300.f)
 		return false;
 
-	// A brief curious dip toward the water, not a landing or a persistent change.
-	RippleInterestLocation = RippleLocation + FVector(0.f, 0.f, 110.f);
+	// Give each color morph its own small station around the disturbance so the
+	// whole daytime group does not converge on one point. This remains a brief
+	// hover above the water, not a landing or a persistent change.
+	constexpr float HoverRadius = 42.f;
+	const float HoverAngle = 2.f * PI * static_cast<float>(ColorVariant) / 3.f;
+	RippleInterestLocation = RippleLocation + FVector(
+		FMath::Cos(HoverAngle) * HoverRadius,
+		FMath::Sin(HoverAngle) * HoverRadius,
+		110.f);
 	RippleInterestRemaining = 1.8f;
 	RippleInterestCooldownRemaining = 7.f;
 	return true;

@@ -1542,8 +1542,24 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				WatchableDragonfly->RippleInterestRemaining > 0.f && WatchableDragonfly->RippleInterestRemaining <= 1.8f);
 			TestTrue(TEXT("The dragonfly aims just above the water surface"),
 				FMath::IsNearlyEqual(WatchableDragonfly->RippleInterestLocation.Z, VisitorRipple->GetActorLocation().Z + 110.f));
+			TestTrue(TEXT("The dragonfly hovers on a small station beside the exact ripple point"),
+				FMath::IsNearlyEqual(FVector::Dist2D(WatchableDragonfly->RippleInterestLocation, VisitorRipple->GetActorLocation()), 42.f, 0.1f));
 			TestEqual(TEXT("One natural ripple starts a bounded seven-second response cooldown"),
 				WatchableDragonfly->RippleInterestCooldownRemaining, 7.f);
+			TArray<AIslandTideglassDragonfly*> OtherMorphs;
+			for (int32 Variant = 1; Variant < 3; ++Variant)
+			{
+				AIslandTideglassDragonfly* OtherDragonfly = World->SpawnActor<AIslandTideglassDragonfly>(
+					WatchableDragonfly->GetActorLocation(), FRotator::ZeroRotator, Spawn);
+				TestNotNull(TEXT("A second daytime morph is available to check non-stacking interest"), OtherDragonfly);
+				if (!OtherDragonfly) continue;
+				OtherDragonfly->SetColorVariant(Variant);
+				TestTrue(TEXT("Another color morph can investigate the same nearby ripple"),
+					OtherDragonfly->RespondToSurfaceRipple(VisitorRipple->GetActorLocation()));
+				TestTrue(TEXT("Different dragonfly morphs keep separate hover stations around one ripple"),
+					FVector::DistSquared2D(OtherDragonfly->RippleInterestLocation, WatchableDragonfly->RippleInterestLocation) > FMath::Square(60.f));
+				OtherMorphs.Add(OtherDragonfly);
+			}
 			const FVector BeforeSwoop = WatchableDragonfly->GetActorLocation();
 			WatchableDragonfly->Tick(0.35f);
 			TestTrue(TEXT("The dragonfly begins curving toward the ripple rather than staying on its patrol point"),
@@ -1557,6 +1573,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
 			TestTrue(TEXT("Cooldown preserves the first ephemeral focus point"),
 				WatchableDragonfly->RippleInterestLocation.Equals(FirstRippleTarget));
+			for (AIslandTideglassDragonfly* OtherDragonfly : OtherMorphs)
+				if (OtherDragonfly) OtherDragonfly->Destroy();
 		}
 
 		const FVector DragonflyLocation = WatchableDragonfly->GetActorLocation();

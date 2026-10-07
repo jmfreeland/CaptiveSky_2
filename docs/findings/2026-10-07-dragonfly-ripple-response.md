@@ -18,3 +18,16 @@ world with memory-only DDC; it did not start a gameplay session. Log:
 The source test is not a substitute for a close in-world visual check. The
 interactive editor was not visible in this session, so the swoop's appearance
 and gameplay frame cost remain unverified.
+
+## Distinct hover stations (2026-10-07)
+
+The three daytime color morphs previously aimed at the exact same point above a
+natural ripple. They now use three fixed, 120-degree-separated hover stations
+on a 42 cm radius around the ripple, while keeping the same 110 cm water
+clearance, 1.8-second interest window and seven-second cooldown. The response
+remains transient and does not create actors or persistent state.
+
+The `CaptiveSky2.Agent.NightEcology` regression now checks the hover radius and
+that all three color variants can investigate the same ripple without stacking
+on the same point. A rendered close-up is still needed to judge whether the
+small separation reads naturally in play.
