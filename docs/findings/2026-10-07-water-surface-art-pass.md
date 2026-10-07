@@ -69,6 +69,15 @@ log path. Ordinary and continuous invocations remain unchanged unless the
 parameter is supplied; the option is explicitly rejected for continuous mode.
 PowerShell parsing, parameter validation, the readiness-marker match against a
 successful Game log line, and `.NET Process.Kill(true)` on a test-owned process
-all passed. The new guard has not yet been exercised against an actual Unreal
-launch. Do not infer water-art quality from either failed capture; no rendered
-comparison exists yet.
+all passed. A follow-up Unreal launch exercised the guard against the real
+project: after 90 seconds without the world-ready marker, the script reported
+the timeout and its Unreal process tree exited. The only remaining `dotnet.exe`
+processes were the two previously observed old husks; no new screenshot was
+created and the Island still did not load. Log:
+`Saved/Logs/Codex_TideglassWaterArtGuard_20261007.log`.
+
+The guard is now runtime-verified as a safeguard, not as a fix for the
+underlying startup problem. The log again stops after TurnkeySupport/target
+platform startup; the next step is to inspect that child-process wait rather
+than repeat another capture. Do not infer water-art quality from these failed
+captures; no rendered comparison exists yet.
