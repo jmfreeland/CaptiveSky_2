@@ -8,6 +8,7 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Agent/IslandWeather.h"
 #include "Agent/IslandWindMoteEffect.h"
 
@@ -132,6 +133,9 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Replacement stones remain collisionless"), Stonework->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Replacement stones do not alter navigation"), Stonework->Stones->CanEverAffectNavigation());
 		TestTrue(TEXT("The replacement uses the existing rough rock mesh"), Stonework->Stones->GetStaticMesh() == Rock);
+		UMaterialInterface* ArchSurface = Stonework->Stones->GetMaterial(0);
+		TestTrue(TEXT("The replacement uses a dedicated subdued material instead of Starter Content's stark mottling"),
+			ArchSurface && ArchSurface->IsA<UMaterialInstanceDynamic>() && ArchSurface != Rock->GetMaterial(0));
 		for (int32 Index = 0; Index < 10; ++Index)
 		{
 			FTransform Instance;

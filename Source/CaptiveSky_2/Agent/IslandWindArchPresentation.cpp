@@ -9,12 +9,15 @@
 #include "EngineUtils.h"
 #include "IslandWeather.h"
 #include "IslandWindMoteEffect.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWindArchPresentation, Log, All);
 
 namespace
 {
 	constexpr TCHAR WindArchRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
+	constexpr TCHAR WindArchRockSurfacePath[] = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
 	constexpr TCHAR EngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
 }
 
@@ -93,6 +96,18 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 {
 	if (!Stones || !RockMesh || Pillars.Num() != 2 || !Beam) return false;
 	Stones->SetStaticMesh(RockMesh);
+	UMaterialInterface* RockSurface = LoadObject<UMaterialInterface>(nullptr, WindArchRockSurfacePath,
+		nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UMaterialInstanceDynamic* StoneSurface = RockSurface ? UMaterialInstanceDynamic::Create(RockSurface, this) : nullptr;
+	if (!StoneSurface)
+	{
+		UE_LOG(LogIslandWindArchPresentation, Warning, TEXT("Wind Arch rock presentation skipped: its subdued stone surface could not be created."));
+		return false;
+	}
+	// Match the Island's Listening Stones: keep the irregular Starter Content rock silhouette,
+	// but avoid M_Rock's stark black-white mottling that made the Arch dominate the approach.
+	StoneSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.28f, 0.26f, 0.22f));
+	Stones->SetMaterial(0, StoneSurface);
 	Stones->ClearInstances();
 
 	// Fit each irregular stack to its own saved proxy: the west pillar is taller than the east one.
