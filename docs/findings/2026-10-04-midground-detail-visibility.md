@@ -95,10 +95,10 @@ separate isolated data roots, capped play at 60 seconds and model requests at
 one, and exited normally after 60.5 / 60.2 seconds with zero model requests.
 The only intentional render change was fine foliage fade/cull range:
 
-| Range | Fine-detail fade/cull | FrameTime p50 / p95 | Max | p95 result |
-|---|---:|---:|---:|---|
-| 90 m | 60 / 90 m | 15.85 / 22.56 ms | 466.77 ms | 44.3 FPS; clears 30-FPS screen |
-| 150 m | 100 / 150 m | 15.75 / 23.74 ms | 646.61 ms | 42.1 FPS; clears 30-FPS screen |
+| Range | Fine-detail fade/cull | FrameTime p50 / p95 / p99 | >33.3 / >100 ms | Max | p95 result |
+|---|---:|---:|---:|---:|---|
+| 90 m | 60 / 90 m | 15.85 / 22.56 / 436.39 ms | 18 / 7 of 600 | 466.77 ms | 44.3 FPS; clears 30-FPS screen |
+| 150 m | 100 / 150 m | 15.75 / 23.74 / 459.22 ms | 24 / 10 of 600 | 646.61 ms | 42.1 FPS; clears 30-FPS screen |
 
 The 150 m [Game frame](../../Saved/Playtests/Codex_TideglassRange150m_20261007/Screenshots/001_Tideglass.png)
 extends grass and low plants behind the central rocks and into much of the
@@ -107,7 +107,10 @@ shows the matched baseline. The added band improves this composition, but the
 far horizon remains sparse and this one stationary camera does not establish
 traversal or target-hardware performance. The 150 m sample's 1.18 ms higher p95
 and 646.61 ms maximum are worth carrying forward; sequential captures cannot
-attribute either difference to range alone, and the hitch tail means a clean
+attribute either difference to range alone. Both runs have a pronounced hitch
+tail despite passing the p95 screen: p99 is 436–459 ms, with 7 / 10 frames over
+100 ms. The worst frames report only 17–18 ms GPU time, but this does not by
+itself identify which worker or operating-system delay caused the hitch. A clean
 30-FPS percentile is not a no-hitch guarantee.
 
 Logs: [90 m](../../Saved/Logs/Codex_TideglassRange90m_20261007.log),
