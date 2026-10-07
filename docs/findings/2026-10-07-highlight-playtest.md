@@ -17,10 +17,11 @@
 
 ## Runtime evidence and limits
 
-- The log reports 400 unprecached PSO-creation hitches during initial rendering. The first screenshot took longer to complete; subsequent viewpoint intervals advanced about 680–745 frame-counter steps per ~12 seconds. This suggests roughly 57–62 fps after warm-up, but is only a rough estimate from log frame counters—not a controlled performance benchmark. It does not replace the earlier PIE profiling result (8–13 fps with the large ground-cover population); investigate why the standalone and PIE measurements differ before declaring the performance issue solved.
+- A follow-up controlled standalone sample used the repeated Tideglass camera, 1600×900, and a 600-frame CSV profile delayed 45 real seconds after spectator startup. It ran for 10.19 seconds. `FrameTime` was 15.60 ms median and 26.10 ms p95 (about 64 fps median and 38 fps at the p95 frame-time boundary), with a 272.15 ms maximum hitch. This sampled window clears the 30-fps target, but the maximum hitch remains and this is not a sustained player-controlled PIE test. The log recorded 350 unprecached PSO-creation hitches before sampling; the sample recorded at most one generic PSO miss and no compute PSO misses. CSV: `Saved/Profiling/CSV/Profile(20261007_022938).csv`; summary via `Scripts/Summarize-RenderProfile.ps1`.
+- The full standalone profiling session ended normally after 180.1 real seconds with 0 model requests. It does not replace the earlier PIE profiling result (8–13 fps with the large ground-cover population); investigate why the standalone and PIE measurements differ before declaring the performance issue solved.
 - Startup logs warn that plant material instances lack `InstancedStaticMeshes` usage and will use the default material in game. Warnings include Rhododendron, Typha, Festuca, and Phalaris materials. This is a concrete asset-side follow-up: fix/re-save the affected instances and confirm their rendered appearance in an interactive editor/game view.
 - A `WaterBrushManager` export-load warning also appeared. Tideglass's visible blockout appearance needs an asset/world inspection before attributing it to that warning.
-- This run validates screenshot capture and the real-time/request caps only. It does not validate resident behavior, interaction quality, the visible UE editor, or a sustained 30-fps minimum under player-controlled gameplay.
+- Together, the screenshot and profiling runs validate capture, one warmed repeated-camera performance window, and the real-time/request caps. They do not validate resident behavior, interaction quality, the visible UE editor, or a sustained 30-fps minimum under player-controlled PIE gameplay.
 
 ## Next steps
 
