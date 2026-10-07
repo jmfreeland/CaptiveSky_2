@@ -76,23 +76,43 @@ Investigate distant terrain appearance separately: mesh range alone will not
 supply continuous ground texture or useful biome transitions. Keep real-time and
 model-request safeguards intact.
 
-## 150 m standalone Game comparison attempt (2026-10-07)
+## Matched Tideglass Game range comparison (2026-10-07)
 
-`Start-Spectator.ps1` now exposes the already-supported
-`-IslandFoliageDetailRangeCm` command-line preview as a validated
-`-FoliageDetailRangeCm` argument (4,500–15,000 cm). PowerShell parsing and the
-range guard passed. A matched 90 m Game baseline was not obtained in this
-restricted session: the first launch could not create shader-transfer files in
-the default user-profile shader directory. Retrying with a private
-`Saved/Playtests/.../ShaderWorking` directory passed that point, but UE did not
-reach the world-ready marker within the 240-second startup guard; it stopped
-after launching `ValidatePlatforms`. The launcher ended only that Game process.
+`Start-Spectator.ps1` exposes the existing `-IslandFoliageDetailRangeCm`
+preview as a validated `-FoliageDetailRangeCm` argument (4,500–15,000 cm).
+PowerShell parsing and rejection of an out-of-range value passed. Two earlier
+launches did not reach the Island: one could not create shader-transfer files
+in the default user-profile directory; another still stalled after platform
+validation with a private shader path. Comparing those logs with a successful
+same-day Game run identified the proven `-NoZenLocalFallback` plus warmed
+`-LocalDataCachePath` setup. With those flags, both matched runs became
+world-ready in 14.2–15.4 seconds.
 
-Both attempts disabled resident thinking/Python, used an isolated data root, a
-60-second play cap and a one-request ceiling; no model request, Island save,
-screenshot or CSV profile was produced. Logs:
-[`first shader-path failure`](../../Saved/Logs/Codex_TideglassRange90m_20261007-backup-2026.10.07-20.07.42.log)
-and [`private shader-path startup timeout`](../../Saved/Logs/Codex_TideglassRange90m_20261007.log).
-This establishes a launch-environment issue, not a foliage-range result. The
-150 m comparison remains untested; resume only when Game startup can reach the
-Island within the bounded guard.
+Both standalone Game sessions used UE 5.8.3, 1600×900, the same five repeated
+Tideglass viewpoints at 11:00, the same current source/map, 15 seconds of
+warm-up, and 600 CSV frames. They disabled resident thinking and Python, used
+separate isolated data roots, capped play at 60 seconds and model requests at
+one, and exited normally after 60.5 / 60.2 seconds with zero model requests.
+The only intentional render change was fine foliage fade/cull range:
+
+| Range | Fine-detail fade/cull | FrameTime p50 / p95 | Max | p95 result |
+|---|---:|---:|---:|---|
+| 90 m | 60 / 90 m | 15.85 / 22.56 ms | 466.77 ms | 44.3 FPS; clears 30-FPS screen |
+| 150 m | 100 / 150 m | 15.75 / 23.74 ms | 646.61 ms | 42.1 FPS; clears 30-FPS screen |
+
+The 150 m [Game frame](../../Saved/Playtests/Codex_TideglassRange150m_20261007/Screenshots/001_Tideglass.png)
+extends grass and low plants behind the central rocks and into much of the
+formerly bare midground without adding instances. The [90 m frame](../../Saved/Playtests/Codex_TideglassRange90m_20261007/Screenshots/001_Tideglass.png)
+shows the matched baseline. The added band improves this composition, but the
+far horizon remains sparse and this one stationary camera does not establish
+traversal or target-hardware performance. The 150 m sample's 1.18 ms higher p95
+and 646.61 ms maximum are worth carrying forward; sequential captures cannot
+attribute either difference to range alone, and the hitch tail means a clean
+30-FPS percentile is not a no-hitch guarantee.
+
+Logs: [90 m](../../Saved/Logs/Codex_TideglassRange90m_20261007.log),
+[150 m](../../Saved/Logs/Codex_TideglassRange150m_20261007.log). CSV:
+[90 m 600-frame profile](../../Saved/Profiling/CSV/Profile%2820261007_211656%29.csv),
+[150 m 600-frame profile](../../Saved/Profiling/CSV/Profile%2820261007_211900%29.csv).
+The 150 m preview remains opt-in pending a separate PIE traversal and
+performance review; no global default or instance budget has been changed.
