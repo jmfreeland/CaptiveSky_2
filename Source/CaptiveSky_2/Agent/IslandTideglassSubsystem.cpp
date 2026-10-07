@@ -7,6 +7,7 @@
 #include "GameFramework/Actor.h"
 #include "Engine/StaticMeshActor.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
@@ -147,9 +148,12 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 	if (!Material) return false;
 	UStaticMeshComponent* PoolSurface = FindPoolSurface(GetWorld());
 	if (!PoolSurface) return false;
+	UMaterialInstanceDynamic* RuntimeMaterial = UMaterialInstanceDynamic::Create(Material, this);
+	if (!RuntimeMaterial) return false;
+	TuneReadablePoolMaterial(RuntimeMaterial);
 	if (AppliedTo.IsValid() && AppliedTo.Get() == RuntimeSurface.Get())
 	{
-		RuntimeSurface->SetMaterial(0, Material);
+		RuntimeSurface->SetMaterial(0, RuntimeMaterial);
 		return true;
 	}
 	RestorePoolMaterial();
@@ -160,9 +164,28 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 	bBlockoutWasHiddenInGame = PoolSurface->bHiddenInGame;
 	PoolSurface->SetVisibility(false);
 	PoolSurface->SetHiddenInGame(true);
-	RuntimeSurface->SetMaterial(0, Material);
+	RuntimeSurface->SetMaterial(0, RuntimeMaterial);
 	AppliedTo = RuntimeSurface;
 	return true;
+}
+
+void UIslandTideglassSubsystem::TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material)
+{
+	if (!Material) return;
+
+	// The source asset stays untouched. These transient overrides keep the shallow pool
+	// legible as water at noon instead of a flat cyan patch, while retaining a restrained
+	// sky-lit edge and stronger, still-small surface swells.
+	Material->SetVectorParameterValue(TEXT("CalmPoolColor"), FLinearColor(0.0045f, 0.030f, 0.038f, 1.f));
+	Material->SetVectorParameterValue(TEXT("StormPoolColor"), FLinearColor(0.004f, 0.024f, 0.040f, 1.f));
+	Material->SetVectorParameterValue(TEXT("EdgeReflectionTint"), FLinearColor(0.022f, 0.070f, 0.083f, 1.f));
+	Material->SetScalarParameterValue(TEXT("CalmRoughness"), 0.24f);
+	Material->SetScalarParameterValue(TEXT("WeatherRoughness"), 0.38f);
+	Material->SetScalarParameterValue(TEXT("Specular"), 0.42f);
+	Material->SetScalarParameterValue(TEXT("CalmNormalGain"), 0.92f);
+	Material->SetScalarParameterValue(TEXT("WeatherNormalGain"), 1.55f);
+	Material->SetScalarParameterValue(TEXT("LongSwellStrength"), 0.50f);
+	Material->SetScalarParameterValue(TEXT("ShortChopStrength"), 0.32f);
 }
 
 void UIslandTideglassSubsystem::RestorePoolMaterial()

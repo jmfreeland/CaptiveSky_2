@@ -5,6 +5,7 @@
 #include "IslandTideglassSubsystem.generated.h"
 
 class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UMeshComponent;
 class UProceduralMeshComponent;
 class AStaticMeshActor;
@@ -40,6 +41,7 @@ public:
 
 private:
 	friend class FIslandTideglassSurfaceTest;
+	static void TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material);
 	void ApplyShoreStonePresentation();
 	void RestoreShoreStonePresentation();
 

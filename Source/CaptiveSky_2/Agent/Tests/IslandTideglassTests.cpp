@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTideglassSurfaceTest, "CaptiveSky2.Agent.IslandTideglass",
@@ -77,7 +78,19 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			TestNotNull(TEXT("Play start creates an organic procedural water surface"), RuntimeWater);
 			if (RuntimeWater)
 			{
-				TestTrue(TEXT("The automatically started surface receives the configured startup material"), RuntimeWater->GetMaterial(0) == StartupMaterial);
+				UMaterialInstanceDynamic* RuntimeMaterial = Cast<UMaterialInstanceDynamic>(RuntimeWater->GetMaterial(0));
+				TestNotNull(TEXT("The play-session water uses a transient material instance"), RuntimeMaterial);
+				TestTrue(TEXT("The transient water material keeps the configured base asset"),
+					RuntimeMaterial && RuntimeMaterial->Parent == StartupMaterial);
+				if (PoolWater && RuntimeMaterial)
+				{
+					TestTrue(TEXT("The calm pool tint is a deep, low-saturation teal"),
+						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0045f, 0.030f, 0.038f, 1.f), 0.001f));
+					TestTrue(TEXT("The shallow swells retain a readable but bounded normal strength"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmNormalGain")), 0.92f, 0.001f));
+					TestTrue(TEXT("The calmer water is less mirror-like than the original candidate"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmRoughness")), 0.24f, 0.001f));
+				}
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
 					RuntimeWater->GetComponentLocation().Equals(Surface->GetComponentLocation(), 1.f));
@@ -143,8 +156,15 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("The configured default material path resolves to the generated Lively asset"),
 					LoadObject<UMaterialInterface>(nullptr, UIslandTideglassSubsystem::MaterialPath) == PoolWater);
 				TestTrue(TEXT("The generated default material applies to the procedural surface"), Tideglass->ApplyPoolMaterial(PoolWater));
-				TestTrue(TEXT("The configured default material is assigned to the procedural surface"),
-					Tideglass->RuntimeSurface && Tideglass->RuntimeSurface->GetMaterial(0) == PoolWater);
+				UMaterialInstanceDynamic* DefaultRuntimeMaterial = Tideglass->RuntimeSurface
+					? Cast<UMaterialInstanceDynamic>(Tideglass->RuntimeSurface->GetMaterial(0)) : nullptr;
+				TestNotNull(TEXT("The default surface uses a transiently tuned material instance"), DefaultRuntimeMaterial);
+				if (DefaultRuntimeMaterial)
+				{
+					TestTrue(TEXT("The transient instance remains based on the generated default asset"), DefaultRuntimeMaterial->Parent == PoolWater);
+					TestTrue(TEXT("Repeated application preserves the tested readable tint"),
+						DefaultRuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0045f, 0.030f, 0.038f, 1.f), 0.001f));
+				}
 				Tideglass->RestorePoolMaterial();
 			}
 		}
