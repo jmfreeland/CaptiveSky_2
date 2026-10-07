@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/FileManager.h"
@@ -206,6 +207,31 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Controller->WovenUntil.Reset();
 	Decide(Site.ToString());
 	TestEqual(TEXT("Second weave adds a layer"), State->FindNest(Site)->Layers, 2);
+	for (TActorIterator<AIslandNest> It(World); It; ++It)
+	{
+		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
+		TestNotNull(TEXT("The visible nest exposes its instance weave for inspection"), TwigInstances);
+		if (!TwigInstances || TwigInstances->GetInstanceCount() != 2 * AIslandNest::TwigsPerLayer) continue;
+		for (int32 Layer = 0; Layer < 2; ++Layer)
+		{
+			for (int32 Twig = 0; Twig < AIslandNest::TwigsPerLayer; ++Twig)
+			{
+				FTransform TwigTransform;
+				const int32 InstanceIndex = Layer * AIslandNest::TwigsPerLayer + Twig;
+				if (!TwigInstances->GetInstanceTransform(InstanceIndex, TwigTransform, false))
+				{
+					AddError(FString::Printf(TEXT("Could not inspect nest twig %d"), InstanceIndex));
+					continue;
+				}
+				const FVector Radial = TwigTransform.GetLocation().GetSafeNormal2D();
+				const FVector TwigAxis = TwigTransform.GetRotation().RotateVector(FVector::UpVector).GetSafeNormal2D();
+				const float RadialAlignment = FMath::Abs(FVector::DotProduct(Radial, TwigAxis));
+				const float ExpectedAlignment = Layer % 2 == 0 ? 0.f : 1.f;
+				TestTrue(FString::Printf(TEXT("Nest layer %d twig %d alternates between tangent and radial weave courses"), Layer, Twig),
+					FMath::Abs(RadialAlignment - ExpectedAlignment) < 0.2f);
+			}
+		}
+	}
 
 	// Bystanders perceive the nest but not who made it.
 	ACharacter* Bystander = World->SpawnActor<ACharacter>(FVector(0.f, 400.f, 302.f), FRotator::ZeroRotator);

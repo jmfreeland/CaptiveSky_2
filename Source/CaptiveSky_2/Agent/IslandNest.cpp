@@ -47,8 +47,11 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers)
 		{
 			const float Angle = 2.f * PI * (Index + Weave.FRandRange(-0.3f, 0.3f)) / TwigsPerLayer + Layer * 0.45f;
 			const FVector Position(FMath::Cos(Angle) * RingRadius, FMath::Sin(Angle) * RingRadius, Height + Weave.FRandRange(-1.f, 1.f));
-			// Pitch 90 lays the cylinder's long axis flat; yaw aligns it roughly tangent to the rim.
-			const FRotator Lie(90.f + Weave.FRandRange(-14.f, 14.f), FMath::RadiansToDegrees(Angle) + 90.f + Weave.FRandRange(-28.f, 28.f), 0.f);
+			// Alternate tangent and radial courses so successive rings visibly interlace instead of stacking as hoops.
+			// Pitch 90 lays the cylinder's long axis flat; the seeded yaw variation keeps each course imperfect.
+			const float WeaveDirection = Layer % 2 == 0 ? 0.f : 90.f;
+			const FRotator Lie(90.f + Weave.FRandRange(-14.f, 14.f),
+				FMath::RadiansToDegrees(Angle) + 90.f + WeaveDirection + Weave.FRandRange(-8.f, 8.f), 0.f);
 			const FVector Scale(0.022f, 0.022f, Weave.FRandRange(0.26f, 0.38f));
 			Twigs->AddInstance(FTransform(Lie, Position, Scale));
 		}
