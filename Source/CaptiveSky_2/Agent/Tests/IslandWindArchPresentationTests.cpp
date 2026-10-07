@@ -8,6 +8,8 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Agent/IslandWeather.h"
+#include "Agent/IslandWindMoteEffect.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWindArchPresentationTest, "CaptiveSky2.Agent.WindArchPresentation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -94,6 +96,26 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 	PillarB->SetActorScale3D(FVector(0.6f, 0.6f, 5.99f));
 	Beam->SetActorScale3D(FVector(7.6f, 0.6f, 0.6f));
 	PillarB->SetActorHiddenInGame(true);
+	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("Synthetic Island weather actor spawns"), Weather))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Weather->MaximumWindSpeed = 300.f;
+	Weather->SetActorTickEnabled(false);
+	double StrongWindOffset = -1.0;
+	for (int32 CandidateSeconds = 0; CandidateSeconds <= 600; CandidateSeconds += 5)
+	{
+		Weather->WeatherTimeOffset = CandidateSeconds;
+		if (Weather->SampleWind(Marker->GetActorLocation(), World->GetTimeSeconds()).Size2D() >= 105.f)
+		{
+			StrongWindOffset = CandidateSeconds;
+			break;
+		}
+	}
+	TestTrue(TEXT("A strong natural-wind sample exists within one configured weather cycle"), StrongWindOffset >= 0.0);
 	World->BeginPlay();
 
 	UIslandWindArchPresentationSubsystem* PresentationSubsystem = World->GetSubsystem<UIslandWindArchPresentationSubsystem>();
@@ -122,6 +144,44 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("Pillar stone %d is fitted to its own proxy height"), Index),
 				Instance.GetLocation().Z >= ProxyCenter.Z - ProxyHalfHeight && Instance.GetLocation().Z <= ProxyCenter.Z + ProxyHalfHeight);
 		}
+	}
+	if (Stonework && StrongWindOffset >= 0.0)
+	{
+		Weather->WeatherTimeOffset = StrongWindOffset;
+		TestTrue(TEXT("The fixture's current natural wind is above the emission threshold"),
+			Weather->SampleWind(Stonework->GetActorLocation(), World->GetTimeSeconds()).Size2D() >= 105.f);
+		Stonework->CheckForAmbientWind();
+		int32 MoteCount = 0;
+		AIslandWindMoteEffect* SpawnedMotes = nullptr;
+		for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It)
+		{
+			++MoteCount;
+			SpawnedMotes = *It;
+		}
+		TestEqual(TEXT("A strong sampled natural wind spawns one mote effect"), MoteCount, 1);
+		TestNotNull(TEXT("The wind response has a transient mote actor"), SpawnedMotes);
+		if (SpawnedMotes)
+		{
+			TestTrue(TEXT("The mote actor is transient and will not alter saved world state"), SpawnedMotes->HasAnyFlags(RF_Transient));
+			TestTrue(TEXT("The mote actor is centered on the Wind Arch"),
+				FVector::Dist2D(SpawnedMotes->GetActorLocation(), Stonework->GetActorLocation()) <= 1.f);
+		}
+		TestTrue(TEXT("Emission starts the full ambient cooldown"),
+			FMath::IsNearlyEqual(Stonework->AmbientMoteCooldownRemaining, 30.f));
+
+		Stonework->CheckForAmbientWind();
+		int32 MotesAfterSecondSample = 0;
+		for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) ++MotesAfterSecondSample;
+		TestEqual(TEXT("A second strong sample does not duplicate a live mote pass"), MotesAfterSecondSample, 1);
+
+		Stonework->AmbientMotes.Reset();
+		Stonework->AmbientMoteCooldownRemaining = 0.f;
+		Stonework->CheckForAmbientWind();
+		int32 MotesAfterOverlapAttempt = 0;
+		for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) ++MotesAfterOverlapAttempt;
+		TestEqual(TEXT("An existing nearby mote pass suppresses an overlapping ambient pass"), MotesAfterOverlapAttempt, 1);
+		TestTrue(TEXT("Overlap suppression retries only after a short delay"),
+			FMath::IsNearlyEqual(Stonework->AmbientMoteCooldownRemaining, 3.f));
 	}
 	if (PresentationSubsystem) PresentationSubsystem->RestorePresentation();
 	TestFalse(TEXT("A previously visible proxy is restored visible"), PillarA->IsHidden());

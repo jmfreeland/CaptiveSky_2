@@ -13,10 +13,13 @@ actor, it remains inert. The interaction is a visual cue for a naturally
 occurring stronger wind, not a persistent weather event or resident decision.
 
 The UE 5.8.3 `CaptiveSky_2Editor` Development target built successfully with the
-full current working set (14 UBT actions). The headless editor automation
-`CaptiveSky2.Agent.WindArchPresentation` passed, including the calm/strong-wind
-threshold and cooldown assertions, saved-map proxy recognition, and transient
-stonework fixture. The automation does not advance natural weather in a Game/PIE
-session or capture the mote effect. A short visual/runtime check at calm and
-strong wind is still needed to judge readability and frame cost; no gameplay
-play session has been run for this change.
+full current working set (14 UBT actions); the focused follow-up rebuild also
+succeeded. `CaptiveSky2.Agent.WindArchPresentation` passed in headless Unreal
+automation. Its synthetic Game world now samples `AIslandWeather` with a
+deterministic high-wind offset, invokes the actual stonework response, and
+asserts one transient mote actor at the arch, the 30-second cooldown, no
+duplicate on a second sample, and nearby-effect suppression with a short retry
+delay. It also retains the calm/strong threshold assertions and saved-map proxy
+recognition. This fixture makes no model calls and does not start a Game/PIE
+session. A short live visual check at calm and strong wind is still needed to
+judge readability and frame cost; runtime appearance remains unverified.
