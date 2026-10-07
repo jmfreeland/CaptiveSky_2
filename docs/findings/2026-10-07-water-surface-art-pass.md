@@ -40,3 +40,28 @@ Turnkey startup. Judge center-water color, edge definition and visible swell
 pattern together; revert or retune the transient values if they still read as
 an opaque cutout. Do not change the material asset or saved map as part of that
 comparison.
+
+### Bounded Game retry (2026-10-07)
+
+After a standalone UE 5.8.3 `ValidatePlatforms` invocation completed in 0.21 s,
+the same isolated noon Game capture was retried with thinking/Python disabled,
+one maximum model request, and a 45-second realtime cap. The attempt used
+`Config/TideglassMotionProbe.json` and wrote to
+`Playtests/Codex_TideglassWaterArtRetry_20261007/`; no screenshot was produced.
+
+The log reached TurnkeySupport and Windows target-platform registration, then
+stopped at `LogSlate` on missing optional VisionOS icon files. It did not record
+completion of the in-process `ValidatePlatforms` child, Island loading, or a
+window. The editor process remained CPU-active and reported responsive, but
+made no log progress for over 90 seconds; it was stopped after approximately
+115 seconds. `AutoSDKInfo.txt` remained at its earlier timestamp, so the quick
+standalone validator result does not establish that the editor's child process
+completed. The stale `dotnet.exe` error dialog/process was not identified or
+terminated. Log: `Saved/Logs/Codex_TideglassWaterArtRetry_20261007.log`.
+
+This narrows the retry result: it is not a confirmed deadlock or a rendering
+failure, but the target-platform startup path is still not reaching the Island.
+The current launcher has no self-enforced startup timeout, so the next safe
+step is to add a process-tree-bounded startup guard before another Game retry,
+then inspect whether the Turnkey child completes. Do not infer water-art
+quality from this attempt; no rendered comparison exists yet.
