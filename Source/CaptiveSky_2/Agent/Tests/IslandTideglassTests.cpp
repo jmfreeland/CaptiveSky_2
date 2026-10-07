@@ -85,11 +85,11 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				if (PoolWater && RuntimeMaterial)
 				{
 					TestTrue(TEXT("The calm pool tint is a deep, low-saturation teal"),
-						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0045f, 0.030f, 0.038f, 1.f), 0.001f));
-					TestTrue(TEXT("The shallow swells retain a readable but bounded normal strength"),
-						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmNormalGain")), 0.92f, 0.001f));
-					TestTrue(TEXT("The calmer water is less mirror-like than the original candidate"),
-						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmRoughness")), 0.24f, 0.001f));
+						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0022f, 0.016f, 0.025f, 1.f), 0.001f));
+					TestTrue(TEXT("The shallow swells have visible but bounded normal strength"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmNormalGain")), 1.35f, 0.001f));
+					TestTrue(TEXT("The calmer water softens broad highlights while retaining surface detail"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmRoughness")), 0.34f, 0.001f));
 				}
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
@@ -163,7 +163,7 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				{
 					TestTrue(TEXT("The transient instance remains based on the generated default asset"), DefaultRuntimeMaterial->Parent == PoolWater);
 					TestTrue(TEXT("Repeated application preserves the tested readable tint"),
-						DefaultRuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0045f, 0.030f, 0.038f, 1.f), 0.001f));
+						DefaultRuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0022f, 0.016f, 0.025f, 1.f), 0.001f));
 				}
 				Tideglass->RestorePoolMaterial();
 			}

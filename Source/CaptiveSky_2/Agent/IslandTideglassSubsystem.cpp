@@ -176,16 +176,16 @@ void UIslandTideglassSubsystem::TuneReadablePoolMaterial(UMaterialInstanceDynami
 	// The source asset stays untouched. These transient overrides keep the shallow pool
 	// legible as water at noon instead of a flat cyan patch, while retaining a restrained
 	// sky-lit edge and stronger, still-small surface swells.
-	Material->SetVectorParameterValue(TEXT("CalmPoolColor"), FLinearColor(0.0045f, 0.030f, 0.038f, 1.f));
-	Material->SetVectorParameterValue(TEXT("StormPoolColor"), FLinearColor(0.004f, 0.024f, 0.040f, 1.f));
-	Material->SetVectorParameterValue(TEXT("EdgeReflectionTint"), FLinearColor(0.022f, 0.070f, 0.083f, 1.f));
-	Material->SetScalarParameterValue(TEXT("CalmRoughness"), 0.24f);
-	Material->SetScalarParameterValue(TEXT("WeatherRoughness"), 0.38f);
+	Material->SetVectorParameterValue(TEXT("CalmPoolColor"), FLinearColor(0.0022f, 0.016f, 0.025f, 1.f));
+	Material->SetVectorParameterValue(TEXT("StormPoolColor"), FLinearColor(0.002f, 0.013f, 0.026f, 1.f));
+	Material->SetVectorParameterValue(TEXT("EdgeReflectionTint"), FLinearColor(0.008f, 0.040f, 0.055f, 1.f));
+	Material->SetScalarParameterValue(TEXT("CalmRoughness"), 0.34f);
+	Material->SetScalarParameterValue(TEXT("WeatherRoughness"), 0.46f);
 	Material->SetScalarParameterValue(TEXT("Specular"), 0.42f);
-	Material->SetScalarParameterValue(TEXT("CalmNormalGain"), 0.92f);
-	Material->SetScalarParameterValue(TEXT("WeatherNormalGain"), 1.55f);
-	Material->SetScalarParameterValue(TEXT("LongSwellStrength"), 0.50f);
-	Material->SetScalarParameterValue(TEXT("ShortChopStrength"), 0.32f);
+	Material->SetScalarParameterValue(TEXT("CalmNormalGain"), 1.35f);
+	Material->SetScalarParameterValue(TEXT("WeatherNormalGain"), 1.75f);
+	Material->SetScalarParameterValue(TEXT("LongSwellStrength"), 0.80f);
+	Material->SetScalarParameterValue(TEXT("ShortChopStrength"), 0.48f);
 }
 
 void UIslandTideglassSubsystem::RestorePoolMaterial()
