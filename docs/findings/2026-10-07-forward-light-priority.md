@@ -33,6 +33,12 @@ loaded, so the runtime cap never became active; the exact process started for
 this probe was stopped. Log:
 [`Codex_ForwardLightPriorityGame_20261007.log`](../../Saved/Logs/Codex_ForwardLightPriorityGame_20261007.log).
 
+**Startup follow-up:** the accompanying `AutoSDKInfo.txt` reports
+`ValidatePlatforms` succeeded in 0.21 seconds. A low-CPU `dotnet.exe` process
+started at the same time as that validation remained after the Game parent was
+stopped; that exact child was then stopped too. This correlation does not prove
+that the child caused the Turnkey wait, and the process did not reach map load.
+
 The source-level selection and editor-render test are verified; actual Game
 selection and the original dusk screen warning remain unverified. Recheck a
 matched dusk Game sequence when a normal Island Game/PIE launch is available.
