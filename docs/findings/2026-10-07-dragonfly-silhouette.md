@@ -45,9 +45,10 @@ collision, ticking, or persistent world-state changes.
 
 The ecology regression now checks that the generated hindwings are at least 25%
 broader and 10% longer than the forewings. The UE 5.8.3 editor target build
-succeeded (7 actions), compiling both the actor and test source. Three
-`UnrealEditor-Cmd` automation attempts returned only platform-SDK validation
-output, creating no requested test log; therefore the new assertion has not run.
-The interactive editor/MCP was unavailable, so the changed outline still needs
-a passing `NightEcology` run and a resident-height capture before this art pass
-can be called done.
+succeeded (7 actions), compiling both the actor and test source. After the
+platform-SDK validation delay, the isolated headless
+`CaptiveSky2.Agent.NightEcology` test completed successfully with thinking
+disabled and a zero model-request ceiling. Log:
+[`Codex_DragonflySilhouette_20261007.log`](../../Saved/Logs/Codex_DragonflySilhouette_20261007.log).
+The interactive editor/MCP remains unavailable, so the changed outline still
+needs a resident-height capture before this art pass can be called done.
