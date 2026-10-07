@@ -39,6 +39,21 @@ started at the same time as that validation remained after the Game parent was
 stopped; that exact child was then stopped too. This correlation does not prove
 that the child caused the Turnkey wait, and the process did not reach map load.
 
-The source-level selection and editor-render test are verified; actual Game
-selection and the original dusk screen warning remain unverified. Recheck a
-matched dusk Game sequence when a normal Island Game/PIE launch is available.
+### Bounded dusk Game verification (2026-10-07)
+
+A standalone Island Game launch used the normal saved viewpoint route at a
+17:18 starting hour, with agent thinking and Python disabled, isolated world
+state, a four-minute realtime cap, and a one-request ceiling. It reached
+world-ready in 15 seconds, captured ten frames including the 17:18 opening
+frame and the Wind Arch at 18:59, then exited cleanly after 240.2 seconds with
+zero model requests. Log:
+[`Codex_ForwardLightDusk_20261007.log`](../../Saved/Logs/Codex_ForwardLightDusk_20261007.log).
+
+The earlier directional-light warning was not reproduced: its message is
+absent from this Game log, and no warning banner is visible in either the
+17:18 opening frame or the later Wind Arch frame. This verifies the warning is
+not present in this bounded Game route after the priority fix; it does not
+prove every renderer, map, or lighting configuration is warning-free. Frames:
+[`001_Shore_Approach.png`](../../Playtests/Codex_ForwardLightDusk_20261007/Screenshots/001_Shore_Approach.png)
+and
+[`008_Wind_Arch_Overlook.png`](../../Playtests/Codex_ForwardLightDusk_20261007/Screenshots/008_Wind_Arch_Overlook.png).
