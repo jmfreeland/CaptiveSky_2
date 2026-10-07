@@ -23,16 +23,23 @@ material.
   of the mesh's default material, alongside the existing 15-stone,
   collision/navigation, proxy-visibility, and natural-gust checks. Log:
   [`Codex_WindArchMaterial_20261007.log`](../../Saved/Logs/Codex_WindArchMaterial_20261007.log).
-- Runtime appearance is **not yet verified**. The first bounded Game capture
-  exited during startup because the installed DDC graph had no writable node.
-  A retry with the memory-DDC fallback stalled in UE `TurnkeySupport` platform
-  validation before loading the Island and was stopped after no log progress;
-  it produced no screenshots. Logs:
+- A bounded, isolated Game run then verified the runtime presentation at 17:00:
+  45.2 real seconds, no agent thinking or Python, and zero model requests. The
+  [Wind Arch frame](../../Playtests/Codex_WindArchTint_Only_20261007/Screenshots/001_Wind_Arch_Overlook.png)
+  shows the rough forms with a more even warm-gray surface rather than the
+  previous stark mottling. Deep shadows remain, and the near-camera pillars
+  still dominate the frame; this material pass did not change their scale. The
+  screenshot also shows UE's existing competing-directional-lights warning, a
+  separate lighting issue. Runtime log:
+  [`Codex_WindArchTint_Only_Elevated_20261007.log`](../../Saved/Logs/Codex_WindArchTint_Only_Elevated_20261007.log).
+- The first Game launch failed because the installed DDC graph had no writable
+  node. A non-elevated retry with the memory-DDC fallback stalled in UE
+  `TurnkeySupport` before loading the Island and was stopped after no log
+  progress; it produced no screenshots. The elevated bounded run above passed
+  that startup gate. Earlier logs:
   [`Codex_WindArchTintGame_20261007.log`](../../Saved/Logs/Codex_WindArchTintGame_20261007.log)
   and
   [`Codex_WindArchTintGame_MemoryDDC_20261007.log`](../../Saved/Logs/Codex_WindArchTintGame_MemoryDDC_20261007.log).
 
-When the editor/Game launch path is available again, capture the same 17:00
-Wind Arch route view and compare the shadowed stone brightness and resident
-framing. This is a reversible material experiment, not a claim that the Arch's
+This remains a reversible material improvement, not a claim that the Arch's
 oversized near-camera silhouette or the broader Island composition is solved.
