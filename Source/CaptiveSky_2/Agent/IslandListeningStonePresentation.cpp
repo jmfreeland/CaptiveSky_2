@@ -9,6 +9,8 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogListeningStonePresentation, Log, All);
 
@@ -68,6 +70,18 @@ bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const F
 	if (RockExtent.IsNearlyZero()) return false;
 
 	Stones->SetStaticMesh(RockMesh);
+	// Starter Content's mottled M_Rock reads almost black in shadow and stark white in direct
+	// sun. Keep its irregular mesh silhouette, but use the same known Color-parameter engine
+	// surface as other island stones to avoid the source texture's extreme mottling.
+	if (UMaterialInterface* BaseSurface = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+	{
+		if (UMaterialInstanceDynamic* StoneSurface = UMaterialInstanceDynamic::Create(BaseSurface, this))
+		{
+			StoneSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.28f, 0.26f, 0.22f));
+			Stones->SetMaterial(0, StoneSurface);
+		}
+	}
 	Stones->ClearInstances();
 	for (int32 Index = 0; Index < Proxies.Num(); ++Index)
 	{
