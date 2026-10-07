@@ -28,6 +28,10 @@ matched 1600x900 noon Game capture visibly confirmed the warm shell and lighter
 appendages. That capture used an isolated world-state root, disabled agent
 thinking/Python, a 25-second real-time cap, and ended with zero model requests.
 Screenshot: [close Tideglass crab view](../../Saved/Playtests/Codex_CrabAppearance_20261007/VisualScreenshotsFinal/001_Crab__Close.png).
+The `CaptiveSky2.Agent.NightEcology` regression also now checks the dynamic
+shell tint and low carapace profile; it passed in UE 5.8.3 with `-NullRHI`,
+agent thinking/Python disabled, a 45-second cap, and zero allowed model
+requests. Log: [`CrabAppearanceTestFinal.log`](../../Saved/Playtests/Codex_CrabAppearanceTest_20261007/CrabAppearanceTestFinal.log).
 
 This visual spot check confirms the material and silhouette, not the transient
 ripple-triggered scurry. The close camera also shows that dense foreground

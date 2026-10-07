@@ -1003,12 +1003,23 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabResidents;
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It)
 	{
+		// This lightweight fixture does not begin the whole world (which would
+		// also scatter the full landscape); exercise each resident's real startup.
+		if (!It->HasActorBegunPlay()) It->DispatchBeginPlay();
 		++CrabPopulation;
 		DayCrabResidents.Add(*It);
 		TestTrue(TEXT("Tidepool crab advertises as untargeted ambient life"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TidepoolCrab")) && !It->ActorHasTag(TEXT("IslandLandmark")));
 		TestTrue(TEXT("Tidepool crab remains at the shoreline of its habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
 		TestEqual(TEXT("Tidepool crab has six visible leg placeholders"), It->Legs.Num(), 6);
 		TestEqual(TEXT("Tidepool crab has two claws and two eye stalks"), It->Claws.Num(), 2);
+		TestTrue(TEXT("Tidepool crab carapace remains visibly flatter than it is wide"), It->Shell && It->Shell->GetRelativeScale3D().Z < It->Shell->GetRelativeScale3D().X * 0.5f);
+		UMaterialInstanceDynamic* CrabShellTint = It->Shell ? Cast<UMaterialInstanceDynamic>(It->Shell->GetMaterial(0)) : nullptr;
+		TestNotNull(TEXT("Tidepool crab shell uses its per-instance natural tint"), CrabShellTint);
+		if (CrabShellTint)
+		{
+			const FLinearColor ShellColor = CrabShellTint->K2_GetVectorParameterValue(TEXT("Color"));
+			TestTrue(TEXT("Tidepool crab shell keeps a warm dark rust palette"), ShellColor.R > ShellColor.G && ShellColor.G > ShellColor.B && ShellColor.R < 0.2f);
+		}
 		TestEqual(TEXT("Tidepool crab geometry cannot block the world"), It->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
