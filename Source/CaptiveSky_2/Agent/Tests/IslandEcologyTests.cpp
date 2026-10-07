@@ -1050,6 +1050,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				Wing && Wing->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Wing->CastShadow &&
 				!Wing->CanEverAffectNavigation());
 		}
+		const FProcMeshSection* ForewingSection = It->Wings.IsValidIndex(0) && It->Wings[0]
+			? It->Wings[0]->GetProcMeshSection(0) : nullptr;
+		const FProcMeshSection* HindwingSection = It->Wings.IsValidIndex(2) && It->Wings[2]
+			? It->Wings[2]->GetProcMeshSection(0) : nullptr;
+		TestTrue(TEXT("Hindwings have a broader, longer silhouette than forewings"),
+			ForewingSection && HindwingSection &&
+			HindwingSection->SectionLocalBox.GetSize().X > ForewingSection->SectionLocalBox.GetSize().X * 1.25f &&
+			HindwingSection->SectionLocalBox.GetSize().Y > ForewingSection->SectionLocalBox.GetSize().Y * 1.1f);
 	}
 	TestEqual(TEXT("Three daytime dragonflies form a small bounded population"), DragonflyPopulation, 3);
 	int32 DistinctDragonflyColorCount = 0;

@@ -15,16 +15,13 @@
 
 namespace
 {
-	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep)
+	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep, float Length, float MaximumHalfWidth)
 	{
 		if (!Wing) return;
 
 		constexpr int32 LengthSegments = 10;
 		constexpr int32 WidthSegments = 4;
 		constexpr int32 SurfaceVertexCount = (LengthSegments + 1) * (WidthSegments + 1);
-		constexpr float Length = 33.f;
-		constexpr float MaximumHalfWidth = 4.4f;
-
 		TArray<FVector> Vertices;
 		TArray<int32> Triangles;
 		TArray<FVector> Normals;
@@ -188,7 +185,13 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 	for (int32 Index = 0; Index < Wings.Num(); ++Index)
 	{
 		if (Wings[Index] && Wings[Index]->GetNumSections() == 0)
-			BuildWingSurface(Wings[Index], Index % 2 == 0 ? -1.f : 1.f, Index < 2 ? 1.7f : -1.7f);
+		{
+			const bool bForewing = Index < 2;
+			BuildWingSurface(Wings[Index], Index % 2 == 0 ? -1.f : 1.f,
+				bForewing ? 1.7f : -1.7f,
+				bForewing ? 33.f : 39.f,
+				bForewing ? 4.4f : 6.8f);
+		}
 		if (!WingMaterials[Index]) WingMaterials[Index] = UMaterialInstanceDynamic::Create(BaseMaterial, this);
 		if (!WingMaterials[Index]) continue;
 		WingMaterials[Index]->SetVectorParameterValue(TEXT("Color"), DragonflyWingColors[ColorVariant]);

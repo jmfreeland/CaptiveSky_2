@@ -34,3 +34,20 @@ When the interactive editor is available, inspect a normal resident-height
 Tideglass view and confirm the new wings remain legible while fluttering. If
 they read as opaque slivers or add measurable cost, revise or remove this
 procedural treatment before adding detail or a new asset dependency.
+
+## Hindwing readability follow-up
+
+The earlier close-view review suggested that the four identical narrow fans read
+as wing streaks. The rear pair now has a 39 cm span and 6.8 cm maximum half-width;
+the front pair remains 33 cm by 4.4 cm. This introduces the broader hindwing
+outline characteristic of dragonflies without adding assets, lights, shadows,
+collision, ticking, or persistent world-state changes.
+
+The ecology regression now checks that the generated hindwings are at least 25%
+broader and 10% longer than the forewings. The UE 5.8.3 editor target build
+succeeded (7 actions), compiling both the actor and test source. Three
+`UnrealEditor-Cmd` automation attempts returned only platform-SDK validation
+output, creating no requested test log; therefore the new assertion has not run.
+The interactive editor/MCP was unavailable, so the changed outline still needs
+a passing `NightEcology` run and a resident-height capture before this art pass
+can be called done.
