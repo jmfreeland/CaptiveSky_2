@@ -31,3 +31,16 @@ the view, but the mote pass is not clearly readable as an intentional airflow
 cue at this distance, so this is not a visual pass. The test did not record
 frame-time data; no performance conclusion is claimed. Captures are in the
 ignored `Playtests/Codex_WindArchAmbientMotes_20261007/Screenshots/` directory.
+
+Follow-up: the tiny (~3.5–5 cm) plain spheres and 140 cm light radius explain
+why the event was not legible from the overlook. The effect now uses 14–20 cm
+emissive cyan cores, a 600 cm shadow-free light radius, and a pulsing/fading
+visual core that tracks its existing eight-second flow. This is still a local
+three-light effect. In the matched bounded Game capture, two cyan cores are
+clearly visible against the sky in the 17:00 activation frame; they are gone in
+the 17:14 frame, consistent with a brief cue. This establishes visibility at
+activation, not continuous readability throughout the full effect or a frame-
+time cost measurement. The run exited after 60.3 seconds with zero model
+requests. The `CaptiveSky2.Agent.NightEcology` automation test passes with
+assertions for emissive material assignment, minimum visible scale, and broad
+shadow-free local lights.

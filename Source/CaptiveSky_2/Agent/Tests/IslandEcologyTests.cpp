@@ -1282,6 +1282,18 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (Motes)
 	{
 		TestEqual(TEXT("WindArch airflow cue uses three non-shadowing motes"), Motes->MoteLights.Num(), 3);
+		TestEqual(TEXT("Each WindArch mote has its own emissive presentation material"), Motes->MoteMaterials.Num(), 3);
+		for (int32 Index = 0; Index < Motes->MoteMeshes.Num(); ++Index)
+		{
+			const UStaticMeshComponent* Mesh = Motes->MoteMeshes[Index];
+			const UPointLightComponent* Light = Motes->MoteLights.IsValidIndex(Index) ? Motes->MoteLights[Index] : nullptr;
+			TestTrue(FString::Printf(TEXT("Wind mote %d is scaled for overlook readability"), Index),
+				Mesh && Mesh->GetRelativeScale3D().GetMin() >= 0.11f);
+			TestTrue(FString::Printf(TEXT("Wind mote %d uses an emissive material"), Index),
+				Mesh && Mesh->GetMaterial(0) && Mesh->GetMaterial(0)->IsA<UMaterialInstanceDynamic>());
+			TestTrue(FString::Printf(TEXT("Wind mote %d has a broad, shadow-free local glow"), Index),
+				Light && !Light->CastShadows && Light->AttenuationRadius >= 500.f && Light->Intensity > 100.f);
+		}
 		TestTrue(TEXT("Wind motes follow the normalized simulated gust direction"), Motes->FlowDirection.IsNormalized());
 		const FVector StartingPosition = Motes->MoteMeshes[0]->GetRelativeLocation();
 		Motes->Tick(2.f);

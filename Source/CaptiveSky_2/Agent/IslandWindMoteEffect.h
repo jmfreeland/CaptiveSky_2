@@ -5,6 +5,7 @@
 #include "IslandWindMoteEffect.generated.h"
 
 class UPointLightComponent;
+class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
 
 /** Three short-lived light motes make a WindArch's simulated local gust legible. */
@@ -27,6 +28,8 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> MoteMeshes;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TArray<TObjectPtr<UPointLightComponent>> MoteLights;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> MoteMaterials;
 
 	FVector FlowDirection = FVector::ForwardVector;
 	float FlowRadius = 1400.f;
