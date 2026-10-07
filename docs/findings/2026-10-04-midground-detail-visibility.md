@@ -75,3 +75,24 @@ Only the first baseline/90 m pair retained the identical map hash.
 Investigate distant terrain appearance separately: mesh range alone will not
 supply continuous ground texture or useful biome transitions. Keep real-time and
 model-request safeguards intact.
+
+## 150 m standalone Game comparison attempt (2026-10-07)
+
+`Start-Spectator.ps1` now exposes the already-supported
+`-IslandFoliageDetailRangeCm` command-line preview as a validated
+`-FoliageDetailRangeCm` argument (4,500–15,000 cm). PowerShell parsing and the
+range guard passed. A matched 90 m Game baseline was not obtained in this
+restricted session: the first launch could not create shader-transfer files in
+the default user-profile shader directory. Retrying with a private
+`Saved/Playtests/.../ShaderWorking` directory passed that point, but UE did not
+reach the world-ready marker within the 240-second startup guard; it stopped
+after launching `ValidatePlatforms`. The launcher ended only that Game process.
+
+Both attempts disabled resident thinking/Python, used an isolated data root, a
+60-second play cap and a one-request ceiling; no model request, Island save,
+screenshot or CSV profile was produced. Logs:
+[`first shader-path failure`](../../Saved/Logs/Codex_TideglassRange90m_20261007-backup-2026.10.07-20.07.42.log)
+and [`private shader-path startup timeout`](../../Saved/Logs/Codex_TideglassRange90m_20261007.log).
+This establishes a launch-environment issue, not a foliage-range result. The
+150 m comparison remains untested; resume only when Game startup can reach the
+Island within the bounded guard.
