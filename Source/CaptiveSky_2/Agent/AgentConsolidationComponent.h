@@ -94,6 +94,10 @@ private:
 	friend class FIslandNestTest;
 	friend class FAgentConsolidationTest;
 	static constexpr int32 MaximumAdjustmentsPerSleep = 3;
+	static constexpr int32 MaximumEvolvingTendencies = 12;
+	static constexpr int32 MaximumEvidenceIdsPerTendency = 3;
+	static constexpr int32 MaximumEvidenceIdCharacters = 128;
+	static constexpr int32 MaximumReasonCharacters = 256;
 	static constexpr float MaximumAdjustmentMagnitude = 0.03f;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	FTimerHandle RestTimer;

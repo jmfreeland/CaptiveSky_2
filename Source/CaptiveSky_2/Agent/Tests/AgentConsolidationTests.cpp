@@ -130,6 +130,14 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Unsupported evidence and adjustments past the per-sleep cap do not add tendencies"),
 		Consolidation->Tendencies.ContainsByPredicate([](const FAgentPersonalityTendency& Tendency)
 			{ return Tendency.Name.Equals(TEXT("Patience"), ESearchCase::IgnoreCase) || Tendency.Name.Equals(TEXT("Wonder"), ESearchCase::IgnoreCase); }));
+	const FString SleepPrompt = Consolidation->BuildConsolidationPrompt(Memories);
+	TestTrue(TEXT("Sleep reflection sees the current derived tendencies so it can reuse stable names"),
+		SleepPrompt.Contains(TEXT("Existing evolving tendencies")) && SleepPrompt.Contains(TEXT("- Curiosity: strength")));
+	TestTrue(TEXT("Sleep reflection prompt states the lifetime tendency and per-sleep adjustment limits"),
+		SleepPrompt.Contains(TEXT("capped at 12 tendencies")) && SleepPrompt.Contains(TEXT("at most three adjustments this sleep")));
+	TestTrue(TEXT("Sleep reflection prompt keeps evidence lists concise"),
+		SleepPrompt.Contains(TEXT("up to three exact ids")) && SleepPrompt.Contains(TEXT("at most 128 characters")) &&
+		SleepPrompt.Contains(TEXT("at most 256 characters")));
 
 	TArray<FString> HistoryLines;
 	TestTrue(TEXT("Each accepted change is represented in reversible personality history"),
@@ -198,6 +206,103 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 		FFileHelper::LoadFileToString(HistoryAfterFailedSave, *Consolidation->GetPersonalityHistoryPath()) && HistoryAfterFailedSave == HistoryBeforeFailedSave);
 	TestEqual(TEXT("The failed save does not leave behind its sleep reflection"), Memory->GetMemoryCount(), 1);
 	IFileManager::Get().DeleteDirectory(*FailedSaveBlocker, false, true);
+
+	for (int32 Batch = 0; Batch < 3; ++Batch)
+	{
+		TArray<FString> NewTendencyAdjustments;
+		for (int32 Item = 0; Item < UAgentConsolidationComponent::MaximumAdjustmentsPerSleep; ++Item)
+		{
+			const FString Trait = FString::Printf(TEXT("SlowGrowth_%02d"), Batch * UAgentConsolidationComponent::MaximumAdjustmentsPerSleep + Item);
+			NewTendencyAdjustments.Add(MakeAdjustment(*Trait, TEXT("strengthen"), TEXT("lived-memory-1")));
+		}
+		const FString BatchResponse = TEXT("{\"reflection\":\"\",\"personality_adjustments\":[") +
+			FString::Join(NewTendencyAdjustments, TEXT(",")) + TEXT("]}");
+		TestTrue(TEXT("A later sleep can add only its small batch of supported new tendencies"),
+			Consolidation->ApplyConsolidationResponse(BatchResponse, Memories));
+	}
+	TestEqual(TEXT("Lifetime personality overlay stops at its fixed tendency budget"),
+		Consolidation->Tendencies.Num(), UAgentConsolidationComponent::MaximumEvolvingTendencies);
+	const FString OverflowResponse = TEXT("{\"reflection\":\"\",\"personality_adjustments\":[") +
+		MakeAdjustment(TEXT("BeyondLifetimeBudget"), TEXT("strengthen"), TEXT("lived-memory-1")) + TEXT("]}");
+	TestTrue(TEXT("A full overlay still completes a valid consolidation transaction"),
+		Consolidation->ApplyConsolidationResponse(OverflowResponse, Memories));
+	TestFalse(TEXT("A full overlay rejects a thirteenth new tendency"),
+		Consolidation->Tendencies.ContainsByPredicate([](const FAgentPersonalityTendency& Tendency)
+			{ return Tendency.Name == TEXT("BeyondLifetimeBudget"); }));
+
+	const FAgentPersonalityTendency* CuriosityBeforeLongReason = Consolidation->Tendencies.FindByPredicate(
+		[](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Equals(TEXT("Curiosity"), ESearchCase::IgnoreCase); });
+	const float CuriosityStrengthBeforeLongReason = CuriosityBeforeLongReason ? CuriosityBeforeLongReason->Strength : 0.f;
+	const FString LongReason = FString::ChrN(UAgentConsolidationComponent::MaximumReasonCharacters + 1, TEXT('x'));
+	const FString OversizedReasonResponse = FString::Printf(
+		TEXT("{\"reflection\":\"\",\"personality_adjustments\":[{\"trait\":\"Curiosity\",\"direction\":\"strengthen\",\"amount\":0.02,\"reason\":\"%s\",\"evidence_memory_ids\":[\"lived-memory-1\"]}] }"),
+		*LongReason);
+	TestTrue(TEXT("Oversized optional detail does not fail the whole sleep transaction"),
+		Consolidation->ApplyConsolidationResponse(OversizedReasonResponse, Memories));
+	const FAgentPersonalityTendency* CuriosityAfterLongReason = Consolidation->Tendencies.FindByPredicate(
+		[](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Equals(TEXT("Curiosity"), ESearchCase::IgnoreCase); });
+	TestTrue(TEXT("An oversized reason cannot alter a tendency or its stored bounded explanation"),
+		CuriosityAfterLongReason && CuriosityAfterLongReason->LastReason.Len() <= UAgentConsolidationComponent::MaximumReasonCharacters &&
+		FMath::IsNearlyEqual(CuriosityAfterLongReason->Strength, CuriosityStrengthBeforeLongReason));
+
+	TArray<FAgentMemoryRecord> ManyEvidenceMemories;
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		FAgentMemoryRecord MemoryRecord = Evidence;
+		MemoryRecord.Id = FString::Printf(TEXT("bounded-evidence-%d"), Index);
+		ManyEvidenceMemories.Add(MemoryRecord);
+	}
+	const FString ManyEvidenceResponse = TEXT(
+		"{\"reflection\":\"\",\"personality_adjustments\":[{\"trait\":\"Curiosity\",\"direction\":\"strengthen\",\"amount\":0.001,"
+		"\"reason\":\"Five memories were available; retain only the few strongest identifiers.\",\"evidence_memory_ids\":["
+		"\"bounded-evidence-0\",\"bounded-evidence-1\",\"bounded-evidence-2\",\"bounded-evidence-3\",\"bounded-evidence-4\"]}]}");
+	TestTrue(TEXT("A tendency may cite several valid memories while retaining only a bounded subset"),
+		Consolidation->ApplyConsolidationResponse(ManyEvidenceResponse, ManyEvidenceMemories));
+	const FAgentPersonalityTendency* CuriosityAfterManyEvidence = Consolidation->Tendencies.FindByPredicate(
+		[](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Equals(TEXT("Curiosity"), ESearchCase::IgnoreCase); });
+	TestTrue(TEXT("Stored tendency evidence IDs stay within their fixed per-trait budget"),
+		CuriosityAfterManyEvidence && CuriosityAfterManyEvidence->EvidenceMemoryIds.Num() == UAgentConsolidationComponent::MaximumEvidenceIdsPerTendency);
+
+	FString LegacyState = TEXT("{\"schema_version\":1,\"revision\":1,\"tendencies\":[");
+	const FString OversizedLegacyReason = FString::ChrN(UAgentConsolidationComponent::MaximumReasonCharacters + 40, TEXT('r'));
+	const FString OversizedLegacyEvidenceId = FString::ChrN(UAgentConsolidationComponent::MaximumEvidenceIdCharacters + 1, TEXT('i'));
+	TArray<FString> LegacyTraitNames;
+	LegacyTraitNames.Add(FString::ChrN(65, TEXT('x')));
+	LegacyTraitNames.Add(TEXT("Legacy_00"));
+	LegacyTraitNames.Add(TEXT(" legacy_00 "));
+	for (int32 Index = 1; Index < UAgentConsolidationComponent::MaximumEvolvingTendencies + 3; ++Index)
+	{
+		LegacyTraitNames.Add(FString::Printf(TEXT("Legacy_%02d"), Index));
+	}
+	for (int32 Index = 0; Index < LegacyTraitNames.Num(); ++Index)
+	{
+		if (Index > 0) LegacyState += TEXT(",");
+		LegacyState += FString::Printf(
+			TEXT("{\"name\":\"%s\",\"strength\":0.15,\"last_reason\":\"%s\",\"evidence_memory_ids\":[\"%s\",\"old-0\",\"old-1\",\"old-2\",\"old-3\"]}"),
+			*LegacyTraitNames[Index], *OversizedLegacyReason, *OversizedLegacyEvidenceId);
+	}
+	LegacyState += TEXT("]}");
+	TestTrue(TEXT("The isolated fixture can replace its overlay with an older oversized state"),
+		FFileHelper::SaveStringToFile(LegacyState, *Consolidation->GetPersonalityStatePath()));
+	UAgentConsolidationComponent* LegacyLoader = NewObject<UAgentConsolidationComponent>(Resident);
+	Resident->AddInstanceComponent(LegacyLoader);
+	LegacyLoader->RegisterComponent();
+	const TArray<FAgentPersonalityTendency> LegacyTendencies = LegacyLoader->GetEvolvingTendencies();
+	TestEqual(TEXT("An older oversized state loads only the lifetime-capped number of tendencies"),
+		LegacyTendencies.Num(), UAgentConsolidationComponent::MaximumEvolvingTendencies);
+	TestFalse(TEXT("An overlong legacy tendency name cannot enter the bounded prompt overlay"),
+		LegacyTendencies.ContainsByPredicate([](const FAgentPersonalityTendency& Tendency) { return Tendency.Name.Len() > 64; }));
+	TestEqual(TEXT("Legacy tendency names are trimmed and deduplicated case-insensitively"),
+		LegacyTendencies.FilterByPredicate([](const FAgentPersonalityTendency& Tendency)
+			{ return Tendency.Name.Equals(TEXT("Legacy_00"), ESearchCase::IgnoreCase); }).Num(), 1);
+	TestTrue(TEXT("Legacy reasons are bounded during load"),
+		!LegacyTendencies.IsEmpty() && LegacyTendencies[0].LastReason.Len() == UAgentConsolidationComponent::MaximumReasonCharacters);
+	TestTrue(TEXT("Legacy supporting evidence is bounded during load"),
+		!LegacyTendencies.IsEmpty() && LegacyTendencies[0].EvidenceMemoryIds.Num() == UAgentConsolidationComponent::MaximumEvidenceIdsPerTendency);
+	TestFalse(TEXT("Overlong legacy evidence IDs cannot enter the bounded personality overlay"),
+		LegacyTendencies.ContainsByPredicate([](const FAgentPersonalityTendency& Tendency)
+			{ return Tendency.EvidenceMemoryIds.ContainsByPredicate([](const FString& Id)
+				{ return Id.Len() > UAgentConsolidationComponent::MaximumEvidenceIdCharacters; }); }));
 
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);

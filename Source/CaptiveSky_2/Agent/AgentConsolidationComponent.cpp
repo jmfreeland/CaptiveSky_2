@@ -274,6 +274,10 @@ void UAgentConsolidationComponent::EnsureStateLoaded()
 	{
 		for (const TSharedPtr<FJsonValue>& Value : *TraitArray)
 		{
+			if (Tendencies.Num() >= MaximumEvolvingTendencies)
+			{
+				break;
+			}
 			const TSharedPtr<FJsonObject>* Object = nullptr;
 			if (!Value.IsValid() || !Value->TryGetObject(Object) || !Object || !Object->IsValid())
 			{
@@ -281,20 +285,34 @@ void UAgentConsolidationComponent::EnsureStateLoaded()
 			}
 			FAgentPersonalityTendency Tendency;
 			(*Object)->TryGetStringField(TEXT("name"), Tendency.Name);
+			Tendency.Name.TrimStartAndEndInline();
+			if (Tendency.Name.IsEmpty() || Tendency.Name.Len() > 64 ||
+				Tendencies.ContainsByPredicate([&Tendency](const FAgentPersonalityTendency& Existing)
+				{
+					return Existing.Name.Equals(Tendency.Name, ESearchCase::IgnoreCase);
+				}))
+			{
+				continue;
+			}
 			double Strength = 0;
 			(*Object)->TryGetNumberField(TEXT("strength"), Strength);
 			Tendency.Strength = FMath::Clamp(static_cast<float>(Strength), -1.f, 1.f);
 			(*Object)->TryGetStringField(TEXT("last_reason"), Tendency.LastReason);
+			Tendency.LastReason = Tendency.LastReason.Left(MaximumReasonCharacters);
 			const TArray<TSharedPtr<FJsonValue>>* Evidence = nullptr;
 			if ((*Object)->TryGetArrayField(TEXT("evidence_memory_ids"), Evidence) && Evidence)
 			{
 				for (const TSharedPtr<FJsonValue>& EvidenceValue : *Evidence)
 				{
 					FString Id;
-					if (EvidenceValue.IsValid() && EvidenceValue->TryGetString(Id)) Tendency.EvidenceMemoryIds.Add(Id);
+					if (EvidenceValue.IsValid() && EvidenceValue->TryGetString(Id) && Id.Len() <= MaximumEvidenceIdCharacters)
+					{
+						Tendency.EvidenceMemoryIds.AddUnique(Id);
+						if (Tendency.EvidenceMemoryIds.Num() >= MaximumEvidenceIdsPerTendency) break;
+					}
 				}
 			}
-			if (!Tendency.Name.IsEmpty()) Tendencies.Add(Tendency);
+			Tendencies.Add(Tendency);
 		}
 	}
 }
@@ -312,8 +330,20 @@ FString UAgentConsolidationComponent::BuildConsolidationPrompt(const TArray<FAge
 		"Infer no trait without explicit evidence. Changes must be small, gradual, and may be negative. A young agent may remain unchanged.\n\n"
 		"Return only JSON: {\"reflection\":\"brief first-person synthesis\",\"personality_adjustments\":["
 		"{\"trait\":\"short neutral tendency name\",\"direction\":\"strengthen|soften\",\"amount\":0.0,"
-		"\"reason\":\"evidence-based reason\",\"evidence_memory_ids\":[\"exact id\"]}]}\n"
-		"Use an empty adjustment array unless repeated or unusually significant lived evidence supports a change.\n\nMemories:\n");
+		"\"reason\":\"evidence-based reason (at most 256 characters)\",\"evidence_memory_ids\":[\"up to three exact ids, each at most 128 characters\"]}]}\n"
+		"Use an empty adjustment array unless repeated or unusually significant lived evidence supports a change. "
+		"Use existing tendency names exactly when continuing a trait; invent a new name only for a genuinely distinct, well-supported tendency. "
+		"The entire lifetime overlay is capped at 12 tendencies; prefer leaving room rather than filling it. Make at most three adjustments this sleep.\n\n");
+	if (!Tendencies.IsEmpty())
+	{
+		Prompt += TEXT("Existing evolving tendencies (derived, optional, and subordinate to the lived evidence):\n");
+		for (const FAgentPersonalityTendency& Tendency : Tendencies)
+		{
+			Prompt += FString::Printf(TEXT("- %s: strength %.3f\n"), *Tendency.Name, Tendency.Strength);
+		}
+		Prompt += TEXT("\n");
+	}
+	Prompt += TEXT("Memories:\n");
 	for (const FAgentMemoryRecord& Memory : Memories)
 	{
 		Prompt += FString::Printf(TEXT("- id=%s time=%s importance=%.2f: %s\n"),
@@ -395,6 +425,7 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 			(*Adjustment)->TryGetStringField(TEXT("reason"), Reason);
 			(*Adjustment)->TryGetNumberField(TEXT("amount"), RequestedAmount);
 			Trait.TrimStartAndEndInline();
+			Reason.TrimStartAndEndInline();
 			Direction.ToLowerInline();
 			const FString NormalizedTrait = Trait.ToLower();
 			TArray<FString> EvidenceIds;
@@ -404,11 +435,16 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 				for (const TSharedPtr<FJsonValue>& EvidenceValue : *Evidence)
 				{
 					FString Id;
-					if (EvidenceValue.IsValid() && EvidenceValue->TryGetString(Id) && ValidEvidenceIds.Contains(Id)) EvidenceIds.AddUnique(Id);
+					if (EvidenceValue.IsValid() && EvidenceValue->TryGetString(Id) &&
+						Id.Len() <= MaximumEvidenceIdCharacters && ValidEvidenceIds.Contains(Id))
+					{
+						EvidenceIds.AddUnique(Id);
+						if (EvidenceIds.Num() >= MaximumEvidenceIdsPerTendency) break;
+					}
 				}
 			}
 			if (Trait.IsEmpty() || Trait.Len() > 64 || AdjustedTraitsThisSleep.Contains(NormalizedTrait) ||
-				Reason.IsEmpty() || EvidenceIds.IsEmpty() ||
+				Reason.IsEmpty() || Reason.Len() > MaximumReasonCharacters || EvidenceIds.IsEmpty() ||
 				(Direction != TEXT("strengthen") && Direction != TEXT("soften")) || RequestedAmount <= 0)
 			{
 				continue;
@@ -422,6 +458,10 @@ bool UAgentConsolidationComponent::ApplyConsolidationResponse(const FString& Res
 			});
 			if (!Existing)
 			{
+				if (Tendencies.Num() >= MaximumEvolvingTendencies)
+				{
+					continue;
+				}
 				FAgentPersonalityTendency NewTendency;
 				NewTendency.Name = Trait;
 				Tendencies.Add(NewTendency);
