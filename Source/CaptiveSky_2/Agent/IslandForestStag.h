@@ -7,6 +7,7 @@
 class UAnimSequence;
 class USkeletalMeshComponent;
 class AIslandLightning;
+class ARavenAgentAIController;
 
 /** A single wild stag that grazes and roams a small, bounded patch near Wind Arch. */
 UCLASS()
@@ -49,6 +50,8 @@ private:
 	float ActivityRemaining = 0.f;
 	float WakeRemaining = 0.f;
 	float ThunderCheckRemaining = 0.f;
+	float RavenCheckRemaining = 0.f;
+	float RavenFlybyCooldownRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bWakingUp = false;
@@ -58,6 +61,7 @@ private:
 
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseWanderTarget(FVector& OutTarget) const;
+	void CheckForNearbyRavenFlyby();
 	void StartMove(const FVector& Target, bool bRun);
 	void PlayLoop(UAnimSequence* Animation);
 	void BeginGrazing();

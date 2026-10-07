@@ -3,6 +3,7 @@
 #include "IslandForestStag.h"
 #include "IslandLightning.h"
 #include "IslandInteractionUtility.h"
+#include "RavenAgentAIController.h"
 #include "Animation/AnimSequence.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -11,6 +12,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Character.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandForestStagTest, "CaptiveSky2.Agent.WoodlandDeer",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -155,6 +157,58 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		Deer->ThunderCheckRemaining = 0.f;
 		Deer->Tick(0.36f);
 		TestTrue(TEXT("An audible close thunderclap gently wakes and startles the stag"), !Deer->IsResting() && Deer->IsStartled());
+	}
+
+	ACharacter* RavenPawn = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	ARavenAgentAIController* RavenController = World->SpawnActor<ARavenAgentAIController>(Spawn);
+	TestNotNull(TEXT("A raven pawn is available for the local flyby response"), RavenPawn);
+	TestNotNull(TEXT("The raven's locomotion state can qualify a flyby"), RavenController);
+	if (RavenPawn && RavenController)
+	{
+		RavenController->Possess(RavenPawn);
+		RavenController->LocomotionState = ERavenLocomotionState::Flying;
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-300.f, 0.f, 420.f));
+		Deer->BeginGrazing();
+		Deer->CheckForNearbyRavenFlyby();
+		TestTrue(TEXT("A close, low raven pass briefly startles a grazing stag"), Deer->IsStartled());
+		const FVector AwayFromRaven = (Deer->GetActorLocation() - RavenPawn->GetActorLocation()).GetSafeNormal2D();
+		TestTrue(TEXT("The stag's short run moves away from the raven"),
+			FVector::DotProduct((Deer->TargetLocation - Deer->GetActorLocation()).GetSafeNormal2D(), AwayFromRaven) > 0.9f);
+		TestTrue(TEXT("The raven response stays within the stag's existing home radius"),
+			FVector::Dist2D(Deer->HomeLocation, Deer->TargetLocation) <= 700.f);
+		TestEqual(TEXT("One flyby starts a bounded twelve-second cooldown"), Deer->RavenFlybyCooldownRemaining, 12.f);
+
+		Deer->BeginGrazing();
+		Deer->RavenFlybyCooldownRemaining = 0.f;
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 1100.f));
+		Deer->CheckForNearbyRavenFlyby();
+		TestFalse(TEXT("A high raven stays outside the stag's disturbance band"), Deer->IsStartled());
+
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-900.f, 0.f, 420.f));
+		Deer->CheckForNearbyRavenFlyby();
+		TestFalse(TEXT("A distant low flight does not startle the stag"), Deer->IsStartled());
+
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 420.f));
+		RavenController->LocomotionState = ERavenLocomotionState::Perched;
+		Deer->CheckForNearbyRavenFlyby();
+		TestFalse(TEXT("A perched raven does not startle the stag"), Deer->IsStartled());
+
+		RavenController->LocomotionState = ERavenLocomotionState::Flying;
+		Deer->SetResting(true);
+		Deer->RavenFlybyCooldownRemaining = 0.f;
+		Deer->CheckForNearbyRavenFlyby();
+		TestTrue(TEXT("A resting stag remains settled during a low raven flyby"), Deer->IsResting() && !Deer->IsStartled());
+
+		Deer->SetResting(false);
+		Deer->BeginGrazing();
+		Deer->RavenFlybyCooldownRemaining = 0.f;
+		Deer->ThunderCheckRemaining = 100.f;
+		Deer->RavenCheckRemaining = 0.f;
+		RavenController->LocomotionState = ERavenLocomotionState::Flying;
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 420.f));
+		Deer->Tick(0.36f);
+		TestTrue(TEXT("Periodic stag sensing notices the same close low flyby"), Deer->IsStartled() && Deer->RavenFlybyCooldownRemaining > 0.f);
+		RavenController->UnPossess();
 	}
 
 	GEngine->DestroyWorldContext(World);

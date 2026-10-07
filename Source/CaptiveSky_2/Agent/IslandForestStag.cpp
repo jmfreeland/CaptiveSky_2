@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "IslandLightning.h"
+#include "RavenAgentAIController.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIslandForestStag::AIslandForestStag()
@@ -85,6 +86,32 @@ void AIslandForestStag::CheckForNearbyThunder()
 		LastHeardThunder = *It;
 		if (bResting) SetResting(false);
 		RespondToQuietObservation(StrikeLocation);
+		return;
+	}
+}
+
+void AIslandForestStag::CheckForNearbyRavenFlyby()
+{
+	if (!GetWorld() || bResting || bWakingUp || bMoving || bStartled || RavenFlybyCooldownRemaining > 0.f) return;
+
+	constexpr float FlybyRadius = 700.f;
+	constexpr float MinimumHeight = 180.f;
+	constexpr float MaximumHeight = 800.f;
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
+		const APawn* Raven = It->GetPawn();
+		if (!IsValid(Raven)) continue;
+
+		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
+		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight ||
+			Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
+			continue;
+
+		// A low wing shadow briefly startles the stag; the existing bounded run returns it
+		// to its ordinary grazing routine without treating the raven as a predator target.
+		RespondToQuietObservation(Raven->GetActorLocation());
+		RavenFlybyCooldownRemaining = 12.f;
 		return;
 	}
 }
@@ -185,11 +212,18 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	if (!GetWorld()) return;
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
+	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - Delta);
 	ThunderCheckRemaining -= Delta;
 	if (ThunderCheckRemaining <= 0.f)
 	{
 		ThunderCheckRemaining = 0.35f;
 		CheckForNearbyThunder();
+	}
+	RavenCheckRemaining -= Delta;
+	if (RavenCheckRemaining <= 0.f)
+	{
+		RavenCheckRemaining = 0.35f;
+		CheckForNearbyRavenFlyby();
 	}
 	if (bResting) return;
 	if (bWakingUp)
