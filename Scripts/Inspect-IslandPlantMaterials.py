@@ -27,10 +27,20 @@ def inspect_graph(material, cache):
     report = {"path": path, "functions": [], "missing_function_calls": [], "errors": []}
     cache[path] = report
     try:
+        library = unreal.MaterialEditingLibrary
+        instance_mesh_usage = unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES
+        if isinstance(material, (unreal.Material, unreal.MaterialInstance)):
+            report["usage"] = {
+                "instanced_static_meshes": bool(library.has_material_usage(material, instance_mesh_usage))
+            }
         if isinstance(material, unreal.MaterialInstance):
+            if isinstance(material, unreal.MaterialInstanceConstant):
+                report["usage"]["instanced_static_mesh_override_exists"] = bool(
+                    library.has_material_usage_override(material, instance_mesh_usage)
+                )
             report["static_switches"] = {
-                str(name): unreal.MaterialEditingLibrary.get_material_instance_static_switch_parameter_value(material, name)
-                for name in unreal.MaterialEditingLibrary.get_static_switch_parameter_names(material)
+                str(name): library.get_material_instance_static_switch_parameter_value(material, name)
+                for name in library.get_static_switch_parameter_names(material)
             }
             parent = material.get_editor_property("parent")
             report["parent"] = parent.get_path_name() if parent else None
@@ -39,7 +49,6 @@ def inspect_graph(material, cache):
             else:
                 report["errors"].append("Material instance has no parent")
             return report
-        library = unreal.MaterialEditingLibrary
         if isinstance(material, unreal.Material):
             report["static_switches"] = {
                 str(name): library.get_material_default_static_switch_parameter_value(material, name)
@@ -70,6 +79,7 @@ def main():
     report = {"meshes": [], "graphs": {}, "limitations": [
         "Reference audit only: does not compile shaders or prove connected graph reachability.",
         "LOD section use is recorded, but camera-distance selection is not exercised.",
+        "Material usage and instance-override flags are reported read-only; no material is recompiled or saved.",
     ]}
     subsystem = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
     for path in MESH_PATHS:
@@ -97,8 +107,13 @@ def main():
     issues = sum(len(graph["missing_function_calls"]) + len(graph["errors"]) for graph in report["graphs"].values())
     issues += sum(len(mesh["errors"]) for mesh in report["meshes"])
     report["reference_issue_count"] = issues
+    report["materials_missing_instanced_static_mesh_usage"] = [
+        path for path, graph in sorted(report["graphs"].items())
+        if graph.get("usage", {}).get("instanced_static_meshes") is False
+    ]
     unreal.log("[PlantAudit] REPORT " + json.dumps(report, sort_keys=True))
-    unreal.log("[PlantAudit] COMPLETE reference_issues={}".format(issues))
+    unreal.log("[PlantAudit] COMPLETE reference_issues={} materials_missing_instanced_static_mesh_usage={}".format(
+        issues, len(report["materials_missing_instanced_static_mesh_usage"])))
 
 
 try:
