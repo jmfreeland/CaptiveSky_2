@@ -75,23 +75,55 @@ gameplay scale.
 
 ## Rigged Raven visual milestone (2026-10-06)
 
-The transient Raven now prefers `SK_Crow` when the optional pack is present, maps its idle/hop/takeoff/
-fly/landing animations to the existing Raven locomotion states, and retains the procedural fallback.
-The imported rig is visual-only for collision and navigation. Current UE 5.8.3 editor-target build,
-Raven perch/flight automation, and the real-RHI Raven pose capture pass. The pose test verifies that
-`M_Crow` resolves `T_Crow_BaseColor`. A source/UV check found the mesh samples dark albedo (about RGB
-66); a representative body pixel is RGB 88 in the deferred Base Color capture but RGB 203, 197, 184
-in the final lit capture. Setting only the diagnostic capture's exposure bias to zero brings that
-pixel to RGB 159, 149, 130. The material and texture wiring therefore work; the pale gameplay-scale
-appearance is coming from the Island's light/exposure response, not missing Crow textures. The actual
-light/exposure fix and live-editor visual review remain open, so this is not yet a polished Raven.
-The diagnostic images are in `Saved/Viewpoints/RavenWingMotion_/20261006_141548/`; the copied content
-remains in ignored `Content/`, outside Git.
+The transient Raven prefers a local `SK_Crow_CaptiveSky` copy when available, then falls back to
+`SK_Crow`; it maps the idle/hop/takeoff/fly/landing animations to existing locomotion states, and
+retains the procedural fallback. The imported rig is visual-only for collision and navigation. A
+separate `M_Crow_CaptiveSky` multiplies only the source Base Color, and the copied mesh assigns it in
+its default material slot; the Fab source assets remain untouched. The current UE 5.8.3 editor-target
+build and `CaptiveSky2.Visual.RavenWingMotion` pass, including assertions for the selected mesh and
+material, but the capture does **not** prove the new material is rendered.
 
-An A/B check of the proposed project-wide exposure change used matched 21:00 Island captures with
-the original bias `+1` and experimental bias `0`. Zero bias makes the grass and shoreline nearly
-black and hides most ground detail; `+1` preserves readable vegetation, water, and cloud detail.
-The project default is therefore restored to `+1`. This rules out a global exposure change as the
-Raven fix: continue with a localized Crow material or light response that does not darken the whole
-night landscape. Paired captures: `Saved/Viewpoints/2026-10-06_142822_h21.0/` (zero) and
+Earlier SceneCapture diagnostics showed that matched isolated-Raven images before and after changing
+the saved `FeatherAlbedoScale` from `0.22` to `0.025` were byte-identical (body pixel RGB 202, 196, 184);
+a runtime dynamic-material override to zero and a Base Color pass also left the same body pixel/image.
+Hiding the Raven body did remove it, so the capture was observing the transient mesh, but it appeared
+to ignore material changes. An added static-sphere control reported the same custom material parent,
+yet its pixel was RGB 180, 172, 155 for both zero and 0.025 albedo. Replacing that sphere's material
+with the engine `WorldGridMaterial` and recreating its render state still produced RGB 181, 173, 156.
+This suggests the SceneCapture-based automation path is not a trustworthy material-binding check. Asset audit
+confirms the copied mesh slot points to
+`M_Crow_CaptiveSky` and the material graph contains the expected multiply. The copied mesh's only
+LOD-0 render section uses material index 0, and the component resolves that index to
+`M_Crow_CaptiveSky`, so a bad section index is not the cause. These SceneCapture results were
+inconclusive about the lit game appearance; the normal game-render check is recorded below. Diagnostic
+captures are under
+`Saved/Viewpoints/RavenWingMotion_/20261006_154133/`, `.../20261006_154810/`,
+`.../20261006_155439/`, `.../20261006_155643/`, `.../20261006_155909/`, and
+`.../20261006_160225/`, `.../20261006_160731/`, `.../20261006_162043/`,
+`.../20261006_162327/`, `.../20261006_162602/`, and `.../20261006_162940/`; copied assets remain
+in ignored `Content/`, outside Git.
+
+The first bounded Game capture on 2026-10-07 reached the Island and confirmed the copied mesh,
+material, and dark feather appearance in a normal game render. It also exposed a spectator-camera
+bug: the Raven can fall or walk away from the actor-tag location after viewpoints are loaded, while
+later cuts kept using the original absolute camera points. The initial four-angle sweep therefore
+showed the Raven in only the first image. `FIslandShot` now tracks a shared tagged anchor, rebases its
+camera/look-at/focus points when each shot begins, and carries the camera and hidden visitor with the
+anchor on subsequent ticks. `CaptiveSky2.Agent.Spectator` verifies both movement before a cut and
+movement during a shot. The UE 5.8.3 editor target builds successfully, and the test passes.
+
+A second 25-second standalone Game run (thinking disabled, one-request maximum, isolated world
+state) exited normally after 25.3 seconds with zero model requests. All four 1600x900 frames show
+the dark Crow from the East, West, North, and South viewpoints; they are in
+`Saved/Playtests/Codex_CrowVisual_20261007/ScreenshotsAnchorFollow2/`. The Raven now reads as a dark
+bird in the actual game. The red texture-streaming pool warning is still visible in these captures;
+remove that diagnostic overlay before selecting a polished highlight frame. The earlier
+`ValidatePlatforms` launch stall did not reproduce in the successful editor build and Game run.
+
+The earlier source/UV check found the Crow mesh samples dark albedo (about RGB 66); the original
+material's representative body pixel was RGB 88 in a deferred Base Color capture but RGB 203, 197, 184
+in the final lit capture. Setting only the diagnostic capture's exposure bias to zero brought that
+pixel to RGB 159, 149, 130. A project-wide exposure A/B found that lowering the default from `+1` to `0`
+makes the grass and shoreline nearly black, so retain `+1` and pursue a localized Raven fix. Paired
+captures: `Saved/Viewpoints/2026-10-06_142822_h21.0/` (zero) and
 `Saved/Viewpoints/2026-10-06_143348_h21.0/` (+1).

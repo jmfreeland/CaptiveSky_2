@@ -37,6 +37,9 @@ struct FIslandShot
 	float Duration = 20.f;
 	/** Where the (hidden) player pawn waits during the shot, so subtitles and weather follow the subject. */
 	FVector Focus = FVector::ZeroVector;
+	/** Optional moving subject shared by the viewpoint's tagged camera and look-at points. */
+	TWeakObjectPtr<AActor> AnchorActor;
+	FVector AnchorLocationAtStart = FVector::ZeroVector;
 };
 
 /**

@@ -60,8 +60,9 @@ namespace
 		return Title;
 	}
 
-	bool ResolveViewpointPoint(UWorld* World, const TSharedPtr<FJsonObject>& Spec, FVector& Out)
+	bool ResolveViewpointPoint(UWorld* World, const TSharedPtr<FJsonObject>& Spec, FVector& Out, AActor** OutAnchor = nullptr)
 	{
+		if (OutAnchor) *OutAnchor = nullptr;
 		auto ReadVector = [](const TSharedPtr<FJsonObject>& Object, const TCHAR* Field, FVector& Vector)
 		{
 			const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
@@ -79,6 +80,9 @@ namespace
 			FVector Offset = FVector::ZeroVector;
 			ReadVector(Spec, TEXT("offset"), Offset);
 			Out = It->GetActorLocation() + Offset;
+			if (OutAnchor) *OutAnchor = *It;
+			UE_LOG(LogIslandSpectator, Display, TEXT("Viewpoint anchor tag '%s' resolved to '%s' at %s"),
+				*Tag, *It->GetName(), *Out.ToCompactString());
 			return true;
 		}
 		return false;
@@ -129,8 +133,15 @@ void AIslandSpectatorDirector::LoadEstablishingShots()
 			const TSharedPtr<FJsonObject>* From = nullptr;
 			const TSharedPtr<FJsonObject>* Look = nullptr;
 			FIslandShot Shot;
+			AActor* FromAnchor = nullptr;
+			AActor* LookAnchor = nullptr;
 			if (!(*Object)->TryGetObjectField(TEXT("from"), From) || !(*Object)->TryGetObjectField(TEXT("look"), Look) ||
-				!ResolveViewpointPoint(World, *From, Shot.From) || !ResolveViewpointPoint(World, *Look, Shot.LookAt)) continue;
+				!ResolveViewpointPoint(World, *From, Shot.From, &FromAnchor) || !ResolveViewpointPoint(World, *Look, Shot.LookAt, &LookAnchor)) continue;
+			if (FromAnchor && FromAnchor == LookAnchor)
+			{
+				Shot.AnchorActor = FromAnchor;
+				Shot.AnchorLocationAtStart = FromAnchor->GetActorLocation();
+			}
 			double FieldOfView = 60.0, MinimumHeight = 160.0;
 			(*Object)->TryGetNumberField(TEXT("fov"), FieldOfView);
 			(*Object)->TryGetNumberField(TEXT("min_height"), MinimumHeight);
@@ -292,6 +303,16 @@ FString AIslandSpectatorDirector::DescribeClock() const
 void AIslandSpectatorDirector::StartShot(const FIslandShot& Shot)
 {
 	Current = Shot;
+	if (AActor* Anchor = Current.AnchorActor.Get())
+	{
+		const FVector AnchorLocation = Anchor->GetActorLocation();
+		const FVector AnchorDelta = AnchorLocation - Current.AnchorLocationAtStart;
+		Current.From += AnchorDelta;
+		Current.To += AnchorDelta;
+		Current.LookAt += AnchorDelta;
+		Current.Focus += AnchorDelta;
+		Current.AnchorLocationAtStart = AnchorLocation;
+	}
 	Elapsed = 0.f;
 	++ShotIndex;
 	bShotCaptured = false;
@@ -473,6 +494,21 @@ void AIslandSpectatorDirector::Tick(float DeltaSeconds)
 		const FString Command = FString::Printf(TEXT("csvprofile frames=%d"), CSVProfileFrames);
 		const bool bCommandAccepted = GEngine && GEngine->Exec(GetWorld(), *Command);
 		UE_LOG(LogIslandSpectator, Log, TEXT("Delayed CSV profile command %s: %s"), bCommandAccepted ? TEXT("accepted") : TEXT("rejected"), *Command);
+	}
+	if (AActor* Anchor = Current.AnchorActor.Get())
+	{
+		const FVector AnchorLocation = Anchor->GetActorLocation();
+		const FVector AnchorDelta = AnchorLocation - Current.AnchorLocationAtStart;
+		if (!AnchorDelta.IsNearlyZero())
+		{
+			Current.From += AnchorDelta;
+			Current.To += AnchorDelta;
+			Current.LookAt += AnchorDelta;
+			Current.Focus += AnchorDelta;
+			if (APawn* Pawn = HiddenPawn.Get())
+				Pawn->SetActorLocation(Pawn->GetActorLocation() + AnchorDelta, false, nullptr, ETeleportType::TeleportPhysics);
+			Current.AnchorLocationAtStart = AnchorLocation;
+		}
 	}
 	Elapsed += DeltaSeconds;
 	const float Alpha = FMath::SmoothStep(0.f, 1.f, FMath::Clamp(Elapsed / FMath::Max(1.f, Current.Duration), 0.f, 1.f));

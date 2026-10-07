@@ -29,6 +29,7 @@
 #include "Misc/Paths.h"
 #include "NavigationSystem.h"
 #include "ContentStreaming.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -588,6 +589,14 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 			It->SetActorHiddenInGame(true);
 		}
 	const bool bUsingRiggedCrow = Controller->RiggedCrowBody.IsValid();
+	USkeletalMesh* AvailableCrowAsset = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow_CaptiveSky.SK_Crow_CaptiveSky"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	const bool bHasIslandCrowAsset = AvailableCrowAsset != nullptr;
+	if (!AvailableCrowAsset)
+		AvailableCrowAsset = LoadObject<USkeletalMesh>(nullptr,
+			TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	TestTrue(TEXT("Raven uses the rigged Crow exactly when its optional asset is available"),
+		bUsingRiggedCrow == (AvailableCrowAsset != nullptr));
 	UProceduralMeshComponent* LeftWing = nullptr;
 	UProceduralMeshComponent* RightWing = nullptr;
 	USceneComponent* HeadPivot = nullptr;
@@ -632,10 +641,26 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		RestoreNearbyPawns();
 		return false;
 	}
+	UMaterialInterface* IslandCrowMaterial = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/AnimalVarietyPack/Crow/Materials/M_Crow_CaptiveSky.M_Crow_CaptiveSky"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 	if (bUsingRiggedCrow && RiggedCrow)
 	{
+		TestTrue(TEXT("The active Raven body is the imported Crow asset"), RiggedCrow->GetSkeletalMeshAsset() == AvailableCrowAsset);
+		TestTrue(TEXT("The rigged Crow does not layer the procedural fallback wing meshes"), !LeftWing && !RightWing);
 		UMaterialInterface* CrowMaterial = RiggedCrow->GetMaterial(0);
 		TestNotNull(TEXT("The imported Crow keeps its authored feather material"), CrowMaterial);
+		if (bHasIslandCrowAsset && IslandCrowMaterial)
+			TestTrue(TEXT("The Island-specific dark-feather material is preferred when installed"), CrowMaterial == IslandCrowMaterial);
+		const FSkeletalMeshRenderData* CrowRenderData = AvailableCrowAsset ? AvailableCrowAsset->GetResourceForRendering() : nullptr;
+		if (CrowRenderData)
+			for (int32 LODIndex = 0; LODIndex < CrowRenderData->LODRenderData.Num(); ++LODIndex)
+				for (const FSkelMeshRenderSection& Section : CrowRenderData->LODRenderData[LODIndex].RenderSections)
+				{
+					AddInfo(FString::Printf(TEXT("Crow render section LOD=%d materialIndex=%u componentMaterial=%s"),
+						LODIndex, Section.MaterialIndex, *GetPathNameSafe(RiggedCrow->GetMaterial(Section.MaterialIndex))));
+					TestTrue(TEXT("Every imported Crow render section resolves an assigned component material"),
+						RiggedCrow->GetMaterial(Section.MaterialIndex) != nullptr);
+				}
 		TArray<UTexture*> CrowTextures;
 		if (CrowMaterial) CrowMaterial->GetUsedTextures(CrowTextures);
 		bool bHasBaseColorTexture = false;
@@ -692,6 +717,13 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	};
 
 	TestTrue(TEXT("Authored rest-pose screenshot is saved"), SavePose(TEXT("01_Rest.png")));
+	const ESceneCapturePrimitiveRenderMode OriginalRenderMode = Capture->PrimitiveRenderMode;
+	Capture->ShowOnlyActors.Add(Raven);
+	Capture->PrimitiveRenderMode = ESceneCapturePrimitiveRenderMode::PRM_UseShowOnlyList;
+	TestTrue(TEXT("An isolated rest-pose capture proves the transient Raven body is what renders"),
+		SavePose(TEXT("00_IsolatedRest.png")));
+	Capture->ShowOnlyActors.Reset();
+	Capture->PrimitiveRenderMode = OriginalRenderMode;
 	Controller->Tick(1.f);
 	if (bUsingRiggedCrow)
 		TestTrue(TEXT("Grounded Raven selects the rigged Crow's idle-look animation"), Controller->CurrentCrowAnimation == Controller->CrowIdleAnimation);

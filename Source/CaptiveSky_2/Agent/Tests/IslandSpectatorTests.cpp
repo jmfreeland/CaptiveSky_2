@@ -50,7 +50,8 @@ bool FIslandSpectatorTest::RunTest(const FString& Parameters)
 	Box->RegisterComponent();
 	Ground->SetActorLocation(FVector(0, 0, -50));
 	World->SpawnActor<ATargetPoint>(FVector(0, 0, 100), FRotator::ZeroRotator)->Tags = {TEXT("ViewA")};
-	World->SpawnActor<ATargetPoint>(FVector(2000, 2000, 100), FRotator::ZeroRotator)->Tags = {TEXT("ViewB")};
+	ATargetPoint* ViewB = World->SpawnActor<ATargetPoint>(FVector(2000, 2000, 100), FRotator::ZeroRotator);
+	ViewB->Tags = {TEXT("ViewB")};
 
 	APlayerController* Player = World->SpawnActor<APlayerController>();
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(-3000, -3000, 100), FRotator::ZeroRotator);
@@ -72,8 +73,21 @@ bool FIslandSpectatorTest::RunTest(const FString& Parameters)
 	const FVector Start = Director->GetCamera()->GetActorLocation();
 	Director->Tick(AIslandSpectatorDirector::EstablishingSeconds * 0.5f);
 	TestTrue(TEXT("Establishing views drift slowly"), !Director->GetCamera()->GetActorLocation().Equals(Start, 1.f) && FVector::Dist(Director->GetCamera()->GetActorLocation(), Start) < 400.f);
+	ViewB->AddActorWorldOffset(FVector(0, 0, 150));
 	Director->Tick(AIslandSpectatorDirector::EstablishingSeconds * 0.6f);
 	TestEqual(TEXT("After its time, the next view follows"), Director->GetCurrentShot().Title, FString(TEXT("Second Place")));
+	const FVector ShotLookAtStart = Director->GetCurrentShot().LookAt;
+	TestTrue(TEXT("A tag-anchored shot starts at the subject's current location"),
+		ShotLookAtStart.Equals(FVector(2000, 2000, 250), 1.f));
+	const FVector CameraBeforeAnchorMove = Director->GetCamera()->GetActorLocation();
+	const FVector VisitorBeforeAnchorMove = Visitor->GetActorLocation();
+	ViewB->AddActorWorldOffset(FVector(0, 0, 75));
+	Director->Tick(0.1f);
+	TestTrue(TEXT("A shot whose camera and look-at share a tag follows its moving subject"),
+		Director->GetCurrentShot().LookAt.Equals(ShotLookAtStart + FVector(0, 0, 75), 1.f));
+	TestTrue(TEXT("The camera and hidden visitor travel with the moving viewpoint anchor"),
+		Director->GetCamera()->GetActorLocation().Z > CameraBeforeAnchorMove.Z + 50.f &&
+		Visitor->GetActorLocation().Z > VisitorBeforeAnchorMove.Z + 50.f);
 
 	// A resident speaks: cut to them, with a clear line of sight even when a wall is in the obvious spot.
 	ACharacter* Speaker = World->SpawnActor<ACharacter>(FVector(500, 500, 100), FRotator::ZeroRotator);

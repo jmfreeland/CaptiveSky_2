@@ -174,7 +174,10 @@ namespace
 		// Prefer the free, rigged Crow when it is present in this checkout. The procedural
 		// raven below remains a runtime fallback for projects without the optional pack.
 		USkeletalMesh* CrowAsset = LoadObject<USkeletalMesh>(nullptr,
-			TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow_CaptiveSky.SK_Crow_CaptiveSky"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!CrowAsset)
+			CrowAsset = LoadObject<USkeletalMesh>(nullptr,
+				TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 		if (CrowAsset)
 		{
 			USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenRiggedVisualRoot"), RF_Transient);
@@ -200,10 +203,6 @@ namespace
 			CrowBody->SetRelativeScale3D(FVector(Scale));
 			CrowBody->SetRelativeLocation(FVector(0.f, 0.f, -Bounds.Origin.Z * Scale));
 			CrowBody->RegisterComponent();
-			// Retain the authored feather material and its in-pack texture dependencies.
-			if (UMaterialInterface* CrowMaterial = LoadObject<UMaterialInterface>(nullptr,
-				TEXT("/Game/AnimalVarietyPack/Crow/Materials/M_Crow.M_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet))
-				CrowBody->SetMaterial(0, CrowMaterial);
 
 			// Carrying is a real action state; keep its small visual attached to the head
 			// bone when available, but never let it affect movement or navigation.
@@ -363,6 +362,10 @@ void ARavenAgentAIController::OnPossess(APawn* InPawn)
 	EnsureProceduralRavenAppearance(InPawn);
 	CacheCrowAnimations(InPawn);
 	CacheWingComponents(InPawn);
+	UE_LOG(LogRavenAgentAI, Display, TEXT("Raven appearance on %s: mesh=%s material=%s visible=%s"),
+		InPawn ? *InPawn->GetName() : TEXT("<none>"), *GetPathNameSafe(RiggedCrowBody.IsValid() ? RiggedCrowBody->GetSkeletalMeshAsset() : nullptr),
+		*GetPathNameSafe(RiggedCrowBody.IsValid() ? RiggedCrowBody->GetMaterial(0) : nullptr),
+		RiggedCrowBody.IsValid() && RiggedCrowBody->IsVisible() && !RiggedCrowBody->bHiddenInGame ? TEXT("yes") : TEXT("no"));
 	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(InPawn))
 		if (Agent->RestPresentation) Agent->RestPresentation->SetRestPosture(EAgentRestPosture::PerchedBird);
 	HomeAltitude = InPawn ? InPawn->GetActorLocation().Z + TakeoffHeight : 0.f;
