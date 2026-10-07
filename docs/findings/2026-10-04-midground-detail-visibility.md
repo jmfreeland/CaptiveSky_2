@@ -107,11 +107,11 @@ shows the matched baseline. The added band improves this composition, but the
 far horizon remains sparse and this one stationary camera does not establish
 traversal or target-hardware performance. The 150 m sample's 1.18 ms higher p95
 and 646.61 ms maximum are worth carrying forward; sequential captures cannot
-attribute either difference to range alone. Both runs have a pronounced hitch
-tail despite passing the p95 screen: p99 is 436–459 ms, with 7 / 10 frames over
-100 ms. The worst frames report only 17–18 ms GPU time, but this does not by
-itself identify which worker or operating-system delay caused the hitch. A clean
-30-FPS percentile is not a no-hitch guarantee.
+attribute either difference to range alone. Both screenshot runs have a
+pronounced hitch tail despite passing the p95 screen: p99 is 436–459 ms, with
+7 / 10 frames over 100 ms. The worst frames report only 17–18 ms GPU time, but
+this does not by itself identify which worker or operating-system delay caused
+the hitch. A clean 30-FPS percentile is not a no-hitch guarantee.
 
 Logs: [90 m](../../Saved/Logs/Codex_TideglassRange90m_20261007.log),
 [150 m](../../Saved/Logs/Codex_TideglassRange150m_20261007.log). CSV:
@@ -119,3 +119,31 @@ Logs: [90 m](../../Saved/Logs/Codex_TideglassRange90m_20261007.log),
 [150 m 600-frame profile](../../Saved/Profiling/CSV/Profile%2820261007_211900%29.csv).
 The 150 m preview remains opt-in pending a separate PIE traversal and
 performance review; no global default or instance budget has been changed.
+
+## Screenshot-free 150 m profile (2026-10-08)
+
+To check whether the screenshot queue was contaminating the long tail, the 150 m
+run was repeated with the same five Tideglass viewpoints and the same render,
+clock, warm-cache, isolation and runtime/request caps, but without `-Shots`. The
+new `-ViewpointHour 11` option applies the fixed hour under an explicit isolated
+`-DataRoot` even when screenshots are disabled; the wrapper still refuses to
+apply it to the normal world-state directory. The 600-frame capture completed and
+the game exited at its 60-second limit with zero model requests.
+
+| 150 m capture | FrameTime p50 / p95 / p99 | >33.3 / >100 ms | Max |
+|---|---:|---:|---:|
+| Screenshots enabled | 15.75 / 23.74 / 459.22 ms | 24 / 10 of 600 | 646.61 ms |
+| Screenshots disabled | 15.58 / 21.03 / 34.70 ms | 14 / 4 of 600 | 474.65 ms |
+
+The large tail reduction is consistent with screenshot capture contributing
+substantial stalls in the earlier sample, whose log shows a screenshot queued
+near the end of the CSV window. It is not proof that screenshots explain all the
+outliers: four frames still exceeded 100 ms, the maximum remained 474.65 ms, and
+these were sequential runs on a shared machine. The no-screenshot 150 m sample
+still clears 30 FPS at p95, but does not demonstrate hitch-free traversal or
+target-hardware performance. A clean, matched 90 m no-screenshot sample is still
+needed; its attempted launch stalled in Turnkey platform validation before the
+Island became ready, so it produced no comparable capture.
+
+Log: [150 m, screenshots disabled](../../Saved/Logs/Codex_TideglassRange150m_NoShots_20261008.log).
+CSV: [150 m, 600-frame screenshot-free profile](../../Saved/Profiling/CSV/Profile%2820261007_213005%29.csv).

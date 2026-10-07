@@ -11,8 +11,9 @@ for an unattended screen: no end time, model requests drawn from a steadily refi
 daily ceiling (see AgentPlaySessionSubsystem). With -Continuous the world is relaunched if the game
 crashes (not when it is closed normally), at most five times in any hour; each restart is noted in
 Saved/Logs/SpectatorRestarts.log. Use -DataRoot and explicit caps for an isolated bounded sample; when
-either cap is supplied, even -Continuous ends at that limit. Press ` and type Island.Spectate to toggle
-back to normal control.
+either cap is supplied, even -Continuous ends at that limit. -ViewpointHour sets the isolated Island
+clock when -DataRoot is supplied, whether or not -Shots is enabled. Press ` and type Island.Spectate to
+toggle back to normal control.
 
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
@@ -134,8 +135,7 @@ if (-not [string]::IsNullOrWhiteSpace($ViewpointFile)) {
 	$arguments += "-SpectatorViewpointFile=$viewpointPath"
 }
 if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
-	if (-not $Shots) { throw "-ViewpointHour requires -Shots; it is a capture-only clock override." }
-	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ViewpointHour requires an explicit isolated -DataRoot so the captured hour cannot overwrite your normal Island clock." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ViewpointHour requires an explicit isolated -DataRoot so this clock override cannot overwrite your normal Island clock." }
 	$hour = ([double]$ViewpointHour).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
 	$execCommands += "Island.Hour $hour"
 }
