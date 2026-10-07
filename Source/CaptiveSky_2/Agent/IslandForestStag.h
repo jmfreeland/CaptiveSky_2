@@ -57,11 +57,16 @@ private:
 	float RavenFlybyCooldownRemaining = 0.f;
 	float ListeningStonesCheckRemaining = 0.f;
 	float ListeningStonesCooldownRemaining = 0.f;
+	float ResidentPresenceCheckRemaining = 0.f;
+	float ResidentPresenceCooldownRemaining = 0.f;
 	float ListeningRemaining = 0.f;
+	float ResidentNoticeRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bWakingUp = false;
 	bool bListeningToChime = false;
+	bool bNoticingResident = false;
+	bool bResidentPresenceNearby = false;
 	bool bStartled = false;
 	bool bResting = false;
 	TWeakObjectPtr<AIslandLightning> LastHeardThunder;
@@ -69,6 +74,7 @@ private:
 
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseWanderTarget(FVector& OutTarget) const;
+	void CheckForNearbyResident();
 	void CheckForNearbyRavenFlyby();
 	void CheckForNearbyListeningStonesChime();
 	void StartMove(const FVector& Target, bool bRun);

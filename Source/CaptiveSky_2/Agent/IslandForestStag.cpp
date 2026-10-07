@@ -1,6 +1,7 @@
 #include "IslandForestStag.h"
 
 #include "Animation/AnimSequence.h"
+#include "AgentBrainComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -70,12 +71,72 @@ void AIslandForestStag::BeginGrazing()
 	bMoving = false;
 	bWakingUp = false;
 	bListeningToChime = false;
+	bNoticingResident = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
+	ResidentNoticeRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
+}
+
+void AIslandForestStag::CheckForNearbyResident()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	constexpr float NoticeRadius = 600.f;
+	constexpr float RearmRadius = 850.f;
+	constexpr float QuietMovementSpeed = 180.f;
+	bool bResidentWithinRearmRange = false;
+	AActor* QuietResident = nullptr;
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Candidate = *It;
+		if (!IsValid(Candidate) || Candidate == this ||
+			!Candidate->FindComponentByClass<UAgentBrainComponent>())
+			continue;
+
+		const FVector Offset = Candidate->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (DistanceSquared > FMath::Square(RearmRadius)) continue;
+		bResidentWithinRearmRange = true;
+		if (DistanceSquared > FMath::Square(NoticeRadius) ||
+			Candidate->GetVelocity().SizeSquared2D() > FMath::Square(QuietMovementSpeed))
+			continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandForestStagResidentNotice), false, this);
+		FHitResult Hit;
+		const FVector StagEye = GetActorLocation() + FVector(0.f, 0.f, 85.f);
+		const FVector ResidentHead = Candidate->GetActorLocation() + FVector(0.f, 0.f, 65.f);
+		if (World->LineTraceSingleByChannel(Hit, StagEye, ResidentHead, ECC_Visibility, Query) &&
+			Hit.GetActor() != Candidate)
+			continue;
+
+		QuietResident = Candidate;
+		break;
+	}
+
+	if (!bResidentWithinRearmRange) bResidentPresenceNearby = false;
+	if (!QuietResident || bResidentPresenceNearby || bResting || bWakingUp || bMoving ||
+		bStartled || bListeningToChime || bNoticingResident ||
+		ResidentPresenceCooldownRemaining > 0.f || !LookAroundAnimation)
+		return;
+
+	// A visible, unhurried resident earns a brief look rather than a startle. One
+	// response covers the whole nearby group and rearms only after everyone leaves.
+	bResidentPresenceNearby = true;
+	bNoticingResident = true;
+	ResidentNoticeRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
+	ResidentPresenceCooldownRemaining = 8.f;
+	ActivityRemaining = 0.f;
+	if (DeerMesh)
+	{
+		DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		DeerMesh->PlayAnimation(LookAroundAnimation, false);
+	}
 }
 
 void AIslandForestStag::CheckForNearbyThunder()
@@ -185,8 +246,10 @@ void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 	if (bResting) return;
 	bWakingUp = false;
 	bListeningToChime = false;
+	bNoticingResident = false;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
+	ResidentNoticeRemaining = 0.f;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -221,11 +284,13 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	bMoving = false;
 	bWakingUp = false;
 	bListeningToChime = false;
+	bNoticingResident = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
+	ResidentNoticeRemaining = 0.f;
 	if (bResting)
 	{
 		PlayLoop(SleepAnimation);
@@ -253,6 +318,7 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - Delta);
 	ListeningStonesCooldownRemaining = FMath::Max(0.f, ListeningStonesCooldownRemaining - Delta);
+	ResidentPresenceCooldownRemaining = FMath::Max(0.f, ResidentPresenceCooldownRemaining - Delta);
 	ThunderCheckRemaining -= Delta;
 	if (ThunderCheckRemaining <= 0.f)
 	{
@@ -271,6 +337,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		ListeningStonesCheckRemaining = 0.35f;
 		CheckForNearbyListeningStonesChime();
 	}
+	ResidentPresenceCheckRemaining -= Delta;
+	if (ResidentPresenceCheckRemaining <= 0.f)
+	{
+		ResidentPresenceCheckRemaining = 0.35f;
+		CheckForNearbyResident();
+	}
 	if (bResting) return;
 	if (bWakingUp)
 	{
@@ -282,6 +354,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	{
 		ListeningRemaining -= Delta;
 		if (ListeningRemaining <= 0.f) BeginGrazing();
+		return;
+	}
+	if (bNoticingResident)
+	{
+		ResidentNoticeRemaining -= Delta;
+		if (ResidentNoticeRemaining <= 0.f) BeginGrazing();
 		return;
 	}
 	if (!bMoving)

@@ -125,6 +125,52 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	// Ambient wildlife notices a calm resident without turning proximity into an
+	// interaction, movement, persistent memory, or additional model request.
+	ACharacter* Resident = World->SpawnActor<ACharacter>(FVector(-300.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	UAgentBrainComponent* ResidentBrain = Resident
+		? NewObject<UAgentBrainComponent>(Resident, TEXT("AgentBrain")) : nullptr;
+	if (ResidentBrain)
+	{
+		Resident->AddInstanceComponent(ResidentBrain);
+	}
+	TestNotNull(TEXT("The ambient visitor is a conscious resident"), ResidentBrain);
+	Deer->BeginGrazing();
+	if (Resident) Resident->SetActorLocation(Deer->GetActorLocation() + FVector(-300.f, 0.f, 0.f));
+	Deer->ResidentPresenceCheckRemaining = 0.f;
+	Deer->CheckForNearbyResident();
+	TestTrue(TEXT("A nearby, visible, unhurried resident draws one brief look"), Deer->bNoticingResident);
+	TestTrue(TEXT("Noticing remains local and does not move or startle the stag"),
+		Deer->GetActorLocation().IsNearlyZero() && !Deer->bMoving && !Deer->bStartled);
+	TestFalse(TEXT("Passive noticing never starts a model request"), ResidentBrain->bRequestInFlight);
+	TestTrue(TEXT("The response is temporary and rate-limited"),
+		Deer->ResidentNoticeRemaining > 0.f && Deer->ResidentPresenceCooldownRemaining == 8.f);
+	const float NoticeRemaining = Deer->ResidentNoticeRemaining;
+	Deer->CheckForNearbyResident();
+	TestEqual(TEXT("One resident presence does not restart the same look"), Deer->ResidentNoticeRemaining, NoticeRemaining);
+	Deer->Tick(NoticeRemaining + 0.1f);
+	TestFalse(TEXT("The stag returns to grazing after its brief notice"), Deer->bNoticingResident || Deer->bMoving);
+	Deer->CheckForNearbyResident();
+	TestFalse(TEXT("A resident lingering nearby does not cause repeated looks"), Deer->bNoticingResident);
+	if (Resident) Resident->SetActorLocation(Deer->GetActorLocation() + FVector(-1000.f, 0.f, 0.f));
+	TestTrue(TEXT("The fixture resident has left the stag's rearm radius"),
+		Resident && FVector::Dist2D(Resident->GetActorLocation(), Deer->GetActorLocation()) > 850.f);
+	Deer->CheckForNearbyResident();
+	TestFalse(TEXT("Presence rearms only after the resident leaves the wider local area"), Deer->bResidentPresenceNearby);
+	if (Resident) Resident->SetActorLocation(Deer->GetActorLocation() + FVector(-300.f, 0.f, 0.f));
+	Deer->CheckForNearbyResident();
+	TestFalse(TEXT("The separate cooldown prevents an immediate return look"), Deer->bNoticingResident);
+	Deer->ResidentPresenceCooldownRemaining = 0.f;
+	Deer->CheckForNearbyResident();
+	TestTrue(TEXT("A resident who returns after leaving can be noticed again"), Deer->bNoticingResident);
+	Deer->BeginGrazing();
+	if (ResidentBrain)
+	{
+		Resident->RemoveInstanceComponent(ResidentBrain);
+		ResidentBrain->DestroyComponent();
+	}
+	if (Resident) Resident->Destroy();
+
 	FString Fact;
 	TestTrue(TEXT("Quiet observation is an implemented reversible interaction"),
 		IslandInteractionUtility::Perform(Observer, Deer, Fact));
