@@ -21,6 +21,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -DataRoot Saved/Playtests/ReturnCheck -MaxRealtimeSeconds 600 -MaxModelRequests 10
 ./Scripts/Start-Spectator.ps1 -Windowed -WindowWidth 1920 -WindowHeight 1080 -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/1080pProfile -MaxRealtimeSeconds 60 -MaxModelRequests 1 -CSVProfileFrames 600 -CSVProfileDelaySeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/BoundedCapture -MaxRealtimeSeconds 45 -MaxModelRequests 1 -StartupTimeoutSeconds 90 -ViewpointFile Config/TideglassMotionProbe.json -ViewpointHour 12
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
@@ -49,6 +50,7 @@ param(
 	[ValidateRange(0.0, 24.0)][Nullable[double]]$ViewpointHour,
 	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
 	[ValidateRange(1, 1800)][Nullable[int]]$CSVProfileDelaySeconds,
+	[ValidateRange(10, 1800)][Nullable[int]]$StartupTimeoutSeconds,
 	[ValidateRange(100, 3000)][Nullable[int]]$FoliageSwayRadiusCm,
 	[ValidateRange(0.1, 2.0)][Nullable[double]]$FoliageSwayUpdateIntervalSeconds,
 	[switch]$DisableAgentThinking,
@@ -68,6 +70,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($Continuous -and $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) {
+	throw "-StartupTimeoutSeconds is supported only for bounded non-continuous sessions."
+}
 $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
 $projectRoot = Split-Path $project
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor.exe"
@@ -84,6 +89,10 @@ $DataRoot = Resolve-ProjectPath $DataRoot
 $ShaderWorkingDir = Resolve-ProjectPath $ShaderWorkingDir
 $LocalDataCachePath = Resolve-ProjectPath $LocalDataCachePath
 $LogPath = Resolve-ProjectPath $LogPath
+if ($PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -and [string]::IsNullOrWhiteSpace($LogPath)) {
+	$startupLogName = "SpectatorStartup_$((Get-Date).ToString('yyyyMMdd_HHmmss_fff')).log"
+	$LogPath = Join-Path (Join-Path $projectRoot "Saved\Logs") $startupLogName
+}
 foreach ($outputDirectory in @($ScreenshotDirectory, $DataRoot, $ShaderWorkingDir, $LocalDataCachePath)) {
 	if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
 		New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
@@ -160,7 +169,64 @@ if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
 
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }
 if ($PSBoundParameters.ContainsKey("MaxModelRequests")) { $arguments += "-CaptiveSkyMaxModelRequests=$MaxModelRequests" }
-if (-not $Continuous) { & $editor @arguments; return }
+if (-not $Continuous) {
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) { & $editor @arguments; return }
+
+	$quotedArguments = $arguments | ForEach-Object {
+		if ("$_" -match '\s') { "`"$_`"" } else { "$_" }
+	}
+	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -PassThru
+	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
+	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
+	$worldReadyPattern = 'LogWorld: Bringing World /Game/Maps/Island\.Island up for play'
+	$bWorldReady = $false
+	while (-not $game.HasExited -and $startupTimer.Elapsed.TotalSeconds -lt $StartupTimeoutSeconds) {
+		if (Test-Path -LiteralPath $LogPath) {
+			$logStream = $null
+			$logReader = $null
+			$newLogText = ""
+			try {
+				$logStream = [System.IO.File]::Open($LogPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+				if ($logStream.Length -lt $startupLogPosition) { $startupLogPosition = 0L }
+				$logStream.Position = $startupLogPosition
+				$logReader = [System.IO.StreamReader]::new($logStream)
+				$newLogText = $logReader.ReadToEnd()
+				$startupLogPosition = $logStream.Position
+			} catch {
+				# The log may be temporarily locked while Unreal rotates or opens it; retry next poll.
+			} finally {
+				if ($logReader) { $logReader.Dispose() }
+				elseif ($logStream) { $logStream.Dispose() }
+			}
+			if ($newLogText -match $worldReadyPattern) {
+				$bWorldReady = $true
+				break
+			}
+		}
+		Start-Sleep -Milliseconds 500
+		$game.Refresh()
+	}
+	$startupTimer.Stop()
+	if (-not $bWorldReady -and -not $game.HasExited) {
+		$timeoutMessage = "Island Game did not reach the world-ready log marker within $StartupTimeoutSeconds seconds; terminating only the launched Game process tree. Log: $LogPath"
+		try {
+			$game.Kill($true)
+			$game.WaitForExit()
+		} catch {
+			throw "$timeoutMessage Process-tree termination failed: $($_.Exception.Message)"
+		}
+		throw $timeoutMessage
+	}
+	if ($bWorldReady -and -not $game.HasExited) {
+		Write-Host "Island world-ready after $([Math]::Round($startupTimer.Elapsed.TotalSeconds, 1)) seconds; waiting for the existing play/request caps."
+		$game.WaitForExit()
+	}
+	$game.Refresh()
+	if ($game.HasExited -and $game.ExitCode -ne 0) {
+		Write-Warning "Island Game exited with code $($game.ExitCode). Log: $LogPath"
+	}
+	return
+}
 $arguments += "-unattended" # a crash must end the process rather than wait on a crash-report dialog
 
 # An unattended screen should outlast an occasional engine crash (one was seen on a render worker thread

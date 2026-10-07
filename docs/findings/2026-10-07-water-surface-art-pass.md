@@ -61,7 +61,14 @@ terminated. Log: `Saved/Logs/Codex_TideglassWaterArtRetry_20261007.log`.
 
 This narrows the retry result: it is not a confirmed deadlock or a rendering
 failure, but the target-platform startup path is still not reaching the Island.
-The current launcher has no self-enforced startup timeout, so the next safe
-step is to add a process-tree-bounded startup guard before another Game retry,
-then inspect whether the Turnkey child completes. Do not infer water-art
-quality from this attempt; no rendered comparison exists yet.
+`Scripts/Start-Spectator.ps1` now has an opt-in `-StartupTimeoutSeconds` guard.
+It waits for the Island's `LogWorld: Bringing World ... up for play` marker,
+then leaves the existing play-time/request caps in charge; if startup misses
+the timeout, it kills only the launched Unreal process tree and reports the
+log path. Ordinary and continuous invocations remain unchanged unless the
+parameter is supplied; the option is explicitly rejected for continuous mode.
+PowerShell parsing, parameter validation, the readiness-marker match against a
+successful Game log line, and `.NET Process.Kill(true)` on a test-owned process
+all passed. The new guard has not yet been exercised against an actual Unreal
+launch. Do not infer water-art quality from either failed capture; no rendered
+comparison exists yet.
