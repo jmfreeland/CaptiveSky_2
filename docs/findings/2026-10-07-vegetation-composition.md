@@ -87,6 +87,39 @@ measurement is a paired, repeated PIE baseline and ground-cover-hidden profile
 at the same camera, resolution, warm-up, and scalability settings, followed by
 one structural ablation at a time. The editor was not available for that test.
 
+## Fixed-camera foliage-sway diagnostic (2026-10-07)
+
+To reduce viewpoint variation, three 1920×1080 standalone Game runs profiled the
+same Tideglass camera from `Config/TideglassMotionProbe.json`. Each used the warm
+`Saved/LocalDDC`, a fresh isolated world-state root, disabled agent thinking and
+Python, a 60-second warm-up, a 600-frame CSV sample, a 180-second real-time cap,
+and a one-request ceiling. All three ended normally with zero model requests.
+
+| Condition | Frame p50 | p95 | p99 | Max | Frames >33.3 ms | Sway-update frames |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Default local sway (100 cm, 1 s) | 15.54 ms | 25.64 ms | 42.48 ms | 469.22 ms | 14 / 600 | 11 |
+| Per-instance sway disabled | 15.96 ms | 20.01 ms | 32.05 ms | 474.27 ms | 6 / 600 | 0 |
+| Local sway at 2 s cadence | 15.82 ms | 23.00 ms | 43.09 ms | 467.53 ms | 11 / 600 | 6 |
+
+The no-sway sample improved p95 by 5.63 ms and brought p99 below the 33.3 ms
+threshold, but still had six over-budget frames. The 2 s cadence was between the
+other runs at p95 and did not improve p99. Most over-budget frames did not
+coincide with the CSV's `NumInstanceTransformUpdates` counter: 2/14 in the
+default run and 1/11 at 2 s. A single roughly 0.47 s frame-time outlier remained
+in all three conditions while GPU maxima stayed below 20 ms. These are three
+single standalone samples, so the outlier's cause and the sway effect need
+repeated/PIE confirmation; do not globally disable resident- or wind-responsive
+foliage from this evidence alone.
+
+Logs: [`Codex_StabilityFixedBaseline_20261007.log`](../../Saved/Logs/Codex_StabilityFixedBaseline_20261007.log),
+[`Codex_StabilityFixedNoSway_20261007.log`](../../Saved/Logs/Codex_StabilityFixedNoSway_20261007.log),
+and [`Codex_StabilityFixedSway2s_20261007.log`](../../Saved/Logs/Codex_StabilityFixedSway2s_20261007.log).
+CSVs: `Saved/Profiling/CSV/Profile(20261007_080758).csv`,
+`Profile(20261007_081155).csv`, and `Profile(20261007_081533).csv`. The next
+performance gate remains a paired, repeated PIE profile at the same camera and
+scalability settings, because these standalone results do not explain the
+reported 8–13 FPS PIE behavior.
+
 ## Next foliage pass
 
 Do not increase the global ground-cover budget based on these images. First
