@@ -70,6 +70,18 @@ int32 AIslandArrangement::StoneCountFor(EIslandArrangementForm Form)
 	}
 }
 
+TArray<FVector2D> AIslandArrangement::MotifOffsetsForSeed(int32 Seed)
+{
+	// A seed selects a small glyph family. Every descendant keeps its source
+	// MotifSeed, so the visible signature is recognizable without UI or text.
+	switch (static_cast<uint32>(Seed) % 3u)
+	{
+	case 1: return { FVector2D(-12.f, -8.f), FVector2D(0.f, 8.f), FVector2D(12.f, -8.f) }; // fork
+	case 2: return { FVector2D(-9.f, 6.f), FVector2D(9.f, 6.f), FVector2D(0.f, -10.f) }; // triangle
+	default: return { FVector2D(-14.f, 0.f), FVector2D(0.f, 2.f), FVector2D(14.f, 0.f) }; // path
+	}
+}
+
 FLinearColor AIslandArrangement::WeatheredTint(int32 AgeDays)
 {
 	const float Weathering = FMath::Clamp(AgeDays / static_cast<float>(DaysToWeather), 0.f, 1.f);
@@ -229,20 +241,20 @@ void AIslandArrangement::ShowSite(const FIslandArrangementSite& Site, int32 Toda
 		}
 		break;
 	}
-	// A small pale three-stone mark is the visible motif carried through a creative lineage.
-	// It is stable across sessions and deliberately separate from the main work's shape seed.
+	// A small pale glyph is the visible motif carried through a creative lineage.
+	// Keep it in the clear ring between the main work and later responses; its
+	// shape and orientation are stable across sessions and inherited descendants.
 	if (!MotifSurface) MotifSurface = MotifStones->CreateAndSetMaterialInstanceDynamic(0);
 	if (MotifSurface) MotifSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.82f, 0.77f, 0.65f));
 	FRandomStream Motif(Site.MotifSeed != 0 ? Site.MotifSeed : Site.Seed);
 	const float MotifAngle = Motif.FRandRange(0.f, 2.f * PI);
-	const FVector2D MotifAxis(FMath::Cos(MotifAngle), FMath::Sin(MotifAngle));
-	const FVector2D MotifSide(-MotifAxis.Y, MotifAxis.X);
-	for (int32 Index = 0; Index < 3; ++Index)
+	const FVector2D MotifRadial(FMath::Cos(MotifAngle), FMath::Sin(MotifAngle));
+	const FVector2D MotifTangent(-MotifRadial.Y, MotifRadial.X);
+	const TArray<FVector2D> MotifOffsets = MotifOffsetsForSeed(Site.MotifSeed != 0 ? Site.MotifSeed : Site.Seed);
+	for (int32 Index = 0; Index < MotifOffsets.Num(); ++Index)
 	{
-		const float Along = (Index - 1) * 17.f;
-		const float Across = (Index == 1 ? 0.f : (Index == 0 ? -1.f : 1.f)) * 5.f;
 		const float Thickness = Motif.FRandRange(0.045f, 0.06f);
-		const FVector2D Mark = MotifAxis * (58.f + Along) + MotifSide * Across;
+		const FVector2D Mark = MotifRadial * 90.f + MotifTangent * MotifOffsets[Index].X + MotifRadial * MotifOffsets[Index].Y;
 		const float Size = Motif.FRandRange(0.08f, 0.105f);
 		MotifStones->AddInstance(FTransform(FRotator(0.f, Motif.FRandRange(0.f, 360.f), 0.f),
 			FVector(Mark.X, Mark.Y, Thickness * 35.f), FVector(Size, Size * Motif.FRandRange(0.72f, 0.9f), Thickness)));

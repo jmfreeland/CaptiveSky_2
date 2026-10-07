@@ -85,6 +85,16 @@ namespace
 
 bool FIslandArrangementTest::RunTest(const FString& Parameters)
 {
+	const TArray<FVector2D> PathMotif = AIslandArrangement::MotifOffsetsForSeed(0);
+	const TArray<FVector2D> ForkMotif = AIslandArrangement::MotifOffsetsForSeed(1);
+	const TArray<FVector2D> TriangleMotif = AIslandArrangement::MotifOffsetsForSeed(2);
+	const TArray<FVector2D> RepeatedForkMotif = AIslandArrangement::MotifOffsetsForSeed(1);
+	TestTrue(TEXT("A stable motif seed reproduces the same glyph layout"), ForkMotif.Num() == 3 && RepeatedForkMotif.Num() == 3 &&
+		ForkMotif[0].Equals(RepeatedForkMotif[0]) && ForkMotif[1].Equals(RepeatedForkMotif[1]) && ForkMotif[2].Equals(RepeatedForkMotif[2]));
+	TestTrue(TEXT("The small cultural motif vocabulary contains distinct path, fork, and triangle glyphs"),
+		PathMotif.Num() == 3 && ForkMotif.Num() == 3 && TriangleMotif.Num() == 3 &&
+		!PathMotif[0].Equals(ForkMotif[0]) && !PathMotif[0].Equals(TriangleMotif[0]) && !ForkMotif[0].Equals(TriangleMotif[0]));
+
 	// No gateway or model requests. Isolated, unique identities keep the place-memory regression
 	// from reading or overwriting any actual resident's data.
 	const FString TestSuffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);

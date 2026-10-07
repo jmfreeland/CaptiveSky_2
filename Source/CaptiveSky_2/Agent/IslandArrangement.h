@@ -141,6 +141,8 @@ public:
 	static constexpr float LichenLightIntensity = 5.f;
 
 	static int32 StoneCountFor(EIslandArrangementForm Form);
+	/** Three stable, seed-selected glyph layouts; descendants inherit the same seed and shape. */
+	static TArray<FVector2D> MotifOffsetsForSeed(int32 Seed);
 	/** Fresh pale stone at age 0, fully moss-darkened at DaysToWeather. */
 	static FLinearColor WeatheredTint(int32 AgeDays);
 	/** 0 until the work is fully weathered, then rises smoothly to 1 at DaysToWeather + DaysToGlow. */
