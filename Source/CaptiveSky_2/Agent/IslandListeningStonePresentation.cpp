@@ -94,11 +94,42 @@ bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const F
 		const FVector WorldExtent = Bounds.BoxExtent;
 		const FVector LocalExtent = MarkerTransform.InverseTransformVectorNoScale(WorldExtent).GetAbs();
 		const FQuat LocalRotation = MarkerTransform.InverseTransformRotation(Proxy->GetActorQuat());
-		const FVector Scale(LocalExtent.X / RockExtent.X, LocalExtent.Y / RockExtent.Y, LocalExtent.Z / RockExtent.Z);
-		Stones->AddInstance(FTransform(LocalRotation, Center, Scale));
+
+		// The old one-rock-per-proxy fit stretched the same mesh to the blockout's tall,
+		// narrow dimensions. Build a small cairn instead: every rock keeps its aspect ratio,
+		// while overlapping layers fill the original silhouette without changing its target.
+		const float FootprintScale = FMath::Min(LocalExtent.X / RockExtent.X, LocalExtent.Y / RockExtent.Y);
+		const float StoneScale = FootprintScale * 0.82f;
+		const float SegmentHeight = RockExtent.Z * StoneScale * 2.f;
+		const float TargetHeight = LocalExtent.Z * 2.f;
+		if (!FMath::IsFinite(SegmentHeight) || SegmentHeight <= KINDA_SMALL_NUMBER ||
+			!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER) return false;
+
+		const int32 SegmentCount = FMath::Clamp(
+			FMath::CeilToInt(TargetHeight / (SegmentHeight * 0.78f)), 2, 7);
+		const float MaximumSpacing = SegmentHeight * 0.74f;
+		const float FittedSpacing = (TargetHeight - SegmentHeight) / (SegmentCount - 1);
+		const float Spacing = FMath::Min(MaximumSpacing, FittedSpacing);
+		const float StackHeight = SegmentHeight + Spacing * (SegmentCount - 1);
+		const float FirstOffset = -0.5f * StackHeight + 0.5f * SegmentHeight;
+		const float OffsetRadius = FMath::Min(LocalExtent.X, LocalExtent.Y) * 0.12f;
+		const FVector Scale(StoneScale);
+
+		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
+		{
+			const float Angle = FMath::DegreesToRadians(Index * 67.f + Layer * 137.5f);
+			const float EdgeFactor = (Layer == 0 || Layer == SegmentCount - 1) ? 0.35f : 1.f;
+			const FVector LayerOffset(
+				FMath::Cos(Angle) * OffsetRadius * EdgeFactor,
+				FMath::Sin(Angle) * OffsetRadius * EdgeFactor,
+				FirstOffset + Layer * Spacing);
+			const FQuat Variation(FVector::UpVector,
+				FMath::DegreesToRadians(Index * 23.f + Layer * 31.f));
+			Stones->AddInstance(FTransform(LocalRotation * Variation, Center + LayerOffset, Scale));
+		}
 		ResonanceLights[Index]->SetRelativeLocation(Center);
 	}
-	return GetStoneCount() == 3;
+	return GetStoneCount() >= 6;
 }
 
 void AListeningStonePresentation::BeginResonance(float WindSpeed)
@@ -292,7 +323,7 @@ void UIslandListeningStonePresentationSubsystem::ApplyPresentation(UWorld* World
 		Proxy->SetActorHiddenInGame(true);
 	}
 	PresentationActor = Presentation;
-	UE_LOG(LogListeningStonePresentation, Log, TEXT("Three cube visuals now present as transient collisionless rock monoliths; map proxies remain unchanged."));
+	UE_LOG(LogListeningStonePresentation, Log, TEXT("Three cube visuals now present as transient collisionless stacked rock cairns; map proxies remain unchanged."));
 }
 
 void UIslandListeningStonePresentationSubsystem::RestorePresentation()

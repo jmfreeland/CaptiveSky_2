@@ -107,16 +107,43 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Game start creates a transient stone presentation"), Presentation);
 	if (Presentation)
 	{
-		TestEqual(TEXT("Three monolith forms match the three blockout proxies"), Presentation->GetStoneCount(), 3);
+		TestTrue(TEXT("The three blockout proxies become a small stack of individual rock forms"),
+			Presentation->GetStoneCount() >= 6 && Presentation->GetStoneCount() <= 21);
 		TestTrue(TEXT("Replacement render component is collisionless"), Presentation->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Replacement forms do not affect navigation"), Presentation->Stones->CanEverAffectNavigation());
 		TestTrue(TEXT("Existing Starter Content rock is used"), Presentation->Stones->GetStaticMesh() == Rock);
-		for (int32 Index = 0; Index < 3; ++Index)
+		for (int32 Index = 0; Index < Presentation->GetStoneCount(); ++Index)
 		{
 			FTransform Instance;
-			TestTrue(FString::Printf(TEXT("Stone form %d has a fitted transform"), Index), Presentation->Stones->GetInstanceTransform(Index, Instance, true));
-			TestTrue(FString::Printf(TEXT("Stone form %d stays centered on its proxy bounds"), Index),
-				Instance.GetLocation().Equals(Proxies[Index]->GetStaticMeshComponent()->Bounds.Origin, 1.f));
+			TestTrue(FString::Printf(TEXT("Stacked rock %d has a valid transform"), Index), Presentation->Stones->GetInstanceTransform(Index, Instance, true));
+			const FVector Scale = Instance.GetScale3D();
+			TestTrue(FString::Printf(TEXT("Stacked rock %d keeps a natural, uniform aspect ratio"), Index),
+				FMath::IsNearlyEqual(Scale.X, Scale.Y, 0.001f) && FMath::IsNearlyEqual(Scale.Y, Scale.Z, 0.001f));
+
+			int32 ClosestProxyIndex = INDEX_NONE;
+			float ClosestHorizontalDistanceSquared = TNumericLimits<float>::Max();
+			for (int32 ProxyIndex = 0; ProxyIndex < Proxies.Num(); ++ProxyIndex)
+			{
+				const FVector Delta = Instance.GetLocation() - Proxies[ProxyIndex]->GetStaticMeshComponent()->Bounds.Origin;
+				const float HorizontalDistanceSquared = FVector(Delta.X, Delta.Y, 0.f).SizeSquared();
+				if (HorizontalDistanceSquared < ClosestHorizontalDistanceSquared)
+				{
+					ClosestHorizontalDistanceSquared = HorizontalDistanceSquared;
+					ClosestProxyIndex = ProxyIndex;
+				}
+			}
+			if (Proxies.IsValidIndex(ClosestProxyIndex))
+			{
+				const FBoxSphereBounds& ProxyBounds = Proxies[ClosestProxyIndex]->GetStaticMeshComponent()->Bounds;
+				const FVector Delta = Instance.GetLocation() - ProxyBounds.Origin;
+				TestTrue(FString::Printf(TEXT("Stacked rock %d remains inside the original proxy bounds"), Index),
+					FMath::Abs(Delta.X) <= ProxyBounds.BoxExtent.X + 1.f &&
+					FMath::Abs(Delta.Y) <= ProxyBounds.BoxExtent.Y + 1.f &&
+					FMath::Abs(Delta.Z) <= ProxyBounds.BoxExtent.Z + 1.f);
+			}
+		}
+		for (int32 Index = 0; Index < Proxies.Num(); ++Index)
+		{
 			TestEqual(FString::Printf(TEXT("Proxy %d collision setting is unchanged"), Index),
 				Proxies[Index]->GetStaticMeshComponent()->GetCollisionEnabled(), OriginalCollision[Index]);
 			TestEqual(FString::Printf(TEXT("Proxy %d navigation setting is unchanged"), Index),
