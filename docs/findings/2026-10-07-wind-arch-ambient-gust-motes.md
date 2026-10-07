@@ -21,5 +21,13 @@ asserts one transient mote actor at the arch, the 30-second cooldown, no
 duplicate on a second sample, and nearby-effect suppression with a short retry
 delay. It also retains the calm/strong threshold assertions and saved-map proxy
 recognition. This fixture makes no model calls and does not start a Game/PIE
-session. A short live visual check at calm and strong wind is still needed to
-judge readability and frame cost; runtime appearance remains unverified.
+session.
+
+A bounded UE 5.8.3 Game capture was then run at the Wind Arch overlook at 17:00
+and 17:14 with a forced 60-second storm, thinking/Python disabled, a 60-second
+real-time cap, and a one-request cap. It exited normally after 60.1 seconds
+with zero model requests. The screenshots contain small vertical flecks across
+the view, but the mote pass is not clearly readable as an intentional airflow
+cue at this distance, so this is not a visual pass. The test did not record
+frame-time data; no performance conclusion is claimed. Captures are in the
+ignored `Playtests/Codex_WindArchAmbientMotes_20261007/Screenshots/` directory.
