@@ -20,14 +20,19 @@ public:
 	AIslandNest();
 
 	static constexpr int32 TwigsPerLayer = 7;
+	static constexpr int32 StormDebrisTwigCount = 5;
 
-	void SetWoven(FName InSiteTag, int32 InLayers);
+	void SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebris = false);
 	int32 GetWovenLayers() const { return WovenLayers; }
 	int32 GetVisibleTwigCount() const;
+	int32 GetVisibleFallenTwigCount() const;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
 	TObjectPtr<UInstancedStaticMeshComponent> Twigs;
+
+	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
+	TObjectPtr<UInstancedStaticMeshComponent> FallenTwigs;
 
 	FName SiteTag;
 	int32 WovenLayers = 0;

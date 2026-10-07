@@ -431,6 +431,8 @@ int32 UIslandWorldStateSubsystem::AddNestLayer(FName SiteTag, const FVector& Sup
 	}
 	if (Record->Layers >= MaxNestLayers) return 0;
 	++Record->Layers;
+	// Re-weaving repairs a recent storm tear; residents should not keep seeing loose twigs afterward.
+	Record->StormDamagedDay = -1;
 	Record->UpdatedUtc = FDateTime::UtcNow();
 	if (!BuilderAgentId.IsEmpty()) Record->Builders.AddUnique(BuilderAgentId);
 	const FIslandNestRecord Updated = *Record;
@@ -451,12 +453,18 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 {
 	const TOptional<float> PreviousHour = SavedHour;
 	const TOptional<int32> PreviousDay = SavedDay;
+	const int32 PreviousDayValue = SavedDay.Get(1);
 	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
 	SavedDay = FMath::Max(1, Day);
 	// A new Island day ages every arrangement a little.
 	if (SavedDay.GetValue() != ShownArrangementDay)
 		for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
-	if (Save()) return true;
+	if (Save())
+	{
+		if (SavedDay.GetValue() != PreviousDayValue)
+			for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
+		return true;
+	}
 	SavedHour = PreviousHour;
 	SavedDay = PreviousDay;
 	return false;
@@ -554,7 +562,9 @@ void UIslandWorldStateSubsystem::RefreshNestActor(const FIslandNestRecord& Recor
 		if (!Actor.IsValid()) return;
 		Actor->Tags.AddUnique(FName(*(TEXT("Nest_") + Record.SiteTag.ToString())));
 	}
-	Actor->SetWoven(Record.SiteTag, Record.Layers);
+	const int32 Today = DisplayDay();
+	const bool bRecentStormDamage = Record.StormDamagedDay >= 0 && Today >= Record.StormDamagedDay && Today - Record.StormDamagedDay <= 2;
+	Actor->SetWoven(Record.SiteTag, Record.Layers, bRecentStormDamage);
 }
 
 void UIslandWorldStateSubsystem::DestroyNestActors()

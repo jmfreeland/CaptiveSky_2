@@ -273,7 +273,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				FHitResult Hit;
 				if (GetWorld()->LineTraceSingleByChannel(Hit, Location, NestView, ECC_Visibility, Params)) continue;
 				// Lasting changes are perceived as they are; who made one is known only to its makers.
-				const bool bStormTorn = Nest.StormDamagedDay >= 0 && UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()) - Nest.StormDamagedDay <= 2;
+				const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+				const bool bStormTorn = Nest.StormDamagedDay >= 0 && Today >= Nest.StormDamagedDay && Today - Nest.StormDamagedDay <= 2;
 				NearbyBeings += !OwnId.IsEmpty() && Nest.Builders.Contains(OwnId)
 					? FString::Printf(TEXT(" The nest you have been weaving at %s is %.0f metres away, %d of %d layers woven.%s"),
 						*Nest.SiteTag.ToString(), FVector::Dist(Location, NestView) / 100.f, Nest.Layers, UIslandWorldStateSubsystem::MaxNestLayers,

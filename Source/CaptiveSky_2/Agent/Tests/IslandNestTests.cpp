@@ -232,15 +232,36 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 			}
 		}
 	}
+	AIslandNest* WovenNest = nullptr;
+	for (TActorIterator<AIslandNest> It(World); It; ++It) { WovenNest = *It; break; }
+	TArray<FString> StormMarks;
+	TestTrue(TEXT("A storm can leave marks on lasting nest work"), State->ApplyStormMarks(3600.0, 1, StormMarks));
+	Nest = State->FindNest(Site);
+	TestTrue(TEXT("The storm removes one outer layer and records when it happened"),
+		Nest && Nest->Layers == 1 && Nest->StormDamagedDay == 1 && StormMarks.ContainsByPredicate([](const FString& Mark)
+			{ return Mark.Contains(TEXT("nest at TestNestRoost")); }));
+	TestEqual(TEXT("A fresh storm tear renders fallen twigs below the nest"),
+		WovenNest ? WovenNest->GetVisibleFallenTwigCount() : 0, AIslandNest::StormDebrisTwigCount);
 
 	// Bystanders perceive the nest but not who made it.
 	ACharacter* Bystander = World->SpawnActor<ACharacter>(FVector(0.f, 400.f, 302.f), FRotator::ZeroRotator);
 	UAgentBrainComponent* BystanderBrain = NewObject<UAgentBrainComponent>(Bystander);
 	Bystander->AddInstanceComponent(BystanderBrain);
 	BystanderBrain->RegisterComponent();
+	const FString DamagedNestView = BystanderBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Nearby residents are told about recent storm damage and loose twigs"),
+		DamagedNestView.Contains(TEXT("outer layer was torn loose in a recent storm")) && DamagedNestView.Contains(TEXT("twigs lie scattered beneath it")));
+	Controller->WovenUntil.Reset();
+	Controller->bCarryingTwigs = true;
+	Decide(Site.ToString());
+	Nest = State->FindNest(Site);
+	TestTrue(TEXT("Re-weaving repairs the nest and clears its storm-damage mark"), Nest && Nest->Layers == 2 && Nest->StormDamagedDay == -1);
+	TestEqual(TEXT("Repair removes the visible fallen-twig debris"),
+		WovenNest ? WovenNest->GetVisibleFallenTwigCount() : -1, 0);
 	const FString BystanderView = BystanderBrain->BuildSituationSummary(FAgentConversationContext());
-	TestTrue(TEXT("A nearby resident can come across the nest"), BystanderView.Contains(TEXT("A small nest of woven twigs")) && BystanderView.Contains(TEXT("2 of 5 layers")));
+	TestTrue(TEXT("A nearby resident can come across the repaired nest"), BystanderView.Contains(TEXT("A small nest of woven twigs")) && BystanderView.Contains(TEXT("2 of 5 layers")));
 	TestTrue(TEXT("The maker is not revealed to someone who did not see it"), BystanderView.Contains(TEXT("did not see who made it")) && !BystanderView.Contains(Raven->GetName()));
+	TestFalse(TEXT("The repaired nest no longer reads as storm-torn"), BystanderView.Contains(TEXT("outer layer was torn loose in a recent storm")));
 	TestFalse(TEXT("A non-raven is not offered the Raven-only forage or nest targets"),
 		BystanderView.Contains(TEXT("build target: GatherTwigs")) || BystanderView.Contains(TEXT("build target: TestNestRoost")));
 	Controller->UnPossess();
