@@ -57,3 +57,30 @@ separately. This run had no CSV frame sampling and does not resolve the PIE vs.
 standalone performance discrepancy or visually validate dragonfly ripple
 responses; the interactive editor was still absent from the desktop window
 inventory.
+
+## Raven portrait follow-up (2026-10-08)
+
+Three standalone Game attempts used a tag-follow camera on the runtime Raven at
+17:00, with 1600×900 captures, disabled agent thinking/Python, isolated world
+data, a warm DDC, a 60-second realtime cap, and a one-request ceiling. Each
+ended normally with zero model requests. The Raven controller logged the rigged
+Crow mesh and visible state in every run, and the `Raven` tag consistently
+resolved to `BP_Raven_Placeholder_C_0`; the target itself is therefore present
+and camera-anchor resolution is not the failure.
+
+- The [first wide composition](../../Playtests/Codex_RavenPortraitGolden_20261008/Screenshots/002_Golden_Portrait.png)
+  keeps Aster at the far left and Raven as a tiny dark shape near the ground.
+- The [closer view](../../Playtests/Codex_RavenPortraitClose_20261008/Screenshots/002_Close_Portrait.png)
+  and [elevated view](../../Playtests/Codex_RavenPortraitElevated_20261008/Screenshots/002_Elevated_Portrait.png)
+  are dominated by foreground grass; Raven is not legible in either frame.
+- All three frames show the red texture-streaming pool warning (about 4.4–5.7
+  MiB over budget), further disqualifying them as showcase captures.
+
+Logs: [`golden`](../../Saved/Logs/Codex_RavenPortraitGolden_20261008.log),
+[`close`](../../Saved/Logs/Codex_RavenPortraitClose_20261008.log), and
+[`elevated`](../../Saved/Logs/Codex_RavenPortraitElevated_20261008.log). Do not
+continue blind tag-follow framing from ground-level grass. Next, use a verified
+supported elevated roost/branch or a clear circulation edge for the portrait,
+and resolve the streaming-pool warning before calling a runtime frame a
+highlight. These are failed composition experiments, not claims that Raven is
+missing or that the runtime is crashing.
