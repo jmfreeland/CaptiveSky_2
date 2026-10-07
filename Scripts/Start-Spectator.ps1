@@ -23,6 +23,7 @@ back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/TideglassMotion -MaxRealtimeSeconds 40 -MaxModelRequests 1 -ScreenshotDirectory Playtests/TideglassMotion/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -EstablishingSeconds 10
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/BoundedCapture -MaxRealtimeSeconds 45 -MaxModelRequests 1 -StartupTimeoutSeconds 90 -ViewpointFile Config/TideglassMotionProbe.json -ViewpointHour 12
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
+./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/TideglassStormProof -MaxRealtimeSeconds 60 -MaxModelRequests 1 -StartupTimeoutSeconds 600 -ScreenshotDirectory Playtests/TideglassStormProof/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -ViewpointHour 12 -ForceStormSeconds 120
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -DisableOcclusionQueries -DataRoot Saved/Playtests/OcclusionOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/OcclusionOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/OcclusionOff.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
@@ -51,6 +52,7 @@ param(
 	[ValidateRange(1, 2000)][Nullable[int]]$CSVProfileFrames,
 	[ValidateRange(1, 1800)][Nullable[int]]$CSVProfileDelaySeconds,
 	[ValidateRange(10, 1800)][Nullable[int]]$StartupTimeoutSeconds,
+	[ValidateRange(1, 3600)][Nullable[int]]$ForceStormSeconds,
 	[ValidateRange(100, 3000)][Nullable[int]]$FoliageSwayRadiusCm,
 	[ValidateRange(0.1, 2.0)][Nullable[double]]$FoliageSwayUpdateIntervalSeconds,
 	[switch]$DisableAgentThinking,
@@ -72,6 +74,16 @@ param(
 $ErrorActionPreference = "Stop"
 if ($Continuous -and $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) {
 	throw "-StartupTimeoutSeconds is supported only for bounded non-continuous sessions."
+}
+if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) {
+	if ($Continuous) { throw "-ForceStormSeconds is supported only for bounded non-continuous sessions." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ForceStormSeconds requires an isolated -DataRoot." }
+	if (-not $DisableAgentThinking) { throw "-ForceStormSeconds requires -DisableAgentThinking for diagnostic runs." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-ForceStormSeconds requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
 }
 $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
 $projectRoot = Split-Path $project
@@ -125,6 +137,7 @@ if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
 	$hour = ([double]$ViewpointHour).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
 	$execCommands += "Island.Hour $hour"
 }
+if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) { $execCommands += "Island.Storm $ForceStormSeconds" }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($DisablePython) { $arguments += "-DisablePython" }

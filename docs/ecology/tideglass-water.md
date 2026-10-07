@@ -254,3 +254,18 @@ Runtime evidence: `Saved/Logs/Codex_TideglassGrazingReadableTest_20261007.log` a
 `Saved/Logs/Codex_TideglassGrazingReadableGame_ElevatedFast_20261007.log`. Next visual pass should
 focus on more legible surface structure and pool-edge treatment without reintroducing the bright
 grazing reflections.
+
+## Bounded forced-storm launch attempt (2026-10-07)
+
+`Scripts/Start-Spectator.ps1` now accepts `-ForceStormSeconds` for a diagnostic storm. To keep the
+override safe, it is rejected for continuous sessions and requires an isolated `-DataRoot`,
+`-DisableAgentThinking`, and explicit startup/realtime/request caps. PowerShell syntax, refusal
+without disabled thinking, and refusal without a startup timeout passed. A 75-second Game run
+with a 180-second storm, one-request cap, thinking/Python disabled, and a 600-second startup
+guard confirmed the command line contained
+`Island.Hour 12,Island.Storm 180`. It did not reach the Island's world-ready marker: the log stopped
+during Turnkey/`ValidatePlatforms` startup and the `AutoSDKInfo.txt` timestamp did not advance. At
+600 seconds, the guard terminated only the Game process tree it had launched. No screenshot or
+storm/ripple observation was produced; this is a startup timeout, not a weather-rendering result.
+Log: `Saved/Logs/Codex_RippleStormVerification_20261007.log`. Do not repeat this launch unchanged;
+retry after the Turnkey startup path changes or is diagnosed.
