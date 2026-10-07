@@ -1471,6 +1471,40 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
 
+		const FVector DragonflyRippleTestHome = TestPoolLocation + FVector(12000.f, 0.f, 800.f);
+		WatchableDragonfly->SetActorLocation(DragonflyRippleTestHome);
+		WatchableDragonfly->HomeLocation = DragonflyRippleTestHome;
+		AIslandPoolRippleEffect* VisitorRipple = World->SpawnActor<AIslandPoolRippleEffect>(
+			WatchableDragonfly->GetActorLocation() + FVector(100.f, 0.f, -160.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A nearby untagged pool ripple is available for filtering"), VisitorRipple);
+		if (VisitorRipple)
+		{
+			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
+			TestTrue(TEXT("Visitor ripples do not trigger the dragonfly's natural response"),
+				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
+			VisitorRipple->ConfigureAsWindImpact(100.f);
+			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
+			TestTrue(TEXT("A nearby wind ripple draws a brief, temporary dragonfly interest response"),
+				WatchableDragonfly->RippleInterestRemaining > 0.f && WatchableDragonfly->RippleInterestRemaining <= 1.8f);
+			TestTrue(TEXT("The dragonfly aims just above the water surface"),
+				FMath::IsNearlyEqual(WatchableDragonfly->RippleInterestLocation.Z, VisitorRipple->GetActorLocation().Z + 110.f));
+			TestEqual(TEXT("One natural ripple starts a bounded seven-second response cooldown"),
+				WatchableDragonfly->RippleInterestCooldownRemaining, 7.f);
+			const FVector BeforeSwoop = WatchableDragonfly->GetActorLocation();
+			WatchableDragonfly->Tick(0.35f);
+			TestTrue(TEXT("The dragonfly begins curving toward the ripple rather than staying on its patrol point"),
+				FVector::DistSquared(WatchableDragonfly->GetActorLocation(), WatchableDragonfly->RippleInterestLocation) <
+				FVector::DistSquared(BeforeSwoop, WatchableDragonfly->RippleInterestLocation));
+			const FVector FirstRippleTarget = WatchableDragonfly->RippleInterestLocation;
+			VisitorRipple->SetActorLocation(WatchableDragonfly->GetActorLocation() + FVector(40.f, 0.f, -160.f));
+			WatchableDragonfly->RippleInterestRemaining = 0.f;
+			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
+			TestTrue(TEXT("A second nearby ripple cannot retrigger during cooldown"),
+				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
+			TestTrue(TEXT("Cooldown preserves the first ephemeral focus point"),
+				WatchableDragonfly->RippleInterestLocation.Equals(FirstRippleTarget));
+		}
+
 		const FVector DragonflyLocation = WatchableDragonfly->GetActorLocation();
 		const FVector LowFlybyLocation = DragonflyLocation + FVector(-200.f, 0.f, 250.f);
 		Controller->LocomotionState = ERavenLocomotionState::Flying;

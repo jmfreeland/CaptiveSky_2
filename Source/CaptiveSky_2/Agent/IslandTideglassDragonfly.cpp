@@ -1,5 +1,6 @@
 #include "IslandTideglassDragonfly.h"
 
+#include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "Components/StaticMeshComponent.h"
 #include "CollisionQueryParams.h"
@@ -238,6 +239,38 @@ void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
 	}
 }
 
+bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLocation)
+{
+	if (RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f ||
+		FVector::DistSquared2D(GetActorLocation(), RippleLocation) > FMath::Square(250.f) ||
+		FMath::Abs(GetActorLocation().Z - RippleLocation.Z) > 300.f)
+		return false;
+
+	// A brief curious dip toward the water, not a landing or a persistent change.
+	RippleInterestLocation = RippleLocation + FVector(0.f, 0.f, 110.f);
+	RippleInterestRemaining = 1.8f;
+	RippleInterestCooldownRemaining = 7.f;
+	return true;
+}
+
+void AIslandTideglassDragonfly::CheckForNearbyNaturalSurfaceRipple()
+{
+	if (!GetWorld() || RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f) return;
+
+	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact"))) continue;
+		if (RespondToSurfaceRipple(It->GetActorLocation())) return;
+	}
+}
+
+float AIslandTideglassDragonfly::GetRippleInterestAlpha() const
+{
+	if (RippleInterestRemaining <= 0.f) return 0.f;
+	const float Elapsed = 1.8f - RippleInterestRemaining;
+	return FMath::SmoothStep(0.f, 0.45f, Elapsed) * (1.f - FMath::SmoothStep(1.2f, 1.8f, Elapsed));
+}
+
 FVector AIslandTideglassDragonfly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
 {
 	UWorld* World = GetWorld();
@@ -265,11 +298,19 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	const float Time = GetWorld()->GetTimeSeconds();
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	RippleInterestRemaining = FMath::Max(0.f, RippleInterestRemaining - SafeDelta);
+	RippleInterestCooldownRemaining = FMath::Max(0.f, RippleInterestCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.35f;
 		CheckForLowRavenFlyby();
+	}
+	RippleCheckRemaining -= SafeDelta;
+	if (RippleCheckRemaining <= 0.f)
+	{
+		RippleCheckRemaining = 0.35f;
+		CheckForNearbyNaturalSurfaceRipple();
 	}
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float MoveScale = RainMovementScale(Rain);
@@ -280,7 +321,9 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 		(150.f * FMath::Sin(MotionTime * 0.29f + Phase * 1.7f) + ScatterDirection.Y * 270.f * ScatterAlpha) * MoveScale,
 		110.f + 55.f * FMath::Sin(MotionTime * 0.9f + Phase * 1.2f) + (ScatterAlpha * 35.f));
 	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
-	const FVector Desired = HomeLocation + Offset + WindDisplacement(LocalWind);
+	const FVector PatrolLocation = HomeLocation + Offset + WindDisplacement(LocalWind);
+	const FVector RippleInterestLocationWithOrbit = RippleInterestLocation + FVector(0.f, 0.f, 12.f) + Offset * 0.12f;
+	const FVector Desired = FMath::Lerp(PatrolLocation, RippleInterestLocationWithOrbit, GetRippleInterestAlpha());
 	const FVector Previous = GetActorLocation();
 	const FVector Safe = ResolveFlightPath(Previous, Desired);
 	SetActorLocation(Safe, false);

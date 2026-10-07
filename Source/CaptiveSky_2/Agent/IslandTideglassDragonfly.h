@@ -56,8 +56,15 @@ private:
 	float ScatterRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	float RippleInterestRemaining = 0.f;
+	float RippleInterestCooldownRemaining = 0.f;
+	float RippleCheckRemaining = 0.f;
+	FVector RippleInterestLocation = FVector::ZeroVector;
 	int32 ColorVariant = 0;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
+	void CheckForNearbyNaturalSurfaceRipple();
+	bool RespondToSurfaceRipple(const FVector& RippleLocation);
+	float GetRippleInterestAlpha() const;
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 };
