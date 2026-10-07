@@ -116,9 +116,13 @@ A second 25-second standalone Game run (thinking disabled, one-request maximum, 
 state) exited normally after 25.3 seconds with zero model requests. All four 1600x900 frames show
 the dark Crow from the East, West, North, and South viewpoints; they are in
 `Saved/Playtests/Codex_CrowVisual_20261007/ScreenshotsAnchorFollow2/`. The Raven now reads as a dark
-bird in the actual game. The red texture-streaming pool warning is still visible in these captures;
-remove that diagnostic overlay before selecting a polished highlight frame. The earlier
-`ValidatePlatforms` launch stall did not reproduce in the successful editor build and Game run.
+bird in the actual game. A later bounded capture used Unreal's temporary `DisableAllScreenMessages`
+command to hide the red texture-pool warning from the highlight image while retaining the spectator
+caption; all four shots are in `Saved/Playtests/Codex_CrowVisual_20261007/ScreenshotsHighlight/`.
+This is only a presentation toggle: the 1000 MB texture pool remains over budget by a few MB, and
+raising it through early `ExecCmds` or a command-line CVar was overridden by the active scalability
+profile. No project setting was changed. The earlier `ValidatePlatforms` launch stall did not
+reproduce in the successful editor build and Game run.
 
 The earlier source/UV check found the Crow mesh samples dark albedo (about RGB 66); the original
 material's representative body pixel was RGB 88 in a deferred Base Color capture but RGB 203, 197, 184
