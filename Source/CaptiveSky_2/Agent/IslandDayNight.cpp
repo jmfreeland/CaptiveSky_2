@@ -251,6 +251,29 @@ void AIslandDayNight::UpdateLighting()
 	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
 	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
 	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
+
+	// Translucent water and volumetric fog can use only one directional light. Give
+	// the brightest current source a unique top priority; keep the inactive/secondary
+	// sources ordered below it so ties never make the renderer choose by brightness.
+	TArray<UDirectionalLightComponent*> DirectionalLights;
+	if (Sun)
+		if (UDirectionalLightComponent* SunComponent = Cast<UDirectionalLightComponent>(Sun->GetLightComponent()))
+			DirectionalLights.Add(SunComponent);
+	if (Moon) DirectionalLights.Add(Moon);
+	if (Starlight) DirectionalLights.Add(Starlight);
+	UDirectionalLightComponent* PrimaryLight = nullptr;
+	for (UDirectionalLightComponent* Light : DirectionalLights)
+		if (Light && (!PrimaryLight || Light->Intensity > PrimaryLight->Intensity)) PrimaryLight = Light;
+	int32 SecondaryPriority = 0;
+	for (UDirectionalLightComponent* Light : DirectionalLights)
+		if (Light && Light != PrimaryLight)
+		{
+			if (Light->ForwardShadingPriority != SecondaryPriority)
+				Light->SetForwardShadingPriority(SecondaryPriority);
+			++SecondaryPriority;
+		}
+	if (PrimaryLight && PrimaryLight->ForwardShadingPriority != DirectionalLights.Num() - 1)
+		PrimaryLight->SetForwardShadingPriority(DirectionalLights.Num() - 1);
 }
 
 FString AIslandDayNight::DescribeTime() const

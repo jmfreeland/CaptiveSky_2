@@ -71,6 +71,26 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->Sky = Sky;
 	TestNotNull(TEXT("The shared clock owns a procedural starfield"), Clock->Starfield);
 	TestNotNull(TEXT("The shared clock owns a night fill light"), Clock->Starlight.Get());
+	auto VerifyForwardLightSelection = [this, Sun, Clock](const TCHAR* Phase)
+	{
+		TArray<UDirectionalLightComponent*> Lights;
+		Lights.Add(Cast<UDirectionalLightComponent>(Sun->GetLightComponent()));
+		Lights.Add(Clock->Moon.Get());
+		Lights.Add(Clock->Starlight.Get());
+		Lights.Remove(nullptr);
+		TSet<int32> Priorities;
+		UDirectionalLightComponent* BrightestLight = nullptr;
+		for (UDirectionalLightComponent* Light : Lights)
+		{
+			Priorities.Add(Light->ForwardShadingPriority);
+			if (!BrightestLight || Light->Intensity > BrightestLight->Intensity) BrightestLight = Light;
+		}
+		TestEqual(FString::Printf(TEXT("%s assigns a unique forward priority to each Island directional light"), Phase),
+			Priorities.Num(), Lights.Num());
+		if (BrightestLight)
+			TestEqual(FString::Printf(TEXT("%s gives the brightest directional light the unique top priority"), Phase),
+				BrightestLight->ForwardShadingPriority, Lights.Num() - 1);
+	};
 	if (Clock->Starfield)
 	{
 		TestEqual(TEXT("The starfield has six progressive twilight groups"), Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount);
@@ -101,6 +121,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->DayNumber = 1;
 	Clock->DaySunIntensity = 10.f;
 	Clock->UpdateLighting();
+	VerifyForwardLightSelection(TEXT("Noon"));
 	bool bNoStarGroupsAtNoon = true;
 	if (Clock->Starfield)
 		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
@@ -113,6 +134,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
 	Clock->CurrentHour = 18.5f;
 	Clock->UpdateLighting();
+	VerifyForwardLightSelection(TEXT("Dusk"));
 	int32 VisibleStarGroupsAtDusk = 0;
 	if (Clock->Starfield)
 		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
@@ -122,6 +144,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		VisibleStarGroupsAtDusk > 0 && VisibleStarGroupsAtDusk < AIslandDayNight::NightStarSectionCount);
 	Clock->CurrentHour = 0.f;
 	Clock->UpdateLighting();
+	VerifyForwardLightSelection(TEXT("New moon"));
 	bool bFirstTwilightGroupVisible = false;
 	if (Clock->Starfield)
 		if (const FProcMeshSection* FirstStarGroup = Clock->Starfield->GetProcMeshSection(0))
@@ -151,6 +174,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		NewMoonDescription.Contains(TEXT("waxing")) && NewMoonDescription.Contains(TEXT("very faint")));
 	Clock->DayNumber = 15;
 	Clock->UpdateLighting();
+	VerifyForwardLightSelection(TEXT("Full moon"));
 	const float FullMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near full moon, the moon moves opposite the sun's arc"), FullMoonOffset > 170.f);
 	const FString FullMoonDescription = Clock->DescribeTime();
