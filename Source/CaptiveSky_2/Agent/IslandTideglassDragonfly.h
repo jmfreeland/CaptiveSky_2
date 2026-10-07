@@ -40,6 +40,8 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Abdomen;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TArray<TObjectPtr<UStaticMeshComponent>> Eyes;
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Wings;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseMaterial;
@@ -49,6 +51,8 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WingMaterials;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> BodyMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> EyeMaterial;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector ScatterDirection = FVector::ZeroVector;

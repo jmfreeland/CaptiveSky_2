@@ -1036,7 +1036,20 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Dragonfly is wild ambient life, not a landmark"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TideglassDragonfly")) && !It->ActorHasTag(TEXT("IslandLandmark")));
 		TestTrue(TEXT("Day dragonfly patrol stays near and above Tideglass"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 700.f && It->GetActorLocation().Z > Habitat->GetActorLocation().Z + 100.f);
 		TestEqual(TEXT("Dragonfly has a distinct four-wing silhouette"), It->Wings.Num(), 4);
-		TestTrue(TEXT("Dragonfly has head, thorax, and elongated abdomen meshes"), It->Head && It->Thorax && It->Abdomen);
+		TestTrue(TEXT("Dragonfly has head, thorax, elongated abdomen, and paired eyes"),
+			It->Head && It->Thorax && It->Abdomen && It->Eyes.Num() == 2);
+		UMaterialInstanceDynamic* EyeMaterial = It->EyeMaterial.Get();
+		TestNotNull(TEXT("Dragonfly compound eyes use a distinct dark material"), EyeMaterial);
+		if (EyeMaterial)
+		{
+			const FLinearColor EyeColor = EyeMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			TestTrue(TEXT("Compound eyes remain visibly darker than the natural body morph"),
+				EyeColor.R < 0.04f && EyeColor.G < 0.05f && EyeColor.B < 0.04f);
+		}
+		for (UStaticMeshComponent* Eye : It->Eyes)
+			TestTrue(TEXT("Each compound eye is cosmetic and cannot block movement or navigation"),
+				Eye && Eye->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+				!Eye->CastShadow && !Eye->CanEverAffectNavigation());
 		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
 		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
 		if (BodyMaterial) DragonflyColors.Add(BodyMaterial->K2_GetVectorParameterValue(TEXT("Color")));

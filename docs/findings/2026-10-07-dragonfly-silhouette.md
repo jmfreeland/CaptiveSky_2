@@ -80,3 +80,20 @@ placeholder rather than a detailed insect asset. This is an offscreen editor
 capture, not a live-editor or gameplay-scale performance check; the interactive
 editor/MCP endpoint was still unavailable during this pass. Revisit the wing
 material and flutter at resident height when the full editor connection returns.
+
+## Paired-eye detail (2026-10-08)
+
+The next close-view pass adds two small, dark compound-eye forms to each of the
+three transient Tideglass dragonflies. They reuse the existing sphere mesh and
+known color-parameter material; body parts and eyes explicitly disable collision,
+shadow casting, and navigation relevance. `NightEcology` checks the pair, dark
+color override, and those exclusions. The target rebuilt successfully and the
+focused automation passed:
+[`Codex_DragonflyEyes_20261008.log`](../../Saved/Logs/Codex_DragonflyEyes_20261008.log).
+
+The close `CaptiveSky2.Visual.Viewpoints` capture passed with three transient
+dragonflies and no world-state writes. Its current view shows the dark eye pair
+against the bright head, though it is still a simple procedural study rather
+than a finished insect model:
+[`02e_TideglassDragonflyClose.png`](../../Saved/Viewpoints/2026-10-08_005441_h12.0/02e_TideglassDragonflyClose.png).
+Log: [`Codex_DragonflyEyesVisual_20261008.log`](../../Saved/Logs/Codex_DragonflyEyesVisual_20261008.log).

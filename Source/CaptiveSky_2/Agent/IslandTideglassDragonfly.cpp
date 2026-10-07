@@ -126,12 +126,15 @@ AIslandTideglassDragonfly::AIslandTideglassDragonfly()
 		Part->SetRelativeLocation(Location);
 		Part->SetRelativeScale3D(Scale);
 		Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Part->SetCanEverAffectNavigation(false);
 		Part->SetCastShadow(false);
 		return Part;
 	};
 	Head = MakeBodyPart(TEXT("Head"), FVector(8.f, 0.f, 0.f), FVector(0.045f, 0.045f, 0.045f));
 	Thorax = MakeBodyPart(TEXT("Thorax"), FVector(0.f, 0.f, 0.f), FVector(0.07f, 0.055f, 0.055f));
 	Abdomen = MakeBodyPart(TEXT("Abdomen"), FVector(-11.f, 0.f, 0.f), FVector(0.19f, 0.025f, 0.027f));
+	Eyes.Add(MakeBodyPart(TEXT("Eye_Left"), FVector(9.2f, -3.0f, 1.7f), FVector(0.026f, 0.026f, 0.026f)));
+	Eyes.Add(MakeBodyPart(TEXT("Eye_Right"), FVector(9.2f, 3.0f, 1.7f), FVector(0.026f, 0.026f, 0.026f)));
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		const bool bLeft = Index % 2 == 0;
@@ -186,6 +189,13 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 		if (Head) Head->SetMaterial(0, BodyMaterial);
 		if (Thorax) Thorax->SetMaterial(0, BodyMaterial);
 		if (Abdomen) Abdomen->SetMaterial(0, BodyMaterial);
+	}
+	if (!EyeMaterial) EyeMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+	if (EyeMaterial)
+	{
+		EyeMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.012f, 0.024f, 0.018f));
+		for (UStaticMeshComponent* Eye : Eyes)
+			if (Eye) Eye->SetMaterial(0, EyeMaterial);
 	}
 	WingMaterials.SetNum(Wings.Num());
 	for (int32 Index = 0; Index < Wings.Num(); ++Index)
