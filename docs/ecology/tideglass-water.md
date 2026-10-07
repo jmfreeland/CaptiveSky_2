@@ -204,3 +204,21 @@ frame is `Saved/Playtests/Codex_TideglassStorm_20261005/Screenshots/005_Tideglas
 17:24). Both frames still show several bright, floating sphere-like highlights, so the art pass
 has not resolved the visible issue. They use different routes/times and do not isolate ripple
 intensity; the spheres' source remains unconfirmed. Do not present these as a matched visual fix.
+
+## Transient Tideglass capture and foliage spot check (2026-10-07)
+
+The first new noon capture intentionally omitted `-TideglassMaterial`, so its white pool was the
+documented fallback sphere—not a regression. The local `/Game/Materials/M_TideglassPool_Lively`
+asset loaded correctly when passed to the transient preview. A calm-collection Tideglass view
+with the temporary `meadowunderstory` layer is saved at
+`Saved/Viewpoints/2026-10-07_042902_h12.0/02_Tideglass.png`; the surface is teal and the capture
+leaves the saved world state untouched. Generic blockout props and sparse distant coverage still
+dominate the wide composition, so this is evidence of the material preview, not a polished
+highlight.
+
+The Tideglass and Tideglass-ground-detail captures passed the 30 FPS *capture-screen* gate: their
+reported p95 frame rates were 52.09 and 50.11 FPS over 50 valid intervals. The ground-detail
+camera still looks through foreground plants; switching from 21 `meadowunderstory` HISM components
+to four `grass` components changed that p95 from 50.11 to 47.66 FPS and did not make the water legible
+from this low framing. These are offscreen SceneCapture measurements, not actual-gameplay or
+target-hardware guarantees. No Game/PIE session was run for this check.
