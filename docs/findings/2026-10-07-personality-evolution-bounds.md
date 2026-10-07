@@ -30,5 +30,15 @@ and agent thinking disabled, a zero model-request cap, and an isolated data
 root; it does not establish what a live model will choose to remember during
 sleep. Log: [`Codex_PersonalityEvolutionBounds_20261007.log`](../../Saved/Logs/Codex_PersonalityEvolutionBounds_20261007.log).
 
+**Resident wiring regression (2026-10-07):** the same automation now loads the
+actual `BP_Agent_Placeholder` (Aster), `BP_Raven_Placeholder`, and configured
+Innkeeper body class. It asserts each is an `AAutonomousAgentCharacter` with
+its own memory, decision brain, and `UAgentConsolidationComponent`, so the
+shared sleep/personality lifecycle cannot silently disappear from one conscious
+resident Blueprint. The UE 5.8.3 editor target rebuilt successfully, and
+`CaptiveSky2.Agent.PersonalityConsolidation` passed with NullRHI, Python and
+agent thinking disabled, zero model requests, and a separate data root. Log:
+[`Codex_ConsciousResidentConsolidation_20261007.log`](../../Saved/Logs/Codex_ConsciousResidentConsolidation_20261007.log).
+
 A live-model sleep remains a separate, explicitly budgeted check; the code
 change itself adds no sleep call, model request, or automatic memory.

@@ -5,9 +5,11 @@
 #include "AgentBrainComponent.h"
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
+#include "AutonomousAgentCharacter.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "HAL/FileManager.h"
+#include "IslandInnkeeperSubsystem.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
@@ -16,6 +18,25 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentConsolidationTest, "CaptiveSky2.Agent.Per
 
 bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 {
+	auto CheckConsciousResidentBody = [this](const TCHAR* Label, UClass* BodyClass)
+	{
+		if (!TestNotNull(FString::Printf(TEXT("%s body class is available"), Label), BodyClass)) return;
+		TestTrue(FString::Printf(TEXT("%s uses the shared autonomous-agent architecture"), Label),
+			BodyClass->IsChildOf(AAutonomousAgentCharacter::StaticClass()));
+		const AAutonomousAgentCharacter* Defaults = Cast<AAutonomousAgentCharacter>(BodyClass->GetDefaultObject());
+		if (!TestNotNull(FString::Printf(TEXT("%s has autonomous-agent defaults"), Label), Defaults)) return;
+		TestNotNull(FString::Printf(TEXT("%s has lived memory for sleep reflection"), Label), Defaults->Memory.Get());
+		TestNotNull(FString::Printf(TEXT("%s has a decision brain"), Label), Defaults->Brain.Get());
+		TestNotNull(FString::Printf(TEXT("%s has sleep-based personality consolidation"), Label), Defaults->Consolidation.Get());
+	};
+
+	CheckConsciousResidentBody(TEXT("Aster"), LoadClass<AAutonomousAgentCharacter>(nullptr,
+		TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C")));
+	CheckConsciousResidentBody(TEXT("Raven"), LoadClass<AAutonomousAgentCharacter>(nullptr,
+		TEXT("/Game/Agents/BP_Raven_Placeholder.BP_Raven_Placeholder_C")));
+	const UIslandInnkeeperSubsystem* InnkeeperDefaults = GetDefault<UIslandInnkeeperSubsystem>();
+	CheckConsciousResidentBody(TEXT("Innkeeper"), InnkeeperDefaults ? InnkeeperDefaults->BodyClass.LoadSynchronous() : nullptr);
+
 	const FString TestAgentId = TEXT("Automation_Consolidation_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	const FString TestDirectory = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / TestAgentId);
 	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
