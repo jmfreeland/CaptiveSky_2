@@ -11,7 +11,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
 
-const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_Lively.M_TideglassPool_Lively");
+const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_GrazingReadable.M_TideglassPool_GrazingReadable");
 
 namespace
 {

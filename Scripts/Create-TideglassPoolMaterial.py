@@ -8,10 +8,13 @@ it; the previous M_TideglassPool_NormalizedWind asset is preserved.
 """
 
 import traceback
+import os
 import unreal
 
 
-MATERIAL_PATH = "/Game/Materials/M_TideglassPool_Lively"
+MATERIAL_NAME = os.environ.get("CAPTIVESKY_TIDEGLASS_MATERIAL_NAME", "M_TideglassPool_Lively")
+MATERIAL_PATH = "/Game/Materials/" + MATERIAL_NAME
+IS_GRAZING_READABLE_CANDIDATE = MATERIAL_NAME == "M_TideglassPool_GrazingReadable"
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WAVE_NORMAL = "/Water/Textures/Normals/T_Water_TilingNormal_Waves_02"
 MEL = unreal.MaterialEditingLibrary
@@ -71,7 +74,7 @@ def build():
         raise RuntimeError("Missing environment collection or Water plugin normal texture")
 
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    material = tools.create_asset("M_TideglassPool_Lively", "/Game/Materials",
+    material = tools.create_asset(MATERIAL_NAME, "/Game/Materials",
                                   unreal.Material, unreal.MaterialFactoryNew())
     if not material:
         raise RuntimeError("Could not create " + MATERIAL_PATH)
@@ -135,13 +138,15 @@ def build():
     link(normal_xy, normalized)
     MEL.connect_material_property(normalized, "", unreal.MaterialProperty.MP_NORMAL)
 
-    calm_pool_color = vector(material, "CalmPoolColor", (0.025, 0.17, 0.22), 100, -250)
+    calm_color = (0.012, 0.085, 0.11) if IS_GRAZING_READABLE_CANDIDATE else (0.025, 0.17, 0.22)
+    calm_pool_color = vector(material, "CalmPoolColor", calm_color, 100, -250)
     storm_pool_color = vector(material, "StormPoolColor", (0.006, 0.045, 0.08), 100, -100)
     pool_color = expr(material, unreal.MaterialExpressionLinearInterpolate, 360, -260)
     link(calm_pool_color, pool_color, "A")
     link(storm_pool_color, pool_color, "B")
     link(agitation, pool_color, "Alpha")
-    reflection_tint = vector(material, "EdgeReflectionTint", (0.14, 0.43, 0.47), 300, -100)
+    edge_tint = (0.045, 0.16, 0.19) if IS_GRAZING_READABLE_CANDIDATE else (0.14, 0.43, 0.47)
+    reflection_tint = vector(material, "EdgeReflectionTint", edge_tint, 300, -100)
     fresnel = expr(material, unreal.MaterialExpressionFresnel, 300, 50, exponent=4.0)
     color = expr(material, unreal.MaterialExpressionLinearInterpolate, 700, -180)
     link(pool_color, color, "A")
