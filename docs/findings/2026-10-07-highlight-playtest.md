@@ -28,3 +28,32 @@
 1. In the editor, repair the plant material usage flags, save the affected asset instances, and recapture the same daytime viewpoints.
 2. Profile PIE and standalone using the same resolution, camera, and warm-up window, recording actual frame-time statistics; reconcile the result with the earlier low-FPS observation.
 3. Prioritize authored visual improvements for the bare shore, Tideglass water surface, and Wind Arch silhouette before using these frames as final highlights.
+
+## Noon visual recheck (2026-10-07)
+
+A second standalone UE 5.8.3 spectator capture used the saved Island viewpoints
+at noon and 1600×900. Agent thinking and Python were disabled; the world-state
+root and shader-working directory were isolated, the warm local DDC was reused,
+and the session had a 90-second realtime cap and a one-request ceiling. It ended
+normally after 90.1 seconds with **0 model requests**. Fifteen frames were
+captured as the viewpoint route repeated before the cap. Runtime log:
+[`Codex_TideglassVisualRecheck_20261007.log`](../../Saved/Logs/Codex_TideglassVisualRecheck_20261007.log); captures:
+[`Screenshots/`](../../Saved/Playtests/Codex_TideglassVisualRecheck_20261007/Screenshots/).
+
+The runtime log confirms that the Lively Tideglass material and four transient
+shore-rock visuals were applied. In the frame, however, the pool still reads as
+a smooth, opaque cyan basin rather than water with an obvious readable surface
+pattern. The close ground-detail view is crowded by tall, overlapping blades;
+the wide shore approach remains mostly bare with thin tree silhouettes, and
+the Wind Arch still dominates with oversized high-contrast rock forms. The Inn
+view remains blockout-heavy. These are art-direction observations from stills,
+not material-state or performance measurements.
+
+The same log contains a `WaterBrushManager` export-load warning (including a
+missing `/Script/WaterEditor` import). Because the Tideglass runtime subsystem
+also logs that its separate water material was successfully applied, this
+warning alone does not explain the cyan appearance and should be investigated
+separately. This run had no CSV frame sampling and does not resolve the PIE vs.
+standalone performance discrepancy or visually validate dragonfly ripple
+responses; the interactive editor was still absent from the desktop window
+inventory.
