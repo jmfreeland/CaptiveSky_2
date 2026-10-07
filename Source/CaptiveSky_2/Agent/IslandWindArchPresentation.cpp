@@ -19,6 +19,10 @@ namespace
 	constexpr TCHAR WindArchRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
 	constexpr TCHAR WindArchRockSurfacePath[] = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
 	constexpr TCHAR EngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
+	constexpr float PillarStoneFootprintRatio = 0.86f;
+	constexpr float MaximumPillarStoneScaleVariation = 0.98f;
+	constexpr float MaximumPillarVerticalOverlap = 0.74f;
+	constexpr int32 MaximumPillarLayerCount = 20;
 }
 
 AWindArchStonework::AWindArchStonework()
@@ -91,6 +95,30 @@ int32 AWindArchStonework::GetStoneCount() const
 	return Stones ? Stones->GetInstanceCount() : 0;
 }
 
+float AWindArchStonework::GetPillarStoneScale(const FVector& LocalHalfExtent, const FVector& RockHalfExtent)
+{
+	if (LocalHalfExtent.X <= KINDA_SMALL_NUMBER || LocalHalfExtent.Y <= KINDA_SMALL_NUMBER ||
+		RockHalfExtent.X <= KINDA_SMALL_NUMBER || RockHalfExtent.Y <= KINDA_SMALL_NUMBER)
+		return 0.f;
+
+	const float Scale = FMath::Min(LocalHalfExtent.X / RockHalfExtent.X, LocalHalfExtent.Y / RockHalfExtent.Y) *
+		PillarStoneFootprintRatio;
+	return FMath::IsFinite(Scale) && Scale > KINDA_SMALL_NUMBER ? Scale : 0.f;
+}
+
+int32 AWindArchStonework::GetPillarLayerCount(const FVector& LocalHalfExtent, const FVector& RockHalfExtent)
+{
+	const float Scale = GetPillarStoneScale(LocalHalfExtent, RockHalfExtent);
+	const float MaximumSegmentHeight = RockHalfExtent.Z * Scale * MaximumPillarStoneScaleVariation * 2.f;
+	const float TargetHeight = LocalHalfExtent.Z * 2.f;
+	if (!FMath::IsFinite(MaximumSegmentHeight) || MaximumSegmentHeight <= KINDA_SMALL_NUMBER ||
+		!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER)
+		return 0;
+
+	const int32 LayerCount = FMath::Max(2, FMath::CeilToInt(TargetHeight / (MaximumSegmentHeight * 0.78f)));
+	return LayerCount <= MaximumPillarLayerCount ? LayerCount : 0;
+}
+
 bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
 	const TArray<AStaticMeshActor*>& Pillars, const AStaticMeshActor* Beam)
 {
@@ -110,33 +138,43 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 	Stones->SetMaterial(0, StoneSurface);
 	Stones->ClearInstances();
 
-	// Fit each irregular stack to its own saved proxy: the west pillar is taller than the east one.
-	const float DepthOffsets[5] = { 0.f, 8.f, -11.f, 10.f, -3.f };
-	const float YawOffsets[5] = { -8.f, 21.f, -17.f, 13.f, -5.f };
-	const float ScaleZ = 0.55f;
-	constexpr float PillarCrossSectionScale = 0.72f;
+	// Preserve the original pillar widths and heights without stretching one rock into a
+	// column. Small overlapping, aspect-preserving stones make the arch read as assembled work.
+	const FVector RockExtent = RockMesh->GetBounds().BoxExtent;
+	if (RockExtent.IsNearlyZero()) return false;
+	int32 PillarLayerTotal = 0;
 	for (int32 SideIndex = 0; SideIndex < 2; ++SideIndex)
 	{
-		const float Side = SideIndex == 0 ? -1.f : 1.f;
 		const UStaticMeshComponent* ProxyMesh = Pillars[SideIndex]->GetStaticMeshComponent();
 		if (!ProxyMesh) return false;
 		const FVector LocalCenter = MarkerTransform.InverseTransformPosition(ProxyMesh->Bounds.Origin);
-		const float HalfHeight = ProxyMesh->Bounds.BoxExtent.Z;
-		const float Bottom = LocalCenter.Z - HalfHeight;
-		const float Top = LocalCenter.Z + HalfHeight;
-		const float StoneHalfHeight = RockMesh->GetBounds().BoxExtent.Z * ScaleZ;
-		const float Spacing = (Top - Bottom - 2.f * StoneHalfHeight) / (UE_ARRAY_COUNT(DepthOffsets) - 1);
-		for (int32 Layer = 0; Layer < UE_ARRAY_COUNT(DepthOffsets); ++Layer)
+		const FVector LocalExtent = MarkerTransform.InverseTransformVectorNoScale(ProxyMesh->Bounds.BoxExtent).GetAbs();
+		const float StoneScale = GetPillarStoneScale(LocalExtent, RockExtent);
+		const int32 LayerCount = GetPillarLayerCount(LocalExtent, RockExtent);
+		if (StoneScale <= 0.f || LayerCount < 2) return false;
+
+		const float SegmentHeight = 2.f * RockExtent.Z * StoneScale * MaximumPillarStoneScaleVariation;
+		const float TargetHeight = 2.f * LocalExtent.Z;
+		const float Spacing = FMath::Min(SegmentHeight * MaximumPillarVerticalOverlap,
+			(TargetHeight - SegmentHeight) / (LayerCount - 1));
+		if (!FMath::IsFinite(Spacing) || Spacing <= 0.f) return false;
+		const float StackHeight = SegmentHeight + Spacing * (LayerCount - 1);
+		const float FirstOffset = -0.5f * StackHeight + 0.5f * SegmentHeight;
+		const float DepthOffsetRadius = LocalExtent.Y * 0.035f;
+		const float ScaleVariations[3] = { 0.94f, 0.96f, MaximumPillarStoneScaleVariation };
+		for (int32 Layer = 0; Layer < LayerCount; ++Layer)
 		{
-			const float InwardLean = SideIndex == 0 ? Layer * 3.f : -Layer * 3.f;
-			const FVector Location(LocalCenter.X + InwardLean, LocalCenter.Y + DepthOffsets[Layer],
-				Bottom + StoneHalfHeight + Spacing * Layer);
-			const FRotator Rotation(Layer % 2 == 0 ? 1.5f : -1.5f, YawOffsets[Layer] + SideIndex * 11.f,
-				Layer % 2 == 0 ? -1.2f : 1.2f);
-			const float ScaleX = (0.55f + ((Layer + SideIndex) % 3) * 0.025f) * PillarCrossSectionScale;
-			const float ScaleY = (0.36f + ((Layer * 2 + SideIndex) % 3) * 0.02f) * PillarCrossSectionScale;
-			Stones->AddInstance(FTransform(Rotation, Location, FVector(ScaleX, ScaleY, ScaleZ)));
+			const float DepthPhase = (Layer + SideIndex * 2) * 1.7f;
+			const float DepthOffset = FMath::Sin(DepthPhase) * DepthOffsetRadius;
+			const FVector Location(LocalCenter.X, LocalCenter.Y + DepthOffset,
+				LocalCenter.Z + FirstOffset + Layer * Spacing);
+			const float YawDegrees = (static_cast<float>((Layer * 7 + SideIndex * 3) % 5) - 2.f) * 3.f;
+			const FQuat Rotation = MarkerTransform.InverseTransformRotation(Pillars[SideIndex]->GetActorQuat()) *
+				FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees));
+			const float Scale = StoneScale * ScaleVariations[Layer % UE_ARRAY_COUNT(ScaleVariations)];
+			Stones->AddInstance(FTransform(Rotation, Location, FVector(Scale)));
 		}
+		PillarLayerTotal += LayerCount;
 	}
 
 	// Five rough voussoirs fit the saved lintel span and height, with only a low crown.
@@ -153,7 +191,7 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 			FVector(1.f, 0.35f, 0.22f)));
 	}
 
-	return Stones->GetInstanceCount() == 15;
+	return Stones->GetInstanceCount() == PillarLayerTotal + UE_ARRAY_COUNT(BeamOffsets);
 }
 
 bool UIslandWindArchPresentationSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const

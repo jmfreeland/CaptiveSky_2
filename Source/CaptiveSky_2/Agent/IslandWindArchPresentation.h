@@ -38,6 +38,8 @@ private:
 	static constexpr float AmbientMoteWindThreshold = 105.f;
 	static constexpr float AmbientMoteCooldownSeconds = 30.f;
 
+	static float GetPillarStoneScale(const FVector& LocalHalfExtent, const FVector& RockHalfExtent);
+	static int32 GetPillarLayerCount(const FVector& LocalHalfExtent, const FVector& RockHalfExtent);
 	bool BuildStonework(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
 		const TArray<AStaticMeshActor*>& Pillars, const AStaticMeshActor* Beam);
 	void CheckForAmbientWind();

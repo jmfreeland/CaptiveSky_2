@@ -124,8 +124,16 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 	AWindArchStonework* Stonework = nullptr;
 	for (TActorIterator<AWindArchStonework> It(World); It; ++It) { Stonework = *It; break; }
 	TestNotNull(TEXT("Game start replaces the three cube visuals with transient rock forms"), Stonework);
-	TestEqual(TEXT("The arch is built from ten rough pillar stones and five lintel blocks"),
-		Stonework ? Stonework->GetStoneCount() : 0, 15);
+	const FVector RockExtent = Rock->GetBounds().BoxExtent;
+	const int32 PillarALayerCount = AWindArchStonework::GetPillarLayerCount(
+		PillarA->GetStaticMeshComponent()->Bounds.BoxExtent, RockExtent);
+	const int32 PillarBLayerCount = AWindArchStonework::GetPillarLayerCount(
+		PillarB->GetStaticMeshComponent()->Bounds.BoxExtent, RockExtent);
+	const int32 BeamStartIndex = PillarALayerCount + PillarBLayerCount;
+	TestTrue(TEXT("Each original pillar is replaced by enough naturally proportioned stones to fill its own height"),
+		PillarALayerCount > 5 && PillarBLayerCount > 5);
+	TestEqual(TEXT("The arch keeps five lintel stones after its variable-height pillar stacks"),
+		Stonework ? Stonework->GetStoneCount() : 0, BeamStartIndex + 5);
 	TestTrue(TEXT("All three original map proxies are hidden only for presentation"),
 		PillarA->IsHidden() && PillarB->IsHidden() && Beam->IsHidden());
 	if (Stonework && Stonework->Stones)
@@ -136,19 +144,32 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		UMaterialInterface* ArchSurface = Stonework->Stones->GetMaterial(0);
 		TestTrue(TEXT("The replacement uses a dedicated subdued material instead of Starter Content's stark mottling"),
 			ArchSurface && ArchSurface->IsA<UMaterialInstanceDynamic>() && ArchSurface != Rock->GetMaterial(0));
-		for (int32 Index = 0; Index < 10; ++Index)
+		for (int32 Index = 0; Index < BeamStartIndex; ++Index)
 		{
 			FTransform Instance;
 			const bool bGotInstance = Stonework->Stones->GetInstanceTransform(Index, Instance, false);
 			TestTrue(FString::Printf(TEXT("Pillar stone %d has a transform"), Index), bGotInstance);
 			if (!bGotInstance) continue;
-			const AStaticMeshActor* Proxy = Index < 5 ? PillarA : PillarB;
+			const bool bLeftPillar = Index < PillarALayerCount;
+			const AStaticMeshActor* Proxy = bLeftPillar ? PillarA : PillarB;
 			const FVector ProxyCenter = Marker->GetActorTransform().InverseTransformPosition(Proxy->GetStaticMeshComponent()->Bounds.Origin);
-			const float ProxyHalfHeight = Proxy->GetStaticMeshComponent()->Bounds.BoxExtent.Z;
-			TestTrue(FString::Printf(TEXT("Pillar stone %d is fitted to its own proxy height"), Index),
-				Instance.GetLocation().Z >= ProxyCenter.Z - ProxyHalfHeight && Instance.GetLocation().Z <= ProxyCenter.Z + ProxyHalfHeight);
-			TestTrue(FString::Printf(TEXT("Pillar stone %d keeps the art-directed narrower cross-section"), Index),
-				Instance.GetScale3D().X <= 0.44f && Instance.GetScale3D().Y <= 0.29f);
+			const FVector ProxyExtent = Proxy->GetStaticMeshComponent()->Bounds.BoxExtent;
+			const FVector Delta = Instance.GetLocation() - ProxyCenter;
+			const FVector Scale = Instance.GetScale3D();
+			TestTrue(FString::Printf(TEXT("Pillar stone %d preserves the rock's natural aspect ratio"), Index),
+				FMath::IsNearlyEqual(Scale.X, Scale.Y, 0.001f) && FMath::IsNearlyEqual(Scale.Y, Scale.Z, 0.001f));
+			TestTrue(FString::Printf(TEXT("Pillar stone %d remains inside its original proxy bounds"), Index),
+				FMath::Abs(Delta.X) + RockExtent.X * Scale.X <= ProxyExtent.X + 1.f &&
+				FMath::Abs(Delta.Y) + RockExtent.Y * Scale.Y <= ProxyExtent.Y + 1.f &&
+				FMath::Abs(Delta.Z) + RockExtent.Z * Scale.Z <= ProxyExtent.Z + 1.f);
+			TestTrue(FString::Printf(TEXT("Pillar stone %d stays on its side of the arch center"), Index),
+				bLeftPillar ? Instance.GetLocation().X < -200.f : Instance.GetLocation().X > 200.f);
+		}
+		for (int32 Index = BeamStartIndex; Index < BeamStartIndex + 5; ++Index)
+		{
+			FTransform BeamStone;
+			TestTrue(FString::Printf(TEXT("Lintel stone %d remains above the open center"), Index - BeamStartIndex),
+				Stonework->Stones->GetInstanceTransform(Index, BeamStone, false) && BeamStone.GetLocation().Z > 300.f);
 		}
 	}
 	if (Stonework && StrongWindOffset >= 0.0)
