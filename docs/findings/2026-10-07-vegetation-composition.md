@@ -149,7 +149,49 @@ view remains below the 30-FPS gate. The next pass should change spatial
 composition and representation—more readable meadow/woodland groupings and
 fewer overlapping near-camera blades—then compare the same view and frame-time
 gate. Avoid changing global species or density budgets until the paired PIE
-baseline and a controlled ablation identify which rendering cost is dominant.
+baseline and controlled visibility ablation identify which rendering cost is
+dominant.
+
+## Same-camera foliage-layer visibility ablation (2026-10-07)
+
+The UE 5.8.3 `CaptiveSky2.Visual.Viewpoints` test was rerun at the same 11:00
+`Tideglass` camera, 1600×900, with transient ground cover and world-state
+loading disabled. Each run spawned the same population—1,780,640 ground-cover
+instances, 14,727 spruce, 15,063 shrubs and 1,487 rhododendrons—then hid all
+but the selected HISM layer before the capture. The test warmed ten frames;
+each run produced 50 valid intervals, exceeding the 45-interval minimum, and
+kept the 30-FPS p95 gate. Results:
+
+| Visible layer | HISM components | Tideglass p95 FPS | Ground-detail p95 FPS |
+|---|---:|---:|---:|
+| Grass | 4 | 48.11 | 44.72 |
+| Ground plants | 15 | 50.30 | 45.70 |
+| Meadow (grass + ground plants) | 19 | 47.29 | 41.91 |
+| Trees | 1 | 45.93 | 46.47 |
+| Understory | 2 | 49.85 | 44.45 |
+| Woodland (trees + understory) | 3 | 51.90 | 43.42 |
+| All layers visible | 22 | 40.38 | 47.27 |
+
+Every capture passed its automation gate. The previous full-population
+27.80-FPS p95 result was not reproduced by the repeat, which reached 40.38 FPS.
+These are single-run, editor SceneCapture measurements, not PIE gameplay or
+packaged-build results; the run-to-run difference is evidence to repeat the
+baseline, not proof of an engine or machine cause. The ablation does not identify
+one isolated foliage family as the source of the reported 8–13 FPS PIE rate.
+Logs: [`grass`](../../Saved/Logs/Codex_TideglassGrassOnly_20261007.log),
+[`ground plants`](../../Saved/Logs/Codex_TideglassGroundPlantsOnly_20261007.log),
+[`meadow`](../../Saved/Logs/Codex_TideglassMeadowOnly_20261007.log),
+[`trees`](../../Saved/Logs/Codex_TideglassTreesOnly_20261007.log),
+[`understory`](../../Saved/Logs/Codex_TideglassUnderstoryOnly_20261007.log),
+[`woodland`](../../Saved/Logs/Codex_TideglassWoodlandOnly_20261007.log), and
+[`all layers`](../../Saved/Logs/Codex_TideglassFullCoverRepeat_20261007.log).
+The matched full-population frame is [here](../../Saved/Viewpoints/2026-10-07_115516_h11.0/02_Tideglass.png).
+
+The evidence still supports improving the spatial composition before adding
+instances, while keeping the paired PIE baseline open. More informative next
+steps are repeated same-settings full-layer SceneCaptures and a matched PIE
+profile after the editor is available; do not claim that the 30-FPS gameplay
+target is met from these captures.
 
 ## Next foliage pass
 
