@@ -49,6 +49,8 @@ void UAgentPlaySessionSubsystem::Initialize(FSubsystemCollectionBase& Collection
 		&bHasExplicitTimeCap, &bHasExplicitRequestCap);
 	StartedAt = FPlatformTime::Seconds();
 	ModelRequests = 0;
+	ModelRequestsInFlight = 0;
+	RequestCapReachedAt = -1.0;
 	bStopRequested = false;
 	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyContinuous"))) bContinuousPlay = true;
 	if (bContinuousPlay) BeginContinuous();
@@ -67,21 +69,29 @@ void UAgentPlaySessionSubsystem::Initialize(FSubsystemCollectionBase& Collection
 		UE_LOG(LogAgentSession, Log, TEXT("Play safety active: %.0f real seconds, at most %d model requests."), MaxRealtimeSeconds, MaxModelRequests);
 }
 
+bool UAgentPlaySessionSubsystem::HasReachedRequestCap() const
+{
+	return (!bContinuousPlay || bHasExplicitRequestCap) &&
+		ModelRequests >= ClampRequestLimit(MaxModelRequests);
+}
+
 bool UAgentPlaySessionSubsystem::IsExpired() const
 {
 	const double ElapsedSeconds = FPlatformTime::Seconds() - StartedAt;
-	if (bContinuousPlay)
+	if (bStopRequested || (!bContinuousPlay && ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds)) ||
+		(bContinuousPlay && bHasExplicitTimeCap && ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds)))
 	{
-		return bStopRequested ||
-			(bHasExplicitTimeCap && ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds)) ||
-			(bHasExplicitRequestCap && ModelRequests >= ClampRequestLimit(MaxModelRequests));
+		return true;
 	}
-	return bStopRequested || ElapsedSeconds >= ClampDuration(MaxRealtimeSeconds) || ModelRequests >= ClampRequestLimit(MaxModelRequests);
+	if (!HasReachedRequestCap()) return false;
+	if (ModelRequestsInFlight <= 0) return true;
+	return RequestCapReachedAt >= 0.0 && Now() - RequestCapReachedAt >= RequestDrainGraceSeconds;
 }
 
 bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId, bool bLight)
 {
-	if (IsExpired()) return false;
+	// A reached cap may be draining requests already in flight, but it must never admit another one.
+	if (IsExpired() || HasReachedRequestCap()) return false;
 	if (bContinuousPlay)
 	{
 		if (!bLedgerPersistenceHealthy) return false;
@@ -116,7 +126,25 @@ bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId, 
 		}
 	}
 	++ModelRequests;
+	++ModelRequestsInFlight;
+	if (HasReachedRequestCap())
+	{
+		RequestCapReachedAt = Now();
+		UE_LOG(LogAgentSession, Display, TEXT("Model request cap reached; accepting no more requests and draining %d in-flight request(s) for up to %.0f seconds."),
+			ModelRequestsInFlight, RequestDrainGraceSeconds);
+	}
 	return true;
+}
+
+void UAgentPlaySessionSubsystem::CompleteModelRequest()
+{
+	if (ModelRequestsInFlight <= 0)
+	{
+		UE_LOG(LogAgentSession, Warning, TEXT("Received model-request completion with no request in flight."));
+		return;
+	}
+	--ModelRequestsInFlight;
+	UE_LOG(LogAgentSession, Verbose, TEXT("Model request completed; %d request(s) remain in flight."), ModelRequestsInFlight);
 }
 
 double UAgentPlaySessionSubsystem::Now() const
@@ -232,7 +260,8 @@ bool UAgentPlaySessionSubsystem::CheckDeadline(float DeltaSeconds)
 	UWorld* World = GetWorld();
 	if (!World || !World->IsGameWorld()) return true;
 	bStopRequested = true;
-	UE_LOG(LogAgentSession, Warning, TEXT("Ending play: %.1f real seconds elapsed, %d model requests. No automatic restart."), FPlatformTime::Seconds() - StartedAt, ModelRequests);
+	UE_LOG(LogAgentSession, Warning, TEXT("Ending play: %.1f real seconds elapsed, %d model requests (%d still in flight). No automatic restart."),
+		FPlatformTime::Seconds() - StartedAt, ModelRequests, ModelRequestsInFlight);
 #if WITH_EDITOR
 	if (World->WorldType == EWorldType::PIE && GEditor)
 	{
@@ -248,6 +277,7 @@ void UAgentPlaySessionSubsystem::Deinitialize()
 {
 	FTSTicker::GetCoreTicker().RemoveTicker(Watchdog);
 	bStopRequested = true;
-	UE_LOG(LogAgentSession, Log, TEXT("Play ended after %.1f real seconds with %d model requests."), FPlatformTime::Seconds() - StartedAt, ModelRequests);
+	UE_LOG(LogAgentSession, Log, TEXT("Play ended after %.1f real seconds with %d model requests (%d still in flight)."),
+		FPlatformTime::Seconds() - StartedAt, ModelRequests, ModelRequestsInFlight);
 	Super::Deinitialize();
 }

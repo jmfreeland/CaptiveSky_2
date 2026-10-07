@@ -50,9 +50,35 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	Session->MaxModelRequests = 2;
 	TestTrue(TEXT("First reservation accepted"), Session->TryReserveModelRequest());
 	TestTrue(TEXT("Last reservation accepted"), Session->TryReserveModelRequest());
-	TestTrue(TEXT("Budget exhaustion expires session"), Session->IsExpired());
+	TestEqual(TEXT("Accepted calls are tracked in flight"), Session->ModelRequestsInFlight, 2);
+	TestFalse(TEXT("Request cap drains accepted work before ending play"), Session->IsExpired());
 	TestFalse(TEXT("Exhausted budget rejects further calls"), Session->TryReserveModelRequest());
 	TestEqual(TEXT("Rejected request is not counted"), Session->ModelRequests, 2);
+	Session->CompleteModelRequest();
+	TestFalse(TEXT("One remaining request keeps the session alive"), Session->IsExpired());
+	Session->CompleteModelRequest();
+	TestTrue(TEXT("Drained request budget expires the session"), Session->IsExpired());
+	TestEqual(TEXT("Completed calls leave no requests in flight"), Session->ModelRequestsInFlight, 0);
+
+	UAgentPlaySessionSubsystem* TimedOutDrain = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	TimedOutDrain->StartedAt = FPlatformTime::Seconds();
+	TimedOutDrain->NowOverride = 1000.0;
+	TimedOutDrain->MaxModelRequests = 1;
+	TestTrue(TEXT("Single capped request is accepted before drain begins"), TimedOutDrain->TryReserveModelRequest());
+	TestFalse(TEXT("In-flight request is protected during bounded drain grace"), TimedOutDrain->IsExpired());
+	TimedOutDrain->NowOverride = 1000.0 + UAgentPlaySessionSubsystem::RequestDrainGraceSeconds - 0.01;
+	TestFalse(TEXT("Drain grace has not expired early"), TimedOutDrain->IsExpired());
+	TimedOutDrain->NowOverride = 1000.0 + UAgentPlaySessionSubsystem::RequestDrainGraceSeconds;
+	TestTrue(TEXT("A stuck request cannot outlive the bounded drain grace"), TimedOutDrain->IsExpired());
+
+	UAgentPlaySessionSubsystem* RealtimeCappedDrain = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	RealtimeCappedDrain->StartedAt = FPlatformTime::Seconds();
+	RealtimeCappedDrain->MaxRealtimeSeconds = 1.f;
+	RealtimeCappedDrain->MaxModelRequests = 1;
+	TestTrue(TEXT("Request accepted before wall-clock deadline"), RealtimeCappedDrain->TryReserveModelRequest());
+	RealtimeCappedDrain->StartedAt = FPlatformTime::Seconds() - 2.0;
+	TestTrue(TEXT("Hard real-time cap still ends play with a request in flight"), RealtimeCappedDrain->IsExpired());
+
 	Session->ModelRequests = 120;
 	Session->MaxModelRequests = 10000;
 	TestFalse(TEXT("Configuration cannot exceed hard request cap"), Session->TryReserveModelRequest());
@@ -90,9 +116,13 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	ExplicitlyRequestCapped->bHasExplicitRequestCap = true;
 	ExplicitlyRequestCapped->MaxModelRequests = 1;
 	ExplicitlyRequestCapped->ModelRequests = 1;
-	TestTrue(TEXT("Continuous play with an explicit request cap expires when reached"), ExplicitlyRequestCapped->IsExpired());
+	ExplicitlyRequestCapped->ModelRequestsInFlight = 1;
+	ExplicitlyRequestCapped->RequestCapReachedAt = 2000.0;
+	TestFalse(TEXT("Continuous play drains a request at its explicit request cap"), ExplicitlyRequestCapped->IsExpired());
 	TestFalse(TEXT("Continuous play with an explicit request cap rejects new requests"),
 		ExplicitlyRequestCapped->TryReserveModelRequest(TEXT("Aster")));
+	ExplicitlyRequestCapped->CompleteModelRequest();
+	TestTrue(TEXT("Continuous play ends once its explicitly capped request drains"), ExplicitlyRequestCapped->IsExpired());
 	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestFalse(TEXT("One resident cannot fire requests back to back"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("The first accepted request creates a durable daily ledger"), FPaths::FileExists(Ledger));

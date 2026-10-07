@@ -170,8 +170,13 @@ void UAgentConsolidationComponent::StartConsolidation()
 	{
 		Provider = CreateAgentLLMProvider();
 	}
-	if (GetWorld() && GetWorld()->GetGameInstance())
-		if (UAgentPlaySessionSubsystem* Session = GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>(); Session && !Session->TryReserveModelRequest(GetOwner() && GetOwner()->FindComponentByClass<UAgentMemoryComponent>() ? GetOwner()->FindComponentByClass<UAgentMemoryComponent>()->GetResolvedAgentId() : FString())) { FinishSleep(); return; }
+	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance()
+		? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
+	if (Session && !Session->TryReserveModelRequest(Memory->GetResolvedAgentId()))
+	{
+		FinishSleep();
+		return;
+	}
 	FAgentLLMRequest Request;
 	Request.SystemPrompt = BuildConsolidationPrompt(Memories);
 	Request.MaxTokens = 1000;
@@ -181,9 +186,14 @@ void UAgentConsolidationComponent::StartConsolidation()
 
 	const int32 Generation = SleepGeneration;
 	TWeakObjectPtr<UAgentConsolidationComponent> WeakThis(this);
+	TWeakObjectPtr<UAgentPlaySessionSubsystem> WeakSession(Session);
 	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda(
-		[WeakThis, Memories, Generation](const FAgentLLMResult& Result)
+		[WeakThis, WeakSession, Memories, Generation](const FAgentLLMResult& Result)
 		{
+			if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get())
+			{
+				StrongSession->CompleteModelRequest();
+			}
 			UAgentConsolidationComponent* StrongThis = WeakThis.Get();
 			if (!StrongThis || StrongThis->SleepGeneration != Generation ||
 				StrongThis->ConsciousState != EAgentConsciousState::Consolidating)

@@ -890,9 +890,14 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 
 	TWeakObjectPtr<UAgentBrainComponent> WeakThis(this);
 	TWeakObjectPtr<UAgentMemoryComponent> WeakMemory(MemoryComp);
+	TWeakObjectPtr<UAgentPlaySessionSubsystem> WeakSession(Session);
 
-	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, Context, bLight](const FAgentLLMResult& Result)
+	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, WeakSession, Context, bLight](const FAgentLLMResult& Result)
 	{
+		if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get())
+		{
+			StrongSession->CompleteModelRequest();
+		}
 		UAgentBrainComponent* StrongThis = WeakThis.Get();
 		if (!StrongThis || StrongThis->bEndedPlay)
 		{
