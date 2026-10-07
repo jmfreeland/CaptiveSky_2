@@ -94,8 +94,29 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),
 					RuntimeWater->GetComponentLocation().Equals(Surface->GetComponentLocation(), 1.f));
-				TestTrue(TEXT("The water surface contains a 64-segment double-ring mesh"),
-					WaterSection && WaterSection->ProcVertexBuffer.Num() == 129 && WaterSection->ProcIndexBuffer.Num() == 576);
+				TestTrue(TEXT("The water surface contains a 64-segment inner pool and lowered three-ring shore shelf"),
+					WaterSection && WaterSection->ProcVertexBuffer.Num() == 257 && WaterSection->ProcIndexBuffer.Num() == 1344);
+				if (WaterSection && WaterSection->ProcVertexBuffer.Num() == 257)
+				{
+					const FVector& WaterEdge = WaterSection->ProcVertexBuffer[65].Position;
+					const FVector& ShelfMid = WaterSection->ProcVertexBuffer[129].Position;
+					const FVector& ShoreEdge = WaterSection->ProcVertexBuffer[193].Position;
+					const FVector& WaterEdgeNormal = WaterSection->ProcVertexBuffer[65].Normal;
+					const FVector& ShelfMidNormal = WaterSection->ProcVertexBuffer[129].Normal;
+					const FVector& ShoreEdgeNormal = WaterSection->ProcVertexBuffer[193].Normal;
+					const float HeightScale = FMath::Abs(Surface->GetComponentScale().Z);
+					const float WaterEdgeRadius = FVector2D(WaterEdge.X, WaterEdge.Y).Size();
+					const float ShelfMidRadius = FVector2D(ShelfMid.X, ShelfMid.Y).Size();
+					const float ShoreEdgeRadius = FVector2D(ShoreEdge.X, ShoreEdge.Y).Size();
+					TestTrue(TEXT("The shoreline shelf widens gradually beyond the water edge"),
+						WaterEdgeRadius < ShelfMidRadius && ShelfMidRadius < ShoreEdgeRadius);
+					TestTrue(TEXT("The inner shelf descends by eight world-space centimetres"),
+						FMath::IsNearlyEqual((WaterEdge.Z - ShelfMid.Z) * HeightScale, 8.f, 0.1f));
+					TestTrue(TEXT("The outer shoreline descends by thirty world-space centimetres"),
+						FMath::IsNearlyEqual((WaterEdge.Z - ShoreEdge.Z) * HeightScale, 30.f, 0.1f));
+					TestTrue(TEXT("Generated surface normals reveal the increasingly sloped pool edge"),
+						WaterEdgeNormal.Z > ShelfMidNormal.Z && ShelfMidNormal.Z > ShoreEdgeNormal.Z && ShoreEdgeNormal.Z > 0.f);
+				}
 				TestTrue(TEXT("The pool's top faces use the winding Unreal renders from above"),
 					WaterSection && WaterSection->ProcIndexBuffer.Num() >= 3 && WaterSection->ProcIndexBuffer[0] == 0 &&
 					WaterSection->ProcIndexBuffer[1] == 2 && WaterSection->ProcIndexBuffer[2] == 1);

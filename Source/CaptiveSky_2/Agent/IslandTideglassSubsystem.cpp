@@ -8,6 +8,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "KismetProceduralMeshLibrary.h"
 #include "ProceduralMeshComponent.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
@@ -18,6 +19,10 @@ namespace
 {
 	constexpr TCHAR TideglassRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
 	constexpr TCHAR TideglassRockMaterialPath[] = TEXT("/Game/StarterContent/Props/Materials/M_Rock.M_Rock");
+	constexpr float ShoreShelfMidRadiusScale = 1.25f;
+	constexpr float ShoreShelfOuterRadiusScale = 1.55f;
+	constexpr float ShoreShelfMidDropCm = 8.f;
+	constexpr float ShoreShelfOuterDropCm = 30.f;
 }
 
 bool UIslandTideglassSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
@@ -63,6 +68,8 @@ UProceduralMeshComponent* UIslandTideglassSubsystem::CreatePoolSurfaceMesh(UStat
 	const float RadiusX = Bounds.BoxExtent.X;
 	const float RadiusY = Bounds.BoxExtent.Y;
 	if (RadiusX <= KINDA_SMALL_NUMBER || RadiusY <= KINDA_SMALL_NUMBER) return nullptr;
+	const float WorldHeightScale = FMath::Abs(BlockoutSurface->GetComponentScale().Z);
+	if (WorldHeightScale <= KINDA_SMALL_NUMBER) return nullptr;
 
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.ObjectFlags |= RF_Transient;
@@ -83,62 +90,73 @@ UProceduralMeshComponent* UIslandTideglassSubsystem::CreatePoolSurfaceMesh(UStat
 	WaterActor->SetActorTransform(BlockoutSurface->GetComponentTransform());
 
 	constexpr int32 SegmentCount = 64;
+	constexpr int32 RingCount = 4;
 	TArray<FVector> Vertices;
 	TArray<FVector> Normals;
 	TArray<FVector2D> UVs;
 	TArray<FLinearColor> Colors;
 	TArray<FProcMeshTangent> Tangents;
 	TArray<int32> Triangles;
-	Vertices.Reserve(1 + 2 * SegmentCount);
-	Normals.Reserve(1 + 2 * SegmentCount);
-	UVs.Reserve(1 + 2 * SegmentCount);
-	Colors.Reserve(1 + 2 * SegmentCount);
-	Tangents.Reserve(1 + 2 * SegmentCount);
-	Triangles.Reserve(9 * SegmentCount);
+	Vertices.Reserve(1 + RingCount * SegmentCount);
+	Normals.Reserve(1 + RingCount * SegmentCount);
+	UVs.Reserve(1 + RingCount * SegmentCount);
+	Colors.Reserve(1 + RingCount * SegmentCount);
+	Tangents.Reserve(1 + RingCount * SegmentCount);
+	Triangles.Reserve((3 + 6 * (RingCount - 1)) * SegmentCount);
 
 	const float WaterHeight = Bounds.BoxExtent.Z;
 	const float InnerHeight = WaterHeight - 12.f;
 	const float EdgeHeight = WaterHeight - 22.f;
+	const float RingHeights[RingCount] = {
+		InnerHeight,
+		EdgeHeight,
+		EdgeHeight - ShoreShelfMidDropCm / WorldHeightScale,
+		EdgeHeight - ShoreShelfOuterDropCm / WorldHeightScale
+	};
 	auto AddVertex = [&](float X, float Y, float Z)
 	{
 		Vertices.Emplace(X, Y, Z);
-		Normals.Emplace(FVector::UpVector);
 		UVs.Emplace(0.5f + X / (2.f * RadiusX), 0.5f + Y / (2.f * RadiusY));
 		Colors.Emplace(FLinearColor::White);
-		Tangents.Emplace(FVector(1.f, 0.f, 0.f), false);
 	};
 
 	AddVertex(0.f, 0.f, WaterHeight);
-	for (int32 Ring = 0; Ring < 2; ++Ring)
+	for (int32 Ring = 0; Ring < RingCount; ++Ring)
 	{
 		for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
 		{
 			const float Angle = 2.f * PI * static_cast<float>(Segment) / SegmentCount;
 			const float Shape = 1.f + 0.060f * FMath::Sin(3.f * Angle + 0.45f)
 				+ 0.038f * FMath::Sin(5.f * Angle - 1.1f) + 0.024f * FMath::Cos(7.f * Angle + 0.7f);
-			const float RadialFraction = Ring == 0 ? 0.62f : Shape;
-			const float Z = Ring == 0 ? InnerHeight : EdgeHeight;
+			const float RadialScale = Ring == 0 ? 0.62f : Ring == 1 ? 1.f
+				: Ring == 2 ? ShoreShelfMidRadiusScale : ShoreShelfOuterRadiusScale;
+			const float RadialFraction = Ring == 0 ? RadialScale : Shape * RadialScale;
 			AddVertex(FMath::Cos(Angle) * RadiusX * RadialFraction,
-				FMath::Sin(Angle) * RadiusY * RadialFraction, Z);
+				FMath::Sin(Angle) * RadiusY * RadialFraction, RingHeights[Ring]);
 		}
 	}
 	for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
 	{
 		const int32 Next = (Segment + 1) % SegmentCount;
-		const int32 Inner = 1 + Segment;
-		const int32 InnerNext = 1 + Next;
-		const int32 Outer = 1 + SegmentCount + Segment;
-		const int32 OuterNext = 1 + SegmentCount + Next;
+		const int32 CenterRing = 1 + Segment;
 		Triangles.Add(0);
-		Triangles.Add(InnerNext);
-		Triangles.Add(Inner);
-		Triangles.Add(Inner);
-		Triangles.Add(OuterNext);
-		Triangles.Add(Outer);
-		Triangles.Add(Inner);
-		Triangles.Add(InnerNext);
-		Triangles.Add(OuterNext);
+		Triangles.Add(1 + Next);
+		Triangles.Add(CenterRing);
+		for (int32 Ring = 0; Ring < RingCount - 1; ++Ring)
+		{
+			const int32 Inner = 1 + Ring * SegmentCount + Segment;
+			const int32 InnerNext = 1 + Ring * SegmentCount + Next;
+			const int32 Outer = 1 + (Ring + 1) * SegmentCount + Segment;
+			const int32 OuterNext = 1 + (Ring + 1) * SegmentCount + Next;
+			Triangles.Add(Inner);
+			Triangles.Add(OuterNext);
+			Triangles.Add(Outer);
+			Triangles.Add(Inner);
+			Triangles.Add(InnerNext);
+			Triangles.Add(OuterNext);
+		}
 	}
+	UKismetProceduralMeshLibrary::CalculateTangentsForMesh(Vertices, Triangles, UVs, Normals, Tangents);
 	WaterSurface->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
 	return WaterSurface;
 }

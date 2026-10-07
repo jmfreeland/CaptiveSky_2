@@ -269,3 +269,28 @@ during Turnkey/`ValidatePlatforms` startup and the `AutoSDKInfo.txt` timestamp d
 storm/ripple observation was produced; this is a startup timeout, not a weather-rendering result.
 Log: `Saved/Logs/Codex_RippleStormVerification_20261007.log`. Do not repeat this launch unchanged;
 retry after the Turnkey startup path changes or is diagnosed.
+
+## Lowered shoreline shelf and slope shading (2026-10-07)
+
+The first transient shelf geometry widened the water footprint but remained difficult to read in
+Game: every procedural vertex still had a straight-up normal, so the shallow slope did not affect
+the water material's Fresnel edge. The runtime mesh now has a 64-segment inner pool plus the saved
+water edge and two wider, lowered rings. The middle shelf sits 25% beyond the water edge and 8 cm
+below it; the outer edge sits 55% beyond and 30 cm below. Heights are converted through the
+blockout component's vertical scale, and the geometry remains transient, non-colliding, and
+restorable with the original blockout. UE's procedural mesh tangent calculator now derives normals
+from the surface triangles instead of flattening the shading to UpVector.
+
+The UE 5.8.3 editor target rebuilt successfully, and `CaptiveSky2.Agent.IslandTideglass` passed.
+The automation checks the 257-vertex / 1,344-index mesh, progressively wider rings, both world-space
+depths, and increasingly sloped generated normals. A dedicated noon Game capture then reached the
+Island in 11.3 seconds and ended normally after 60.2 seconds with zero model requests. The
+matched earlier-geometry frame is
+[`001_Tideglass.png`](../../Playtests/Codex_TideglassShelfIteration4_20261007/Screenshots/001_Tideglass.png);
+the derived-normal frame is
+[`001_Tideglass.png`](../../Playtests/Codex_TideglassShelfIteration5_20261007/Screenshots/001_Tideglass.png).
+The newer frame has a noticeably darker, more legible sloped rim. This is an improvement, not a
+finished waterline: from this low angle the water still has a defined outer edge, and foreground
+grass partly occludes it. Runtime and automation logs are
+`Saved/Logs/Codex_TideglassShelfIteration5_20261007.log` and
+`Saved/Logs/Codex_TideglassShelfNormals_20261007.log`.
