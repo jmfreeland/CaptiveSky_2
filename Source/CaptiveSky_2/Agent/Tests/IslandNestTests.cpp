@@ -48,7 +48,7 @@ namespace
 		return Count;
 	}
 
-	AIslandArrangement* FindArrangementActor(UWorld* World, FName SiteId)
+	AIslandArrangement* FindNestForageArrangementActor(UWorld* World, FName SiteId)
 	{
 		for (TActorIterator<AIslandArrangement> It(World); It; ++It)
 			if (It->GetSiteId() == SiteId) return *It;
@@ -289,8 +289,8 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	Nest = State->FindNest(Site);
 	TestTrue(TEXT("Nest persists across sessions"), Nest && Nest->Layers == 2 && Nest->Builders.Num() == 1);
 	TestEqual(TEXT("Persisted nest is visible again"), CountNestActors(World, Site), 1);
-	const AIslandArrangement* RestoredStartForage = FindArrangementActor(World, StartForageSite.Id);
-	const AIslandArrangement* RestoredOccludedForage = FindArrangementActor(World, OccludedForageSite.Id);
+	const AIslandArrangement* RestoredStartForage = FindNestForageArrangementActor(World, StartForageSite.Id);
+	const AIslandArrangement* RestoredOccludedForage = FindNestForageArrangementActor(World, OccludedForageSite.Id);
 	TestTrue(TEXT("Gathered bundles remain depleted after reopening the same Island day"),
 		RestoredStartForage && !RestoredStartForage->HasForageableTwigs() &&
 		RestoredOccludedForage && !RestoredOccludedForage->HasForageableTwigs());
@@ -385,7 +385,7 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	World = CreateNestWorld(StateFile);
 	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	World->BeginPlay();
-	AIslandArrangement* ReloadedForage = FindArrangementActor(World, FarForageSite.Id);
+	AIslandArrangement* ReloadedForage = FindNestForageArrangementActor(World, FarForageSite.Id);
 	TestNotNull(TEXT("The saved forage site is visible after restart"), ReloadedForage);
 	if (ReloadedForage)
 	{
