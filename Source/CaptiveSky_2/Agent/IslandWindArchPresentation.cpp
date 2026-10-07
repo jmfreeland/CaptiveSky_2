@@ -19,9 +19,9 @@ namespace
 	constexpr TCHAR WindArchRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
 	constexpr TCHAR WindArchRockSurfacePath[] = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
 	constexpr TCHAR EngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
-	constexpr float PillarStoneFootprintRatio = 0.86f;
+	constexpr float PillarStoneFootprintRatio = 0.82f;
 	constexpr float MaximumPillarStoneScaleVariation = 0.98f;
-	constexpr float MaximumPillarVerticalOverlap = 0.74f;
+	constexpr float PillarCourseSpacingRatio = 0.58f;
 	constexpr int32 MaximumPillarLayerCount = 20;
 }
 
@@ -115,7 +115,9 @@ int32 AWindArchStonework::GetPillarLayerCount(const FVector& LocalHalfExtent, co
 		!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER)
 		return 0;
 
-	const int32 LayerCount = FMath::Max(2, FMath::CeilToInt(TargetHeight / (MaximumSegmentHeight * 0.78f)));
+	const float RemainingHeight = FMath::Max(0.f, TargetHeight - MaximumSegmentHeight);
+	const int32 LayerCount = FMath::Max(2, FMath::CeilToInt(RemainingHeight /
+		(MaximumSegmentHeight * PillarCourseSpacingRatio)) + 1);
 	return LayerCount <= MaximumPillarLayerCount ? LayerCount : 0;
 }
 
@@ -155,23 +157,30 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 
 		const float SegmentHeight = 2.f * RockExtent.Z * StoneScale * MaximumPillarStoneScaleVariation;
 		const float TargetHeight = 2.f * LocalExtent.Z;
-		const float Spacing = FMath::Min(SegmentHeight * MaximumPillarVerticalOverlap,
+		const float Spacing = FMath::Min(SegmentHeight * PillarCourseSpacingRatio,
 			(TargetHeight - SegmentHeight) / (LayerCount - 1));
 		if (!FMath::IsFinite(Spacing) || Spacing <= 0.f) return false;
 		const float StackHeight = SegmentHeight + Spacing * (LayerCount - 1);
 		const float FirstOffset = -0.5f * StackHeight + 0.5f * SegmentHeight;
-		const float DepthOffsetRadius = LocalExtent.Y * 0.035f;
-		const float ScaleVariations[3] = { 0.94f, 0.96f, MaximumPillarStoneScaleVariation };
+		const float WidthOffsetRadius = LocalExtent.X * 0.04f;
+		const float DepthOffsetRadius = LocalExtent.Y * 0.06f;
+		const float ScaleVariations[5] = { 0.94f, 0.98f, 0.92f, 1.0f, 0.96f };
 		for (int32 Layer = 0; Layer < LayerCount; ++Layer)
 		{
-			const float DepthPhase = (Layer + SideIndex * 2) * 1.7f;
-			const float DepthOffset = FMath::Sin(DepthPhase) * DepthOffsetRadius;
-			const FVector Location(LocalCenter.X, LocalCenter.Y + DepthOffset,
-				LocalCenter.Z + FirstOffset + Layer * Spacing);
-			const float YawDegrees = (static_cast<float>((Layer * 7 + SideIndex * 3) % 5) - 2.f) * 3.f;
+			// Offset each course in both axes so the outline isn't a straight chain of
+			// identical boulders; the reduced footprint leaves room inside the proxy.
+			const float DepthPhase = (Layer + SideIndex * 2) * HALF_PI;
+			const float WidthOffset = FMath::Sin(DepthPhase) * WidthOffsetRadius;
+			const float DepthOffset = FMath::Cos(DepthPhase) * DepthOffsetRadius;
+			const float CourseAlpha = static_cast<float>(Layer) / static_cast<float>(LayerCount - 1);
+			const float Taper = FMath::Lerp(1.f, 0.90f, CourseAlpha);
+			const float Scale = StoneScale * ScaleVariations[Layer % UE_ARRAY_COUNT(ScaleVariations)] * Taper;
+			const float TopAlignment = SegmentHeight * 0.5f * (1.f - Taper);
+			const FVector Location(LocalCenter.X + WidthOffset, LocalCenter.Y + DepthOffset,
+				LocalCenter.Z + FirstOffset + Layer * Spacing + TopAlignment);
+			const float YawDegrees = (static_cast<float>((Layer * 7 + SideIndex * 3) % 5) - 2.f) * 5.f;
 			const FQuat Rotation = MarkerTransform.InverseTransformRotation(Pillars[SideIndex]->GetActorQuat()) *
 				FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees));
-			const float Scale = StoneScale * ScaleVariations[Layer % UE_ARRAY_COUNT(ScaleVariations)];
 			Stones->AddInstance(FTransform(Rotation, Location, FVector(Scale)));
 		}
 		PillarLayerTotal += LayerCount;

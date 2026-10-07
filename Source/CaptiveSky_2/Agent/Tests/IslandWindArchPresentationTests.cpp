@@ -138,6 +138,8 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		PillarA->IsHidden() && PillarB->IsHidden() && Beam->IsHidden());
 	if (Stonework && Stonework->Stones)
 	{
+		bool bHasStaggeredCourse = false;
+		bool bBothCrownsTaper = false;
 		TestTrue(TEXT("Replacement stones remain collisionless"), Stonework->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Replacement stones do not alter navigation"), Stonework->Stones->CanEverAffectNavigation());
 		TestTrue(TEXT("The replacement uses the existing rough rock mesh"), Stonework->Stones->GetStaticMesh() == Rock);
@@ -156,15 +158,38 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 			const FVector ProxyExtent = Proxy->GetStaticMeshComponent()->Bounds.BoxExtent;
 			const FVector Delta = Instance.GetLocation() - ProxyCenter;
 			const FVector Scale = Instance.GetScale3D();
+			const FQuat Rotation = Instance.GetRotation();
+			const FVector RockAxisX = Rotation.RotateVector(FVector(RockExtent.X * Scale.X, 0.f, 0.f));
+			const FVector RockAxisY = Rotation.RotateVector(FVector(0.f, RockExtent.Y * Scale.Y, 0.f));
+			const FVector RockAxisZ = Rotation.RotateVector(FVector(0.f, 0.f, RockExtent.Z * Scale.Z));
+			const FVector RotatedExtent(
+				FMath::Abs(RockAxisX.X) + FMath::Abs(RockAxisY.X) + FMath::Abs(RockAxisZ.X),
+				FMath::Abs(RockAxisX.Y) + FMath::Abs(RockAxisY.Y) + FMath::Abs(RockAxisZ.Y),
+				FMath::Abs(RockAxisX.Z) + FMath::Abs(RockAxisY.Z) + FMath::Abs(RockAxisZ.Z));
+			bHasStaggeredCourse |= FMath::Abs(Delta.X) >= ProxyExtent.X * 0.05f || FMath::Abs(Delta.Y) >= ProxyExtent.Y * 0.05f;
+			if (bLeftPillar && Index == PillarALayerCount - 1)
+			{
+				FTransform BaseCourse;
+				const bool bGotBase = Stonework->Stones->GetInstanceTransform(0, BaseCourse, false);
+				bBothCrownsTaper = bGotBase && Scale.X < BaseCourse.GetScale3D().X;
+			}
+			else if (!bLeftPillar && Index == BeamStartIndex - 1)
+			{
+				FTransform BaseCourse;
+				const bool bGotBase = Stonework->Stones->GetInstanceTransform(PillarALayerCount, BaseCourse, false);
+				bBothCrownsTaper &= bGotBase && Scale.X < BaseCourse.GetScale3D().X;
+			}
 			TestTrue(FString::Printf(TEXT("Pillar stone %d preserves the rock's natural aspect ratio"), Index),
 				FMath::IsNearlyEqual(Scale.X, Scale.Y, 0.001f) && FMath::IsNearlyEqual(Scale.Y, Scale.Z, 0.001f));
 			TestTrue(FString::Printf(TEXT("Pillar stone %d remains inside its original proxy bounds"), Index),
-				FMath::Abs(Delta.X) + RockExtent.X * Scale.X <= ProxyExtent.X + 1.f &&
-				FMath::Abs(Delta.Y) + RockExtent.Y * Scale.Y <= ProxyExtent.Y + 1.f &&
-				FMath::Abs(Delta.Z) + RockExtent.Z * Scale.Z <= ProxyExtent.Z + 1.f);
+				FMath::Abs(Delta.X) + RotatedExtent.X <= ProxyExtent.X + 1.f &&
+				FMath::Abs(Delta.Y) + RotatedExtent.Y <= ProxyExtent.Y + 1.f &&
+				FMath::Abs(Delta.Z) + RotatedExtent.Z <= ProxyExtent.Z + 1.f);
 			TestTrue(FString::Printf(TEXT("Pillar stone %d stays on its side of the arch center"), Index),
 				bLeftPillar ? Instance.GetLocation().X < -200.f : Instance.GetLocation().X > 200.f);
 		}
+		TestTrue(TEXT("Pillar courses deliberately stagger within the original proxy envelope"), bHasStaggeredCourse);
+		TestTrue(TEXT("Both pillars narrow toward the crown while preserving natural stone proportions"), bBothCrownsTaper);
 		for (int32 Index = BeamStartIndex; Index < BeamStartIndex + 5; ++Index)
 		{
 			FTransform BeamStone;
