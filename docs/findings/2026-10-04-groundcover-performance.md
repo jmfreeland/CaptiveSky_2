@@ -247,7 +247,7 @@ thin tree trunks/silhouettes, placeholder-looking landmark materials and no conv
 wet-edge-to-meadow-to-woodland composition. The visual habitat milestone remains open.
 Before expanding instance counts, improve plant scale/material readability and meadow/
 woodland grouping, and consider broad-meadow fallback for rejected reserved flower sites.
-The user's new Megaplants library additions have not yet been inventoried or imported.
+**Fab project-asset check (2026-10-07):** a read-only inventory of the current project found 96 flower meshes, 72 ground-plant meshes, and 3 grass meshes in `PN_FoliageCollection/Meshes`. The only directory under the project's `Fab/Megascans` is `Surfaces`; no clearly named Megaplants pack or asset path was found in `Content`. This checks the local project only, not the user's Fab library, and a filename search cannot rule out renamed assets. Thus the user's library additions have not been confirmed as project assets or imported into this Island. When the editor/Fab library is available, inventory candidates there and import only a small set aimed at the observed middle-distance/woodland-silhouette gap; preview the fixed 11:00 composition and warm 1080p profile before increasing any scatter budget.
 
 Logs: `Saved/Logs/Codex_FlowerEdgeGroundCover_20261004.log` and
 `Saved/Logs/Codex_FlowerEdgeTideglass_20261004.log`. Images:
