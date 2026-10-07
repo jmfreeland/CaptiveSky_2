@@ -15,7 +15,8 @@
 
 namespace
 {
-	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep, float Length, float MaximumHalfWidth)
+	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep, float Length, float MaximumHalfWidth,
+		const FLinearColor& WingColor)
 	{
 		if (!Wing) return;
 
@@ -50,7 +51,7 @@ namespace
 						Surface == 0 ? 0.35f * Arch : -0.35f * Arch);
 					Normals.Emplace(0.f, 0.f, Surface == 0 ? 1.f : -1.f);
 					UVs.Emplace(Along, (Across + 1.f) * 0.5f);
-					Colors.Emplace(FLinearColor::White);
+					Colors.Emplace(WingColor);
 					Tangents.Emplace(FVector(1.f, 0.f, 0.f), false);
 				}
 			}
@@ -96,9 +97,9 @@ namespace
 		FLinearColor(0.34f, 0.19f, 0.08f)  // copper
 	};
 	const FLinearColor DragonflyWingColors[] = {
-		FLinearColor(0.55f, 0.75f, 0.61f),
-		FLinearColor(0.52f, 0.73f, 0.78f),
-		FLinearColor(0.78f, 0.64f, 0.43f)
+		FLinearColor(0.18f, 0.30f, 0.20f, 0.44f),
+		FLinearColor(0.18f, 0.31f, 0.36f, 0.44f),
+		FLinearColor(0.36f, 0.24f, 0.12f, 0.44f)
 	};
 }
 
@@ -112,7 +113,10 @@ AIslandTideglassDragonfly::AIslandTideglassDragonfly()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> TranslucentWingMaterial(
+		TEXT("/Engine/EngineDebugMaterials/M_SimpleUnlitTranslucent.M_SimpleUnlitTranslucent"));
 	BaseMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
+	WingBaseMaterial = TranslucentWingMaterial.Succeeded() ? TranslucentWingMaterial.Object : BaseMaterial;
 	UStaticMesh* SphereMesh = Sphere.Succeeded() ? Sphere.Object : nullptr;
 	auto MakeBodyPart = [this, SphereMesh](const TCHAR* Name, const FVector& Location, const FVector& Scale)
 	{
@@ -167,6 +171,8 @@ void AIslandTideglassDragonfly::BeginPlay()
 void AIslandTideglassDragonfly::SetColorVariant(int32 Variant)
 {
 	ColorVariant = ((Variant % UE_ARRAY_COUNT(DragonflyBodyColors)) + UE_ARRAY_COUNT(DragonflyBodyColors)) % UE_ARRAY_COUNT(DragonflyBodyColors);
+	for (UProceduralMeshComponent* Wing : Wings)
+		if (Wing) Wing->ClearAllMeshSections();
 	ConfigureAppearance();
 }
 
@@ -190,9 +196,10 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 			BuildWingSurface(Wings[Index], Index % 2 == 0 ? -1.f : 1.f,
 				bForewing ? 1.7f : -1.7f,
 				bForewing ? 33.f : 39.f,
-				bForewing ? 4.4f : 6.8f);
+				bForewing ? 3.f : 4.f,
+				DragonflyWingColors[ColorVariant]);
 		}
-		if (!WingMaterials[Index]) WingMaterials[Index] = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+		if (!WingMaterials[Index]) WingMaterials[Index] = UMaterialInstanceDynamic::Create(WingBaseMaterial, this);
 		if (!WingMaterials[Index]) continue;
 		WingMaterials[Index]->SetVectorParameterValue(TEXT("Color"), DragonflyWingColors[ColorVariant]);
 		Wings[Index]->SetMaterial(0, WingMaterials[Index]);

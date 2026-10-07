@@ -44,6 +44,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseMaterial;
 	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> WingBaseMaterial;
+	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WingMaterials;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> BodyMaterial;

@@ -1025,6 +1025,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
 	int32 DragonflyPopulation = 0;
 	TArray<FLinearColor> DragonflyColors;
+	const FLinearColor ExpectedDragonflyWingColors[] = {
+		FLinearColor(0.18f, 0.30f, 0.20f, 0.44f),
+		FLinearColor(0.18f, 0.31f, 0.36f, 0.44f),
+		FLinearColor(0.36f, 0.24f, 0.12f, 0.44f)
+	};
 	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It)
 	{
 		++DragonflyPopulation;
@@ -1035,12 +1040,23 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
 		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
 		if (BodyMaterial) DragonflyColors.Add(BodyMaterial->K2_GetVectorParameterValue(TEXT("Color")));
+		const FLinearColor ExpectedWingColor = ExpectedDragonflyWingColors[
+			FMath::Clamp(It->ColorVariant, 0, UE_ARRAY_COUNT(ExpectedDragonflyWingColors) - 1)];
 		for (UProceduralMeshComponent* Wing : It->Wings)
 		{
 			const FProcMeshSection* Section = Wing ? Wing->GetProcMeshSection(0) : nullptr;
 			TestTrue(TEXT("Each dragonfly wing is a generated two-sided surface"),
 				Wing && Wing->GetNumSections() == 1 && Section &&
 				Section->ProcVertexBuffer.Num() >= 100 && Section->ProcIndexBuffer.Num() >= 200);
+			const FColor WingTint = Section && Section->ProcVertexBuffer.Num() > 0
+				? Section->ProcVertexBuffer[0].Color : FColor::Black;
+			TestTrue(TEXT("Wing surfaces retain a tinted translucent vertex color"),
+				Wing && Wing->GetMaterial(0) && Wing->GetMaterial(0)->GetBlendMode() == BLEND_Translucent &&
+				WingTint.R + WingTint.G + WingTint.B > 0 && WingTint.A < 128);
+			UMaterialInstanceDynamic* WingMaterial = Wing
+				? Cast<UMaterialInstanceDynamic>(Wing->GetMaterial(0)) : nullptr;
+			TestTrue(TEXT("Each translucent wing material receives the dragonfly's natural color morph"),
+				WingMaterial && WingMaterial->K2_GetVectorParameterValue(TEXT("Color")).Equals(ExpectedWingColor, 0.01f));
 			bool bFiniteWingGeometry = Section && !Section->SectionLocalBox.ContainsNaN();
 			if (Section)
 				for (const FProcMeshVertex& Vertex : Section->ProcVertexBuffer)

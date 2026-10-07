@@ -138,6 +138,27 @@
 			"min_height": -1
 		},
 		{
+			"name": "02e_TideglassDragonflyClose",
+			"from": {
+				"tag": "TideglassDragonfly",
+				"offset": [
+					0,
+					-200,
+					160
+				]
+			},
+			"look": {
+				"tag": "TideglassDragonfly",
+				"offset": [
+					0,
+					0,
+					0
+				]
+			},
+			"fov": 38,
+			"min_height": -1
+		},
+		{
 			"name": "03_ListeningStones",
 			"from": {
 				"tag": "ListeningStones",
