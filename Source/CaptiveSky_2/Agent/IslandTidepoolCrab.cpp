@@ -21,13 +21,15 @@ AIslandTidepoolCrab::AIslandTidepoolCrab()
 	Tags.AddUnique(TEXT("TidepoolCrab"));
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicShapeInstance(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	BaseShapeMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
+	BaseShapeMaterial = BasicShapeInstance.Succeeded() ? BasicShapeInstance.Object : (BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr);
 
 	Shell = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Shell"));
 	Shell->SetupAttachment(RootComponent);
 	Shell->SetRelativeLocation(FVector(-5.f, 0.f, 22.f));
-	Shell->SetRelativeScale3D(FVector(0.30f, 0.24f, 0.16f));
+	// The flatter carapace reads as a crab at close range instead of a round prop.
+	Shell->SetRelativeScale3D(FVector(0.30f, 0.24f, 0.11f));
 	Shell->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
 	Shell->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Shell->SetCastShadow(false);
@@ -73,6 +75,16 @@ AIslandTidepoolCrab::AIslandTidepoolCrab()
 void AIslandTidepoolCrab::BeginPlay()
 {
 	Super::BeginPlay();
+	// Resolve the material on actor start if the constructor finder did not supply
+	// it, so runtime-spawned crabs never silently keep the mesh's white default.
+	if (!BaseShapeMaterial)
+	{
+		BaseShapeMaterial = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
+		if (!BaseShapeMaterial)
+			BaseShapeMaterial = LoadObject<UMaterialInterface>(nullptr,
+				TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	}
 	HomeLocation = GetActorLocation();
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
@@ -84,8 +96,20 @@ void AIslandTidepoolCrab::BeginPlay()
 	{
 		UMaterialInstanceDynamic* ShellTint = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
 		UMaterialInstanceDynamic* LegTint = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
-		if (ShellTint) ShellTint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.24f, 0.16f, 0.10f));
-		if (LegTint) LegTint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.42f, 0.27f, 0.14f));
+		const FLinearColor ShellColor(0.10f, 0.035f, 0.018f);
+		const FLinearColor LegColor(0.22f, 0.095f, 0.04f);
+		// Keep the common shape-color parameter and its BaseColor variant in sync;
+		// engine material instances may expose either name.
+		if (ShellTint)
+		{
+			ShellTint->SetVectorParameterValue(TEXT("Color"), ShellColor);
+			ShellTint->SetVectorParameterValue(TEXT("BaseColor"), ShellColor);
+		}
+		if (LegTint)
+		{
+			LegTint->SetVectorParameterValue(TEXT("Color"), LegColor);
+			LegTint->SetVectorParameterValue(TEXT("BaseColor"), LegColor);
+		}
 		if (ShellTint && Shell) Shell->SetMaterial(0, ShellTint);
 		for (UStaticMeshComponent* Leg : Legs) if (Leg) Leg->SetMaterial(0, LegTint);
 		for (UStaticMeshComponent* Claw : Claws) if (Claw) Claw->SetMaterial(0, LegTint);
