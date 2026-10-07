@@ -1453,6 +1453,49 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableCrab->CheckForLowRavenFlyby();
 		TestTrue(TEXT("A low but distant flight does not startle a shore crab"),
 			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+
+		WatchableCrab->RippleResponseCooldownRemaining = 0.f;
+		AIslandPoolRippleEffect* ShoreRipple = World->SpawnActor<AIslandPoolRippleEffect>(
+			CrabStart + FVector(160.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A nearby untagged pool ripple is available for filtering"), ShoreRipple);
+		if (ShoreRipple)
+		{
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			TestTrue(TEXT("Untyped visitor ripples do not startle shore crabs"),
+				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			ShoreRipple->ConfigureAsWindImpact(110.f);
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			const FVector AwayFromRipple = (CrabStart - ShoreRipple->GetActorLocation()).GetSafeNormal2D();
+			TestTrue(TEXT("A nearby natural wind ripple prompts a brief shoreward scurry"),
+				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+			TestTrue(TEXT("The crab moves away from the natural ripple"),
+				FVector::DotProduct(WatchableCrab->ScurryDirection, AwayFromRipple) > 0.95f);
+			TestEqual(TEXT("One natural ripple starts a bounded eight-second response cooldown"),
+				WatchableCrab->RippleResponseCooldownRemaining, 8.f);
+			WatchableCrab->ScurryRemaining = 0.f;
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			TestTrue(TEXT("The same nearby ripple cannot retrigger during cooldown"),
+				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			ShoreRipple->Destroy();
+		}
+
+		WatchableCrab->RippleResponseCooldownRemaining = 0.f;
+		AIslandPoolRippleEffect* DistantShoreRipple = World->SpawnActor<AIslandPoolRippleEffect>(
+			CrabStart + FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A distant natural ripple is available for radius filtering"), DistantShoreRipple);
+		if (DistantShoreRipple)
+		{
+			DistantShoreRipple->ConfigureAsRainImpact();
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			TestTrue(TEXT("A distant rain ripple does not startle the shore crab"),
+				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			DistantShoreRipple->SetActorLocation(CrabStart + FVector(180.f, 0.f, 0.f));
+			WatchableCrab->RippleCheckRemaining = 0.36f;
+			WatchableCrab->Tick(0.36f);
+			TestTrue(TEXT("A nearby rain ripple also prompts a brief temporary response"),
+				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+			DistantShoreRipple->Destroy();
+		}
 		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 	}
 	AIslandTideglassDragonfly* WatchableDragonfly = World->SpawnActor<AIslandTideglassDragonfly>(TestPoolLocation + FVector(100.f, 0.f, 160.f), FRotator::ZeroRotator, Spawn);

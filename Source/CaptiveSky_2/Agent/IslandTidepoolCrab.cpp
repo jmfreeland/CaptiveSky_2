@@ -7,6 +7,7 @@
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "IslandPoolRippleEffect.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -125,6 +126,25 @@ void AIslandTidepoolCrab::CheckForLowRavenFlyby()
 	}
 }
 
+void AIslandTidepoolCrab::CheckForNearbyNaturalRipple()
+{
+	if (!GetWorld() || bIsSheltered || ScurryRemaining > 0.f || RippleResponseCooldownRemaining > 0.f) return;
+
+	constexpr float RippleResponseRadius = 275.f;
+	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
+	{
+		AIslandPoolRippleEffect* Ripple = *It;
+		if (!IsValid(Ripple) || (!Ripple->ActorHasTag(TEXT("WindImpact")) && !Ripple->ActorHasTag(TEXT("RainImpact")))) continue;
+		if (FVector::DistSquared2D(GetActorLocation(), Ripple->GetActorLocation()) > FMath::Square(RippleResponseRadius)) continue;
+
+		// Natural weather ripples briefly send the shore crab back from the water's edge.
+		// The cue is local, transient and deliberately ignores untagged visitor ripples.
+		RespondToQuietObservation(Ripple->GetActorLocation());
+		RippleResponseCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 void AIslandTidepoolCrab::SetSheltered(bool bSheltered)
 {
 	if (bIsSheltered == bSheltered) return;
@@ -167,11 +187,18 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ScurryRemaining = FMath::Max(0.f, ScurryRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	RippleResponseCooldownRemaining = FMath::Max(0.f, RippleResponseCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.35f;
 		CheckForLowRavenFlyby();
+	}
+	RippleCheckRemaining -= SafeDelta;
+	if (RippleCheckRemaining <= 0.f)
+	{
+		RippleCheckRemaining = 0.35f;
+		CheckForNearbyNaturalRipple();
 	}
 	const float Angle = Time * 0.12f + Phase;
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
