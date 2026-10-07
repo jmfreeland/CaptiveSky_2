@@ -6,6 +6,8 @@
 #include "IslandWindArchPresentation.generated.h"
 
 class AStaticMeshActor;
+class AIslandWindMoteEffect;
+class AIslandWeather;
 class UInstancedStaticMeshComponent;
 class UStaticMesh;
 
@@ -19,15 +21,26 @@ public:
 	AWindArchStonework();
 
 	int32 GetStoneCount() const;
+	/** Stronger natural winds may create one nearby transient motes pass after the cooldown. */
+	static bool ShouldEmitNaturalWindMotes(float WindSpeed, float CooldownRemaining);
+
+protected:
+	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	friend class UIslandWindArchPresentationSubsystem;
 	friend class FIslandWindArchPresentationTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")
 	TObjectPtr<UInstancedStaticMeshComponent> Stones;
+	TWeakObjectPtr<AIslandWeather> Weather;
+	TWeakObjectPtr<AIslandWindMoteEffect> AmbientMotes;
+	float AmbientMoteCooldownRemaining = 0.f;
+	static constexpr float AmbientMoteWindThreshold = 105.f;
+	static constexpr float AmbientMoteCooldownSeconds = 30.f;
 
 	bool BuildStonework(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
 		const TArray<AStaticMeshActor*>& Pillars, const AStaticMeshActor* Beam);
+	void CheckForAmbientWind();
 };
 
 /** Replaces only the saved Wind Arch's cube visuals during Game/PIE; never saves map edits. */

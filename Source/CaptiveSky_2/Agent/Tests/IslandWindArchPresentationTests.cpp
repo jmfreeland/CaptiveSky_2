@@ -14,6 +14,15 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWindArchPresentationTest, "CaptiveSky2.A
 
 bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 {
+	TestFalse(TEXT("Calm wind does not produce ambient Wind Arch motes"),
+		AWindArchStonework::ShouldEmitNaturalWindMotes(104.9f, 0.f));
+	TestTrue(TEXT("A stronger natural wind can produce an ambient mote pass"),
+		AWindArchStonework::ShouldEmitNaturalWindMotes(105.f, 0.f));
+	TestFalse(TEXT("The ambient effect remains rate-limited during its cooldown"),
+		AWindArchStonework::ShouldEmitNaturalWindMotes(180.f, 0.1f));
+	TestFalse(TEXT("An invalid negative wind sample cannot produce motes"),
+		AWindArchStonework::ShouldEmitNaturalWindMotes(-1.f, 0.f));
+
 	UWorld* Island = nullptr;
 	for (const FWorldContext& Context : GEngine->GetWorldContexts())
 	{

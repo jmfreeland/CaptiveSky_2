@@ -7,6 +7,8 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "IslandWeather.h"
+#include "IslandWindMoteEffect.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandWindArchPresentation, Log, All);
 
@@ -18,7 +20,8 @@ namespace
 
 AWindArchStonework::AWindArchStonework()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 1.f;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	Stones = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Stonework"));
 	Stones->SetupAttachment(RootComponent);
@@ -27,6 +30,57 @@ AWindArchStonework::AWindArchStonework()
 	Stones->SetCanEverAffectNavigation(false);
 	Stones->SetGenerateOverlapEvents(false);
 	Stones->SetCastShadow(true);
+}
+
+bool AWindArchStonework::ShouldEmitNaturalWindMotes(float WindSpeed, float CooldownRemaining)
+{
+	return FMath::IsFinite(WindSpeed) && WindSpeed >= AmbientMoteWindThreshold && CooldownRemaining <= 0.f;
+}
+
+void AWindArchStonework::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	AmbientMoteCooldownRemaining = FMath::Max(0.f, AmbientMoteCooldownRemaining - FMath::Max(0.f, DeltaSeconds));
+	CheckForAmbientWind();
+}
+
+void AWindArchStonework::CheckForAmbientWind()
+{
+	UWorld* World = GetWorld();
+	if (!World || AmbientMotes.IsValid()) return;
+	if (!Weather.IsValid())
+	{
+		for (TActorIterator<AIslandWeather> It(World); It; ++It)
+		{
+			Weather = *It;
+			break;
+		}
+	}
+	if (!Weather.IsValid()) return;
+
+	const FVector LocalWind = Weather->SampleWind(GetActorLocation(), World->GetTimeSeconds());
+	if (!ShouldEmitNaturalWindMotes(LocalWind.Size2D(), AmbientMoteCooldownRemaining)) return;
+
+	// An explicit user gust may already have created its own short-lived motes here.
+	// Avoid doubling the light effect at the landmark.
+	for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It)
+	{
+		if (FVector::DistSquared2D(It->GetActorLocation(), GetActorLocation()) <= FMath::Square(900.f))
+		{
+			AmbientMoteCooldownRemaining = 3.f;
+			return;
+		}
+	}
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandWindMoteEffect* Motes = World->SpawnActor<AIslandWindMoteEffect>(
+		GetActorLocation() + FVector(0.f, 0.f, 120.f), FRotator::ZeroRotator, Spawn);
+	if (!Motes) return;
+	Motes->InitializeGust(LocalWind, 800.f, 8.f);
+	AmbientMotes = Motes;
+	AmbientMoteCooldownRemaining = AmbientMoteCooldownSeconds;
 }
 
 int32 AWindArchStonework::GetStoneCount() const
