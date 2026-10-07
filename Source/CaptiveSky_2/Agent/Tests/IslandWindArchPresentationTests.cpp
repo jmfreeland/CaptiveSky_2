@@ -147,6 +147,8 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 			const float ProxyHalfHeight = Proxy->GetStaticMeshComponent()->Bounds.BoxExtent.Z;
 			TestTrue(FString::Printf(TEXT("Pillar stone %d is fitted to its own proxy height"), Index),
 				Instance.GetLocation().Z >= ProxyCenter.Z - ProxyHalfHeight && Instance.GetLocation().Z <= ProxyCenter.Z + ProxyHalfHeight);
+			TestTrue(FString::Printf(TEXT("Pillar stone %d keeps the art-directed narrower cross-section"), Index),
+				Instance.GetScale3D().X <= 0.44f && Instance.GetScale3D().Y <= 0.29f);
 		}
 	}
 	if (Stonework && StrongWindOffset >= 0.0)

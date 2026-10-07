@@ -114,6 +114,7 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 	const float DepthOffsets[5] = { 0.f, 8.f, -11.f, 10.f, -3.f };
 	const float YawOffsets[5] = { -8.f, 21.f, -17.f, 13.f, -5.f };
 	const float ScaleZ = 0.55f;
+	constexpr float PillarCrossSectionScale = 0.72f;
 	for (int32 SideIndex = 0; SideIndex < 2; ++SideIndex)
 	{
 		const float Side = SideIndex == 0 ? -1.f : 1.f;
@@ -132,8 +133,8 @@ bool AWindArchStonework::BuildStonework(UStaticMesh* RockMesh, const FTransform&
 				Bottom + StoneHalfHeight + Spacing * Layer);
 			const FRotator Rotation(Layer % 2 == 0 ? 1.5f : -1.5f, YawOffsets[Layer] + SideIndex * 11.f,
 				Layer % 2 == 0 ? -1.2f : 1.2f);
-			const float ScaleX = 0.55f + ((Layer + SideIndex) % 3) * 0.025f;
-			const float ScaleY = 0.36f + ((Layer * 2 + SideIndex) % 3) * 0.02f;
+			const float ScaleX = (0.55f + ((Layer + SideIndex) % 3) * 0.025f) * PillarCrossSectionScale;
+			const float ScaleY = (0.36f + ((Layer * 2 + SideIndex) % 3) * 0.02f) * PillarCrossSectionScale;
 			Stones->AddInstance(FTransform(Rotation, Location, FVector(ScaleX, ScaleY, ScaleZ)));
 		}
 	}
