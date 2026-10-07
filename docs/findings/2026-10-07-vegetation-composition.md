@@ -120,6 +120,37 @@ performance gate remains a paired, repeated PIE profile at the same camera and
 scalability settings, because these standalone results do not explain the
 reported 8–13 FPS PIE behavior.
 
+## Current 11:00 gameplay-scale foliage gate (2026-10-07)
+
+A single-view UE 5.8.3 editor SceneCapture reran `Tideglass` and
+`TideglassGroundDetail` with transient ground cover enabled and world-state
+loading disabled. The foliage preview generated 1,779,877 ground-cover
+instances and ten nonblocking Tideglass cattails. The 50-interval gameplay-scale
+Tideglass view reached 38.21 FPS wall-clock throughput, but its p95 frame
+throughput was only 27.80 FPS, so the existing 30-FPS p95 gate failed. The
+close-detail view reached 59.20 FPS wall-clock and 45.91 FPS p95 over 50 valid
+intervals. This repeats the broad-versus-close mismatch on the current build;
+it does not establish the separate reported PIE rate.
+
+The editor SceneCapture frame shows dense, overlapping low plants around the
+foreground pool, a long exposed brown slope, and narrow, evenly spaced distant
+tree silhouettes. The close crop is almost entirely overlapping blades. The
+pool and landmark proxies in these editor captures are blockout presentation,
+not the runtime Game materials or transient rock landmark art, so these PNGs
+are diagnostic composition references rather than highlight images. Screenshots:
+[`02_Tideglass.png`](../../Saved/Viewpoints/2026-10-07_083121_h11.0/02_Tideglass.png)
+and
+[`02a_TideglassGroundDetail.png`](../../Saved/Viewpoints/2026-10-07_083121_h11.0/02a_TideglassGroundDetail.png).
+Log: [`Codex_TideglassGroundCoverReview_20261007.log`](../../Saved/Logs/Codex_TideglassGroundCoverReview_20261007.log).
+
+The result argues against increasing the global instance budget: the foreground
+is already crowded while the middle/distant slope lacks mass, and the broad
+view remains below the 30-FPS gate. The next pass should change spatial
+composition and representation—more readable meadow/woodland groupings and
+fewer overlapping near-camera blades—then compare the same view and frame-time
+gate. Avoid changing global species or density budgets until the paired PIE
+baseline and a controlled ablation identify which rendering cost is dominant.
+
 ## Next foliage pass
 
 Do not increase the global ground-cover budget based on these images. First
