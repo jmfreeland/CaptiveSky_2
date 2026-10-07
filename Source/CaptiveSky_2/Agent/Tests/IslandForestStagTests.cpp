@@ -2,8 +2,10 @@
 #include "AgentBrainComponent.h"
 #include "IslandForestStag.h"
 #include "IslandLightning.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandInteractionUtility.h"
 #include "RavenAgentAIController.h"
+#include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/AnimSequence.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
@@ -55,20 +57,23 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	}
 
 	TestTrue(TEXT("The imported stag mesh is assigned"), Deer->GetDeerMesh() && Deer->GetDeerMesh()->GetSkeletalMeshAsset());
-	TestTrue(TEXT("The imported graze, walk, run, sleep, and wake animations resolve"),
-		Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation && Deer->WakeAnimation);
+	TestTrue(TEXT("The imported graze, walk, run, sleep, wake, and look-around animations resolve"),
+		Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation &&
+		Deer->WakeAnimation && Deer->LookAroundAnimation);
 	if (USkeletalMesh* StagMesh = Deer->GetDeerMesh() ? Deer->GetDeerMesh()->GetSkeletalMeshAsset() : nullptr)
 	{
 		USkeleton* StagSkeleton = StagMesh->GetSkeleton();
 		TestTrue(TEXT("Every assigned stag animation targets the mesh skeleton"), StagSkeleton &&
 			Deer->GrazeAnimation->GetSkeleton() == StagSkeleton && Deer->WalkAnimation->GetSkeleton() == StagSkeleton &&
 			Deer->RunAnimation->GetSkeleton() == StagSkeleton && Deer->SleepAnimation->GetSkeleton() == StagSkeleton &&
-			Deer->WakeAnimation->GetSkeleton() == StagSkeleton);
+			Deer->WakeAnimation->GetSkeleton() == StagSkeleton && Deer->LookAroundAnimation->GetSkeleton() == StagSkeleton);
 	}
-	if (Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation)
-		TestFalse(TEXT("Stag locomotion animations have no root motion; bounded movement stays actor-driven"),
+	if (Deer->GrazeAnimation && Deer->WalkAnimation && Deer->RunAnimation && Deer->SleepAnimation &&
+		Deer->WakeAnimation && Deer->LookAroundAnimation)
+		TestFalse(TEXT("Stag response and locomotion animations have no root motion; movement stays actor-driven"),
 			Deer->GrazeAnimation->HasRootMotion() || Deer->WalkAnimation->HasRootMotion() ||
-			Deer->RunAnimation->HasRootMotion() || Deer->SleepAnimation->HasRootMotion() || Deer->WakeAnimation->HasRootMotion());
+			Deer->RunAnimation->HasRootMotion() || Deer->SleepAnimation->HasRootMotion() ||
+			Deer->WakeAnimation->HasRootMotion() || Deer->LookAroundAnimation->HasRootMotion());
 	TestTrue(TEXT("The visible mesh is nonblocking"), Deer->GetDeerMesh()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 	Deer->HomeLocation = Deer->GetActorLocation();
 	TestTrue(TEXT("The stag is wild life, not a conscious agent or landmark"),
@@ -83,6 +88,42 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Ordinary world destinations remain available"), IslandInteractionUtility::IsMovementTargetAllowed(Landmark));
 	TestTrue(TEXT("A nearby clear observer can inspect without touching the animal"),
 		IslandInteractionUtility::CanInspect(Observer, Deer, 400.f));
+
+	AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A short-lived Listening Stones chime can be heard by nearby wildlife"), Chime);
+	if (Chime)
+	{
+		Chime->BeginChime();
+		Deer->BeginGrazing();
+		const FVector BeforeListening = Deer->GetActorLocation();
+		Deer->CheckForNearbyListeningStonesChime();
+		TestTrue(TEXT("A nearby fading stone tone starts one look-around response"), Deer->bListeningToChime);
+		TestTrue(TEXT("The imported look-around animation is selected for the response"),
+			Deer->LookAroundAnimation && Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+			Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+		TestTrue(TEXT("Listening does not move the wild stag from its bounded patch"),
+			Deer->GetActorLocation().Equals(BeforeListening));
+		TestTrue(TEXT("The chime response is temporary and rate-limited"),
+			Deer->ListeningRemaining > 0.f && Deer->ListeningStonesCooldownRemaining == 10.f);
+
+		Deer->CheckForNearbyListeningStonesChime();
+		TestTrue(TEXT("One chime cannot restart the look-around while it is already playing"), Deer->bListeningToChime);
+		Deer->Tick(Deer->ListeningRemaining + 0.1f);
+		TestFalse(TEXT("The stag returns to its ordinary routine after looking around"), Deer->bListeningToChime);
+		TestTrue(TEXT("The finite response leaves the stag at its original location"),
+			Deer->GetActorLocation().Equals(BeforeListening));
+
+		AIslandListeningStonesChime* DistantChime = World->SpawnActor<AIslandListeningStonesChime>(
+			FVector(Chime->AudibleRadius + 50.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		if (DistantChime)
+		{
+			DistantChime->BeginChime();
+			Deer->ListeningStonesCooldownRemaining = 0.f;
+			Deer->CheckForNearbyListeningStonesChime();
+			TestFalse(TEXT("A chime outside its documented audible radius does not draw the stag's attention"),
+				Deer->bListeningToChime);
+		}
+	}
 
 	FString Fact;
 	TestTrue(TEXT("Quiet observation is an implemented reversible interaction"),

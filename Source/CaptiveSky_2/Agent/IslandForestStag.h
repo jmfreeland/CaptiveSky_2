@@ -7,6 +7,7 @@
 class UAnimSequence;
 class USkeletalMeshComponent;
 class AIslandLightning;
+class AIslandListeningStonesChime;
 class ARavenAgentAIController;
 
 /** A single wild stag that grazes and roams a small, bounded patch near Wind Arch. */
@@ -44,6 +45,8 @@ private:
 	TObjectPtr<UAnimSequence> SleepAnimation;
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimSequence> WakeAnimation;
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> LookAroundAnimation;
 
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector TargetLocation = FVector::ZeroVector;
@@ -52,16 +55,22 @@ private:
 	float ThunderCheckRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
+	float ListeningStonesCheckRemaining = 0.f;
+	float ListeningStonesCooldownRemaining = 0.f;
+	float ListeningRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bWakingUp = false;
+	bool bListeningToChime = false;
 	bool bStartled = false;
 	bool bResting = false;
 	TWeakObjectPtr<AIslandLightning> LastHeardThunder;
+	TWeakObjectPtr<AIslandListeningStonesChime> LastHeardChime;
 
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseWanderTarget(FVector& OutTarget) const;
 	void CheckForNearbyRavenFlyby();
+	void CheckForNearbyListeningStonesChime();
 	void StartMove(const FVector& Target, bool bRun);
 	void PlayLoop(UAnimSequence* Animation);
 	void BeginGrazing();

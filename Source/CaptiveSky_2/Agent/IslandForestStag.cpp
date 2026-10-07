@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "IslandLightning.h"
+#include "IslandListeningStonesChime.h"
 #include "RavenAgentAIController.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -37,6 +38,8 @@ AIslandForestStag::AIslandForestStag()
 		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_Sleep.ANIM_DeerStag_Sleep"));
 	static ConstructorHelpers::FObjectFinder<UAnimSequence> WakeAsset(
 		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_SleepToGoBackUp.ANIM_DeerStag_SleepToGoBackUp"));
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> LookAroundAsset(
+		TEXT("/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_IdleLookAround.ANIM_DeerStag_IdleLookAround"));
 
 	if (MeshAsset.Succeeded()) DeerMesh->SetSkeletalMesh(MeshAsset.Object);
 	if (GrazeAsset.Succeeded()) GrazeAnimation = GrazeAsset.Object;
@@ -44,6 +47,7 @@ AIslandForestStag::AIslandForestStag()
 	if (RunAsset.Succeeded()) RunAnimation = RunAsset.Object;
 	if (SleepAsset.Succeeded()) SleepAnimation = SleepAsset.Object;
 	if (WakeAsset.Succeeded()) WakeAnimation = WakeAsset.Object;
+	if (LookAroundAsset.Succeeded()) LookAroundAnimation = LookAroundAsset.Object;
 	DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 }
 
@@ -65,9 +69,11 @@ void AIslandForestStag::BeginGrazing()
 {
 	bMoving = false;
 	bWakingUp = false;
+	bListeningToChime = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	WakeRemaining = 0.f;
+	ListeningRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
 }
@@ -116,6 +122,35 @@ void AIslandForestStag::CheckForNearbyRavenFlyby()
 	}
 }
 
+void AIslandForestStag::CheckForNearbyListeningStonesChime()
+{
+	if (!GetWorld() || bResting || bWakingUp || bMoving || bStartled || bListeningToChime ||
+		ListeningStonesCooldownRemaining > 0.f || !LookAroundAnimation)
+		return;
+
+	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
+	{
+		AIslandListeningStonesChime* Chime = *It;
+		if (!IsValid(Chime) || LastHeardChime.Get() == Chime ||
+			Chime->DescribeForListener(GetActorLocation()).IsEmpty())
+			continue;
+
+		// A nearby, fading stone tone briefly draws the stag's attention. It stays in
+		// place, makes no lasting change, and returns to grazing after the look-around.
+		LastHeardChime = Chime;
+		bListeningToChime = true;
+		ListeningRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
+		ActivityRemaining = 0.f;
+		if (DeerMesh)
+		{
+			DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			DeerMesh->PlayAnimation(LookAroundAnimation, false);
+		}
+		ListeningStonesCooldownRemaining = 10.f;
+		return;
+	}
+}
+
 bool AIslandForestStag::FindGround(const FVector& NearPoint, FVector& OutGround) const
 {
 	UWorld* World = GetWorld();
@@ -149,7 +184,9 @@ void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 {
 	if (bResting) return;
 	bWakingUp = false;
+	bListeningToChime = false;
 	WakeRemaining = 0.f;
+	ListeningRemaining = 0.f;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -183,10 +220,12 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	bResting = bShouldRest;
 	bMoving = false;
 	bWakingUp = false;
+	bListeningToChime = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
 	WakeRemaining = 0.f;
+	ListeningRemaining = 0.f;
 	if (bResting)
 	{
 		PlayLoop(SleepAnimation);
@@ -213,6 +252,7 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	if (!GetWorld()) return;
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - Delta);
+	ListeningStonesCooldownRemaining = FMath::Max(0.f, ListeningStonesCooldownRemaining - Delta);
 	ThunderCheckRemaining -= Delta;
 	if (ThunderCheckRemaining <= 0.f)
 	{
@@ -225,11 +265,23 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		RavenCheckRemaining = 0.35f;
 		CheckForNearbyRavenFlyby();
 	}
+	ListeningStonesCheckRemaining -= Delta;
+	if (ListeningStonesCheckRemaining <= 0.f)
+	{
+		ListeningStonesCheckRemaining = 0.35f;
+		CheckForNearbyListeningStonesChime();
+	}
 	if (bResting) return;
 	if (bWakingUp)
 	{
 		WakeRemaining -= Delta;
 		if (WakeRemaining <= 0.f) BeginGrazing();
+		return;
+	}
+	if (bListeningToChime)
+	{
+		ListeningRemaining -= Delta;
+		if (ListeningRemaining <= 0.f) BeginGrazing();
 		return;
 	}
 	if (!bMoving)
