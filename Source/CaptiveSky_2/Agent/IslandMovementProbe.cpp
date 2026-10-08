@@ -27,19 +27,47 @@ public:
 
 		const TSharedRef<FProbeState> State = MakeShared<FProbeState>();
 		State->World = World;
-		State->MoverTag = FName(Args.IsEmpty() ? TEXT("IslandInnkeeper") : *Args[0]);
-		State->bApproachProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Approach"), ESearchCase::IgnoreCase);
-		State->bWanderProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Wander"), ESearchCase::IgnoreCase);
-		State->bForceCuriosityProbe = State->bWanderProbe && Args.Num() > 2 && Args[2].Equals(TEXT("Curious"), ESearchCase::IgnoreCase);
-		State->bInteractAfterMove = !State->bWanderProbe && !State->bApproachProbe && Args.Num() > 2 && Args[2].Equals(TEXT("Interact"), ESearchCase::IgnoreCase);
-		State->TargetTag = State->bApproachProbe
-			? FName(Args.Num() > 2 ? *Args[2] : TEXT("ApproachAgent_Raven_01"))
-			: FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
-		State->PerchTag = State->bApproachProbe ? FName(Args.Num() > 3 ? *Args[3] : TEXT("Roost_East")) : NAME_None;
-		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : (State->bInteractAfterMove ? 3 : INDEX_NONE));
-		if (StartOverrideIndex != INDEX_NONE && Args.Num() > StartOverrideIndex)
+		State->QueuedAt = World->GetTimeSeconds();
+		TArray<FString> PositionalArgs;
+		for (const FString& Arg : Args)
 		{
-			if (Args.Num() <= StartOverrideIndex + 2)
+			double OptionValue = 0.0;
+			if (Arg.StartsWith(TEXT("DelaySeconds="), ESearchCase::IgnoreCase))
+			{
+				if (!LexTryParseString(OptionValue, *Arg.RightChop(13)) || OptionValue < 0.0 || OptionValue > 30.0)
+				{
+					UE_LOG(LogIslandMovementProbe, Error, TEXT("DelaySeconds must be a number from 0 to 30."));
+					return;
+				}
+				State->DispatchDelaySeconds = OptionValue;
+			}
+			else if (Arg.StartsWith(TEXT("HoldSeconds="), ESearchCase::IgnoreCase))
+			{
+				if (!LexTryParseString(OptionValue, *Arg.RightChop(12)) || OptionValue < 0.0 || OptionValue > 20.0)
+				{
+					UE_LOG(LogIslandMovementProbe, Error, TEXT("HoldSeconds must be a number from 0 to 20."));
+					return;
+				}
+				State->PostCompletionHoldSeconds = OptionValue;
+			}
+			else
+			{
+				PositionalArgs.Add(Arg);
+			}
+		}
+		State->MoverTag = FName(PositionalArgs.IsEmpty() ? TEXT("IslandInnkeeper") : *PositionalArgs[0]);
+		State->bApproachProbe = PositionalArgs.Num() > 1 && PositionalArgs[1].Equals(TEXT("Approach"), ESearchCase::IgnoreCase);
+		State->bWanderProbe = PositionalArgs.Num() > 1 && PositionalArgs[1].Equals(TEXT("Wander"), ESearchCase::IgnoreCase);
+		State->bForceCuriosityProbe = State->bWanderProbe && PositionalArgs.Num() > 2 && PositionalArgs[2].Equals(TEXT("Curious"), ESearchCase::IgnoreCase);
+		State->bInteractAfterMove = !State->bWanderProbe && !State->bApproachProbe && PositionalArgs.Num() > 2 && PositionalArgs[2].Equals(TEXT("Interact"), ESearchCase::IgnoreCase);
+		State->TargetTag = State->bApproachProbe
+			? FName(PositionalArgs.Num() > 2 ? *PositionalArgs[2] : TEXT("ApproachAgent_Raven_01"))
+			: FName(PositionalArgs.Num() > 1 ? *PositionalArgs[1] : TEXT("InnDoorLantern"));
+		State->PerchTag = State->bApproachProbe ? FName(PositionalArgs.Num() > 3 ? *PositionalArgs[3] : TEXT("Roost_East")) : NAME_None;
+		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : (State->bInteractAfterMove ? 3 : INDEX_NONE));
+		if (StartOverrideIndex != INDEX_NONE && PositionalArgs.Num() > StartOverrideIndex)
+		{
+			if (PositionalArgs.Num() <= StartOverrideIndex + 2)
 			{
 				UE_LOG(LogIslandMovementProbe, Error, TEXT("Start override needs all three numeric world coordinates."));
 				return;
@@ -47,9 +75,9 @@ public:
 			double StartX = 0.0;
 			double StartY = 0.0;
 			double StartZ = 0.0;
-			if (!LexTryParseString(StartX, *Args[StartOverrideIndex]) ||
-				!LexTryParseString(StartY, *Args[StartOverrideIndex + 1]) ||
-				!LexTryParseString(StartZ, *Args[StartOverrideIndex + 2]))
+			if (!LexTryParseString(StartX, *PositionalArgs[StartOverrideIndex]) ||
+				!LexTryParseString(StartY, *PositionalArgs[StartOverrideIndex + 1]) ||
+				!LexTryParseString(StartZ, *PositionalArgs[StartOverrideIndex + 2]))
 			{
 				UE_LOG(LogIslandMovementProbe, Error, TEXT("Start override needs three numeric world coordinates."));
 				return;
@@ -59,9 +87,10 @@ public:
 		}
 		World->GetTimerManager().SetTimer(State->PollTimer,
 			FTimerDelegate::CreateLambda([State]() { Poll(State); }), 0.5f, true);
-		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s%s probe for %s; waiting for runtime actors."),
+		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s%s probe for %s; camera warm-up %.1f s, post-probe hold %.1f s; waiting for runtime actors."),
 			State->bForceCuriosityProbe ? TEXT("forced-curiosity ") : (State->bWanderProbe ? TEXT("wander ") : TEXT("")),
-			State->bWanderProbe ? TEXT("flight-wander") : TEXT("movement"), *State->MoverTag.ToString());
+			State->bWanderProbe ? TEXT("flight-wander") : TEXT("movement"), *State->MoverTag.ToString(),
+			State->DispatchDelaySeconds, State->PostCompletionHoldSeconds);
 	}
 
 private:
@@ -74,8 +103,12 @@ private:
 		FName TargetTag;
 		FName PerchTag;
 		FTimerHandle PollTimer;
+		FTimerHandle ExitTimer;
 		FVector StartLocation = FVector::ZeroVector;
 		double StartedAt = 0.0;
+		double QueuedAt = 0.0;
+		double DispatchDelaySeconds = 0.0;
+		double PostCompletionHoldSeconds = 0.0;
 		double PerchRequestedAt = 0.0;
 		double GroundingStartedAt = 0.0;
 		int32 StartupPolls = 0;
@@ -98,6 +131,8 @@ private:
 
 		if (!State->bMoveStarted)
 		{
+			if (World->GetTimeSeconds() - State->QueuedAt < State->DispatchDelaySeconds) return;
+
 			AActor* Mover = nullptr;
 			AActor* Target = nullptr;
 			for (TActorIterator<AActor> It(World); It; ++It)
@@ -301,13 +336,22 @@ private:
 
 	static void Finish(const TSharedRef<FProbeState>& State, bool bSuccess)
 	{
-		if (UWorld* World = State->World.Get()) World->GetTimerManager().ClearTimer(State->PollTimer);
+		UWorld* World = State->World.Get();
+		if (World) World->GetTimerManager().ClearTimer(State->PollTimer);
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Isolated movement probe finished: %s."), bSuccess ? TEXT("success") : TEXT("failure"));
+		if (bSuccess && State->PostCompletionHoldSeconds > 0.0 && World)
+		{
+			UE_LOG(LogIslandMovementProbe, Log, TEXT("Holding the runtime view for %.1f seconds before the bounded diagnostic exit."), State->PostCompletionHoldSeconds);
+			World->GetTimerManager().SetTimer(State->ExitTimer,
+				FTimerDelegate::CreateLambda([State]() { FPlatformMisc::RequestExit(false); }),
+				static_cast<float>(State->PostCompletionHoldSeconds), false);
+			return;
+		}
 		FPlatformMisc::RequestExit(false);
 	}
 };
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact] [optional-start-x start-y start-z]|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
+	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Add DelaySeconds=0..30 for camera warm-up and HoldSeconds=0..20 for post-success observation. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact] [optional-start-x start-y start-z]|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));
