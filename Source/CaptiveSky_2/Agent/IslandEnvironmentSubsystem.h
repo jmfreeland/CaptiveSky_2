@@ -73,6 +73,8 @@ public:
 	float GetIndoors() const { return Indoors; }
 	float GetStorm() const { return Storm; }
 	float GetCloudCover() const { return CloudCover; }
+	float GetSunHeight() const { return SunHeight; }
+	float GetIslandHour() const { return IslandHour; }
 
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
