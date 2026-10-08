@@ -178,39 +178,31 @@ that volume center, outside its 100 m square footprint. The saved
 Audit log:
 [`IslandNavBoundsAudit.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Logs/IslandNavBoundsAudit.log).
 
-To test the obvious coverage hypothesis without touching the open map, a
-physical scratch copy of `Island.umap` was changed to scale the volume by
-`(12, 3, 2)` (600 m by 150 m half-extents) and set the Recast data to `DYNAMIC`.
-The main `Content/Maps/Island.umap` hash remained unchanged. In a bounded
-four-minute `-NullRHI` Game run, the runtime build reported no tile work (0.00
-seconds, zero remaining tasks), and the shore point still did not project to
-navigation. A follow-up settings audit confirmed the scratch Recast data was
-indeed dynamic, with a 1024-tile pool, and that
-`GenerateNavigationOnlyAroundNavigationInvokers` was false. So this failed
-probe is not explained by the test accidentally remaining static or by
-invoker-only generation. It does **not** rule out a proper offline editor bake;
-it shows that simply expanding bounds and asking the runtime to rebuild is not
-enough in this project. Evidence:
-[`NavBoundsRuntimeProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsRuntimeProbe.log),
-[`IslandNavRuntimeSettingsAudit2.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/IslandNavRuntimeSettingsAudit2.log).
+The first scratch attempt was incorrectly scaled. `SetActorScale3D` took
+absolute scale values, so changing the original `(50, 50, 20)` to `(12, 3, 2)`
+shrunk the bounds to half-extents `(1200, 300, 200)` cm; it did **not** expand
+them to 600 m by 150 m. The resulting no-tile and failed-projection results
+are invalid evidence about expanded bounds or runtime generation. The main
+`Content/Maps/Island.umap` hash remained unchanged. Earlier claims in this
+section that the experiment ruled out runtime rebuilding are withdrawn.
 
-A second scratch-only attempt launched the project in `UnrealEditor.exe` (not
-the Game target), opened the copied Island, released the async-load build lock,
-and called `UNavigationSystemV1::Build()`. The editor log shows the call ran in
-the editor world, but Recast still queued no tiles: `RebuildAll` load time was
-3.78 s and tile-build time was 0.00 s. The probe's delayed result did not fire
-because an editor world is not a ticking gameplay world. This therefore
-confirms that the same runtime `Build()` call is ineffective in both Game and
-editor contexts; it is **not** a test of the editor menu's offline `Build
-Paths` operation, and provides no new shoreline projection result. The
-scratch editor was closed afterward; the live editors and main map were left
-alone. Log:
-[`NavBoundsEditorProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsEditorProbe.log).
+A corrected scratch map set absolute scale `(600, 150, 40)`, giving bounds
+half-extents `(60000, 15000, 4000)` cm around the same center, and kept Recast
+generation `DYNAMIC`. Recast generated tile work in 1.44 s. In the bounded
+120-second `-NullRHI` Game run, the wrack point projected from
+`(-44480.88, 103520.22, 1069.24)` to navmesh at Z `1085.733`, and the nav query
+found a **complete 585 m route from that point to ListeningStones**. The run
+ended normally at the time cap with zero model requests and no automatic
+restart. This proves runtime generation can produce a connected navmesh route
+from the shore target to ListeningStones with corrected bounds. It does not
+yet prove a physical Aster walk, a route from Aster's actual spawn, or a saved
+static/offline bake. Evidence:
+[`IslandNavBoundsPrepareCorrected.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/IslandNavBoundsPrepareCorrected.log),
+[`NavBoundsCorrectedRuntimeProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsCorrectedRuntimeProbe.log).
 
-The next validating step is an offline `Build Paths` bake in an isolated editor
-copy, then `Island.NavProbe` at both the wrack and a corridor point. If that
-works, the actual map needs an expanded bounds volume **and saved baked
-navigation**; do not save or alter the live Island while its editor state is
-unsaved. Epic documents static navigation as offline/saved and dynamic
+The next validation is a bounded physical Aster move on an isolated copy with
+the corrected bounds; separately, test whether an offline `Build Paths` bake
+can persist navigation. Do not save or alter the live Island while its editor
+state is unsaved. Epic documents static navigation as offline/saved and dynamic
 navigation as supporting runtime generation ([generation modes](https://dev.epicgames.com/documentation/unreal-engine/overview-of-how-to-modify-the-navigation-mesh-in-unreal-engine),
 [basic navigation and Build Paths](https://dev.epicgames.com/documentation/unreal-engine/basic-navigation-in-unreal-engine?lang=en-US)).
