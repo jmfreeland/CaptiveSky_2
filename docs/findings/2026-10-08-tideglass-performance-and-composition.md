@@ -31,11 +31,16 @@ owner or root cause.
 This points toward variable render-thread synchronization/RDG work in this
 capture, not a demonstrated GPU-bound frame or a proven ground-cover-density
 cause. Do not tune foliage density or culling based on the maximum frame alone.
-The next useful performance check is a short Unreal Insights trace around a
-matched fixed-camera capture, followed separately by a bounded moving PIE
-trace; correlate render-thread waits/resource collection with the frame spikes.
-This does not change the p95 result or the separate need to improve the broad
-view's ecological composition.
+The longer [controlled Insights record](2026-10-04-actual-gameplay-profile.md)
+already compares Lumen, CPU ground-cover sway, occlusion queries, and the RHI
+thread. It linked some earlier ~0.45–0.48 second stalls to CPU instance updates
+and task/sync-point waits, but this shorter 10/8 hitch is not proven to share
+those causes. Avoid repeating those broad ablations. If the hitch recurs after
+the current foliage changes settle, capture an event-level trace of that exact
+default config with screenshots disabled and correlate Render Thread EventWait
+/ RDG against `GameThreadWaitForTask`; separately keep the bounded moving-PIE
+check distinct from this fixed-view profile. This does not change the p95
+result or the separate need to improve the broad view's ecological composition.
 
 The [Game screenshot](../../Playtests/Codex_TideglassCurrent_20261008/Screenshots/003_Tideglass.png)
 shows a reflective pool, a dense and partly tangled foreground, broad sparse
