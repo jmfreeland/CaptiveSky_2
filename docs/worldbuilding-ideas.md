@@ -110,6 +110,18 @@ make → perceive → value → remember → imitate → transform → teach →
 
 Minnow breaches already make a brief surface ripple, and dragonflies can investigate it. Shore crabs now share that cue: a nearby minnow splash draws one crab a short distance toward the water, while wind and rain impacts still startle it back. Each response is local, temporary, and cooldown-limited; visitor-made ripples remain inert, and no agent request or saved-world state is added. This creates a readable cause-and-effect beat between two wild species without turning the crab into a target or a guaranteed interaction. The UE 5.8.3 editor target built successfully and `CaptiveSky2.Agent.NightEcology` passed, including splash direction and cooldown coverage ([automation log](../Saved/Logs/Codex_MinnowCrabEcology_20261008.log)). In-world frequency and visual readability still need a bounded Game/PIE observation.
 
+## Character inspirations — Sierra and Quest for Glory
+
+The user would like future characters that borrow the spirit of old Sierra games,
+especially Quest for Glory: a very intelligent rat (the exact reference/name is
+uncertain; “Erasmus” was floated as a possibility), some of the wizard
+characters, and perhaps the innkeeper archetype. Treat these as tonal and role
+inspirations rather than direct reproductions. Any eventual Island characters
+should have original names, histories, motivations, and relationships; keep
+their arrival and roles open until the user chooses which references matter
+most. The existing Innkeeper need not be replaced or duplicated just to satisfy
+the inspiration.
+
 ## Concept art — The first crossing becomes a place
 
 Aspirational visual target rather than a proposal to immediately construct a complete settlement. The useful hierarchy is intimate resident activity in the foreground, infrastructure connecting people through the middle ground, architecture/ecology beyond, and geography holding everything together.
