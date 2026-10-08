@@ -389,3 +389,26 @@ still too distant to read as individual species. Frames: [`close`](../../Playtes
 and [`edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TaperedBody/002_Edge_Distance.png).
 Automation log: `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowBody_Verified_20261008.log`;
 Game log: `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowBody_Game_20261008.log`.
+
+## Controlled Raven flight near Tideglass (2026-10-08)
+
+A bounded UE 5.8.3 scratch Game run used `Island.MoveProbe Agent_Raven_01 Wander Curious`
+with Raven placed at `(-99180, 100060, 3524)`, directly above the TideglassPool anchor.
+The daytime school spawns 24 cm above that anchor, so this starting pose was 450 cm above
+the school and inside the minnow cue's 150–700 cm low-flyby height band. The log records
+the Raven taking off and reaching its flight destination after 3.4 simulated seconds and
+1,019 cm; the probe exited successfully. Agent thinking and Python were disabled, world
+data was isolated, the Game cap was 45 seconds, and the session ended with zero model
+requests. The scratch Game loaded the Raven mesh. The first sandboxed launch failed at
+startup because Unreal's Installed DDC graph had no writable node (exit code 3); the
+successful retry used `-DDC-ForceMemoryCache -ddc=NoZenLocalFallback`, and platform
+validation returned success.
+
+This is physical-flight evidence, not confirmation that the minnow response was visibly
+triggered: the short probe exited before the spectator's first screenshot, and its log
+does not record the school's scatter state. The separate 60-second Game check ended at its
+cap with zero model requests, but did not run the Raven probe. Next, stage the flight only
+after the camera is ready and retain the scene long enough to capture the brief scatter;
+until then, treat the in-world reaction as unverified. Logs:
+[`flight probe`](../../Saved/Logs/Codex_TideglassMinnowRavenGameElevated_20261008.log) and
+[`capped Game check`](../../Saved/Logs/Codex_TideglassMinnowRavenLive_20261008.log).
