@@ -128,6 +128,15 @@ EIslandDriftKind AIslandDrift::KindForSlot(int32 Index)
 	return EIslandDriftKind::GreenLeaf;
 }
 
+FString AIslandDrift::DescribeDrift(float WindSpeed, float Rain, float Daylight)
+{
+	if (Rain > 0.3f || Daylight < 0.3f) return FString();
+	if (WindSpeed >= 260.f) return TEXT(" The wind is tearing leaves loose and flinging them past in tumbling handfuls.");
+	if (WindSpeed >= 120.f) return TEXT(" Dry leaves and petals tumble across the ground on the wind.");
+	if (WindSpeed >= 40.f) return TEXT(" Petals and seeds drift past on the breeze.");
+	return TEXT(" A few seeds hang almost motionless in the still air.");
+}
+
 int32 AIslandDrift::GetActiveCount() const
 {
 	int32 Count = 0;

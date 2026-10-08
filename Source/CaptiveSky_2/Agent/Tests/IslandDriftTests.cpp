@@ -25,6 +25,13 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	for (int32 Kind = 0; Kind < static_cast<int32>(EIslandDriftKind::Count); ++Kind)
 		TestTrue(TEXT("Every kind has slots"), Seen[Kind] > 0);
 
+	TestTrue(TEXT("Still air hangs a few seeds"), Drift::DescribeDrift(0.f, 0.f, 1.f).Contains(TEXT("seeds")));
+	TestTrue(TEXT("A breeze carries petals"), Drift::DescribeDrift(80.f, 0.f, 1.f).Contains(TEXT("Petals")));
+	TestTrue(TEXT("A wind tumbles leaves"), Drift::DescribeDrift(160.f, 0.f, 1.f).Contains(TEXT("tumble")));
+	TestTrue(TEXT("A gale flings them"), Drift::DescribeDrift(400.f, 0.f, 1.f).Contains(TEXT("flinging")));
+	TestTrue(TEXT("Nothing drifts in rain"), Drift::DescribeDrift(400.f, 1.f, 1.f).IsEmpty());
+	TestTrue(TEXT("Nothing is seen at night"), Drift::DescribeDrift(400.f, 0.f, 0.f).IsEmpty());
+
 	const FVector Wind(200.f, 0.f, 0.f);
 	FVector Velocity = FVector::ZeroVector;
 	for (int32 Step = 0; Step < 600; ++Step) Velocity = Drift::StepVelocity(Velocity, Wind, EIslandDriftKind::DryLeaf, 0.016f);

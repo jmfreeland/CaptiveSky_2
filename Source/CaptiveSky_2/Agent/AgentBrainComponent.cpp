@@ -25,6 +25,8 @@
 #include "Engine/GameInstance.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandDrift.h"
+#include "IslandTrail.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandListeningStonesChime.h"
 
@@ -276,6 +278,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeGround(Environment->GetWetness(), Environment->GetRainIntensity());
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeAir(Environment->GetMist());
+				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
+				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
+					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
 			}
 			break;
 		}

@@ -194,6 +194,30 @@ int32 UIslandTrailSubsystem::GetActivePrintCount() const
 	return Count;
 }
 
+FString UIslandTrailSubsystem::DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness)
+{
+	FString Out;
+	if (Steps >= WearFullSteps) Out += TEXT(" The ground underfoot is trodden bare along a track that many feet have worn.");
+	else if (Steps >= WearStartSteps) Out += TEXT(" The grass here is worn thin along a track where feet often pass.");
+	else if (Steps >= WearStartSteps / 2) Out += TEXT(" The grass is faintly flattened here, as if others have passed this way before.");
+	if (NearbyPrints >= 3)
+		Out += Wetness < 0.3f ? TEXT(" Dark footprints still mark the ground nearby, shrinking as it dries.") : TEXT(" Fresh footprints are pressed into the wet ground nearby.");
+	return Out;
+}
+
+FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float Wetness) const
+{
+	int32 Steps = 0;
+	const FIntPoint Here = FIslandTrailLedger::CellFor(Position);
+	for (int32 DX = -1; DX <= 1; ++DX)
+		for (int32 DY = -1; DY <= 1; ++DY)
+			if (const FIslandTrailCell* Cell = Ledger.Cells.Find(Here + FIntPoint(DX, DY))) Steps = FMath::Max(Steps, Cell->Steps);
+	int32 Prints = 0;
+	for (const FPrint& Print : PrintRing)
+		if (Print.bActive && FVector::DistSquared2D(Print.Position, Position) < FMath::Square(600.f)) ++Prints;
+	return DescribeTrail(Steps, Prints, Wetness);
+}
+
 FString UIslandTrailSubsystem::GetStorageFilePath() const
 {
 	if (!bAllowStorage) return FString();

@@ -88,6 +88,10 @@ public:
 	const FIslandTrailLedger& GetLedger() const { return Ledger; }
 	FIslandTrailLedger& GetLedgerMutable() { return Ledger; }
 	int32 GetActivePrintCount() const;
+	/** What a resident notices of the ground itself: worn tracks and wet prints. Pure; counts come from the ledger. */
+	static FString DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness);
+	/** The same, for a point on the island. */
+	FString DescribeUnderfoot(const FVector& Position, float Wetness) const;
 	/** Tests set this to redirect or suppress saving; empty means derive from the map. */
 	FString StorageFileOverride;
 	bool bAllowStorage = true;

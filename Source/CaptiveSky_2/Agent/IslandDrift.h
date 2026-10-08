@@ -62,6 +62,8 @@ public:
 	static FVector StepVelocity(const FVector& Velocity, const FVector& Wind, EIslandDriftKind Kind, float Seconds);
 	/** The kind that mote slot Index belongs to (slots are partitioned by kind). */
 	static EIslandDriftKind KindForSlot(int32 Index);
+	/** What a resident notices drifting past in this wind (cm/s); empty when nothing is lifting. */
+	static FString DescribeDrift(float WindSpeed, float Rain, float Daylight);
 
 	/**
 	 * Advance every mote by Dt seconds around Viewer. WindAt gives the wind (cm/s) at a point; Rain and
