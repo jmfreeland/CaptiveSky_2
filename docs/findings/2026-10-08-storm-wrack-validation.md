@@ -136,3 +136,23 @@ The automatic storm-mark trigger and Raven-to-wrack action chain are now
 verified. The remaining task for this feature is a grounded path to the shore
 and an Aster interaction test; keep agent thinking off until those physical
 behaviors are confirmed.
+
+## Bounded Raven shore awareness
+
+The Raven's normal situation summary now includes a coarse, optional cue for
+fresh unturned storm wrack within 600 m. It names the nearest `Wrack_N` target,
+gives an approximate distance, and says to fly before inspecting at close
+range. Additional nearby heaps are mentioned without replacing the normal
+25 m local observation. The distant cue is only added for a Raven controller;
+grounded residents keep their existing local-only perception. Turned, expired,
+future-dated, and out-of-range items are omitted. This bridges the gap between
+the demonstrated ~557 m spawn-to-shore flight and the Raven's ordinary local
+perception without making the chronicle a source of character knowledge.
+
+The helper's focused automation assertions passed in an isolated UE 5.8.3
+scratch project, and the scratch editor target compiled and linked successfully.
+This verifies cue filtering and the compiled integration call site, not whether
+an LLM-driven Raven will choose to follow the invitation in a live session;
+agent thinking was intentionally disabled in physical probes to keep them at
+zero model requests. The in-world decision remains to be tested after the
+grounded shore route and map-navmesh question are resolved.

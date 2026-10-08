@@ -116,6 +116,8 @@ class CAPTIVESKY_2_API UIslandWrackSubsystem : public UTickableWorldSubsystem
 public:
 	/** Distance (cm) within which a resident notices wrack. */
 	static constexpr float NoticeRadius = 2500.f;
+	/** A flying Raven may learn about fresh shorefall from up to 600 m away. */
+	static constexpr float RavenShoreAwarenessRadius = 60000.f;
 
 	/** The kind a seed picks: mostly driftwood and kelp, fewer shells, rarely a float. Pure. */
 	static EIslandWrackKind PickKind(int32 Seed);
@@ -130,6 +132,8 @@ public:
 	bool Examine(int32 ItemId, int32 Today, const FString& AgentId, FString& OutFact);
 	/** What a resident at Position notices of wrack near them, with move_to/interact targets. Empty when none. */
 	FString DescribeNearby(const FVector& Position, int32 Today) const;
+	/** Optional distant shore cue for the Raven only; grounded residents still receive strictly local observations. */
+	static FString DescribeShoreForRaven(const TArray<FIslandWrackItem>& Items, const FVector& Position, int32 Today);
 	/** The unique inspection tag an item's actor carries. */
 	static FName TargetTagFor(int32 ItemId);
 	/** The item id behind an inspection tag, or 0 when the tag is not a wrack tag. */

@@ -44,6 +44,21 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Other tags are not wrack"), Wrack::ItemIdFromTag(FName(TEXT("WindArch"))), 0);
 	TestEqual(TEXT("A malformed tag is not wrack"), Wrack::ItemIdFromTag(FName(TEXT("Wrack_x"))), 0);
 
+	FIslandWrackLedger RavenAwareness;
+	const int32 NearestShorefall = RavenAwareness.Add(Kind::Kelp, FVector(55674.f, 0.f, 0.f), 0.f, 11, 10).Id;
+	RavenAwareness.Add(Kind::Shells, FVector(58000.f, 0.f, 0.f), 0.f, 12, 10);
+	const int32 AlreadyTurned = RavenAwareness.Add(Kind::Driftwood, FVector(54000.f, 0.f, 0.f), 0.f, 13, 10).Id;
+	FIslandWrackItem TurnedItem;
+	RavenAwareness.Turn(AlreadyTurned, TEXT("Aster"), TurnedItem);
+	RavenAwareness.Add(Kind::Float, FVector(UIslandWrackSubsystem::RavenShoreAwarenessRadius + 1.f, 0.f, 0.f), 0.f, 14, 10);
+	RavenAwareness.Add(Kind::Shells, FVector(2000.f, 0.f, 0.f), 0.f, 15, 10);
+	const FString RavenShoreCue = Wrack::DescribeShoreForRaven(RavenAwareness.Items, FVector::ZeroVector, 10);
+	TestTrue(TEXT("The Raven receives the nearest distant shore target"), RavenShoreCue.Contains(Wrack::TargetTagFor(NearestShorefall).ToString()));
+	TestTrue(TEXT("The Raven's shore cue explains that flight and interaction are optional"), RavenShoreCue.Contains(TEXT("invitation, not an obligation")));
+	TestFalse(TEXT("Already-turned wrack is not offered again"), RavenShoreCue.Contains(Wrack::TargetTagFor(AlreadyTurned).ToString()));
+	TestFalse(TEXT("Wrack beyond the Raven's awareness radius is omitted"), RavenShoreCue.Contains(TEXT("Wrack_4")));
+	TestFalse(TEXT("Nearby wrack remains in the local observation channel"), RavenShoreCue.Contains(TEXT("Wrack_5")));
+
 	FIslandWrackLedger Ledger;
 	const int32 A = Ledger.Add(Kind::Driftwood, FVector(100.f, 200.f, 30.f), 45.f, 123, 10).Id;
 	const int32 B = Ledger.Add(Kind::Kelp, FVector(500.f, 200.f, 30.f), 10.f, 456, 10).Id;

@@ -283,7 +283,12 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
 					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
 				if (const UIslandWrackSubsystem* Wrack = GetWorld()->GetSubsystem<UIslandWrackSubsystem>())
-					NearbyBeings += Wrack->DescribeNearby(Location, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+				{
+					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+					NearbyBeings += Wrack->DescribeNearby(Location, Today);
+					if (RavenRoostController)
+						NearbyBeings += Wrack->DescribeShoreForRaven(Wrack->GetLedger().Items, Location, Today);
+				}
 			}
 			break;
 		}

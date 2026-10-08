@@ -686,6 +686,32 @@ FString UIslandWrackSubsystem::DescribeNearby(const FVector& Position, int32 Tod
 	return Out;
 }
 
+FString UIslandWrackSubsystem::DescribeShoreForRaven(const TArray<FIslandWrackItem>& Items, const FVector& Position, int32 Today)
+{
+	TArray<TPair<float, const FIslandWrackItem*>> Distant;
+	for (const FIslandWrackItem& Item : Items)
+	{
+		const int32 Age = Today - Item.Day;
+		if (Item.bTurned || Age < 0 || Age > FIslandWrackLedger::LifespanDays(Item.Kind)) continue;
+		const float Distance = FVector::Dist2D(Item.Position, Position);
+		if (Distance <= NoticeRadius || Distance > RavenShoreAwarenessRadius) continue;
+		Distant.Emplace(Distance, &Item);
+	}
+	if (Distant.IsEmpty()) return FString();
+	Distant.Sort([](const TPair<float, const FIslandWrackItem*>& A, const TPair<float, const FIslandWrackItem*>& B)
+		{ return A.Key < B.Key; });
+
+	const FIslandWrackItem& Nearest = *Distant[0].Value;
+	FString Out = FString::Printf(
+		TEXT("The last storm left unturned wrack along the shore, about %.0f metres away (move_to target: %s). If curiosity takes you there, fly to it and inspect only once close; it is an invitation, not an obligation."),
+		Distant[0].Key / 100.f, *TargetTagFor(Nearest.Id).ToString());
+	if (Distant.Num() > 1)
+		Out += FString::Printf(TEXT(" Another unturned piece lies elsewhere along the shore (move_to target: %s)."), *TargetTagFor(Distant[1].Value->Id).ToString());
+	if (Distant.Num() > 2)
+		Out += FString::Printf(TEXT(" %d more fresh pieces lie along the shore."), Distant.Num() - 2);
+	return Out;
+}
+
 static FAutoConsoleCommandWithWorldAndArgs GIslandWrackStormCommand(
 	TEXT("Island.WrackStorm"),
 	TEXT("Developer: leave fresh storm wrack on the shore now (saved like a real storm's). Usage: Island.WrackStorm [count]"),
