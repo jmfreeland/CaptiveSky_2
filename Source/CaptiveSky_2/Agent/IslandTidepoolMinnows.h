@@ -9,7 +9,6 @@ class AIslandDayNight;
 class ARavenAgentAIController;
 class UMaterialInterface;
 class UProceduralMeshComponent;
-class UStaticMeshComponent;
 
 /** A small daytime school that stays in the Tideglass shallows and briefly scatters from quiet attention. */
 UCLASS()
@@ -38,7 +37,7 @@ private:
 	static constexpr int32 FishCount = 5;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
-	TArray<TObjectPtr<UStaticMeshComponent>> Fish;
+	TArray<TObjectPtr<UProceduralMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Tails;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")

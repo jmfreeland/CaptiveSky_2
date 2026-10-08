@@ -353,8 +353,9 @@ the body laterally. The UE 5.8.3 scratch editor target rebuilt successfully and 
 automation passed.
 
 A matched two-view Game run used the saved Tideglass viewpoints, disabled agent thinking,
-isolated world data, a zero-model-request ceiling, and a 38-second realtime cap. It ended
-normally. In the close view the dorsal fin and forked tail now read as part of a fish silhouette;
+isolated world data, and a 38-second realtime cap. The requested zero model-request limit is
+clamped to one by the session subsystem; thinking was disabled and the run made no model calls.
+It ended normally. In the close view the dorsal fin and forked tail now read as part of a fish silhouette;
 at the pool-edge distance, most of the school still resolves to small pale flecks, and the
 pectoral fins are not consistently legible. This is a close-range improvement, not yet a
 finished gameplay-distance fish treatment. Compare the current frames at
@@ -364,6 +365,27 @@ Automation and bounded Game logs are
 `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowVerticalFins_20261008.log`
 and `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowVerticalFins_Game_20261008_2.log`.
 
-Next, improve body/fin contrast and volume with a game-ready silhouette or a more deliberate
-low-poly body profile, then repeat the same close and edge-distance views. Keep the school small,
-surface-hugging, nonblocking, and within the existing play/request safeguards.
+Next, check how the school reacts to an actual raven approach in Game rather than only in the
+focused behavior test. Keep the fish small, surface-hugging, nonblocking, and within the existing
+play/request safeguards.
+
+## Tapered minnow body profile (2026-10-08)
+
+The ellipsoid is now a procedural, twelve-sided body profile: a narrow tail stock opens into a
+fuller midsection and tapers again to the snout. The body spans 16.8 cm, with the forked tail and
+fins remaining separate so their movement and silhouette stay independently testable. The mesh
+uses smooth radial normals, no collision, and no shadow casting. `CaptiveSky2.Agent.TidepoolMinnows`
+checks its section size, bounds, narrower tail/snout rings, fin extents, nonblocking behavior,
+tide-following waterline, and existing school/ripple responses. The UE 5.8.3 scratch target built
+successfully and the focused automation passed after the final profile assertions were added.
+
+The matched two-view Game run again used isolated world data, disabled agent thinking, a 38-second
+realtime cap, and `CaptiveSkyMaxModelRequests=0`. The session subsystem clamps request limits to
+at least one, so the effective ceiling was one; with thinking disabled, it exited normally after
+38.3 seconds with zero actual model requests. The close view now shows a tapered, dark-backed body
+with a forked tail and dorsal fin.
+At the pool edge, the school is more consistently visible as small dark silhouettes, though it is
+still too distant to read as individual species. Frames: [`close`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TaperedBody/001_Close.png)
+and [`edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TaperedBody/002_Edge_Distance.png).
+Automation log: `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowBody_Verified_20261008.log`;
+Game log: `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowBody_Game_20261008.log`.

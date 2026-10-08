@@ -1,7 +1,5 @@
 #include "IslandTidepoolMinnows.h"
 
-#include "Components/StaticMeshComponent.h"
-#include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
@@ -62,32 +60,136 @@ void BuildForkedCaudalFin(UProceduralMeshComponent* Tail)
 {
 	if (!Tail) return;
 
-	// The body is a 100-unit sphere scaled to a 15 cm spindle. Its tail must
-	// stand in the vertical side profile, not lie flat in the water plane.
+	// Coordinates are centimeters in the fish's local frame. The fork stands
+	// vertically behind the tapered body rather than lying in the water plane.
 	const TArray<FVector> Vertices = {
 		FVector(0.f, 0.f, 0.f),
-		FVector(-10.f, 0.f, 0.f),
-		FVector(-24.f, 0.f, 80.f),
-		FVector(-24.f, 0.f, -80.f)
+		FVector(-1.4f, 0.f, 0.f),
+		FVector(-3.1f, 0.f, 3.2f),
+		FVector(-3.1f, 0.f, -3.2f)
 	};
 	const TArray<int32> Triangles = { 0, 2, 1, 0, 1, 3 };
 	BuildDoubleSidedTriangles(Tail, Vertices, Triangles);
 }
 
-	void BuildBodyFins(UProceduralMeshComponent* Fins)
-	{
-		if (!Fins) return;
+void BuildMinnowBody(UProceduralMeshComponent* Body)
+{
+	if (!Body) return;
 
-		// The dorsal base rests on the ellipsoid's upper skin; lateral pectorals
-		// extend beyond both sides so neither is buried by the scaled sphere.
-		const TArray<FVector> Vertices = {
-			FVector(-30.f, 0.f, 40.f), FVector(5.f, 0.f, 50.f), FVector(-8.f, 0.f, 112.f),
-			FVector(0.f, 45.f, 0.f), FVector(-28.f, 50.f, 0.f), FVector(-15.f, 0.f, 18.f),
-			FVector(0.f, -45.f, 0.f), FVector(-15.f, 0.f, 18.f), FVector(-28.f, -50.f, 0.f)
-		};
-		const TArray<int32> Triangles = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
-		BuildDoubleSidedTriangles(Fins, Vertices, Triangles);
+	struct FBodyRing
+	{
+		float X;
+		float RadiusY;
+		float RadiusZ;
+	};
+	static constexpr int32 SegmentCount = 12;
+	const TArray<FBodyRing> Rings = {
+		{ -7.0f, 0.55f, 0.55f },
+		{ -5.8f, 1.05f, 1.15f },
+		{ -4.0f, 1.55f, 1.60f },
+		{ -1.0f, 1.95f, 1.95f },
+		{  3.0f, 1.80f, 1.85f },
+		{  6.2f, 1.25f, 1.40f },
+		{  8.0f, 0.52f, 0.65f }
+	};
+	const FVector TailTip(-8.0f, 0.f, 0.f);
+	const FVector Snout(8.8f, 0.f, 0.f);
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	const int32 RingVertexCount = Rings.Num() * SegmentCount;
+	Vertices.Reserve(RingVertexCount + 2);
+	Normals.Reserve(RingVertexCount + 2);
+	UVs.Reserve(RingVertexCount + 2);
+	Colors.Reserve(RingVertexCount + 2);
+	Tangents.Reserve(RingVertexCount + 2);
+	Triangles.Reserve((Rings.Num() - 1) * SegmentCount * 6 + SegmentCount * 6);
+
+	Vertices.Add(TailTip);
+	Normals.Add(FVector(-1.f, 0.f, 0.f));
+	UVs.Add(FVector2D(0.f, 0.5f));
+	Colors.Add(FLinearColor::White);
+	Tangents.Add(FProcMeshTangent(FVector(0.f, 1.f, 0.f), false));
+
+	for (int32 RingIndex = 0; RingIndex < Rings.Num(); ++RingIndex)
+	{
+		const FBodyRing& Ring = Rings[RingIndex];
+		const int32 PreviousIndex = FMath::Max(0, RingIndex - 1);
+		const int32 NextIndex = FMath::Min(Rings.Num() - 1, RingIndex + 1);
+		const float DeltaX = FMath::Max(0.01f, Rings[NextIndex].X - Rings[PreviousIndex].X);
+		const float RadiusYSlope = (Rings[NextIndex].RadiusY - Rings[PreviousIndex].RadiusY) / DeltaX;
+		const float RadiusZSlope = (Rings[NextIndex].RadiusZ - Rings[PreviousIndex].RadiusZ) / DeltaX;
+		for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
+		{
+			const float Angle = 2.f * PI * Segment / SegmentCount;
+			const float CosAngle = FMath::Cos(Angle);
+			const float SinAngle = FMath::Sin(Angle);
+			Vertices.Add(FVector(Ring.X, CosAngle * Ring.RadiusY, SinAngle * Ring.RadiusZ));
+			Normals.Add(FVector(
+				-0.5f * (RadiusYSlope / Ring.RadiusY + RadiusZSlope / Ring.RadiusZ),
+				CosAngle / Ring.RadiusY,
+				SinAngle / Ring.RadiusZ).GetSafeNormal());
+			UVs.Add(FVector2D(static_cast<float>(RingIndex + 1) / (Rings.Num() + 1), static_cast<float>(Segment) / SegmentCount));
+			Colors.Add(FLinearColor::White);
+			Tangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
+		}
 	}
+
+	const int32 SnoutIndex = Vertices.Num();
+	Vertices.Add(Snout);
+	Normals.Add(FVector::ForwardVector);
+	UVs.Add(FVector2D(1.f, 0.5f));
+	Colors.Add(FLinearColor::White);
+	Tangents.Add(FProcMeshTangent(FVector(0.f, 1.f, 0.f), false));
+
+	const int32 FirstRingIndex = 1;
+	for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
+	{
+		const int32 Current = FirstRingIndex + Segment;
+		const int32 Next = FirstRingIndex + (Segment + 1) % SegmentCount;
+		Triangles.Append({ 0, Next, Current });
+	}
+	for (int32 RingIndex = 0; RingIndex < Rings.Num() - 1; ++RingIndex)
+	{
+		const int32 CurrentRing = FirstRingIndex + RingIndex * SegmentCount;
+		const int32 NextRing = CurrentRing + SegmentCount;
+		for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
+		{
+			const int32 A = CurrentRing + Segment;
+			const int32 B = CurrentRing + (Segment + 1) % SegmentCount;
+			const int32 C = NextRing + (Segment + 1) % SegmentCount;
+			const int32 D = NextRing + Segment;
+			Triangles.Append({ A, B, C, A, C, D });
+		}
+	}
+	const int32 LastRing = FirstRingIndex + (Rings.Num() - 1) * SegmentCount;
+	for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
+	{
+		const int32 Current = LastRing + Segment;
+		const int32 Next = LastRing + (Segment + 1) % SegmentCount;
+		Triangles.Append({ Current, Next, SnoutIndex });
+	}
+
+	Body->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+}
+
+void BuildBodyFins(UProceduralMeshComponent* Fins)
+{
+	if (!Fins) return;
+
+	// The dorsal fin rises from the upper skin while paired pectorals fan out
+	// from the body flanks. All coordinates are local centimeters.
+	const TArray<FVector> Vertices = {
+		FVector(-5.0f, 0.f, 1.45f), FVector(-2.0f, 0.f, 1.90f), FVector(-3.3f, 0.f, 4.25f),
+		FVector(-0.7f, 1.8f, 0.15f), FVector(-2.8f, 2.0f, 0.10f), FVector(-1.3f, 4.2f, 0.55f),
+		FVector(-0.7f, -1.8f, 0.15f), FVector(-1.3f, -4.2f, 0.55f), FVector(-2.8f, -2.0f, 0.10f)
+	};
+	const TArray<int32> Triangles = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+	BuildDoubleSidedTriangles(Fins, Vertices, Triangles);
+}
 }
 
 AIslandTidepoolMinnows::AIslandTidepoolMinnows()
@@ -98,7 +200,6 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 	Tags.AddUnique(TEXT("IslandLife"));
 	Tags.AddUnique(TEXT("MinnowSchool"));
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	BaseShapeMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
 
@@ -108,10 +209,9 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 	for (int32 Index = 0; Index < FishCount; ++Index)
 	{
 		const FName ComponentName(*FString::Printf(TEXT("Minnow_%d"), Index));
-		UStaticMeshComponent* Minnow = CreateDefaultSubobject<UStaticMeshComponent>(ComponentName);
+		UProceduralMeshComponent* Minnow = CreateDefaultSubobject<UProceduralMeshComponent>(ComponentName);
 		Minnow->SetupAttachment(RootComponent);
-		Minnow->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
-		Minnow->SetRelativeScale3D(FVector(0.15f, 0.05f, 0.05f));
+		BuildMinnowBody(Minnow);
 		Minnow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Minnow->SetCastShadow(false);
 		Minnow->SetCanEverAffectNavigation(false);
@@ -120,10 +220,7 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 		const FName TailName(*FString::Printf(TEXT("MinnowTail_%d"), Index));
 		UProceduralMeshComponent* Tail = CreateDefaultSubobject<UProceduralMeshComponent>(TailName);
 		Tail->SetupAttachment(Minnow);
-		// Relative locations are in the parent mesh's local units; the body sphere
-		// has 50-unit half-length. The mesh fans behind that pole rather than
-		// hiding a tiny spherical tail inside the body.
-		Tail->SetRelativeLocation(FVector(-50.f, 0.f, 0.f));
+		Tail->SetRelativeLocation(FVector(-7.8f, 0.f, 0.f));
 		BuildForkedCaudalFin(Tail);
 		Tail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Tail->SetCastShadow(false);
@@ -241,7 +338,7 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		return;
 	}
 
-	UStaticMeshComponent* FishThatBrokeSurface = Fish[SurfaceBreakFishIndex % Fish.Num()];
+	UProceduralMeshComponent* FishThatBrokeSurface = Fish[SurfaceBreakFishIndex % Fish.Num()];
 	if (!FishThatBrokeSurface)
 	{
 		SurfaceBreakRemaining = 4.f;
@@ -350,7 +447,7 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 	const FVector Side(-ScatterDirection.Y, ScatterDirection.X, 0.f);
 	for (int32 Index = 0; Index < Fish.Num(); ++Index)
 	{
-		UStaticMeshComponent* Minnow = Fish[Index];
+		UProceduralMeshComponent* Minnow = Fish[Index];
 		if (!Minnow) continue;
 		const float Angle = Phase + ElapsedSeconds * 0.62f + Index * 2.f * PI / FishCount;
 		const FVector IdleOffset(

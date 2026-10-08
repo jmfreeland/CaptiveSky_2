@@ -7,7 +7,6 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
-#include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -74,20 +73,46 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	TArray<FLinearColor> FishColors;
 	for (int32 Index = 0; Index < School->Fish.Num(); ++Index)
 	{
-		UStaticMeshComponent* Minnow = School->Fish[Index];
+		UProceduralMeshComponent* Minnow = School->Fish[Index];
 		UProceduralMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
 		UProceduralMeshComponent* Fins = School->BodyFins.IsValidIndex(Index) ? School->BodyFins[Index] : nullptr;
+		const FProcMeshSection* BodySection = Minnow ? Minnow->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* TailSection = Tail ? Tail->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* FinsSection = Fins ? Fins->GetProcMeshSection(0) : nullptr;
-		TestTrue(TEXT("Minnows are visual-only and nonblocking"), Minnow && Minnow->GetStaticMesh() && Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
+		TestTrue(TEXT("Tapered minnow bodies are procedural, visual-only, and nonblocking"),
+			BodySection && BodySection->ProcVertexBuffer.Num() == 86 && BodySection->ProcIndexBuffer.Num() == 504 &&
+			Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
+		if (BodySection)
+		{
+			const FBox BodyBounds = BodySection->SectionLocalBox;
+			TestTrue(TEXT("The low-poly body tapers at both the tail stock and snout"),
+				BodyBounds.Min.X <= -8.f && BodyBounds.Max.X >= 8.8f &&
+				BodyBounds.Min.Y <= -1.9f && BodyBounds.Max.Y >= 1.9f &&
+				BodyBounds.Min.Z <= -1.9f && BodyBounds.Max.Z >= 1.9f);
+			auto MaxRingRadius = [BodySection](int32 FirstVertex)
+			{
+				float Radius = 0.f;
+				for (int32 Segment = 0; Segment < 12; ++Segment)
+				{
+					const FVector& Position = BodySection->ProcVertexBuffer[FirstVertex + Segment].Position;
+					Radius = FMath::Max(Radius, FVector2D(Position.Y, Position.Z).Size());
+				}
+				return Radius;
+			};
+			const float TailStockRadius = MaxRingRadius(1);
+			const float MidBodyRadius = MaxRingRadius(1 + 3 * 12);
+			const float SnoutBaseRadius = MaxRingRadius(1 + 6 * 12);
+			TestTrue(TEXT("The tail stock and snout are substantially narrower than the fuller midsection"),
+				TailStockRadius < MidBodyRadius * 0.35f && SnoutBaseRadius < MidBodyRadius * 0.35f);
+		}
 		TestTrue(TEXT("Forked tail fins are visible procedural meshes without collision or shadows"),
 			Tail && TailSection && Tail->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Tail->CastShadow);
 		TestTrue(TEXT("Dorsal and pectoral fins are visible procedural meshes without collision or shadows"),
 			Fins && FinsSection && Fins->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Fins->CastShadow);
 		TestTrue(TEXT("The dorsal and paired pectoral fins are double-sided triangles"),
 			FinsSection && FinsSection->ProcVertexBuffer.Num() == 18 && FinsSection->ProcIndexBuffer.Num() == 18);
-		TestTrue(TEXT("Each tail fin is positioned beyond the rear of its fish instead of embedded near the center"),
-			Tail && Tail->GetRelativeLocation().X <= -40.f);
+		TestTrue(TEXT("Each tail fin is positioned just behind the body tail stock"),
+			Tail && Tail->GetRelativeLocation().X <= -7.5f);
 		if (TailSection)
 		{
 			float MinTailX = BIG_NUMBER;
@@ -100,7 +125,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 				MaxTailZ = FMath::Max(MaxTailZ, Vertex.Position.Z);
 			}
 			TestTrue(TEXT("The caudal fin has two vertical lobes extending behind its narrow stalk"),
-				TailSection->ProcVertexBuffer.Num() == 12 && MinTailX <= -24.f && MinTailZ <= -80.f && MaxTailZ >= 80.f);
+				TailSection->ProcVertexBuffer.Num() == 12 && MinTailX <= -3.1f && MinTailZ <= -3.2f && MaxTailZ >= 3.2f);
 		if (FinsSection)
 		{
 			float MinFinY = BIG_NUMBER;
@@ -113,7 +138,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 				MaxFinZ = FMath::Max(MaxFinZ, Vertex.Position.Z);
 			}
 			TestTrue(TEXT("Pectoral fins extend laterally and the dorsal fin clears the body surface"),
-				MinFinY <= -50.f && MaxFinY >= 50.f && MaxFinZ >= 110.f);
+				MinFinY <= -4.2f && MaxFinY >= 4.2f && MaxFinZ >= 4.25f);
 		}
 		}
 		UMaterialInstanceDynamic* FishMaterial = Minnow ? Cast<UMaterialInstanceDynamic>(Minnow->GetMaterial(0)) : nullptr;
@@ -141,7 +166,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	School->UpdateSchool(0.f);
 	const float LowWaterFishZ = School->Fish[0]->GetComponentLocation().Z;
 	const float LowWaterSwimHeight = LowWaterFishZ - School->GetActorLocation().Z - SpringLowOffset;
-	const float FishHalfHeight = School->Fish[0]->GetStaticMesh()->GetBounds().BoxExtent.Z * School->Fish[0]->GetRelativeScale3D().Z;
+	const FProcMeshSection* TideTestBody = School->Fish[0]->GetProcMeshSection(0);
+	const float FishHalfHeight = TideTestBody ? TideTestBody->SectionLocalBox.GetExtent().Z : 0.f;
 	TestTrue(TEXT("The school rises and falls with Tideglass between spring high and low water"),
 		FMath::IsNearlyEqual(LowWaterFishZ - HighWaterFishZ, SpringLowOffset - SpringHighOffset, 0.01f));
 	TestTrue(TEXT("At spring high tide the fish center stays within 1.3 cm of the surface"),
@@ -174,7 +200,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	const FVector BeforeScatter = [&School]()
 	{
 		FVector Center = FVector::ZeroVector;
-		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) Center += Minnow->GetRelativeLocation();
+		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) Center += Minnow->GetRelativeLocation();
 		return Center / School->Fish.Num();
 	}();
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(School->GetActorLocation() - FVector(300.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
@@ -192,25 +218,25 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		VisitorFact.Contains(TEXT("scattered from your quiet attention")) && VisitorFact.Contains(TEXT("wild and uncaught")) && VisitorFact.Contains(TEXT("nothing persistent changed")));
 	School->Tick(0.7f);
 	FVector ScatteredCenter = FVector::ZeroVector;
-	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) ScatteredCenter += Minnow->GetRelativeLocation();
+	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) ScatteredCenter += Minnow->GetRelativeLocation();
 	ScatteredCenter /= School->Fish.Num();
 	TestTrue(TEXT("The school visibly fans away from a quiet observer"), ScatteredCenter.X > BeforeScatter.X + 80.f);
 	School->Tick(2.f);
 	FVector RegroupedCenter = FVector::ZeroVector;
-	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) RegroupedCenter += Minnow->GetRelativeLocation();
+	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) RegroupedCenter += Minnow->GetRelativeLocation();
 	RegroupedCenter /= School->Fish.Num();
 	TestTrue(TEXT("Minnows naturally regroup within their small local habitat"), RegroupedCenter.Size2D() < 180.f && FMath::IsNearlyZero(School->ScatterRemaining));
 
 	Habitat->Tags.Add(TEXT("IslandLandmark"));
 	FVector CircleCenter = FVector::ZeroVector;
 	float OriginalCircleRadius = 0.f;
-	for (UStaticMeshComponent* Minnow : School->Fish)
+	for (UProceduralMeshComponent* Minnow : School->Fish)
 	{
 		if (!Minnow) continue;
 		CircleCenter += Minnow->GetRelativeLocation();
 	}
 	CircleCenter /= School->Fish.Num();
-	for (UStaticMeshComponent* Minnow : School->Fish)
+	for (UProceduralMeshComponent* Minnow : School->Fish)
 		if (Minnow) OriginalCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
 	OriginalCircleRadius /= School->Fish.Num();
 	TestTrue(TEXT("The close observer has a clear view of the minnow school"), IslandInteractionUtility::CanInspect(Visitor, School, 800.f));
@@ -221,10 +247,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The school accepts one short water-ripple response"), School->SurfacePulseRemaining > 0.f && School->SurfacePulseRemaining <= 1.2f);
 	School->Tick(0.3f);
 	CircleCenter = FVector::ZeroVector;
-	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
 	CircleCenter /= School->Fish.Num();
 	float ExpandedCircleRadius = 0.f;
-	for (UStaticMeshComponent* Minnow : School->Fish)
+	for (UProceduralMeshComponent* Minnow : School->Fish)
 		if (Minnow) ExpandedCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
 	ExpandedCircleRadius /= School->Fish.Num();
 	TestTrue(TEXT("The school visibly widens rather than fleeing the pool"), ExpandedCircleRadius > OriginalCircleRadius * 1.4f);
@@ -238,10 +264,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The pool itself still responds independently of who can see its fish"), IslandInteractionUtility::Perform(Visitor, Habitat, DistantPoolFact));
 	TestFalse(TEXT("A distant observer is not told the minnow school reacted to their interaction"), DistantPoolFact.Contains(TEXT("widened its circle of motion")));
 	CircleCenter = FVector::ZeroVector;
-	for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
 	CircleCenter /= School->Fish.Num();
 	float PreWindCircleRadius = 0.f;
-	for (UStaticMeshComponent* Minnow : School->Fish)
+	for (UProceduralMeshComponent* Minnow : School->Fish)
 		if (Minnow) PreWindCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
 	PreWindCircleRadius /= School->Fish.Num();
 
@@ -255,10 +281,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			School->SurfacePulseRemaining > 0.f && School->SurfacePulseRemaining <= 1.2f);
 		School->Tick(0.3f);
 		CircleCenter = FVector::ZeroVector;
-		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
+		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) CircleCenter += Minnow->GetRelativeLocation();
 		CircleCenter /= School->Fish.Num();
 		ExpandedCircleRadius = 0.f;
-		for (UStaticMeshComponent* Minnow : School->Fish)
+		for (UProceduralMeshComponent* Minnow : School->Fish)
 			if (Minnow) ExpandedCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
 		ExpandedCircleRadius /= School->Fish.Num();
 		TestTrue(*FString::Printf(TEXT("The natural ripple produces readable widening (%.1f cm vs %.1f cm before; pulse alpha %.2f)"),
@@ -313,7 +339,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyEqual(MinnowRipple->DurationSeconds, 0.95f) &&
 			FMath::IsNearlyEqual(MinnowRipple->SurfaceRadius, 48.f) &&
 			MinnowRipple->PeakLightIntensity <= 0.7f);
-		const UStaticMeshComponent* SourceFish = School->Fish[0];
+		const UProceduralMeshComponent* SourceFish = School->Fish[0];
 		TestTrue(TEXT("The ripple originates under the source fish at the shallow surface"), SourceFish &&
 			FVector::Dist2D(MinnowRipple->GetActorLocation(), SourceFish->GetComponentLocation()) < 1.f &&
 			FMath::IsNearlyEqual(MinnowRipple->GetActorLocation().Z, School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f));
@@ -359,13 +385,13 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Distant flight remains outside the Tideglass disturbance radius"), FMath::IsNearlyZero(School->ScatterRemaining));
 		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 400.f));
 		FVector BeforeFlyby = FVector::ZeroVector;
-		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) BeforeFlyby += Minnow->GetRelativeLocation();
+		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) BeforeFlyby += Minnow->GetRelativeLocation();
 		BeforeFlyby /= School->Fish.Num();
 		School->Tick(0.4f);
 		TestTrue(TEXT("A low raven glide over the shallows briefly startles the school"), School->ScatterRemaining > 1.9f && School->ScatterRemaining <= 2.4f);
 		School->Tick(0.7f);
 		FVector DuringFlyby = FVector::ZeroVector;
-		for (UStaticMeshComponent* Minnow : School->Fish) if (Minnow) DuringFlyby += Minnow->GetRelativeLocation();
+		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) DuringFlyby += Minnow->GetRelativeLocation();
 		DuringFlyby /= School->Fish.Num();
 		TestTrue(TEXT("Minnows fan away from the low overhead approach"), DuringFlyby.X > BeforeFlyby.X + 80.f);
 		School->Tick(3.f);
