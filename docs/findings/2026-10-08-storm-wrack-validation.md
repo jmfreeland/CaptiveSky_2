@@ -167,3 +167,37 @@ matching crash report. This is a launch failure, not evidence that the Raven
 ignored the cue; the autonomous decision is still unverified. Resume only from
 a launch path that produces `LogInit` and `LogAgentSession` output, and retain
 the short realtime/request caps.
+
+## Ground navigation bounds experiment
+
+An isolated audit of the saved map found one `NavMeshBoundsVolume` centered at
+`(-100900, 100460, 3920)` cm with half-extents `(5000, 5000, 2000)` cm. The
+storm-wrack point `(-44480.88, 103520.22, 1069.24)` is about 564 m west of
+that volume center, outside its 100 m square footprint. The saved
+`RecastNavMesh-Default` was `STATIC`, with 10 m tiles and a 35 cm agent radius.
+Audit log:
+[`IslandNavBoundsAudit.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Logs/IslandNavBoundsAudit.log).
+
+To test the obvious coverage hypothesis without touching the open map, a
+physical scratch copy of `Island.umap` was changed to scale the volume by
+`(12, 3, 2)` (600 m by 150 m half-extents) and set the Recast data to `DYNAMIC`.
+The main `Content/Maps/Island.umap` hash remained unchanged. In a bounded
+four-minute `-NullRHI` Game run, the runtime build reported no tile work (0.00
+seconds, zero remaining tasks), and the shore point still did not project to
+navigation. A follow-up settings audit confirmed the scratch Recast data was
+indeed dynamic, with a 1024-tile pool, and that
+`GenerateNavigationOnlyAroundNavigationInvokers` was false. So this failed
+probe is not explained by the test accidentally remaining static or by
+invoker-only generation. It does **not** rule out a proper offline editor bake;
+it shows that simply expanding bounds and asking the runtime to rebuild is not
+enough in this project. Evidence:
+[`NavBoundsRuntimeProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsRuntimeProbe.log),
+[`IslandNavRuntimeSettingsAudit2.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/IslandNavRuntimeSettingsAudit2.log).
+
+The next validating step is an offline `Build Paths` bake in an isolated editor
+copy, then `Island.NavProbe` at both the wrack and a corridor point. If that
+works, the actual map needs an expanded bounds volume **and saved baked
+navigation**; do not save or alter the live Island while its editor state is
+unsaved. Epic documents static navigation as offline/saved and dynamic
+navigation as supporting runtime generation ([generation modes](https://dev.epicgames.com/documentation/unreal-engine/overview-of-how-to-modify-the-navigation-mesh-in-unreal-engine),
+[basic navigation and Build Paths](https://dev.epicgames.com/documentation/unreal-engine/basic-navigation-in-unreal-engine?lang=en-US)).
