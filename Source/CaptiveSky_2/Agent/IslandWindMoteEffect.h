@@ -17,6 +17,8 @@ class CAPTIVESKY_2_API AIslandWindMoteEffect : public AActor
 public:
 	AIslandWindMoteEffect();
 	void InitializeGust(const FVector& Direction, float Radius, float DurationSeconds);
+	/** Finds the nearest still-visible gust mote for a nearby listener. */
+	bool FindNearestVisibleMote(const FVector& Origin, float MaxDistance, FVector& OutLocation) const;
 
 protected:
 	virtual void BeginPlay() override;

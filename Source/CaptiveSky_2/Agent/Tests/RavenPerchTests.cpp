@@ -12,6 +12,7 @@
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -386,6 +387,57 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 
 			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
 			BlueprintController->DewGlintAttentionRemaining = 0.f;
+			BlueprintController->WindMoteAttentionRemaining = 0.f;
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->CrabScurryAttentionRemaining = 0.f;
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedWindMote.Reset();
+			BlueprintController->HeadScanTime = 0.f;
+			BlueprintHeadPivot->SetRelativeRotation(BlueprintController->RavenHeadRestRotation);
+			BlueprintController->ListeningStoneCheckRemaining = 1.f;
+			const FVector RavenPositionBeforeWindMotes = BlueprintRaven->GetActorLocation();
+			AIslandWindMoteEffect* WindMotes = World->SpawnActor<AIslandWindMoteEffect>(
+				RavenPositionBeforeWindMotes + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("A transient Wind Arch gust can be created without external services"), WindMotes);
+			if (WindMotes)
+			{
+				WindMotes->InitializeGust(FVector::ForwardVector, 800.f, 8.f);
+				FVector NearestMoteLocation = FVector::ZeroVector;
+				TestTrue(TEXT("The moving gust exposes a nearby visible mote"),
+					WindMotes->FindNearestVisibleMote(RavenPositionBeforeWindMotes + FVector(0.f, 0.f, 25.f),
+						1400.f, NearestMoteLocation));
+				FVector OutOfRangeMoteLocation = FVector::ZeroVector;
+				TestFalse(TEXT("The gust does not expose motes beyond the listener's range"),
+					WindMotes->FindNearestVisibleMote(RavenPositionBeforeWindMotes + FVector(6000.f, 0.f, 25.f),
+						1400.f, OutOfRangeMoteLocation));
+				BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+				BlueprintController->CheckForNearbyWindMote();
+				TestTrue(TEXT("An airborne raven ignores the brief Wind Arch cue"),
+					FMath::IsNearlyZero(BlueprintController->WindMoteAttentionRemaining));
+				BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+				BlueprintController->CheckForNearbyWindMote();
+				TestTrue(TEXT("A settled raven gives a visible nearby gust mote one brief look"),
+					BlueprintController->WindMoteAttentionRemaining > 0.f &&
+					BlueprintController->WindMoteLocation.Equals(NearestMoteLocation, 0.1f));
+				TestTrue(TEXT("Noticing the moving gust leaves the raven in place"),
+					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeWindMotes, 0.1f));
+				const FRotator HeadPoseBeforeWindMotes = BlueprintHeadPivot->GetRelativeRotation();
+				const float WindAttentionAfterNotice = BlueprintController->WindMoteAttentionRemaining;
+				BlueprintController->Tick(0.3f);
+				TestTrue(TEXT("Wind-mote attention fades smoothly instead of holding"),
+					BlueprintController->WindMoteAttentionRemaining < WindAttentionAfterNotice);
+				TestFalse(TEXT("The raven's head turns toward the drifting gust lights"),
+					BlueprintHeadPivot->GetRelativeRotation().Equals(HeadPoseBeforeWindMotes, 0.1f));
+				BlueprintController->WindMoteAttentionRemaining = 0.f;
+				BlueprintController->CheckForNearbyWindMote();
+				TestTrue(TEXT("One Wind Arch gust cannot repeatedly restart the same glance"),
+					FMath::IsNearlyZero(BlueprintController->WindMoteAttentionRemaining));
+				WindMotes->Destroy();
+			}
+
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->DewGlintAttentionRemaining = 0.f;
+			BlueprintController->WindMoteAttentionRemaining = 0.f;
 			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
 			BlueprintController->CrabScurryAttentionRemaining = 0.f;
 			BlueprintController->ResidentAttentionRemaining = 0.f;

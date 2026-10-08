@@ -66,6 +66,26 @@ void AIslandWindMoteEffect::InitializeGust(const FVector& Direction, float Radiu
 	UpdateMotes(0.f);
 }
 
+bool AIslandWindMoteEffect::FindNearestVisibleMote(const FVector& Origin, float MaxDistance, FVector& OutLocation) const
+{
+	if (MaxDistance <= 0.f) return false;
+
+	float NearestDistanceSquared = FMath::Square(MaxDistance);
+	bool bFound = false;
+	for (const UStaticMeshComponent* Mote : MoteMeshes)
+	{
+		if (!IsValid(Mote) || !Mote->IsVisible() || Mote->GetRelativeScale3D().GetMax() <= 0.04f)
+			continue;
+		const FVector Location = Mote->GetComponentLocation();
+		const float DistanceSquared = FVector::DistSquared(Origin, Location);
+		if (DistanceSquared > NearestDistanceSquared) continue;
+		NearestDistanceSquared = DistanceSquared;
+		OutLocation = Location;
+		bFound = true;
+	}
+	return bFound;
+}
+
 void AIslandWindMoteEffect::BeginPlay()
 {
 	Super::BeginPlay();
