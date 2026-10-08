@@ -127,6 +127,7 @@ private:
 	float HeadScanTime = 0.f;
 	TWeakObjectPtr<AIslandListeningStonesChime> LastNoticedListeningChime;
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
+	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
 	FVector MinnowRippleLocation = FVector::ZeroVector;

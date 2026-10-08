@@ -366,9 +366,13 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					TestTrue(TEXT("A nearby, unhurried resident gets one short acknowledgment"),
 						BlueprintController->ResidentAttentionRemaining > 1.7f &&
 						BlueprintController->ResidentAttentionRemaining <= ARavenAgentAIController::ResidentAttentionDuration);
+					Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(0.f, 400.f, 20.f));
 					BlueprintController->Tick(0.5f);
 					TestTrue(TEXT("The perched raven gently turns its head toward Aster"),
 						BlueprintHeadPivot->GetRelativeRotation().Yaw > 5.f && BlueprintHeadPivot->GetRelativeRotation().Yaw <= 25.f);
+					TestTrue(TEXT("The glance tracks Aster's updated position while he remains calm and nearby"),
+						BlueprintController->ResidentAttentionLocation.Equals(
+							Aster->GetActorLocation() + FVector(0.f, 0.f, 90.f), 0.1f));
 					TestTrue(TEXT("Acknowledging Aster does not move the raven"),
 						BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforePresence, 0.1f));
 					const float PresenceAttentionAfterNotice = BlueprintController->ResidentAttentionRemaining;
@@ -432,6 +436,13 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 						TestTrue(TEXT("Leaving and calmly returning allows a fresh acknowledgment"),
 							BlueprintController->ResidentAttentionRemaining > 0.f);
 					}
+					Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+					BlueprintController->Tick(0.1f);
+					TestTrue(TEXT("The raven releases attention soon after Aster leaves"),
+						BlueprintController->ResidentAttentionRemaining <= 0.31f);
+					BlueprintController->Tick(0.4f);
+					TestFalse(TEXT("A completed glance releases its weak attention target"),
+						BlueprintController->ResidentAttentionTarget.IsValid());
 					Aster->Destroy();
 				}
 			BlueprintController->ResidentAttentionRemaining = 0.f;

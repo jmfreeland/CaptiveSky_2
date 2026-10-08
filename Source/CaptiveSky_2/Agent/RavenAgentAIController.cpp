@@ -736,6 +736,7 @@ void ARavenAgentAIController::CheckForNearbyResidentPresence()
 		// A close, unhurried resident gets one small acknowledgment, preferring
 		// the nearest eligible one. The raven stays put and never calls its model.
 		NoticedResidentsInNearbyGroup.Add(ClosestEligibleResident);
+		ResidentAttentionTarget = ClosestEligibleResident;
 		ResidentAttentionLocation = ClosestResidentAttentionLocation;
 		ResidentAttentionRemaining = ResidentAttentionDuration;
 	}
@@ -1521,7 +1522,34 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ListeningStoneAttentionRemaining = FMath::Max(0.f, ListeningStoneAttentionRemaining - SafeDelta);
 	MinnowRippleAttentionRemaining = FMath::Max(0.f, MinnowRippleAttentionRemaining - SafeDelta);
+	if (ResidentAttentionRemaining > 0.f)
+	{
+		AAutonomousAgentCharacter* AttendedResident = ResidentAttentionTarget.Get();
+		const bool bSettled = LocomotionState == ERavenLocomotionState::Grounded ||
+			LocomotionState == ERavenLocomotionState::Perched;
+		bool bResidentStillEligible = IsValid(AttendedResident) && AttendedResident->Consolidation &&
+			AttendedResident->Consolidation->IsAwake() && bSettled && !IsResting();
+		if (bResidentStillEligible)
+		{
+			const FVector Offset = AttendedResident->GetActorLocation() - Raven->GetActorLocation();
+			bResidentStillEligible = FMath::Abs(Offset.Z) <= 250.f &&
+				Offset.SizeSquared2D() <= FMath::Square(700.f) &&
+				AttendedResident->GetVelocity().SizeSquared2D() <= FMath::Square(180.f);
+			if (bResidentStillEligible)
+			{
+				ResidentAttentionLocation = AttendedResident->GetActorLocation() + FVector(0.f, 0.f, 90.f);
+			}
+		}
+		if (!bResidentStillEligible)
+		{
+			ResidentAttentionRemaining = FMath::Min(ResidentAttentionRemaining, 0.4f);
+		}
+	}
 	ResidentAttentionRemaining = FMath::Max(0.f, ResidentAttentionRemaining - SafeDelta);
+	if (ResidentAttentionRemaining <= 0.f)
+	{
+		ResidentAttentionTarget.Reset();
+	}
 	ListeningStoneCheckRemaining -= SafeDelta;
 	if (ListeningStoneCheckRemaining <= 0.f)
 	{
