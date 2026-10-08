@@ -25,6 +25,13 @@ struct CAPTIVESKY_2_API FIslandTrailLedger
 	static constexpr float CellSize = 150.f;
 
 	TMap<FIntPoint, FIslandTrailCell> Cells;
+	/** Island day the ledger was last weathered, or -1 before the first day is known. */
+	int32 LastDecayDay = -1;
+
+	/** Grass creeps back over unused ground: each cell loses a few percent (at least one step) per day. */
+	void Decay(int32 Days);
+	/** Weather the ledger up to Today. Returns true when anything changed. */
+	bool WeatherTo(int32 Today);
 
 	static FIntPoint CellFor(const FVector& Position);
 	/** Count one footfall on the ground at Position. Returns false when the ledger is full and the cell is new. */
@@ -125,11 +132,13 @@ private:
 	double NextRefresh = 0.0;
 	double NextWearRefresh = 0.0;
 	double NextSave = 0.0;
+	double NextWeathering = 0.0;
 	bool bLedgerDirty = false;
 
 	FString GetStorageFilePath() const;
 	void Load();
 	void Save();
+	void WeatherLedger();
 	void Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness);
 	void RefreshPrints(double Now, float Wetness);
 	void RefreshWear(const FVector& Viewer, float Wetness);

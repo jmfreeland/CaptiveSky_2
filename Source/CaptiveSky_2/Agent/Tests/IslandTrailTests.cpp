@@ -53,6 +53,24 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A malformed row is refused"), Garbage.FromJson(TEXT("{\"version\":1,\"cells\":[[1,2,3]]}")));
 	TestEqual(TEXT("A refused load leaves the ledger alone"), Garbage.StepsAt(Here), 1);
 
+	FIslandTrailLedger Weathered;
+	for (int32 I = 0; I < 200; ++I) Weathered.AddStep(Here, FVector::UpVector);
+	FIslandTrailLedger Faint;
+	Faint.AddStep(Here + FVector(900.f, 0.f, 0.f), FVector::UpVector);
+	TestTrue(TEXT("The first day only sets the clock"), Weathered.WeatherTo(10));
+	TestEqual(TEXT("It changes no steps"), Weathered.StepsAt(Here), 200);
+	TestFalse(TEXT("The same day changes nothing"), Weathered.WeatherTo(10));
+	TestFalse(TEXT("An earlier day changes nothing"), Weathered.WeatherTo(4));
+	Weathered.WeatherTo(11);
+	TestTrue(TEXT("A day of disuse costs a path some steps"), Weathered.StepsAt(Here) < 200 && Weathered.StepsAt(Here) > 180);
+	Weathered.WeatherTo(40);
+	TestTrue(TEXT("A month of disuse mostly undoes it"), Weathered.StepsAt(Here) < 120);
+	Faint.Decay(1);
+	TestEqual(TEXT("A single footfall is gone in a day"), Faint.Cells.Num(), 0);
+	FIslandTrailLedger Reloaded;
+	TestTrue(TEXT("The weathering day is saved"), Reloaded.FromJson(Weathered.ToJson()));
+	TestEqual(TEXT("And reloaded"), Reloaded.LastDecayDay, 40);
+
 	TestTrue(TEXT("Virgin ground says nothing"), Trail::DescribeTrail(0, 0, 0.f).IsEmpty());
 	TestTrue(TEXT("A faint track is noticed"), Trail::DescribeTrail(Trail::WearStartSteps / 2, 0, 0.f).Contains(TEXT("faintly")));
 	TestTrue(TEXT("A worn track is noticed"), Trail::DescribeTrail(Trail::WearStartSteps, 0, 0.f).Contains(TEXT("worn thin")));

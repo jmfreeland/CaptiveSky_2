@@ -12,6 +12,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandWorldStateSubsystem.h"
 #include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -64,10 +65,37 @@ int32 FIslandTrailLedger::StepsAt(const FVector& Position) const
 	return Cell ? Cell->Steps : 0;
 }
 
+void FIslandTrailLedger::Decay(int32 Days)
+{
+	for (int32 Day = 0; Day < Days && !Cells.IsEmpty(); ++Day)
+	{
+		for (auto It = Cells.CreateIterator(); It; ++It)
+		{
+			It.Value().Steps -= FMath::Max(1, It.Value().Steps / 25);
+			if (It.Value().Steps <= 0) It.RemoveCurrent();
+		}
+	}
+}
+
+bool FIslandTrailLedger::WeatherTo(int32 Today)
+{
+	if (Today < 0) return false;
+	if (LastDecayDay < 0)
+	{
+		LastDecayDay = Today;
+		return true;
+	}
+	if (Today <= LastDecayDay) return false;
+	Decay(FMath::Min(Today - LastDecayDay, 400));
+	LastDecayDay = Today;
+	return true;
+}
+
 FString FIslandTrailLedger::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 	Root->SetNumberField(TEXT("version"), TrailVersion);
+	Root->SetNumberField(TEXT("decay_day"), LastDecayDay);
 	TArray<TSharedPtr<FJsonValue>> Rows;
 	for (const TPair<FIntPoint, FIslandTrailCell>& Pair : Cells)
 	{
@@ -108,6 +136,9 @@ bool FIslandTrailLedger::FromJson(const FString& Json)
 		if (Loaded.Num() < MaxCells) Loaded.Add(FIntPoint(static_cast<int32>(V[0]), static_cast<int32>(V[1])), Cell);
 	}
 	Cells = MoveTemp(Loaded);
+	int32 Day = -1;
+	Root->TryGetNumberField(TEXT("decay_day"), Day);
+	LastDecayDay = Day;
 	return true;
 }
 
@@ -250,11 +281,17 @@ void UIslandTrailSubsystem::Save()
 		UE_LOG(LogIslandTrail, Error, TEXT("Failed to save trail ledger to %s"), *Path);
 }
 
+void UIslandTrailSubsystem::WeatherLedger()
+{
+	if (Ledger.WeatherTo(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()))) bLedgerDirty = true;
+}
+
 void UIslandTrailSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	PrintRing.SetNum(MaxPrints);
 	Load();
+	WeatherLedger();
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -405,6 +442,11 @@ void UIslandTrailSubsystem::Tick(float DeltaTime)
 	{
 		NextWearRefresh = Now + 1.5;
 		RefreshWear(Player->GetPawn()->GetActorLocation(), Wetness);
+	}
+	if (Now >= NextWeathering)
+	{
+		NextWeathering = Now + 30.0;
+		WeatherLedger();
 	}
 	if (bLedgerDirty && Now >= NextSave)
 	{
