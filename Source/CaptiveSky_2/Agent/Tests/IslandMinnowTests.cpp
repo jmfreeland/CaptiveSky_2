@@ -3,6 +3,7 @@
 #include "IslandDayNight.h"
 #include "IslandInteractionUtility.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandTideglassSubsystem.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
@@ -48,6 +49,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	Clock->CurrentHour = 12.f;
+	Clock->DayNumber = 1;
 	Habitat->Tags.Add(TEXT("TideglassPool"));
 	Weather->RefreshNightEcology();
 	AIslandTidepoolMinnows* School = Weather->DayMinnowSchool.Get();
@@ -58,6 +60,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	School->Weather = Weather;
+	School->IslandClock = Clock;
 	School->ConfigureAppearance();
 	Weather->RefreshNightEcology();
 	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->DayMinnowSchool.Get() == School);
@@ -82,6 +85,23 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		}
 	}
 	TestEqual(TEXT("Every fish receives an individual visual color"), FishColors.Num(), School->Fish.Num());
+	const float SpringHighOffset = UIslandTideglassSubsystem::TideOffsetCm(6.21f, 1);
+	const float SpringLowOffset = UIslandTideglassSubsystem::TideOffsetCm(18.63f, 1);
+	Clock->CurrentHour = 6.21f;
+	School->UpdateSchool(0.f);
+	const float HighWaterFishZ = School->Fish[0]->GetComponentLocation().Z;
+	const float HighWaterSwimHeight = HighWaterFishZ - School->GetActorLocation().Z - SpringHighOffset;
+	Clock->CurrentHour = 18.63f;
+	School->UpdateSchool(0.f);
+	const float LowWaterFishZ = School->Fish[0]->GetComponentLocation().Z;
+	const float LowWaterSwimHeight = LowWaterFishZ - School->GetActorLocation().Z - SpringLowOffset;
+	TestTrue(TEXT("The school rises and falls with Tideglass between spring high and low water"),
+		FMath::IsNearlyEqual(LowWaterFishZ - HighWaterFishZ, SpringLowOffset - SpringHighOffset, 0.01f));
+	TestTrue(TEXT("Minnows keep a natural shallow swim height above the water at both tide turns"),
+		HighWaterSwimHeight >= 10.f && HighWaterSwimHeight <= 24.f &&
+		LowWaterSwimHeight >= 10.f && LowWaterSwimHeight <= 24.f);
+	Clock->CurrentHour = 12.f;
+	School->UpdateSchool(0.f);
 	int32 DistinctColorCount = 0;
 	for (int32 Index = 0; Index < FishColors.Num(); ++Index)
 	{
@@ -246,7 +266,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		const UStaticMeshComponent* SourceFish = School->Fish[0];
 		TestTrue(TEXT("The ripple originates under the source fish at the shallow surface"), SourceFish &&
 			FVector::Dist2D(MinnowRipple->GetActorLocation(), SourceFish->GetComponentLocation()) < 1.f &&
-			FMath::IsNearlyEqual(MinnowRipple->GetActorLocation().Z, School->GetActorLocation().Z - 24.f));
+			FMath::IsNearlyEqual(MinnowRipple->GetActorLocation().Z, School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f));
 		School->CheckForNaturalSurfaceRipple();
 		TestTrue(TEXT("The minnow school ignores its own surface break instead of feeding back"),
 			FMath::IsNearlyZero(School->SurfacePulseRemaining));

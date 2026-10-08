@@ -3,8 +3,10 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
+#include "IslandTideglassSubsystem.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -53,6 +55,11 @@ void AIslandTidepoolMinnows::BeginPlay()
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
 		Weather = *It;
+		break;
+	}
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		IslandClock = *It;
 		break;
 	}
 	ConfigureAppearance();
@@ -139,10 +146,10 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		return;
 	}
 
-	// Fish swim about 17 cm above the marker; the ripple lights sit 24 cm above
-	// their root, so offset the actor back to the pool plane before spawning it.
+	// Fish swim about 17 cm above the moving waterline; the ripple lights sit
+	// 24 cm above their root, so place the actor below the same tidal surface.
 	const FVector FishLocation = FishThatBrokeSurface->GetComponentLocation();
-	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z - 24.f);
+	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z + GetTideOffsetCm() - 24.f);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.ObjectFlags |= RF_Transient;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -164,6 +171,13 @@ float AIslandTidepoolMinnows::RainMovementScale(float RainIntensity)
 {
 	const float RainActivity = FMath::SmoothStep(0.35f, 0.85f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 	return FMath::Lerp(1.f, 0.68f, RainActivity);
+}
+
+float AIslandTidepoolMinnows::GetTideOffsetCm() const
+{
+	return IslandClock.IsValid()
+		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
+		: 0.f;
 }
 
 float AIslandTidepoolMinnows::GetScatterAlpha() const
@@ -228,6 +242,7 @@ void AIslandTidepoolMinnows::CheckForNearbyRavenDisturbance()
 void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 {
 	const float TuckScale = RainMovementScale(RainIntensity);
+	const float TideOffset = GetTideOffsetCm();
 	const float ScatterAlpha = GetScatterAlpha();
 	const float CircleScale = 1.f + 0.65f * GetSurfacePulseAlpha();
 	const FVector Side(-ScatterDirection.Y, ScatterDirection.X, 0.f);
@@ -239,7 +254,7 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 		const FVector IdleOffset(
 			FMath::Cos(Angle) * 135.f * TuckScale * CircleScale,
 			FMath::Sin(Angle) * 82.f * TuckScale * CircleScale,
-			17.f + FMath::Sin(Angle * 1.7f) * 7.f);
+			TideOffset + 17.f + FMath::Sin(Angle * 1.7f) * 7.f);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
 		Minnow->SetRelativeLocation(IdleOffset + ScatterOffset * ScatterAlpha);

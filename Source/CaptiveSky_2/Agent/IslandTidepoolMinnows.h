@@ -5,6 +5,7 @@
 #include "IslandTidepoolMinnows.generated.h"
 
 class AIslandWeather;
+class AIslandDayNight;
 class ARavenAgentAIController;
 class UMaterialInterface;
 class UStaticMeshComponent;
@@ -42,6 +43,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseShapeMaterial;
 	TWeakObjectPtr<AIslandWeather> Weather;
+	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	FVector ScatterDirection = FVector::ZeroVector;
 	float ScatterRemaining = 0.f;
 	float SurfacePulseRemaining = 0.f;
@@ -58,6 +60,7 @@ private:
 
 	float GetScatterAlpha() const;
 	float GetSurfacePulseAlpha() const;
+	float GetTideOffsetCm() const;
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNaturalSurfaceRipple();
