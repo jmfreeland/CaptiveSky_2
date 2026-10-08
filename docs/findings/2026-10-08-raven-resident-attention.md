@@ -44,3 +44,9 @@ an editor-session activation issue, not evidence that the project needs a full
 computer reboot. If a linked build is still needed, first resolve the unsaved
 level deliberately, then reopen the editor (or test the Live Coding console
 activation in a session without user data at risk).
+
+The current editor's logged launch arguments also preserve the play safeguards:
+`-CaptiveSkyDisableAgentThinking`, `-CaptiveSkyMaxModelRequests=0`, and
+`-CaptiveSkyMaxRealtimeSeconds=600`. The launch line contains `-unattended` but
+no explicit `-LiveCoding` flag. That absence is a useful relaunch diagnostic,
+not yet a proven cause of Live Coding being unavailable.
