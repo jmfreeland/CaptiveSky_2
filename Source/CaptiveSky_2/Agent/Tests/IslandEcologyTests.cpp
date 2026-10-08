@@ -1482,6 +1482,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (WatchableCrab)
 	{
 		WatchableCrab->HomeLocation = CrabStart;
+		// Keep the inspection-only scurry separate from the settled-presence cue
+		// exercised below; the Raven remains at the observer location.
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
 		Controller->InspectTarget(TEXT("TidepoolCrab"));
 		TestTrue(TEXT("Quiet observation prompts a brief scurry, not capture"), WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
 		TestTrue(*FString::Printf(TEXT("Crab scurry direction is set (%s)"), *WatchableCrab->ScurryDirection.ToString()), !WatchableCrab->ScurryDirection.IsNearlyZero());
@@ -1495,7 +1498,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		const FVector LowPassLocation = CrabStart + FVector(200.f, 0.f, 260.f);
 		Observer->SetActorLocation(LowPassLocation);
 		WatchableCrab->SetActorLocation(CrabStart);
-		WatchableCrab->CheckForLowRavenFlyby();
+		WatchableCrab->CheckForNearbyRavenDisturbance();
 		TestTrue(TEXT("A nearby low raven pass briefly startles the shore crab"),
 			WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
 		const FVector AwayFromRaven = (CrabStart - LowPassLocation).GetSafeNormal2D();
@@ -1504,18 +1507,48 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("One low pass starts a short response cooldown"), WatchableCrab->RavenFlybyCooldownRemaining, 8.f);
 
 		WatchableCrab->ScurryRemaining = 0.f;
-		WatchableCrab->CheckForLowRavenFlyby();
+		WatchableCrab->CheckForNearbyRavenDisturbance();
 		TestTrue(TEXT("A hovering raven cannot retrigger the response during cooldown"),
 			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 		WatchableCrab->RavenFlybyCooldownRemaining = 0.f;
 		Observer->SetActorLocation(CrabStart + FVector(0.f, 0.f, 900.f));
-		WatchableCrab->CheckForLowRavenFlyby();
+		WatchableCrab->CheckForNearbyRavenDisturbance();
 		TestTrue(TEXT("A high raven flight does not startle a shore crab"),
 			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 		Observer->SetActorLocation(CrabStart + FVector(800.f, 0.f, 260.f));
-		WatchableCrab->CheckForLowRavenFlyby();
+		WatchableCrab->CheckForNearbyRavenDisturbance();
 		TestTrue(TEXT("A low but distant flight does not startle a shore crab"),
 			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+
+		Controller->LocomotionState = ERavenLocomotionState::Perched;
+		const FVector PerchedRavenLocation = CrabStart + FVector(-200.f, 0.f, 180.f);
+		Observer->SetActorLocation(PerchedRavenLocation);
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A nearby perched raven makes the shore crab scurry briefly"),
+			WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+		TestTrue(TEXT("The shore crab moves away from a settled raven"),
+			FVector::DotProduct(WatchableCrab->ScurryDirection, (CrabStart - PerchedRavenLocation).GetSafeNormal2D()) > 0.95f);
+		WatchableCrab->ScurryRemaining = 0.f;
+		WatchableCrab->RavenFlybyCooldownRemaining = 0.f;
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A lingering perched raven does not repeatedly startle the same crab"),
+			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
+		Observer->SetActorLocation(CrabStart + FVector(0.f, 0.f, 900.f));
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		Controller->LocomotionState = ERavenLocomotionState::Perched;
+		Observer->SetActorLocation(PerchedRavenLocation);
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("Changing flight state without leaving the wider ring does not rearm settled presence"),
+			FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+		Observer->SetActorLocation(CrabStart + FVector(800.f, 0.f, 180.f));
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		Observer->SetActorLocation(PerchedRavenLocation);
+		WatchableCrab->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("Leaving and approaching again rearms the brief Raven response"),
+			WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+		WatchableCrab->ScurryRemaining = 0.f;
+		WatchableCrab->RavenFlybyCooldownRemaining = 0.f;
 
 		WatchableCrab->RippleResponseCooldownRemaining = 0.f;
 		AIslandPoolRippleEffect* ShoreRipple = World->SpawnActor<AIslandPoolRippleEffect>(

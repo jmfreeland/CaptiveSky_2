@@ -125,25 +125,44 @@ void AIslandTidepoolCrab::RespondToQuietObservation(const FVector& ObserverLocat
 	ScurryRemaining = 2.4f;
 }
 
-void AIslandTidepoolCrab::CheckForLowRavenFlyby()
+void AIslandTidepoolCrab::CheckForNearbyRavenDisturbance()
 {
-	if (!GetWorld() || bIsSheltered || ScurryRemaining > 0.f || RavenFlybyCooldownRemaining > 0.f) return;
+	if (!GetWorld() || bIsSheltered) return;
 
 	constexpr float FlybyRadius = 425.f;
 	constexpr float MinimumHeight = 120.f;
 	constexpr float MaximumHeight = 480.f;
+	constexpr float SettledRavenRadius = 320.f;
+	constexpr float SettledRavenHeight = 320.f;
+	constexpr float PresenceRearmRadius = 650.f;
 	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
 	{
-		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
 		const APawn* Raven = It->GetPawn();
 		if (!IsValid(Raven)) continue;
 
 		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
-		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight || Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
-			continue;
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const bool bSettledRaven = It->LocomotionState == ERavenLocomotionState::Grounded ||
+			It->LocomotionState == ERavenLocomotionState::Hopping || It->LocomotionState == ERavenLocomotionState::Perched;
+		if (RavenPresenceLatch.Get() == *It && DistanceSquared > FMath::Square(PresenceRearmRadius))
+			RavenPresenceLatch.Reset();
 
-		// A close, low pass briefly startles the crab away from the bird; it remains
-		// wild and resumes its local routine without becoming a target or changing state.
+		const bool bCloseSettledPresence = bSettledRaven && FMath::Abs(Offset.Z) <= SettledRavenHeight &&
+			DistanceSquared <= FMath::Square(SettledRavenRadius);
+		const bool bLowFlyby = It->LocomotionState == ERavenLocomotionState::Flying &&
+			Offset.Z >= MinimumHeight && Offset.Z <= MaximumHeight && DistanceSquared <= FMath::Square(FlybyRadius);
+		if (bCloseSettledPresence)
+		{
+			// A bird lingering at the water's edge should not keep startling the same
+			// crab; arm once per approach and rearm only after it leaves the wider ring.
+			const bool bAlreadyNoticedThisApproach = RavenPresenceLatch.Get() == *It;
+			if (!bAlreadyNoticedThisApproach) RavenPresenceLatch = *It;
+			if (bAlreadyNoticedThisApproach || RavenFlybyCooldownRemaining > 0.f || ScurryRemaining > 0.f) continue;
+		}
+		else if (!bLowFlyby || RavenFlybyCooldownRemaining > 0.f || ScurryRemaining > 0.f) continue;
+
+		// A close, low pass or settled approach briefly sends the crab away from the
+		// bird; it remains wild and resumes its local routine without saved changes.
 		RespondToQuietObservation(Raven->GetActorLocation());
 		RavenFlybyCooldownRemaining = 8.f;
 		return;
@@ -228,7 +247,7 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.35f;
-		CheckForLowRavenFlyby();
+		CheckForNearbyRavenDisturbance();
 	}
 	RippleCheckRemaining -= SafeDelta;
 	if (RippleCheckRemaining <= 0.f)
