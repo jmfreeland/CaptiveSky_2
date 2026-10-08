@@ -85,3 +85,24 @@ visible, but its owning PID was not identified. The two older parentless .NET
 entries (created 2026-09-29 and 2026-10-01) remain, and port 8000 is still
 closed. No other editor was stopped, and no project content was loaded or
 changed. Do not retry editor launch before the stale-process state is cleared.
+
+## 2026-10-08 MCP recovery
+
+The configured Unreal MCP endpoint became usable after launching UE 5.8.3 as a
+hidden editor process (PID 828). `list_toolsets` returned the registered editor,
+automation, Niagara, PCG, and other toolsets; editor queries confirmed
+`/Game/Maps/Island` is loaded and returned visible actors and a viewport image.
+This supersedes the earlier recommendation to reboot as the next step: a full
+machine reboot was not needed to restore MCP access.
+
+This is not confirmation that the user's visible desktop editor is connected.
+The recovered process has no main-window title and uses roughly 8.1 GB of
+working memory. Its viewport camera was aimed at a coastal slope, not the
+Tideglass composition. Keep this process rather than launching a duplicate
+while MCP access is needed; if a visible editor window is required, reopen the
+project visibly only after checking that PID 828 has exited or deliberately
+closing that isolated process. The earlier bounded Simulate session was stopped
+and `IsPIERunning` returned false. The recovery launch used a separate
+world-data root, disabled resident thinking, and set the model-request cap to
+zero; no world-state writes or resident requests were intended. The editor log
+is [`Codex_EditorMcpRecovery_20261008.log`](../../Saved/Logs/Codex_EditorMcpRecovery_20261008.log).
