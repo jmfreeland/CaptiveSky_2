@@ -28,6 +28,7 @@ public:
 private:
 	friend class UIslandListeningStonePresentationSubsystem;
 	friend class FIslandListeningStonePresentationTest;
+	static constexpr float StoneHeightRatio = 0.58f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")
 	TObjectPtr<UInstancedStaticMeshComponent> Stones;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")

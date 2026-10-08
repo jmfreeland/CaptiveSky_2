@@ -140,6 +140,15 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 					FMath::Abs(Delta.X) <= ProxyBounds.BoxExtent.X + 1.f &&
 					FMath::Abs(Delta.Y) <= ProxyBounds.BoxExtent.Y + 1.f &&
 					FMath::Abs(Delta.Z) <= ProxyBounds.BoxExtent.Z + 1.f);
+
+				const FBoxSphereBounds RenderedBounds = Rock->GetBounds().TransformBy(Instance);
+				const float ProxyBottom = ProxyBounds.Origin.Z - ProxyBounds.BoxExtent.Z;
+				const float ShortenedTop = ProxyBottom + 2.f * ProxyBounds.BoxExtent.Z * AListeningStonePresentation::StoneHeightRatio;
+				TestTrue(FString::Printf(TEXT("Stacked rock %d stays planted in the shortened silhouette band (render %.1f..%.1f, band %.1f..%.1f)"),
+					Index, RenderedBounds.Origin.Z - RenderedBounds.BoxExtent.Z, RenderedBounds.Origin.Z + RenderedBounds.BoxExtent.Z,
+					ProxyBottom, ShortenedTop),
+					RenderedBounds.Origin.Z - RenderedBounds.BoxExtent.Z >= ProxyBottom - 2.f &&
+					RenderedBounds.Origin.Z + RenderedBounds.BoxExtent.Z <= ShortenedTop + 2.f);
 			}
 		}
 		for (int32 Index = 0; Index < Proxies.Num(); ++Index)

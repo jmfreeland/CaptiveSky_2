@@ -99,33 +99,55 @@ bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const F
 		// narrow dimensions. Build a small cairn instead: every rock keeps its aspect ratio,
 		// while overlapping layers fill the original silhouette without changing its target.
 		const float FootprintScale = FMath::Min(LocalExtent.X / RockExtent.X, LocalExtent.Y / RockExtent.Y);
-		const float StoneScale = FootprintScale * 0.82f;
+		const float StoneScale = FootprintScale * 0.72f;
 		const float SegmentHeight = RockExtent.Z * StoneScale * 2.f;
-		const float TargetHeight = LocalExtent.Z * 2.f;
+		const float TargetHeight = LocalExtent.Z * 2.f * StoneHeightRatio;
 		if (!FMath::IsFinite(SegmentHeight) || SegmentHeight <= KINDA_SMALL_NUMBER ||
 			!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER) return false;
-
 		const int32 SegmentCount = FMath::Clamp(
 			FMath::CeilToInt(TargetHeight / (SegmentHeight * 0.78f)), 2, 7);
-		const float MaximumSpacing = SegmentHeight * 0.74f;
-		const float FittedSpacing = (TargetHeight - SegmentHeight) / (SegmentCount - 1);
-		const float Spacing = FMath::Min(MaximumSpacing, FittedSpacing);
-		const float StackHeight = SegmentHeight + Spacing * (SegmentCount - 1);
-		const float FirstOffset = -0.5f * StackHeight + 0.5f * SegmentHeight;
 		const float OffsetRadius = FMath::Min(LocalExtent.X, LocalExtent.Y) * 0.12f;
-		const FVector Scale(StoneScale);
+		TArray<FVector> LayerScales;
+		TArray<FQuat> LayerRotations;
+		TArray<FBoxSphereBounds> LayerBounds;
+		LayerScales.Reserve(SegmentCount);
+		LayerRotations.Reserve(SegmentCount);
+		LayerBounds.Reserve(SegmentCount);
+		float MaximumLayerHalfHeight = 0.f;
 
 		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
 		{
-			const float Angle = FMath::DegreesToRadians(Index * 67.f + Layer * 137.5f);
+			const float CourseAlpha = static_cast<float>(Layer) / static_cast<float>(SegmentCount - 1);
+			const float Taper = FMath::Lerp(1.f, 0.90f, CourseAlpha);
+			const float ScaleVariation[] = { 1.00f, 0.98f, 0.96f, 0.94f, 0.92f };
+			const FVector Scale(StoneScale * ScaleVariation[Layer % UE_ARRAY_COUNT(ScaleVariation)] * Taper);
+			const FQuat Variation(FVector::UpVector,
+				FMath::DegreesToRadians(Index * 23.f + Layer * 31.f));
+			const FQuat Rotation = LocalRotation * Variation;
+			const FBoxSphereBounds RelativeBounds = RockMesh->GetBounds().TransformBy(
+				FTransform(Rotation, FVector::ZeroVector, Scale));
+			MaximumLayerHalfHeight = FMath::Max(MaximumLayerHalfHeight, RelativeBounds.BoxExtent.Z);
+			LayerScales.Add(Scale);
+			LayerRotations.Add(Rotation);
+			LayerBounds.Add(RelativeBounds);
+		}
+
+		const float AvailableCenterSpan = TargetHeight - 2.f * MaximumLayerHalfHeight;
+		if (!FMath::IsFinite(AvailableCenterSpan) || AvailableCenterSpan < 0.f) return false;
+		const float Spacing = FMath::Min(SegmentHeight * 0.74f, AvailableCenterSpan / (SegmentCount - 1));
+		const float StoneBottom = Center.Z - LocalExtent.Z;
+		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
+		{
 			const float EdgeFactor = (Layer == 0 || Layer == SegmentCount - 1) ? 0.35f : 1.f;
+			const float Angle = FMath::DegreesToRadians(Index * 67.f + Layer * 137.5f);
 			const FVector LayerOffset(
 				FMath::Cos(Angle) * OffsetRadius * EdgeFactor,
 				FMath::Sin(Angle) * OffsetRadius * EdgeFactor,
-				FirstOffset + Layer * Spacing);
-			const FQuat Variation(FVector::UpVector,
-				FMath::DegreesToRadians(Index * 23.f + Layer * 31.f));
-			Stones->AddInstance(FTransform(LocalRotation * Variation, Center + LayerOffset, Scale));
+				MaximumLayerHalfHeight + Layer * Spacing);
+			const float BoundsCenterZ = StoneBottom + LayerOffset.Z;
+			const float PivotZ = BoundsCenterZ - LayerBounds[Layer].Origin.Z;
+			const FVector InstanceLocation(Center.X + LayerOffset.X, Center.Y + LayerOffset.Y, PivotZ);
+			Stones->AddInstance(FTransform(LayerRotations[Layer], InstanceLocation, LayerScales[Layer]));
 		}
 		ResonanceLights[Index]->SetRelativeLocation(Center);
 	}

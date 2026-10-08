@@ -168,3 +168,25 @@ with a short shader-working path allowed the bounded capture to complete.
 For the next matched visual comparison, resolve the pending imported-flower
 material repair authorization first; keep the separate 30-FPS traversal gate
 and resident behavior checks independent from this screenshot result.
+
+## Listening Stones silhouette check (2026-10-08)
+
+The transient Listening Stones were reduced to 58% of each saved proxy's height,
+with a smaller rock-course scale. Course placement now uses the rotated mesh's
+actual bounds and mesh-pivot offset, so the visible rocks remain grounded and
+inside the shorter silhouette. `CaptiveSky2.Agent.ListeningStonePresentation`
+passed in the UE 5.8.3 scratch project after the bounds regression was added.
+A real-RHI Game run using the isolated 11:00 ListeningStones viewpoint reached
+the map, captured seven frames, exited within its 45-second gameplay cap, and
+made zero model requests. The close frame is available at
+[`001_Listening_Stones_Close.png`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/Codex_ListeningStonesClose58/Screenshots/001_Listening_Stones_Close.png).
+
+The close view confirms these are the three pale stacked-rock forms below the
+Wind Arch. They remain lumpy and unusually light against the landscape, so this
+pass only addresses their height and ground contact; it is not a final material
+or art-direction pass. A matched baseline capture did not complete in the
+available diagnostic window, so the screenshot is evidence of the resulting
+appearance, not a quantified before/after comparison. The editor's unsaved
+Island remained untouched. Build and automation logs are under the same ignored
+`Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Logs`
+directory.
