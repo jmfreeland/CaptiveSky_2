@@ -122,3 +122,27 @@ and the mismatch is specifically between MCP image access and the visible
 desktop/process endpoint. If direct control of the user's visible editor is
 needed, identify the window/process pairing first, while preserving its
 unsaved level.
+
+## 2026-10-08 UBT AutoSDK exception-code correlation
+
+A UE 5.8.3 scratch `UnrealEditor-Cmd` run for `CaptiveSky2.Agent.WoodlandDeer`
+logged `LogTargetPlatformManager: UBT AutoSDK ReturnCode: -532462766`. Interpreted
+as a 32-bit code, `-532462766` is `0xE0434352`, exactly matching the user's
+Windows `dotnet.exe - Application Error` dialog. The run continued through map
+startup and the automation test passed, so this result identifies the UBT
+AutoSDK child path as a source of at least one matching exception status, not
+the cause of every dialog or the underlying managed exception. No .NET stack or
+matching Windows Application event was available.
+
+The same run reported access denied reading the installed per-user DDC. A
+normal scratch `Build.bat` invocation also stalled before producing UBT output;
+the same scratch build succeeded after approved elevated access and compiled
+only `IslandForestStagTests.cpp` before relinking. This makes restricted access
+to UE's per-user cache/log/tooling paths a plausible contributor, but not a
+confirmed root cause. The matching-code test log is
+[`Codex_RavenStagNotice_20261008_retry.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RavenStagNotice_20261008_retry.log).
+
+Next diagnostic: capture the child command line and managed exception details
+for `ValidatePlatforms`/`VerifySdk` while preserving the editor's unsaved
+material state. Do not treat the material graph errors or VRAM pressure as the
+cause of this CLR code without new evidence.

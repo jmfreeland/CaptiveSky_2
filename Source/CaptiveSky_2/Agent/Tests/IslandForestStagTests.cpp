@@ -247,8 +247,16 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	}
 
 	ACharacter* RavenPawn = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	UAgentBrainComponent* RavenBrain = RavenPawn
+		? NewObject<UAgentBrainComponent>(RavenPawn, TEXT("AgentBrain")) : nullptr;
+	if (RavenBrain)
+	{
+		RavenPawn->AddInstanceComponent(RavenBrain);
+		RavenBrain->RegisterComponent();
+	}
 	ARavenAgentAIController* RavenController = World->SpawnActor<ARavenAgentAIController>(Spawn);
 	TestNotNull(TEXT("A raven pawn is available for the local flyby response"), RavenPawn);
+	TestNotNull(TEXT("The Raven carries the same resident brain used by nearby-witness sensing"), RavenBrain);
 	TestNotNull(TEXT("The raven's locomotion state can qualify a flyby"), RavenController);
 	if (RavenPawn && RavenController)
 	{
@@ -279,6 +287,19 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		RavenController->LocomotionState = ERavenLocomotionState::Perched;
 		Deer->CheckForNearbyRavenFlyby();
 		TestFalse(TEXT("A perched raven does not startle the stag"), Deer->IsStartled());
+		Deer->BeginGrazing();
+		Deer->bResidentPresenceNearby = false;
+		Deer->ResidentPresenceCooldownRemaining = 0.f;
+		Deer->ResidentPresenceCheckRemaining = 0.f;
+		const FVector BeforeQuietRavenNotice = Deer->GetActorLocation();
+		Deer->CheckForNearbyResident();
+		TestTrue(TEXT("The quiet, nearby perched Raven earns the stag's brief look-around response"), Deer->bNoticingResident);
+		TestTrue(TEXT("Quiet Raven presence does not startle, move, or leave the stag's patch"),
+			!Deer->bStartled && !Deer->bMoving && Deer->GetActorLocation().Equals(BeforeQuietRavenNotice));
+		TestTrue(TEXT("The perched Raven response uses the existing look-around animation"),
+			Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+			Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+		TestFalse(TEXT("Noticing a perched companion makes no model request"), RavenBrain && RavenBrain->bRequestInFlight);
 
 		RavenController->LocomotionState = ERavenLocomotionState::Flying;
 		Deer->SetResting(true);
@@ -296,6 +317,11 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		Deer->Tick(0.36f);
 		TestTrue(TEXT("Periodic stag sensing notices the same close low flyby"), Deer->IsStartled() && Deer->RavenFlybyCooldownRemaining > 0.f);
 		RavenController->UnPossess();
+	}
+	if (RavenBrain)
+	{
+		RavenPawn->RemoveInstanceComponent(RavenBrain);
+		RavenBrain->DestroyComponent();
 	}
 
 	GEngine->DestroyWorldContext(World);
