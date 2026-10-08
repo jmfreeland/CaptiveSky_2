@@ -7,6 +7,7 @@
 #include "AgentSocialComponent.h"
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -255,6 +256,34 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				BlueprintController->Tick(0.05f);
 				TestTrue(TEXT("The procedural wings return exactly to their perched transforms"),
 					BlueprintLeftWingPivot->GetRelativeRotation().Equals(BlueprintLeftRest) && BlueprintRightWingPivot->GetRelativeRotation().Equals(BlueprintRightRest));
+			}
+		}
+		if (BlueprintHeadPivot)
+		{
+			const FRotator RavenHeadRest = BlueprintHeadPivot->GetRelativeRotation();
+			const FVector RavenPositionBeforeChime = BlueprintRaven->GetActorLocation();
+			AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(
+				RavenPositionBeforeChime + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("A nearby Listening Stones chime can be created without external services"), Chime);
+			if (Chime)
+			{
+				Chime->BeginChime(120.f);
+				BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+				BlueprintController->Tick(0.25f);
+				BlueprintController->Tick(0.25f);
+				const FRotator ChimeAttentionPose = BlueprintHeadPivot->GetRelativeRotation();
+				TestTrue(TEXT("A grounded raven briefly turns toward an audible Listening Stones chime"),
+					ChimeAttentionPose.Yaw > 5.f && ChimeAttentionPose.Yaw <= 30.f);
+				TestTrue(TEXT("Noticing the chime does not move the raven"), BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeChime, 0.1f));
+				const float AttentionRemainingAfterNotice = BlueprintController->ListeningStoneAttentionRemaining;
+				BlueprintController->Tick(0.25f);
+				TestTrue(TEXT("Chime attention fades on a short timer instead of retriggering continuously"),
+					BlueprintController->ListeningStoneAttentionRemaining < AttentionRemainingAfterNotice);
+				BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+				BlueprintController->Tick(0.05f);
+				TestTrue(TEXT("Taking flight immediately restores the raven's neutral head pose"),
+					BlueprintHeadPivot->GetRelativeRotation().Equals(RavenHeadRest));
+				Chime->Destroy();
 			}
 		}
 		BlueprintController->UnPossess();

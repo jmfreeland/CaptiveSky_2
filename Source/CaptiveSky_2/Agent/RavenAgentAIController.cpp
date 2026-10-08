@@ -12,6 +12,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandInteractionUtility.h"
@@ -564,7 +565,48 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 	HeadScanTime = FMath::Fmod(HeadScanTime + FMath::Max(0.f, DeltaSeconds), 100.f);
 	const float YawDegrees = 7.f * FMath::Sin(HeadScanTime * 2.f * PI * 0.13f);
 	const float PitchDegrees = 2.5f * FMath::Sin(HeadScanTime * 2.f * PI * 0.09f + 1.2f);
-	Head->SetRelativeRotation(RavenHeadRestRotation + FRotator(PitchDegrees, YawDegrees, 0.f));
+	const FRotator IdlePose = RavenHeadRestRotation + FRotator(PitchDegrees, YawDegrees, 0.f);
+	if (ListeningStoneAttentionRemaining > 0.f)
+	{
+		if (const APawn* Raven = GetPawn())
+		{
+			const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+				ListeningChimeLocation - Raven->GetActorLocation()).GetSafeNormal();
+			FRotator FocusOffset = LocalDirection.Rotation();
+			FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -12.f, 12.f);
+			FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -22.f, 22.f);
+			const float Elapsed = ListeningStoneAttentionDuration - ListeningStoneAttentionRemaining;
+			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.3f, Elapsed) *
+				(1.f - FMath::SmoothStep(2.0f, ListeningStoneAttentionDuration, Elapsed));
+			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
+			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+	}
+	Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), IdlePose,
+		FMath::Max(0.f, DeltaSeconds), 7.f));
+}
+
+void ARavenAgentAIController::CheckForNearbyListeningStoneChime()
+{
+	const APawn* Raven = GetPawn();
+	if (!GetWorld() || !Raven || IsResting() ||
+		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
+		return;
+
+	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
+	{
+		AIslandListeningStonesChime* Chime = *It;
+		if (!IsValid(Chime) || LastNoticedListeningChime.Get() == Chime ||
+			Chime->DescribeForListener(Raven->GetActorLocation()).IsEmpty())
+			continue;
+
+		LastNoticedListeningChime = Chime;
+		ListeningChimeLocation = Chime->GetActorLocation();
+		ListeningStoneAttentionRemaining = ListeningStoneAttentionDuration;
+		return;
+	}
 }
 
 void ARavenAgentAIController::UpdateCarriedTwigVisual()
@@ -1344,6 +1386,14 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	APawn* Raven = GetPawn();
 	if (!Raven) return;
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	ListeningStoneAttentionRemaining = FMath::Max(0.f, ListeningStoneAttentionRemaining - SafeDelta);
+	ListeningStoneCheckRemaining -= SafeDelta;
+	if (ListeningStoneCheckRemaining <= 0.f)
+	{
+		ListeningStoneCheckRemaining = 0.25f;
+		CheckForNearbyListeningStoneChime();
+	}
 	UpdateWingAnimation(DeltaSeconds);
 	UpdateHeadAnimation(DeltaSeconds);
 	UpdateCarriedTwigVisual();
