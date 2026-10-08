@@ -180,7 +180,7 @@ void AIslandTrailMarks::EnsureMaterials()
 			Layer->SetMaterial(0, Slot);
 		}
 	};
-	Bind(Prints, PrintMaterial, FLinearColor(0.03f, 0.025f, 0.02f));
+	Bind(Prints, PrintMaterial, FLinearColor(0.035f, 0.04f, 0.045f));
 	Bind(Wear, WearMaterial, UIslandTrailSubsystem::WearColor(0.f));
 }
 
@@ -344,7 +344,7 @@ void UIslandTrailSubsystem::Footfall(const APawn& Pawn, FWalker& Walker, double 
 	const FVector Side(-Forward.Y, Forward.X, 0.f);
 	FPrint& Print = PrintRing[NextPrint];
 	NextPrint = (NextPrint + 1) % PrintRing.Num();
-	Print.Position = Ground + Side * (Walker.bRight ? PrintHalfStance : -PrintHalfStance) + Normal * 0.5f;
+	Print.Position = Ground + Side * (Walker.bRight ? PrintHalfStance : -PrintHalfStance) + Normal * 0.4f;
 	Print.Rotation = FRotationMatrix::MakeFromXZ(Forward, Normal).ToQuat();
 	Print.Born = Now;
 	Print.Life = Life;
@@ -357,7 +357,7 @@ void UIslandTrailSubsystem::RefreshPrints(double Now, float Wetness)
 	if (!Actor || !Actor->Prints) return;
 	UInstancedStaticMeshComponent* Layer = Actor->Prints;
 	while (Layer->GetInstanceCount() < PrintRing.Num()) Layer->AddInstance(FTransform(FQuat::Identity, FVector::ZeroVector, FVector(0.0001f)));
-	const FVector Footprint(0.09f, 0.21f, 0.008f);
+	const FVector Footprint(0.28f, 0.12f, 0.03f);
 	for (int32 I = 0; I < PrintRing.Num(); ++I)
 	{
 		FPrint& Print = PrintRing[I];
