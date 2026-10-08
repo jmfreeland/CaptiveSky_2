@@ -24,8 +24,22 @@ reversible in-editor toggle caused the root and its dependent instances to
 compile for PCD3D_SM6, but compilation failed with `StaticSwitchParameter`
 `Missing A input` and `MakeMaterialAttributes` `Error on property Normal`.
 Unreal reports that it will use Default Material after this compile failure.
-This means the missing usage flag is not the only issue, and enabling it alone
-cannot restore the authored foliage appearance.
+
+A read-only Python graph audit of an isolated project copy found 186
+expressions and four `MaterialExpressionMaterialFunctionCall` nodes whose
+`material_function` reference is `None` (expression names ending `_4` through
+`_7`). Their outputs feed the True branches of static switches ending `_37`
+through `_40`. The root's first `MakeMaterialAttributes` node takes its Normal
+input from switch `_38` and World Position Offset from switch `_37`, explaining
+why the unresolved billboard branches break both the material's Normal compile
+and the `Billboard material` switch. The Python query completed; the scratch
+commandlet exited non-zero later because its Derived Data Cache had no writable
+node. This was diagnostic only, not a clean build.
+
+The missing usage flag is therefore not the only issue, and enabling it alone
+cannot restore the authored foliage appearance. The material-function assets
+need to be recovered from the source package/library or a known-good project
+copy before wiring or bypassing those branches.
 
 The toggle was returned to unchecked. The on-disk root `.uasset` remains
 byte-identical to the pre-test SHA256
@@ -38,10 +52,11 @@ level was not saved or changed.
 
 ## Safe next action
 
-Inspect the root graph and the referenced static switch/material-attributes
-nodes; identify the intended source for the missing `A` input and `Normal`
-attribute from the imported material graph or a known-good sibling material.
-Repair and compile the graph before enabling `MATUSAGE_InstancedStaticMeshes`.
+Recover the four referenced material functions from the original plant package,
+Fab library, or a known-good sibling project and restore their asset references.
+Avoid wiring the false branch into both switch inputs without confirming the
+intended billboard behavior. Compile the repaired graph before enabling
+`MATUSAGE_InstancedStaticMeshes`.
 Then save only the root material and run the same bounded Tideglass Game
 capture, checking both that the 13 fallback warnings are gone and that the
 vegetation visibly uses its authored material. Keep Starter Content `M_Rock`
