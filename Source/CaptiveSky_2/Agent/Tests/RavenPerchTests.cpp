@@ -8,6 +8,7 @@
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
 #include "IslandListeningStonesChime.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -284,6 +285,41 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("Taking flight immediately restores the raven's neutral head pose"),
 					BlueprintHeadPivot->GetRelativeRotation().Equals(RavenHeadRest));
 				Chime->Destroy();
+			}
+
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedMinnowRipple.Reset();
+			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+			const FVector RavenPositionBeforeRipple = BlueprintRaven->GetActorLocation();
+			AIslandPoolRippleEffect* MinnowRipple = World->SpawnActor<AIslandPoolRippleEffect>(
+				RavenPositionBeforeRipple + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("A transient minnow ripple can be created without external services"), MinnowRipple);
+			if (MinnowRipple)
+			{
+				MinnowRipple->ConfigureAsMinnowImpact();
+				BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+				BlueprintController->CheckForNearbyMinnowSurfaceBreak();
+				TestTrue(TEXT("An airborne raven does not try to attend a brief surface ripple"),
+					FMath::IsNearlyZero(BlueprintController->MinnowRippleAttentionRemaining));
+				BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+				BlueprintController->CheckForNearbyMinnowSurfaceBreak();
+				BlueprintController->Tick(0.25f);
+				TestTrue(TEXT("A grounded raven briefly turns toward a nearby minnow surface break"),
+					BlueprintController->MinnowRippleAttentionRemaining > 0.f &&
+					FMath::Abs(BlueprintHeadPivot->GetRelativeRotation().Yaw) > 4.f &&
+					FMath::Abs(BlueprintHeadPivot->GetRelativeRotation().Yaw) <= 25.f);
+				TestTrue(TEXT("Noticing a fish ripple does not move the raven"),
+					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeRipple, 0.1f));
+				const float RippleAttentionAfterNotice = BlueprintController->MinnowRippleAttentionRemaining;
+				BlueprintController->Tick(0.25f);
+				TestTrue(TEXT("Fish-ripple attention fades instead of holding a fixed pose"),
+					BlueprintController->MinnowRippleAttentionRemaining < RippleAttentionAfterNotice);
+				BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+				BlueprintController->CheckForNearbyMinnowSurfaceBreak();
+				TestTrue(TEXT("The same brief ripple cannot restart attention after it has been noticed"),
+					FMath::IsNearlyZero(BlueprintController->MinnowRippleAttentionRemaining));
+				MinnowRipple->Destroy();
 			}
 		}
 		BlueprintController->UnPossess();

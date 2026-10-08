@@ -6,6 +6,7 @@
 
 class AIslandArrangement;
 class AIslandListeningStonesChime;
+class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UAnimSequence;
 class USkeletalMeshComponent;
@@ -124,10 +125,14 @@ private:
 	float WingAnimationTime = 0.f;
 	float HeadScanTime = 0.f;
 	TWeakObjectPtr<AIslandListeningStonesChime> LastNoticedListeningChime;
+	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
+	FVector MinnowRippleLocation = FVector::ZeroVector;
 	float ListeningStoneAttentionRemaining = 0.f;
+	float MinnowRippleAttentionRemaining = 0.f;
 	float ListeningStoneCheckRemaining = 0.f;
 	static constexpr float ListeningStoneAttentionDuration = 2.4f;
+	static constexpr float MinnowRippleAttentionDuration = 1.6f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
 	/** First target for flying From -> To: To itself when the way is clear, else a climb above what blocks it. */
@@ -159,6 +164,7 @@ private:
 	void UpdateWingAnimation(float DeltaSeconds);
 	void UpdateHeadAnimation(float DeltaSeconds);
 	void CheckForNearbyListeningStoneChime();
+	void CheckForNearbyMinnowSurfaceBreak();
 	void UpdateCarriedTwigVisual();
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;
