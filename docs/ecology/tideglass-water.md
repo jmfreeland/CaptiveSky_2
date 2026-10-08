@@ -404,11 +404,33 @@ startup because Unreal's Installed DDC graph had no writable node (exit code 3);
 successful retry used `-DDC-ForceMemoryCache -ddc=NoZenLocalFallback`, and platform
 validation returned success.
 
-This is physical-flight evidence, not confirmation that the minnow response was visibly
-triggered: the short probe exited before the spectator's first screenshot, and its log
-does not record the school's scatter state. The separate 60-second Game check ended at its
-cap with zero model requests, but did not run the Raven probe. Next, stage the flight only
-after the camera is ready and retain the scene long enough to capture the brief scatter;
-until then, treat the in-world reaction as unverified. Logs:
+This initial controlled flight was not enough to confirm the school response. It is superseded
+by the later telemetry-enabled, bounded pass documented below, which records the actual Raven
+envelope entry and the school's measured scatter.
+Logs:
 [`flight probe`](../../Saved/Logs/Codex_TideglassMinnowRavenGameElevated_20261008.log) and
 [`capped Game check`](../../Saved/Logs/Codex_TideglassMinnowRavenLive_20261008.log).
+
+## Transient Raven/minnow startle cue (2026-10-08)
+
+When quiet attention startles the school—either from a nearby visitor/resident or a Raven's
+low flyby—the nearest fish now marks the response with one transient Tideglass ripple. It is
+anchored to that fish's horizontal position and the current moving waterline, lasts 1.15 seconds,
+reaches a 104 cm ring radius, and is throttled by a five-second school cooldown. The cue carries
+both `MinnowImpact` and `MinnowStartleImpact`, so existing nearby shore-wildlife listeners can
+recognize a minnow disturbance. It does not change capture, memory, or persistent world state.
+
+The UE 5.8.3 scratch Editor target rebuilt successfully (5 actions), and
+`CaptiveSky2.Agent.TidepoolMinnows` passed. The regression checks visitor and Raven triggers,
+nearest-fish/waterline placement, restrained lifetime/size/intensity, and that repeated attention
+does not stack cues. A bounded standalone Game pass then recorded 13 low-flyby samples and up to
+208 cm of fish-body centroid movement; it exited normally. Agent thinking and Python were disabled,
+world state was isolated, and the real-time cap was 60 seconds. Logs:
+[`automation`](../../Saved/Logs/Codex_MinnowScatterRipple_Final_20261008.log) and
+[`Game`](../../Saved/Logs/Codex_MinnowScatterCue_Game_5cd_20261008.log). The close waterline frames
+are in [`Screenshots_5cd`](../../Saved/Playtests/Codex_MinnowScatterCue_20261008/Screenshots_5cd/).
+
+The scatter itself reads in the close frames, but the brief light-ring cue is still not reliably
+distinguishable from the water's existing moving reflections. Automation confirms the transient
+actor and its wildlife tag, not that a player can clearly see the ring. A material-driven surface
+normal/ripple response would be the next step if stronger visual cause-and-effect is needed.

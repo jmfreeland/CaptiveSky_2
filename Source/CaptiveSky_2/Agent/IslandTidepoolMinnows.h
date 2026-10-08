@@ -36,6 +36,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
+	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -50,6 +51,7 @@ private:
 	float ScatterRemaining = 0.f;
 	float SurfacePulseRemaining = 0.f;
 	float SurfacePulseCooldownRemaining = 0.f;
+	float ScatterSurfaceCueCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
 	float SurfaceBreakRemaining = 13.f;
 	float SurfaceBreakContextRemaining = 0.f;
@@ -67,5 +69,6 @@ private:
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNaturalSurfaceRipple();
 	void TryCreateSurfaceBreak(float RainIntensity);
+	void CreateScatterSurfaceCue(const FVector& ObserverLocation);
 	void UpdateSchool(float RainIntensity);
 };

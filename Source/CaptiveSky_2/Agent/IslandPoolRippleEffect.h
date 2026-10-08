@@ -20,6 +20,8 @@ public:
 	void ConfigureAsWindImpact(float HorizontalWindSpeed);
 	/** A brief, subtle surface break caused by a fish near the shallows. */
 	void ConfigureAsMinnowImpact();
+	/** A restrained surface cue when the school startles from nearby quiet attention. */
+	void ConfigureAsMinnowStartleImpact();
 	static float WindRippleActivity(float HorizontalWindSpeed);
 
 protected:

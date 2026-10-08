@@ -293,6 +293,40 @@ void AIslandTidepoolMinnows::RespondToQuietObservation(const FVector& ObserverLo
 	ScatterDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScatterDirection.IsNearlyZero()) ScatterDirection = GetActorForwardVector();
 	ScatterRemaining = 2.4f;
+	CreateScatterSurfaceCue(ObserverLocation);
+}
+
+void AIslandTidepoolMinnows::CreateScatterSurfaceCue(const FVector& ObserverLocation)
+{
+	if (!GetWorld() || Fish.IsEmpty() || ScatterSurfaceCueCooldownRemaining > 0.f) return;
+
+	UProceduralMeshComponent* NearestFish = nullptr;
+	float NearestDistanceSquared = TNumericLimits<float>::Max();
+	for (UProceduralMeshComponent* FishBody : Fish)
+	{
+		if (!FishBody) continue;
+		const float DistanceSquared = FVector::DistSquared2D(FishBody->GetComponentLocation(), ObserverLocation);
+		if (DistanceSquared < NearestDistanceSquared)
+		{
+			NearestDistanceSquared = DistanceSquared;
+			NearestFish = FishBody;
+		}
+	}
+	if (!NearestFish) return;
+
+	// The closest fish to a quiet approach breaks the surface as the rest of the
+	// school fans away. Keep the cue short, tide-locked, and visually secondary.
+	const FVector FishLocation = NearestFish->GetComponentLocation();
+	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z + GetTideOffsetCm() - 24.f);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.ObjectFlags |= RF_Transient;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(
+		RippleLocation, FRotator::ZeroRotator, SpawnParameters))
+	{
+		Ripple->ConfigureAsMinnowStartleImpact();
+		ScatterSurfaceCueCooldownRemaining = ScatterSurfaceCueCooldownSeconds;
+	}
 }
 
 bool AIslandTidepoolMinnows::RespondToSurfaceRipple()
@@ -479,6 +513,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	SurfacePulseRemaining = FMath::Max(0.f, SurfacePulseRemaining - SafeDelta);
 	SurfacePulseCooldownRemaining = FMath::Max(0.f, SurfacePulseCooldownRemaining - SafeDelta);
+	ScatterSurfaceCueCooldownRemaining = FMath::Max(0.f, ScatterSurfaceCueCooldownRemaining - SafeDelta);
 	RippleCheckRemaining -= SafeDelta;
 	if (RippleCheckRemaining <= 0.f)
 	{

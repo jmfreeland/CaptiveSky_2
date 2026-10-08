@@ -212,10 +212,50 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("Visitors and residents resolve one stable school target"), IslandInteractionUtility::GetTargetTag(School), FName(TEXT("MinnowSchool")));
 	TestTrue(TEXT("The nearby school is visible to a visitor"), IslandInteractionUtility::CanInteract(Visitor, School));
+	FVector ExpectedStartleRippleLocation = FVector::ZeroVector;
+	float NearestFishDistanceSquared = TNumericLimits<float>::Max();
+	for (UProceduralMeshComponent* FishBody : School->Fish)
+	{
+		if (!FishBody) continue;
+		const float DistanceSquared = FVector::DistSquared2D(FishBody->GetComponentLocation(), Visitor->GetActorLocation());
+		if (DistanceSquared < NearestFishDistanceSquared)
+		{
+			NearestFishDistanceSquared = DistanceSquared;
+			const FVector FishLocation = FishBody->GetComponentLocation();
+			ExpectedStartleRippleLocation = FVector(FishLocation.X, FishLocation.Y,
+				School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f);
+		}
+	}
 	FString VisitorFact;
 	TestTrue(TEXT("Quiet observation is a valid visitor response"), IslandInteractionUtility::Perform(Visitor, School, VisitorFact));
 	TestTrue(TEXT("The response truthfully describes scattering without capture or persistence"),
 		VisitorFact.Contains(TEXT("scattered from your quiet attention")) && VisitorFact.Contains(TEXT("wild and uncaught")) && VisitorFact.Contains(TEXT("nothing persistent changed")));
+	AIslandPoolRippleEffect* ObserverStartleRipple = nullptr;
+	int32 ObserverStartleRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("MinnowStartleImpact"))) continue;
+		ObserverStartleRipple = *It;
+		++ObserverStartleRippleCount;
+	}
+	TestEqual(TEXT("One quiet observation creates one short-lived school-startle cue"), ObserverStartleRippleCount, 1);
+	if (ObserverStartleRipple)
+	{
+		TestTrue(TEXT("Nearby shore wildlife can recognize the cue as a minnow surface disturbance"),
+			ObserverStartleRipple->ActorHasTag(TEXT("MinnowImpact")) && ObserverStartleRipple->ActorHasTag(TEXT("MinnowStartleImpact")));
+		TestTrue(TEXT("The startle ripple is brief, slightly broader than a fish's surface break, and below deliberate pool inspection"),
+			FMath::IsNearlyEqual(ObserverStartleRipple->DurationSeconds, 1.15f) &&
+			FMath::IsNearlyEqual(ObserverStartleRipple->SurfaceRadius, 104.f) &&
+			ObserverStartleRipple->PeakLightIntensity > 1.35f && ObserverStartleRipple->PeakLightIntensity <= 5.f);
+		TestTrue(TEXT("The cue starts at the nearest fish on the current Tideglass surface"),
+			ObserverStartleRipple->GetActorLocation().Equals(ExpectedStartleRippleLocation, 0.1f));
+		School->RespondToQuietObservation(Visitor->GetActorLocation());
+		int32 RepeatedStartleRippleCount = 0;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+			if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) ++RepeatedStartleRippleCount;
+		TestEqual(TEXT("A repeated quiet look cannot stack a startle cue inside its short cooldown"), RepeatedStartleRippleCount, 1);
+		ObserverStartleRipple->Destroy();
+	}
 	School->Tick(0.7f);
 	FVector ScatteredCenter = FVector::ZeroVector;
 	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) ScatteredCenter += Minnow->GetRelativeLocation();
@@ -384,11 +424,46 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		School->Tick(0.4f);
 		TestTrue(TEXT("Distant flight remains outside the Tideglass disturbance radius"), FMath::IsNearlyZero(School->ScatterRemaining));
 		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 400.f));
+		School->ScatterSurfaceCueCooldownRemaining = 0.f;
+		FVector ExpectedRavenRippleLocation = FVector::ZeroVector;
+		NearestFishDistanceSquared = TNumericLimits<float>::Max();
+		for (UProceduralMeshComponent* FishBody : School->Fish)
+		{
+			if (!FishBody) continue;
+			const float DistanceSquared = FVector::DistSquared2D(FishBody->GetComponentLocation(), RavenBody->GetActorLocation());
+			if (DistanceSquared < NearestFishDistanceSquared)
+			{
+				NearestFishDistanceSquared = DistanceSquared;
+				const FVector FishLocation = FishBody->GetComponentLocation();
+				ExpectedRavenRippleLocation = FVector(FishLocation.X, FishLocation.Y,
+					School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f);
+			}
+		}
 		FVector BeforeFlyby = FVector::ZeroVector;
 		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) BeforeFlyby += Minnow->GetRelativeLocation();
 		BeforeFlyby /= School->Fish.Num();
 		School->Tick(0.4f);
 		TestTrue(TEXT("A low raven glide over the shallows briefly startles the school"), School->ScatterRemaining > 1.9f && School->ScatterRemaining <= 2.4f);
+		AIslandPoolRippleEffect* RavenStartleRipple = nullptr;
+		int32 RavenStartleRippleCount = 0;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("MinnowStartleImpact"))) continue;
+			RavenStartleRipple = *It;
+			++RavenStartleRippleCount;
+		}
+		TestEqual(TEXT("A low Raven pass creates one transient surface cue for the scattering school"), RavenStartleRippleCount, 1);
+		if (RavenStartleRipple)
+		{
+			TestTrue(TEXT("The Raven-triggered cue is tide-locked beneath the nearest fish"),
+				RavenStartleRipple->GetActorLocation().Equals(ExpectedRavenRippleLocation, 0.1f));
+			School->CheckForNearbyRavenDisturbance();
+			int32 RepeatedRavenRippleCount = 0;
+			for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+				if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) ++RepeatedRavenRippleCount;
+			TestEqual(TEXT("The same Raven approach does not stack overlapping startle cues"), RepeatedRavenRippleCount, 1);
+			RavenStartleRipple->Destroy();
+		}
 		School->Tick(0.7f);
 		FVector DuringFlyby = FVector::ZeroVector;
 		for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) DuringFlyby += Minnow->GetRelativeLocation();
