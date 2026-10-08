@@ -27,19 +27,29 @@ Unreal reports that it will use Default Material after this compile failure.
 
 A read-only Python graph audit of an isolated project copy found 186
 expressions and four `MaterialExpressionMaterialFunctionCall` nodes whose
-`material_function` reference is `None` (expression names ending `_4` through
-`_7`). Their outputs feed the True branches of static switches ending `_37`
-through `_40`. The root's first `MakeMaterialAttributes` node takes its Normal
-input from switch `_38` and World Position Offset from switch `_37`, explaining
-why the unresolved billboard branches break both the material's Normal compile
-and the `Billboard material` switch. The Python query completed; the scratch
-commandlet exited non-zero later because its Derived Data Cache had no writable
-node. This was diagnostic only, not a clean build.
+`material_function` reference is `None` and zero saved input names (expression
+names ending `_4` through `_7`). Their outputs feed the True branches of static
+switches ending `_37` through `_40`. The root's first `MakeMaterialAttributes`
+node takes its Normal input from switch `_38` and World Position Offset from
+switch `_37`; the material editor identifies the affected switch as
+`Billboard material`.
+
+The package's Engine dependencies include several similarly named
+`ExampleContent` assets, but loading those exact packages in UE 5.8.3 resolves
+them as `Texture2D`, not `MaterialFunction`. They are not valid replacements for
+the empty call nodes. Searches across the local CaptiveSky/CS_Interactive
+project copies found the same root material hash in each; no clean donor copy
+was found. A filename search across the local Fab VaultCache, Documents, and
+Downloads also found no separate Everestianum source package. The Python graph
+query completed; the scratch commandlet exited non-zero later because its
+Derived Data Cache had no writable node. This was diagnostic only, not a clean
+build.
 
 The missing usage flag is therefore not the only issue, and enabling it alone
-cannot restore the authored foliage appearance. The material-function assets
-need to be recovered from the source package/library or a known-good project
-copy before wiring or bypassing those branches.
+cannot restore the authored foliage appearance. The four call nodes have no
+function references or input pins to relink; a known-good source package is
+needed to restore them accurately, or they must be deliberately reconstructed
+on a test duplicate before any live replacement.
 
 The toggle was returned to unchecked. The on-disk root `.uasset` remains
 byte-identical to the pre-test SHA256
@@ -54,11 +64,11 @@ changed.
 
 ## Safe next action
 
-Recover the four referenced material functions from the original plant package,
-Fab library, or a known-good sibling project and restore their asset references.
-Avoid wiring the false branch into both switch inputs without confirming the
-intended billboard behavior. Compile the repaired graph before enabling
-`MATUSAGE_InstancedStaticMeshes`.
+Obtain the original plant source package or a genuinely different known-good
+project copy. If none is available, reconstruct the four empty call nodes on a
+test duplicate and validate their visual/compile behavior there; do not connect
+the similarly named texture assets or blindly copy false branches. Compile the
+repaired graph before enabling `MATUSAGE_InstancedStaticMeshes`.
 Then save only the root material and run the same bounded Tideglass Game
 capture, checking both that the 13 fallback warnings are gone and that the
 vegetation visibly uses its authored material. Keep Starter Content `M_Rock`
