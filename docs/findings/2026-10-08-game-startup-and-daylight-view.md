@@ -24,13 +24,20 @@ real-time/request caps, and no changes to the saved Island map or Content assets
   was dark. A final 40-second daylight run captured two Tideglass frames at
   11:00 and 11:24. All runs used isolated `Saved/Playtests/` roots, disabled
   agent thinking and Python, and ended with zero model requests.
+- An elevated Editor launch with the same DDC workarounds completed Turnkey's
+  SDK detection (`ExitCode=0`) and loaded many engine modules, but did not
+  expose a usable Editor window or MCP endpoint within three minutes. The only
+  visible Unreal window was its log console; a `dotnet.exe - Application
+  Error` dialog showed exception `0xe0434352`. I stopped only the Editor
+  process tree launched for this probe after the timeout.
 
-This does not show that the Unreal Editor GUI or its MCP endpoint is available:
-after the bounded Game runs, no Unreal Editor process remained and
-`127.0.0.1:8000` was still closed. The two old parentless `dotnet.exe` entries
-(PIDs 40100 and 52284) also remained, yet the elevated Game run completed
-without them being cleared. A reboot may still be a convenient way to clear
-those process husks, but it is not required to run this bounded Game workflow.
+After the Editor probe, no Unreal Editor process remained and `127.0.0.1:8000`
+was still closed. The two old parentless `dotnet.exe` entries (PIDs 40100 and
+52284) also remained, yet the elevated Game runs completed without them being
+cleared. A reboot may still be a convenient way to clear those process husks,
+but it is not required to run the bounded Game workflow. The Editor/MCP startup
+failure remains unresolved; the exception code alone does not identify which
+.NET component failed.
 
 ## Visual evidence
 
@@ -64,4 +71,3 @@ as a daylight composition comparison.
 3. Coordinate/authorize any binary `Content/` material repair, then rerun the
    same 11:00 Game camera and a separate bounded PIE traversal profile. Keep the
    screenshots and performance measures distinct.
-
