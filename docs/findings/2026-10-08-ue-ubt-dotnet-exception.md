@@ -86,6 +86,34 @@ dialog is visible, capture its timestamp and the owning process ID/command line
 in Task Manager or Process Explorer, then correlate with the corresponding
 fresh log or event. Do not alter SDK validation or Windows permissions.
 
+### Timestamped UBT correlation (2026-10-08, 18:02–18:04 local)
+
+During the next visible dialog, the elevated process snapshot found a new live
+`dotnet.exe` (PID 55928) running the UE 5.8.3 bundled .NET 10 host and
+`UnrealBuildTool.dll` for `Saved/CompileScratch/Claude_Props/CaptiveSky_2.uproject`:
+
+```text
+CaptiveSky_2Editor Win64 Development -WaitMutex -MaxParallelActions=3 -NoHotReloadFromIDE
+```
+
+Its start time was 18:02:08. The matching `dotnet.exe - Application Error`
+window was present at the same time, but Windows exposed that dialog under
+`csrss.exe`; no window-to-process ID was available. The UBT process had exited
+by 18:04:42 while the dialog remained. No matching `.NET Runtime`, Application
+Error, or WER event supplied a managed exception type or stack trace. This is a
+strong process/time correlation to Claude's scratch build, not proof that PID
+55928 owned the displayed dialog or the root cause of its exception.
+
+After that process exited, a separate elevated UE 5.8.3 scratch build for
+`Codex_RavenCrabAttention_20261008` used the same bundled .NET host with
+`-NoHotReloadFromIDE` and `-MaxParallelActions=2`; it compiled successfully.
+The focused `CaptiveSky2.Agent.RavenPerch` automation then passed with agent
+thinking disabled and model requests capped at zero. This shows that the
+toolchain can complete a controlled build/test in the same environment; it
+does not explain why the earlier Claude build surfaced the dialog. The dialog
+was no longer visible in the later Unreal Editor capture. Keep the cause open
+until a recurrence is tied to its exact process and fresh UBT output.
+
 ## Scope and next step
 
 No game source, user project config, Windows permissions, or editor state was
