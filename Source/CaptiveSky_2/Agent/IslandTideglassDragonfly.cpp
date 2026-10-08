@@ -286,7 +286,8 @@ void AIslandTideglassDragonfly::CheckForNearbyNaturalSurfaceRipple()
 
 	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
 	{
-		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact"))) continue;
+		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact")) &&
+			!It->ActorHasTag(TEXT("MinnowImpact"))) continue;
 		if (RespondToSurfaceRipple(It->GetActorLocation())) return;
 	}
 }

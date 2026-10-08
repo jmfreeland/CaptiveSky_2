@@ -111,6 +111,42 @@ void AIslandTidepoolMinnows::CheckForNaturalSurfaceRipple()
 	}
 }
 
+void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
+{
+	if (!GetWorld() || Fish.IsEmpty() || ScatterRemaining > 0.f ||
+		SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f || RainIntensity >= 0.35f)
+	{
+		SurfaceBreakRemaining = 4.f;
+		return;
+	}
+
+	UStaticMeshComponent* FishThatBrokeSurface = Fish[SurfaceBreakFishIndex % Fish.Num()];
+	if (!FishThatBrokeSurface)
+	{
+		SurfaceBreakRemaining = 4.f;
+		return;
+	}
+
+	// Fish swim about 17 cm above the marker; the ripple lights sit 24 cm above
+	// their root, so offset the actor back to the pool plane before spawning it.
+	const FVector FishLocation = FishThatBrokeSurface->GetComponentLocation();
+	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z - 24.f);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.ObjectFlags |= RF_Transient;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandPoolRippleEffect* Ripple = GetWorld()->SpawnActor<AIslandPoolRippleEffect>(
+		RippleLocation, FRotator::ZeroRotator, SpawnParameters))
+	{
+		Ripple->ConfigureAsMinnowImpact();
+		SurfaceBreakFishIndex = (SurfaceBreakFishIndex + 1) % Fish.Num();
+		SurfaceBreakRemaining = 19.f;
+		SurfacePulseCooldownRemaining = FMath::Max(SurfacePulseCooldownRemaining, 3.f);
+		return;
+	}
+
+	SurfaceBreakRemaining = 4.f;
+}
+
 float AIslandTidepoolMinnows::RainMovementScale(float RainIntensity)
 {
 	const float RainActivity = FMath::SmoothStep(0.35f, 0.85f, FMath::Clamp(RainIntensity, 0.f, 1.f));
@@ -213,5 +249,10 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	const float Rain = Weather.IsValid() && GetWorld()
 		? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
+	SurfaceBreakRemaining -= SafeDelta;
+	if (SurfaceBreakRemaining <= 0.f)
+	{
+		TryCreateSurfaceBreak(Rain);
+	}
 	UpdateSchool(Rain);
 }

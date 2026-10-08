@@ -8,6 +8,7 @@
 #include "RavenAgentAIController.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -214,6 +215,44 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		School->Tick(0.36f);
 		TestTrue(TEXT("The ambient weather sensor ignores ordinary interaction ripples"), FMath::IsNearlyZero(School->SurfacePulseRemaining));
 		NearbyVisitorRipple->Destroy();
+	}
+
+	School->ScatterRemaining = 0.f;
+	School->SurfacePulseRemaining = 0.f;
+	School->SurfacePulseCooldownRemaining = 0.f;
+	AIslandPoolRippleEffect* UnintendedRipple = nullptr;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("MinnowImpact"))) { UnintendedRipple = *It; break; }
+	if (UnintendedRipple) UnintendedRipple->Destroy();
+	School->SurfaceBreakRemaining = 0.f;
+	School->TryCreateSurfaceBreak(0.8f);
+	TestTrue(TEXT("Heavy rain postpones rather than stacks a fish surface break"),
+		FMath::IsNearlyEqual(School->SurfaceBreakRemaining, 4.f));
+	School->SurfaceBreakRemaining = 0.f;
+	School->TryCreateSurfaceBreak(0.f);
+	AIslandPoolRippleEffect* MinnowRipple = nullptr;
+	int32 MinnowRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("MinnowImpact"))) { MinnowRipple = *It; ++MinnowRippleCount; }
+	}
+	TestEqual(TEXT("One calm surface break creates exactly one transient ripple"), MinnowRippleCount, 1);
+	if (MinnowRipple)
+	{
+		TestTrue(TEXT("The fish ripple is short, small, and visually restrained"),
+			FMath::IsNearlyEqual(MinnowRipple->DurationSeconds, 0.95f) &&
+			FMath::IsNearlyEqual(MinnowRipple->SurfaceRadius, 48.f) &&
+			MinnowRipple->PeakLightIntensity <= 0.7f);
+		const UStaticMeshComponent* SourceFish = School->Fish[0];
+		TestTrue(TEXT("The ripple originates under the source fish at the shallow surface"), SourceFish &&
+			FVector::Dist2D(MinnowRipple->GetActorLocation(), SourceFish->GetComponentLocation()) < 1.f &&
+			FMath::IsNearlyEqual(MinnowRipple->GetActorLocation().Z, School->GetActorLocation().Z - 24.f));
+		School->CheckForNaturalSurfaceRipple();
+		TestTrue(TEXT("The minnow school ignores its own surface break instead of feeding back"),
+			FMath::IsNearlyZero(School->SurfacePulseRemaining));
+		TestTrue(TEXT("The next surface break is delayed to keep wildlife effects sparse"),
+			FMath::IsNearlyEqual(School->SurfaceBreakRemaining, 19.f));
+		MinnowRipple->Destroy();
 	}
 
 	ARavenAgentAIController* FlybyController = World->SpawnActor<ARavenAgentAIController>(Spawn);

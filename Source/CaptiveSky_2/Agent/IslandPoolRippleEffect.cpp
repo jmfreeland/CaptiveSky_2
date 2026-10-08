@@ -51,6 +51,15 @@ void AIslandPoolRippleEffect::ConfigureAsWindImpact(float HorizontalWindSpeed)
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
 }
 
+void AIslandPoolRippleEffect::ConfigureAsMinnowImpact()
+{
+	DurationSeconds = 0.95f;
+	SurfaceRadius = 48.f;
+	PeakLightIntensity = 0.65f;
+	Tags.AddUnique(TEXT("MinnowImpact"));
+	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
+}
+
 float AIslandPoolRippleEffect::WindRippleActivity(float HorizontalWindSpeed)
 {
 	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Max(0.f, HorizontalWindSpeed) : 0.f;

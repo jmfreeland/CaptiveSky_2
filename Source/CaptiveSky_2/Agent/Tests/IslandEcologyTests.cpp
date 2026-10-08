@@ -1585,9 +1585,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
 			TestTrue(TEXT("Visitor ripples do not trigger the dragonfly's natural response"),
 				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
-			VisitorRipple->ConfigureAsWindImpact(100.f);
+			VisitorRipple->ConfigureAsMinnowImpact();
 			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
-			TestTrue(TEXT("A nearby wind ripple draws a brief, temporary dragonfly interest response"),
+			TestTrue(TEXT("A nearby fish surface break draws a brief, temporary dragonfly interest response"),
 				WatchableDragonfly->RippleInterestRemaining > 0.f && WatchableDragonfly->RippleInterestRemaining <= 1.8f);
 			TestTrue(TEXT("The dragonfly aims just above the water surface"),
 				FMath::IsNearlyEqual(WatchableDragonfly->RippleInterestLocation.Z, VisitorRipple->GetActorLocation().Z + 110.f));

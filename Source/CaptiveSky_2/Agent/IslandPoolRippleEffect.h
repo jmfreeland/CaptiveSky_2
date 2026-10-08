@@ -18,6 +18,8 @@ public:
 	void ConfigureAsRainImpact();
 	/** Size a gentle wind ripple from the measured local wind speed (cm/s). */
 	void ConfigureAsWindImpact(float HorizontalWindSpeed);
+	/** A brief, subtle surface break caused by a fish near the shallows. */
+	void ConfigureAsMinnowImpact();
 	static float WindRippleActivity(float HorizontalWindSpeed);
 
 protected:
@@ -25,6 +27,7 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
+	friend class FIslandMinnowTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandWeatherTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")

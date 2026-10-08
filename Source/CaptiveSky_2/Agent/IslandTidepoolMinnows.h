@@ -43,7 +43,9 @@ private:
 	float SurfacePulseRemaining = 0.f;
 	float SurfacePulseCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
+	float SurfaceBreakRemaining = 13.f;
 	float ElapsedSeconds = 0.f;
+	int32 SurfaceBreakFishIndex = 0;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float Phase = 0.73f;
@@ -53,5 +55,6 @@ private:
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
 	void CheckForNaturalSurfaceRipple();
+	void TryCreateSurfaceBreak(float RainIntensity);
 	void UpdateSchool(float RainIntensity);
 };
