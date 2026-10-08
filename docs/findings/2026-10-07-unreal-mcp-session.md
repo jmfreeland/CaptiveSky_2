@@ -72,3 +72,16 @@ is not a confirmed fix for the SDK-verification failure. After restart, verify
 the old entries are gone, then launch the editor once and capture fresh
 Turnkey/.NET logs if the failure returns. Avoid killing the opaque old PIDs
 individually; their ownership and executable paths remain unavailable.
+
+## Startup-process cleanup
+
+The only editor instance in the process list was the one started for this
+diagnostic (PID 12728); it remained at the same Turnkey log line with a blank
+title. Its process tree was stopped. The active `ValidatePlatforms` and
+`VerifySdk` parents terminated; two short-lived child PIDs returned access
+denied during tree termination, then disappeared from the subsequent process
+inventory. The Windows `dotnet.exe - Application Error` dialog remained
+visible, but its owning PID was not identified. The two older parentless .NET
+entries (created 2026-09-29 and 2026-10-01) remain, and port 8000 is still
+closed. No other editor was stopped, and no project content was loaded or
+changed. Do not retry editor launch before the stale-process state is cleared.
