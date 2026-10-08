@@ -10,6 +10,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "IslandPoolRippleEffect.h"
 #include "RavenAgentAIController.h"
+#include "IslandTrail.h"
 #include "HAL/PlatformTime.h"
 #include <limits>
 
@@ -187,6 +188,23 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::WanderNoveltyScore(FVector(0.f, 100.f, 0.f), RecentDestinations));
 	TestEqual(TEXT("A new resident's first wander remains unbiased by nonexistent history"),
 		AAutonomousAgentAIController::WanderNoveltyScore(WanderGoal, {}), 0.f);
+	FIslandTrailLedger WornRouteLedger;
+	for (int32 Cell = 0; Cell <= 10; ++Cell)
+		for (int32 Step = 0; Step < 80; ++Step)
+			WornRouteLedger.AddStep(FVector(Cell * FIslandTrailLedger::CellSize + 10.f, 10.f, 0.f), FVector::UpVector);
+	const TArray<FVector> WornRoute = { FVector(10.f, 10.f, 0.f), FVector(1510.f, 10.f, 0.f) };
+	const TArray<FVector> UntroddenRoute = { FVector(10.f, 5000.f, 0.f), FVector(1510.f, 5000.f, 0.f) };
+	const float WornRouteAffinity = AAutonomousAgentAIController::WanderPathTrailAffinityScore(WornRoute, WornRouteLedger);
+	TestTrue(TEXT("A route through repeatedly worn ground has high trail affinity"), WornRouteAffinity > 0.9f);
+	TestEqual(TEXT("An equally long untrodden route has no trail affinity"),
+		AAutonomousAgentAIController::WanderPathTrailAffinityScore(UntroddenRoute, WornRouteLedger), 0.f);
+	TestEqual(TEXT("A path with no traversable segment has no trail affinity"),
+		AAutonomousAgentAIController::WanderPathTrailAffinityScore({ FVector::ZeroVector, FVector::ZeroVector }, WornRouteLedger), 0.f);
+	TestTrue(TEXT("Worn paths only make a small tie-breaking difference to an existing curiosity score"),
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, WornRouteAffinity) > 1000.f &&
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, WornRouteAffinity) <= 1030.f);
+	TestEqual(TEXT("A trail cannot make a resident wander when there is no curiosity score"),
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(0.f, WornRouteAffinity), 0.f);
 	const TArray<FVector> FrontierRecentDestinations = { FVector::ZeroVector, FVector(200.f, 0.f, 0.f), FVector(0.f, 500.f, 0.f) };
 	TestTrue(TEXT("An explicit wander prefers extending a new frontier over circling familiar ground"),
 		AAutonomousAgentAIController::WanderFrontierScore(FVector(0.f, 1800.f, 0.f), FVector::ZeroVector,

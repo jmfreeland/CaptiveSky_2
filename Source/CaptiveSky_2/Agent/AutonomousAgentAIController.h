@@ -12,6 +12,7 @@ class UNavigationSystemV1;
 class ACharacter;
 struct FNavAgentProperties;
 struct FNavLocation;
+struct FIslandTrailLedger;
 
 /**
  * Drives an AAutonomousAgentCharacter's think/act loop directly in C++: polls
@@ -61,6 +62,8 @@ public:
 	static constexpr float WanderAcceptanceRadius = 50.f;
 	static constexpr float WanderFrontierProgressWeight = 4000.f;
 	static constexpr float WanderLandmarkProgressWeight = 4000.f;
+	/** A fully worn route may adjust wander ranking by at most this fraction. */
+	static constexpr float WanderTrailAffinityWeight = 0.03f;
 	static bool IsUsableWanderPath(const UNavigationPath* Path, const FVector& Origin, const FVector& Goal);
 	static bool IsWanderPathPhysicallyClear(const UWorld* World, const UNavigationPath* Path, const APawn* Pawn);
 	/** Larger scores mean a wander goal is farther from the resident's recent successful destinations. */
@@ -68,6 +71,10 @@ public:
 	/** Extends an explicit wander's explored frontier, with local novelty as a tie-breaker. */
 	static float WanderFrontierScore(const FVector& Candidate, const FVector& ExplorationOrigin,
 		float FurthestExploredDistance, const TArray<FVector>& RecentDestinations);
+	/** 0..1 share of a complete candidate route that follows persistent worn ground. */
+	static float WanderPathTrailAffinityScore(const TArray<FVector>& PathPoints, const FIslandTrailLedger& TrailLedger);
+	/** Applies only a gentle tie-break; a route with no base curiosity score gets no bonus. */
+	static float WanderTrailAdjustedScore(float BaseScore, float TrailAffinity);
 	/** Rewards a wander candidate only when it moves toward a currently visible nearby landmark. */
 	static float WanderLandmarkProgressScore(const FVector& Candidate, const FVector& Origin,
 		const TArray<FVector>& VisibleLandmarks);

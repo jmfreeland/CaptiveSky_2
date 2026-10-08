@@ -17,6 +17,7 @@
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandTidepoolMinnows.h"
+#include "IslandTrail.h"
 #include "IslandWorldStateSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -223,6 +224,47 @@ float AAutonomousAgentAIController::WanderFrontierScore(const FVector& Candidate
 	const float CandidateDistance = FVector::Dist2D(Candidate, ExplorationOrigin);
 	const float FrontierProgress = FMath::Max(0.f, CandidateDistance - FurthestExploredDistance);
 	return WanderNoveltyScore(Candidate, RecentDestinations) + FrontierProgress * WanderFrontierProgressWeight;
+}
+float AAutonomousAgentAIController::WanderPathTrailAffinityScore(const TArray<FVector>& PathPoints,
+	const FIslandTrailLedger& TrailLedger)
+{
+	if (PathPoints.Num() < 2) return 0.f;
+
+	float PathLength = 0.f;
+	for (int32 Index = 1; Index < PathPoints.Num(); ++Index)
+		PathLength += FVector::Dist2D(PathPoints[Index - 1], PathPoints[Index]);
+	if (PathLength <= KINDA_SMALL_NUMBER) return 0.f;
+
+	// Evenly sample the full polyline at half-cell intervals, with a hard cap so
+	// a malformed or unusually long nav route cannot make candidate scoring costly.
+	constexpr int32 MaxSamples = 256;
+	const int32 NumSamples = FMath::Clamp(
+		FMath::CeilToInt(PathLength / (FIslandTrailLedger::CellSize * 0.5f)) + 1, 2, MaxSamples);
+	float FamiliaritySum = 0.f;
+	int32 Segment = 1;
+	float SegmentStartDistance = 0.f;
+	float SegmentLength = FVector::Dist2D(PathPoints[0], PathPoints[1]);
+	for (int32 SampleIndex = 0; SampleIndex < NumSamples; ++SampleIndex)
+	{
+		const float DistanceAlongPath = PathLength * static_cast<float>(SampleIndex) / (NumSamples - 1);
+		while (Segment < PathPoints.Num() - 1 &&
+			(SegmentLength <= KINDA_SMALL_NUMBER || DistanceAlongPath > SegmentStartDistance + SegmentLength))
+		{
+			SegmentStartDistance += SegmentLength;
+			++Segment;
+			SegmentLength = FVector::Dist2D(PathPoints[Segment - 1], PathPoints[Segment]);
+		}
+		if (SegmentLength <= KINDA_SMALL_NUMBER) continue;
+		const float Alpha = FMath::Clamp((DistanceAlongPath - SegmentStartDistance) / SegmentLength, 0.f, 1.f);
+		const FVector Sample = FMath::Lerp(PathPoints[Segment - 1], PathPoints[Segment], Alpha);
+		FamiliaritySum += UIslandTrailSubsystem::WearAmount(TrailLedger.StepsAt(Sample));
+	}
+	return FamiliaritySum / NumSamples;
+}
+float AAutonomousAgentAIController::WanderTrailAdjustedScore(float BaseScore, float TrailAffinity)
+{
+	if (!FMath::IsFinite(BaseScore) || !FMath::IsFinite(TrailAffinity)) return 0.f;
+	return BaseScore * (1.f + FMath::Clamp(TrailAffinity, 0.f, 1.f) * WanderTrailAffinityWeight);
 }
 float AAutonomousAgentAIController::WanderLandmarkProgressScore(const FVector& Candidate, const FVector& Origin,
 	const TArray<FVector>& VisibleLandmarks)
@@ -695,6 +737,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			bool bFoundFullRoute = false;
 			float BestWanderScore = -1.f;
 			float BestLandmarkProgressScore = 0.f;
+			float BestTrailAffinityScore = 0.f;
+			const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>();
 			TArray<FVector> BestWanderPathPoints;
 			TArray<FVector> VisibleLandmarks;
 			VisibleLandmarks.Reserve(6);
@@ -722,13 +766,18 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 					continue;
 				}
 				const float LandmarkProgressScore = WanderLandmarkProgressScore(Candidate.Location, Origin, VisibleLandmarks);
-				const float WanderScore = WanderFrontierScore(Candidate.Location, WanderExplorationOrigin,
+				const float BaseWanderScore = WanderFrontierScore(Candidate.Location, WanderExplorationOrigin,
 					FurthestWanderDistance, RecentWanderDestinations) + LandmarkProgressScore;
+				const float TrailAffinity = Trail
+					? WanderPathTrailAffinityScore(Route->PathPoints, Trail->GetLedger())
+					: 0.f;
+				const float WanderScore = WanderTrailAdjustedScore(BaseWanderScore, TrailAffinity);
 				if (bFoundFullRoute && WanderScore <= BestWanderScore) continue;
 				Destination = Candidate;
 				bFoundFullRoute = true;
 				BestWanderScore = WanderScore;
 				BestLandmarkProgressScore = LandmarkProgressScore;
+				BestTrailAffinityScore = TrailAffinity;
 				BestWanderPathPoints = Route->PathPoints;
 			}
 			if (bFoundFullRoute)
@@ -737,9 +786,10 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				for (const FVector& PathPoint : BestWanderPathPoints)
 					PathDescription += (PathDescription.IsEmpty() ? TEXT("") : TEXT(" -> ")) + PathPoint.ToCompactString();
 				UE_LOG(LogAutonomousAgentAI, Log,
-					TEXT("%s selected wander destination %s with %d visible nearby landmarks; landmark progress %.0f cm; rejected %d capsule-blocked paths; nav path: %s."),
+					TEXT("%s selected wander destination %s with %d visible nearby landmarks; landmark progress %.0f cm; worn-trail affinity %.0f%%; rejected %d capsule-blocked paths; nav path: %s."),
 					*GetName(), *Destination.Location.ToCompactString(), VisibleLandmarks.Num(),
-					BestLandmarkProgressScore / WanderLandmarkProgressWeight, BlockedPathCount, *PathDescription);
+					BestLandmarkProgressScore / WanderLandmarkProgressWeight, BestTrailAffinityScore * 100.f,
+					BlockedPathCount, *PathDescription);
 				// A random reachable point is usually not the exact point a capsule can occupy.
 				// Stop with overlap tolerance and reject partial paths instead of timing out at a wall.
 				const EPathFollowingRequestResult::Type Request = MoveToLocation(Destination.Location,
