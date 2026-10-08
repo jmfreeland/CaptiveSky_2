@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandRainBasin.h"
+#include "AgentBrainComponent.h"
 #include "IslandInteractionUtility.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
@@ -157,6 +158,13 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("Synthetic resident observer created beside the basin"), Resident);
 		if (Resident)
 		{
+			UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Resident);
+			Resident->AddInstanceComponent(Brain);
+			Brain->RegisterComponent();
+			const FString Situation = Brain->BuildSituationSummary(FAgentConversationContext());
+			TestTrue(TEXT("Resident situation names the nearby basin and its exact interaction target"),
+				Situation.Contains(TEXT("rain basin")) && Situation.Contains(TEXT("RainBasin")) && Situation.Contains(TEXT("rainwater")));
+
 			const bool bCanInteract = IslandInteractionUtility::CanInteract(Resident, BasinActor, 250.f);
 			TestTrue(*FString::Printf(TEXT("Resident can perceive the basin at %.1f cm (hidden=%d)"),
 				FVector::Dist(Resident->GetActorLocation(), BasinActor->GetActorLocation()), BasinActor->IsHidden()), bCanInteract);

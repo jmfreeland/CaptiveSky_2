@@ -273,6 +273,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			NearbyBeings += LocalClock->DescribeTime();
 			break;
 		}
+		// The basin is a lasting landmark subsystem, so its prompt must not depend on a weather actor existing.
+		if (const UIslandRainBasinSubsystem* Basin = GetWorld()->GetSubsystem<UIslandRainBasinSubsystem>())
+			NearbyBeings += Basin->DescribeNearby(Location);
 		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 		{
 			LocalWeather = *It;
@@ -293,8 +296,6 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
 					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
-				if (const UIslandRainBasinSubsystem* Basin = GetWorld()->GetSubsystem<UIslandRainBasinSubsystem>())
-					NearbyBeings += Basin->DescribeNearby(Location);
 				if (const UIslandWrackSubsystem* Wrack = GetWorld()->GetSubsystem<UIslandWrackSubsystem>())
 				{
 					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());

@@ -17,14 +17,18 @@ geometry values, and descriptions, the world test now creates a tiny temporary
 world, places the basin beside tagged Listening Stones, discovers and interacts
 with it through the ordinary resident target path, checks the once-per-day
 response, and reloads placement, water, and leaf ownership from an isolated JSON
-file in a second world. Local log:
-[`Codex_RainBasinRules_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RainBasinRules_20261008.log).
+file in a second world. It also calls the actual resident situation-summary
+builder and confirms the exact `RainBasin` affordance appears even without an
+`AIslandWeather` actor; basin awareness is now tied to its own subsystem rather
+than accidentally nested beneath weather initialization. Local log:
+[`Codex_RainBasinResidentContext_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RainBasinResidentContext_20261008.log).
 
 This verifies deterministic rules and subsystem behavior in a synthetic flat
 world, not placement on the saved Island, observed water response to real
-weather over time, residents' willingness to interact autonomously, or whether
-the basin and floating leaves read clearly at normal gameplay distance. The
+weather over time, a resident's choice to act on the affordance, or whether the
+basin and floating leaves read clearly at normal gameplay distance. The
 synthetic world also lacks the three Listening Stones presentation proxies, so
 its expected “presentation skipped” warning is fixture-only. The connected
-editor has unsaved Rhododendron material work; leave that session alone. The next
-check remains a short PIE observation after its owner has preserved those edits.
+editor has unsaved Rhododendron material work; leave that session alone. The
+next check remains a short PIE observation after its owner has preserved those
+edits.
