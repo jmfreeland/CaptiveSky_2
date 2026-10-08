@@ -13,10 +13,14 @@ Fresh automation runs passed:
 - `CaptiveSky2.Agent.IslandArrangement` and
   `CaptiveSky2.Agent.IslandArrangementInspection` — persistent arrangement
   state, public lineage and inspection/known-influence boundaries.
+- `CaptiveSky2.Agent.NightEcology` — bounded night insects, minnow and crab
+  responses, weather effects, and wildlife reactions covered by the shared
+  ecology regression.
 
 Logs: [`Codex_HeadlessAgency_20261008.log`](../../Saved/Logs/Codex_HeadlessAgency_20261008.log),
 [`Codex_HeadlessRavenPerch_20261008.log`](../../Saved/Logs/Codex_HeadlessRavenPerch_20261008.log),
-and [`Codex_HeadlessArrangement_20261008.log`](../../Saved/Logs/Codex_HeadlessArrangement_20261008.log).
+[`Codex_HeadlessArrangement_20261008.log`](../../Saved/Logs/Codex_HeadlessArrangement_20261008.log),
+and [`Codex_HeadlessNightEcology_20261008.log`](../../Saved/Logs/Codex_HeadlessNightEcology_20261008.log).
 
 These checks validate compilation and deterministic behavior only. They do not
 prove animation readability, voluntary resident choices, rendered appearance,
