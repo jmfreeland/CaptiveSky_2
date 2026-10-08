@@ -6,6 +6,7 @@
 #include "IslandInteractionUtility.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassSubsystem.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
@@ -814,6 +815,15 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Dry conditions leave crab roaming unchanged"), FMath::IsNearlyEqual(AIslandTidepoolCrab::RainMovementScale(0.f), 1.f));
 	TestTrue(TEXT("Heavy rain reduces but does not stop crab roaming"), AIslandTidepoolCrab::RainMovementScale(1.f) > 0.f && AIslandTidepoolCrab::RainMovementScale(1.f) < 1.f);
 	TestTrue(TEXT("Crab rain response changes smoothly and monotonically"), AIslandTidepoolCrab::RainMovementScale(0.75f) < AIslandTidepoolCrab::RainMovementScale(0.45f));
+	const float LowTideActivity = AIslandTidepoolCrab::TideMovementScale(-UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	const float HighTideActivity = AIslandTidepoolCrab::TideMovementScale(UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	TestTrue(TEXT("No tidal displacement leaves crab activity at its ordinary baseline"),
+		FMath::IsNearlyEqual(AIslandTidepoolCrab::TideMovementScale(0.f), 1.f));
+	TestTrue(TEXT("Low water slightly broadens crab foraging drift"), LowTideActivity > 1.f && LowTideActivity <= 1.18f);
+	TestTrue(TEXT("High water gently tucks crab drift without stopping it"), HighTideActivity < 1.f && HighTideActivity >= 0.82f);
+	TestTrue(TEXT("Tidal crab activity is monotonic and bounded outside the tide range"),
+		AIslandTidepoolCrab::TideMovementScale(-1000.f) == LowTideActivity &&
+		AIslandTidepoolCrab::TideMovementScale(1000.f) == HighTideActivity);
 	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
 		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
 		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
@@ -1021,6 +1031,27 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Tidepool crab shell keeps a warm dark rust palette"), ShellColor.R > ShellColor.G && ShellColor.G > ShellColor.B && ShellColor.R < 0.2f);
 		}
 		TestEqual(TEXT("Tidepool crab geometry cannot block the world"), It->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		if (DayCrabResidents.Num() == 1)
+		{
+			// Hold world time, weather, and the crab's idle phase constant while
+			// sampling opposite extrema of the same Island clock's lunar tide.
+			const FVector CrabHome = It->HomeLocation;
+			It->ScurryRemaining = 0.f;
+			It->RippleCheckRemaining = 1.f;
+			It->RavenCheckRemaining = 1.f;
+			Clock->DayNumber = 1;
+			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.75f;
+			It->SetActorLocation(CrabHome);
+			It->Tick(0.f);
+			const float EbbingDrift = FVector::Dist2D(CrabHome, It->GetActorLocation());
+			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			It->SetActorLocation(CrabHome);
+			It->Tick(0.f);
+			const float HighWaterDrift = FVector::Dist2D(CrabHome, It->GetActorLocation());
+			TestTrue(TEXT("A crab forages more broadly at low tide than high tide"), EbbingDrift > HighWaterDrift + 1.f);
+			TestTrue(TEXT("Low tide movement changes only idle drift, not the crab's shoreline home"), CrabHome.Equals(It->HomeLocation));
+			Clock->CurrentHour = 12.f;
+		}
 	}
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
 	int32 DragonflyPopulation = 0;

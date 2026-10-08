@@ -7,6 +7,7 @@
 class UStaticMeshComponent;
 class UMaterialInterface;
 class AIslandWeather;
+class AIslandDayNight;
 class AIslandPoolRippleEffect;
 class ARavenAgentAIController;
 
@@ -26,6 +27,8 @@ public:
 	bool IsSheltered() const { return bIsSheltered; }
 	/** Strong showers gently reduce exposed roaming without stopping escape or changing habitat. */
 	static float RainMovementScale(float RainIntensity);
+	/** Ebbing water slightly widens ordinary foraging drift; high water gently tucks it in. */
+	static float TideMovementScale(float TideOffsetCm);
 
 protected:
 	virtual void BeginPlay() override;
@@ -47,6 +50,7 @@ private:
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector ScurryDirection = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandWeather> Weather;
+	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	float Phase = 0.f;
 	float ScurryRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;

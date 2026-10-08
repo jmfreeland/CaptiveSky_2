@@ -1,5 +1,7 @@
 #include "IslandTidepoolCrab.h"
+#include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "IslandTideglassSubsystem.h"
 #include "RavenAgentAIController.h"
 #include "GameFramework/Pawn.h"
 #include "Components/StaticMeshComponent.h"
@@ -90,6 +92,11 @@ void AIslandTidepoolCrab::BeginPlay()
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
 		Weather = *It;
+		break;
+	}
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		IslandClock = *It;
 		break;
 	}
 	if (BaseShapeMaterial)
@@ -215,6 +222,15 @@ float AIslandTidepoolCrab::RainMovementScale(float RainIntensity)
 	return FMath::Lerp(1.f, 0.38f, RainActivity);
 }
 
+float AIslandTidepoolCrab::TideMovementScale(float TideOffsetCm)
+{
+	const float NormalizedTide = FMath::Clamp(TideOffsetCm / UIslandTideglassSubsystem::MaximumTideOffsetCm, -1.f, 1.f);
+	// Low water leaves the shore open for a slightly broader forage; high water
+	// keeps the ordinary loop compact. Disturbance scurries remain independent.
+	const float EbbAlpha = (1.f - NormalizedTide) * 0.5f;
+	return FMath::Lerp(0.82f, 1.18f, EbbAlpha);
+}
+
 FVector AIslandTidepoolCrab::ResolveGroundPath(const FVector& Start, const FVector& Desired) const
 {
 	UWorld* World = GetWorld();
@@ -258,7 +274,12 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	const float Angle = Time * 0.12f + Phase;
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float RainScale = RainMovementScale(Rain);
-	const FVector IdleDrift(FMath::Sin(Angle) * 90.f * RainScale, FMath::Cos(Angle * 0.73f) * 80.f * RainScale, 0.f);
+	const float TideOffset = IslandClock.IsValid()
+		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
+		: 0.f;
+	const float TideScale = TideMovementScale(TideOffset);
+	const FVector IdleDrift(FMath::Sin(Angle) * 90.f * RainScale * TideScale,
+		FMath::Cos(Angle * 0.73f) * 80.f * RainScale * TideScale, 0.f);
 	const float ScurryAlpha = ScurryRemaining > 1.7f
 		? FMath::SmoothStep(0.f, 0.7f, 2.4f - ScurryRemaining)
 		: FMath::SmoothStep(0.f, 1.7f, ScurryRemaining);
