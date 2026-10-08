@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "RavenAgentAIController.h"
+#include "Animation/AnimSequence.h"
 #include "AutonomousAgentCharacter.h"
 #include "AgentBrainComponent.h"
 #include "AgentConsolidationComponent.h"
@@ -1131,13 +1132,34 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	Controller->LocomotionState = ERavenLocomotionState::Perched;
 	Controller->LocomotionState = ERavenLocomotionState::Flying;
 	Controller->Tick(0.05f);
+	TArray<FTransform> FirstCrowFlightPose;
 	if (bUsingRiggedCrow)
+	{
 		TestTrue(TEXT("Flight selects the rigged Crow's flight animation"), Controller->CurrentCrowAnimation == Controller->CrowFlyAnimation);
+		if (RiggedCrow && Controller->CrowFlyAnimation)
+		{
+			const float FlightDuration = Controller->CrowFlyAnimation->GetPlayLength();
+			RiggedCrow->SetPosition(FlightDuration * 0.125f, false);
+			RiggedCrow->RefreshBoneTransforms();
+			for (int32 BoneIndex = 0; BoneIndex < RiggedCrow->GetNumBones(); ++BoneIndex)
+				FirstCrowFlightPose.Add(RiggedCrow->GetBoneTransform(BoneIndex));
+		}
+	}
 	else
 		TestTrue(TEXT("Flight visibly rotates the procedural wing pivots"),
 			!LeftWingPivot->GetRelativeRotation().Equals(LeftRest) && !RightWingPivot->GetRelativeRotation().Equals(RightRest));
 	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("05_FlightStrokeA.png")));
 	Controller->Tick(0.15f);
+	if (bUsingRiggedCrow && RiggedCrow && Controller->CrowFlyAnimation)
+	{
+		const float FlightDuration = Controller->CrowFlyAnimation->GetPlayLength();
+		RiggedCrow->SetPosition(FlightDuration * 0.625f, false);
+		RiggedCrow->RefreshBoneTransforms();
+		bool bFlightPoseChanged = false;
+		for (int32 BoneIndex = 0; BoneIndex < FirstCrowFlightPose.Num(); ++BoneIndex)
+			bFlightPoseChanged |= !RiggedCrow->GetBoneTransform(BoneIndex).Equals(FirstCrowFlightPose[BoneIndex], 0.1f);
+		TestTrue(TEXT("Two captured rigged-Crow flight phases contain distinct rendered skeletal poses"), bFlightPoseChanged);
+	}
 	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("06_FlightStrokeB.png")));
 	if (!bUsingRiggedCrow)
 		TestTrue(TEXT("Flight fully deploys both wings from their folded perch pose"),

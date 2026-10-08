@@ -95,3 +95,17 @@ and blockout props remain visible, and a real Game/PIE scene review is still
 needed before judging the moment in its natural habitat. The isolated target
 rebuilt successfully after the fixture adjustment; the final real-RHI test
 reported `Result={Success}`.
+
+**Imported Crow flight-pose capture (2026-10-08):** review of the same visual
+test found its two flight screenshots were identical: the automation manually
+advanced the AI controller but did not advance the skeletal component's
+single-node animation clock. The fixture now samples two separated times in the
+selected flight sequence, refreshes the skeleton, and asserts that at least one
+bone transform changes before saving the second frame. The isolated UE 5.8.3
+target rebuilt successfully and the real-RHI `CaptiveSky2.Visual.RavenWingMotion`
+test again reported `Result={Success}` with thinking disabled, zero model
+requests, and a 60-second cap. The rendered [first stroke](../../Saved/CompileScratch/Codex_RavenAttentionValidation_20261008/Project/Saved/Viewpoints/RavenWingMotion_/20261008_054450/05_FlightStrokeA.png)
+and [second stroke](../../Saved/CompileScratch/Codex_RavenAttentionValidation_20261008/Project/Saved/Viewpoints/RavenWingMotion_/20261008_054450/06_FlightStrokeB.png)
+now show distinct wing poses. This proves the imported clip renders at two
+sampled phases; a natural, ticking Game/PIE flight remains the in-world visual
+check.
