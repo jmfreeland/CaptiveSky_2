@@ -1,6 +1,7 @@
 #include "IslandWeatherTraces.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandWrack.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 
@@ -35,6 +36,8 @@ bool UIslandWeatherTracesSubsystem::EvaluateStorm(double Now)
 		TArray<FString> Marks;
 		if (!WorldState->ApplyStormMarks(It->WeatherTimeOffset + Now, UIslandWorldStateSubsystem::CurrentIslandDay(World), Marks)) return false;
 		for (const FString& Mark : Marks) UE_LOG(LogIslandWeatherTraces, Log, TEXT("Storm mark: %s"), *Mark);
+		if (UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>())
+			Wrack->DepositAfterStorm(UIslandWorldStateSubsystem::CurrentIslandDay(World));
 		return Marks.Num() > 0;
 	}
 	return false;

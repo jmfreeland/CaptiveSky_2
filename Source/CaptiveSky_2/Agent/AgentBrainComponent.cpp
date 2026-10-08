@@ -27,6 +27,7 @@
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandDrift.h"
 #include "IslandTrail.h"
+#include "IslandWrack.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandListeningStonesChime.h"
 
@@ -281,6 +282,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
 					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
+				if (const UIslandWrackSubsystem* Wrack = GetWorld()->GetSubsystem<UIslandWrackSubsystem>())
+					NearbyBeings += Wrack->DescribeNearby(Location, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
 			}
 			break;
 		}
@@ -499,7 +502,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		int32 VisibleLandmarks = 0;
 		for (TActorIterator<AActor> It(GetWorld()); It && VisibleLandmarks < 6; ++It)
 		{
-			if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->Tags.Num() == 0 || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
+			if (!It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("StormWrack")) || It->Tags.Num() == 0 || FVector::DistSquared(Location, It->GetActorLocation()) > FMath::Square(5000.f)) continue;
 			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentLandmarkVisibility), false, Owner);
 			Params.AddIgnoredActor(*It);
 			FHitResult Hit;

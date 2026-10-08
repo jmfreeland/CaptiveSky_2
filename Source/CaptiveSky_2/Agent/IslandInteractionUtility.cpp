@@ -17,6 +17,7 @@
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandWindMoteEffect.h"
+#include "IslandWrack.h"
 
 FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 {
@@ -113,6 +114,19 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	if (!IsValid(Observer) || !IsValid(Target) || !Observer->GetWorld() || Observer->GetWorld() != Target->GetWorld()) return false;
 	const FName TargetTag = GetTargetTag(Target);
 	UWorld* World = Observer->GetWorld();
+	if (Target->ActorHasTag(TEXT("StormWrack")))
+	{
+		UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>();
+		const UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>();
+		if (!Wrack)
+		{
+			OutFact = TEXT("You looked at the wrack, but nothing about it can change here. Nothing changed.");
+			return false;
+		}
+		return Wrack->Examine(UIslandWrackSubsystem::ItemIdFromTag(TargetTag), UIslandWorldStateSubsystem::CurrentIslandDay(World),
+			Memory ? Memory->GetResolvedAgentId() : Observer->GetName(), OutFact);
+	}
+
 	if (TargetTag == FName(TEXT("GuestBook")))
 	{
 		const UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
