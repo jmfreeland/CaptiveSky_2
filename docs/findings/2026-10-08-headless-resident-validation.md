@@ -60,3 +60,14 @@ not sufficient evidence: verify each requested test has its own
 above. These regressions cover deterministic mechanics only; they do not prove
 that Aster or the raven will voluntarily approach or speak during ordinary
 play.
+
+## Current-tree recheck
+
+A subsequent UE 5.8.3 editor-target build completed successfully and reported
+`Target is up to date` (zero compile/link actions were required). Against that
+target, a separate headless `CaptiveSky2.Agent.NightEcology` run passed with
+agent thinking disabled, `-CaptiveSkyMaxModelRequests=0`, `-NullRHI`, and an
+isolated data root. Log: [`Codex_NightEcology_20261008.log`](../../Saved/Logs/Codex_NightEcology_20261008.log).
+The interactive editor still did not start and port 8000 remained closed;
+headless tests are therefore a usable validation path, not evidence that the
+GUI/MCP problem is resolved.
