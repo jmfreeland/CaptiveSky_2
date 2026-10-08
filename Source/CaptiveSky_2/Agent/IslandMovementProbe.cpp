@@ -343,7 +343,7 @@ private:
 		{
 			UE_LOG(LogIslandMovementProbe, Log, TEXT("Holding the runtime view for %.1f seconds before the bounded diagnostic exit."), State->PostCompletionHoldSeconds);
 			World->GetTimerManager().SetTimer(State->ExitTimer,
-				FTimerDelegate::CreateLambda([State]() { FPlatformMisc::RequestExit(false); }),
+				FTimerDelegate::CreateLambda([]() { FPlatformMisc::RequestExit(false); }),
 				static_cast<float>(State->PostCompletionHoldSeconds), false);
 			return;
 		}
