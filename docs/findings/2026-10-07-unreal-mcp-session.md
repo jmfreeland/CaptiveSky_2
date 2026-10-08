@@ -52,3 +52,23 @@ show that Windows itself needs a reboot. Keep the visible exception available
 for inspection and capture the failing Turnkey/.NET child details before
 restarting the machine. No level, asset, or source file was changed by the
 launch.
+
+## Process-chain follow-up
+
+The launch's two active Unreal-bundled .NET commands were identified: UBT
+`ValidatePlatforms` and AutomationTool `Turnkey ... -WaitForUATMutex -command=VerifySdk`.
+No other `UnrealEditor`, `UnrealBuildTool`, or `AutomationTool` process was
+present. Their output files did not advance beyond the existing startup log.
+The machine also retains two older `dotnet.exe` entries created on 2026-09-29
+and 2026-10-01; their recorded parent processes are absent and their executable
+paths are unavailable. Those entries predate this editor launch. The visible
+error window's owning PID could not be identified, and the Application and
+.NET Runtime event-log queries returned no matching records, so a causal link
+between the old entries, the dialog, and Turnkey's wait is not proven.
+
+A clean Windows reboot is now a reasonable diagnostic experiment if user work
+is saved: it should clear the parentless entries and any stale dialogs, but it
+is not a confirmed fix for the SDK-verification failure. After restart, verify
+the old entries are gone, then launch the editor once and capture fresh
+Turnkey/.NET logs if the failure returns. Avoid killing the opaque old PIDs
+individually; their ownership and executable paths remain unavailable.
