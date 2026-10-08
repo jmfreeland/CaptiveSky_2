@@ -66,6 +66,21 @@ namespace
 		return false;
 	}
 
+	/** Orientation that lays an item on the ground under it: up follows the slope, forward follows Yaw. */
+	FQuat GroundRotation(UWorld* World, const FVector& Position, float Yaw, FVector& OutNormal)
+	{
+		TArray<const ALandscapeProxy*> Landscapes;
+		for (TActorIterator<ALandscapeProxy> It(World); It; ++It) Landscapes.Add(*It);
+		OutNormal = FVector::UpVector;
+		constexpr float Reach = 150.f;
+		float XPlus, XMinus, YPlus, YMinus;
+		if (HeightAt(Landscapes, FVector2D(Position.X + Reach, Position.Y), XPlus) && HeightAt(Landscapes, FVector2D(Position.X - Reach, Position.Y), XMinus) &&
+			HeightAt(Landscapes, FVector2D(Position.X, Position.Y + Reach), YPlus) && HeightAt(Landscapes, FVector2D(Position.X, Position.Y - Reach), YMinus))
+			OutNormal = FVector(-(XPlus - XMinus) / (2.f * Reach), -(YPlus - YMinus) / (2.f * Reach), 1.f).GetSafeNormal();
+		const FVector Forward(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)), 0.f);
+		return FRotationMatrix::MakeFromZX(OutNormal, Forward).ToQuat();
+	}
+
 	/** Walk from Start along Direction until dry land gives way to water; return the tide line. */
 	bool MarchToTideLine(const TArray<const ALandscapeProxy*>& Landscapes, const FBox& Bounds, const FVector2D& Start, const FVector2D& Direction,
 		float SeaZ, float Step, float MaxDistance, FVector2D& OutEdge)
@@ -279,10 +294,10 @@ TArray<FIslandWrackPiece> AIslandWrack::Layout(EIslandWrackKind Kind, int32 Seed
 		const int32 Fronds = 4 + Random.RandRange(0, 3);
 		for (int32 I = 0; I < Fronds; ++I)
 		{
-			FVector Offset = InDisc(80.f);
+			FVector Offset = InDisc(60.f);
 			Offset.Z = Ground + 3.f;
 			const FRotator Yaw(0.f, Random.FRandRange(0.f, 360.f), 0.f);
-			Out.Add({FTransform(Yaw, Offset, FVector(Random.FRandRange(0.5f, 1.3f), Random.FRandRange(0.2f, 0.5f), 0.045f))});
+			Out.Add({FTransform(Yaw, Offset, FVector(Random.FRandRange(0.35f, 0.85f), Random.FRandRange(0.12f, 0.3f), 0.04f))});
 		}
 		break;
 	}
@@ -328,7 +343,7 @@ FLinearColor AIslandWrack::ItemColor(EIslandWrackKind Kind, int32 AgeDays, bool 
 		Color = FMath::Lerp(FLinearColor(0.09f, 0.06f, 0.04f), FLinearColor(0.42f, 0.37f, 0.3f), FMath::SmoothStep(0.f, 0.5f, Age));
 		break;
 	}
-	if (bTurned) Color = FMath::Lerp(Color, FLinearColor(0.03f, 0.027f, 0.022f), 0.3f);
+	if (bTurned) Color = FMath::Lerp(Color, FLinearColor(0.02f, 0.018f, 0.015f), 0.5f);
 	Color.A = 1.f;
 	return Color;
 }
@@ -357,7 +372,11 @@ void AIslandWrack::Show(int32 InItemId, EIslandWrackKind Kind, int32 Seed, int32
 		Slot = UMaterialInstanceDynamic::Create(Layer->GetMaterial(0), this);
 		if (Slot) Layer->SetMaterial(0, Slot);
 	}
-	if (Slot) Slot->SetVectorParameterValue(TEXT("Color"), ItemColor(Kind, AgeDays, bTurned));
+	if (Slot)
+	{
+		Slot->SetVectorParameterValue(TEXT("Color"), ItemColor(Kind, AgeDays, bTurned));
+		Slot->SetScalarParameterValue(TEXT("Roughness"), Kind == EIslandWrackKind::Float ? 0.15f : 0.95f);
+	}
 }
 
 int32 AIslandWrack::GetPieceCount() const
@@ -508,7 +527,9 @@ void UIslandWrackSubsystem::SyncActors(int32 Today)
 			FActorSpawnParameters Spawn;
 			Spawn.ObjectFlags |= RF_Transient;
 			Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			Slot = World->SpawnActor<AIslandWrack>(Item.Position + FVector(0.f, 0.f, AIslandWrack::OriginLift), FRotator(0.f, Item.Yaw, 0.f), Spawn);
+			FVector Normal;
+				const FQuat Rotation = GroundRotation(World, Item.Position, Item.Yaw, Normal);
+				Slot = World->SpawnActor<AIslandWrack>(Item.Position + Normal * AIslandWrack::OriginLift, Rotation.Rotator(), Spawn);
 		}
 		if (AIslandWrack* Actor = Slot.Get()) Actor->Show(Item.Id, Item.Kind, Item.Seed, FMath::Max(0, Today - Item.Day), Item.bTurned);
 	}
