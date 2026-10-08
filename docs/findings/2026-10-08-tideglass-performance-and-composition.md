@@ -206,3 +206,75 @@ keeping cold PSO and warm gameplay windows separate. Then compare the same
 11:00 broad Tideglass view and its composition against the foliage WIP before
 changing scatter density. Any persistent PSO-cache fix should be a separately
 measured project-config experiment, not bundled into this environment sample.
+
+## PSO-cache config probe (2026-10-08)
+
+A disposable scratch-project config added
+`[ConsoleVariables] r.D3D12.PSO.DiskCache=1`; the repository's normal config and
+the open editor were untouched. This did **not** enable the D3D12 cache: the
+startup log says the CVar was deferred as a dummy variable, then D3D12 RHI
+explicitly reports `Not using pipeline state disk cache per
+r.D3D12.PSO.DiskCache=0`. During world startup it still counted 500 PSO
+creation hitches, zero precached. Treat this as a failed toggle, not a cache-on
+benchmark. A second isolated launch also passed
+`-r.D3D12.PSO.DiskCache=1`; the command line was recorded and the startup log
+again created a deferred value of 1, but D3D12 RHI still reported the cache
+disabled at 0. That run was stopped before world startup because it could not
+test persistence. Do not repeat the same config/command-line toggle; first
+investigate whether this installed UE 5.8.3 build hard-disables this path or
+whether another supported PSO precaching mechanism is intended.
+
+The isolated profile completed all 600 CSV frames in 14.61 seconds after its
+10-second spectator delay. In the full stationary close-camera window,
+FrameTime mean was 24.49 ms, p50 17.45 ms, p95 32.26 ms (31.0 FPS), and max
+1,530.77 ms; 27 frames exceeded 33.33 ms, 15 exceeded 50 ms, and 8 exceeded
+100 ms. After the first 120 frames, the remaining 480 had mean 18.75 ms, p50
+17.18 ms, p95 30.33 ms (33.0 FPS), max 67.05 ms, with 12 frames above 33.33
+ms and 6 above 50 ms. The warm-window p95 clears the 30-FPS floor, but its
+remaining hitch tail and the full-window spike mean this is not a gameplay
+pass or moving-PIE result.
+
+This run used a writable local DDC, but first-use project shader/material
+processing still took about 7 minutes 17 seconds before the Island became
+ready; at peak the game process used about 7.8 GB and 16 shader workers were
+active. The run used the same 11:00 Listening-Stones view, disabled resident
+thinking and Python, requested zero model calls, and wrote only to scratch
+world data. It was stopped after CSV finalization. Log:
+[`CurrentWetEdgePSODiskCache.log`](../../Saved/Logs/CurrentWetEdgePSODiskCache.log).
+CSV:
+[`Profile(20261008_111647).csv`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Profiling/CSV/Profile%2820261008_111647%29.csv).
+Frame:
+[`001_Listening_Stones_Close.png`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/CurrentWetEdgePSODiskCache/Screenshots/001_Listening_Stones_Close.png).
+
+Next: profile the ordinary moving-PIE route and broad Tideglass composition
+with the warmed DDC, keeping first-use PSO hitches separate from steady travel.
+Investigate UE's supported precache mechanism only after capturing that route;
+the two cache-enable paths above both failed to change RHI state.
+
+## Grounded Aster movement smoke test (2026-10-08)
+
+An isolated UE 5.8.3 NullRHI Game run invoked
+`Island.MoveProbe Agent_Aster_01 Wander` with resident thinking and Python
+disabled, an isolated world-data root, a 120-second real-time cap, and zero
+model requests. Aster began falling at Z=3695 cm; the probe waited until the
+pawn landed at Z=2823 cm before asking the normal controller to wander. The
+controller selected a nav route, rejected 11 capsule-blocked candidates, then
+reached its selected destination after 1,793 cm of travel in 3.5 simulated
+seconds. The bounded session ended normally after 28.5 real seconds with zero
+model requests.
+
+This confirms one grounded autonomous move under current working-tree source;
+it does not test a landmark interaction, player input, rendered appearance,
+or gameplay frame rate. A separate immediate `MoveTo ListeningStones` probe
+failed while Aster was still falling, so that result is not evidence that the
+landmark route itself is unreachable. The same successful log emitted the
+UBT AutoSDK return code discussed in
+[`the .NET exception note`](2026-10-08-ue-ubt-dotnet-exception.md), and the
+known RecastNavMesh/CrowdFollowing teardown warning appeared after the move
+completed.
+
+Evidence: [`CurrentAsterGroundedWander.log`](../../Saved/Logs/CurrentAsterGroundedWander.log).
+Next: make any future direct ground-movement probe wait for landing first,
+then test one tagged landmark arrival and interaction in a render-enabled
+session. Keep that separate from the still-unverified user-controlled PIE
+route and 30-FPS target.
