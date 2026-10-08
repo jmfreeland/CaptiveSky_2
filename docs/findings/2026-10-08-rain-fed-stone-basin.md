@@ -9,16 +9,22 @@ rests on the stone instead. This extends an existing interaction path; it
 doesn't force an action or add a separate model request.
 
 UE 5.8.3 `CaptiveSky_2Editor` compiled the basin code, and
-`CaptiveSky2.Agent.IslandRainBasin` passed in a scratch editor run with agent
-thinking disabled, model requests capped at zero, and a 60-second process cap.
-The regression covers rain/sun accumulation bounds, once-per-day behavior,
-leaf aging and capacity, state serialization/rejection, basin geometry values,
-and resident-facing descriptions. Local log:
-[`Codex_RainBasin_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RainBasin_20261008.log).
+`CaptiveSky2.Agent.IslandRainBasin` and `CaptiveSky2.Agent.IslandRainBasinWorld`
+passed together in the scratch editor with agent thinking disabled, model
+requests capped at zero, and a 60-second process cap. In addition to the pure
+regression for rain/sun bounds, daily interaction, leaf aging/capacity, JSON,
+geometry values, and descriptions, the world test now creates a tiny temporary
+world, places the basin beside tagged Listening Stones, discovers and interacts
+with it through the ordinary resident target path, checks the once-per-day
+response, and reloads placement, water, and leaf ownership from an isolated JSON
+file in a second world. Local log:
+[`Codex_RainBasinRules_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RainBasinRules_20261008.log).
 
-This verifies deterministic rules, not the saved Island placement, observed
-water response to weather over time, residents' willingness to interact, or
-whether the basin and floating leaves read clearly at normal gameplay distance.
-The connected editor currently has unsaved Rhododendron material work, so leave
-that session alone; the next check is a short PIE observation after its owner
-has preserved those edits.
+This verifies deterministic rules and subsystem behavior in a synthetic flat
+world, not placement on the saved Island, observed water response to real
+weather over time, residents' willingness to interact autonomously, or whether
+the basin and floating leaves read clearly at normal gameplay distance. The
+synthetic world also lacks the three Listening Stones presentation proxies, so
+its expected “presentation skipped” warning is fixture-only. The connected
+editor has unsaved Rhododendron material work; leave that session alone. The next
+check remains a short PIE observation after its owner has preserved those edits.

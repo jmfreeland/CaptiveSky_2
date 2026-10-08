@@ -1,5 +1,14 @@
 #include "Misc/AutomationTest.h"
 #include "IslandRainBasin.h"
+#include "IslandInteractionUtility.h"
+#include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandRainBasinTest, "CaptiveSky2.Agent.IslandRainBasin",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -53,5 +62,142 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("One leaf is singular"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 1).Contains(TEXT("1 leaf drifts")));
 	TestTrue(TEXT("Several leaves are plural"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 3).Contains(TEXT("3 leaves drift")));
 	TestTrue(TEXT("Leaves on a dry basin lie on the stone"), UIslandRainBasinSubsystem::DescribeWater(0.f, 2).Contains(TEXT("dried leaves lie")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandRainBasinWorldTest, "CaptiveSky2.Agent.IslandRainBasinWorld",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
+{
+	const FString Scratch = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("IslandRainBasin"));
+	IFileManager::Get().MakeDirectory(*Scratch, true);
+	const FString StateFile = Scratch / (FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".json"));
+	auto CleanupFiles = [&StateFile]()
+	{
+		IFileManager::Get().Delete(*StateFile, false, true, true);
+		IFileManager::Get().Delete(*(StateFile + TEXT(".tmp")), false, true, true);
+	};
+	auto CreateWorld = [&StateFile](bool bWithPlacementFixture)
+	{
+		const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+		if (!World) return static_cast<UWorld*>(nullptr);
+		GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+		if (UIslandRainBasinSubsystem* Basin = World->GetSubsystem<UIslandRainBasinSubsystem>()) Basin->StorageFileOverride = StateFile;
+		if (bWithPlacementFixture)
+		{
+			AActor* Stones = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator);
+			if (Stones) Stones->Tags = { TEXT("IslandLandmark"), TEXT("ListeningStones") };
+			AActor* Ground = World->SpawnActor<AActor>();
+			if (Ground)
+			{
+				UBoxComponent* Box = NewObject<UBoxComponent>(Ground);
+				Ground->SetRootComponent(Box);
+				Box->SetBoxExtent(FVector(5000.f, 5000.f, 20.f));
+				Box->SetCollisionProfileName(TEXT("BlockAll"));
+				Box->RegisterComponent();
+				Ground->SetActorLocation(FVector(0.f, 0.f, -20.f));
+			}
+		}
+		return World;
+	};
+	auto DestroyWorld = [](UWorld* World)
+	{
+		if (!World) return;
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+
+	UWorld* World = CreateWorld(true);
+	if (!TestNotNull(TEXT("Synthetic basin placement world created"), World))
+	{
+		CleanupFiles();
+		return false;
+	}
+	World->BeginPlay();
+	UIslandRainBasinSubsystem* Basin = World->GetSubsystem<UIslandRainBasinSubsystem>();
+	TestNotNull(TEXT("Synthetic world owns the basin subsystem"), Basin);
+	if (!Basin)
+	{
+		DestroyWorld(World);
+		CleanupFiles();
+		return false;
+	}
+	TestTrue(TEXT("The tagged Listening Stones cause deterministic basin placement"), Basin->GetState().bPlaced);
+	AIslandRainBasin* BasinActor = nullptr;
+	for (TActorIterator<AIslandRainBasin> It(World); It; ++It) { BasinActor = *It; break; }
+	TestNotNull(TEXT("Placed basin has a visible interaction actor"), BasinActor);
+	TestTrue(TEXT("The basin resolves through the ordinary interaction target tag"),
+		BasinActor && IslandInteractionUtility::GetTargetTag(BasinActor) == FName(TEXT("RainBasin")));
+	TestTrue(TEXT("The basin actor occupies its saved ground position plus its inspection lift"),
+		BasinActor && BasinActor->GetActorLocation().Equals(Basin->GetState().Location + FVector(0.f, 0.f, AIslandRainBasin::OriginLift), 0.1f));
+	if (BasinActor)
+	{
+		const FString Nearby = Basin->DescribeNearby(BasinActor->GetActorLocation());
+		TestTrue(TEXT("A resident nearby receives the basin interaction affordance"), Nearby.Contains(TEXT("RainBasin")) && Nearby.Contains(TEXT("interact")));
+		TestTrue(TEXT("A resident outside the notice radius receives no basin prompt"), Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(0.f, 0.f, UIslandRainBasinSubsystem::NoticeRadius + 100.f)).IsEmpty());
+	}
+	FIslandBasinState PlacedState;
+	FString Json;
+	TestTrue(TEXT("Initial placement is persisted to the isolated scratch file"), FFileHelper::LoadFileToString(Json, *StateFile) && PlacedState.FromJson(Json) && PlacedState.bPlaced);
+
+	if (BasinActor)
+	{
+		Basin->ForceWater(0.7f);
+		AActor* Resident = World->SpawnActor<AActor>();
+		if (Resident)
+		{
+			USceneComponent* Root = NewObject<USceneComponent>(Resident);
+			Resident->SetRootComponent(Root);
+			Root->RegisterComponent();
+			Resident->SetActorLocation(BasinActor->GetActorLocation() + FVector(50.f, 0.f, 40.f), false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		TestNotNull(TEXT("Synthetic resident observer created beside the basin"), Resident);
+		if (Resident)
+		{
+			const bool bCanInteract = IslandInteractionUtility::CanInteract(Resident, BasinActor, 250.f);
+			TestTrue(*FString::Printf(TEXT("Resident can perceive the basin at %.1f cm (hidden=%d)"),
+				FVector::Dist(Resident->GetActorLocation(), BasinActor->GetActorLocation()), BasinActor->IsHidden()), bCanInteract);
+			AActor* FoundTarget = IslandInteractionUtility::FindNearestVisibleTarget(Resident, World, 250.f);
+			TestTrue(*FString::Printf(TEXT("Ordinary nearest-visible-target discovery finds the basin (found=%s)"),
+				FoundTarget ? *IslandInteractionUtility::GetTargetTag(FoundTarget).ToString() : TEXT("none")), FoundTarget == BasinActor);
+			FString Fact;
+			TestTrue(TEXT("Resident inspection uses the ordinary interaction path"), IslandInteractionUtility::Perform(Resident, BasinActor, Fact));
+			TestTrue(TEXT("The resident's first inspection sets a leaf afloat"), Fact.Contains(TEXT("set it on the water")) && Basin->GetState().Leaves.Num() == 1);
+			const int32 LeafCount = Basin->GetState().Leaves.Num();
+			TestTrue(TEXT("A repeat inspection reports today's leaf without changing the basin"),
+				IslandInteractionUtility::Perform(Resident, BasinActor, Fact) && Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == LeafCount);
+			TestTrue(TEXT("Water and the resident's leaf are durably saved"),
+				FFileHelper::LoadFileToString(Json, *StateFile) && PlacedState.FromJson(Json) &&
+				FMath::IsNearlyEqual(PlacedState.Water, Basin->GetState().Water) && PlacedState.Leaves.Num() == 1 &&
+				PlacedState.Leaves[0].AgentId == Resident->GetName());
+		}
+	}
+	const FVector ExpectedLocation = Basin->GetState().Location;
+	DestroyWorld(World);
+
+	UWorld* ReloadedWorld = CreateWorld(false);
+	if (!TestNotNull(TEXT("Second synthetic world created for persistence reload"), ReloadedWorld))
+	{
+		CleanupFiles();
+		return false;
+	}
+	ReloadedWorld->BeginPlay();
+	UIslandRainBasinSubsystem* ReloadedBasin = ReloadedWorld->GetSubsystem<UIslandRainBasinSubsystem>();
+	TestTrue(TEXT("Saved placement reloads without needing Listening Stones in the new world"),
+		ReloadedBasin && ReloadedBasin->GetState().bPlaced && ReloadedBasin->GetState().Location.Equals(ExpectedLocation, 0.1f));
+	TestTrue(TEXT("Saved water and the resident's leaf survive subsystem reload"),
+		ReloadedBasin && ReloadedBasin->GetState().Leaves.Num() == PlacedState.Leaves.Num() && PlacedState.Leaves.Num() == 1 &&
+		ReloadedBasin->GetState().Leaves[0].Day == PlacedState.Leaves[0].Day &&
+		ReloadedBasin->GetState().Leaves[0].AgentId == PlacedState.Leaves[0].AgentId &&
+		FMath::IsNearlyEqual(ReloadedBasin->GetState().Water, PlacedState.Water));
+	AIslandRainBasin* ReloadedActor = nullptr;
+	for (TActorIterator<AIslandRainBasin> It(ReloadedWorld); It; ++It) { ReloadedActor = *It; break; }
+	TestTrue(TEXT("Reload materializes the basin actor at its saved ground position"),
+		ReloadedActor && ReloadedActor->GetActorLocation().Equals(ExpectedLocation + FVector(0.f, 0.f, AIslandRainBasin::OriginLift), 0.1f));
+	DestroyWorld(ReloadedWorld);
+	CleanupFiles();
 	return true;
 }
