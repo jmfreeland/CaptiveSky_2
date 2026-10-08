@@ -84,3 +84,16 @@ the project module can load and exercise the provider-free behavior; this does
 not validate the graphical Editor startup path. A system reboot has not been
 performed. If authorized, reboot once, then make one bounded Editor launch and
 check the process, visible window, and MCP port independently.
+
+## Live editor recheck (2026-10-08, later)
+
+The editor is now reachable through Unreal MCP: `CaptureEditorImage`,
+`GetCameraTransform`, `GetSelectedActors`, and `IsPIERunning` responded. The
+Island level is open, no actor is selected, and PIE is not running. The editor
+tab/status bar shows `Island*` and `1 Unsaved`, so the viewport and level were
+left untouched. The captured editor image showed no `dotnet.exe` error dialog;
+this does not identify or resolve the earlier exception. The older parentless
+`dotnet.exe` entries remain an unverified separate observation. The current
+editor/MCP check did not require or initiate a reboot, though the recurring
+managed exception still requires a Reliability Monitor or equivalent
+faulting-application record to identify its source.
