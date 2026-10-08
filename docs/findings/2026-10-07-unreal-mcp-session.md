@@ -146,3 +146,35 @@ Next diagnostic: capture the child command line and managed exception details
 for `ValidatePlatforms`/`VerifySdk` while preserving the editor's unsaved
 material state. Do not treat the material graph errors or VRAM pressure as the
 cause of this CLR code without new evidence.
+
+## 2026-10-09 sandboxed AutoSDK A/B
+
+The same UE 5.8.3 `Build.bat -Mode=ValidatePlatforms -OutputSDKs -AllPlatforms`
+command was run against the scratch project twice. Under the normal restricted
+workspace token, UE's bundled .NET 10 `dotnet.exe` stayed at 0.14 CPU seconds
+for roughly 50 seconds and produced no validation log. Only that diagnostic
+process was stopped; the already-open editor (PID 828) remained responsive.
+Repeating the command with approved access to UE's per-user support/log paths
+completed in about 2.5 seconds, returned exit code 0, and reported Win64 valid
+with SDK 10.0.22621.0. The log is
+[`Codex_AutoSDK_ValidatePlatforms_20261009_elevated.log`](../../Saved/Logs/Codex_AutoSDK_ValidatePlatforms_20261009_elevated.log).
+
+This controlled result strongly supports restricted access to UBT's per-user
+support/log path as a cause of the sandboxed validation stall. Separately, the
+bounded scratch Game and automation logs again recorded
+`UBT AutoSDK ReturnCode: -532462766` (`0xE0434352`) while automation continued
+successfully. The repeated child return code appears in the bounded
+[`Game`](../../Saved/Logs/Codex_MinnowSurfaceRing_Game_20261009b.log) and
+[`automation`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Saved/Logs/Codex_MinnowSurfaceRing_Automation_20261009.log)
+logs. Together with the earlier `UnauthorizedAccessException` reading
+`%LOCALAPPDATA%\UnrealBuildTool`, this ties at least some matching exceptions
+to the UE/UBT AutoSDK startup path. It still does not identify the managed
+exception stack behind each desktop dialog, and does not prove that every
+popup has the same cause; recent Windows Application/.NET Runtime queries
+still returned no matching event.
+
+For Codex-launched builds/validation, use approved access to the UE per-user
+support paths instead of repeating the known restricted invocation. If a
+desktop-editor popup recurs, capture its owning PID and the `ValidatePlatforms`
+or `VerifySdk` child stack before restarting Windows. The editor and its
+unsaved state were not changed during this A/B check.
