@@ -5,6 +5,8 @@
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Components/SceneComponent.h"
+#include "Components/ActorComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
 #include "GameFramework/Character.h"
@@ -86,7 +88,7 @@ public:
 			State->MoverStartOverride = FVector(StartX, StartY, StartZ);
 		}
 		World->GetTimerManager().SetTimer(State->PollTimer,
-			FTimerDelegate::CreateLambda([State]() { Poll(State); }), 0.5f, true);
+			FTimerDelegate::CreateLambda([State]() { Poll(State); }), State->bForceCuriosityProbe ? 0.1f : 0.5f, true);
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Queued isolated %s%s probe for %s; camera warm-up %.1f s, post-probe hold %.1f s; waiting for runtime actors."),
 			State->bForceCuriosityProbe ? TEXT("forced-curiosity ") : (State->bWanderProbe ? TEXT("wander ") : TEXT("")),
 			State->bWanderProbe ? TEXT("flight-wander") : TEXT("movement"), *State->MoverTag.ToString(),
@@ -122,7 +124,81 @@ private:
 		bool bHasMoverStartOverride = false;
 		FVector MoverStartOverride = FVector::ZeroVector;
 		TWeakObjectPtr<AActor> TargetActor;
+		bool bHasMinnowBaseline = false;
+		bool bLoggedMinnowBandEntry = false;
+		FVector MinnowBaselineCentroid = FVector::ZeroVector;
+		int32 MinnowBodyCount = 0;
+		int32 MinnowLowFlybySampleCount = 0;
+		float MaxMinnowCentroidShiftInBand = 0.f;
 	};
+
+	static bool SampleMinnowSchool(UWorld* World, FVector& OutSchoolLocation, FVector& OutBodyCentroid, int32& OutBodyCount)
+	{
+		if (!World) return false;
+		AActor* School = nullptr;
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (It->ActorHasTag(TEXT("MinnowSchool")))
+			{
+				School = *It;
+				break;
+			}
+		}
+		if (!School) return false;
+
+		TArray<UActorComponent*> Components;
+		School->GetComponents(Components);
+		FVector BodyLocationSum = FVector::ZeroVector;
+		OutBodyCount = 0;
+		for (UActorComponent* Component : Components)
+		{
+			const USceneComponent* Scene = Cast<USceneComponent>(Component);
+			if (!Scene || !Scene->GetName().StartsWith(TEXT("Minnow_"), ESearchCase::CaseSensitive)) continue;
+			BodyLocationSum += Scene->GetRelativeLocation();
+			++OutBodyCount;
+		}
+		if (OutBodyCount == 0) return false;
+
+		OutSchoolLocation = School->GetActorLocation();
+		OutBodyCentroid = BodyLocationSum / static_cast<float>(OutBodyCount);
+		return true;
+	}
+
+	static void SampleRavenMinnowProximity(const TSharedRef<FProbeState>& State, UWorld* World,
+		const ARavenAgentAIController* RavenController, const APawn* Raven)
+	{
+		if (!State->bForceCuriosityProbe || !RavenController || !Raven || !State->bHasMinnowBaseline) return;
+
+		FVector SchoolLocation = FVector::ZeroVector;
+		FVector BodyCentroid = FVector::ZeroVector;
+		int32 BodyCount = 0;
+		if (!SampleMinnowSchool(World, SchoolLocation, BodyCentroid, BodyCount)) return;
+
+		const FVector Offset = Raven->GetActorLocation() - SchoolLocation;
+		const float HorizontalDistance = Offset.Size2D();
+		const bool bLowFlybyEnvelope = RavenController->LocomotionState == ERavenLocomotionState::Flying &&
+			Offset.Z >= 150.f && Offset.Z <= 700.f && HorizontalDistance <= 550.f;
+		if (!bLowFlybyEnvelope) return;
+
+		++State->MinnowLowFlybySampleCount;
+		const float CentroidShift = FVector::Dist(BodyCentroid, State->MinnowBaselineCentroid);
+		State->MaxMinnowCentroidShiftInBand = FMath::Max(State->MaxMinnowCentroidShiftInBand, CentroidShift);
+		if (!State->bLoggedMinnowBandEntry)
+		{
+			State->bLoggedMinnowBandEntry = true;
+			UE_LOG(LogIslandMovementProbe, Log,
+				TEXT("Raven entered the minnow low-flyby envelope: horizontal %.0f cm, vertical %.0f cm, school bodies %d, centroid shift %.0f cm."),
+				HorizontalDistance, Offset.Z, BodyCount, CentroidShift);
+		}
+	}
+
+	static void LogMinnowProbeSummary(const TSharedRef<FProbeState>& State)
+	{
+		if (!State->bHasMinnowBaseline) return;
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Raven/minnow probe summary: %d low-flyby samples; maximum fish-body centroid shift inside the envelope %.0f cm from the pre-action baseline."),
+			State->MinnowLowFlybySampleCount, State->MaxMinnowCentroidShiftInBand);
+	}
 
 	static void Poll(const TSharedRef<FProbeState>& State)
 	{
@@ -247,6 +323,14 @@ private:
 					Finish(State, false);
 					return;
 				}
+				FVector SchoolLocation = FVector::ZeroVector;
+				if (SampleMinnowSchool(World, SchoolLocation, State->MinnowBaselineCentroid, State->MinnowBodyCount))
+				{
+					State->bHasMinnowBaseline = true;
+					UE_LOG(LogIslandMovementProbe, Log,
+						TEXT("Captured pre-flight minnow baseline: %d fish bodies at school %s (relative centroid %s)."),
+						State->MinnowBodyCount, *SchoolLocation.ToCompactString(), *State->MinnowBaselineCentroid.ToCompactString());
+				}
 				RavenController->BeginTakeoff(RavenController->MakeCruiseTarget(true));
 			}
 			else
@@ -280,6 +364,7 @@ private:
 			return;
 		}
 		const ARavenAgentAIController* RavenController = Cast<ARavenAgentAIController>(Controller);
+		SampleRavenMinnowProximity(State, World, RavenController, Pawn);
 		const FString ActionState = Controller->DescribeActionState();
 		const bool bComplete = RavenController
 			? !Controller->IsActionInProgress() &&
@@ -338,6 +423,7 @@ private:
 	{
 		UWorld* World = State->World.Get();
 		if (World) World->GetTimerManager().ClearTimer(State->PollTimer);
+		LogMinnowProbeSummary(State);
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Isolated movement probe finished: %s."), bSuccess ? TEXT("success") : TEXT("failure"));
 		if (bSuccess && State->PostCompletionHoldSeconds > 0.0 && World)
 		{
