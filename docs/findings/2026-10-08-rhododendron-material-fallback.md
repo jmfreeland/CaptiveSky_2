@@ -46,9 +46,11 @@ byte-identical to the pre-test SHA256
 `2B1746766E5EC27371AFDC7E58B7996A314320161A5CF943792A0D9CBCE055AB`.
 A matching safety copy is in the ignored
 `Saved/AssetBackups/Codex_RhodoMaterialUsage_20261008/` directory. No material
-package was saved and no Game re-capture was run. The material editor still
-shows a dirty package after recompilation; the user's separate unsaved Island
-level was not saved or changed.
+package was saved back to `Content`, and no Game re-capture was run. Unreal did
+create `Saved/Autosaves/Game/Plants/Materials/OriginalFlower/MM_Rhododendron__Everestianum__HD_Auto2.uasset`
+during the test. The material editor still shows a dirty package after
+recompilation; the user's separate unsaved Island level was not saved or
+changed.
 
 ## Safe next action
 
