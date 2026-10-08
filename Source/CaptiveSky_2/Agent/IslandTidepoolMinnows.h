@@ -33,7 +33,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
-	static constexpr float SurfaceBreakContextLifetime = 300.f;
+	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UStaticMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")

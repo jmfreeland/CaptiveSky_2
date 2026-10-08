@@ -258,7 +258,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		{
 			CueObserverController->Possess(Visitor);
 			const FString NearbyContext = CueObserverController->DescribeActionState();
-			TestTrue(TEXT("The cue remains available through the longest normal decision interval"),
+			TestTrue(TEXT("The cue remains available through the longest normal decision interval and timer slack"),
 				FMath::IsNearlyEqual(School->SurfaceBreakContextRemaining, AIslandTidepoolMinnows::SurfaceBreakContextLifetime));
 			TestTrue(TEXT("A nearby resident receives the faded surface-break cue in its next action context"),
 				NearbyContext.Contains(TEXT("Nearby transient wildlife cue")) && NearbyContext.Contains(TEXT("ripple has faded")));

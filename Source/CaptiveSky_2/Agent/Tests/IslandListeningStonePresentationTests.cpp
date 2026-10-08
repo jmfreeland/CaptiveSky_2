@@ -208,6 +208,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			const FString NearbyTone = NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f));
 			TestTrue(TEXT("A nearby resident can notice the fading local tone"), NearbyTone.Contains(TEXT("ListeningStones")) && NearbyTone.Contains(TEXT("5 metres away")));
 			TestTrue(TEXT("A resident beyond the sound radius gets no tone fact"), NaturalChime->DescribeForListener(FVector(1200.f, 0.f, 0.f)).IsEmpty());
+			TestTrue(TEXT("The resident context spans one full maximum decision interval"),
+				FMath::IsNearlyEqual(NaturalChime->GetLifeSpan(), AIslandListeningStonesChime::ResidentContextLifetimeSeconds));
 		}
 		Presentation->ObserveAmbientWind(40.f);
 		Presentation->ObserveAmbientWind(120.f);
@@ -217,7 +219,12 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		if (NaturalChime)
 		{
 			NaturalChime->Tick(2.9f);
-			TestTrue(TEXT("Residents stop receiving the sound fact after the tone fades"), NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f)).IsEmpty());
+			TestFalse(TEXT("A faded chime no longer produces audio or ticks"), NaturalChime->IsAudibleAt(FVector(500.f, 0.f, 0.f)) || NaturalChime->IsActorTickEnabled());
+			TestTrue(TEXT("The faded tone remains available for the next scheduled resident thought"),
+				NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f)).Contains(TEXT("within the last few minutes")));
+			NaturalChime->ContextExpiresAt = World->GetTimeSeconds() - 0.1;
+			TestTrue(TEXT("The transient resident context expires without a persistent record"),
+				NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f)).IsEmpty());
 		}
 		Presentation->Tick(2.9f);
 		TestEqual(TEXT("Natural resonance lights expire without persistent state"), Presentation->GetResonanceRemaining(), 0.f);

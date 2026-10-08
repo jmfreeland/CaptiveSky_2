@@ -18,8 +18,11 @@ public:
 	static constexpr float AttenuationInnerRadius = 350.f;
 	static constexpr float AttenuationFalloffDistance = 750.f;
 	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
+	static constexpr float ResidentContextLifetimeSeconds = 305.f;
 	void BeginChime(float HorizontalWindSpeed = 0.f);
-	/** Short-lived listener fact for nearby resident situation summaries; empty outside the audible window. */
+	/** Whether a nearby animal can still physically hear the tone. */
+	bool IsAudibleAt(const FVector& ListenerLocation) const;
+	/** Fading or just-faded tone fact for nearby residents; no enduring discovery is implied. */
 	FString DescribeForListener(const FVector& ListenerLocation) const;
 
 protected:
@@ -34,6 +37,7 @@ private:
 	TObjectPtr<USoundWaveProcedural> ChimeWave;
 	float ElapsedSeconds = 0.f;
 	float DurationSeconds = 2.8f;
+	double ContextExpiresAt = 0.0;
 	float SampledWindSpeed = 0.f;
 	float AppliedPitchRatio = 1.f;
 	static float CalculateWindPitchRatio(float HorizontalWindSpeed);

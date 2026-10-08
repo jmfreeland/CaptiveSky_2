@@ -193,7 +193,7 @@ void AIslandForestStag::CheckForNearbyListeningStonesChime()
 	{
 		AIslandListeningStonesChime* Chime = *It;
 		if (!IsValid(Chime) || LastHeardChime.Get() == Chime ||
-			Chime->DescribeForListener(GetActorLocation()).IsEmpty())
+			!Chime->IsAudibleAt(GetActorLocation()))
 			continue;
 
 		// A nearby, fading stone tone briefly draws the stag's attention. It stays in

@@ -1416,11 +1416,13 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCount;
 		TestEqual(TEXT("Inspection cooldown prevents stacking chimes"), ChimeCount, 1);
 		Chime->Tick(2.9f);
-		TestTrue(TEXT("Generated sound actor cleans itself up after playback"), Chime->IsActorBeingDestroyed());
+		TestTrue(TEXT("Generated sound actor stops ticking after playback while the resident context remains"),
+			!Chime->IsActorTickEnabled() && !Chime->IsAudibleAt(Chime->GetActorLocation()) &&
+			!Chime->DescribeForListener(Chime->GetActorLocation()).IsEmpty());
 		if (ChimeListener)
 		{
 			ChimeListener->CheckForNearbyStoneChime();
-			TestTrue(TEXT("Destroyed sound actors are pruned from the firefly's temporary response history"),
+			TestTrue(TEXT("Finished sound actors are pruned from the firefly's temporary response history"),
 				ChimeListener->RespondedChimes.IsEmpty());
 		}
 	}
@@ -1437,7 +1439,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	Controller->InspectTarget(TEXT("ListeningStones"));
 	int32 ChimeCountAfterRepeatedControllerAction = 0;
 	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimeCountAfterRepeatedControllerAction;
-	TestEqual(TEXT("The controller's repeat cooldown still prevents another chime"), ChimeCountAfterRepeatedControllerAction, 1);
+	TestEqual(TEXT("The controller's repeat cooldown prevents a third chime while two finite contexts coexist"),
+		ChimeCountAfterRepeatedControllerAction, 2);
 	AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(700.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandFirefly* OccludedFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandFirefly* WatchableFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation, FRotator::ZeroRotator, Spawn);

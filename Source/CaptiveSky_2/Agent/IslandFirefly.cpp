@@ -171,12 +171,12 @@ bool AIslandFirefly::RespondToSoftChime(AIslandListeningStonesChime* Chime)
 	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& HeardChime)
 	{
 		const AIslandListeningStonesChime* Actor = HeardChime.Get();
-		return !Actor || Actor->IsActorBeingDestroyed();
+		return !Actor || Actor->IsActorBeingDestroyed() || !Actor->IsAudibleAt(Actor->GetActorLocation());
 	});
 	if (Chime->IsActorBeingDestroyed()) return false;
 	const TWeakObjectPtr<AIslandListeningStonesChime> ChimeRef(Chime);
 	if (RespondedChimes.Contains(ChimeRef) ||
-		FVector::DistSquared(GetActorLocation(), Chime->GetActorLocation()) > FMath::Square(AIslandListeningStonesChime::AudibleRadius))
+		!Chime->IsAudibleAt(GetActorLocation()))
 	{
 		return false;
 	}
@@ -191,7 +191,7 @@ void AIslandFirefly::CheckForNearbyStoneChime()
 	RespondedChimes.RemoveAll([](const TWeakObjectPtr<AIslandListeningStonesChime>& HeardChime)
 	{
 		const AIslandListeningStonesChime* Actor = HeardChime.Get();
-		return !Actor || Actor->IsActorBeingDestroyed();
+		return !Actor || Actor->IsActorBeingDestroyed() || !Actor->IsAudibleAt(Actor->GetActorLocation());
 	});
 	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
 	{
