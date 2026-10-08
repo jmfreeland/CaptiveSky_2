@@ -9,8 +9,8 @@ the code stays hidden if that optional asset is absent.
 
 ## Validation
 
-- The UE 5.8.3 `CaptiveSky_2Editor` scratch target returned success and was
-  already up to date (zero build actions).
+- The UE 5.8.3 `CaptiveSky_2Editor` scratch target rebuilt successfully, including
+  the added runtime test.
 - `CaptiveSky2.Agent.IslandDew` passed in that isolated scratch editor with
   `-NullRHI`, Python and agent thinking disabled, model requests capped at
   zero, and a 60-second realtime cap. It covers weather gates, clamping,
@@ -18,6 +18,16 @@ the code stays hidden if that optional asset is absent.
 - A separate scratch-editor Python audit recompiled the existing material in
   memory and reported `instanced=True`, additive blend, unlit shading, and no
   compile errors. It did not save the shared `.uasset`.
+- `CaptiveSky2.Agent.IslandDewRuntime` passed in the isolated scratch editor with
+  `-NullRHI`, Python and agent thinking disabled, model requests capped at zero,
+  and a 60-second realtime cap. It verifies that the transient actor spawns,
+  glints are non-colliding and excluded from navigation, the fixed instance pool
+  stays bounded and repositions with the viewer, zero strength hides it, and a
+  missing optional material safely leaves it empty. This is a headless lifecycle
+  check, not a visual-quality or performance measurement.
+- The first runtime-test launch stopped before automation because this machine's
+  configured DDC had no writable node; retrying with `-DDC-ForceMemoryCache`
+  succeeded. Log: [`Codex_IslandDewRuntime_20261008_retry.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_IslandDewRuntime_20261008_retry.log).
 - Log: [`Codex_IslandDew_Validation_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_IslandDew_Validation_20261008.log).
 - Material audit: [`Codex_IslandDewMaterialAudit_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_IslandDewMaterialAudit_20261008.log).
 
