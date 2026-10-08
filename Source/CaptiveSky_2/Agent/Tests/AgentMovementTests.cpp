@@ -190,7 +190,7 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::WanderNoveltyScore(WanderGoal, {}), 0.f);
 	FIslandTrailLedger WornRouteLedger;
 	for (int32 Cell = 0; Cell <= 10; ++Cell)
-		for (int32 Step = 0; Step < 80; ++Step)
+		for (int32 Step = 0; Step < UIslandTrailSubsystem::WearFullSteps; ++Step)
 			WornRouteLedger.AddStep(FVector(Cell * FIslandTrailLedger::CellSize + 10.f, 10.f, 0.f), FVector::UpVector);
 	const TArray<FVector> WornRoute = { FVector(10.f, 10.f, 0.f), FVector(1510.f, 10.f, 0.f) };
 	const TArray<FVector> UntroddenRoute = { FVector(10.f, 5000.f, 0.f), FVector(1510.f, 5000.f, 0.f) };

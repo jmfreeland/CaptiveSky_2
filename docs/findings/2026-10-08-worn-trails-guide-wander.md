@@ -14,17 +14,23 @@ request, a new persistent record, or a scheduled action. Residents may still
 choose whether to wander; the preference only shapes the route after they have
 already chosen it.
 
-`CaptiveSky2.Agent.ResidentWanderPaths` now checks worn-versus-untrodden route
-affinity, degenerate paths, and the strict 3% score bound. The isolated UE
-5.8.3 editor target compiled and linked successfully (146 actions, including
-both edited translation units). Runtime automation is still unverified: the
-first headless launch produced a scratch-only Unreal assert because its
-user-level Zen/DDC graph had no writable node; a retry with the documented
-memory-cache flags remained CPU-active for over six minutes without opening an
-editor log and was stopped. The crash report identifies DDC configuration,
-not this code. No user map, persistent Island state, or model request was
-involved. Continue with a known-writable UE cache or a warm validation project,
-then check `CaptiveSky2.Agent.ResidentWanderPaths`. This still would not prove
-whether residents choose to wander, how often trails become worn, or whether
-the marks read clearly in a normal Game/PIE view; compare bounded movement logs
-with empty and populated trail data when the automation launch is reliable.
+`CaptiveSky2.Agent.ResidentWanderPaths` checks worn-versus-untrodden route
+affinity, degenerate paths, and the strict 3% score bound. Its first runtime
+attempt exposed a fixture mismatch: it seeded 80 steps per route cell while
+asserting affinity above 0.9, but the wear curve reaches full wear at 160 steps.
+The route-scoring code was not changed; the fixture now seeds the declared
+`WearFullSteps` threshold.
+
+The isolated UE 5.8.3 editor target rebuilt and linked the corrected test, and
+`ResidentWanderPaths` completed with `Result={Success}` and exit code 0. The run
+used `-NullRHI -NoSound -DisablePython`, disabled agent thinking, set the model
+request cap to zero and the realtime cap to 60 seconds, and wrote only to the
+scratch world-data root. The interactive editor and its unsaved Island level
+were untouched. Log:
+[`ResidentWanderPaths_FullWear.log`](../../Saved/CompileScratch/Codex_TidalCrabActivity_20261008/Project/Saved/Logs/ResidentWanderPaths_FullWear.log).
+
+This proves the deterministic route-affinity and tie-break bounds, not whether
+residents choose to wander, how often trails become worn in ordinary play, or
+whether the ground marks read clearly in a rendered Game/PIE view. Compare
+bounded movement logs with empty and populated trail data during a future
+in-world pass.
