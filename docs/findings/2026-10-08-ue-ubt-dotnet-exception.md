@@ -64,6 +64,28 @@ behind the pictured occurrence. The dialog's generic CLR exception code is not
 enough to assign blame to UnrealBuildTool; capture the process and timestamp
 while it is present, then correlate those with a fresh event/log entry.
 
+### Latest recurrence while a bounded PIE session was running
+
+During a later report of the same dialog, two tiny `dotnet.exe` process entries
+(PIDs 40100 and 52284) were visible, but process command lines and owner details
+were inaccessible. Windows' Application log had no matching recent event, and
+no recent Windows Error Reporting `Report.wer` named `dotnet.exe` or the CLR
+exception code. An offscreen UE Editor process (PID 5584) was running Claude's
+bounded `Claude_Props` dew PIE capture at the same time. Its log records
+`UBT AutoSDK ReturnCode: 0` during startup and a normal `LogExit: Exiting`; it
+contains no `0xe0434352`, unhandled-exception, or fatal-error entry. It does
+contain an unrelated material warning: `/Game/Materials/M_IslandDew` lacks the
+`InstancedStaticMeshes` usage flag and falls back to Default Material in Game.
+
+This rules out a failing AutoSDK validation in that particular UE process and
+shows that its gameplay session completed normally. It does not identify the
+source of the dialog: the two `dotnet.exe` entries still cannot be tied to a
+parent or command line, and absence of a Windows event is not proof that no
+other managed process failed. Keep the next diagnostic unchanged: while one
+dialog is visible, capture its timestamp and the owning process ID/command line
+in Task Manager or Process Explorer, then correlate with the corresponding
+fresh log or event. Do not alter SDK validation or Windows permissions.
+
 ## Scope and next step
 
 No game source, user project config, Windows permissions, or editor state was
