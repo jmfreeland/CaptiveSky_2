@@ -109,3 +109,22 @@ and [second stroke](../../Saved/CompileScratch/Codex_RavenAttentionValidation_20
 now show distinct wing poses. This proves the imported clip renders at two
 sampled phases; a natural, ticking Game/PIE flight remains the in-world visual
 check.
+
+## Nearby residents notice the raven's activity (2026-10-08)
+
+`UAgentBrainComponent::BuildSituationSummary` now adds one transient cue for
+the nearest line-of-sight-visible raven within 25 m: on the ground, hopping,
+taking off, flying, coming in to land, or perched. The cue is omitted when
+solid visibility-blocking geometry hides the bird. It adds no memory, world
+state, or model request; it gives the resident's next already-scheduled thought
+observable context for choosing whether to approach, watch, or do something
+else. Existing agent-presence text still supplies the ordinary movement target
+when the raven is represented as an autonomous resident.
+
+The isolated UE 5.8.3 scratch target rebuilt successfully, compiling the brain
+and `RavenPerchTests.cpp`. `CaptiveSky2.Agent.RavenPerch` passed under NullRHI
+with thinking disabled, zero model requests, a 60-second cap, and a separate
+world-state root. The new regression sees the perched raven from Aster's
+fixture and then confirms that an intervening solid box removes the activity
+cue. This validates deterministic summary behavior, not the raven's visual
+readability in the live Island or a decision made by the LLM.

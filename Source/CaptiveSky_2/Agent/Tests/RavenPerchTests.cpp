@@ -590,8 +590,26 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	UAgentBrainComponent* AsterBrain = NewObject<UAgentBrainComponent>(AsterBody);
 	AsterBody->AddInstanceComponent(AsterBrain);
 	AsterBrain->RegisterComponent();
+	const FVector BlueprintRavenOriginalLocation = BlueprintRaven ? BlueprintRaven->GetActorLocation() : FVector::ZeroVector;
+	if (BlueprintRaven) BlueprintRaven->SetActorLocation(FVector(5000.f, 0.f, 302.f));
 	const FString AsterSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("Aster is not offered bird-sized roosts as movement targets"), AsterSituation.Contains(TEXT("move_to target: TestRoost")));
+	TestTrue(TEXT("Aster receives the raven's visible perched activity as a transient nearby cue"),
+		AsterSituation.Contains(TEXT("In clear view, the raven is perched")) && AsterSituation.Contains(TEXT("about 7 metres away")));
+	AActor* RavenOccluder = World->SpawnActor<AActor>();
+	if (TestNotNull(TEXT("Aster-raven visibility blocker fixture spawned"), RavenOccluder))
+	{
+		UBoxComponent* OccluderBox = NewObject<UBoxComponent>(RavenOccluder);
+		RavenOccluder->SetRootComponent(OccluderBox);
+		OccluderBox->SetBoxExtent(FVector(100.f, 100.f, 150.f));
+		OccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
+		OccluderBox->RegisterComponent();
+		OccluderBox->SetWorldLocation(FVector(300.f, 200.f, 332.f));
+		TestFalse(TEXT("Aster does not receive the raven activity cue through solid cover"),
+			AsterBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("In clear view, the raven is perched")));
+		RavenOccluder->Destroy();
+	}
+	if (BlueprintRaven) BlueprintRaven->SetActorLocation(BlueprintRavenOriginalLocation);
 	UAgentConsolidationComponent* AsterRest = NewObject<UAgentConsolidationComponent>(AsterBody);
 	AsterBody->AddInstanceComponent(AsterRest);
 	AsterRest->RegisterComponent();

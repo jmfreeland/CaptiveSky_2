@@ -198,6 +198,46 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 			}
 		}
+		// The raven is part of the nearby-beings picture, but its moment-to-moment
+		// activity is more useful than another bare distance. Report only the closest
+		// one that is actually visible; this is transient perception, not memory.
+		const ARavenAgentAIController* NearestVisibleRaven = nullptr;
+		float NearestRavenDistanceSquared = FMath::Square(2500.f);
+		for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+		{
+			const APawn* RavenBody = It->GetPawn();
+			if (!IsValid(RavenBody) || RavenBody == Owner) continue;
+			const float DistanceSquared = FVector::DistSquared(Location, RavenBody->GetActorLocation());
+			if (DistanceSquared > NearestRavenDistanceSquared) continue;
+
+			FVector Start = Location + FVector(0.f, 0.f, 80.f);
+			FRotator ViewRotation = Owner->GetActorRotation();
+			Owner->GetActorEyesViewPoint(Start, ViewRotation);
+			const FVector End = RavenBody->GetActorLocation() + FVector(0.f, 0.f, 60.f);
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentRavenVisibility), false, Owner);
+			Params.AddIgnoredActor(RavenBody);
+			FHitResult Hit;
+			if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params)) continue;
+
+			NearestVisibleRaven = *It;
+			NearestRavenDistanceSquared = DistanceSquared;
+		}
+		if (NearestVisibleRaven)
+		{
+			const APawn* RavenBody = NearestVisibleRaven->GetPawn();
+			const TCHAR* Activity = TEXT("on the ground");
+			switch (NearestVisibleRaven->LocomotionState)
+			{
+			case ERavenLocomotionState::Hopping: Activity = TEXT("hopping"); break;
+			case ERavenLocomotionState::TakingOff: Activity = TEXT("taking off"); break;
+			case ERavenLocomotionState::Flying: Activity = TEXT("flying"); break;
+			case ERavenLocomotionState::Landing: Activity = TEXT("coming in to land"); break;
+			case ERavenLocomotionState::Perched: Activity = TEXT("perched"); break;
+			default: break;
+			}
+			NearbyBeings += FString::Printf(TEXT(" In clear view, the raven is %s about %.0f metres away."),
+				Activity, FVector::Dist(Location, RavenBody->GetActorLocation()) / 100.f);
+		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");
 	if (GetWorld())

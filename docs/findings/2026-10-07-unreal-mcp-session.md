@@ -106,3 +106,19 @@ and `IsPIERunning` returned false. The recovery launch used a separate
 world-data root, disabled resident thinking, and set the model-request cap to
 zero; no world-state writes or resident requests were intended. The editor log
 is [`Codex_EditorMcpRecovery_20261008.log`](../../Saved/Logs/Codex_EditorMcpRecovery_20261008.log).
+
+## 2026-10-08 reachability recheck
+
+`CaptureEditorImage` still returns the Island editor UI, and `IsPIERunning`
+returns false after the short Simulate session was stopped. A Windows process
+query shows PID 828 responsive, but with an empty `MainWindowTitle`; no listener
+is present on local port 8000. This proves the Unreal MCP tool route can reach
+an editor image, but it does not prove that this is the visible desktop editor
+the user opened. The captured Island shows `1 Unsaved`; do not close, restart,
+or save that level without an explicit choice about its unknown edit.
+
+No reboot is indicated by this evidence: the reachable process is responsive,
+and the mismatch is specifically between MCP image access and the visible
+desktop/process endpoint. If direct control of the user's visible editor is
+needed, identify the window/process pairing first, while preserving its
+unsaved level.
