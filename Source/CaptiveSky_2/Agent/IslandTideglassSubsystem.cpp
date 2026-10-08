@@ -1,5 +1,6 @@
 #include "IslandTideglassSubsystem.h"
 
+#include "IslandDayNight.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -10,10 +11,25 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "KismetProceduralMeshLibrary.h"
 #include "ProceduralMeshComponent.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
 
 const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_GrazingReadable.M_TideglassPool_GrazingReadable");
+
+float UIslandTideglassSubsystem::TideOffsetCm(float IslandHour, int32 IslandDay)
+{
+	const int32 SafeDay = FMath::Max(1, IslandDay);
+	const float Hour = AIslandDayNight::WrapHour(IslandHour);
+	const double ElapsedHours = static_cast<double>(SafeDay - 1) * 24.0 + Hour;
+	const double LunarProgress = AIslandDayNight::LunarPhaseProgress(SafeDay, Hour);
+	const double LunarAngle = LunarProgress * 2.0 * PI;
+	// New and full moons reinforce the spring range; quarter moons temper it. The
+	// small closed pool never follows the ocean's full storm swell.
+	const float SpringRange = 0.66f + 0.34f * FMath::Abs(FMath::Cos(LunarAngle));
+	const double TideAngle = 2.0 * PI * ElapsedHours / TidalDayHours;
+	return MaximumTideOffsetCm * SpringRange * static_cast<float>(FMath::Sin(TideAngle));
+}
 
 namespace
 {
@@ -177,6 +193,8 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 	RestorePoolMaterial();
 	RuntimeSurface = CreatePoolSurfaceMesh(PoolSurface);
 	if (!RuntimeSurface) return false;
+	RuntimeSurfaceBaseLocation = RuntimeSurface->GetComponentLocation();
+	AppliedTideOffsetCm = TNumericLimits<float>::Max();
 	BlockoutSurface = PoolSurface;
 	bBlockoutWasVisible = PoolSurface->IsVisible();
 	bBlockoutWasHiddenInGame = PoolSurface->bHiddenInGame;
@@ -184,6 +202,7 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 	PoolSurface->SetHiddenInGame(true);
 	RuntimeSurface->SetMaterial(0, RuntimeMaterial);
 	AppliedTo = RuntimeSurface;
+	UpdateTideSurface();
 	return true;
 }
 
@@ -220,6 +239,8 @@ void UIslandTideglassSubsystem::RestorePoolMaterial()
 	RuntimeSurface = nullptr;
 	BlockoutSurface = nullptr;
 	AppliedTo.Reset();
+	AppliedTideOffsetCm = TNumericLimits<float>::Max();
+	TideUpdateAccumulator = 0.f;
 }
 
 void UIslandTideglassSubsystem::ApplyShoreStonePresentation()
@@ -322,6 +343,11 @@ void UIslandTideglassSubsystem::RestoreShoreStonePresentation()
 void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	for (TActorIterator<AIslandDayNight> It(&InWorld); It; ++It)
+	{
+		IslandClock = *It;
+		break;
+	}
 	bool bHasTideglassMarker = false;
 	for (TActorIterator<AActor> It(&InWorld); It; ++It)
 	{
@@ -349,6 +375,35 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	UE_LOG(LogIslandTideglass, Log, TEXT("Tideglass runtime water material applied to the shallow pool."));
+}
+
+void UIslandTideglassSubsystem::UpdateTideSurface()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(IslandTideglass_UpdateTideSurface);
+	if (!RuntimeSurface || !IslandClock.IsValid()) return;
+	const float Offset = TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber);
+	if (FMath::IsFinite(AppliedTideOffsetCm) && FMath::Abs(Offset - AppliedTideOffsetCm) < 0.05f) return;
+	RuntimeSurface->SetWorldLocation(RuntimeSurfaceBaseLocation + FVector(0.f, 0.f, Offset), false, nullptr, ETeleportType::TeleportPhysics);
+	AppliedTideOffsetCm = Offset;
+}
+
+void UIslandTideglassSubsystem::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	TideUpdateAccumulator += FMath::Max(0.f, DeltaTime);
+	if (TideUpdateAccumulator < 0.5f) return;
+	TideUpdateAccumulator = 0.f;
+	UpdateTideSurface();
+}
+
+TStatId UIslandTideglassSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(UIslandTideglassSubsystem, STATGROUP_Tickables);
+}
+
+bool UIslandTideglassSubsystem::IsTickable() const
+{
+	return !IsTemplate() && RuntimeSurface && IslandClock.IsValid();
 }
 
 void UIslandTideglassSubsystem::Deinitialize()

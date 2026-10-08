@@ -10,15 +10,20 @@ class UMeshComponent;
 class UProceduralMeshComponent;
 class AStaticMeshActor;
 class UStaticMeshComponent;
+class AIslandDayNight;
 
-/** Applies a weather-responsive water surface to Tideglass for the play session only. */
+/** Applies a weather-responsive, gently lunar-tidal water surface to Tideglass for the play session only. */
 UCLASS()
-class CAPTIVESKY_2_API UIslandTideglassSubsystem : public UWorldSubsystem
+class CAPTIVESKY_2_API UIslandTideglassSubsystem : public UTickableWorldSubsystem
 {
 	GENERATED_BODY()
 
 public:
 	static const TCHAR* MaterialPath;
+	static constexpr float TidalDayHours = 24.84f;
+	static constexpr float MaximumTideOffsetCm = 14.f;
+	/** Small semidiurnal tide: spring range follows new/full moon, reduced at quarter moons. */
+	static float TideOffsetCm(float IslandHour, int32 IslandDay);
 
 	/** Tests may inject a transient material; otherwise the additive project asset is loaded at play start. */
 	UPROPERTY(Transient)
@@ -37,11 +42,16 @@ public:
 
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+	virtual bool IsTickable() const override;
 	virtual void Deinitialize() override;
 
 private:
 	friend class FIslandTideglassSurfaceTest;
+	friend class FIslandTideglassTideTest;
 	static void TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material);
+	void UpdateTideSurface();
 	void ApplyShoreStonePresentation();
 	void RestoreShoreStonePresentation();
 
@@ -56,6 +66,10 @@ private:
 	TArray<TWeakObjectPtr<AStaticMeshActor>> ShoreStonePresentationActors;
 
 	TWeakObjectPtr<UMeshComponent> AppliedTo;
+	TWeakObjectPtr<AIslandDayNight> IslandClock;
+	FVector RuntimeSurfaceBaseLocation = FVector::ZeroVector;
+	float AppliedTideOffsetCm = TNumericLimits<float>::Max();
+	float TideUpdateAccumulator = 0.f;
 	bool bBlockoutWasVisible = true;
 	bool bBlockoutWasHiddenInGame = false;
 };
