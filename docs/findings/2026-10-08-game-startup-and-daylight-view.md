@@ -71,3 +71,16 @@ as a daylight composition comparison.
 3. Coordinate/authorize any binary `Content/` material repair, then rerun the
    same 11:00 Game camera and a separate bounded PIE traversal profile. Keep the
    screenshots and performance measures distinct.
+
+## GUI startup recheck (2026-10-08)
+
+A fresh desktop inspection still finds no Unreal Editor window or process. The
+Windows desktop has a `dotnet.exe - Application Error` dialog reporting
+`0xe0434352`, while `127.0.0.1:8000` remains closed. Recent Application-log
+queries did not expose a matching .NET Runtime or Unreal crash event, so the
+throwing component is still unidentified. The UE 5.8.3 headless
+`CaptiveSky2.Agent.RavenPerch` test passed in the same session, confirming that
+the project module can load and exercise the provider-free behavior; this does
+not validate the graphical Editor startup path. A system reboot has not been
+performed. If authorized, reboot once, then make one bounded Editor launch and
+check the process, visible window, and MCP port independently.
