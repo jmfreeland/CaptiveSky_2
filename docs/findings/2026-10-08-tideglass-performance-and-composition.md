@@ -93,3 +93,22 @@ Game art. The layer isolation makes the next art direction clearer: reserve a
 legible circulation opening and group a visibly distinct wet-edge band, rather
 than increasing total meadow coverage. Logs: [IslandWeather regression](../../Saved/Logs/Codex_SharedIslandWeatherValidation_20261008.log)
 and [Viewpoints capture](../../Saved/Logs/Codex_SharedWetEdge_Meadow_Dragonflies_20261008.log).
+
+## Live Simulate observation
+
+After the local Unreal MCP bridge was restored, the actual Island ran in
+Simulate-In-Editor for about 83 seconds. The editor launch used a separate
+world-data root, disabled resident thinking and set the model-request cap to
+zero; the session was stopped manually and confirmed idle afterward. A live
+viewport capture at the Tideglass composition showed runtime ground cover,
+the stag, and the raven rather than the offscreen harness's transient proxy
+preview. The ground cover still crowds the foreground and does not form a
+clear circulation lane; the pool surface reads pale and flat in this Simulate
+view, so verify it again in Game before judging the authored runtime material.
+
+The editor log reports a 306 cm pool-edge clearance and “10 nonblocking
+cattails,” while the passing wetland composition automation reports 7 Typha
+plus 3 Phalaris. Treat the count as consistent but the runtime species label
+as stale instrumentation; the shared `IslandWeather` work was not edited.
+This was a brief visual observation, not an FPS/profile measurement or a
+30-FPS gameplay claim. Log: [bounded MCP editor session](../../Saved/Logs/Codex_EditorMcpRecovery_20261008.log).
