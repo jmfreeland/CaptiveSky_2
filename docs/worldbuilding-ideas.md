@@ -133,3 +133,7 @@ Aspirational visual target rather than a proposal to immediately construct a com
 ### Design note
 
 Authored content is scaffolding, not sacred. Prefer removing, simplifying or handing authored elements back to simulation when they do not justify their existence. Simulation-produced features should generally disappear through causal world processes rather than developer cleanup.
+
+### Rhodo material compile diagnosis (2026-10-08)
+
+The currently open `/Game/Plants/Materials/OriginalFlower/MM_Rhododendron__Everestianum__HD` logs two SM6 graph errors: `StaticSwitchParameter` is missing its A input, and `MakeMaterialAttributes` reports an error on Normal. Unreal also reports the base material and its instances falling back to Default Material in Game. The editor still shows two unsaved items, so this inspection did not save, close, or alter the open asset. This is separate from the `dotnet.exe` application-error dialog. After the current editor work is preserved, repair and validate the material in a coordinated Content change before judging this species' appearance.
