@@ -16,6 +16,17 @@ read-only query. The Unreal MCP reported PIE was not running. Neither editor
 was closed because their unsaved state and project command lines could not be
 verified.
 
+## Follow-up recheck
+
+A later read-only poll still found both Unreal Editor processes running. GPU
+usage had eased to 11,072 MiB of 12,282 MiB, with 926 MiB free; the editor
+process counters were 8,592.6 MiB and 2,286.8 MiB dedicated. The current
+worldbuilding notes also say the editor has two unsaved items
+([Rhododendron material diagnosis](../worldbuilding-ideas.md#rhodo-material-compile-diagnosis-2026-10-08)).
+Do not close either process until those edits are saved or their owner confirms
+which editor can be closed. This follow-up still does not link the GPU warning
+to the CLR exception.
+
 ## Safe next check
 
 After confirming which editor window is safe to close, keep one editor open and
