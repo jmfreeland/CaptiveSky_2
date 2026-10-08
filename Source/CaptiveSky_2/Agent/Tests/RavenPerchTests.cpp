@@ -8,6 +8,7 @@
 #include "AgentSocialComponent.h"
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
+#include "IslandDew.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
@@ -325,6 +326,66 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			}
 
 			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->DewGlintAttentionRemaining = 0.f;
+			BlueprintController->CrabScurryAttentionRemaining = 0.f;
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedDewActor.Reset();
+			BlueprintController->ListeningStoneCheckRemaining = 1.f;
+			const FVector RavenPositionBeforeDew = BlueprintRaven->GetActorLocation();
+			AIslandDewActor* MorningDew = World->SpawnActor<AIslandDewActor>(
+				RavenPositionBeforeDew, FRotator::ZeroRotator);
+			TestNotNull(TEXT("The transient morning dew scatter can be created without external services"), MorningDew);
+			if (MorningDew)
+			{
+				for (int32 SeatPass = 0; SeatPass < 8; ++SeatPass)
+					MorningDew->Advance(RavenPositionBeforeDew, 0.9f);
+
+				FVector NearestDewGlint = FVector::ZeroVector;
+				const bool bHasVisibleDewGlint = MorningDew->FindNearestGlint(
+					RavenPositionBeforeDew + FVector(0.f, 0.f, 25.f), 850.f, NearestDewGlint);
+				if (!MorningDew->HasMaterial())
+				{
+					TestFalse(TEXT("Missing optional dew material cannot attract the raven"), bHasVisibleDewGlint);
+					BlueprintController->CheckForNearbyDewGlint();
+					TestTrue(TEXT("Missing optional material produces no attention cue"),
+						FMath::IsNearlyZero(BlueprintController->DewGlintAttentionRemaining));
+				}
+				else
+				{
+					TestTrue(TEXT("Dew exposes a nearby active glint as an attention target"), bHasVisibleDewGlint);
+					BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+					BlueprintController->CheckForNearbyDewGlint();
+					TestTrue(TEXT("An airborne raven ignores a brief ground-level dew glint"),
+						FMath::IsNearlyZero(BlueprintController->DewGlintAttentionRemaining));
+					BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+					BlueprintController->CheckForNearbyDewGlint();
+					TestTrue(TEXT("A settled raven gives a visible dew glint one brief look"),
+						BlueprintController->DewGlintAttentionRemaining > 0.f &&
+						BlueprintController->DewGlintLocation.Equals(NearestDewGlint, 0.1f));
+					TestTrue(TEXT("Noticing dew leaves the raven's body where it was"),
+						BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeDew, 0.1f));
+					const FRotator HeadPoseBeforeDew = BlueprintHeadPivot->GetRelativeRotation();
+					const float DewAttentionAfterNotice = BlueprintController->DewGlintAttentionRemaining;
+					BlueprintController->Tick(0.25f);
+					TestTrue(TEXT("Dew attention fades rather than holding the raven's head fixed"),
+						BlueprintController->DewGlintAttentionRemaining < DewAttentionAfterNotice);
+					TestFalse(TEXT("The raven's head actually turns toward its dew-glint cue"),
+						BlueprintHeadPivot->GetRelativeRotation().Equals(HeadPoseBeforeDew, 0.1f));
+					BlueprintController->DewGlintAttentionRemaining = 0.f;
+					BlueprintController->CheckForNearbyDewGlint();
+					TestTrue(TEXT("One morning's dew scatter cannot repeatedly retrigger the glance"),
+						FMath::IsNearlyZero(BlueprintController->DewGlintAttentionRemaining));
+					MorningDew->Advance(RavenPositionBeforeDew, 0.f);
+					BlueprintController->CheckForNearbyDewGlint();
+					TestFalse(TEXT("Fading dew rearms the brief attention cue for a later morning"),
+						BlueprintController->LastNoticedDewActor.IsValid());
+				}
+			}
+			if (MorningDew) MorningDew->Destroy();
+
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->DewGlintAttentionRemaining = 0.f;
 			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
 			BlueprintController->CrabScurryAttentionRemaining = 0.f;
 			BlueprintController->ResidentAttentionRemaining = 0.f;

@@ -5,6 +5,7 @@
 #include "RavenAgentAIController.generated.h"
 
 class AIslandArrangement;
+class AIslandDewActor;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
 class AIslandTidepoolCrab;
@@ -128,20 +129,24 @@ private:
 	float WingAnimationTime = 0.f;
 	float HeadScanTime = 0.f;
 	TWeakObjectPtr<AIslandListeningStonesChime> LastNoticedListeningChime;
+	TWeakObjectPtr<AIslandDewActor> LastNoticedDewActor;
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
 	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
+	FVector DewGlintLocation = FVector::ZeroVector;
 	FVector MinnowRippleLocation = FVector::ZeroVector;
 	FVector CrabScurryLocation = FVector::ZeroVector;
 	FVector ResidentAttentionLocation = FVector::ZeroVector;
 	float ListeningStoneAttentionRemaining = 0.f;
+	float DewGlintAttentionRemaining = 0.f;
 	float MinnowRippleAttentionRemaining = 0.f;
 	float CrabScurryAttentionRemaining = 0.f;
 	float ResidentAttentionRemaining = 0.f;
 	float ListeningStoneCheckRemaining = 0.f;
 	static constexpr float ListeningStoneAttentionDuration = 2.4f;
+	static constexpr float DewGlintAttentionDuration = 1.8f;
 	static constexpr float MinnowRippleAttentionDuration = 1.6f;
 	static constexpr float CrabScurryAttentionDuration = 1.5f;
 	static constexpr float ResidentAttentionDuration = 1.8f;
@@ -176,6 +181,7 @@ private:
 	void UpdateWingAnimation(float DeltaSeconds);
 	void UpdateHeadAnimation(float DeltaSeconds);
 	void CheckForNearbyListeningStoneChime();
+	void CheckForNearbyDewGlint();
 	void CheckForNearbyMinnowSurfaceBreak();
 	void CheckForNearbyCrabScurry();
 	void CheckForNearbyResidentPresence();

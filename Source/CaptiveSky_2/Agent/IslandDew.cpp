@@ -62,6 +62,28 @@ int32 AIslandDewActor::DesiredCount(float Strength)
 	return FMath::Clamp(FMath::RoundToInt(MaxGlints * FMath::Clamp(Strength, 0.f, 1.f)), 0, MaxGlints);
 }
 
+bool AIslandDewActor::FindNearestGlint(const FVector& Origin, float MaxDistance, FVector& OutLocation) const
+{
+	if (!HasMaterial() || !Glints || !Glints->IsVisible() || CurrentStrength < 0.3f || MaxDistance <= 0.f)
+		return false;
+
+	const int32 ActiveCount = FMath::Min(DesiredCount(CurrentStrength), Slots.Num());
+	const float MaxDistanceSquared = FMath::Square(MaxDistance);
+	float NearestDistanceSquared = MaxDistanceSquared;
+	bool bFound = false;
+	for (int32 Index = 0; Index < ActiveCount; ++Index)
+	{
+		const FIslandDewGlint& Glint = Slots[Index];
+		if (!Glint.bPlaced) continue;
+		const float DistanceSquared = FVector::DistSquared(Origin, Glint.Position);
+		if (DistanceSquared > NearestDistanceSquared) continue;
+		NearestDistanceSquared = DistanceSquared;
+		OutLocation = Glint.Position;
+		bFound = true;
+	}
+	return bFound;
+}
+
 float AIslandDewActor::GlintSize(float Distance)
 {
 	// A sphere mesh is 100 cm across; this is the diameter wanted, in cm.
@@ -103,6 +125,7 @@ void AIslandDewActor::Advance(const FVector& Viewer, float Strength)
 	}
 
 	const int32 Wanted = DesiredCount(Strength);
+	CurrentStrength = FMath::Clamp(Strength, 0.f, 1.f);
 	const bool bVisible = Strength > 0.002f && Wanted > 0;
 	Glints->SetVisibility(bVisible);
 	if (!bVisible) return;

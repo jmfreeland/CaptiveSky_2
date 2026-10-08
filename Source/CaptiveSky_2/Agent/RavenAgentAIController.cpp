@@ -13,6 +13,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
+#include "IslandDew.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
@@ -595,6 +596,14 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			FadeInSeconds = 0.25f;
 			FadeOutSeconds = 1.0f;
 		}
+		else if (DewGlintAttentionRemaining > 0.f)
+		{
+			FocusLocation = DewGlintLocation;
+			AttentionRemaining = DewGlintAttentionRemaining;
+			AttentionDuration = DewGlintAttentionDuration;
+			FadeInSeconds = 0.25f;
+			FadeOutSeconds = 1.25f;
+		}
 		else if (CrabScurryAttentionRemaining > 0.f)
 		{
 			FocusLocation = CrabScurryLocation;
@@ -679,6 +688,24 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			return;
 		}
 	}
+	if (DewGlintAttentionRemaining > 0.f)
+	{
+		if (const APawn* Raven = GetPawn())
+		{
+			const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+				DewGlintLocation - Raven->GetActorLocation()).GetSafeNormal();
+			FRotator FocusOffset = LocalDirection.Rotation();
+			FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -12.f, 12.f);
+			FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -22.f, 22.f);
+			const float Elapsed = DewGlintAttentionDuration - DewGlintAttentionRemaining;
+			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
+				(1.f - FMath::SmoothStep(1.25f, DewGlintAttentionDuration, Elapsed));
+			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
+			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+	}
 	if (CrabScurryAttentionRemaining > 0.f)
 	{
 		if (const APawn* Raven = GetPawn())
@@ -723,7 +750,7 @@ void ARavenAgentAIController::CheckForNearbyMinnowSurfaceBreak()
 {
 	const APawn* Raven = GetPawn();
 	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
-		MinnowRippleAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f ||
 		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
 	{
 		return;
@@ -744,6 +771,46 @@ void ARavenAgentAIController::CheckForNearbyMinnowSurfaceBreak()
 		LastNoticedMinnowRipple = Ripple;
 		MinnowRippleLocation = Ripple->GetActorLocation();
 		MinnowRippleAttentionRemaining = MinnowRippleAttentionDuration;
+		return;
+	}
+}
+
+void ARavenAgentAIController::CheckForNearbyDewGlint()
+{
+	const APawn* Raven = GetPawn();
+	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f ||
+		CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
+	{
+		return;
+	}
+
+	constexpr float NoticeRadius = 850.f;
+	for (TActorIterator<AIslandDewActor> It(GetWorld()); It; ++It)
+	{
+		AIslandDewActor* Dew = *It;
+		if (!IsValid(Dew) || Dew->GetStrength() < 0.3f)
+		{
+			if (LastNoticedDewActor.Get() == Dew) LastNoticedDewActor.Reset();
+			continue;
+		}
+		if (LastNoticedDewActor.Get() == Dew) continue;
+
+		FVector GlintLocation;
+		if (!Dew->FindNearestGlint(Raven->GetActorLocation() + FVector(0.f, 0.f, 25.f), NoticeRadius, GlintLocation))
+			continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenDewGlintAttention), false, Raven);
+		Query.AddIgnoredActor(Dew);
+		FHitResult Hit;
+		const FVector EyeLocation = Raven->GetActorLocation() + FVector(0.f, 0.f, 70.f);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, EyeLocation, GlintLocation, ECC_Visibility, Query))
+			continue;
+
+		LastNoticedDewActor = Dew;
+		DewGlintLocation = GlintLocation;
+		DewGlintAttentionRemaining = DewGlintAttentionDuration;
 		return;
 	}
 }
@@ -773,7 +840,8 @@ void ARavenAgentAIController::CheckForNearbyCrabScurry()
 {
 	const APawn* Raven = GetPawn();
 	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
-		MinnowRippleAttentionRemaining > 0.f || CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f ||
+		CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
 		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
 	{
 		return;
@@ -811,7 +879,8 @@ void ARavenAgentAIController::CheckForNearbyResidentPresence()
 {
 	const APawn* Raven = GetPawn();
 	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
-		MinnowRippleAttentionRemaining > 0.f || CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f ||
+		CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
 		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
 	{
 		return;
@@ -1652,6 +1721,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	if (!Raven) return;
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ListeningStoneAttentionRemaining = FMath::Max(0.f, ListeningStoneAttentionRemaining - SafeDelta);
+	DewGlintAttentionRemaining = FMath::Max(0.f, DewGlintAttentionRemaining - SafeDelta);
 	MinnowRippleAttentionRemaining = FMath::Max(0.f, MinnowRippleAttentionRemaining - SafeDelta);
 	CrabScurryAttentionRemaining = FMath::Max(0.f, CrabScurryAttentionRemaining - SafeDelta);
 	if (ResidentAttentionRemaining > 0.f)
@@ -1688,6 +1758,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 		ListeningStoneCheckRemaining = 0.25f;
 		CheckForNearbyListeningStoneChime();
 		CheckForNearbyMinnowSurfaceBreak();
+		CheckForNearbyDewGlint();
 		CheckForNearbyCrabScurry();
 		CheckForNearbyResidentPresence();
 	}

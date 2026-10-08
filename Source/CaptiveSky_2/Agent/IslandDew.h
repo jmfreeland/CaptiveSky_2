@@ -55,6 +55,9 @@ public:
 
 	/** False when the optional material asset is missing; the actor then stays hidden. */
 	bool HasMaterial() const { return Material != nullptr; }
+	float GetStrength() const { return CurrentStrength; }
+	/** Finds the nearest active glint that could plausibly be noticed from Origin. */
+	bool FindNearestGlint(const FVector& Origin, float MaxDistance, FVector& OutLocation) const;
 	/** Keep Strength's worth of glints scattered around Viewer, re-seating any that fall out of range. */
 	void Advance(const FVector& Viewer, float Strength);
 
@@ -65,6 +68,7 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> Material;
 	TArray<FIslandDewGlint> Slots;
 	FRandomStream Random;
+	float CurrentStrength = 0.f;
 	float LastStrength = -1.f;
 
 	float GroundHeightAt(const FVector2D& XY, float ReferenceZ) const;
