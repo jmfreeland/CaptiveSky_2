@@ -31,11 +31,12 @@ public:
 		State->bApproachProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Approach"), ESearchCase::IgnoreCase);
 		State->bWanderProbe = Args.Num() > 1 && Args[1].Equals(TEXT("Wander"), ESearchCase::IgnoreCase);
 		State->bForceCuriosityProbe = State->bWanderProbe && Args.Num() > 2 && Args[2].Equals(TEXT("Curious"), ESearchCase::IgnoreCase);
+		State->bInteractAfterMove = !State->bWanderProbe && !State->bApproachProbe && Args.Num() > 2 && Args[2].Equals(TEXT("Interact"), ESearchCase::IgnoreCase);
 		State->TargetTag = State->bApproachProbe
 			? FName(Args.Num() > 2 ? *Args[2] : TEXT("ApproachAgent_Raven_01"))
 			: FName(Args.Num() > 1 ? *Args[1] : TEXT("InnDoorLantern"));
 		State->PerchTag = State->bApproachProbe ? FName(Args.Num() > 3 ? *Args[3] : TEXT("Roost_East")) : NAME_None;
-		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : INDEX_NONE);
+		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : (State->bInteractAfterMove ? 3 : INDEX_NONE));
 		if (StartOverrideIndex != INDEX_NONE && Args.Num() > StartOverrideIndex)
 		{
 			if (Args.Num() <= StartOverrideIndex + 2)
@@ -79,6 +80,7 @@ private:
 		double GroundingStartedAt = 0.0;
 		int32 StartupPolls = 0;
 		bool bMoveStarted = false;
+		bool bInteractAfterMove = false;
 		bool bWaitingForGround = false;
 		bool bWanderProbe = false;
 		bool bForceCuriosityProbe = false;
@@ -86,6 +88,7 @@ private:
 		bool bPerchRequested = false;
 		bool bHasMoverStartOverride = false;
 		FVector MoverStartOverride = FVector::ZeroVector;
+		TWeakObjectPtr<AActor> TargetActor;
 	};
 
 	static void Poll(const TSharedRef<FProbeState>& State)
@@ -197,6 +200,7 @@ private:
 
 			State->Pawn = Pawn;
 			State->Controller = Controller;
+			State->TargetActor = Target;
 			State->StartLocation = Pawn->GetActorLocation();
 			State->StartedAt = World->GetTimeSeconds();
 			if (State->bForceCuriosityProbe)
@@ -247,7 +251,11 @@ private:
 				(ActionState.Contains(TEXT("Reached the flight destination")) || ActionState.Contains(TEXT("short ground hop")))
 			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving &&
 				ActionState.Contains(TEXT("Reached the requested destination"));
-		const bool bTimedOut = World->GetTimeSeconds() - State->StartedAt >= 45.0;
+		// The Raven may need to cross a large portion of the Island to reach a
+		// shore marker. Keep the probe bounded, but allow a real long-distance
+		// flight to complete before reporting it as stuck.
+		constexpr double MovementTimeoutSeconds = 210.0;
+		const bool bTimedOut = World->GetTimeSeconds() - State->StartedAt >= MovementTimeoutSeconds;
 		const bool bMovementStopped = RavenController ? !Controller->IsActionInProgress()
 			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving;
 		if (bComplete || bTimedOut || bMovementStopped)
@@ -257,10 +265,34 @@ private:
 			{
 				UE_LOG(LogIslandMovementProbe, Log, TEXT("Probe completed: %.0f cm in %.1f simulated seconds; final location %s; %s"),
 					Distance, World->GetTimeSeconds() - State->StartedAt, *Pawn->GetActorLocation().ToCompactString(), *Controller->DescribeActionState());
+				if (State->bInteractAfterMove)
+				{
+					if (!State->TargetActor.IsValid())
+					{
+						UE_LOG(LogIslandMovementProbe, Error, TEXT("Movement arrived, but the interaction target no longer exists."));
+						Finish(State, false);
+						return;
+					}
+					FAgentDecision Decision;
+					Decision.bValid = true;
+					Decision.ActionType = EAgentActionType::Interact;
+					Decision.ActionTarget = State->TargetTag.ToString();
+					Controller->ActOnDecision(Decision);
+					const FString InteractionResult = Controller->DescribeActionState();
+					UE_LOG(LogIslandMovementProbe, Log, TEXT("Issued the resident's normal interact action for %s after arrival: %s"),
+						*State->TargetTag.ToString(), *InteractionResult);
+					if (!InteractionResult.Contains(TEXT("You crouched by"), ESearchCase::IgnoreCase))
+					{
+						UE_LOG(LogIslandMovementProbe, Error, TEXT("Movement arrived, but the normal interaction did not turn over %s."),
+							*State->TargetTag.ToString());
+						Finish(State, false);
+						return;
+					}
+				}
 			}
 			else
 			{
-				UE_LOG(LogIslandMovementProbe, Warning, TEXT("Probe did not complete: %.0f cm in %.1f simulated seconds; final location %s; %s"),
+				UE_LOG(LogIslandMovementProbe, Warning, TEXT("Probe did not complete within 210 simulated seconds: %.0f cm in %.1f simulated seconds; final location %s; %s"),
 					Distance, World->GetTimeSeconds() - State->StartedAt, *Pawn->GetActorLocation().ToCompactString(), *Controller->DescribeActionState());
 			}
 			Finish(State, bComplete);
@@ -277,5 +309,5 @@ private:
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
+	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact] [optional-start-x start-y start-z]|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));

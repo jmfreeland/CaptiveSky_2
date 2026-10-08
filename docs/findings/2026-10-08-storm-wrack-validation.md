@@ -71,12 +71,37 @@ the new warning identifies that expected early return while the weather-trace
 assertions still pass:
 [`Codex_WrackDiagnostics_WeatherTraces_20261008.log`](../../Saved/Logs/Codex_WrackDiagnostics_WeatherTraces_20261008.log).
 
-## Remaining validation
+## Raven-to-wrack interaction
 
-Both direct debug placement and automatic storm-to-wrack placement now work on
-the map. Nor has an autonomous resident been shown noticing a piece, navigating
-to it, and using `interact`; the successful turnover above was by
-`debug_visitor`. That remains the next integration check.
+A bounded UE 5.8.3 Game session forced a storm and then issued the raven's normal
+`move_to` action for `Wrack_1`, followed by its normal `interact` action. The
+raven flew 55,674 cm from its ordinary spawn, reached the shore in 185.5
+simulated seconds, and turned over a kelp heap, finding fishing line. The
+isolated ledger records `turned: true` and `by: "Agent_Raven_01"`; the
+chronicle records the `wrack_turned` event. The run ended normally after 211.5
+real seconds with zero model requests. Its hard real-time cap was 240 seconds.
+Evidence:
+[`RavenInteract.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackRavenInteractionProbe_CurrentHandler_20261008/RavenInteract.log),
+[`Island.wrack.json`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackRavenInteractionProbe_CurrentHandler_20261008/World/WorldState/Island.wrack.json),
+and
+[`chronicle.jsonl`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackRavenInteractionProbe_CurrentHandler_20261008/World/WorldState/chronicle.jsonl).
+
+This proves that a resident can use the real flight and interaction chain to
+change and remember a storm object. The same test exposed an important
+grounded-navigation limit: an Innkeeper `move_to` at the shoreline fails with
+"no walkable ground near that marker," and `Island.NavProbe` found no baked
+navmesh at the wrack or within a 10 m ring. The raven's flight is therefore the
+only validated resident route to this shore activity; Aster and other grounded
+residents still need an accessible route. Do not call the static-prototype
+result from the first Raven run a product failure: that scratch binary had an
+older `IslandInteractionUtility.cpp` without the current wrack handler. The
+final run rebuilt that handler and verified the saved ledger and chronicle.
+
+The probe's movement deadline is now 210 simulated seconds so long Raven
+flights can finish while remaining bounded. The final run took 211.5 real
+seconds overall, including startup. A future integration improvement should
+extend safe grounded navigation to at least one shore approach, then validate
+Aster's approach and interaction with a similarly capped run.
 
 Early attempts exposed environment-specific setup issues: the default scratch
 launch could not read the shared Zen/Derived Data Cache; a shader compiler
@@ -92,6 +117,7 @@ failed attempts remain available:
 [`BeachCapture_ShortPaths.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackHeadlessRuntime/BeachCapture_ShortPaths.log),
 [`BeachCapture_Warmed.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackHeadlessRuntime/BeachCapture_Warmed.log).
 
-Next, verify the real storm-mark trigger in another isolated bounded session,
-then test a resident's `move_to` and `interact` path without enabling model
-thinking until the code-driven behavior is confirmed.
+The automatic storm-mark trigger and Raven-to-wrack action chain are now
+verified. The remaining task for this feature is a grounded path to the shore
+and an Aster interaction test; keep agent thinking off until those physical
+behaviors are confirmed.
