@@ -341,3 +341,29 @@ the focused automation log is
 Next visual work should replace or procedurally shape these primitive bodies into a readable fish
 silhouette and repeat the same close and edge-distance Game views; avoid compensating with blanket
 foliage or more reflective light effects.
+
+## Procedural minnow fins and gameplay-distance review (2026-10-08)
+
+The next silhouette pass replaced the flat-in-water-plane fin triangles with a vertical,
+double-sided forked tail, a raised dorsal fin, and lateral pectoral fins that extend beyond
+the scaled body. The fin vertices are procedural component geometry with no collision or
+shadow cost. `CaptiveSky2.Agent.TidepoolMinnows` now checks that tail lobes rise above and
+below the narrow stalk, that the body fins are double-sided, and that the pectorals clear
+the body laterally. The UE 5.8.3 scratch editor target rebuilt successfully and the focused
+automation passed.
+
+A matched two-view Game run used the saved Tideglass viewpoints, disabled agent thinking,
+isolated world data, a zero-model-request ceiling, and a 38-second realtime cap. It ended
+normally. In the close view the dorsal fin and forked tail now read as part of a fish silhouette;
+at the pool-edge distance, most of the school still resolves to small pale flecks, and the
+pectoral fins are not consistently legible. This is a close-range improvement, not yet a
+finished gameplay-distance fish treatment. Compare the current frames at
+[`close`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_VerticalFins/001_Close.png)
+and [`edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_VerticalFins/002_Edge_Distance.png).
+Automation and bounded Game logs are
+`Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowVerticalFins_20261008.log`
+and `Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowVerticalFins_Game_20261008_2.log`.
+
+Next, improve body/fin contrast and volume with a game-ready silhouette or a more deliberate
+low-poly body profile, then repeat the same close and edge-distance views. Keep the school small,
+surface-hugging, nonblocking, and within the existing play/request safeguards.

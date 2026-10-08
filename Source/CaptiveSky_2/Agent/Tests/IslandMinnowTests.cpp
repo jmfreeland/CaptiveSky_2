@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ProceduralMeshComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMinnowTest, "CaptiveSky2.Agent.TidepoolMinnows",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -68,16 +69,53 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		School->ActorHasTag(TEXT("IslandLife")) && School->ActorHasTag(TEXT("MinnowSchool")) &&
 		!School->ActorHasTag(TEXT("IslandLandmark")) && !School->ActorHasTag(TEXT("RavenNestSite")));
 	TestEqual(TEXT("The shallow-water school has a small bounded population"), School->Fish.Num(), 5);
-	TestEqual(TEXT("Each fish has one articulated-looking tail fin"), School->Tails.Num(), School->Fish.Num());
+	TestEqual(TEXT("Each fish has one animated forked caudal fin"), School->Tails.Num(), School->Fish.Num());
+	TestEqual(TEXT("Each fish has a dorsal fin and paired pectoral fins"), School->BodyFins.Num(), School->Fish.Num());
 	TArray<FLinearColor> FishColors;
 	for (int32 Index = 0; Index < School->Fish.Num(); ++Index)
 	{
 		UStaticMeshComponent* Minnow = School->Fish[Index];
-		UStaticMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
+		UProceduralMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
+		UProceduralMeshComponent* Fins = School->BodyFins.IsValidIndex(Index) ? School->BodyFins[Index] : nullptr;
+		const FProcMeshSection* TailSection = Tail ? Tail->GetProcMeshSection(0) : nullptr;
+		const FProcMeshSection* FinsSection = Fins ? Fins->GetProcMeshSection(0) : nullptr;
 		TestTrue(TEXT("Minnows are visual-only and nonblocking"), Minnow && Minnow->GetStaticMesh() && Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
-		TestTrue(TEXT("Tail fins are visible meshes without collision or shadows"), Tail && Tail->GetStaticMesh() && Tail->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Tail->CastShadow);
+		TestTrue(TEXT("Forked tail fins are visible procedural meshes without collision or shadows"),
+			Tail && TailSection && Tail->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Tail->CastShadow);
+		TestTrue(TEXT("Dorsal and pectoral fins are visible procedural meshes without collision or shadows"),
+			Fins && FinsSection && Fins->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Fins->CastShadow);
+		TestTrue(TEXT("The dorsal and paired pectoral fins are double-sided triangles"),
+			FinsSection && FinsSection->ProcVertexBuffer.Num() == 18 && FinsSection->ProcIndexBuffer.Num() == 18);
 		TestTrue(TEXT("Each tail fin is positioned beyond the rear of its fish instead of embedded near the center"),
 			Tail && Tail->GetRelativeLocation().X <= -40.f);
+		if (TailSection)
+		{
+			float MinTailX = BIG_NUMBER;
+			float MinTailZ = BIG_NUMBER;
+			float MaxTailZ = -BIG_NUMBER;
+			for (const FProcMeshVertex& Vertex : TailSection->ProcVertexBuffer)
+			{
+				MinTailX = FMath::Min(MinTailX, Vertex.Position.X);
+				MinTailZ = FMath::Min(MinTailZ, Vertex.Position.Z);
+				MaxTailZ = FMath::Max(MaxTailZ, Vertex.Position.Z);
+			}
+			TestTrue(TEXT("The caudal fin has two vertical lobes extending behind its narrow stalk"),
+				TailSection->ProcVertexBuffer.Num() == 12 && MinTailX <= -24.f && MinTailZ <= -80.f && MaxTailZ >= 80.f);
+		if (FinsSection)
+		{
+			float MinFinY = BIG_NUMBER;
+			float MaxFinY = -BIG_NUMBER;
+			float MaxFinZ = -BIG_NUMBER;
+			for (const FProcMeshVertex& Vertex : FinsSection->ProcVertexBuffer)
+			{
+				MinFinY = FMath::Min(MinFinY, Vertex.Position.Y);
+				MaxFinY = FMath::Max(MaxFinY, Vertex.Position.Y);
+				MaxFinZ = FMath::Max(MaxFinZ, Vertex.Position.Z);
+			}
+			TestTrue(TEXT("Pectoral fins extend laterally and the dorsal fin clears the body surface"),
+				MinFinY <= -50.f && MaxFinY >= 50.f && MaxFinZ >= 110.f);
+		}
+		}
 		UMaterialInstanceDynamic* FishMaterial = Minnow ? Cast<UMaterialInstanceDynamic>(Minnow->GetMaterial(0)) : nullptr;
 		if (FishMaterial)
 		{
@@ -85,7 +123,11 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			FishColors.Add(FishColor);
 			TestTrue(TEXT("Minnow palette stays subdued enough to hold its color in bright shallow-water light"),
 				FMath::Max(FishColor.R, FMath::Max(FishColor.G, FishColor.B)) <= 0.4f);
-			TestTrue(TEXT("Each tail shares its fish's stable color"), Tail && Tail->GetMaterial(0) == FishMaterial);
+			UMaterialInstanceDynamic* FinMaterial = Tail ? Cast<UMaterialInstanceDynamic>(Tail->GetMaterial(0)) : nullptr;
+			const FLinearColor FinColor = FinMaterial ? FinMaterial->K2_GetVectorParameterValue(TEXT("Color")) : FLinearColor::Black;
+			TestTrue(TEXT("Tail and body fins share a darker, stable accent material"),
+				FinMaterial && Fins && Tail->GetMaterial(0) == Fins->GetMaterial(0) &&
+				FinColor.Equals(FishColor * 0.55f, 0.001f));
 		}
 	}
 	TestEqual(TEXT("Every fish receives an individual visual color"), FishColors.Num(), School->Fish.Num());

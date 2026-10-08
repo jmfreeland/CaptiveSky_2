@@ -10,7 +10,85 @@
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
+
+namespace
+{
+void BuildDoubleSidedTriangles(UProceduralMeshComponent* Mesh, const TArray<FVector>& SourceVertices, const TArray<int32>& SourceTriangles)
+{
+	if (!Mesh) return;
+
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	Vertices.Reserve(SourceTriangles.Num() * 2);
+	Triangles.Reserve(SourceTriangles.Num() * 2);
+	Normals.Reserve(SourceTriangles.Num() * 2);
+	UVs.Reserve(SourceTriangles.Num() * 2);
+	Colors.Reserve(SourceTriangles.Num() * 2);
+	Tangents.Reserve(SourceTriangles.Num() * 2);
+
+	for (int32 Triangle = 0; Triangle < SourceTriangles.Num(); Triangle += 3)
+	{
+		const FVector A = SourceVertices[SourceTriangles[Triangle]];
+		const FVector B = SourceVertices[SourceTriangles[Triangle + 1]];
+		const FVector C = SourceVertices[SourceTriangles[Triangle + 2]];
+		const FVector Normal = FVector::CrossProduct(B - A, C - A).GetSafeNormal();
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			const int32 FirstVertex = Vertices.Num();
+			const FVector FaceVertices[3] = { A, Side == 0 ? B : C, Side == 0 ? C : B };
+			const FVector FaceNormal = Side == 0 ? Normal : -Normal;
+			for (int32 Corner = 0; Corner < 3; ++Corner)
+			{
+				Vertices.Add(FaceVertices[Corner]);
+				Triangles.Add(FirstVertex + Corner);
+				Normals.Add(FaceNormal);
+				UVs.Add(FVector2D(Corner == 1 ? 1.f : 0.f, Corner == 2 ? 1.f : 0.f));
+				Colors.Add(FLinearColor::White);
+				Tangents.Add(FProcMeshTangent((B - A).GetSafeNormal(), false));
+			}
+		}
+	}
+
+	Mesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+}
+
+void BuildForkedCaudalFin(UProceduralMeshComponent* Tail)
+{
+	if (!Tail) return;
+
+	// The body is a 100-unit sphere scaled to a 15 cm spindle. Its tail must
+	// stand in the vertical side profile, not lie flat in the water plane.
+	const TArray<FVector> Vertices = {
+		FVector(0.f, 0.f, 0.f),
+		FVector(-10.f, 0.f, 0.f),
+		FVector(-24.f, 0.f, 80.f),
+		FVector(-24.f, 0.f, -80.f)
+	};
+	const TArray<int32> Triangles = { 0, 2, 1, 0, 1, 3 };
+	BuildDoubleSidedTriangles(Tail, Vertices, Triangles);
+}
+
+	void BuildBodyFins(UProceduralMeshComponent* Fins)
+	{
+		if (!Fins) return;
+
+		// The dorsal base rests on the ellipsoid's upper skin; lateral pectorals
+		// extend beyond both sides so neither is buried by the scaled sphere.
+		const TArray<FVector> Vertices = {
+			FVector(-30.f, 0.f, 40.f), FVector(5.f, 0.f, 50.f), FVector(-8.f, 0.f, 112.f),
+			FVector(0.f, 45.f, 0.f), FVector(-28.f, 50.f, 0.f), FVector(-15.f, 0.f, 18.f),
+			FVector(0.f, -45.f, 0.f), FVector(-15.f, 0.f, 18.f), FVector(-28.f, -50.f, 0.f)
+		};
+		const TArray<int32> Triangles = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+		BuildDoubleSidedTriangles(Fins, Vertices, Triangles);
+	}
+}
 
 AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 {
@@ -26,29 +104,42 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 
 	Fish.Reserve(FishCount);
 	Tails.Reserve(FishCount);
+	BodyFins.Reserve(FishCount);
 	for (int32 Index = 0; Index < FishCount; ++Index)
 	{
 		const FName ComponentName(*FString::Printf(TEXT("Minnow_%d"), Index));
 		UStaticMeshComponent* Minnow = CreateDefaultSubobject<UStaticMeshComponent>(ComponentName);
 		Minnow->SetupAttachment(RootComponent);
 		Minnow->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
-		Minnow->SetRelativeScale3D(FVector(0.12f, 0.035f, 0.045f));
+		Minnow->SetRelativeScale3D(FVector(0.15f, 0.05f, 0.05f));
 		Minnow->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Minnow->SetCastShadow(false);
+		Minnow->SetCanEverAffectNavigation(false);
 		Fish.Add(Minnow);
 
 		const FName TailName(*FString::Printf(TEXT("MinnowTail_%d"), Index));
-		UStaticMeshComponent* Tail = CreateDefaultSubobject<UStaticMeshComponent>(TailName);
+		UProceduralMeshComponent* Tail = CreateDefaultSubobject<UProceduralMeshComponent>(TailName);
 		Tail->SetupAttachment(Minnow);
-		Tail->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
-		// Relative locations are in the parent mesh's local units. Keep the fin at
-		// the rear pole of the 50-unit sphere; a sub-unit offset leaves it buried
-		// almost entirely inside the fish after the body is scaled down.
+		// Relative locations are in the parent mesh's local units; the body sphere
+		// has 50-unit half-length. The mesh fans behind that pole rather than
+		// hiding a tiny spherical tail inside the body.
 		Tail->SetRelativeLocation(FVector(-50.f, 0.f, 0.f));
-		Tail->SetRelativeScale3D(FVector(0.28f, 0.18f, 0.45f));
+		BuildForkedCaudalFin(Tail);
 		Tail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Tail->SetCastShadow(false);
+		Tail->SetCanEverAffectNavigation(false);
+		Tail->SetGenerateOverlapEvents(false);
 		Tails.Add(Tail);
+
+		const FName FinsName(*FString::Printf(TEXT("MinnowFins_%d"), Index));
+		UProceduralMeshComponent* Fins = CreateDefaultSubobject<UProceduralMeshComponent>(FinsName);
+		Fins->SetupAttachment(Minnow);
+		BuildBodyFins(Fins);
+		Fins->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Fins->SetCastShadow(false);
+		Fins->SetCanEverAffectNavigation(false);
+		Fins->SetGenerateOverlapEvents(false);
+		BodyFins.Add(Fins);
 	}
 }
 
@@ -86,8 +177,16 @@ void AIslandTidepoolMinnows::ConfigureAppearance()
 			UMaterialInstanceDynamic* FishMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
 			if (!FishMaterial) continue;
 			FishMaterial->SetVectorParameterValue(TEXT("Color"), SchoolPalette[Index % FishCount]);
+			FishMaterial->SetVectorParameterValue(TEXT("BaseColor"), SchoolPalette[Index % FishCount]);
 			if (Fish[Index]) Fish[Index]->SetMaterial(0, FishMaterial);
-			if (Tails.IsValidIndex(Index) && Tails[Index]) Tails[Index]->SetMaterial(0, FishMaterial);
+
+			const FLinearColor FinColor = SchoolPalette[Index % FishCount] * 0.55f;
+			UMaterialInstanceDynamic* FinMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			if (!FinMaterial) continue;
+			FinMaterial->SetVectorParameterValue(TEXT("Color"), FinColor);
+			FinMaterial->SetVectorParameterValue(TEXT("BaseColor"), FinColor);
+			if (Tails.IsValidIndex(Index) && Tails[Index]) Tails[Index]->SetMaterial(0, FinMaterial);
+			if (BodyFins.IsValidIndex(Index) && BodyFins[Index]) BodyFins[Index]->SetMaterial(0, FinMaterial);
 		}
 	}
 }
