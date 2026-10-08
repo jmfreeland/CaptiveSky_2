@@ -168,9 +168,41 @@ presented as a stable traversal result. The game screenshot
 [`001_Listening_Stones_Close.png`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/CurrentWetEdgeProfile/Screenshots/001_Listening_Stones_Close.png)
 is a close landmark view, not the broad Tideglass composition or moving PIE.
 
-Next profile: keep the same camera and current source, allow enough capped
-gameplay time for all 600 measured frames to finish after warm-up, and retain
-the first-run PSO hitches separately from the settled window. Then capture the
-11:00 broad Tideglass view and a distinct moving-PIE traversal before deciding
+The complete 600-frame follow-up is recorded below. Next, capture the 11:00
+broad Tideglass view and a distinct moving-PIE traversal before deciding
 whether to tune density or composition. No foliage source, imported asset, or
-world-state file was changed in this diagnostic.
+world-state file was changed in either diagnostic.
+
+## Complete 600-frame follow-up (2026-10-08)
+
+The same scratch UE 5.8.3 Game setup and 11:00 Listening-Stones camera completed
+all 600 requested CSV frames in 14.49 seconds after the 10-second spectator
+delay. Agent thinking and Python were disabled, the command requested zero
+model requests, and the world data remained isolated. The safety subsystem
+logged its deliberate one-request minimum ceiling; no provider-call entry
+appears in this run's log, though the process was stopped after the CSV was
+finalized and so has no normal-shutdown request tally. It was stopped after the
+capture (about 80 seconds of its 180-second real-time gameplay cap). The user's
+editor was not touched. Startup again took 324.74 seconds because engine
+material shaders were absent from the read-only shared DDC; 500 PSO creation
+hitches were reported, none precached. The project's current configuration
+also reports `r.D3D12.PSO.DiskCache=0`.
+
+Across the complete 600-frame close-camera sample, FrameTime mean was 24.28 ms,
+p50 17.41 ms, p95 33.20 ms (30.1 FPS), and max 970.46 ms. Thirty frames were
+over 33.33 ms and fourteen over 50 ms. The full window therefore clears the
+30-FPS p95 floor only narrowly and retains a severe hitch tail. After the first
+120 captured frames, the remaining 480 measured 17.20 ms p50, 29.06 ms p95
+(34.4 FPS), 56.76 ms max, with sixteen frames over 33.33 ms and four over 50
+ms. The warm-window result clears the target more comfortably, but it remains
+a stationary close view; it is not moving PIE or a broad-composition check.
+
+Log: [`CurrentWetEdgeProfile600.log`](../../Saved/Logs/CurrentWetEdgeProfile600.log).
+CSV: [`Profile(20261008_110102).csv`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Profiling/CSV/Profile%2820261008_110102%29.csv).
+Diagnostic frame: [`001_Listening_Stones_Close.png`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/CurrentWetEdgeProfile600/Screenshots/001_Listening_Stones_Close.png).
+
+Next: reproduce the user's ordinary moving route under the same current source,
+keeping cold PSO and warm gameplay windows separate. Then compare the same
+11:00 broad Tideglass view and its composition against the foliage WIP before
+changing scatter density. Any persistent PSO-cache fix should be a separately
+measured project-config experiment, not bundled into this environment sample.
