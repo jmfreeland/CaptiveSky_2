@@ -83,6 +83,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		{
 			const FLinearColor FishColor = FishMaterial->K2_GetVectorParameterValue(TEXT("Color"));
 			FishColors.Add(FishColor);
+			TestTrue(TEXT("Minnow palette stays subdued enough to hold its color in bright shallow-water light"),
+				FMath::Max(FishColor.R, FMath::Max(FishColor.G, FishColor.B)) <= 0.4f);
 			TestTrue(TEXT("Each tail shares its fish's stable color"), Tail && Tail->GetMaterial(0) == FishMaterial);
 		}
 	}
@@ -97,11 +99,15 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	School->UpdateSchool(0.f);
 	const float LowWaterFishZ = School->Fish[0]->GetComponentLocation().Z;
 	const float LowWaterSwimHeight = LowWaterFishZ - School->GetActorLocation().Z - SpringLowOffset;
+	const float FishHalfHeight = School->Fish[0]->GetStaticMesh()->GetBounds().BoxExtent.Z * School->Fish[0]->GetRelativeScale3D().Z;
 	TestTrue(TEXT("The school rises and falls with Tideglass between spring high and low water"),
 		FMath::IsNearlyEqual(LowWaterFishZ - HighWaterFishZ, SpringLowOffset - SpringHighOffset, 0.01f));
-	TestTrue(TEXT("Minnows keep a natural shallow swim height above the water at both tide turns"),
-		HighWaterSwimHeight >= 10.f && HighWaterSwimHeight <= 24.f &&
-		LowWaterSwimHeight >= 10.f && LowWaterSwimHeight <= 24.f);
+	TestTrue(TEXT("At spring high tide the fish center stays within 1.3 cm of the surface"),
+		HighWaterSwimHeight >= 0.3f && HighWaterSwimHeight <= 1.3f);
+	TestTrue(TEXT("At spring low tide the fish center stays within 1.3 cm of the surface"),
+		LowWaterSwimHeight >= 0.3f && LowWaterSwimHeight <= 1.3f);
+	TestTrue(TEXT("The fish body straddles the surface instead of hovering wholly above it"),
+		FishHalfHeight > HighWaterSwimHeight && FishHalfHeight > LowWaterSwimHeight);
 	Clock->CurrentHour = 12.f;
 	School->UpdateSchool(0.f);
 	int32 DistinctColorCount = 0;

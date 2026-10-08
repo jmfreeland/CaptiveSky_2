@@ -75,11 +75,11 @@ void AIslandTidepoolMinnows::ConfigureAppearance()
 	{
 		static const FLinearColor SchoolPalette[FishCount] =
 		{
-			FLinearColor(0.42f, 0.68f, 0.76f),
-			FLinearColor(0.54f, 0.72f, 0.74f),
-			FLinearColor(0.60f, 0.70f, 0.62f),
-			FLinearColor(0.72f, 0.73f, 0.66f),
-			FLinearColor(0.44f, 0.61f, 0.72f)
+			FLinearColor(0.18f, 0.34f, 0.40f),
+			FLinearColor(0.22f, 0.36f, 0.34f),
+			FLinearColor(0.28f, 0.32f, 0.19f),
+			FLinearColor(0.38f, 0.36f, 0.24f),
+			FLinearColor(0.17f, 0.28f, 0.39f)
 		};
 		for (int32 Index = 0; Index < Fish.Num(); ++Index)
 		{
@@ -149,7 +149,7 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		return;
 	}
 
-	// Fish swim about 17 cm above the moving waterline; the ripple lights sit
+	// Fish skim about 1.5 cm above the moving waterline; the ripple lights sit
 	// 24 cm above their root, so place the actor below the same tidal surface.
 	const FVector FishLocation = FishThatBrokeSurface->GetComponentLocation();
 	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z + GetTideOffsetCm() - 24.f);
@@ -257,7 +257,7 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 		const FVector IdleOffset(
 			FMath::Cos(Angle) * 135.f * TuckScale * CircleScale,
 			FMath::Sin(Angle) * 82.f * TuckScale * CircleScale,
-			TideOffset + 17.f + FMath::Sin(Angle * 1.7f) * 7.f);
+			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
 		Minnow->SetRelativeLocation(IdleOffset + ScatterOffset * ScatterAlpha);

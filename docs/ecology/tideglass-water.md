@@ -316,25 +316,28 @@ landscape or binary Content assets were changed in this pass.
 
 ## Minnow gameplay-distance review (2026-10-08)
 
-A close and pool-edge Game capture confirmed the small fish were reading mostly as pale flecks. The
-tail component was attached at only `-0.9` parent-local units, while the sphere body is scaled to
-12 cm across; that kept nearly all of the tail fin buried inside the body. It now attaches at the
-rear pole of the sphere, and `CaptiveSky2.Agent.TidepoolMinnows` checks that the fin stays outside
-the body. The UE 5.8.3 scratch target rebuilt successfully and the focused automation passed.
+A close and pool-edge Game capture confirmed that the school read mostly as pale flecks. The tail
+component was attached at only `-0.9` parent-local units while the scaled sphere body is 12 cm
+across, burying nearly all of the fin; it now attaches at the rear pole. The fish also swam 17 cm
+above the waterline with a 7 cm vertical bob, making the simple ellipsoids look detached from the
+pool. Their centers now skim 0.8 cm above the moving surface with a 0.4 cm bob, so the body crosses
+the waterline, and the palette uses more subdued blue-green/olive variants. Automation checks the
+rear fin attachment, subdued color range, tide following, and near-surface swim height. The UE
+5.8.3 scratch target rebuilt successfully and `CaptiveSky2.Agent.TidepoolMinnows` passed.
 
-The new isolated Game capture used two Tideglass angles, an 11:00 clock, disabled agent thinking,
-and a 38-second realtime cap; it ended normally with zero model requests. The tail is now visible
-on the closest fish, but from pool-edge distance the school still reads as pale surface flecks,
-not clearly identifiable minnows. This fixes a real silhouette attachment bug, not the remaining
-art/readability issue. Before/after frames are local artifacts at
+The isolated Game capture used two Tideglass angles, an 11:00 clock, disabled agent thinking, and a
+38-second realtime cap; it ended normally with zero model requests. The fish skim the surface more
+convincingly and the colors hold a little better, but their primitive shapes are still not clearly
+recognizable as minnows at gameplay distance. The tail attachment fix shipped in `33889da`; the
+near-surface placement and palette are a follow-up. Before/after frames are local artifacts at
 [`before`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots/001_Close.png) and
-[`after`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TailFix/001_Close.png),
+[`after`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_Waterline/001_Close.png),
 with the gameplay-distance view at
-[`after, edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TailFix/002_Edge_Distance.png).
+[`after, edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_Waterline/002_Edge_Distance.png).
 The runtime log is
-[`Codex_MinnowTailPlacement_Game_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowTailPlacement_Game_20261008.log);
+[`Codex_MinnowWaterline_Game_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowWaterline_Game_20261008.log);
 the focused automation log is
-[`Codex_MinnowTailPlacement_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowTailPlacement_20261008.log).
-Next visual work should make the fish silhouette/material legible against the reflective water,
-then repeat the same close and edge-distance Game views without adding blanket foliage or light
-effects.
+[`Codex_MinnowWaterline_final_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowWaterline_final_20261008.log).
+Next visual work should replace or procedurally shape these primitive bodies into a readable fish
+silhouette and repeat the same close and edge-distance Game views; avoid compensating with blanket
+foliage or more reflective light effects.
