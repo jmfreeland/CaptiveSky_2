@@ -57,6 +57,7 @@ public:
 
 	/** The actor origin floats this far above the ground so inspection traces clear the terrain. */
 	static constexpr float OriginLift = 30.f;
+	static constexpr float FloorThickness = 6.f;
 	static constexpr float RimRadius = 46.f;
 	static constexpr float RimHeight = 16.f;
 

@@ -114,15 +114,44 @@ does not explain why the earlier Claude build surfaced the dialog. The dialog
 was no longer visible in the later Unreal Editor capture. Keep the cause open
 until a recurrence is tied to its exact process and fresh UBT output.
 
+### Repeatable ValidatePlatforms exception code (2026-10-08, 19:31–19:34 local)
+
+A fresh isolated UE 5.8.3 headless launch for the Raven attention regression
+again ran the bundled .NET 10 host with
+`Build.bat -Mode=ValidatePlatforms`. Its UE log recorded
+`LogTargetPlatformManager: UBT AutoSDK ReturnCode: -532462766` on two
+consecutive launches. In both runs, the separate `AutoSDKInfo.txt` reported
+`Result: Succeeded` and a 0.21-second execution; the last process loaded the
+scratch `CaptiveSky_2` module, passed `CaptiveSky2.Agent.RavenPerch`, and exited
+with code 0. The editor's own in-session validation continued to report
+`ReturnCode: 0`.
+
+This confirms that the matching CLR exception code is repeatedly returned by
+the Turnkey/UBT validation child during otherwise successful headless editor
+startup. It makes that child a strong candidate source for the recurring
+`dotnet.exe` popup, but the dialog's owning process was not captured in this
+turn and no managed exception type or stack trace was obtained. Do not infer
+that Windows/.NET installation repair, SDK deletion, or disabling platform
+validation is justified by the generic code alone.
+
+The final verification log is
+[`Codex_RavenRainBasinAttention_verify.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_RavenRainBasinAttention_verify.log);
+its adjacent `AutoSDKInfo.txt` is scratch output. The build and test used the
+isolated scratch project's binaries and data root; the open editor and its
+unsaved material were not altered.
+
 ## Scope and next step
 
-No game source, user project config, Windows permissions, or editor state was
-changed. Do not “fix” this by changing Windows ACLs or globally disabling SDK
-validation. If the exact exception must be traced to its managed stack, rerun
-the validation in an approved context that can access UBT's standard log
-directory (or first arrange an approved UBT log-path override), then inspect
-the fresh UBT log and event details. The current evidence supports an Unreal
-tooling/permission-context issue, not an Aster/Raven gameplay exception.
+The exception investigation did not change Windows permissions or disable SDK
+validation. A separate, scoped Raven attention source change and its scratch
+build/test are recorded in
+[`2026-10-08-raven-rain-basin-attention.md`](2026-10-08-raven-rain-basin-attention.md);
+the connected editor's unsaved material was left untouched. Do not “fix” this
+dialog by changing Windows ACLs or globally disabling SDK validation. If the
+exact exception must be traced to its managed stack, correlate a visible popup
+with the process and Event Viewer details, then inspect the corresponding fresh
+UBT output. The current evidence supports an Unreal tooling/validation lead,
+not an Aster/Raven gameplay exception.
 
 Evidence: [`CurrentAsterGroundedWander.log`](../../Saved/Logs/CurrentAsterGroundedWander.log)
 contains the matching return code and later successful game/probe shutdown;

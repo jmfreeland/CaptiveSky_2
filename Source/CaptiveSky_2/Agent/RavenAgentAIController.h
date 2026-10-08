@@ -8,6 +8,7 @@ class AIslandArrangement;
 class AIslandDewActor;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
+class AIslandRainBasin;
 class AIslandTidepoolCrab;
 class AIslandWindMoteEffect;
 class AAutonomousAgentCharacter;
@@ -133,6 +134,7 @@ private:
 	TWeakObjectPtr<AIslandDewActor> LastNoticedDewActor;
 	TWeakObjectPtr<AIslandWindMoteEffect> LastNoticedWindMote;
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
+	TWeakObjectPtr<AIslandRainBasin> LastNoticedRainBasin;
 	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
@@ -140,12 +142,14 @@ private:
 	FVector DewGlintLocation = FVector::ZeroVector;
 	FVector WindMoteLocation = FVector::ZeroVector;
 	FVector MinnowRippleLocation = FVector::ZeroVector;
+	FVector RainBasinLocation = FVector::ZeroVector;
 	FVector CrabScurryLocation = FVector::ZeroVector;
 	FVector ResidentAttentionLocation = FVector::ZeroVector;
 	float ListeningStoneAttentionRemaining = 0.f;
 	float DewGlintAttentionRemaining = 0.f;
 	float WindMoteAttentionRemaining = 0.f;
 	float MinnowRippleAttentionRemaining = 0.f;
+	float RainBasinAttentionRemaining = 0.f;
 	float CrabScurryAttentionRemaining = 0.f;
 	float ResidentAttentionRemaining = 0.f;
 	float ListeningStoneCheckRemaining = 0.f;
@@ -153,6 +157,7 @@ private:
 	static constexpr float DewGlintAttentionDuration = 1.8f;
 	static constexpr float WindMoteAttentionDuration = 2.f;
 	static constexpr float MinnowRippleAttentionDuration = 1.6f;
+	static constexpr float RainBasinAttentionDuration = 1.8f;
 	static constexpr float CrabScurryAttentionDuration = 1.5f;
 	static constexpr float ResidentAttentionDuration = 1.8f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
@@ -189,6 +194,7 @@ private:
 	void CheckForNearbyDewGlint();
 	void CheckForNearbyWindMote();
 	void CheckForNearbyMinnowSurfaceBreak();
+	void CheckForNearbyRainBasin();
 	void CheckForNearbyCrabScurry();
 	void CheckForNearbyResidentPresence();
 	void UpdateCarriedTwigVisual();

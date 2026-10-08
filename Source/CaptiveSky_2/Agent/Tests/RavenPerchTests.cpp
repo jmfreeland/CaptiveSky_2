@@ -11,6 +11,7 @@
 #include "IslandDew.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandRainBasin.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
@@ -292,6 +293,67 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			}
 
 			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->RainBasinAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedRainBasin.Reset();
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->DewGlintAttentionRemaining = 0.f;
+			BlueprintController->WindMoteAttentionRemaining = 0.f;
+			BlueprintController->CrabScurryAttentionRemaining = 0.f;
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+			const FVector RavenPositionBeforeRainBasin = BlueprintRaven->GetActorLocation();
+			AIslandRainBasin* RainBasin = World->SpawnActor<AIslandRainBasin>(
+				RavenPositionBeforeRainBasin + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+			UIslandRainBasinSubsystem* RainBasinSubsystem = World->GetSubsystem<UIslandRainBasinSubsystem>();
+			TestNotNull(TEXT("A rain basin can be created for the raven's water-attention fixture"), RainBasin);
+			TestNotNull(TEXT("The rain basin's deterministic state is available to the fixture"), RainBasinSubsystem);
+			if (RainBasin && RainBasinSubsystem)
+			{
+				FIslandBasinState& BasinState = RainBasinSubsystem->GetStateMutable();
+				BasinState.bPlaced = true;
+				BasinState.Location = RainBasin->GetActorLocation() - FVector(0.f, 0.f, AIslandRainBasin::OriginLift);
+				BasinState.Water = 0.f;
+				RainBasin->Show(BasinState, 1);
+				BlueprintController->CheckForNearbyRainBasin();
+				TestTrue(TEXT("An empty stone hollow does not attract the raven's attention"),
+					FMath::IsNearlyZero(BlueprintController->RainBasinAttentionRemaining));
+
+				BasinState.Water = 0.5f;
+				RainBasin->Show(BasinState, 1);
+				BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+				BlueprintController->CheckForNearbyRainBasin();
+				TestTrue(TEXT("A flying raven does not attend to a ground-level water bowl"),
+					FMath::IsNearlyZero(BlueprintController->RainBasinAttentionRemaining));
+
+				BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+				BlueprintController->CheckForNearbyRainBasin();
+				TestTrue(TEXT("A settled raven notices the nearby rainwater once it is deep enough to float a leaf"),
+					BlueprintController->RainBasinAttentionRemaining > 0.f &&
+					BlueprintController->RainBasinLocation.Equals(BasinState.Location +
+						FVector(0.f, 0.f, AIslandRainBasin::FloorThickness + AIslandRainBasin::WaterDepth(BasinState.Water)), 0.1f));
+				BlueprintController->Tick(0.25f);
+				TestFalse(TEXT("The raven briefly turns its head toward the water surface"),
+					BlueprintHeadPivot->GetRelativeRotation().Equals(BlueprintController->RavenHeadRestRotation, 0.1f));
+				TestTrue(TEXT("Noticing the rain basin leaves the raven in place"),
+					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeRainBasin, 0.1f));
+				BlueprintController->RainBasinAttentionRemaining = 0.f;
+				BlueprintController->CheckForNearbyRainBasin();
+				TestTrue(TEXT("One continuously wet basin cannot repeatedly restart the glance"),
+					FMath::IsNearlyZero(BlueprintController->RainBasinAttentionRemaining));
+				BasinState.Water = 0.f;
+				BlueprintController->CheckForNearbyRainBasin();
+				TestFalse(TEXT("A dry interval rearms rain-basin awareness"),
+					BlueprintController->LastNoticedRainBasin.IsValid());
+				BasinState.Water = 0.5f;
+				BlueprintController->CheckForNearbyRainBasin();
+				TestTrue(TEXT("A later wet spell can draw one new glance"),
+					BlueprintController->RainBasinAttentionRemaining > 0.f);
+				RainBasin->Destroy();
+			}
+
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->RainBasinAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedRainBasin.Reset();
 			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
 			BlueprintController->LastNoticedMinnowRipple.Reset();
 			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;

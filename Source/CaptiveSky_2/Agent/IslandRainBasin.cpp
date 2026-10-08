@@ -29,7 +29,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogIslandRainBasin, Log, All);
 namespace
 {
 	constexpr int32 BasinVersion = 1;
-	constexpr float FloorThickness = 6.f;
 	constexpr float MaxWaterDepth = 9.f;
 	constexpr float FillSecondsAtFullRain = 240.f;
 	constexpr float NightDryRate = 0.0001f;
