@@ -67,19 +67,37 @@ changed.
 Obtain the original plant source package or a genuinely different known-good
 project copy. If none is available, reconstruct the four empty call nodes on a
 test duplicate and validate their visual/compile behavior there; do not connect
-the similarly named texture assets or blindly copy false branches. Compile the
-repaired graph before enabling `MATUSAGE_InstancedStaticMeshes`.
+the similarly named texture assets or blindly copy false branches. The existing
+`Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project` is not an
+isolated asset workspace: its `Content` directory is a junction to the live
+project's `Content`. Do not save or otherwise mutate assets through that
+project. A follow-up experiment needs a physical scratch `Content` directory
+with a copied material package. Compile the repaired graph before enabling
+`MATUSAGE_InstancedStaticMeshes`.
 Then save only the root material and run the same bounded Tideglass Game
-capture, checking both that the 13 fallback warnings are gone and that the
-vegetation visibly uses its authored material. Keep Starter Content `M_Rock`
-and `M_Wood_Oak` checks separate.
+capture after coordinating any write to the shared `Content/` asset. Check both
+that the 13 fallback warnings are gone and that the vegetation visibly uses its
+authored material. Keep Starter Content `M_Rock` and `M_Wood_Oak` checks separate.
+
+## Scratch-project isolation correction
+
+On 2026-10-08, checking the scratch project's filesystem metadata showed that
+`Project/Content` is a Windows junction targeting the main project's `Content`
+directory. The earlier Python graph and registry inspections were read-only,
+and the root package still matches its pre-test SHA256, so there is no evidence
+those inspections wrote to the live asset. Nevertheless, that scratch project
+must not be treated as safe for material-editing tests: writes through the
+junction would affect shared content. The live material editor also remains
+open with a dirty in-memory package from the compile test; do not save it or
+save the user's separate unsaved Island level as part of this investigation.
 
 ## Scope and evidence
 
-The initial audit used an isolated UE 5.8.3 Python commandlet and read the
-shared asset dependency chain. The follow-up compile test used the existing
-live editor. No binary `Content` asset or user project configuration was
-modified on disk.
+The initial audit used a UE 5.8.3 Python commandlet whose scratch project's
+`Content/` junction shared the main asset tree; the audit only read the asset
+registry and material graph. The follow-up compile test used the existing live
+editor. No binary `Content` asset or user project configuration was modified
+on disk.
 
 Game warnings are present in
 [`Codex_TideglassCompositionCurrent_20261008.log`](../../Saved/Logs/Codex_TideglassCompositionCurrent_20261008.log)
