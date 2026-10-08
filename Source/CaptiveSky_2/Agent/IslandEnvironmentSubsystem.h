@@ -71,6 +71,8 @@ public:
 	float GetGoldenHour() const { return GoldenHour; }
 	float GetDaylight() const { return Daylight; }
 	float GetIndoors() const { return Indoors; }
+	float GetStorm() const { return Storm; }
+	float GetCloudCover() const { return CloudCover; }
 
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
