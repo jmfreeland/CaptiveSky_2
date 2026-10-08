@@ -133,3 +133,38 @@ reliable, rerun a matched 11:00 camera after restoring the flower readability,
 then do a separate PIE traversal profile with the foliage owner's current
 `IslandWeather.*` changes. Keep the 30-FPS p95 gate and don't infer performance
 from these frames.
+
+## Isolated viewpoint-hour fix and runtime recheck (2026-10-08, later)
+
+The earlier `Island.Hour 11` command was issued during `-ExecCmds`, before the
+Island world-state and day/night actors restored their saved/default clock;
+the capture therefore stayed at 09:00. `Start-Spectator.ps1 -ViewpointHour`
+now requires an explicit isolated `-DataRoot` and passes
+`-CaptiveSkyIsolatedStartHour`. `UIslandSpectatorSubsystem` applies the finite,
+wrapped hour once a player is ready to spectate, after world-state startup. The
+automation fixture also confirms quoted data-root arguments containing spaces
+are accepted and that the override is refused without isolation or with a
+non-finite value.
+
+UE 5.8.3 scratch build and `CaptiveSky2.Agent.Spectator` both passed. A
+real-RHI scratch Game then reached Island world-ready in 28.6 seconds, logged
+`Applied isolated spectator start hour 11.00 after world-state load`, captured
+four 1600×900 Tideglass frames starting at the requested 11:00 Island clock,
+and exited normally after 45.2 real seconds with zero model requests. Agent
+thinking and Python were disabled; world, screenshots, log, and shader files
+were isolated under ignored `Saved/CompileScratch/`. The
+[first verified 11:00 frame](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/H11Retry_20261008/Shots/001_Tideglass.png)
+shows the pool, a grazing stag, and airborne dragonflies. It also confirms the
+same broad composition issues: crowded near-ground plants, an exposed brown
+middle-distance strip, thin distant tree silhouettes, and the Inn cropped at
+the left edge. This is a capture-clock fix and visual baseline, not a 30-FPS
+profile or proof of resident autonomy. No `Content/` assets or the open editor's
+unsaved Island were modified.
+
+The first real-RHI scratch attempt exited before world-ready because its
+project-local `-LocalDataCachePath` exceeded UE's 119-character cache-path
+limit. Omitting that optional cache and using `-NoZen -DDC-ForceMemoryCache`
+with a short shader-working path allowed the bounded capture to complete.
+For the next matched visual comparison, resolve the pending imported-flower
+material repair authorization first; keep the separate 30-FPS traversal gate
+and resident behavior checks independent from this screenshot result.

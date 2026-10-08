@@ -18,6 +18,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "ProfilingDebugging/TraceAuxiliary.h"
 #include "Serialization/JsonReader.h"
@@ -561,10 +562,41 @@ void UIslandSpectatorSubsystem::StartSpectating()
 	UWorld* World = GetWorld();
 	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
 	if (!Player || IsSpectating()) return;
+	if (!bIsolatedStartHourOverrideConsumed)
+	{
+		float AppliedHour = 0.f;
+		if (ApplyIsolatedStartHourOverride(World, FCommandLine::Get(), AppliedHour))
+		{
+			bIsolatedStartHourOverrideConsumed = true;
+			UE_LOG(LogIslandSpectator, Log, TEXT("Applied isolated spectator start hour %.2f after world-state load."), AppliedHour);
+		}
+	}
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Director = World->SpawnActor<AIslandSpectatorDirector>(Spawn);
 	if (Director.IsValid()) Director->BeginSpectating(Player);
+}
+
+bool UIslandSpectatorSubsystem::ApplyIsolatedStartHourOverride(UWorld* World, const FString& CommandLine, float& OutHour)
+{
+	OutHour = 0.f;
+	if (!World) return false;
+
+	FString DataRoot;
+	float RequestedHour = 0.f;
+	if (!FParse::Value(*CommandLine, TEXT("CaptiveSkyDataRoot="), DataRoot) || DataRoot.TrimStartAndEnd().IsEmpty() ||
+		!FParse::Value(*CommandLine, TEXT("CaptiveSkyIsolatedStartHour="), RequestedHour) || !FMath::IsFinite(RequestedHour))
+	{
+		return false;
+	}
+
+	for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+	{
+		OutHour = AIslandDayNight::WrapHour(RequestedHour);
+		It->CurrentHour = OutHour;
+		return true;
+	}
+	return false;
 }
 
 void UIslandSpectatorSubsystem::StopSpectating()

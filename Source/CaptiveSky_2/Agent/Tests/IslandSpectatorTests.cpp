@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandSpectator.h"
+#include "IslandDayNight.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Camera/CameraActor.h"
 #include "Components/BoxComponent.h"
@@ -57,6 +58,27 @@ bool FIslandSpectatorTest::RunTest(const FString& Parameters)
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(-3000, -3000, 100), FRotator::ZeroRotator);
 	Player->Possess(Visitor);
 	World->BeginPlay();
+	AIslandDayNight* TestClock = World->SpawnActor<AIslandDayNight>();
+	if (!TestNotNull(TEXT("A synthetic Island clock is available for isolated viewpoint-hour testing"), TestClock))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		IFileManager::Get().Delete(*StateFile, false, true, true);
+		return false;
+	}
+	float AppliedHour = 0.f;
+	TestTrue(TEXT("A requested viewpoint hour applies after world-state load when data is isolated"),
+		UIslandSpectatorSubsystem::ApplyIsolatedStartHourOverride(World,
+			TEXT("-CaptiveSkyDataRoot=\"D:/Captive Sky/Saved/Automation/Spectator\" -CaptiveSkyIsolatedStartHour=11.5"), AppliedHour));
+	TestTrue(TEXT("The isolated viewpoint clock is set to the requested hour"),
+		FMath::IsNearlyEqual(AppliedHour, 11.5f) && FMath::IsNearlyEqual(TestClock->CurrentHour, 11.5f));
+	TestFalse(TEXT("The startup override is refused without a separate data root"),
+		UIslandSpectatorSubsystem::ApplyIsolatedStartHourOverride(World,
+			TEXT("-CaptiveSkyIsolatedStartHour=7"), AppliedHour));
+	TestTrue(TEXT("A refused override leaves the active clock unchanged"), FMath::IsNearlyEqual(TestClock->CurrentHour, 11.5f));
+	TestFalse(TEXT("A non-finite isolated viewpoint hour is refused"),
+		UIslandSpectatorSubsystem::ApplyIsolatedStartHourOverride(World,
+			TEXT("-CaptiveSkyDataRoot=Saved/Automation/Spectator -CaptiveSkyIsolatedStartHour=nan"), AppliedHour));
 
 	const FVector VisitorHome = Visitor->GetActorLocation();
 	AIslandSpectatorDirector* Director = World->SpawnActor<AIslandSpectatorDirector>();

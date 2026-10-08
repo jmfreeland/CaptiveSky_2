@@ -137,7 +137,7 @@ if (-not [string]::IsNullOrWhiteSpace($ViewpointFile)) {
 if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-ViewpointHour requires an explicit isolated -DataRoot so this clock override cannot overwrite your normal Island clock." }
 	$hour = ([double]$ViewpointHour).ToString("0.###", [System.Globalization.CultureInfo]::InvariantCulture)
-	$execCommands += "Island.Hour $hour"
+	$arguments += "-CaptiveSkyIsolatedStartHour=$hour"
 }
 if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) { $execCommands += "Island.Storm $ForceStormSeconds" }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }

@@ -133,6 +133,8 @@ class CAPTIVESKY_2_API UIslandSpectatorSubsystem : public UWorldSubsystem
 public:
 	bool IsSpectating() const { return Director.IsValid(); }
 	AIslandSpectatorDirector* GetDirector() const { return Director.Get(); }
+	/** Applies the startup clock override only when an isolated CaptiveSkyDataRoot is present. */
+	static bool ApplyIsolatedStartHourOverride(UWorld* World, const FString& CommandLine, float& OutHour);
 	void StartSpectating();
 	void StopSpectating();
 
@@ -143,4 +145,5 @@ protected:
 private:
 	TWeakObjectPtr<AIslandSpectatorDirector> Director;
 	FTimerHandle StartRetry;
+	bool bIsolatedStartHourOverrideConsumed = false;
 };
