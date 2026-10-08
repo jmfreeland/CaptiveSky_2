@@ -41,7 +41,10 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 		UStaticMeshComponent* Tail = CreateDefaultSubobject<UStaticMeshComponent>(TailName);
 		Tail->SetupAttachment(Minnow);
 		Tail->SetStaticMesh(Sphere.Succeeded() ? Sphere.Object : nullptr);
-		Tail->SetRelativeLocation(FVector(-0.9f, 0.f, 0.f));
+		// Relative locations are in the parent mesh's local units. Keep the fin at
+		// the rear pole of the 50-unit sphere; a sub-unit offset leaves it buried
+		// almost entirely inside the fish after the body is scaled down.
+		Tail->SetRelativeLocation(FVector(-50.f, 0.f, 0.f));
 		Tail->SetRelativeScale3D(FVector(0.28f, 0.18f, 0.45f));
 		Tail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Tail->SetCastShadow(false);

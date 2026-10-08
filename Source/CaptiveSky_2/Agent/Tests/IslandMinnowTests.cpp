@@ -76,6 +76,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		UStaticMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
 		TestTrue(TEXT("Minnows are visual-only and nonblocking"), Minnow && Minnow->GetStaticMesh() && Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
 		TestTrue(TEXT("Tail fins are visible meshes without collision or shadows"), Tail && Tail->GetStaticMesh() && Tail->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Tail->CastShadow);
+		TestTrue(TEXT("Each tail fin is positioned beyond the rear of its fish instead of embedded near the center"),
+			Tail && Tail->GetRelativeLocation().X <= -40.f);
 		UMaterialInstanceDynamic* FishMaterial = Minnow ? Cast<UMaterialInstanceDynamic>(Minnow->GetMaterial(0)) : nullptr;
 		if (FishMaterial)
 		{

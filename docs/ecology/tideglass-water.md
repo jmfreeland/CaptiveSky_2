@@ -313,3 +313,28 @@ and retain the open pool collision/traversal. Separately, inspect the minnow sil
 transient surface-break cue at normal gameplay distance before changing their scale or brightness.
 The UE editor/MCP was unavailable during this review; the PNGs are a local playtest artifact, and no
 landscape or binary Content assets were changed in this pass.
+
+## Minnow gameplay-distance review (2026-10-08)
+
+A close and pool-edge Game capture confirmed the small fish were reading mostly as pale flecks. The
+tail component was attached at only `-0.9` parent-local units, while the sphere body is scaled to
+12 cm across; that kept nearly all of the tail fin buried inside the body. It now attaches at the
+rear pole of the sphere, and `CaptiveSky2.Agent.TidepoolMinnows` checks that the fin stays outside
+the body. The UE 5.8.3 scratch target rebuilt successfully and the focused automation passed.
+
+The new isolated Game capture used two Tideglass angles, an 11:00 clock, disabled agent thinking,
+and a 38-second realtime cap; it ended normally with zero model requests. The tail is now visible
+on the closest fish, but from pool-edge distance the school still reads as pale surface flecks,
+not clearly identifiable minnows. This fixes a real silhouette attachment bug, not the remaining
+art/readability issue. Before/after frames are local artifacts at
+[`before`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots/001_Close.png) and
+[`after`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TailFix/001_Close.png),
+with the gameplay-distance view at
+[`after, edge distance`](../../Playtests/Codex_TideglassMinnowReview_20261008/Screenshots_TailFix/002_Edge_Distance.png).
+The runtime log is
+[`Codex_MinnowTailPlacement_Game_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowTailPlacement_Game_20261008.log);
+the focused automation log is
+[`Codex_MinnowTailPlacement_20261008.log`](../../Saved/CompileScratch/Codex_RavenCrabAttention_20261008/Saved/Logs/Codex_MinnowTailPlacement_20261008.log).
+Next visual work should make the fish silhouette/material legible against the reflective water,
+then repeat the same close and edge-distance Game views without adding blanket foliage or light
+effects.
