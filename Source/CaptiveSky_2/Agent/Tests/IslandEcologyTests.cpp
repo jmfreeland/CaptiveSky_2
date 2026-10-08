@@ -1543,6 +1543,27 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		}
 
 		WatchableCrab->RippleResponseCooldownRemaining = 0.f;
+		AIslandPoolRippleEffect* MinnowSplash = World->SpawnActor<AIslandPoolRippleEffect>(
+			CrabStart + FVector(160.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A nearby minnow breach is available for the shore-crab response"), MinnowSplash);
+		if (MinnowSplash)
+		{
+			MinnowSplash->ConfigureAsMinnowImpact();
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			const FVector TowardMinnowSplash = (MinnowSplash->GetActorLocation() - CrabStart).GetSafeNormal2D();
+			TestTrue(TEXT("A nearby minnow splash draws a brief cautious crab step toward the water"),
+				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 1.8f &&
+				FVector::DotProduct(WatchableCrab->ScurryDirection, TowardMinnowSplash) > 0.95f);
+			TestEqual(TEXT("A minnow splash shares the bounded natural-cue cooldown"),
+				WatchableCrab->RippleResponseCooldownRemaining, 8.f);
+			WatchableCrab->ScurryRemaining = 0.f;
+			WatchableCrab->CheckForNearbyNaturalRipple();
+			TestTrue(TEXT("The same minnow splash cannot repeatedly pull the crab during cooldown"),
+				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			MinnowSplash->Destroy();
+		}
+
+		WatchableCrab->RippleResponseCooldownRemaining = 0.f;
 		AIslandPoolRippleEffect* DistantShoreRipple = World->SpawnActor<AIslandPoolRippleEffect>(
 			CrabStart + FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 		TestNotNull(TEXT("A distant natural ripple is available for radius filtering"), DistantShoreRipple);

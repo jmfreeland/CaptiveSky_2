@@ -106,6 +106,10 @@ make → perceive → value → remember → imitate → transform → teach →
 
 **First visual milestone:** an old weathered spiral at Listening Stones, a younger transformed descendant elsewhere, and a small derivative motif near a traveled social location. Better stone materials, moss/lichen and careful placement should make lineage visually legible without UI.
 
+## 2026-10-08 — A small food-web cue at Tideglass
+
+Minnow breaches already make a brief surface ripple, and dragonflies can investigate it. Shore crabs now share that cue: a nearby minnow splash draws one crab a short distance toward the water, while wind and rain impacts still startle it back. Each response is local, temporary, and cooldown-limited; visitor-made ripples remain inert, and no agent request or saved-world state is added. This creates a readable cause-and-effect beat between two wild species without turning the crab into a target or a guaranteed interaction. The UE 5.8.3 editor target built successfully and `CaptiveSky2.Agent.NightEcology` passed, including splash direction and cooldown coverage ([automation log](../Saved/Logs/Codex_MinnowCrabEcology_20261008.log)). In-world frequency and visual readability still need a bounded Game/PIE observation.
+
 ## Concept art — The first crossing becomes a place
 
 Aspirational visual target rather than a proposal to immediately construct a complete settlement. The useful hierarchy is intimate resident activity in the foreground, infrastructure connecting people through the middle ground, architecture/ecology beyond, and geography holding everything together.

@@ -158,12 +158,24 @@ void AIslandTidepoolCrab::CheckForNearbyNaturalRipple()
 	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
 	{
 		AIslandPoolRippleEffect* Ripple = *It;
-		if (!IsValid(Ripple) || (!Ripple->ActorHasTag(TEXT("WindImpact")) && !Ripple->ActorHasTag(TEXT("RainImpact")))) continue;
+		if (!IsValid(Ripple)) continue;
+		const bool bMinnowSplash = Ripple->ActorHasTag(TEXT("MinnowImpact"));
+		if (!bMinnowSplash && !Ripple->ActorHasTag(TEXT("WindImpact")) && !Ripple->ActorHasTag(TEXT("RainImpact"))) continue;
 		if (FVector::DistSquared2D(GetActorLocation(), Ripple->GetActorLocation()) > FMath::Square(RippleResponseRadius)) continue;
 
-		// Natural weather ripples briefly send the shore crab back from the water's edge.
-		// The cue is local, transient and deliberately ignores untagged visitor ripples.
-		RespondToQuietObservation(Ripple->GetActorLocation());
+		if (bMinnowSplash)
+		{
+			// A nearby minnow breach draws a short, cautious step toward the water;
+			// weather impacts still startle the crab away, and visitor ripples stay inert.
+			ScurryDirection = (Ripple->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			if (ScurryDirection.IsNearlyZero()) continue;
+			ScurryRemaining = 1.8f;
+		}
+		else
+		{
+			// Natural weather ripples briefly send the shore crab back from the water's edge.
+			RespondToQuietObservation(Ripple->GetActorLocation());
+		}
 		RippleResponseCooldownRemaining = 8.f;
 		return;
 	}
