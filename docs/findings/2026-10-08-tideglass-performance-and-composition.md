@@ -139,3 +139,38 @@ plus 3 Phalaris. Treat the count as consistent but the runtime species label
 as stale instrumentation; the shared `IslandWeather` work was not edited.
 This was a brief visual observation, not an FPS/profile measurement or a
 30-FPS gameplay claim. Log: [bounded MCP editor session](../../Saved/Logs/Codex_EditorMcpRecovery_20261008.log).
+
+## Current-source bounded Game profile (2026-10-08)
+
+A scratch UE 5.8.3 Game launch loaded the exact current `IslandWeather.h`
+working-tree contents (SHA-256 matched the scratch copy) at 11:00 with the
+Listening-Stones close camera held stationary. Agent thinking and Python were
+disabled, the world-data root was isolated, and the play session ended itself
+at 75.2 real seconds with zero model requests. The open editor and unsaved
+level were left alone. Cold engine/shader initialization took 320.75 seconds;
+the Game log also recorded 300 PSO-creation hitches with none precached. Logs:
+[`CurrentWetEdgeProfile.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Logs/CurrentWetEdgeProfile.log)
+and CSV [`Profile(20261008_104857).csv`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Profiling/CSV/Profile%2820261008_104857%29.csv).
+
+Runtime scatter reported 1,779,877 ground-cover instances under the 1.92M
+budget, 359 Fab meadow flowers across eight species, 14,727 trees, 15,063
+shrubs, and 1,487 woodland rhododendrons. This confirms the existing local
+pack already contributes substantial species variety; it does not confirm
+the user's separate Fab Megaplants library is installed in this project.
+
+The requested 600-frame CSV window was cut short by the 75-second gameplay
+cap and contains 406 numeric frame rows, so this is an exploratory sample, not
+a completed performance gate. In those rows FrameTime p50 was 17.45 ms, p95
+33.63 ms (29.7 FPS), and max 1,693.71 ms. After discarding the first 120
+captured rows, the remaining 286 had p95 26.45 ms (37.8 FPS) and max 78.68
+ms. The first-window tail coincided with cold PSO creation; it must not be
+presented as a stable traversal result. The game screenshot
+[`001_Listening_Stones_Close.png`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/CurrentWetEdgeProfile/Screenshots/001_Listening_Stones_Close.png)
+is a close landmark view, not the broad Tideglass composition or moving PIE.
+
+Next profile: keep the same camera and current source, allow enough capped
+gameplay time for all 600 measured frames to finish after warm-up, and retain
+the first-run PSO hitches separately from the settled window. Then capture the
+11:00 broad Tideglass view and a distinct moving-PIE traversal before deciding
+whether to tune density or composition. No foliage source, imported asset, or
+world-state file was changed in this diagnostic.
