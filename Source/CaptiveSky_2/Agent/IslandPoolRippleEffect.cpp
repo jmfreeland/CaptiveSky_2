@@ -1,12 +1,18 @@
 #include "IslandPoolRippleEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
 
 AIslandPoolRippleEffect::AIslandPoolRippleEffect()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.025f;
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	RippleMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
 	Tags.AddUnique(TEXT("IslandTransientEffect"));
 	Tags.AddUnique(TEXT("TideglassRipple"));
 
@@ -23,11 +29,22 @@ AIslandPoolRippleEffect::AIslandPoolRippleEffect()
 		Light->SetIntensity(0.f);
 		RippleLights.Add(Light);
 	}
+
+	StartleRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("MinnowStartleRing"));
+	StartleRing->SetupAttachment(RootComponent);
+	StartleRing->SetRelativeLocation(FVector(0.f, 0.f, 25.f));
+	StartleRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	StartleRing->SetCastShadow(false);
+	StartleRing->SetCanEverAffectNavigation(false);
+	StartleRing->SetGenerateOverlapEvents(false);
+	StartleRing->SetVisibility(false, true);
+	BuildStartleRing();
 }
 
 void AIslandPoolRippleEffect::BeginPlay()
 {
 	Super::BeginPlay();
+	EnsureStartleRingMaterial();
 	UpdateRipple(0.f);
 }
 
@@ -67,6 +84,8 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowStartleImpact()
 	PeakLightIntensity = 5.f;
 	Tags.AddUnique(TEXT("MinnowImpact"));
 	Tags.AddUnique(TEXT("MinnowStartleImpact"));
+	EnsureStartleRingMaterial();
+	if (StartleRing) StartleRing->SetVisibility(true, true);
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
 }
 
@@ -89,6 +108,16 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 {
 	const float RingRadius = FMath::Lerp(12.f, SurfaceRadius, Alpha);
 	const float Pulse = FMath::Max(0.f, FMath::Sin(Alpha * PI));
+	if (StartleRing && StartleRing->IsVisible())
+	{
+		StartleRing->SetRelativeScale3D(FVector(RingRadius, RingRadius, 1.f));
+		if (StartleRingMaterial)
+		{
+			const FLinearColor RingTint = FLinearColor(0.08f, 0.78f, 0.92f) * Pulse;
+			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
+			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
+		}
+	}
 	for (int32 Index = 0; Index < RippleLights.Num(); ++Index)
 	{
 		const float Angle = (2.f * PI * Index) / RippleLights.Num();
@@ -96,4 +125,59 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		Light->SetRelativeLocation(FVector(FMath::Cos(Angle) * RingRadius, FMath::Sin(Angle) * RingRadius, 24.f));
 		Light->SetIntensity(PeakLightIntensity * Pulse);
 	}
+}
+
+void AIslandPoolRippleEffect::BuildStartleRing()
+{
+	if (!StartleRing) return;
+
+	constexpr int32 SegmentCount = 64;
+	constexpr float InnerRadius = 0.965f;
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	Vertices.Reserve(SegmentCount * 2);
+	Triangles.Reserve(SegmentCount * 6);
+	Normals.Reserve(SegmentCount * 2);
+	UVs.Reserve(SegmentCount * 2);
+	Colors.Reserve(SegmentCount * 2);
+	Tangents.Reserve(SegmentCount * 2);
+
+	for (int32 Index = 0; Index < SegmentCount; ++Index)
+	{
+		const float Angle = 2.f * PI * Index / SegmentCount;
+		const float CosAngle = FMath::Cos(Angle);
+		const float SinAngle = FMath::Sin(Angle);
+		Vertices.Add(FVector(CosAngle * InnerRadius, SinAngle * InnerRadius, 0.f));
+		Vertices.Add(FVector(CosAngle, SinAngle, 0.f));
+		for (int32 Edge = 0; Edge < 2; ++Edge)
+		{
+			Normals.Add(FVector::UpVector);
+			UVs.Add(FVector2D((CosAngle + 1.f) * 0.5f, (SinAngle + 1.f) * 0.5f));
+			Colors.Add(FLinearColor::White);
+			Tangents.Add(FProcMeshTangent(FVector(-SinAngle, CosAngle, 0.f), false));
+		}
+	}
+
+	for (int32 Index = 0; Index < SegmentCount; ++Index)
+	{
+		const int32 CurrentInner = Index * 2;
+		const int32 CurrentOuter = CurrentInner + 1;
+		const int32 NextInner = ((Index + 1) % SegmentCount) * 2;
+		const int32 NextOuter = NextInner + 1;
+		Triangles.Append({ CurrentInner, CurrentOuter, NextOuter, CurrentInner, NextOuter, NextInner });
+	}
+
+	StartleRing->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+	if (RippleMaterial) StartleRing->SetMaterial(0, RippleMaterial);
+}
+
+void AIslandPoolRippleEffect::EnsureStartleRingMaterial()
+{
+	if (!StartleRing || StartleRingMaterial || !RippleMaterial) return;
+	StartleRingMaterial = UMaterialInstanceDynamic::Create(RippleMaterial, this);
+	if (StartleRingMaterial) StartleRing->SetMaterial(0, StartleRingMaterial);
 }

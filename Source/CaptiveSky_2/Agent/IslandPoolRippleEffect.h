@@ -5,6 +5,9 @@
 #include "IslandPoolRippleEffect.generated.h"
 
 class UPointLightComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
+class UProceduralMeshComponent;
 
 /** Short-lived ring of moving highlights across the TideglassPool prototype surface. */
 UCLASS()
@@ -34,10 +37,18 @@ private:
 	friend class FIslandWeatherTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TArray<TObjectPtr<UPointLightComponent>> RippleLights;
+	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
+	TObjectPtr<UProceduralMeshComponent> StartleRing;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> RippleMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> StartleRingMaterial;
 
 	float ElapsedSeconds = 0.f;
 	float DurationSeconds = 1.6f;
 	float SurfaceRadius = 150.f;
 	float PeakLightIntensity = 55.f;
+	void BuildStartleRing();
+	void EnsureStartleRingMaterial();
 	void UpdateRipple(float Alpha);
 };

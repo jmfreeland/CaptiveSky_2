@@ -430,7 +430,18 @@ world state was isolated, and the real-time cap was 60 seconds. Logs:
 [`Game`](../../Saved/Logs/Codex_MinnowScatterCue_Game_5cd_20261008.log). The close waterline frames
 are in [`Screenshots_5cd`](../../Saved/Playtests/Codex_MinnowScatterCue_20261008/Screenshots_5cd/).
 
-The scatter itself reads in the close frames, but the brief light-ring cue is still not reliably
-distinguishable from the water's existing moving reflections. Automation confirms the transient
-actor and its wildlife tag, not that a player can clearly see the ring. A material-driven surface
-normal/ripple response would be the next step if stronger visual cause-and-effect is needed.
+The scatter itself reads in the close frames, but the earlier light-only cue was not reliably
+distinguishable from the water's moving reflections. The startle-only effect now also draws a thin,
+continuous procedural ring that expands with the moving highlights; rain and wind remain light-only.
+`CaptiveSky2.Agent.TidepoolMinnows` now checks that this ring has visible geometry and expands during
+the cue. The UE 5.8.3 scratch build and automation passed; see the
+[`automation log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Saved/Logs/Codex_MinnowSurfaceRing_Automation_20261009.log).
+
+Rendered readability is still unverified. The old close frames above predate the geometry. A new
+bounded Game attempt was held in cold shader/texture initialization before the Island world loaded;
+after ten minutes without a screenshot it was stopped along with its own shader workers. Its isolated
+local DDC remains at
+[`MinnowSurfaceRing DDC`](../../Saved/Playtests/Codex_MinnowSurfaceRing_20261009b/DDC/), so a future
+visual pass can reuse the partial cache. Do not treat the geometric ring as visually proven until a
+post-startle frame confirms it reads cleanly against the water. If it still disappears, a
+material-driven surface-normal response is the stronger next step.

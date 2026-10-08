@@ -247,8 +247,14 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyEqual(ObserverStartleRipple->DurationSeconds, 1.15f) &&
 			FMath::IsNearlyEqual(ObserverStartleRipple->SurfaceRadius, 104.f) &&
 			ObserverStartleRipple->PeakLightIntensity > 1.35f && ObserverStartleRipple->PeakLightIntensity <= 5.f);
+		TestTrue(TEXT("A startle response renders a visible continuous surface ring in addition to its moving highlights"),
+			ObserverStartleRipple->StartleRing && ObserverStartleRipple->StartleRing->IsVisible() &&
+			ObserverStartleRipple->StartleRing->GetProcMeshSection(0) != nullptr);
 		TestTrue(TEXT("The cue starts at the nearest fish on the current Tideglass surface"),
 			ObserverStartleRipple->GetActorLocation().Equals(ExpectedStartleRippleLocation, 0.1f));
+		ObserverStartleRipple->Tick(0.5f);
+		TestTrue(TEXT("The visible surface ring expands while the startle cue fades"),
+			ObserverStartleRipple->StartleRing->GetRelativeScale3D().X > 12.f);
 		School->RespondToQuietObservation(Visitor->GetActorLocation());
 		int32 RepeatedStartleRippleCount = 0;
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
