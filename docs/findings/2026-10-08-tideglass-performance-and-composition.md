@@ -54,6 +54,17 @@ than globally adding more instances. The temporary water material reads cyan and
 the Wind Arch proxies remain blockout shapes; these captures do not validate the
 current Game water material or final landmark art.
 
+A third no-world-state capture isolated only the `groundplants` layer, using the
+now-validated `-TideglassDragonflies` wrapper option. The viewpoint automation
+passed at 47.24 FPS p95 SceneCapture throughput; this remains an offscreen
+diagnostic, not Game or PIE performance evidence. The [ground-plants-only
+frame](../../Saved/Viewpoints/2026-10-08_014251_h11.0/02_Tideglass.png) still
+reads as nearly continuous foreground cover, with no clear circulation lane.
+That shows the issue is spatial organization, not merely species choice: the
+next production pass needs to reserve an open corridor and confine wet-edge
+plants to a narrow band rather than scattering them uniformly across the view.
+The transient pool material remains a preview only.
+
 The initial wrapper attempt failed its dragonfly close-up because the script did
 not forward the harness's daytime-dragonfly preview flag. `Capture-Viewpoints.ps1`
 now exposes `-TideglassDragonflies`, validates daylight and its compatibility
