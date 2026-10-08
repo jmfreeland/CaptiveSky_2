@@ -194,6 +194,19 @@ enough in this project. Evidence:
 [`NavBoundsRuntimeProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsRuntimeProbe.log),
 [`IslandNavRuntimeSettingsAudit2.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/IslandNavRuntimeSettingsAudit2.log).
 
+A second scratch-only attempt launched the project in `UnrealEditor.exe` (not
+the Game target), opened the copied Island, released the async-load build lock,
+and called `UNavigationSystemV1::Build()`. The editor log shows the call ran in
+the editor world, but Recast still queued no tiles: `RebuildAll` load time was
+3.78 s and tile-build time was 0.00 s. The probe's delayed result did not fire
+because an editor world is not a ticking gameplay world. This therefore
+confirms that the same runtime `Build()` call is ineffective in both Game and
+editor contexts; it is **not** a test of the editor menu's offline `Build
+Paths` operation, and provides no new shoreline projection result. The
+scratch editor was closed afterward; the live editors and main map were left
+alone. Log:
+[`NavBoundsEditorProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsEditorProbe.log).
+
 The next validating step is an offline `Build Paths` bake in an isolated editor
 copy, then `Island.NavProbe` at both the wrack and a corridor point. If that
 works, the actual map needs an expanded bounds volume **and saved baked
