@@ -54,6 +54,16 @@ successful validation as the cause. The inaccessible standard UBT log directory
 remains a limitation for the restricted shell context; don't change ACLs or
 disable validation to work around it.
 
+## Repeat occurrence check
+
+After the same dialog was shown again on 2026-10-08, a read-only check found no
+`dotnet.exe` process at the time of inspection and no matching `.NET Runtime`,
+`Application Error`, or Windows Error Reporting event naming `dotnet.exe` or
+`0xe0434352` in the preceding two days. This still does not identify the process
+behind the pictured occurrence. The dialog's generic CLR exception code is not
+enough to assign blame to UnrealBuildTool; capture the process and timestamp
+while it is present, then correlate those with a fresh event/log entry.
+
 ## Scope and next step
 
 No game source, user project config, Windows permissions, or editor state was
