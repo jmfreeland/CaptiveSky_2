@@ -77,3 +77,15 @@ The current editor's logged launch arguments also preserve the play safeguards:
 `-CaptiveSkyMaxRealtimeSeconds=600`. The launch line contains `-unattended` but
 no explicit `-LiveCoding` flag. That absence is a useful relaunch diagnostic,
 not yet a proven cause of Live Coding being unavailable.
+
+**Editor reachability and attention framing (2026-10-08):** a fresh Unreal MCP
+`CaptureEditorImage` succeeds. The Island editor is open and rendering; a
+separate Profile Data Visualizer window is simply covering much of it. The
+editor still shows `1 Unsaved`, so no restart/reboot or UI dismissal was needed
+to diagnose reachability. A real-RHI `CaptiveSky2.Visual.RavenWingMotion`
+capture completed successfully and saved all seven pose images, including
+`03_ResidentAttention.png`. However, the Raven is mostly hidden behind a large
+foreground rock despite a zero-blocker visibility trace, so the current
+camera/trace heuristic does not produce a readable highlight. Keep this
+presentation fixture, but do not describe the resulting frame as visually
+validated until its collision/occlusion assumptions or staging are improved.

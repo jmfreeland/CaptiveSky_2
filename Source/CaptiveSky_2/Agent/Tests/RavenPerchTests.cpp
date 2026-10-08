@@ -1019,13 +1019,107 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	Camera->SetActorLocationAndRotation(ForageCameraLocation, (ForageLookAt - ForageCameraLocation).Rotation());
 	Raven->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	UClass* AttentionResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,
+		TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C"));
+	AAutonomousAgentCharacter* AttentionResident = nullptr;
+	const FVector AttentionResidentLocation = Raven->GetActorLocation() + FVector(0.f, 300.f, 0.f);
+	if (TestNotNull(TEXT("Aster's placeholder is available for the resident-attention capture"), AttentionResidentClass))
+	{
+		const FTransform ResidentTransform(FRotator::ZeroRotator, AttentionResidentLocation);
+		AttentionResident = Island->SpawnActorDeferred<AAutonomousAgentCharacter>(AttentionResidentClass,
+			ResidentTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (AttentionResident)
+		{
+			AttentionResident->AutoPossessAI = EAutoPossessAI::Disabled;
+			AttentionResident->FinishSpawning(ResidentTransform);
+			if (AttentionResident->Consolidation)
+				AttentionResident->Consolidation->ConsciousState = EAgentConsciousState::Awake;
+			AttentionResident->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+		}
+	}
+	if (TestNotNull(TEXT("A transient Aster placeholder was spawned for the attention capture"), AttentionResident))
+	{
+		TestTrue(TEXT("Aster is conscious for the presentation capture"),
+			AttentionResident->Consolidation && AttentionResident->Consolidation->IsAwake());
+		Controller->ResidentAttentionRemaining = 0.f;
+		Controller->ResidentAttentionTarget.Reset();
+		Controller->ListeningStoneAttentionRemaining = 0.f;
+		Controller->MinnowRippleAttentionRemaining = 0.f;
+		Controller->ListeningStoneCheckRemaining = 1.f;
+		Controller->HeadScanTime = 0.f;
+		if (HeadPivot)
+			HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
+		else if (RiggedCrow)
+			RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
+		// RavenPerch covers eligibility/one-shot selection; this editor-world capture stages
+		// the already-selected cue so the screenshot focuses on presentation and framing.
+		Controller->ResidentAttentionTarget = AttentionResident;
+		Controller->ResidentAttentionLocation = AttentionResidentLocation + FVector(0.f, 0.f, 90.f);
+		Controller->ResidentAttentionRemaining = ARavenAgentAIController::ResidentAttentionDuration;
+		Controller->Tick(0.25f);
+		if (bUsingRiggedCrow && RiggedCrow)
+		{
+			const float BodyTurn = FMath::Abs(FMath::FindDeltaAngleDegrees(
+				Controller->RiggedCrowRestRotation.Yaw, RiggedCrow->GetRelativeRotation().Yaw));
+			TestTrue(TEXT("The imported Crow visibly turns toward Aster without moving its actor"),
+				BodyTurn > 3.f && BodyTurn <= 12.f &&
+				Raven->GetActorLocation().Equals(ForageGround + FVector(0.f, 0.f,
+					Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), 0.1f));
+		}
+	else if (HeadPivot)
+		TestTrue(TEXT("The procedural Raven visibly turns its head toward Aster"),
+			FMath::Abs(HeadPivot->GetRelativeRotation().Yaw) > 4.f &&
+			FMath::Abs(HeadPivot->GetRelativeRotation().Yaw) <= 25.f);
+	ForagePatch->SetActorHiddenInGame(true);
+	const FVector AttentionLookAt = (Raven->GetActorLocation() + AttentionResidentLocation) * 0.5f + FVector(0.f, 0.f, 25.f);
+	const FVector CameraOffsets[] = { FVector(660.f, 0.f, 230.f), FVector(-660.f, 0.f, 230.f),
+		FVector(0.f, 660.f, 230.f), FVector(0.f, -660.f, 230.f) };
+	FVector AttentionCameraLocation = AttentionLookAt + CameraOffsets[0];
+	FCollisionQueryParams AttentionCameraQuery(SCENE_QUERY_STAT(RavenAttentionCameraVisibility), false, Camera);
+	AttentionCameraQuery.AddIgnoredActor(Raven);
+	AttentionCameraQuery.AddIgnoredActor(AttentionResident);
+	AttentionCameraQuery.AddIgnoredActor(ForagePatch);
+	int32 AttentionCameraBlockers = MAX_int32;
+	for (const FVector& CameraOffset : CameraOffsets)
+	{
+		const FVector CandidateCameraLocation = AttentionLookAt + CameraOffset;
+		FHitResult RavenOcclusion;
+		FHitResult ResidentOcclusion;
+		const bool bRavenOccluded = Island->LineTraceSingleByChannel(RavenOcclusion, CandidateCameraLocation,
+			Raven->GetActorLocation() + FVector(0.f, 0.f, 25.f), ECC_Visibility, AttentionCameraQuery);
+		const bool bResidentOccluded = Island->LineTraceSingleByChannel(ResidentOcclusion, CandidateCameraLocation,
+			AttentionResidentLocation, ECC_Visibility, AttentionCameraQuery);
+		const int32 BlockerCount = static_cast<int32>(bRavenOccluded) + static_cast<int32>(bResidentOccluded);
+		if (BlockerCount < AttentionCameraBlockers)
+		{
+			AttentionCameraBlockers = BlockerCount;
+			AttentionCameraLocation = CandidateCameraLocation;
+		}
+		if (BlockerCount == 0)
+			break;
+	}
+	AddInfo(FString::Printf(TEXT("Resident-attention capture camera at %s with %d blocked subject traces"),
+		*AttentionCameraLocation.ToCompactString(), AttentionCameraBlockers));
+	Camera->SetActorLocationAndRotation(AttentionCameraLocation, (AttentionLookAt - AttentionCameraLocation).Rotation());
+	TestTrue(TEXT("Calm resident attention screenshot is saved"), SavePose(TEXT("03_ResidentAttention.png")));
+	AttentionResident->Destroy();
+	Controller->ResidentAttentionRemaining = 0.f;
+	Controller->ResidentAttentionTarget.Reset();
+	Controller->NoticedResidentsInNearbyGroup.Reset();
+	if (HeadPivot)
+		HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
+	if (RiggedCrow)
+		RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
+	ForagePatch->SetActorHiddenInGame(false);
+	}
+	Camera->SetActorLocationAndRotation(ForageCameraLocation, (ForageLookAt - ForageCameraLocation).Rotation());
 	Controller->bCarryingTwigs = true;
 	Controller->Tick(0.f);
 	TestTrue(TEXT("The carried-twig presentation shows a beak bundle while leaving the patch intact"),
 		Controller->bCarryingTwigs && ForagePatch->HasForageableTwigs() && ForagePatch->GetVisibleForageTwigCount() == 7 &&
 		CarriedTwigs->IsVisible() && !CarriedTwigs->bHiddenInGame &&
 		CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !CarriedTwigs->CanEverAffectNavigation());
-	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("03_CarryingTwigs.png")));
+	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("04_CarryingTwigs.png")));
 	// Reset only this transient test actor; a real weave has separate persistence coverage.
 	Controller->bCarryingTwigs = false;
 	Controller->Tick(0.f);
@@ -1042,9 +1136,9 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	else
 		TestTrue(TEXT("Flight visibly rotates the procedural wing pivots"),
 			!LeftWingPivot->GetRelativeRotation().Equals(LeftRest) && !RightWingPivot->GetRelativeRotation().Equals(RightRest));
-	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("04_FlightStrokeA.png")));
+	TestTrue(TEXT("Wingdown flight screenshot is saved"), SavePose(TEXT("05_FlightStrokeA.png")));
 	Controller->Tick(0.15f);
-	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("05_FlightStrokeB.png")));
+	TestTrue(TEXT("Opposite flight stroke screenshot is saved"), SavePose(TEXT("06_FlightStrokeB.png")));
 	if (!bUsingRiggedCrow)
 		TestTrue(TEXT("Flight fully deploys both wings from their folded perch pose"),
 			FMath::Abs(LeftWingPivot->GetRelativeRotation().Yaw) < 0.1f && FMath::Abs(RightWingPivot->GetRelativeRotation().Yaw) < 0.1f);
