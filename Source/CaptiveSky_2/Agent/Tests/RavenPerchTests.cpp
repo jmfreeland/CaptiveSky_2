@@ -321,6 +321,106 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					FMath::IsNearlyZero(BlueprintController->MinnowRippleAttentionRemaining));
 				MinnowRipple->Destroy();
 			}
+
+			UClass* ConsciousResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,
+				TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C"));
+			TestNotNull(TEXT("Aster's grounded resident Blueprint is available to the quiet-presence fixture"), ConsciousResidentClass);
+			if (ConsciousResidentClass)
+			{
+				const FTransform AsterTransform(FRotator::ZeroRotator,
+					BlueprintRaven->GetActorLocation() + FVector(0.f, 450.f, 0.f));
+				AAutonomousAgentCharacter* Aster = World->SpawnActorDeferred<AAutonomousAgentCharacter>(
+					ConsciousResidentClass, AsterTransform, nullptr, nullptr,
+					ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+				if (Aster)
+				{
+					Aster->AutoPossessAI = EAutoPossessAI::Disabled;
+					Aster->FinishSpawning(AsterTransform);
+				}
+				TestNotNull(TEXT("Aster spawns without an AI controller or external service"), Aster);
+				if (Aster)
+				{
+					BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+					BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+					BlueprintController->ResidentAttentionRemaining = 0.f;
+					BlueprintController->NoticedResidentsInNearbyGroup.Reset();
+					BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+					BlueprintController->CheckForNearbyResidentPresence();
+					TestTrue(TEXT("An airborne raven does not attend nearby resident presence"),
+						FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+					BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+					Aster->GetCharacterMovement()->Velocity = FVector(250.f, 0.f, 0.f);
+					BlueprintController->CheckForNearbyResidentPresence();
+					TestTrue(TEXT("A fast-moving resident does not demand the raven's attention"),
+						FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+					Aster->Consolidation->ConsciousState = EAgentConsciousState::Resting;
+					BlueprintController->CheckForNearbyResidentPresence();
+					TestTrue(TEXT("A sleeping resident does not draw the raven's attention"),
+						FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+					Aster->Consolidation->ConsciousState = EAgentConsciousState::Awake;
+					Aster->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+					const FVector RavenPositionBeforePresence = BlueprintRaven->GetActorLocation();
+					BlueprintController->HeadScanTime = 0.f;
+					BlueprintHeadPivot->SetRelativeRotation(BlueprintController->RavenHeadRestRotation);
+					BlueprintController->CheckForNearbyResidentPresence();
+					TestTrue(TEXT("A nearby, unhurried resident gets one short acknowledgment"),
+						BlueprintController->ResidentAttentionRemaining > 1.7f &&
+						BlueprintController->ResidentAttentionRemaining <= ARavenAgentAIController::ResidentAttentionDuration);
+					BlueprintController->Tick(0.5f);
+					TestTrue(TEXT("The perched raven gently turns its head toward Aster"),
+						BlueprintHeadPivot->GetRelativeRotation().Yaw > 5.f && BlueprintHeadPivot->GetRelativeRotation().Yaw <= 25.f);
+					TestTrue(TEXT("Acknowledging Aster does not move the raven"),
+						BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforePresence, 0.1f));
+					const float PresenceAttentionAfterNotice = BlueprintController->ResidentAttentionRemaining;
+					BlueprintController->Tick(0.25f);
+					TestTrue(TEXT("Resident attention fades instead of holding a fixed pose"),
+						BlueprintController->ResidentAttentionRemaining < PresenceAttentionAfterNotice);
+					BlueprintController->ResidentAttentionRemaining = 0.f;
+					BlueprintController->CheckForNearbyResidentPresence();
+					TestTrue(TEXT("A resident who remains nearby does not retrigger the glance"),
+						FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+					const FTransform SecondResidentTransform(FRotator::ZeroRotator,
+						BlueprintRaven->GetActorLocation() + FVector(0.f, -450.f, 0.f));
+					AAutonomousAgentCharacter* SecondResident = World->SpawnActorDeferred<AAutonomousAgentCharacter>(
+						ConsciousResidentClass, SecondResidentTransform, nullptr, nullptr,
+						ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+					if (SecondResident)
+					{
+						SecondResident->AutoPossessAI = EAutoPossessAI::Disabled;
+						SecondResident->FinishSpawning(SecondResidentTransform);
+					}
+					TestNotNull(TEXT("A second nearby resident can be added to the quiet-presence fixture"), SecondResident);
+					if (SecondResident)
+					{
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("A second resident can receive their own brief acknowledgment"),
+							BlueprintController->ResidentAttentionRemaining > 0.f);
+						BlueprintController->ResidentAttentionRemaining = 0.f;
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("The raven does not alternate back to either resident while both remain nearby"),
+							FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+						SecondResident->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+						BlueprintController->CheckForNearbyResidentPresence();
+						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(0.f, 450.f, 0.f));
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("Leaving as a group and calmly returning allows a fresh acknowledgment"),
+							BlueprintController->ResidentAttentionRemaining > 0.f);
+						SecondResident->Destroy();
+					}
+					else
+					{
+						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+						BlueprintController->CheckForNearbyResidentPresence();
+						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(0.f, 450.f, 0.f));
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("Leaving and calmly returning allows a fresh acknowledgment"),
+							BlueprintController->ResidentAttentionRemaining > 0.f);
+					}
+					Aster->Destroy();
+				}
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+		}
 		}
 		BlueprintController->UnPossess();
 		BlueprintController->Destroy();

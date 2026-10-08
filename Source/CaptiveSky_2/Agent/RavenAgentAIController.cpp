@@ -1,5 +1,6 @@
 #include "RavenAgentAIController.h"
 #include "AutonomousAgentCharacter.h"
+#include "AgentConsolidationComponent.h"
 #include "AgentRestPresentationComponent.h"
 #include "IslandArrangement.h"
 #include "Components/CapsuleComponent.h"
@@ -603,6 +604,24 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			return;
 		}
 	}
+	if (ResidentAttentionRemaining > 0.f)
+	{
+		if (const APawn* Raven = GetPawn())
+		{
+			const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+				ResidentAttentionLocation - Raven->GetActorLocation()).GetSafeNormal();
+			FRotator FocusOffset = LocalDirection.Rotation();
+			FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -10.f, 10.f);
+			FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -18.f, 18.f);
+			const float Elapsed = ResidentAttentionDuration - ResidentAttentionRemaining;
+			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
+				(1.f - FMath::SmoothStep(1.25f, ResidentAttentionDuration, Elapsed));
+			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
+			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+	}
 	Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), IdlePose,
 		FMath::Max(0.f, DeltaSeconds), 7.f));
 }
@@ -654,6 +673,57 @@ void ARavenAgentAIController::CheckForNearbyListeningStoneChime()
 		ListeningChimeLocation = Chime->GetActorLocation();
 		ListeningStoneAttentionRemaining = ListeningStoneAttentionDuration;
 		return;
+	}
+}
+
+void ARavenAgentAIController::CheckForNearbyResidentPresence()
+{
+	const APawn* Raven = GetPawn();
+	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
+	{
+		return;
+	}
+
+	constexpr float NoticeRadius = 500.f;
+	constexpr float ForgetRadius = 700.f;
+	constexpr float MaximumHeightDifference = 250.f;
+	constexpr float MaximumCalmMovementSpeed = 180.f;
+	bool bResidentRemainsNearby = false;
+	for (TActorIterator<AAutonomousAgentCharacter> It(GetWorld()); It; ++It)
+	{
+		AAutonomousAgentCharacter* Resident = *It;
+		if (!IsValid(Resident) || Resident == Raven || !Resident->Consolidation || !Resident->Consolidation->IsAwake())
+		{
+			continue;
+		}
+
+		const FVector Offset = Resident->GetActorLocation() - Raven->GetActorLocation();
+		if (FMath::Abs(Offset.Z) > MaximumHeightDifference || Offset.SizeSquared2D() > FMath::Square(ForgetRadius))
+		{
+			continue;
+		}
+		const TWeakObjectPtr<AAutonomousAgentCharacter> ResidentWeak(Resident);
+		bResidentRemainsNearby = true;
+		if (Offset.SizeSquared2D() > FMath::Square(NoticeRadius) ||
+			Resident->GetVelocity().SizeSquared2D() > FMath::Square(MaximumCalmMovementSpeed) ||
+			NoticedResidentsInNearbyGroup.Contains(ResidentWeak))
+		{
+			continue;
+		}
+
+		// A close, unhurried resident gets one small acknowledgment. The raven
+		// stays where it is; this never starts speech, movement, memory, or a model turn.
+		NoticedResidentsInNearbyGroup.Add(ResidentWeak);
+		ResidentAttentionLocation = Resident->GetActorLocation() + FVector(0.f, 0.f, 90.f);
+		ResidentAttentionRemaining = ResidentAttentionDuration;
+		return;
+	}
+
+	if (!bResidentRemainsNearby)
+	{
+		NoticedResidentsInNearbyGroup.Reset();
 	}
 }
 
@@ -1437,12 +1507,14 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ListeningStoneAttentionRemaining = FMath::Max(0.f, ListeningStoneAttentionRemaining - SafeDelta);
 	MinnowRippleAttentionRemaining = FMath::Max(0.f, MinnowRippleAttentionRemaining - SafeDelta);
+	ResidentAttentionRemaining = FMath::Max(0.f, ResidentAttentionRemaining - SafeDelta);
 	ListeningStoneCheckRemaining -= SafeDelta;
 	if (ListeningStoneCheckRemaining <= 0.f)
 	{
 		ListeningStoneCheckRemaining = 0.25f;
 		CheckForNearbyListeningStoneChime();
 		CheckForNearbyMinnowSurfaceBreak();
+		CheckForNearbyResidentPresence();
 	}
 	UpdateWingAnimation(DeltaSeconds);
 	UpdateHeadAnimation(DeltaSeconds);
