@@ -245,6 +245,10 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 			NearbyBeings += FString::Printf(TEXT(" In clear view, the raven is %s about %.0f metres away."),
 				Activity, FVector::Dist(Location, RavenBody->GetActorLocation()) / 100.f);
+			if (NearestVisibleRaven->bCarryingTwigs && NearestRavenDistanceSquared <= FMath::Square(1200.f))
+			{
+				NearbyBeings += TEXT(" At close range, you can see a small bundle of fallen twigs held in the raven's beak; that visible clue does not tell you what it plans to do.");
+			}
 		}
 	}
 	if (NearbyBeings.IsEmpty()) NearbyBeings = TEXT(" no other conscious beings are nearby;");

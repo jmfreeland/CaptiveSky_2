@@ -807,11 +807,20 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	AsterBody->AddInstanceComponent(AsterBrain);
 	AsterBrain->RegisterComponent();
 	const FVector BlueprintRavenOriginalLocation = BlueprintRaven ? BlueprintRaven->GetActorLocation() : FVector::ZeroVector;
-	if (BlueprintRaven) BlueprintRaven->SetActorLocation(FVector(5000.f, 0.f, 302.f));
+	if (BlueprintRaven) BlueprintRaven->SetActorLocation(Raven->GetActorLocation() + FVector(5000.f, 0.f, 0.f));
+	Controller->bCarryingTwigs = true;
 	const FString AsterSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("Aster is not offered bird-sized roosts as movement targets"), AsterSituation.Contains(TEXT("move_to target: TestRoost")));
 	TestTrue(TEXT("Aster receives the raven's visible perched activity as a transient nearby cue"),
 		AsterSituation.Contains(TEXT("In clear view, the raven is perched")) && AsterSituation.Contains(TEXT("about 7 metres away")));
+	TestTrue(TEXT("Aster can notice the carried twigs without being told the raven's intent"),
+		AsterSituation.Contains(TEXT("bundle of fallen twigs held in the raven's beak")) &&
+		AsterSituation.Contains(TEXT("does not tell you what it plans to do")));
+	AsterBody->SetActorLocation(Raven->GetActorLocation() + FVector(1600.f, 0.f, 0.f));
+	const FString DistantRavenSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Raven activity remains visible at the broader awareness range"), DistantRavenSituation.Contains(TEXT("In clear view, the raven is perched")));
+	TestFalse(TEXT("The finer foraging detail is reserved for close range"), DistantRavenSituation.Contains(TEXT("bundle of fallen twigs")));
+	AsterBody->SetActorLocation(FVector(0.f, 400.f, 302.f));
 	AActor* RavenOccluder = World->SpawnActor<AActor>();
 	if (TestNotNull(TEXT("Aster-raven visibility blocker fixture spawned"), RavenOccluder))
 	{
@@ -823,8 +832,11 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		OccluderBox->SetWorldLocation(FVector(300.f, 200.f, 332.f));
 		TestFalse(TEXT("Aster does not receive the raven activity cue through solid cover"),
 			AsterBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("In clear view, the raven is perched")));
+		TestFalse(TEXT("Aster does not receive the carried-twig cue through solid cover"),
+			AsterBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("bundle of fallen twigs")));
 		RavenOccluder->Destroy();
 	}
+	Controller->bCarryingTwigs = false;
 	if (BlueprintRaven) BlueprintRaven->SetActorLocation(BlueprintRavenOriginalLocation);
 	UAgentConsolidationComponent* AsterRest = NewObject<UAgentConsolidationComponent>(AsterBody);
 	AsterBody->AddInstanceComponent(AsterRest);
