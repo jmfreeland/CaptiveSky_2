@@ -21,6 +21,8 @@ public:
 	void RespondToQuietObservation(const FVector& ObserverLocation);
 	/** Briefly widen the school's circling path in response to a visible, nearby surface ripple. */
 	bool RespondToSurfaceRipple();
+	/** Describes a recent surface break to a nearby observer for the next already-scheduled decision. */
+	FString DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const;
 	static float RainMovementScale(float RainIntensity);
 
 protected:
@@ -31,6 +33,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
+	static constexpr float SurfaceBreakContextLifetime = 300.f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UStaticMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -44,6 +47,7 @@ private:
 	float SurfacePulseCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
 	float SurfaceBreakRemaining = 13.f;
+	float SurfaceBreakContextRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
 	int32 SurfaceBreakFishIndex = 0;
 	float RavenCheckRemaining = 0.f;

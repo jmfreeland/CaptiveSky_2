@@ -16,6 +16,7 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandWorldStateSubsystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -439,6 +440,16 @@ FString AAutonomousAgentAIController::DescribeActionState() const
 	for (const auto& Entry : InspectedUntil)
 		if (Entry.Value > FPlatformTime::Seconds()) Result += FString::Printf(TEXT(" %s was already inspected; no new interaction is available for %.0f more real seconds."), *Entry.Key.ToString(), Entry.Value - FPlatformTime::Seconds());
 	if (RepeatedActions >= 2) Result += TEXT(" You have repeated this choice without new progress. Rest, wait quietly, speak, or choose something different; do not invent a discovery.");
+	if (const APawn* Observer = GetPawn())
+	{
+		for (TActorIterator<AIslandTidepoolMinnows> It(GetWorld()); It; ++It)
+		{
+			const FString WildlifeCue = It->DescribeRecentSurfaceBreak(Observer->GetActorLocation());
+			if (WildlifeCue.IsEmpty()) continue;
+			Result += TEXT(" Nearby transient wildlife cue: ") + WildlifeCue;
+			break;
+		}
+	}
 	return Result;
 }
 void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)

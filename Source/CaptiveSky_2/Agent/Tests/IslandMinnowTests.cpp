@@ -252,6 +252,27 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyZero(School->SurfacePulseRemaining));
 		TestTrue(TEXT("The next surface break is delayed to keep wildlife effects sparse"),
 			FMath::IsNearlyEqual(School->SurfaceBreakRemaining, 19.f));
+		Visitor->SetActorLocation(School->GetActorLocation() + FVector(300.f, 0.f, 0.f));
+		ARavenAgentAIController* CueObserverController = World->SpawnActor<ARavenAgentAIController>(Spawn);
+		if (TestNotNull(TEXT("A resident controller can inspect its immediate wildlife context"), CueObserverController))
+		{
+			CueObserverController->Possess(Visitor);
+			const FString NearbyContext = CueObserverController->DescribeActionState();
+			TestTrue(TEXT("The cue remains available through the longest normal decision interval"),
+				FMath::IsNearlyEqual(School->SurfaceBreakContextRemaining, AIslandTidepoolMinnows::SurfaceBreakContextLifetime));
+			TestTrue(TEXT("A nearby resident receives the faded surface-break cue in its next action context"),
+				NearbyContext.Contains(TEXT("Nearby transient wildlife cue")) && NearbyContext.Contains(TEXT("ripple has faded")));
+			Visitor->SetActorLocation(School->GetActorLocation() + FVector(1600.f, 0.f, 0.f));
+			TestFalse(TEXT("The same transient cue is omitted outside the habitat radius"),
+				CueObserverController->DescribeActionState().Contains(TEXT("Nearby transient wildlife cue")));
+			Visitor->SetActorLocation(School->GetActorLocation() + FVector(300.f, 0.f, 0.f));
+			School->SurfaceBreakContextRemaining = 0.1f;
+			School->Tick(0.2f);
+			TestFalse(TEXT("The cue expires from resident context without leaving memory or world state"),
+				CueObserverController->DescribeActionState().Contains(TEXT("Nearby transient wildlife cue")));
+			CueObserverController->UnPossess();
+			CueObserverController->Destroy();
+		}
 		MinnowRipple->Destroy();
 	}
 

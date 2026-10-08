@@ -97,6 +97,18 @@ bool AIslandTidepoolMinnows::RespondToSurfaceRipple()
 	return true;
 }
 
+FString AIslandTidepoolMinnows::DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const
+{
+	if (SurfaceBreakContextRemaining <= 0.f ||
+		FVector::DistSquared2D(ObserverLocation, GetActorLocation()) > FMath::Square(1100.f) ||
+		FMath::Abs(ObserverLocation.Z - GetActorLocation().Z) > 500.f)
+	{
+		return FString();
+	}
+
+	return TEXT("A minnow made a brief surface break in the Tideglass shallows within the last few minutes. The ripple has faded; the school remains wild and nothing lasting changed.");
+}
+
 void AIslandTidepoolMinnows::CheckForNaturalSurfaceRipple()
 {
 	if (!GetWorld() || SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f) return;
@@ -140,6 +152,7 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		Ripple->ConfigureAsMinnowImpact();
 		SurfaceBreakFishIndex = (SurfaceBreakFishIndex + 1) % Fish.Num();
 		SurfaceBreakRemaining = 19.f;
+		SurfaceBreakContextRemaining = SurfaceBreakContextLifetime;
 		SurfacePulseCooldownRemaining = FMath::Max(SurfacePulseCooldownRemaining, 3.f);
 		return;
 	}
@@ -250,6 +263,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 		? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
 	SurfaceBreakRemaining -= SafeDelta;
+	SurfaceBreakContextRemaining = FMath::Max(0.f, SurfaceBreakContextRemaining - SafeDelta);
 	if (SurfaceBreakRemaining <= 0.f)
 	{
 		TryCreateSurfaceBreak(Rain);
