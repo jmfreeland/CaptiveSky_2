@@ -97,11 +97,26 @@ result from the first Raven run a product failure: that scratch binary had an
 older `IslandInteractionUtility.cpp` without the current wrack handler. The
 final run rebuilt that handler and verified the saved ledger and chronicle.
 
+A follow-up saved-navmesh scan sampled six heights every 50 m along the
+westward line at Y=1035.2 m. None of the 72 points from X=-1000 m through
+X=-450 m projected to navigation. A parallel line at Y=1009.6 m found a
+walkable point at X=-1000 m, Z=27.8 m, with an 18 m complete route to the
+Listening Stones; the next sample 50 m west had no navigation, as did all
+tested points toward the coast. These are corridor samples, not a proof that
+the whole island lacks other navmesh patches, but they show the current baked
+walker network is confined to a small area around the spawn/Listening Stones
+and does not reach the shore. Logs:
+[`Navmesh.log` (Y=1035.2 m)](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackNavmeshTransition_20261008/Navmesh.log)
+and
+[`Navmesh.log` (Y=1009.6 m)](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackNavmeshRouteY100960_20261008/Navmesh.log).
+
 The probe's movement deadline is now 210 simulated seconds so long Raven
 flights can finish while remaining bounded. The final run took 211.5 real
 seconds overall, including startup. A future integration improvement should
-extend safe grounded navigation to at least one shore approach, then validate
-Aster's approach and interaction with a similarly capped run.
+extend safe grounded navigation through the relevant island corridors and at
+least one shore approach, then validate Aster's approach and interaction with a
+similarly capped run. Avoid changing wrack coordinates to conceal the map's
+missing navigation coverage.
 
 Early attempts exposed environment-specific setup issues: the default scratch
 launch could not read the shared Zen/Derived Data Cache; a shader compiler
