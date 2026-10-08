@@ -33,4 +33,23 @@ A second launch path tested the existing `Binaries/Win64/CaptiveSky_2.exe` direc
 
 When a normal interactive editor/game launch is available, recapture Tideglass and verify the three repaired plant families render without default-material warnings. The direct game-target route is ruled out unless run from a correctly cooked build; next attempt should use the UE 5.8.3 editor/source-project route after the prior `TurnkeySupport` stall is diagnosed. Keep Rhododendron deferred until its missing material-function references can be repaired from source evidence rather than guessed graph edits.
 
+## Rhododendron source-recovery recheck (2026-10-08)
+
+A read-only hash comparison checked the current master, its saved pre-repair
+backup, and copies in four sibling Unreal projects. All six files are identical
+(SHA-256
+`2B1746766E5EC27371AFDC7E58B7996A314320161A5CF943792A0D9CBCE055AB`), so none
+provides an intact source graph. The restored PlantAudit JSON also confirms the
+master has 186 material expressions, three resolved function-call references,
+and four null calls (`MaterialExpressionMaterialFunctionCall_4` through `_7`).
+This narrows the failure to the saved graph itself; it does not identify the
+original function assets or prove which disconnected/connected material paths
+the null nodes served. No material was recompiled, saved, or replaced.
+
+Therefore the Rhododendron fallback cannot be repaired safely by only toggling
+`MATUSAGE_InstancedStaticMeshes`. A faithful repair needs reviewed graph-source
+evidence or an explicitly approved replacement material built from the local
+textures and checked against the intended plant appearance. Until then, leave
+the current imported master untouched; do not infer its four missing nodes.
+
 API reference: [UE 5.8 MaterialEditingLibrary Python API](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MaterialEditingLibrary).
