@@ -32,3 +32,15 @@ unknown map state. Next: after the unsaved-level choice is resolved (or Live
 Coding is enabled), rebuild/link, run `CaptiveSky2.Agent.RavenPerch`, and take a
 short in-world look at the glance. Keep the cue nonverbal and non-persistent if
 presentation tuning is needed.
+
+**Editor-session follow-up (2026-10-08):** Unreal MCP can currently see the
+`CaptiveSky_2 - Unreal Editor` window, and Windows reports its process as
+responsive. The Editor Preferences Live Coding section reports `bEnabled=true`
+and `startup=AutomaticButHidden`, but the Live Coding MCP compile tool still
+reports that Live Coding is not enabled for this session; invoking the
+documented `Ctrl+Alt+F11` shortcut did not change that result. No editor or PC
+restart was attempted because the Island still has one unsaved level. This is
+an editor-session activation issue, not evidence that the project needs a full
+computer reboot. If a linked build is still needed, first resolve the unsaved
+level deliberately, then reopen the editor (or test the Live Coding console
+activation in a session without user data at risk).
