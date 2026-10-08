@@ -16,25 +16,43 @@ The same Game logs separately report Starter Content `M_Rock` and
 `M_Wood_Oak` missing the usage flag. They are separate assets and should be
 audited/repaired independently if those instanced materials remain in use.
 
+## Follow-up compile finding
+
+In the live UE 5.8.3 material editor, the root material's
+`Used with Instanced Static Meshes` checkbox was confirmed unchecked. A
+reversible in-editor toggle caused the root and its dependent instances to
+compile for PCD3D_SM6, but compilation failed with `StaticSwitchParameter`
+`Missing A input` and `MakeMaterialAttributes` `Error on property Normal`.
+Unreal reports that it will use Default Material after this compile failure.
+This means the missing usage flag is not the only issue, and enabling it alone
+cannot restore the authored foliage appearance.
+
+The toggle was returned to unchecked. The on-disk root `.uasset` remains
+byte-identical to the pre-test SHA256
+`2B1746766E5EC27371AFDC7E58B7996A314320161A5CF943792A0D9CBCE055AB`.
+A matching safety copy is in the ignored
+`Saved/AssetBackups/Codex_RhodoMaterialUsage_20261008/` directory. No material
+package was saved and no Game re-capture was run. The material editor still
+shows a dirty package after recompilation; the user's separate unsaved Island
+level was not saved or changed.
+
 ## Safe next action
 
-Do not write the `.uasset` files from a second editor/commandlet while the live
-editor is open and reports unsaved state. In the active editor, use Unreal's
-material usage API/editor control to enable
-`MATUSAGE_InstancedStaticMeshes` on the rhododendron root material, save that
-material only, and allow shader recompilation. Then run the same bounded
-Tideglass Game capture and verify both that the 13 fallback warnings are gone
-and that the vegetation renders with its authored material. Keep the
-`M_Rock` and `M_Wood_Oak` checks separate so their appearance/performance impact
-is not conflated with the plant fix.
+Inspect the root graph and the referenced static switch/material-attributes
+nodes; identify the intended source for the missing `A` input and `Normal`
+attribute from the imported material graph or a known-good sibling material.
+Repair and compile the graph before enabling `MATUSAGE_InstancedStaticMeshes`.
+Then save only the root material and run the same bounded Tideglass Game
+capture, checking both that the 13 fallback warnings are gone and that the
+vegetation visibly uses its authored material. Keep Starter Content `M_Rock`
+and `M_Wood_Oak` checks separate.
 
 ## Scope and evidence
 
-The investigation was read-only: no binary `Content` asset or user project
-configuration was modified. The audit used an isolated UE 5.8.3 Python
-commandlet and read the shared asset dependency chain; the material usage flag
-was false. The current editor showed one unsaved item, so the asset was not
-saved from the audit process.
+The initial audit used an isolated UE 5.8.3 Python commandlet and read the
+shared asset dependency chain. The follow-up compile test used the existing
+live editor. No binary `Content` asset or user project configuration was
+modified on disk.
 
 Game warnings are present in
 [`Codex_TideglassCompositionCurrent_20261008.log`](../../Saved/Logs/Codex_TideglassCompositionCurrent_20261008.log)
