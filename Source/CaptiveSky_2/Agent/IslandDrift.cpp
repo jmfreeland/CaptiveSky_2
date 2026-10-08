@@ -17,6 +17,9 @@ namespace
 	TAutoConsoleVariable<int32> CVarIslandDrift(TEXT("Island.Drift"), 1,
 		TEXT("1 shows windborne leaves, petals and seeds around the viewer; 0 hides them."));
 
+	TAutoConsoleVariable<float> CVarIslandDriftWind(TEXT("Island.DriftWind"), 0.f,
+		TEXT("Developer override: a steady wind speed in cm/s along +X for the drift motes; 0 follows the weather."));
+
 	constexpr int32 SlotsPerKind[static_cast<int32>(EIslandDriftKind::Count)] = {18, 28, 20, 30};
 
 	// Flat leaf-like boxes (cm = 100 * scale) for leaves and petals, a small round seed head.
@@ -337,6 +340,8 @@ void UIslandDriftSubsystem::Tick(float DeltaTime)
 	const AIslandWeather* WeatherActor = Weather.Get();
 	const auto WindAt = [WeatherActor, Now](const FVector& Position)
 	{
+		const float Forced = CVarIslandDriftWind.GetValueOnGameThread();
+		if (Forced > 0.f) return FVector(Forced, 0.f, 0.f);
 		return WeatherActor ? WeatherActor->SampleWind(Position, Now) : FVector::ZeroVector;
 	};
 	Actor->Advance(DeltaTime, Player->GetPawn()->GetActorLocation(), WindAt, bIndoors ? 1.f : Rain, Daylight);
