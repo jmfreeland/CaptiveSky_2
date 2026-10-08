@@ -72,3 +72,24 @@ with the night-firefly preview, and the full meadow-layer capture passed through
 the wrapper at 46.71 FPS p95 SceneCapture throughput. An hour-20 negative check
 was rejected before launch. Log: [`Codex_TideglassMeadowWrapper_20261008.log`](../../Saved/Logs/Codex_TideglassMeadowWrapper_20261008.log).
 No saved map or world state was changed and no model request was made.
+
+## Shared wetland layer checkpoint
+
+The current working-tree foliage preview was exercised without changing its
+source or map. The UE 5.8.3 target was already up to date; headless
+`CaptiveSky2.Agent.IslandWeather` passed, and the no-world-state
+`CaptiveSky2.Visual.Viewpoints` meadow-layer capture passed with transient
+dragonflies. It reported 7 Typha plus 3 Phalaris, 559.6 cm minimum pool-edge
+clearance, and 440.8 cm minimum shared plant spacing. The `meadow` diagnostic
+kept 19 HISM components visible. SceneCapture p95 throughput was 50.17 FPS at
+the overview, 47.51 FPS at ground detail, and 51.16 FPS for the close
+dragonfly frame. These are offscreen editor captures only; they do not verify
+Game/PIE performance or the authored landscape/water materials.
+
+The [current meadow frame](../../Saved/Viewpoints/2026-10-08_035323_h11.0/02_Tideglass.png)
+still reads as dense foreground cover over a broad sparse brown midground; the
+white pool and blocky landmark shapes are editor-world placeholders, not final
+Game art. The layer isolation makes the next art direction clearer: reserve a
+legible circulation opening and group a visibly distinct wet-edge band, rather
+than increasing total meadow coverage. Logs: [IslandWeather regression](../../Saved/Logs/Codex_SharedIslandWeatherValidation_20261008.log)
+and [Viewpoints capture](../../Saved/Logs/Codex_SharedWetEdge_Meadow_Dragonflies_20261008.log).
