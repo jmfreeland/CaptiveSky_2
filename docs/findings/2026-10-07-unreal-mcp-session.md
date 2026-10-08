@@ -33,3 +33,22 @@ If the endpoint appears after the editor finishes loading but this session
 still cannot connect, restart/reload the Codex session before considering a
 machine reboot. No editor or server process was started, stopped, or modified
 by this check.
+
+## 2026-10-08 project-launch reproduction
+
+The project was then launched once with the installed UE 5.8.3 editor. Startup
+initialized D3D12 on the RTX 4080 Laptop GPU and reached `TurnkeySupport`,
+which began serialized `VerifySdk` through `RunUAT.bat`. Before the editor
+window or MCP listener became available, Windows displayed a
+`dotnet.exe - Application Error` dialog with exception `0xe0434352`, matching
+the user's screenshot. The editor process remained alive with a blank window
+title, while TCP port 8000 remained closed. The project log stops immediately
+after the Turnkey command launch; no `Intermediate/TurnkeyLog_0.log` was
+created. A recent Application-log query returned no matching records, so the
+specific .NET exception source is not established yet.
+
+This reproduces a startup failure in the SDK-verification path; it does not
+show that Windows itself needs a reboot. Keep the visible exception available
+for inspection and capture the failing Turnkey/.NET child details before
+restarting the machine. No level, asset, or source file was changed by the
+launch.
