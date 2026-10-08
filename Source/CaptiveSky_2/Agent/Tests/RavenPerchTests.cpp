@@ -444,8 +444,63 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					TestFalse(TEXT("A completed glance releases its weak attention target"),
 						BlueprintController->ResidentAttentionTarget.IsValid());
 					Aster->Destroy();
-				}
+			}
 			BlueprintController->ResidentAttentionRemaining = 0.f;
+			if (BlueprintRiggedCrow)
+			{
+				UClass* RiggedResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,
+					TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C"));
+				TestNotNull(TEXT("Aster's resident Blueprint is available to the rigged Crow attention fixture"), RiggedResidentClass);
+				if (RiggedResidentClass)
+				{
+					const FTransform ResidentTransform(FRotator::ZeroRotator,
+						BlueprintRaven->GetActorLocation() + FVector(0.f, 450.f, 0.f));
+					AAutonomousAgentCharacter* Resident = World->SpawnActorDeferred<AAutonomousAgentCharacter>(
+						RiggedResidentClass, ResidentTransform, nullptr, nullptr,
+						ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+					if (Resident)
+					{
+						Resident->AutoPossessAI = EAutoPossessAI::Disabled;
+						Resident->FinishSpawning(ResidentTransform);
+						if (Resident->Consolidation)
+							Resident->Consolidation->ConsciousState = EAgentConsciousState::Awake;
+						Resident->GetCharacterMovement()->Velocity = FVector::ZeroVector;
+					}
+					TestNotNull(TEXT("Aster spawns without an AI controller for the rigged Crow cue"), Resident);
+					if (Resident)
+					{
+						BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+						BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+						BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+						BlueprintController->ResidentAttentionRemaining = 0.f;
+						BlueprintController->NoticedResidentsInNearbyGroup.Reset();
+						BlueprintController->ListeningStoneCheckRemaining = 1.f;
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("The rigged Crow selects a calm nearby resident"),
+							BlueprintController->ResidentAttentionTarget.Get() == Resident &&
+							BlueprintController->ResidentAttentionRemaining > 1.7f);
+						const FVector RavenLocationBeforeGlance = BlueprintRaven->GetActorLocation();
+						const FRotator CrowRest = BlueprintController->RiggedCrowRestRotation;
+						BlueprintController->Tick(0.25f);
+						const float GlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+							CrowRest.Yaw, BlueprintRiggedCrow->GetRelativeRotation().Yaw));
+						TestTrue(TEXT("The rigged Crow gives a small visible turn toward the calm resident"),
+							GlanceYaw > 3.f && GlanceYaw <= 12.f);
+						TestTrue(TEXT("Rigged-Crow attention does not move Raven"),
+							BlueprintRaven->GetActorLocation().Equals(RavenLocationBeforeGlance, 0.1f));
+						Resident->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+						BlueprintController->Tick(0.1f);
+						TestTrue(TEXT("The rigged Crow releases attention soon after the resident leaves"),
+							BlueprintController->ResidentAttentionRemaining <= 0.31f);
+						BlueprintController->Tick(0.4f);
+						TestFalse(TEXT("The rigged Crow releases its completed attention target"),
+							BlueprintController->ResidentAttentionTarget.IsValid());
+						TestTrue(TEXT("The rigged Crow returns to its authored orientation after the glance"),
+							BlueprintRiggedCrow->GetRelativeRotation().Equals(CrowRest, 1.f));
+						Resident->Destroy();
+					}
+				}
+			}
 		}
 		}
 		BlueprintController->UnPossess();

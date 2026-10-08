@@ -439,6 +439,7 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 	RavenHeadPivot.Reset();
 	CarriedTwigVisual.Reset();
 	RavenHeadRestRotation = FRotator::ZeroRotator;
+	RiggedCrowRestRotation = RiggedCrowBody.IsValid() ? RiggedCrowBody->GetRelativeRotation() : FRotator::ZeroRotator;
 	HeadScanTime = 0.f;
 	WingDeployment = 0.f;
 	WingAnimationTime = 0.f;
@@ -556,7 +557,72 @@ void ARavenAgentAIController::UpdateWingAnimation(float DeltaSeconds)
 void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 {
 	USceneComponent* Head = Cast<USceneComponent>(RavenHeadPivot.Get());
-	if (!Head) return;
+	if (!Head)
+	{
+		// The imported Crow is a single animated skeletal mesh, so it has no separate
+		// procedural head pivot. Give its settled body a small, reversible yaw toward
+		// the same nearby cues rather than silently dropping attention on the preferred art.
+		USkeletalMeshComponent* Crow = RiggedCrowBody.Get();
+		if (!Crow) return;
+		const bool bCanAttend = (LocomotionState == ERavenLocomotionState::Grounded ||
+			LocomotionState == ERavenLocomotionState::Perched) && !IsResting();
+		if (!bCanAttend)
+		{
+			Crow->SetRelativeRotation(RiggedCrowRestRotation);
+			return;
+		}
+
+		const APawn* Raven = GetPawn();
+		FVector FocusLocation = FVector::ZeroVector;
+		float AttentionRemaining = 0.f;
+		float AttentionDuration = 0.f;
+		float FadeInSeconds = 0.f;
+		float FadeOutSeconds = 0.f;
+		if (ListeningStoneAttentionRemaining > 0.f)
+		{
+			FocusLocation = ListeningChimeLocation;
+			AttentionRemaining = ListeningStoneAttentionRemaining;
+			AttentionDuration = ListeningStoneAttentionDuration;
+			FadeInSeconds = 0.3f;
+			FadeOutSeconds = 2.0f;
+		}
+		else if (MinnowRippleAttentionRemaining > 0.f)
+		{
+			FocusLocation = MinnowRippleLocation;
+			AttentionRemaining = MinnowRippleAttentionRemaining;
+			AttentionDuration = MinnowRippleAttentionDuration;
+			FadeInSeconds = 0.25f;
+			FadeOutSeconds = 1.0f;
+		}
+		else if (ResidentAttentionRemaining > 0.f)
+		{
+			FocusLocation = ResidentAttentionLocation;
+			AttentionRemaining = ResidentAttentionRemaining;
+			AttentionDuration = ResidentAttentionDuration;
+			FadeInSeconds = 0.25f;
+			FadeOutSeconds = 1.25f;
+		}
+
+		if (!Raven || AttentionRemaining <= 0.f || AttentionDuration <= 0.f)
+		{
+			Crow->SetRelativeRotation(FMath::RInterpTo(Crow->GetRelativeRotation(), RiggedCrowRestRotation,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+
+		const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+			FocusLocation - Raven->GetActorLocation()).GetSafeNormal();
+		FRotator FocusOffset = LocalDirection.Rotation();
+		FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -5.f, 5.f);
+		FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -12.f, 12.f);
+		const float Elapsed = AttentionDuration - AttentionRemaining;
+		const float AttentionAlpha = FMath::SmoothStep(0.f, FadeInSeconds, Elapsed) *
+			(1.f - FMath::SmoothStep(FadeOutSeconds, AttentionDuration, Elapsed));
+		const FRotator FocusPose = RiggedCrowRestRotation + FocusOffset * AttentionAlpha;
+		Crow->SetRelativeRotation(FMath::RInterpTo(Crow->GetRelativeRotation(), FocusPose,
+			FMath::Max(0.f, DeltaSeconds), 7.f));
+		return;
+	}
 	const bool bCanScan = (LocomotionState == ERavenLocomotionState::Grounded || LocomotionState == ERavenLocomotionState::Perched) && !IsResting();
 	if (!bCanScan)
 	{

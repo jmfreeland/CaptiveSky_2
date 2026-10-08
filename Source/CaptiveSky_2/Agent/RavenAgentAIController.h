@@ -122,6 +122,7 @@ private:
 	FRotator LeftWingFlightRotation = FRotator::ZeroRotator;
 	FRotator RightWingFlightRotation = FRotator::ZeroRotator;
 	FRotator RavenHeadRestRotation = FRotator::ZeroRotator;
+	FRotator RiggedCrowRestRotation = FRotator::ZeroRotator;
 	float WingDeployment = 0.f;
 	float WingAnimationTime = 0.f;
 	float HeadScanTime = 0.f;
