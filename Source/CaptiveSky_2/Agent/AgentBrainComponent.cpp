@@ -19,6 +19,7 @@
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandDayNight.h"
+#include "IslandTideglassSubsystem.h"
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.h"
 #include "AgentPlaySessionSubsystem.h"
@@ -258,12 +259,14 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		RavenRoostController = Cast<ARavenAgentAIController>(Body->GetController());
 	}
 	const AIslandWeather* LocalWeather = nullptr;
+	const AIslandDayNight* LocalClock = nullptr;
 	if (Owner && GetWorld())
 	{
 		NearbyBeings += UIslandEnvironmentSubsystem::DescribeInnInteriorAt(GetWorld(), Location, Owner);
 		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 		{
-			NearbyBeings += It->DescribeTime();
+			LocalClock = *It;
+			NearbyBeings += LocalClock->DescribeTime();
 			break;
 		}
 		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
@@ -520,6 +523,20 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				const bool bHeavyShower = LocalWeather && LocalWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) >= 0.55f;
 				NearbyBeings += FString::Printf(TEXT(" The TideglassPool is %.0f metres away (move_to/interact target: %s). At close range, Interact sends a brief ring of cool moving highlights across its flattened prototype surface; this fades in about one and a half seconds and leaves no persistent change.%s Respect recent interaction results."),
 					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString(), bHeavyShower ? TEXT(" In this stronger shower, faint ripples also appear on the water by themselves; they are a weather response, not a discovery or an interaction you caused.") : TEXT(""));
+				if (LocalClock)
+				{
+					const float TideOffset = UIslandTideglassSubsystem::TideOffsetCm(LocalClock->CurrentHour, LocalClock->DayNumber);
+					if (FMath::Abs(TideOffset) < 0.5f)
+						NearbyBeings += TEXT(" The shallow pool's waterline is near its mean level.");
+					else
+					{
+						const bool bHighWater = TideOffset > 0.f;
+						const bool bNearTurn = FMath::Abs(TideOffset) >= UIslandTideglassSubsystem::MaximumTideOffsetCm * 0.7f;
+						NearbyBeings += FString::Printf(TEXT(" The shallow pool's waterline is about %.0f cm %s its mean level, %s."),
+							FMath::Abs(TideOffset), bHighWater ? TEXT("above") : TEXT("below"),
+							bNearTurn ? (bHighWater ? TEXT("near high water") : TEXT("near low water")) : TEXT("between high and low water"));
+					}
+				}
 			}
 			else if (bResponsiveWindArch)
 			{

@@ -101,6 +101,7 @@ private:
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
 	friend class FIslandGuestBookTest;
+	friend class FIslandTideglassTideTest;
 	friend class FAgentArrangementReflectionPromptTest;
 	friend class FAgentLingeringTest;
 	friend class FAgentPlacesTest;

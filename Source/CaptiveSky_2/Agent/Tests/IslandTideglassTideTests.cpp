@@ -1,9 +1,11 @@
 #include "Misc/AutomationTest.h"
 #include "Components/StaticMeshComponent.h"
+#include "AgentBrainComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include "IslandDayNight.h"
 #include "IslandTideglassSubsystem.h"
 #include "Misc/ScopeExit.h"
@@ -73,6 +75,7 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 		!TestNotNull(TEXT("Tideglass integration footprint spawned"), PoolFootprint)) return false;
 	Clock->CurrentHour = 6.21f;
 	Clock->DayNumber = 1;
+	PoolMarker->Tags.Add(TEXT("IslandLandmark"));
 	PoolMarker->Tags.Add(TEXT("TideglassPool"));
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
@@ -81,6 +84,7 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 	UStaticMeshComponent* BlockoutSurface = NewObject<UStaticMeshComponent>(PoolFootprint);
 	BlockoutSurface->SetStaticMesh(Sphere);
 	BlockoutSurface->SetRelativeScale3D(FVector(6.f, 6.f, 0.01f));
+	BlockoutSurface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	PoolFootprint->SetRootComponent(BlockoutSurface);
 	BlockoutSurface->RegisterComponent();
 	PoolFootprint->SetActorLocation(PoolMarker->GetActorLocation());
@@ -89,6 +93,17 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Tideglass integration subsystem is available"), Subsystem)) return false;
 	Subsystem->IslandClock = Clock;
 	TestTrue(TEXT("Runtime water is generated from the temporary pool footprint"), Subsystem->ApplyPoolMaterial(Material));
+	AActor* Resident = World->SpawnActor<AActor>(FVector(500.f, 0.f, 200.f), FRotator::ZeroRotator, Spawn);
+	UAgentBrainComponent* Brain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
+	if (Resident && Brain)
+	{
+		Resident->AddInstanceComponent(Brain);
+		Brain->RegisterComponent();
+		const FString HighWaterSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+		TestTrue(TEXT("A nearby resident can perceive Tideglass near spring high water"),
+			HighWaterSituation.Contains(TEXT("near high water")) && HighWaterSituation.Contains(TEXT("cm above its mean level")));
+	}
+	else TestTrue(TEXT("A resident perception fixture is available"), Resident && Brain);
 	if (Subsystem->RuntimeSurface)
 	{
 		const float BaseZ = Subsystem->RuntimeSurfaceBaseLocation.Z;
@@ -98,6 +113,12 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 		Subsystem->Tick(0.5f);
 		TestTrue(TEXT("Tick moves the same transient surface down to low tide"),
 			FMath::IsNearlyEqual(Subsystem->RuntimeSurface->GetComponentLocation().Z - BaseZ, NewMoonLow, 0.1f));
+	}
+	if (Brain)
+	{
+		const FString LowWaterSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+		TestTrue(TEXT("The same resident perceives Tideglass near spring low water without invented travel claims"),
+			LowWaterSituation.Contains(TEXT("near low water")) && LowWaterSituation.Contains(TEXT("cm below its mean level")));
 	}
 	return true;
 }
