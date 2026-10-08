@@ -429,6 +429,34 @@ FString UIslandWrackSubsystem::FindFor(EIslandWrackKind Kind, int32 Seed)
 	}
 }
 
+FString UIslandWrackSubsystem::EchoFromChronicle(const TArray<FString>& ChronicleLines, int32 Seed, int32 Today)
+{
+	struct FEcho { FString Agent; FString Text; int32 Day; };
+	TArray<FEcho> Candidates;
+	for (const FString& Line : ChronicleLines)
+	{
+		TSharedPtr<FJsonObject> Entry;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Line), Entry) || !Entry.IsValid()) continue;
+		FString Type, Agent, Text;
+		double Day = 0.0;
+		if (!Entry->TryGetStringField(TEXT("type"), Type) || Type != TEXT("decision")) continue;
+		if (!Entry->TryGetStringField(TEXT("agent"), Agent) || Agent.IsEmpty()) continue;
+		if (!Entry->TryGetStringField(TEXT("text"), Text)) continue;
+		Entry->TryGetNumberField(TEXT("day"), Day);
+		if (static_cast<int32>(Day) >= Today) continue;
+		Text.TrimStartAndEndInline();
+		if (Text.Len() < 30 || Text.Len() > 220) continue;
+		bool bClean = true;
+		for (const TCHAR Character : Text) if (Character == 0xFFFD || Character > 0x7E) { bClean = false; break; }
+		if (!bClean) continue;
+		Candidates.Add({Agent, Text, static_cast<int32>(Day)});
+	}
+	if (Candidates.IsEmpty()) return FString();
+	const FEcho& Pick = Candidates[FMath::Abs(Seed / 11) % Candidates.Num()];
+	return FString::Printf(TEXT("a rolled slip of paper sealed inside the glass, written by %s on Island day %d: \"%s\" - a thought from before, carried round the sea and back"),
+		*Pick.Agent.Left(24), Pick.Day, *Pick.Text);
+}
+
 FString UIslandWrackSubsystem::DescribeItem(EIslandWrackKind Kind, int32 AgeDays, bool bTurned)
 {
 	FString Out;
@@ -665,6 +693,20 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 	{
 		OutFact = TEXT("The tide has already taken this wrack back; there is nothing left to look at. Nothing changed.");
 		return false;
+	}
+	if (Result == EIslandWrackTurn::Turned && Item.Kind == EIslandWrackKind::Float && Item.Seed % 2 == 0)
+	{
+		FString Contents;
+		TArray<FString> Lines;
+		const FString ChroniclePath = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState/chronicle.jsonl"));
+		if (bAllowStorage && FFileHelper::LoadFileToString(Contents, *ChroniclePath)) Contents.ParseIntoArrayLines(Lines);
+		if (Lines.Num() > 3000) Lines.RemoveAt(0, Lines.Num() - 3000);
+		const FString Echo = EchoFromChronicle(Lines, Item.Seed, Today);
+		if (!Echo.IsEmpty())
+		{
+			Item.Find = Echo;
+			for (FIslandWrackItem& Stored : Ledger.Items) if (Stored.Id == ItemId) Stored.Find = Echo;
+		}
 	}
 	const int32 Age = FMath::Max(0, Today - Item.Day);
 	const int32 Remaining = FMath::Max(1, FIslandWrackLedger::LifespanDays(Item.Kind) - Age);

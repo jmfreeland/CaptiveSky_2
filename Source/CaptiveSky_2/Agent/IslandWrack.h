@@ -123,6 +123,8 @@ public:
 	static EIslandWrackKind PickKind(int32 Seed);
 	/** What turning an item over reveals. Deterministic in kind and seed. Pure. */
 	static FString FindFor(EIslandWrackKind Kind, int32 Seed);
+	/** A slip of paper in a glass float: one resident thought from an earlier Island day, taken from chronicle lines. Empty when none suits. Pure. */
+	static FString EchoFromChronicle(const TArray<FString>& ChronicleLines, int32 Seed, int32 Today);
 	/** How an item looks to a resident now. Pure. */
 	static FString DescribeItem(EIslandWrackKind Kind, int32 AgeDays, bool bTurned);
 

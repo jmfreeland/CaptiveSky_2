@@ -40,6 +40,17 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Driftwood bleaches"), AIslandWrack::ItemColor(Kind::Driftwood, 14, false).R > AIslandWrack::ItemColor(Kind::Driftwood, 0, false).R);
 	TestTrue(TEXT("Seeds make different heaps"), AIslandWrack::Layout(Kind::Kelp, 1)[0].Transform.GetLocation() != AIslandWrack::Layout(Kind::Kelp, 2)[0].Transform.GetLocation());
 
+	const TArray<FString> Chronicle = {
+		TEXT("{\"type\":\"decision\",\"agent\":\"Raven\",\"day\":3,\"text\":\"The wind is dropping, so I will check the eastern roost again.\"}"),
+		TEXT("{\"type\":\"session\",\"day\":3,\"text\":\"The session ends. It is a long line of text here.\"}"),
+		TEXT("{\"type\":\"decision\",\"agent\":\"Aster\",\"day\":9,\"text\":\"Too recent to have been bottled and carried away.\"}"),
+		TEXT("{\"type\":\"decision\",\"agent\":\"Aster\",\"day\":2,\"text\":\"short\"}"),
+		TEXT("not json at all")};
+	const FString Echo = Wrack::EchoFromChronicle(Chronicle, 4, 5);
+	TestTrue(TEXT("An earlier thought goes in the bottle"), Echo.Contains(TEXT("eastern roost")) && Echo.Contains(TEXT("Raven")));
+	TestFalse(TEXT("A thought from today stays out"), Echo.Contains(TEXT("Too recent")));
+	TestTrue(TEXT("No suitable line means no note"), Wrack::EchoFromChronicle(Chronicle, 4, 1).IsEmpty() && Wrack::EchoFromChronicle(TArray<FString>(), 4, 5).IsEmpty());
+
 	TestEqual(TEXT("Tags round-trip to ids"), Wrack::ItemIdFromTag(Wrack::TargetTagFor(42)), 42);
 	TestEqual(TEXT("Other tags are not wrack"), Wrack::ItemIdFromTag(FName(TEXT("WindArch"))), 0);
 	TestEqual(TEXT("A malformed tag is not wrack"), Wrack::ItemIdFromTag(FName(TEXT("Wrack_x"))), 0);
