@@ -691,6 +691,9 @@ void ARavenAgentAIController::CheckForNearbyResidentPresence()
 	constexpr float MaximumHeightDifference = 250.f;
 	constexpr float MaximumCalmMovementSpeed = 180.f;
 	bool bResidentRemainsNearby = false;
+	AAutonomousAgentCharacter* ClosestEligibleResident = nullptr;
+	FVector ClosestResidentAttentionLocation = FVector::ZeroVector;
+	float ClosestResidentDistanceSquared = FMath::Square(NoticeRadius);
 	for (TActorIterator<AAutonomousAgentCharacter> It(GetWorld()); It; ++It)
 	{
 		AAutonomousAgentCharacter* Resident = *It;
@@ -706,24 +709,35 @@ void ARavenAgentAIController::CheckForNearbyResidentPresence()
 		}
 		const TWeakObjectPtr<AAutonomousAgentCharacter> ResidentWeak(Resident);
 		bResidentRemainsNearby = true;
-		if (Offset.SizeSquared2D() > FMath::Square(NoticeRadius) ||
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (DistanceSquared > FMath::Square(NoticeRadius) ||
 			Resident->GetVelocity().SizeSquared2D() > FMath::Square(MaximumCalmMovementSpeed) ||
 			NoticedResidentsInNearbyGroup.Contains(ResidentWeak))
 		{
 			continue;
 		}
 
-		// A close, unhurried resident gets one small acknowledgment. The raven
-		// stays where it is; this never starts speech, movement, memory, or a model turn.
-		NoticedResidentsInNearbyGroup.Add(ResidentWeak);
-		ResidentAttentionLocation = Resident->GetActorLocation() + FVector(0.f, 0.f, 90.f);
-		ResidentAttentionRemaining = ResidentAttentionDuration;
-		return;
+		if (!ClosestEligibleResident || DistanceSquared < ClosestResidentDistanceSquared)
+		{
+			ClosestEligibleResident = Resident;
+			ClosestResidentDistanceSquared = DistanceSquared;
+			ClosestResidentAttentionLocation = Resident->GetActorLocation() + FVector(0.f, 0.f, 90.f);
+		}
 	}
 
 	if (!bResidentRemainsNearby)
 	{
 		NoticedResidentsInNearbyGroup.Reset();
+		return;
+	}
+
+	if (ClosestEligibleResident)
+	{
+		// A close, unhurried resident gets one small acknowledgment, preferring
+		// the nearest eligible one. The raven stays put and never calls its model.
+		NoticedResidentsInNearbyGroup.Add(ClosestEligibleResident);
+		ResidentAttentionLocation = ClosestResidentAttentionLocation;
+		ResidentAttentionRemaining = ResidentAttentionDuration;
 	}
 }
 

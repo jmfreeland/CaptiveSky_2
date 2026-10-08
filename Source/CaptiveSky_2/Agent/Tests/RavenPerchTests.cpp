@@ -399,6 +399,21 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 						BlueprintController->CheckForNearbyResidentPresence();
 						TestTrue(TEXT("The raven does not alternate back to either resident while both remain nearby"),
 							FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
+						BlueprintController->NoticedResidentsInNearbyGroup.Reset();
+						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(0.f, 450.f, 0.f));
+						SecondResident->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(0.f, -300.f, 0.f));
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("When two residents are eligible, the raven notices the closer one first"),
+							BlueprintController->ResidentAttentionLocation.Equals(
+								SecondResident->GetActorLocation() + FVector(0.f, 0.f, 90.f), 0.1f));
+						BlueprintController->ResidentAttentionRemaining = 0.f;
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("The next unacknowledged resident can then receive attention"),
+							BlueprintController->ResidentAttentionRemaining > 0.f);
+						BlueprintController->ResidentAttentionRemaining = 0.f;
+						BlueprintController->CheckForNearbyResidentPresence();
+						TestTrue(TEXT("Neither member of the nearby group is repeatedly selected"),
+							FMath::IsNearlyZero(BlueprintController->ResidentAttentionRemaining));
 						Aster->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
 						SecondResident->SetActorLocation(BlueprintRaven->GetActorLocation() + FVector(800.f, 0.f, 0.f));
 						BlueprintController->CheckForNearbyResidentPresence();

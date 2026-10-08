@@ -8,13 +8,14 @@ turn. Each awake resident is acknowledged at most once while the nearby group
 remains present, including when several residents are close; the group rearms
 after everyone moves beyond the 7 m forget radius. Flight and other attention
 responses take precedence. A per-group weak set prevents two close residents
-from causing the raven to alternate repeatedly between them.
+from causing the raven to alternate repeatedly between them; when several
+unacknowledged residents are eligible, it chooses the closest first.
 
 `CaptiveSky2.Agent.RavenPerch` was extended to cover airborne suppression,
 fast-mover and sleeping-resident suppression, the brief head turn, unchanged
 Raven position, fade, no immediate retrigger, and re-arming after leaving and
-returning. The initial UE 5.8.3 UHT step passed. After the per-group weak-set
-change and the sleeping-/multiple-resident assertions, both changed
+returning. The initial UE 5.8.3 UHT step passed. After the per-group weak-set,
+nearest-resident selection, and sleeping-/multiple-resident assertions, both changed
 translation units compiled directly with the project's cached UE 5.8.3 MSVC
 response files. This does not replace a fresh UHT pass or full editor-target
 link. Linking could not replace the loaded `UnrealEditor-CaptiveSky_2.dll`;
