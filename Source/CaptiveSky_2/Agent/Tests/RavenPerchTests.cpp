@@ -1366,7 +1366,70 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		Controller->bCarryingTwigs && ForagePatch->HasForageableTwigs() && ForagePatch->GetVisibleForageTwigCount() == 7 &&
 		CarriedTwigs->IsVisible() && !CarriedTwigs->bHiddenInGame &&
 		CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !CarriedTwigs->CanEverAffectNavigation());
+	if (RiggedCrow)
+	{
+		FTransform FirstTwigWorld;
+		CarriedTwigs->GetInstanceTransform(0, FirstTwigWorld, true);
+		const FTransform CarrySocketWorld = RiggedCrow->GetSocketTransform(CarriedTwigs->GetAttachSocketName(), RTS_World);
+		const FVector TwigOffsetFromHead = FirstTwigWorld.GetLocation() - CarrySocketWorld.GetLocation();
+		TestTrue(TEXT("The carried twig bundle sits ahead of and slightly below the Crow's head"),
+			FVector::DotProduct(TwigOffsetFromHead, Raven->GetActorForwardVector()) > 10.f && TwigOffsetFromHead.Z < 0.f);
+		AddInfo(FString::Printf(TEXT("Twig anchor socket=%s firstInstanceWorld=%s offsetFromSocket=%s"),
+			*CarriedTwigs->GetAttachSocketName().ToString(), *FirstTwigWorld.GetLocation().ToCompactString(),
+			*TwigOffsetFromHead.ToCompactString()));
+	}
 	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("04_CarryingTwigs.png")));
+	AAutonomousAgentCharacter* DistantAster = Island->SpawnActor<AAutonomousAgentCharacter>(
+		AttentionResidentClass, Raven->GetActorLocation() + FVector(600.f, 0.f, 0.f), FRotator(0.f, 180.f, 0.f), Spawn);
+	if (TestNotNull(TEXT("A second transient Aster is available to scale gameplay-distance twig captures"), DistantAster))
+	{
+		auto CaptureAtResidentRange = [this, &Raven, &DistantAster, &Camera, &SavePose, &ForagePatch](float ResidentRange,
+			const TCHAR* ScreenshotName)
+		{
+			const FVector RavenLocation = Raven->GetActorLocation();
+			const FVector ResidentLocation = RavenLocation + FVector(ResidentRange, 0.f, 0.f);
+			DistantAster->SetActorLocation(ResidentLocation);
+			const FVector LookAt = (RavenLocation + ResidentLocation) * 0.5f + FVector(0.f, 0.f, 65.f);
+			const float CameraDistance = ResidentRange * 2.f + 200.f;
+			const float CameraElevation = ResidentRange * 0.65f + 200.f;
+			const FVector Offsets[] = {
+				FVector(0.f, -CameraDistance, CameraElevation), FVector(0.f, CameraDistance, CameraElevation),
+				FVector(-CameraDistance, 0.f, CameraElevation), FVector(CameraDistance, 0.f, CameraElevation)
+			};
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenCarryDistanceCamera), false, Camera);
+			Query.AddIgnoredActor(Raven);
+			Query.AddIgnoredActor(DistantAster);
+			Query.AddIgnoredActor(ForagePatch);
+			FVector CameraLocation = LookAt + Offsets[0];
+			int32 BestBlockerCount = MAX_int32;
+			for (const FVector& Offset : Offsets)
+			{
+				const FVector Candidate = LookAt + Offset;
+				FHitResult RavenHit;
+				FHitResult ResidentHit;
+				const bool bRavenBlocked = Raven->GetWorld()->LineTraceSingleByChannel(RavenHit, Candidate,
+					RavenLocation + FVector(0.f, 0.f, 35.f), ECC_Visibility, Query);
+				const bool bResidentBlocked = Raven->GetWorld()->LineTraceSingleByChannel(ResidentHit, Candidate,
+					ResidentLocation + FVector(0.f, 0.f, 80.f), ECC_Visibility, Query);
+				const int32 BlockerCount = static_cast<int32>(bRavenBlocked) + static_cast<int32>(bResidentBlocked);
+				if (BlockerCount < BestBlockerCount)
+				{
+					BestBlockerCount = BlockerCount;
+					CameraLocation = Candidate;
+				}
+				if (BlockerCount == 0) break;
+			}
+			Camera->SetActorLocationAndRotation(CameraLocation, (LookAt - CameraLocation).Rotation());
+			return SavePose(ScreenshotName);
+		};
+		TestTrue(TEXT("Aster and the carried bundle are framed together at 3 m"),
+			CaptureAtResidentRange(300.f, TEXT("07_CarryingTwigs_3m.png")));
+		TestTrue(TEXT("Aster and the carried bundle are framed together at 6 m"),
+			CaptureAtResidentRange(600.f, TEXT("08_CarryingTwigs_6m.png")));
+		TestTrue(TEXT("Aster and the carried bundle are framed together at 12 m"),
+			CaptureAtResidentRange(1200.f, TEXT("09_CarryingTwigs_12m.png")));
+		DistantAster->Destroy();
+	}
 	// Reset only this transient test actor; a real weave has separate persistence coverage.
 	Controller->bCarryingTwigs = false;
 	Controller->Tick(0.f);

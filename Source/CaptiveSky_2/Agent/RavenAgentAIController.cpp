@@ -231,15 +231,23 @@ namespace
 			UInstancedStaticMeshComponent* Twigs = NewObject<UInstancedStaticMeshComponent>(Raven, TEXT("RavenCarriedTwigs"), RF_Transient);
 			Raven->AddInstanceComponent(Twigs);
 			Twigs->SetupAttachment(CrowBody, CarryBone);
-			Twigs->SetRelativeLocation(CarryBone == HeadBone ? FVector(1.5f, 0.f, -1.f) : FVector(0.5f, 0.f, 0.f));
+			Twigs->SetRelativeLocation(FVector::ZeroVector);
 			if (UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
 			{
 				Twigs->SetStaticMesh(TwigMesh);
 				Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.16f, 0.075f, 0.025f, 1.f)));
+				const FTransform CarrySocketWorld = CrowBody->GetSocketTransform(CarryBone, RTS_World);
+				const FVector Forward = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorForwardVector()).GetSafeNormal();
+				const FVector Right = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorRightVector()).GetSafeNormal();
+				const FVector Down = CarrySocketWorld.InverseTransformVectorNoScale(FVector::DownVector).GetSafeNormal();
+				const FVector BundleCenter = Forward * (CarryBone == HeadBone ? 14.f : 4.f) + Down * 5.f;
 				const FTransform TwigTransforms[] = {
-					FTransform(FRotator(82.f, 0.f, -7.f), FVector(17.f, -2.5f, -4.f), FVector(0.025f, 0.025f, 0.18f)),
-					FTransform(FRotator(88.f, 5.f, 8.f), FVector(17.f, 0.f, -5.f), FVector(0.025f, 0.025f, 0.18f)),
-					FTransform(FRotator(76.f, -4.f, 12.f), FVector(16.f, 2.5f, -3.f), FVector(0.025f, 0.025f, 0.18f))
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward - Right * 0.10f + Down * 0.05f).GetSafeNormal()),
+						BundleCenter - Right * 3.5f, FVector(0.018f, 0.018f, 0.15f)),
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, Forward),
+						BundleCenter, FVector(0.018f, 0.018f, 0.15f)),
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.08f - Down * 0.04f).GetSafeNormal()),
+						BundleCenter + Right * 3.5f + Down, FVector(0.018f, 0.018f, 0.15f))
 				};
 				for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
 			}
