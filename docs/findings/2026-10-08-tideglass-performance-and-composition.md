@@ -15,6 +15,28 @@ maximum. This stationary, fixed-view sample clears the 30-FPS p95 floor, but
 the maximum exposes a hitch tail. It is one short sample, not proof that PIE,
 travel, weather transitions, or target hardware meet the same threshold.
 
+## Hitch-tail drilldown
+
+The same 600 numeric frames in [`Profile(20261008_010737).csv`](../../Saved/Profiling/CSV/Profile%2820261008_010737%29.csv)
+contain 19 frames over 33.33 ms and nine over 50 ms. Sixteen frames exceed
+33.33 ms on the Render Thread, compared with three on the Game Thread and one
+on the GPU. In the 171.78 ms maximum-frame row, GameThreadTime is 20.51 ms,
+RenderThreadTime is 139.85 ms, GPUTime is 23.05 ms, and RHIThreadTime is 9.73
+ms. The largest exclusive Render Thread samples in that row are EventWait
+(50.23 ms), RDG (39.81 ms), and EventWait/Visibility (15.70 ms); the Game
+Thread also spends 117.73 ms in EventWait. These overlapping thread samples
+are not additive, and a single CSV row does not establish the underlying wait
+owner or root cause.
+
+This points toward variable render-thread synchronization/RDG work in this
+capture, not a demonstrated GPU-bound frame or a proven ground-cover-density
+cause. Do not tune foliage density or culling based on the maximum frame alone.
+The next useful performance check is a short Unreal Insights trace around a
+matched fixed-camera capture, followed separately by a bounded moving PIE
+trace; correlate render-thread waits/resource collection with the frame spikes.
+This does not change the p95 result or the separate need to improve the broad
+view's ecological composition.
+
 The [Game screenshot](../../Playtests/Codex_TideglassCurrent_20261008/Screenshots/003_Tideglass.png)
 shows a reflective pool, a dense and partly tangled foreground, broad sparse
 brown middle distance, and thin distant tree silhouettes. The camera makes the
