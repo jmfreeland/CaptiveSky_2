@@ -18,6 +18,7 @@
 #include "EngineUtils.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandWindMoteEffect.h"
 #include "IslandDayNight.h"
 #include "IslandTideglassSubsystem.h"
 #include "AutonomousAgentAIController.h"
@@ -542,6 +543,19 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearbyBeings += FString::Printf(TEXT(" The WindArch is %.0f metres away (move_to/interact target: %s). At close range, Interact can create one brief local gust with three small moving light motes tracing its airflow; both fade naturally and the wind affects nearby residents. This is not a reward or discovery. Respect recent interaction results."),
 					FVector::Dist(Location, It->GetActorLocation()) / 100.f, *It->Tags[0].ToString());
+				for (TActorIterator<AIslandWindMoteEffect> MoteIt(GetWorld()); MoteIt; ++MoteIt)
+				{
+					if (!MoteIt->ActorHasTag(TEXT("WindArchGustMotes")) ||
+						FVector::DistSquared(MoteIt->GetActorLocation(), It->GetActorLocation()) > FMath::Square(1500.f) ||
+						FVector::DistSquared(Location, MoteIt->GetActorLocation()) > FMath::Square(1400.f)) continue;
+					FCollisionQueryParams MoteParams(SCENE_QUERY_STAT(AgentWindArchMoteVisibility), false, Owner);
+					MoteParams.AddIgnoredActor(*It);
+					MoteParams.AddIgnoredActor(*MoteIt);
+					FHitResult MoteHit;
+					if (GetWorld()->LineTraceSingleByChannel(MoteHit, Location, MoteIt->GetActorLocation(), ECC_Visibility, MoteParams)) continue;
+					NearbyBeings += TEXT(" A few pale lights are drifting with the wind around the Arch, then fading; you can watch them or leave them be.");
+					break;
+				}
 			}
 			else if (bResponsiveListeningStones)
 			{

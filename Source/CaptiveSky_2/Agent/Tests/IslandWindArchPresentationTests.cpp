@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Agent/AgentBrainComponent.h"
 #include "Agent/IslandWindArchPresentation.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -197,6 +198,7 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 				Stonework->Stones->GetInstanceTransform(Index, BeamStone, false) && BeamStone.GetLocation().Z > 300.f);
 		}
 	}
+	UAgentBrainComponent* WindArchObserverBrain = nullptr;
 	if (Stonework && StrongWindOffset >= 0.0)
 	{
 		Weather->WeatherTimeOffset = StrongWindOffset;
@@ -217,6 +219,22 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("The mote actor is transient and will not alter saved world state"), SpawnedMotes->HasAnyFlags(RF_Transient));
 			TestTrue(TEXT("The mote actor is centered on the Wind Arch"),
 				FVector::Dist2D(SpawnedMotes->GetActorLocation(), Stonework->GetActorLocation()) <= 1.f);
+			ATargetPoint* Resident = World->SpawnActor<ATargetPoint>(Marker->GetActorLocation() + FVector(0.f, 800.f, 0.f), FRotator::ZeroRotator);
+			UAgentBrainComponent* Brain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
+			if (Resident && Brain)
+			{
+				WindArchObserverBrain = Brain;
+				Resident->AddInstanceComponent(Brain);
+				Brain->RegisterComponent();
+				const FString MoteSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+				TestTrue(TEXT("A nearby resident notices the visible lights drifting with the Wind Arch gust"),
+					MoteSituation.Contains(TEXT("pale lights are drifting with the wind around the Arch")));
+				Resident->SetActorLocation(Marker->GetActorLocation() + FVector(0.f, 3000.f, 0.f));
+				TestFalse(TEXT("A distant resident is not told about lights outside its local view"),
+					Brain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("pale lights are drifting with the wind around the Arch")));
+				Resident->SetActorLocation(Marker->GetActorLocation() + FVector(0.f, 800.f, 0.f));
+			}
+			else TestTrue(TEXT("A resident perception fixture is available"), Resident && Brain);
 		}
 		TestTrue(TEXT("Emission starts the full ambient cooldown"),
 			FMath::IsNearlyEqual(Stonework->AmbientMoteCooldownRemaining, 30.f));
@@ -234,6 +252,10 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("An existing nearby mote pass suppresses an overlapping ambient pass"), MotesAfterOverlapAttempt, 1);
 		TestTrue(TEXT("Overlap suppression retries only after a short delay"),
 			FMath::IsNearlyEqual(Stonework->AmbientMoteCooldownRemaining, 3.f));
+		if (SpawnedMotes) SpawnedMotes->Destroy();
+		if (WindArchObserverBrain)
+			TestFalse(TEXT("The transient cue disappears as soon as the lights are gone"),
+				WindArchObserverBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("pale lights are drifting with the wind around the Arch")));
 	}
 	if (PresentationSubsystem) PresentationSubsystem->RestorePresentation();
 	TestFalse(TEXT("A previously visible proxy is restored visible"), PillarA->IsHidden());
