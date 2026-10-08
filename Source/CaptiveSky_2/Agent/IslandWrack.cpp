@@ -550,7 +550,11 @@ int32 UIslandWrackSubsystem::DepositAfterStorm(int32 Today, int32 Count)
 {
 	UWorld* World = GetWorld();
 	AStaticMeshActor* Ocean = World ? UIslandOceanSubsystem::FindOceanPlane(World) : nullptr;
-	if (!Ocean || Today < 0) return 0;
+	if (!Ocean || Today < 0)
+	{
+		UE_LOG(LogIslandWrack, Warning, TEXT("Storm wrack placement skipped: ocean plane %s, Island day %d."), Ocean ? TEXT("found") : TEXT("missing"), Today);
+		return 0;
+	}
 	const float SeaZ = Ocean->GetActorLocation().Z;
 
 	TArray<const ALandscapeProxy*> Landscapes;
@@ -560,7 +564,11 @@ int32 UIslandWrackSubsystem::DepositAfterStorm(int32 Today, int32 Count)
 		Landscapes.Add(*It);
 		Bounds += It->GetComponentsBoundingBox();
 	}
-	if (Landscapes.IsEmpty() || !Bounds.IsValid) return 0;
+	if (Landscapes.IsEmpty() || !Bounds.IsValid)
+	{
+		UE_LOG(LogIslandWrack, Warning, TEXT("Storm wrack placement skipped: no landscape bounds were available."));
+		return 0;
+	}
 
 	FRandomStream Random(Today * 7919 + Ledger.NextId * 104729);
 	if (Count <= 0) Count = 3 + (Today + Ledger.NextId) % 4;
@@ -584,7 +592,11 @@ int32 UIslandWrackSubsystem::DepositAfterStorm(int32 Today, int32 Count)
 		Seaward = Direction;
 		bFound = true;
 	}
-	if (!bFound) return 0;
+	if (!bFound)
+	{
+		UE_LOG(LogIslandWrack, Warning, TEXT("Storm wrack placement found no suitable beach across %d landscape(s)."), Landscapes.Num());
+		return 0;
+	}
 
 	const FVector2D Along(-Seaward.Y, Seaward.X);
 	const float AlongYaw = FMath::RadiansToDegrees(FMath::Atan2(Along.Y, Along.X));
@@ -611,7 +623,11 @@ int32 UIslandWrackSubsystem::DepositAfterStorm(int32 Today, int32 Count)
 		Descriptions.Add(DescribeItem(Item.Kind, 0, false));
 		UE_LOG(LogIslandWrack, Log, TEXT("Wrack %d (%s) left at %s"), Item.Id, *KindName(Item.Kind), *Position.ToCompactString());
 	}
-	if (Placed.IsEmpty()) return 0;
+	if (Placed.IsEmpty())
+	{
+		UE_LOG(LogIslandWrack, Warning, TEXT("Storm wrack placement found a beach but could not place any items."));
+		return 0;
+	}
 
 	SyncActors(Today);
 	Save();

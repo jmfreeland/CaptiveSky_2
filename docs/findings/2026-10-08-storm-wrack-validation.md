@@ -39,34 +39,44 @@ Log:
 
 ## Automatic storm-trigger probe
 
-A second isolated UE 5.8.3 Game session loaded the saved Island, forced a storm
-for 180 seconds with `Island.Storm 180`, disabled agent thinking, and retained
-the 60-second real-time / one-request safeguards. The storm was recorded in
-`chronicle.jsonl`, and the saved world state advanced `last_storm_mark` to
-5 seconds, proving that the automatic weather-trace evaluation ran. However,
-no `Island.wrack.json` ledger was created and no `LogIslandWrack` placement
-appeared. Thus the automatic storm path currently fails to produce visible,
-persisted wrack in this runtime probe, despite direct `Island.WrackStorm`
-placement succeeding. Log:
-[`AutomaticStorm.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm/AutomaticStorm.log);
-state:
-[`Island.json`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm/World/WorldState/Island.json);
-chronicle:
-[`chronicle.jsonl`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm/World/WorldState/chronicle.jsonl).
+The first forced-storm runtime probe is **not evidence about the current
+storm-to-wrack hook**: inspection afterward showed that its isolated scratch
+project still contained an older `IslandWeatherTraces.cpp` without the
+`UIslandWrackSubsystem` call. It did record the forced storm and advance
+`last_storm_mark`, but the compiled binary could not have deposited wrack
+automatically. Its result is retained for provenance only:
+[`AutomaticStorm.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm/AutomaticStorm.log).
 
-The current hook applies storm marks before asking the wrack subsystem to
-deposit, and does not report the deposit result. The next step is to instrument
-that boundary and check whether the subsystem is missing or placement is being
-attempted before the loaded shoreline is ready; if placement can fail
-transiently, the storm should retry without duplicating successful deposits.
+After copying the current hook into the isolated scratch project's source,
+UE 5.8.3 compiled `IslandWeatherTraces.cpp` and `IslandWrack.cpp` and linked
+successfully. A fresh bounded Game session with `Island.Storm 180` then logged
+`Storm wrack deposit completed: 5 item(s) placed`; five objects were written
+to the isolated `Island.wrack.json` and a `wrack` chronicle event was recorded.
+This confirms the real automatic storm path works on the saved Island. The
+first run was a stale-binary issue, not a production bug. Logs now report the
+placement count and explain early exits (missing ocean, missing landscape,
+unsuitable beach, or no valid item positions), so any future map-specific
+failure is diagnosable.
+
+Evidence:
+[`Codex_WrackDiagnostics_Build_20261008.log`](../../Saved/Logs/Codex_WrackDiagnostics_Build_20261008.log),
+[`AutomaticStorm.log`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm_CurrentHook/AutomaticStorm.log),
+[`Island.wrack.json`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm_CurrentHook/World/WorldState/Island.wrack.json),
+and
+[`chronicle.jsonl`](../../Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/WrackAutomaticStorm_CurrentHook/World/WorldState/chronicle.jsonl).
+
+The existing `CaptiveSky2.Agent.WeatherTraces` automation also passed with the
+updated hook. Its lightweight synthetic world intentionally has no ocean plane;
+the new warning identifies that expected early return while the weather-trace
+assertions still pass:
+[`Codex_WrackDiagnostics_WeatherTraces_20261008.log`](../../Saved/Logs/Codex_WrackDiagnostics_WeatherTraces_20261008.log).
 
 ## Remaining validation
 
-Direct debug placement works on the map, while the automatic storm path's
-wrack placement failed in the bounded probe above. Nor has an autonomous
-resident been shown noticing a piece, navigating to it, and using `interact`;
-the successful turnover above was by `debug_visitor`. Those are the remaining
-integration checks.
+Both direct debug placement and automatic storm-to-wrack placement now work on
+the map. Nor has an autonomous resident been shown noticing a piece, navigating
+to it, and using `interact`; the successful turnover above was by
+`debug_visitor`. That remains the next integration check.
 
 Early attempts exposed environment-specific setup issues: the default scratch
 launch could not read the shared Zen/Derived Data Cache; a shader compiler

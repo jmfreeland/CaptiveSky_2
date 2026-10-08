@@ -37,7 +37,14 @@ bool UIslandWeatherTracesSubsystem::EvaluateStorm(double Now)
 		if (!WorldState->ApplyStormMarks(It->WeatherTimeOffset + Now, UIslandWorldStateSubsystem::CurrentIslandDay(World), Marks)) return false;
 		for (const FString& Mark : Marks) UE_LOG(LogIslandWeatherTraces, Log, TEXT("Storm mark: %s"), *Mark);
 		if (UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>())
-			Wrack->DepositAfterStorm(UIslandWorldStateSubsystem::CurrentIslandDay(World));
+		{
+			const int32 Placed = Wrack->DepositAfterStorm(UIslandWorldStateSubsystem::CurrentIslandDay(World));
+			UE_LOG(LogIslandWeatherTraces, Log, TEXT("Storm wrack deposit completed: %d item(s) placed."), Placed);
+		}
+		else
+		{
+			UE_LOG(LogIslandWeatherTraces, Warning, TEXT("A storm left lasting marks, but the wrack subsystem is unavailable."));
+		}
 		return Marks.Num() > 0;
 	}
 	return false;
