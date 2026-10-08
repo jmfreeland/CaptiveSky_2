@@ -83,9 +83,15 @@ not yet a proven cause of Live Coding being unavailable.
 separate Profile Data Visualizer window is simply covering much of it. The
 editor still shows `1 Unsaved`, so no restart/reboot or UI dismissal was needed
 to diagnose reachability. A real-RHI `CaptiveSky2.Visual.RavenWingMotion`
-capture completed successfully and saved all seven pose images, including
-`03_ResidentAttention.png`. However, the Raven is mostly hidden behind a large
-foreground rock despite a zero-blocker visibility trace, so the current
-camera/trace heuristic does not produce a readable highlight. Keep this
-presentation fixture, but do not describe the resulting frame as visually
-validated until its collision/occlusion assumptions or staging are improved.
+capture completed successfully under UE 5.8.3, agent thinking disabled, zero
+model requests, and a 60-second cap. Four elevated camera candidates confirmed
+that visibility-channel traces do not predict rendered occlusion in this
+fixture. The selected reverse-X angle and an Aster-facing transient actor pose
+now show both Aster and the Raven clearly, with the bird looking toward Aster;
+the latest image is
+[`03_ResidentAttention.png`](../../Saved/CompileScratch/Codex_RavenAttentionValidation_20261008/Project/Saved/Viewpoints/RavenWingMotion_/20261008_053557/03_ResidentAttention.png).
+This is readable behavior evidence, not a beauty shot: the editor-world ground
+and blockout props remain visible, and a real Game/PIE scene review is still
+needed before judging the moment in its natural habitat. The isolated target
+rebuilt successfully after the fixture adjustment; the final real-RHI test
+reported `Result={Success}`.

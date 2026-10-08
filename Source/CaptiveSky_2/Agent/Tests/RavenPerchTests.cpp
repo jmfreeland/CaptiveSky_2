@@ -1025,7 +1025,7 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	const FVector AttentionResidentLocation = Raven->GetActorLocation() + FVector(0.f, 300.f, 0.f);
 	if (TestNotNull(TEXT("Aster's placeholder is available for the resident-attention capture"), AttentionResidentClass))
 	{
-		const FTransform ResidentTransform(FRotator::ZeroRotator, AttentionResidentLocation);
+		const FTransform ResidentTransform(FRotator(0.f, 180.f, 0.f), AttentionResidentLocation);
 		AttentionResident = Island->SpawnActorDeferred<AAutonomousAgentCharacter>(AttentionResidentClass,
 			ResidentTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (AttentionResident)
@@ -1072,8 +1072,8 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 			FMath::Abs(HeadPivot->GetRelativeRotation().Yaw) <= 25.f);
 	ForagePatch->SetActorHiddenInGame(true);
 	const FVector AttentionLookAt = (Raven->GetActorLocation() + AttentionResidentLocation) * 0.5f + FVector(0.f, 0.f, 25.f);
-	const FVector CameraOffsets[] = { FVector(660.f, 0.f, 230.f), FVector(-660.f, 0.f, 230.f),
-		FVector(0.f, 660.f, 230.f), FVector(0.f, -660.f, 230.f) };
+	const FVector CameraOffsets[] = { FVector(-660.f, 0.f, 460.f), FVector(660.f, 0.f, 460.f),
+		FVector(0.f, 660.f, 460.f), FVector(0.f, -660.f, 460.f) };
 	FVector AttentionCameraLocation = AttentionLookAt + CameraOffsets[0];
 	FCollisionQueryParams AttentionCameraQuery(SCENE_QUERY_STAT(RavenAttentionCameraVisibility), false, Camera);
 	AttentionCameraQuery.AddIgnoredActor(Raven);
@@ -1098,7 +1098,7 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		if (BlockerCount == 0)
 			break;
 	}
-	AddInfo(FString::Printf(TEXT("Resident-attention capture camera at %s with %d blocked subject traces"),
+	AddInfo(FString::Printf(TEXT("Resident-attention selected camera at %s with %d blocked subject traces"),
 		*AttentionCameraLocation.ToCompactString(), AttentionCameraBlockers));
 	Camera->SetActorLocationAndRotation(AttentionCameraLocation, (AttentionLookAt - AttentionCameraLocation).Rotation());
 	TestTrue(TEXT("Calm resident attention screenshot is saved"), SavePose(TEXT("03_ResidentAttention.png")));
