@@ -54,8 +54,10 @@ than globally adding more instances. The temporary water material reads cyan and
 the Wind Arch proxies remain blockout shapes; these captures do not validate the
 current Game water material or final landmark art.
 
-The first wrapper invocation failed only because it omitted the harness's
-daytime-dragonfly preview flag; the corrected UE 5.8.3 invocation passed. The
-current wrapper does not yet expose that flag, so the successful layer captures
-used direct command-line arguments. No saved map or world state was changed and
-no model request was made.
+The initial wrapper attempt failed its dragonfly close-up because the script did
+not forward the harness's daytime-dragonfly preview flag. `Capture-Viewpoints.ps1`
+now exposes `-TideglassDragonflies`, validates daylight and its compatibility
+with the night-firefly preview, and the full meadow-layer capture passed through
+the wrapper at 46.71 FPS p95 SceneCapture throughput. An hour-20 negative check
+was rejected before launch. Log: [`Codex_TideglassMeadowWrapper_20261008.log`](../../Saved/Logs/Codex_TideglassMeadowWrapper_20261008.log).
+No saved map or world state was changed and no model request was made.

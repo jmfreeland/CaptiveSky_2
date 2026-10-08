@@ -15,6 +15,7 @@ The editor must be built first. Close any running editor on this project before 
 ./Scripts/Capture-Viewpoints.ps1 -Hour 8 -Only Tideglass -GroundCoverSway -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -NightFireflies -Only Firefly -NoWorldState -Day 1
+./Scripts/Capture-Viewpoints.ps1 -Hour 11 -Only Tideglass -TideglassDragonflies -NoWorldState
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 0
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -LandscapeWetness 1
 ./Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only WindArchOverlook -CompareLandscapeWetness
@@ -40,6 +41,7 @@ param(
 	[string]$LogPath = "",
 	[string]$Only = "",
 	[switch]$NightFireflies,
+	[switch]$TideglassDragonflies,
 	[switch]$GroundCover,
 	[switch]$GroundCoverSway,
 	[switch]$LandmarkRockPreview,
@@ -61,6 +63,13 @@ New-Item -ItemType Directory -Force -Path $localDataCachePath | Out-Null
 
 $extra = @()
 if ($NightFireflies -and $Hour -lt 0) { $Hour = 20 }
+if ($TideglassDragonflies -and $Hour -lt 0) { $Hour = 11 }
+if ($NightFireflies -and $TideglassDragonflies) { throw "Choose either -NightFireflies or -TideglassDragonflies." }
+if ($TideglassDragonflies) {
+	if ($Hour -lt 6 -or $Hour -ge 19) { throw "-TideglassDragonflies requires a daylight hour (06:00-18:59)." }
+	if ($Only -and $Only -ne "Tideglass") { throw "-TideglassDragonflies is only valid with -Only Tideglass." }
+	$extra += "-ViewpointTideglassDragonflies"
+}
 if ($Hour -ge 0) { $extra += "-ViewpointHour=$Hour" }
 if ($Day -gt 0) { $extra += "-ViewpointDay=$Day" }
 if ($LandscapeWetness -lt -1 -or $LandscapeWetness -gt 1) { throw "-LandscapeWetness must be -1 (not set) or between 0 and 1." }
