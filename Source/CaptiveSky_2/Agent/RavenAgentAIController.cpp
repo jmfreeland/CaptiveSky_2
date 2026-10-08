@@ -15,6 +15,7 @@
 #include "EngineUtils.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandInteractionUtility.h"
@@ -594,6 +595,14 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			FadeInSeconds = 0.25f;
 			FadeOutSeconds = 1.0f;
 		}
+		else if (CrabScurryAttentionRemaining > 0.f)
+		{
+			FocusLocation = CrabScurryLocation;
+			AttentionRemaining = CrabScurryAttentionRemaining;
+			AttentionDuration = CrabScurryAttentionDuration;
+			FadeInSeconds = 0.25f;
+			FadeOutSeconds = 0.9f;
+		}
 		else if (ResidentAttentionRemaining > 0.f)
 		{
 			FocusLocation = ResidentAttentionLocation;
@@ -664,6 +673,24 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			const float Elapsed = MinnowRippleAttentionDuration - MinnowRippleAttentionRemaining;
 			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
 				(1.f - FMath::SmoothStep(1.0f, MinnowRippleAttentionDuration, Elapsed));
+			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
+			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+	}
+	if (CrabScurryAttentionRemaining > 0.f)
+	{
+		if (const APawn* Raven = GetPawn())
+		{
+			const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+				CrabScurryLocation - Raven->GetActorLocation()).GetSafeNormal();
+			FRotator FocusOffset = LocalDirection.Rotation();
+			FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -10.f, 10.f);
+			FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -20.f, 20.f);
+			const float Elapsed = CrabScurryAttentionDuration - CrabScurryAttentionRemaining;
+			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
+				(1.f - FMath::SmoothStep(0.9f, CrabScurryAttentionDuration, Elapsed));
 			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
 			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
 				FMath::Max(0.f, DeltaSeconds), 7.f));
@@ -742,11 +769,49 @@ void ARavenAgentAIController::CheckForNearbyListeningStoneChime()
 	}
 }
 
+void ARavenAgentAIController::CheckForNearbyCrabScurry()
+{
+	const APawn* Raven = GetPawn();
+	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
+	{
+		return;
+	}
+
+	constexpr float NoticeRadius = 700.f;
+	constexpr float MaximumHeightDifference = 320.f;
+	for (TActorIterator<AIslandTidepoolCrab> It(GetWorld()); It; ++It)
+	{
+		AIslandTidepoolCrab* Crab = *It;
+		if (!IsValid(Crab)) continue;
+		if (!Crab->IsScurrying())
+		{
+			if (LastNoticedScurryingCrab.Get() == Crab) LastNoticedScurryingCrab.Reset();
+			continue;
+		}
+
+		const FVector Offset = Crab->GetActorLocation() - Raven->GetActorLocation();
+		if (LastNoticedScurryingCrab.Get() == Crab || FMath::Abs(Offset.Z) > MaximumHeightDifference ||
+			Offset.SizeSquared2D() > FMath::Square(NoticeRadius))
+		{
+			continue;
+		}
+
+		// One quick look makes the crab's startled movement legible without turning
+		// the raven's curiosity into a chase or another resident decision.
+		LastNoticedScurryingCrab = Crab;
+		CrabScurryLocation = Crab->GetActorLocation() + FVector(0.f, 0.f, 24.f);
+		CrabScurryAttentionRemaining = CrabScurryAttentionDuration;
+		return;
+	}
+}
+
 void ARavenAgentAIController::CheckForNearbyResidentPresence()
 {
 	const APawn* Raven = GetPawn();
 	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
-		MinnowRippleAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
+		MinnowRippleAttentionRemaining > 0.f || CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f ||
 		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
 	{
 		return;
@@ -1588,6 +1653,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ListeningStoneAttentionRemaining = FMath::Max(0.f, ListeningStoneAttentionRemaining - SafeDelta);
 	MinnowRippleAttentionRemaining = FMath::Max(0.f, MinnowRippleAttentionRemaining - SafeDelta);
+	CrabScurryAttentionRemaining = FMath::Max(0.f, CrabScurryAttentionRemaining - SafeDelta);
 	if (ResidentAttentionRemaining > 0.f)
 	{
 		AAutonomousAgentCharacter* AttendedResident = ResidentAttentionTarget.Get();
@@ -1622,6 +1688,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 		ListeningStoneCheckRemaining = 0.25f;
 		CheckForNearbyListeningStoneChime();
 		CheckForNearbyMinnowSurfaceBreak();
+		CheckForNearbyCrabScurry();
 		CheckForNearbyResidentPresence();
 	}
 	UpdateWingAnimation(DeltaSeconds);

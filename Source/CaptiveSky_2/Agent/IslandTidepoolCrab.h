@@ -22,6 +22,8 @@ public:
 
 	/** Briefly scuttle away from a quiet observer; never changes ownership or saved state. */
 	void RespondToQuietObservation(const FVector& ObserverLocation);
+	/** True only while the crab is actively moving away from a recent disturbance. */
+	bool IsScurrying() const { return ScurryRemaining > 0.f && !bIsSheltered; }
 	/** Conceal at night without destroying this resident; restores its visible local routine at dawn. */
 	void SetSheltered(bool bSheltered);
 	bool IsSheltered() const { return bIsSheltered; }
@@ -36,6 +38,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FRavenPerchTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Shell;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")

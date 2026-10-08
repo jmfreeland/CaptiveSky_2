@@ -7,6 +7,7 @@
 class AIslandArrangement;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
+class AIslandTidepoolCrab;
 class AAutonomousAgentCharacter;
 class UInstancedStaticMeshComponent;
 class UAnimSequence;
@@ -128,17 +129,21 @@ private:
 	float HeadScanTime = 0.f;
 	TWeakObjectPtr<AIslandListeningStonesChime> LastNoticedListeningChime;
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
+	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
 	FVector MinnowRippleLocation = FVector::ZeroVector;
+	FVector CrabScurryLocation = FVector::ZeroVector;
 	FVector ResidentAttentionLocation = FVector::ZeroVector;
 	float ListeningStoneAttentionRemaining = 0.f;
 	float MinnowRippleAttentionRemaining = 0.f;
+	float CrabScurryAttentionRemaining = 0.f;
 	float ResidentAttentionRemaining = 0.f;
 	float ListeningStoneCheckRemaining = 0.f;
 	static constexpr float ListeningStoneAttentionDuration = 2.4f;
 	static constexpr float MinnowRippleAttentionDuration = 1.6f;
+	static constexpr float CrabScurryAttentionDuration = 1.5f;
 	static constexpr float ResidentAttentionDuration = 1.8f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
@@ -172,6 +177,7 @@ private:
 	void UpdateHeadAnimation(float DeltaSeconds);
 	void CheckForNearbyListeningStoneChime();
 	void CheckForNearbyMinnowSurfaceBreak();
+	void CheckForNearbyCrabScurry();
 	void CheckForNearbyResidentPresence();
 	void UpdateCarriedTwigVisual();
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;

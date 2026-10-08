@@ -10,6 +10,7 @@
 #include "IslandArrangement.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -321,6 +322,46 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("The same brief ripple cannot restart attention after it has been noticed"),
 					FMath::IsNearlyZero(BlueprintController->MinnowRippleAttentionRemaining));
 				MinnowRipple->Destroy();
+			}
+
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->CrabScurryAttentionRemaining = 0.f;
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+			BlueprintController->LastNoticedScurryingCrab.Reset();
+			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+			const FVector RavenPositionBeforeCrab = BlueprintRaven->GetActorLocation();
+			AIslandTidepoolCrab* ScurryingCrab = World->SpawnActor<AIslandTidepoolCrab>(
+				RavenPositionBeforeCrab + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("A shore crab can be spawned without external services"), ScurryingCrab);
+			if (ScurryingCrab)
+			{
+				ScurryingCrab->RespondToQuietObservation(RavenPositionBeforeCrab);
+				TestTrue(TEXT("A crab exposes its brief disturbance state to nearby wildlife"), ScurryingCrab->IsScurrying());
+				BlueprintController->CheckForNearbyCrabScurry();
+				BlueprintController->Tick(0.25f);
+				TestTrue(TEXT("A grounded raven briefly looks toward a nearby scurrying crab"),
+					BlueprintController->CrabScurryAttentionRemaining > 0.f &&
+					FMath::Abs(BlueprintHeadPivot->GetRelativeRotation().Yaw) > 4.f &&
+					FMath::Abs(BlueprintHeadPivot->GetRelativeRotation().Yaw) <= 25.f);
+				TestTrue(TEXT("Noticing the crab does not move the raven"),
+					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeCrab, 0.1f));
+				const float CrabAttentionAfterNotice = BlueprintController->CrabScurryAttentionRemaining;
+				BlueprintController->Tick(0.25f);
+				TestTrue(TEXT("Crab attention fades on a short timer"),
+					BlueprintController->CrabScurryAttentionRemaining < CrabAttentionAfterNotice);
+				BlueprintController->CrabScurryAttentionRemaining = 0.f;
+				BlueprintController->CheckForNearbyCrabScurry();
+				TestTrue(TEXT("One scurry cannot repeatedly restart the same glance"),
+					FMath::IsNearlyZero(BlueprintController->CrabScurryAttentionRemaining));
+				ScurryingCrab->ScurryRemaining = 0.f;
+				TestFalse(TEXT("A crab's brief scurry naturally ends"), ScurryingCrab->IsScurrying());
+				BlueprintController->CheckForNearbyCrabScurry();
+				ScurryingCrab->RespondToQuietObservation(RavenPositionBeforeCrab);
+				BlueprintController->CheckForNearbyCrabScurry();
+				TestTrue(TEXT("A later scurry can draw the raven's attention again"),
+					BlueprintController->CrabScurryAttentionRemaining > 0.f);
+				ScurryingCrab->Destroy();
 			}
 
 			UClass* ConsciousResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,
