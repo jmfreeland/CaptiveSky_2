@@ -156,3 +156,14 @@ an LLM-driven Raven will choose to follow the invitation in a live session;
 agent thinking was intentionally disabled in physical probes to keep them at
 zero model requests. The in-world decision remains to be tested after the
 grounded shore route and map-navmesh question are resolved.
+
+An autonomous-choice check was attempted with the compiled scratch project,
+five seeded wrack items, an isolated output root, NullRHI, a 240-second play
+cap, and a five-request ceiling. Both `UnrealEditor.exe` and
+`UnrealEditor-Cmd.exe` exited with code 3 before producing a game log or
+populating their isolated world roots. No model request was made and the open
+interactive editor/map was untouched. Recent Application/WER queries had no
+matching crash report. This is a launch failure, not evidence that the Raven
+ignored the cue; the autonomous decision is still unverified. Resume only from
+a launch path that produces `LogInit` and `LogAgentSession` output, and retain
+the short realtime/request caps.
