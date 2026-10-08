@@ -20,18 +20,30 @@ retrigger, and group re-arming after everyone leaves and returns. The initial
 UE 5.8.3 UHT step passed. After the per-group weak-set, nearest-resident
 selection, and moving-target/early-release assertions, both changed translation
 units compiled directly with the project's cached UE 5.8.3 MSVC response files.
-This does not replace a fresh UHT pass or full editor-target link. Linking could
-not replace the loaded `UnrealEditor-CaptiveSky_2.dll`;
-Live Coding is disabled in this editor session. The RavenPerch automation has
-therefore not run against the new code, and visual readability remains
-unverified.
+That initial probe did not replace a fresh UHT pass or full editor-target link:
+the link could not replace the loaded `UnrealEditor-CaptiveSky_2.dll`, and Live
+Coding was unavailable in that editor session.
+
+**Isolated UE 5.8.3 validation (2026-10-08):** to validate without disturbing
+the open editor, the current `Source`, `Config`, `Plugins`, and project file
+were copied into a disposable scratch project with its own `Binaries` and
+`Intermediate`; its `Content` path was a junction to the project's existing
+assets. The `CaptiveSky_2Editor` target completed UHT and all 142 compile/link
+actions successfully in 107.58 seconds, including `RavenAgentAIController.cpp`
+and `RavenPerchTests.cpp`. Then `UnrealEditor-Cmd` ran
+`CaptiveSky2.Agent.RavenPerch` under UE 5.8.3 with `-NullRHI`, agent thinking
+disabled, a zero model-request cap, a 60-second runtime cap, and an isolated
+world-data root. The test completed with `Result={Success}` and exit code 0.
+This is current-source build and deterministic behavior evidence; it does not
+show the cue in the Island or validate its visual readability. The user's
+interactive editor and unsaved level were not saved, closed, or modified.
 
 The editor is the hidden process launched for MCP recovery, but its Island level
 shows `Island*` / `1 Unsaved`. It was left open to avoid discarding or saving
-unknown map state. Next: after the unsaved-level choice is resolved (or Live
-Coding is enabled), rebuild/link, run `CaptiveSky2.Agent.RavenPerch`, and take a
-short in-world look at the glance. Keep the cue nonverbal and non-persistent if
-presentation tuning is needed.
+unknown map state. Next: after the unsaved-level choice is resolved, load the
+validated code into the interactive editor and take a short in-world look at the
+glance. Keep the cue nonverbal and non-persistent if presentation tuning is
+needed.
 
 **Editor-session follow-up (2026-10-08):** Unreal MCP can currently see the
 `CaptiveSky_2 - Unreal Editor` window, and Windows reports its process as
