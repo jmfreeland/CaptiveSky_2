@@ -10,6 +10,7 @@
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandListeningStonePresentation.h"
+#include "IslandRainBasin.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandTideglassDragonfly.h"
@@ -125,6 +126,19 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		}
 		return Wrack->Examine(UIslandWrackSubsystem::ItemIdFromTag(TargetTag), UIslandWorldStateSubsystem::CurrentIslandDay(World),
 			Memory ? Memory->GetResolvedAgentId() : Observer->GetName(), OutFact);
+	}
+
+	if (TargetTag == FName(TEXT("RainBasin")))
+	{
+		UIslandRainBasinSubsystem* Basin = World->GetSubsystem<UIslandRainBasinSubsystem>();
+		if (!Basin)
+		{
+			OutFact = TEXT("You looked at the basin, but nothing about it can change here. Nothing changed.");
+			return false;
+		}
+		const UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>();
+		Basin->Examine(Memory ? Memory->GetResolvedAgentId() : Observer->GetName(), UIslandWorldStateSubsystem::CurrentIslandDay(World), OutFact);
+		return true;
 	}
 
 	if (TargetTag == FName(TEXT("GuestBook")))

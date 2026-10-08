@@ -32,6 +32,7 @@
 #include "IslandWrack.h"
 #include "IslandRainbow.h"
 #include "IslandDew.h"
+#include "IslandRainBasin.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandListeningStonesChime.h"
 
@@ -292,6 +293,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
 					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
+				if (const UIslandRainBasinSubsystem* Basin = GetWorld()->GetSubsystem<UIslandRainBasinSubsystem>())
+					NearbyBeings += Basin->DescribeNearby(Location);
 				if (const UIslandWrackSubsystem* Wrack = GetWorld()->GetSubsystem<UIslandWrackSubsystem>())
 				{
 					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
