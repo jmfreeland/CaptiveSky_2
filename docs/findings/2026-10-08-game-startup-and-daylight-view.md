@@ -97,3 +97,39 @@ this does not identify or resolve the earlier exception. The older parentless
 editor/MCP check did not require or initiate a reboot, though the recurring
 managed exception still requires a Reliability Monitor or equivalent
 faulting-application record to identify its source.
+
+## Tideglass ecology-cue visual recheck (2026-10-08)
+
+A separate main-project Game process reached the saved Island with the existing
+UE 5.8.3 runtime, using `-CaptiveSkyDisableAgentThinking`, `-DisablePython`, an
+isolated `-CaptiveSkyDataRoot`, a 90-real-second cap, and a one-request ceiling.
+It ended normally after 90.1 seconds with zero model requests. The open editor
+and its unsaved map were not used or saved. A prior attempt against a fresh
+scratch project hit its 180-second startup ceiling during cold shader/cache
+initialization; it never reached the map. Using the main project's already
+available shader/DDC path reached world-ready in 71.3 seconds. Logs:
+[`Codex_TideglassEcologyCue_MainProject_20261008.log`](../../Saved/Logs/Codex_TideglassEcologyCue_MainProject_20261008.log)
+and [`Codex_TideglassEcologyCue_Elevated_20261008.log`](../../Saved/Logs/Codex_TideglassEcologyCue_Elevated_20261008.log).
+
+The 1600×900 Game sequence produced three frames at Island-clock 09:00, 09:14,
+and 09:29, despite the startup request for hour 11; the requested hour override
+did not take effect and must be fixed before a matched 11:00 comparison:
+[`001_Tideglass.png`](../../Saved/EcoCue_MainProject_20261008/Screenshots/001_Tideglass.png),
+[`002_Tideglass.png`](../../Saved/EcoCue_MainProject_20261008/Screenshots/002_Tideglass.png),
+and [`003_Tideglass.png`](../../Saved/EcoCue_MainProject_20261008/Screenshots/003_Tideglass.png).
+They show the reflective pool, the transient stone presentation, a moving stag,
+and dragonflies, so the wider habitat feels more inhabited than a static
+landmark shot. They do not demonstrate the Raven/minnow behavior specifically.
+The same frame still has a crowded near edge, open brown middle-distance slope,
+thin distant tree silhouettes, and the Inn cut off at frame-left. The runtime
+again reports 13 Rhododendron Ever material instances missing the
+`InstancedStaticMeshes` usage flag and falling back to Default Material. Repair
+of those ignored `Content/` assets is pending explicit user coordination; no
+Content asset was changed. This is a composition/readability check, not a
+30-FPS gameplay profile or validation of voluntary agent behavior.
+
+Next: once the imported-flower repair is authorized and the hour override is
+reliable, rerun a matched 11:00 camera after restoring the flower readability,
+then do a separate PIE traversal profile with the foliage owner's current
+`IslandWeather.*` changes. Keep the 30-FPS p95 gate and don't infer performance
+from these frames.
