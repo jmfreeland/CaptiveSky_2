@@ -5,6 +5,7 @@
 #include "IslandTidepoolMinnows.generated.h"
 
 class AIslandWeather;
+class ARavenAgentAIController;
 class UMaterialInterface;
 class UStaticMeshComponent;
 
@@ -50,6 +51,7 @@ private:
 	float SurfaceBreakContextRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
 	int32 SurfaceBreakFishIndex = 0;
+	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float Phase = 0.73f;
@@ -57,7 +59,7 @@ private:
 	float GetScatterAlpha() const;
 	float GetSurfacePulseAlpha() const;
 	void ConfigureAppearance();
-	void CheckForLowRavenFlyby();
+	void CheckForNearbyRavenDisturbance();
 	void CheckForNaturalSurfaceRipple();
 	void TryCreateSurfaceBreak(float RainIntensity);
 	void UpdateSchool(float RainIntensity);

@@ -302,6 +302,42 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The school regroups without being repeatedly startled during one close pass"),
 			FMath::IsNearlyZero(School->ScatterRemaining) && School->RavenFlybyCooldownRemaining > 0.f);
 		FlybyController->LocomotionState = ERavenLocomotionState::Perched;
+		School->RavenFlybyCooldownRemaining = 0.f;
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-900.f, 0.f, 100.f));
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A settled raven at the far side of the pool does not disturb the school"),
+			FMath::IsNearlyZero(School->ScatterRemaining));
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 700.f));
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A nearby settled raven well above the shallows does not disturb the school"),
+			FMath::IsNearlyZero(School->ScatterRemaining));
+		const FVector PerchedRavenLocation = School->GetActorLocation() + FVector(-300.f, 0.f, 100.f);
+		RavenBody->SetActorLocation(PerchedRavenLocation);
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A nearby perched raven briefly scatters the minnow school"),
+			School->ScatterRemaining > 0.f && School->ScatterRemaining <= 2.4f);
+		TestTrue(TEXT("The school fans away from a settled raven"), School->ScatterDirection.X > 0.95f);
+		School->ScatterRemaining = 0.f;
+		School->RavenFlybyCooldownRemaining = 0.f;
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A lingering perched raven does not repeatedly scatter the school"),
+			FMath::IsNearlyZero(School->ScatterRemaining));
+		FlybyController->LocomotionState = ERavenLocomotionState::Flying;
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(0.f, 0.f, 900.f));
+		School->CheckForNearbyRavenDisturbance();
+		FlybyController->LocomotionState = ERavenLocomotionState::Perched;
+		RavenBody->SetActorLocation(PerchedRavenLocation);
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("Changing Raven flight state within the outer ring does not rearm the school"),
+			FMath::IsNearlyZero(School->ScatterRemaining));
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-900.f, 0.f, 100.f));
+		School->CheckForNearbyRavenDisturbance();
+		RavenBody->SetActorLocation(PerchedRavenLocation);
+		School->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("Leaving the outer ring and returning rearms the minnow response"),
+			School->ScatterRemaining > 0.f && School->ScatterRemaining <= 2.4f);
+		School->ScatterRemaining = 0.f;
+		School->RavenFlybyCooldownRemaining = 0.f;
 		FlybyController->UnPossess();
 	}
 

@@ -181,25 +181,44 @@ float AIslandTidepoolMinnows::GetSurfacePulseAlpha() const
 	return FMath::SmoothStep(0.f, 0.18f, Elapsed) * (1.f - FMath::SmoothStep(0.45f, 1.2f, Elapsed));
 }
 
-void AIslandTidepoolMinnows::CheckForLowRavenFlyby()
+void AIslandTidepoolMinnows::CheckForNearbyRavenDisturbance()
 {
-	if (!GetWorld() || ScatterRemaining > 0.f || RavenFlybyCooldownRemaining > 0.f) return;
+	if (!GetWorld()) return;
 
 	constexpr float FlybyRadius = 550.f;
 	constexpr float MinimumHeight = 150.f;
 	constexpr float MaximumHeight = 700.f;
+	constexpr float SettledRavenRadius = 450.f;
+	constexpr float SettledRavenHeight = 350.f;
+	constexpr float PresenceRearmRadius = 800.f;
 	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
 	{
-		if (It->LocomotionState != ERavenLocomotionState::Flying) continue;
 		const APawn* Raven = It->GetPawn();
 		if (!IsValid(Raven)) continue;
 
 		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
-		if (Offset.Z < MinimumHeight || Offset.Z > MaximumHeight || Offset.SizeSquared2D() > FMath::Square(FlybyRadius))
-			continue;
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const bool bSettledRaven = It->LocomotionState == ERavenLocomotionState::Grounded ||
+			It->LocomotionState == ERavenLocomotionState::Hopping || It->LocomotionState == ERavenLocomotionState::Perched;
+		if (RavenPresenceLatch.Get() == *It && DistanceSquared > FMath::Square(PresenceRearmRadius))
+			RavenPresenceLatch.Reset();
 
-		// A bird gliding low over the shallows briefly breaks the school's pattern; it is
-		// a visible world response, not a hunt, capture, model call, or lasting change.
+		const bool bCloseSettledPresence = bSettledRaven && FMath::Abs(Offset.Z) <= SettledRavenHeight &&
+			DistanceSquared <= FMath::Square(SettledRavenRadius);
+		const bool bLowFlyby = It->LocomotionState == ERavenLocomotionState::Flying &&
+			Offset.Z >= MinimumHeight && Offset.Z <= MaximumHeight && DistanceSquared <= FMath::Square(FlybyRadius);
+		if (bCloseSettledPresence)
+		{
+			// The school scatters once for an approach. Remaining nearby, including
+			// changing between perched and flying, does not repeatedly reset its path.
+			const bool bAlreadyNoticedThisApproach = RavenPresenceLatch.Get() == *It;
+			if (!bAlreadyNoticedThisApproach) RavenPresenceLatch = *It;
+			if (bAlreadyNoticedThisApproach || RavenFlybyCooldownRemaining > 0.f || ScatterRemaining > 0.f) continue;
+		}
+		else if (!bLowFlyby || RavenFlybyCooldownRemaining > 0.f || ScatterRemaining > 0.f) continue;
+
+		// A close, low pass or settled approach briefly breaks the school's pattern;
+		// this is not a hunt, capture, model call, or lasting change.
 		RespondToQuietObservation(Raven->GetActorLocation());
 		RavenFlybyCooldownRemaining = 8.f;
 		return;
@@ -257,7 +276,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.35f;
-		CheckForLowRavenFlyby();
+		CheckForNearbyRavenDisturbance();
 	}
 	const float Rain = Weather.IsValid() && GetWorld()
 		? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
