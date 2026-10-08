@@ -1,5 +1,16 @@
 #include "Misc/AutomationTest.h"
+#include "Engine/Engine.h"
+#include "Engine/TargetPoint.h"
+#include "Engine/World.h"
+#include "HAL/FileManager.h"
+#include "IslandChronicle.h"
+#include "IslandDayNight.h"
+#include "IslandInteractionUtility.h"
 #include "IslandWrack.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Guid.h"
+#include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWrackTest, "CaptiveSky2.Agent.IslandWrack",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -123,5 +134,78 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("A full shore is capped"), Full.Items.Num(), FIslandWrackLedger::MaxItems);
 	TestNull(TEXT("The oldest wrack was taken back"), Full.Find(First));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWrackBottleInteractionTest, "CaptiveSky2.Agent.IslandWrackBottleInteraction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWrackBottleInteractionTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Transient wrack interaction world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	const FString TestFolder = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/WrackBottle"));
+	const FString TestStem = FPaths::Combine(TestFolder, FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	const FString ChroniclePath = TestStem + TEXT("_chronicle.jsonl");
+	const FString WrackPath = TestStem + TEXT("_wrack.json");
+	IFileManager::Get().MakeDirectory(*TestFolder, true);
+	ON_SCOPE_EXIT
+	{
+		IFileManager::Get().Delete(*ChroniclePath, false, true);
+		IFileManager::Get().Delete(*WrackPath, false, true);
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+
+	UIslandChronicleSubsystem* Chronicle = World->GetSubsystem<UIslandChronicleSubsystem>();
+	UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>();
+	if (!TestNotNull(TEXT("Transient world chronicle subsystem exists"), Chronicle) ||
+		!TestNotNull(TEXT("Transient world wrack subsystem exists"), Wrack)) return false;
+	Chronicle->ChronicleFileOverride = ChroniclePath;
+	Wrack->StorageFileOverride = WrackPath;
+	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("Island clock is available for the interaction day"), Clock)) return false;
+	Clock->DayNumber = 5;
+
+	const FString EarlierThought = TEXT("I left the western stones in a little circle so the raven might notice.");
+	const FString ChronicleLine = UIslandChronicleSubsystem::FormatEntry(FDateTime::UtcNow(), 3, TEXT("18:30"),
+		TEXT("decision"), TEXT("Aster"), EarlierThought, {});
+	TestTrue(TEXT("Only the transient test chronicle receives the earlier thought"),
+		FFileHelper::SaveStringToFile(ChronicleLine + LINE_TERMINATOR, *ChroniclePath,
+			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM));
+	const FIslandWrackItem& Float = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Float,
+		FVector(100.f, 200.f, 0.f), 0.f, 22, 4);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ATargetPoint* Raven = World->SpawnActor<ATargetPoint>(FVector(100.f, 200.f, 0.f), FRotator::ZeroRotator, Spawn);
+	ATargetPoint* FloatActor = World->SpawnActor<ATargetPoint>(Float.Position, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Raven observer fixture exists"), Raven) || !TestNotNull(TEXT("Glass float target fixture exists"), FloatActor)) return false;
+	FloatActor->Tags = { UIslandWrackSubsystem::TargetTagFor(Float.Id), TEXT("IslandLandmark"), TEXT("StormWrack") };
+	FString Fact;
+	TestTrue(TEXT("Inspecting the float uses the ordinary landmark interaction route"),
+		IslandInteractionUtility::Perform(Raven, FloatActor, Fact));
+	TestTrue(TEXT("The earlier thought is attributed and quoted as the bottle's discovery"),
+		Fact.Contains(TEXT("Aster")) && Fact.Contains(TEXT("Island day 3")) && Fact.Contains(EarlierThought));
+	const FIslandWrackItem* TurnedFloat = Wrack->GetLedger().Find(Float.Id);
+	if (TestNotNull(TEXT("The inspected float remains in the local shore ledger"), TurnedFloat))
+	{
+		TestTrue(TEXT("The float stays turned over"), TurnedFloat->bTurned);
+		TestEqual(TEXT("The raven receives credit for finding the note"), TurnedFloat->TurnedBy, Raven->GetName());
+		TestTrue(TEXT("The discovered note is saved with the wrack record"), TurnedFloat->Find.Contains(EarlierThought));
+	}
+	FString SavedWrack;
+	FIslandWrackLedger Reloaded;
+	TestTrue(TEXT("The test-only shore file was written"), FFileHelper::LoadFileToString(SavedWrack, *WrackPath));
+	TestTrue(TEXT("The bottle's opened state and note survive reloading"), Reloaded.FromJson(SavedWrack) &&
+		Reloaded.Find(Float.Id) && Reloaded.Find(Float.Id)->bTurned && Reloaded.Find(Float.Id)->Find.Contains(EarlierThought));
 	return true;
 }

@@ -698,8 +698,9 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 	{
 		FString Contents;
 		TArray<FString> Lines;
-		const FString ChroniclePath = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("WorldState/chronicle.jsonl"));
-		if (bAllowStorage && FFileHelper::LoadFileToString(Contents, *ChroniclePath)) Contents.ParseIntoArrayLines(Lines);
+		const UIslandChronicleSubsystem* Chronicle = GetWorld() ? GetWorld()->GetSubsystem<UIslandChronicleSubsystem>() : nullptr;
+		const FString ChroniclePath = Chronicle ? Chronicle->GetChroniclePath() : FString();
+		if (bAllowStorage && !ChroniclePath.IsEmpty() && FFileHelper::LoadFileToString(Contents, *ChroniclePath)) Contents.ParseIntoArrayLines(Lines);
 		if (Lines.Num() > 3000) Lines.RemoveAt(0, Lines.Num() - 3000);
 		const FString Echo = EchoFromChronicle(Lines, Item.Seed, Today);
 		if (!Echo.IsEmpty())
