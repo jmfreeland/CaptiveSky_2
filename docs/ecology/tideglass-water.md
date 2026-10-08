@@ -294,3 +294,22 @@ finished waterline: from this low angle the water still has a defined outer edge
 grass partly occludes it. Runtime and automation logs are
 `Saved/Logs/Codex_TideglassShelfIteration5_20261007.log` and
 `Saved/Logs/Codex_TideglassShelfNormals_20261007.log`.
+
+## Latest bounded Game-frame review (2026-10-08)
+
+Three consecutive Tideglass Game frames at Day 1, 11:00, 11:14, and 11:29 are in the local
+`Playtests/Codex_TideglassCurrent_20261008/Screenshots/` capture. The pool and its darker sloped rim
+read clearly, and the grazing stag makes the middle ground feel inhabited. The closest grass still
+cuts across the near waterline in screen space; this is an edge-composition problem, not proof that
+plants are rooted in the water. Beyond the stag, a broad brown strip separates the lush foreground
+from thin distant trees, so simply increasing total vegetation would likely worsen the foreground
+without fixing depth. Several tiny bright flecks move over the water, but these frames do not make
+them identifiable as fish or a deliberate water cue.
+
+Next visual pass: use the same camera and lighting to open a clear foreground sightline to the pool,
+keep the authored wet-edge plants in a distinct narrow band, and strengthen mid-distance habitat
+masses rather than raising blanket density. Compare the unchanged view against the 30-FPS p95 screen
+and retain the open pool collision/traversal. Separately, inspect the minnow silhouettes and the
+transient surface-break cue at normal gameplay distance before changing their scale or brightness.
+The UE editor/MCP was unavailable during this review; the PNGs are a local playtest artifact, and no
+landscape or binary Content assets were changed in this pass.
