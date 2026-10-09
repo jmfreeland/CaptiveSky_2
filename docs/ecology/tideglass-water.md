@@ -443,15 +443,20 @@ with a restrained cyan tint, a 10% band, and a 72 cm peak radius so it reads wit
 over the shallows. Its screenshot probe waits 0.45 seconds after detecting the cue, near the ring's
 mid-pulse rather than its almost-invisible first frame.
 
-A final bounded UE 5.8.3 Game pass captured the ring cleanly on the water during an actual Raven
-low-flyby. This route recorded two samples inside the disturbance envelope and a maximum 17 cm fish
-centroid shift; the visible cue is proven, while more consistent school movement still merits a
-separate runtime check. The session used an isolated world state, disabled agent thinking and Python,
-allowed zero model requests, and had a 60-second real-time cap; it exited normally after the probe's
-short observation hold. The scratch Editor target rebuilt successfully (5 actions), and
-`CaptiveSky2.Agent.TidepoolMinnows` passed, including the one-tick flyby and ring-width checks.
-Evidence:
-[`build`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowContained_UBT.log),
-[`automation`](../../Saved/Logs/Codex_MinnowRippleContained_Automation.log),
-[`bounded Game`](../../Saved/Playtests/Codex_MinnowRippleContained_20261009/Codex_MinnowRippleContained_Game.log),
-and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowRippleContained_20261009/Screenshots/000_MinnowStartleMidPulse.png).
+A final bounded UE 5.8.3 Game pass captured the ring during an actual Raven low-flyby. Its original
+17 cm centroid figure came from only two samples while the Raven remained inside the disturbance
+envelope; it did not measure the full scatter response. The probe now records a cue-time baseline
+and continues sampling for 2.5 simulated seconds, even after the Raven leaves that envelope, holding
+an otherwise completed flight only until that short observation window ends.
+
+The repeat pass recorded six in-envelope samples and 29 post-startle samples. The fish-body centroid
+moved 205 cm from the cue-time baseline, independently confirming the earlier 208 cm whole-pass
+measurement above. Agent thinking and Python were disabled, the world state was isolated, the model
+request cap was zero (zero actual requests), and the Game had a 60-second real-time cap. It exited
+normally after the short probe hold. The UE 5.8.3 scratch Editor target rebuilt successfully (4
+actions), and `CaptiveSky2.Agent.TidepoolMinnows` passed, including the one-tick flyby and ring-width
+checks. Evidence:
+[`build`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowPostStartle_UBT.log),
+[`automation`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowPostStartle_Automation.log),
+[`bounded Game`](../../Saved/Playtests/Codex_MinnowPostStartle_20261009/Codex_MinnowPostStartle_WarmCache_Game.log),
+and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowPostStartle_20261009/ScreenshotsWarmCache/000_MinnowStartleMidPulse.png).

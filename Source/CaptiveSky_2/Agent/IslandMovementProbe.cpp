@@ -136,6 +136,10 @@ private:
 		int32 MinnowLowFlybySampleCount = 0;
 		float MaxMinnowCentroidShiftInBand = 0.f;
 		bool bLoggedMinnowStartleCue = false;
+		double MinnowStartleObservedAt = 0.0;
+		FVector MinnowStartleBaselineCentroid = FVector::ZeroVector;
+		int32 MinnowPostStartleSampleCount = 0;
+		float MaxMinnowCentroidShiftAfterStartle = 0.f;
 		bool bRequestedMinnowStartleScreenshot = false;
 		FTimerHandle MinnowScreenshotTimer;
 		FString MinnowStartleScreenshotPath;
@@ -187,17 +191,31 @@ private:
 		const float HorizontalDistance = Offset.Size2D();
 		const bool bLowFlybyEnvelope = RavenController->LocomotionState == ERavenLocomotionState::Flying &&
 			Offset.Z >= 150.f && Offset.Z <= 700.f && HorizontalDistance <= 550.f;
-		if (!bLowFlybyEnvelope) return;
+		if (bLowFlybyEnvelope)
+		{
+			++State->MinnowLowFlybySampleCount;
+			const float CentroidShift = FVector::Dist(BodyCentroid, State->MinnowBaselineCentroid);
+			State->MaxMinnowCentroidShiftInBand = FMath::Max(State->MaxMinnowCentroidShiftInBand, CentroidShift);
+			if (!State->bLoggedMinnowBandEntry)
+			{
+				State->bLoggedMinnowBandEntry = true;
+				UE_LOG(LogIslandMovementProbe, Log,
+					TEXT("Raven entered the minnow low-flyby envelope: horizontal %.0f cm, vertical %.0f cm, school bodies %d, centroid shift %.0f cm."),
+					HorizontalDistance, Offset.Z, BodyCount, CentroidShift);
+			}
+		}
 
-		++State->MinnowLowFlybySampleCount;
-		const float CentroidShift = FVector::Dist(BodyCentroid, State->MinnowBaselineCentroid);
-		State->MaxMinnowCentroidShiftInBand = FMath::Max(State->MaxMinnowCentroidShiftInBand, CentroidShift);
 		if (!State->bLoggedMinnowStartleCue)
 		{
 			for (TActorIterator<AActor> It(World); It; ++It)
 			{
 				if (!It->ActorHasTag(TEXT("MinnowStartleImpact"))) continue;
 				State->bLoggedMinnowStartleCue = true;
+				State->MinnowStartleObservedAt = World->GetTimeSeconds();
+				State->MinnowStartleBaselineCentroid = BodyCentroid;
+				UE_LOG(LogIslandMovementProbe, Log,
+					TEXT("Captured post-startle minnow baseline: %d fish bodies at relative centroid %s; tracking their full 2.4-second response."),
+					BodyCount, *BodyCentroid.ToCompactString());
 				UE_LOG(LogIslandMovementProbe, Log,
 					TEXT("Observed the live minnow startle cue at %s during Raven low-flyby sample %d."),
 					*It->GetActorLocation().ToCompactString(), State->MinnowLowFlybySampleCount);
@@ -223,12 +241,12 @@ private:
 				break;
 			}
 		}
-		if (!State->bLoggedMinnowBandEntry)
+
+		if (State->bLoggedMinnowStartleCue && World->GetTimeSeconds() - State->MinnowStartleObservedAt <= 2.5)
 		{
-			State->bLoggedMinnowBandEntry = true;
-			UE_LOG(LogIslandMovementProbe, Log,
-				TEXT("Raven entered the minnow low-flyby envelope: horizontal %.0f cm, vertical %.0f cm, school bodies %d, centroid shift %.0f cm."),
-				HorizontalDistance, Offset.Z, BodyCount, CentroidShift);
+			++State->MinnowPostStartleSampleCount;
+			const float PostStartleShift = FVector::Dist(BodyCentroid, State->MinnowStartleBaselineCentroid);
+			State->MaxMinnowCentroidShiftAfterStartle = FMath::Max(State->MaxMinnowCentroidShiftAfterStartle, PostStartleShift);
 		}
 	}
 
@@ -236,8 +254,9 @@ private:
 	{
 		if (!State->bHasMinnowBaseline) return;
 		UE_LOG(LogIslandMovementProbe, Log,
-			TEXT("Raven/minnow probe summary: %d low-flyby samples; maximum fish-body centroid shift inside the envelope %.0f cm from the pre-action baseline."),
-			State->MinnowLowFlybySampleCount, State->MaxMinnowCentroidShiftInBand);
+			TEXT("Raven/minnow probe summary: %d low-flyby samples; maximum fish-body centroid shift inside the envelope %.0f cm from the pre-action baseline; %d post-startle samples and %.0f cm maximum shift from the cue-time baseline."),
+			State->MinnowLowFlybySampleCount, State->MaxMinnowCentroidShiftInBand,
+			State->MinnowPostStartleSampleCount, State->MaxMinnowCentroidShiftAfterStartle);
 	}
 
 	static void Poll(const TSharedRef<FProbeState>& State)
@@ -420,6 +439,11 @@ private:
 			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving;
 		if (bComplete || bTimedOut || bMovementStopped)
 		{
+			if (bComplete && State->bLoggedMinnowStartleCue &&
+				World->GetTimeSeconds() - State->MinnowStartleObservedAt < 2.5)
+			{
+				return;
+			}
 			const float Distance = FVector::Dist2D(State->StartLocation, Pawn->GetActorLocation());
 			if (bComplete)
 			{
