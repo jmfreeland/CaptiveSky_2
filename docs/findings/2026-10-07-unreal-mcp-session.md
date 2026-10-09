@@ -199,3 +199,24 @@ Next, if the desktop dialog appears again, correlate its timestamp and owning
 process with the UBT AutoSDK child while preserving the visible editor state.
 The current successful automation is evidence that the code path can be
 non-fatal, not a fix for the CLR exception.
+
+## 2026-10-10 repeated popup: live desktop check
+
+The user supplied the same `dotnet.exe - Application Error` dialog again. A
+read-only desktop inspection confirmed the modal was still open and showed
+exception `0xe0434352` at `0x00007FFD8E6B483A`. The window was exposed under
+`csrss.exe`; a contemporaneous process query found no `dotnet.exe`,
+`UnrealBuildTool`, `AutomationTool`, `UnrealEditor`, or `UnrealEditor-Cmd`, so
+there was no live command line or process tree to correlate with the modal.
+
+The captured desktop image also included a separate-looking Windows alert
+naming `UnrealBuildTool` from Epic Games, Inc., with wording about public and
+private network access. The alert was not separately targetable in the window
+list, and no firewall choice was made. This makes an Unreal
+startup attempt plausible, but does not prove that the alert caused this
+managed exception or that the popup is from the same process. The latest
+bounded saved-Island Game log remains a successful, separate run: AutoSDK
+returned 0 and the session shut down normally after 60.1 seconds with zero
+model requests. The current exception's managed stack and owner remain
+unidentified; the next useful evidence is a fresh process/command line at the
+moment of another reproduction, without changing firewall settings blindly.
