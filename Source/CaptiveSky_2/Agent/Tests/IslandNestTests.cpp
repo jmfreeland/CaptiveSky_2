@@ -178,9 +178,41 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("One visible nest actor"), CountNestActors(World, Site), 1);
 	for (TActorIterator<AIslandNest> It(World); It; ++It)
 	{
-		TestEqual(TEXT("One layer of twigs is visible"), It->GetVisibleTwigCount(), AIslandNest::TwigsPerLayer);
+		TestEqual(TEXT("A shallow woven base sits beneath the first twig layer"), It->GetVisibleTwigCount(),
+			AIslandNest::FoundationTwigCount + AIslandNest::TwigsPerLayer);
 		TestTrue(TEXT("Nest rests on the support surface, not the marker in the air"), FMath::IsNearlyEqual(It->GetActorLocation().Z, SupportTop, 4.f));
 		TestTrue(TEXT("Nest is visual only and cannot alter perch support"), It->GetActorEnableCollision() == false || It->GetRootComponent()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+
+		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
+		TestNotNull(TEXT("The visible nest exposes its foundation instances for inspection"), TwigInstances);
+		if (!TwigInstances) continue;
+		TArray<FTransform> FoundationTransforms;
+		for (int32 Index = 0; Index < AIslandNest::FoundationTwigCount; ++Index)
+		{
+			FTransform TwigTransform;
+			TestTrue(FString::Printf(TEXT("Foundation twig %d has a visible instance transform"), Index),
+				TwigInstances->GetInstanceTransform(Index, TwigTransform, false));
+			if (TwigInstances->GetInstanceTransform(Index, TwigTransform, false))
+			{
+				const FVector TwigAxis = TwigTransform.GetRotation().RotateVector(FVector::UpVector).GetSafeNormal();
+				TestTrue(FString::Printf(TEXT("Foundation twig %d lies nearly flat"), Index), FMath::Abs(TwigAxis.Z) < 0.1f);
+				TestTrue(FString::Printf(TEXT("Foundation twig %d sits at the floor of the nest"), Index),
+					FMath::Abs(TwigTransform.GetLocation().Z - 1.5f) < 0.3f);
+				FoundationTransforms.Add(TwigTransform);
+			}
+		}
+		It->SetWoven(Site, 1);
+		for (int32 Index = 0; Index < FoundationTransforms.Num(); ++Index)
+		{
+			FTransform RebuiltTransform;
+			const bool bFoundTransform = TwigInstances->GetInstanceTransform(Index, RebuiltTransform, false);
+			TestTrue(FString::Printf(TEXT("Foundation twig %d remains after repeating the same weave"), Index), bFoundTransform);
+			if (bFoundTransform)
+			{
+				TestTrue(FString::Printf(TEXT("Foundation twig %d is deterministic for its site"), Index),
+					FoundationTransforms[Index].Equals(RebuiltTransform, 0.01f));
+			}
+		}
 	}
 	TestTrue(TEXT("Raven still counts as perched on real support after weaving"), Controller->LocomotionState == ERavenLocomotionState::Perched);
 	FAgentDecision SleepAtNest;
@@ -211,13 +243,13 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	{
 		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
 		TestNotNull(TEXT("The visible nest exposes its instance weave for inspection"), TwigInstances);
-		if (!TwigInstances || TwigInstances->GetInstanceCount() != 2 * AIslandNest::TwigsPerLayer) continue;
+		if (!TwigInstances || TwigInstances->GetInstanceCount() != AIslandNest::FoundationTwigCount + 2 * AIslandNest::TwigsPerLayer) continue;
 		for (int32 Layer = 0; Layer < 2; ++Layer)
 		{
 			for (int32 Twig = 0; Twig < AIslandNest::TwigsPerLayer; ++Twig)
 			{
 				FTransform TwigTransform;
-				const int32 InstanceIndex = Layer * AIslandNest::TwigsPerLayer + Twig;
+				const int32 InstanceIndex = AIslandNest::FoundationTwigCount + Layer * AIslandNest::TwigsPerLayer + Twig;
 				if (!TwigInstances->GetInstanceTransform(InstanceIndex, TwigTransform, false))
 				{
 					AddError(FString::Printf(TEXT("Could not inspect nest twig %d"), InstanceIndex));

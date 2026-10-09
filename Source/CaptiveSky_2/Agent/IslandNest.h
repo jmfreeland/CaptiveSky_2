@@ -20,6 +20,7 @@ public:
 	AIslandNest();
 
 	static constexpr int32 TwigsPerLayer = 7;
+	static constexpr int32 FoundationTwigCount = 5;
 	static constexpr int32 StormDebrisTwigCount = 5;
 
 	void SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebris = false);

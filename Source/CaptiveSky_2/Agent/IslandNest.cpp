@@ -54,6 +54,26 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 	FRandomStream Weave(static_cast<int32>(GetTypeHash(SiteTag.ToString())));
 	Twigs->ClearInstances();
 	FallenTwigs->ClearInstances();
+	if (WovenLayers > 0)
+	{
+		// Cross a small floor beneath the first hoop so a nest reads as a cup, not an open ring stack.
+		// These are still visual-only twigs; the nest does not gain collision or shelter semantics.
+		for (int32 Index = 0; Index < FoundationTwigCount; ++Index)
+		{
+			const bool bAlongX = Index < 3;
+			const float CourseOffset = bAlongX
+				? (static_cast<float>(Index) - 1.f) * 5.f
+				: (Index == 3 ? -2.5f : 2.5f);
+			const FVector Position(
+				bAlongX ? Weave.FRandRange(-1.f, 1.f) : CourseOffset,
+				bAlongX ? CourseOffset : Weave.FRandRange(-1.f, 1.f),
+				1.5f + Weave.FRandRange(-0.25f, 0.25f));
+			const float AxisYaw = bAlongX ? 0.f : 90.f;
+			const FRotator Lie(90.f + Weave.FRandRange(-4.f, 4.f), AxisYaw + Weave.FRandRange(-3.f, 3.f), 0.f);
+			const float TwigLength = Weave.FRandRange(0.31f, 0.35f);
+			Twigs->AddInstance(FTransform(Lie, Position, FVector(0.022f, 0.022f, TwigLength)));
+		}
+	}
 	for (int32 Layer = 0; Layer < WovenLayers; ++Layer)
 	{
 		// Lower layers form the cup; later layers widen and raise the rim.
