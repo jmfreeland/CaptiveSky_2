@@ -524,7 +524,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
-		RavenCheckRemaining = 0.35f;
+		RavenCheckRemaining = RavenCheckIntervalSeconds;
 		CheckForNearbyRavenDisturbance();
 	}
 	const float Rain = Weather.IsValid() && GetWorld()

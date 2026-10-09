@@ -243,13 +243,20 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("Nearby shore wildlife can recognize the cue as a minnow surface disturbance"),
 			ObserverStartleRipple->ActorHasTag(TEXT("MinnowImpact")) && ObserverStartleRipple->ActorHasTag(TEXT("MinnowStartleImpact")));
-		TestTrue(TEXT("The startle ripple is brief, slightly broader than a fish's surface break, and below deliberate pool inspection"),
+		TestTrue(TEXT("The startle ripple is brief, broad enough to notice, and contained near the fish in the shallows"),
 			FMath::IsNearlyEqual(ObserverStartleRipple->DurationSeconds, 1.15f) &&
-			FMath::IsNearlyEqual(ObserverStartleRipple->SurfaceRadius, 104.f) &&
+			FMath::IsNearlyEqual(ObserverStartleRipple->SurfaceRadius, 72.f) &&
 			ObserverStartleRipple->PeakLightIntensity > 1.35f && ObserverStartleRipple->PeakLightIntensity <= 5.f);
 		TestTrue(TEXT("A startle response renders a visible continuous surface ring in addition to its moving highlights"),
 			ObserverStartleRipple->StartleRing && ObserverStartleRipple->StartleRing->IsVisible() &&
-			ObserverStartleRipple->StartleRing->GetProcMeshSection(0) != nullptr);
+			ObserverStartleRipple->StartleRing->GetProcMeshSection(0) != nullptr &&
+			ObserverStartleRipple->StartleRingMaterial &&
+			ObserverStartleRipple->StartleRing->GetRelativeLocation().Z >= 32.f);
+		const FProcMeshSection* StartleRingSection = ObserverStartleRipple->StartleRing
+			? ObserverStartleRipple->StartleRing->GetProcMeshSection(0) : nullptr;
+		TestTrue(TEXT("The surface ring has a broad enough band to remain legible over moving water"),
+			StartleRingSection && StartleRingSection->ProcVertexBuffer.Num() >= 2 &&
+			FVector::Dist(StartleRingSection->ProcVertexBuffer[0].Position, StartleRingSection->ProcVertexBuffer[1].Position) >= 0.09f);
 		TestTrue(TEXT("The cue starts at the nearest fish on the current Tideglass surface"),
 			ObserverStartleRipple->GetActorLocation().Equals(ExpectedStartleRippleLocation, 0.1f));
 		ObserverStartleRipple->Tick(0.5f);
@@ -260,6 +267,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
 			if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) ++RepeatedStartleRippleCount;
 		TestEqual(TEXT("A repeated quiet look cannot stack a startle cue inside its short cooldown"), RepeatedStartleRippleCount, 1);
+		ObserverStartleRipple->Tags.Remove(TEXT("MinnowStartleImpact"));
 		ObserverStartleRipple->Destroy();
 	}
 	School->Tick(0.7f);
@@ -399,6 +407,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		if (TestNotNull(TEXT("A resident controller can inspect its immediate wildlife context"), CueObserverController))
 		{
 			CueObserverController->Possess(Visitor);
+			World->GetTimerManager().ClearAllTimersForObject(CueObserverController);
 			const FString NearbyContext = CueObserverController->DescribeActionState();
 			TestTrue(TEXT("The cue remains available through the longest normal decision interval and timer slack"),
 				FMath::IsNearlyEqual(School->SurfaceBreakContextRemaining, AIslandTidepoolMinnows::SurfaceBreakContextLifetime));
@@ -416,6 +425,9 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			CueObserverController->Destroy();
 		}
 		MinnowRipple->Destroy();
+		School->ScatterRemaining = 0.f;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+			if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) It->Destroy();
 	}
 
 	ARavenAgentAIController* FlybyController = World->SpawnActor<ARavenAgentAIController>(Spawn);
@@ -423,6 +435,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("Raven controller spawned for overhead ecology"), FlybyController) && TestNotNull(TEXT("Raven body spawned for overhead ecology"), RavenBody))
 	{
 		FlybyController->Possess(RavenBody);
+		World->GetTimerManager().ClearAllTimersForObject(FlybyController);
 		FlybyController->LocomotionState = ERavenLocomotionState::Flying;
 		School->Tick(0.4f);
 		TestTrue(TEXT("High flight remains outside the fish school's disturbance height"), FMath::IsNearlyZero(School->ScatterRemaining));
@@ -430,6 +443,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		School->Tick(0.4f);
 		TestTrue(TEXT("Distant flight remains outside the Tideglass disturbance radius"), FMath::IsNearlyZero(School->ScatterRemaining));
 		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 400.f));
+		School->ScatterRemaining = 0.f;
+		School->RavenFlybyCooldownRemaining = 0.f;
+		School->RavenCheckRemaining = 0.f;
+		School->RavenPresenceLatch.Reset();
 		School->ScatterSurfaceCueCooldownRemaining = 0.f;
 		FVector ExpectedRavenRippleLocation = FVector::ZeroVector;
 		NearestFishDistanceSquared = TNumericLimits<float>::Max();
@@ -478,6 +495,23 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		School->Tick(3.f);
 		TestTrue(TEXT("The school regroups without being repeatedly startled during one close pass"),
 			FMath::IsNearlyZero(School->ScatterRemaining) && School->RavenFlybyCooldownRemaining > 0.f);
+		FlybyController->LocomotionState = ERavenLocomotionState::Flying;
+		School->RavenFlybyCooldownRemaining = 0.f;
+		School->ScatterSurfaceCueCooldownRemaining = 0.f;
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-3000.f, 0.f, 400.f));
+		School->RavenCheckRemaining = 0.f;
+		School->Tick(0.06f);
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 400.f));
+		School->Tick(0.06f);
+		TestTrue(TEXT("A one-tick low Raven pass is detected by the per-tick ecology poll"),
+			School->ScatterRemaining > 0.f && School->RavenFlybyCooldownRemaining > 0.f);
+		School->ScatterRemaining = 0.f;
+		School->RavenFlybyCooldownRemaining = 0.f;
+		School->RavenCheckRemaining = 0.f;
+		School->ScatterSurfaceCueCooldownRemaining = 0.f;
+		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+			if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) It->Destroy();
+		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-3000.f, 0.f, 400.f));
 		FlybyController->LocomotionState = ERavenLocomotionState::Perched;
 		School->RavenFlybyCooldownRemaining = 0.f;
 		RavenBody->SetActorLocation(School->GetActorLocation() + FVector(-900.f, 0.f, 100.f));

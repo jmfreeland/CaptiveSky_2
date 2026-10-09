@@ -37,6 +37,7 @@ private:
 	static constexpr int32 FishCount = 5;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
+	static constexpr float RavenCheckIntervalSeconds = 0.06f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")

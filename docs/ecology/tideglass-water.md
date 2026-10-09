@@ -437,11 +437,21 @@ continuous procedural ring that expands with the moving highlights; rain and win
 the cue. The UE 5.8.3 scratch build and automation passed; see the
 [`automation log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Saved/Logs/Codex_MinnowSurfaceRing_Automation_20261009.log).
 
-Rendered readability is still unverified. The old close frames above predate the geometry. A new
-bounded Game attempt was held in cold shader/texture initialization before the Island world loaded;
-after ten minutes without a screenshot it was stopped along with its own shader workers. Its isolated
-local DDC remains at
-[`MinnowSurfaceRing DDC`](../../Saved/Playtests/Codex_MinnowSurfaceRing_20261009b/DDC/), so a future
-visual pass can reuse the partial cache. Do not treat the geometric ring as visually proven until a
-post-startle frame confirms it reads cleanly against the water. If it still disappears, a
-material-driven surface-normal response is the stronger next step.
+The first rendered checks showed that a narrow band on the lit basic-shape material still vanished
+among the pool's specular facets. The startle-only ring now uses UE's unlit emissive engine material,
+with a restrained cyan tint, a 10% band, and a 72 cm peak radius so it reads without spilling as far
+over the shallows. Its screenshot probe waits 0.45 seconds after detecting the cue, near the ring's
+mid-pulse rather than its almost-invisible first frame.
+
+A final bounded UE 5.8.3 Game pass captured the ring cleanly on the water during an actual Raven
+low-flyby. This route recorded two samples inside the disturbance envelope and a maximum 17 cm fish
+centroid shift; the visible cue is proven, while more consistent school movement still merits a
+separate runtime check. The session used an isolated world state, disabled agent thinking and Python,
+allowed zero model requests, and had a 60-second real-time cap; it exited normally after the probe's
+short observation hold. The scratch Editor target rebuilt successfully (5 actions), and
+`CaptiveSky2.Agent.TidepoolMinnows` passed, including the one-tick flyby and ring-width checks.
+Evidence:
+[`build`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowContained_UBT.log),
+[`automation`](../../Saved/Logs/Codex_MinnowRippleContained_Automation.log),
+[`bounded Game`](../../Saved/Playtests/Codex_MinnowRippleContained_20261009/Codex_MinnowRippleContained_Game.log),
+and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowRippleContained_20261009/Screenshots/000_MinnowStartleMidPulse.png).

@@ -11,7 +11,9 @@ AIslandPoolRippleEffect::AIslandPoolRippleEffect()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.025f;
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	// An unlit engine material keeps this small interaction cue legible on water
+	// even when the scene's specular facets and direct sun are brighter than its light.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
 	RippleMaterial = BasicMaterial.Succeeded() ? BasicMaterial.Object : nullptr;
 	Tags.AddUnique(TEXT("IslandTransientEffect"));
 	Tags.AddUnique(TEXT("TideglassRipple"));
@@ -32,7 +34,9 @@ AIslandPoolRippleEffect::AIslandPoolRippleEffect()
 
 	StartleRing = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("MinnowStartleRing"));
 	StartleRing->SetupAttachment(RootComponent);
-	StartleRing->SetRelativeLocation(FVector(0.f, 0.f, 25.f));
+	// Lift the surface cue just clear of the water's moving facets so the narrow
+	// procedural band cannot disappear into the prototype pool mesh.
+	StartleRing->SetRelativeLocation(FVector(0.f, 0.f, 32.f));
 	StartleRing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	StartleRing->SetCastShadow(false);
 	StartleRing->SetCanEverAffectNavigation(false);
@@ -80,7 +84,7 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowImpact()
 void AIslandPoolRippleEffect::ConfigureAsMinnowStartleImpact()
 {
 	DurationSeconds = 1.15f;
-	SurfaceRadius = 104.f;
+	SurfaceRadius = 72.f;
 	PeakLightIntensity = 5.f;
 	Tags.AddUnique(TEXT("MinnowImpact"));
 	Tags.AddUnique(TEXT("MinnowStartleImpact"));
@@ -113,9 +117,10 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		StartleRing->SetRelativeScale3D(FVector(RingRadius, RingRadius, 1.f));
 		if (StartleRingMaterial)
 		{
-			const FLinearColor RingTint = FLinearColor(0.08f, 0.78f, 0.92f) * Pulse;
+			const FLinearColor RingTint = FLinearColor(0.035f, 0.58f, 0.72f) * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
+			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);
 		}
 	}
 	for (int32 Index = 0; Index < RippleLights.Num(); ++Index)
@@ -132,7 +137,9 @@ void AIslandPoolRippleEffect::BuildStartleRing()
 	if (!StartleRing) return;
 
 	constexpr int32 SegmentCount = 64;
-	constexpr float InnerRadius = 0.965f;
+	// A narrow ring disappears among the prototype water's broad specular facets.
+	// Keep this a soft band, but give it enough surface area to read at game scale.
+	constexpr float InnerRadius = 0.90f;
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;

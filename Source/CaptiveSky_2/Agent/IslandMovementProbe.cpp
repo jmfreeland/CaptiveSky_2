@@ -11,8 +11,13 @@
 #include "HAL/PlatformMisc.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "HAL/FileManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "TimerManager.h"
+#include "UnrealClient.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandMovementProbe, Log, All);
 
@@ -130,6 +135,10 @@ private:
 		int32 MinnowBodyCount = 0;
 		int32 MinnowLowFlybySampleCount = 0;
 		float MaxMinnowCentroidShiftInBand = 0.f;
+		bool bLoggedMinnowStartleCue = false;
+		bool bRequestedMinnowStartleScreenshot = false;
+		FTimerHandle MinnowScreenshotTimer;
+		FString MinnowStartleScreenshotPath;
 	};
 
 	static bool SampleMinnowSchool(UWorld* World, FVector& OutSchoolLocation, FVector& OutBodyCentroid, int32& OutBodyCount)
@@ -183,6 +192,37 @@ private:
 		++State->MinnowLowFlybySampleCount;
 		const float CentroidShift = FVector::Dist(BodyCentroid, State->MinnowBaselineCentroid);
 		State->MaxMinnowCentroidShiftInBand = FMath::Max(State->MaxMinnowCentroidShiftInBand, CentroidShift);
+		if (!State->bLoggedMinnowStartleCue)
+		{
+			for (TActorIterator<AActor> It(World); It; ++It)
+			{
+				if (!It->ActorHasTag(TEXT("MinnowStartleImpact"))) continue;
+				State->bLoggedMinnowStartleCue = true;
+				UE_LOG(LogIslandMovementProbe, Log,
+					TEXT("Observed the live minnow startle cue at %s during Raven low-flyby sample %d."),
+					*It->GetActorLocation().ToCompactString(), State->MinnowLowFlybySampleCount);
+				if (!State->bRequestedMinnowStartleScreenshot && FParse::Param(FCommandLine::Get(), TEXT("SpectatorShots")))
+				{
+					FString ScreenshotDirectory;
+					if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorScreenshotDir="), ScreenshotDirectory) && !ScreenshotDirectory.IsEmpty())
+					{
+						IFileManager::Get().MakeDirectory(*ScreenshotDirectory, true);
+						State->MinnowStartleScreenshotPath = FPaths::Combine(ScreenshotDirectory, TEXT("000_MinnowStartleMidPulse.png"));
+						// The ring deliberately grows from a quiet first frame. Capture near
+						// its mid-pulse so the probe judges the cue at its intended visibility.
+						World->GetTimerManager().SetTimer(State->MinnowScreenshotTimer,
+							FTimerDelegate::CreateLambda([State]()
+							{
+								FScreenshotRequest::RequestScreenshot(State->MinnowStartleScreenshotPath, true, false);
+								UE_LOG(LogIslandMovementProbe, Log, TEXT("Requested mid-pulse startle screenshot at %s."), *State->MinnowStartleScreenshotPath);
+							}), 0.45f, false);
+						State->bRequestedMinnowStartleScreenshot = true;
+						UE_LOG(LogIslandMovementProbe, Log, TEXT("Scheduled mid-pulse startle screenshot at %s."), *State->MinnowStartleScreenshotPath);
+					}
+				}
+				break;
+			}
+		}
 		if (!State->bLoggedMinnowBandEntry)
 		{
 			State->bLoggedMinnowBandEntry = true;
