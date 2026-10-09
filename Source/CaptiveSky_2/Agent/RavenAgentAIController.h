@@ -59,6 +59,15 @@ public:
 
 	/** Read-only collision assessment for a tagged roost marker; does not begin movement or claim ownership. */
 	FString AssessRoostSite(const AActor* Site) const;
+	/** True only while the settled bird's head is visibly following one of its brief attention cues. */
+	bool IsShowingDirectedAttention() const
+	{
+		const bool bCanAttend = (LocomotionState == ERavenLocomotionState::Grounded ||
+			LocomotionState == ERavenLocomotionState::Perched) && !IsResting();
+		return bCanAttend && (ListeningStoneAttentionRemaining > 0.f || MinnowRippleAttentionRemaining > 0.f ||
+			RainBasinAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f || WindMoteAttentionRemaining > 0.f ||
+			CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f);
+	}
 	/** Maximum visible distance for selecting an exact open-ground landing target. */
 	static constexpr float GroundLandingVisibilityRange = 3500.f;
 

@@ -331,12 +331,44 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					BlueprintController->RainBasinAttentionRemaining > 0.f &&
 					BlueprintController->RainBasinLocation.Equals(BasinState.Location +
 						FVector(0.f, 0.f, AIslandRainBasin::FloorThickness + AIslandRainBasin::WaterDepth(BasinState.Water)), 0.1f));
+				TestTrue(TEXT("A settled raven exposes an active visible attention pose"), BlueprintController->IsShowingDirectedAttention());
+				BlueprintController->LocomotionState = ERavenLocomotionState::Flying;
+				TestFalse(TEXT("A flying raven does not report a head-attention pose to nearby residents"),
+					BlueprintController->IsShowingDirectedAttention());
+				BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
 				BlueprintController->Tick(0.25f);
 				TestFalse(TEXT("The raven briefly turns its head toward the water surface"),
 					BlueprintHeadPivot->GetRelativeRotation().Equals(BlueprintController->RavenHeadRestRotation, 0.1f));
 				TestTrue(TEXT("Noticing the rain basin leaves the raven in place"),
 					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeRainBasin, 0.1f));
+
+				ACharacter* CuriousResident = World->SpawnActor<ACharacter>(
+					RavenPositionBeforeRainBasin + FVector(0.f, -350.f, 0.f), FRotator(0.f, 90.f, 0.f));
+				UAgentBrainComponent* CuriousResidentBrain = CuriousResident
+					? NewObject<UAgentBrainComponent>(CuriousResident) : nullptr;
+				if (CuriousResident && CuriousResidentBrain)
+				{
+					CuriousResident->AddInstanceComponent(CuriousResidentBrain);
+					FAgentConversationContext NoMessageContext;
+					const FString NearbyRavenObservation = CuriousResidentBrain->BuildSituationSummary(NoMessageContext);
+					TestTrue(TEXT("A nearby resident can notice the raven's brief head turn without being told what caused it"),
+						NearbyRavenObservation.Contains(TEXT("the raven's head is briefly turned toward something")) &&
+						NearbyRavenObservation.Contains(TEXT("cannot tell what has caught its attention")));
+					CuriousResident->SetActorLocation(RavenPositionBeforeRainBasin + FVector(0.f, -900.f, 0.f));
+					const FString DistantRavenObservation = CuriousResidentBrain->BuildSituationSummary(NoMessageContext);
+					TestFalse(TEXT("The brief head-turn cue is omitted beyond close visual range"),
+						DistantRavenObservation.Contains(TEXT("the raven's head is briefly turned toward something")));
+				}
+				else AddError(TEXT("A resident observer is required to verify the Raven's visible attention cue."));
+
 				BlueprintController->RainBasinAttentionRemaining = 0.f;
+				if (CuriousResidentBrain)
+				{
+					CuriousResident->SetActorLocation(RavenPositionBeforeRainBasin + FVector(0.f, -350.f, 0.f));
+					const FString QuietRavenObservation = CuriousResidentBrain->BuildSituationSummary(FAgentConversationContext());
+					TestFalse(TEXT("The brief attention cue disappears when the raven's glance has faded"),
+						QuietRavenObservation.Contains(TEXT("the raven's head is briefly turned toward something")));
+				}
 				BlueprintController->CheckForNearbyRainBasin();
 				TestTrue(TEXT("One continuously wet basin cannot repeatedly restart the glance"),
 					FMath::IsNearlyZero(BlueprintController->RainBasinAttentionRemaining));
