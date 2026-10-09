@@ -63,8 +63,17 @@ Both bounded runs used a 120-second watchdog and zero model requests.
 The physical sweeps identified both the large `SM_Rock` and map-placed grass actors as
 Pawn-channel blockers. Grass actors reported `affects-nav=1` and `pawn-response=2`
 (`ECR_Block`). This is useful evidence, not yet a reason to weaken vegetation collision:
-check whether those individual map actors are intended walkable cover before changing
-their collision.
+the read-only level audit identified them as `Roost_Undergrowth_*`, around the
+`Roost_West_NaturalLedge`. The rock is the ledge itself; the nearby Tripo props are the
+intentional East/West Inn lantern posts. These authored components use `BlockAll`,
+`QueryAndPhysics`, and affect navigation, so no map or global foliage collision was
+changed. A reusable read-only `Scripts/Inspect-IslandPawnBlockers.py` audit records
+their actor labels, bounds, mesh paths, and collision responses without saving the map.
+
+Aster's ListeningStones move provides a second target check: all 19 direct approaches
+from the saved start were capsule-blocked, but the target-aware staging move found 16
+clear approaches afterward. Aster reached the stones after 1,079 cm in 3.0 simulated
+seconds, again with zero model requests.
 
 ## Logs
 
@@ -72,12 +81,13 @@ their collision.
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterWindArchMove_Final.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterRainBasinMove.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterInnCounterMove_AfterFix4.log`
+- `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterListeningStonesMove.log`
+- `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/PawnBlockerAudit_Methods.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/BlockedGroundMoveApproach.log`
 
 ## Next
 
-Inspect the specific grass actors that block Pawn sweeps and confirm whether they are
-intentional map dressing or stray collision objects. Avoid broad changes to generated
-vegetation or `IslandWeather.*`; the current evidence points to individual map actors.
-Then test the same staging behavior from a second saved start so the successful
-InnCounter route is not mistaken for universal reachability.
+Preserve the authored Roost collision and use the staging behavior where it is needed.
+These successful routes cover Aster's saved start only, not every resident or every
+approach. Next, exercise a raven roost return and a second grounded start before making
+any wider claim about landmark reachability.
