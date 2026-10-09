@@ -87,3 +87,26 @@ shows the weave without the previous hard black nest-shadow cluster. The
 remaining brown rods are still engine primitives, not natural branch art; a
 proper twig mesh is the next art-quality step if an available/free asset fits.
 The user's open editor and its unsaved materials were left untouched.
+
+## Primary-world persistence check (2026-10-09)
+
+The current primary `WorldState/Island.json` has an empty `nests` array. Raven's
+saved `memory.jsonl` contains 879 records dated 2026-08-22 through 2026-09-30;
+the only nest/twig reference is an earlier Discord conversation expressing a
+wish for a quiet place to nest, with no memory of foraging or weaving. The
+separate `places.json` remembers only the Cairn. This explains why the 17:00
+Game screenshot's `04a` view showed the physical Roost_West rock/perch rather
+than a woven nest: there is no nest record in that world to materialize. The
+close-up is therefore a misleading camera title, not evidence that the nest
+actor failed to render.
+
+In ordinary play, `GatherTwigs` is offered only after the Raven lands at a
+visible forage patch, and weaving is offered only while carrying twigs at a
+verified perch. Both actions remain optional; the system does not assign a
+home or create a nest automatically. Do not seed a nest into the user's save or
+force the Raven to build merely to improve a screenshot. The next meaningful
+check is a separately approved, short live observation with the normal model
+request ceiling in place, asking whether the Raven discovers and chooses this
+multi-step project over time. Until then, an empty nest list is an honest
+world-state result, and the generated close-up should not be presented as a
+portrait of an existing nest.
