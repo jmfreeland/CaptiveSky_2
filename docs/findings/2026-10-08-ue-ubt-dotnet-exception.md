@@ -203,6 +203,16 @@ lines were unavailable. A 30-minute Application-log query returned no matching
 snapshot does not link the displayed dialog to either older process and does
 not supersede the earlier Game-startup correlation.
 
+### Bundled .NET host sanity check (2026-10-09)
+
+The UE 5.8.3 bundled host completed `dotnet.exe --info` successfully in 1.7
+seconds and reported SDK 10.0.203 with .NET runtimes 10.0.7. This verifies that
+the host and SDK can start and enumerate their installation; it does not
+exercise UnrealBuildTool, Turnkey, AutoSDK enumeration, or the standalone Game
+startup path. It therefore argues against treating the generic popup alone as
+evidence that the machine-wide .NET installation needs repair, while leaving
+the UBT/Turnkey correlation open.
+
 ## Scope and next step
 
 The exception investigation did not change Windows permissions or disable SDK
