@@ -273,3 +273,11 @@ interactive Unreal session has this cause. If the popup recurs outside an
 agent build, its owning process and matching Windows event are still needed.
 
 Build output: [`Codex_RippleTint_VisualPolish_Build_20261009.log`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/Codex_RippleTint_VisualPolish_Build_20261009.log).
+
+### Latest elevated validation (2026-10-09, 09:47 local)
+
+The denser crossing-site automation rebuilt in the isolated `Codex_NestFoundation_20261009` scratch project. The elevated `Build.bat` invocation ran UE's bundled .NET 10 / UnrealBuildTool successfully; editor startup recorded `UBT AutoSDK ReturnCode: 0`, and the refreshed `AutoSDKInfo.txt` said `Result: Succeeded` (0.21 s). Windows SDK 10.0.22621.0 was found. Setup warnings for Android, iOS, Linux, macOS, TVOS, LinuxArm64, and VisionOS reflect unavailable optional platform SDKs; they did not prevent the Win64 editor target from building or loading `/Game/Maps/Island`. `CaptiveSky2.Agent.CrossingSiteAudit` then passed and the commandlet exited normally. The desktop UI was not observable from this tool session, so whether a separate modal appeared could not be verified.
+
+This confirms the controlled elevated path is healthy and can validate the project; it does not identify the owner of the user's separate popup or establish that every occurrence is caused by sandboxed UBT. Continue to avoid un-elevated UBT invocations that cannot access its documented per-user trace/config paths, but do not change Windows permissions, uninstall SDKs, or disable validation. If a popup appears outside one of our restricted build attempts, capture its process tree at that moment before attributing it.
+
+Build/test evidence: [`Codex_CrossingSiteAudit_Dense_20261009.log`](../../Saved/Logs/Codex_CrossingSiteAudit_Dense_20261009.log); refreshed scratch SDK report: `Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/AutoSDKInfo.txt`.
