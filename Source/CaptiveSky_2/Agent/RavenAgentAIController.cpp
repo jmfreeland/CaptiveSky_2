@@ -189,10 +189,18 @@ namespace
 				TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 		if (CrowAsset)
 		{
+			const float CapsuleHalfHeight = Raven->GetCapsuleComponent()
+				? Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+			const FBoxSphereBounds Bounds = CrowAsset->GetBounds();
+			const float HorizontalSpan = 2.f * FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y);
+			const float Scale = HorizontalSpan > 1.f ? FMath::Clamp(112.f / HorizontalSpan, 0.25f, 3.f) : 1.f;
 			USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenRiggedVisualRoot"), RF_Transient);
 			Raven->AddInstanceComponent(VisualRoot);
 			VisualRoot->SetupAttachment(PlaceholderBody);
-			VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation());
+			// Character actor locations sit at the capsule center, but the scaled bird mesh
+			// is centered on its own bounds. Place the mesh's lowest point on the surface.
+			VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation() +
+				FVector(0.f, 0.f, Bounds.BoxExtent.Z * Scale - CapsuleHalfHeight));
 			VisualRoot->SetRelativeRotation(FRotator::ZeroRotator);
 			VisualRoot->SetRelativeScale3D(FVector::OneVector);
 			VisualRoot->RegisterComponent();
@@ -206,15 +214,12 @@ namespace
 			CrowBody->SetGenerateOverlapEvents(false);
 			CrowBody->SetCastShadow(true);
 			CrowBody->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-			const FBoxSphereBounds Bounds = CrowAsset->GetBounds();
-			const float HorizontalSpan = 2.f * FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y);
-			const float Scale = HorizontalSpan > 1.f ? FMath::Clamp(112.f / HorizontalSpan, 0.25f, 3.f) : 1.f;
 			CrowBody->SetRelativeScale3D(FVector(Scale));
 			CrowBody->SetRelativeLocation(FVector(0.f, 0.f, -Bounds.Origin.Z * Scale));
 			CrowBody->RegisterComponent();
 
-			// Carrying is a real action state; keep its small visual attached to the head
-			// bone when available, but never let it affect movement or navigation.
+			// Carrying is a real action state; keep its visible bundle attached to the bill
+			// when available, but never let it affect movement or navigation.
 			FName CarryBone = NAME_None;
 			FName HeadBone = NAME_None;
 			const FReferenceSkeleton& RefSkeleton = CrowAsset->GetRefSkeleton();
@@ -237,19 +242,21 @@ namespace
 			if (UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
 			{
 				Twigs->SetStaticMesh(TwigMesh);
-				Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.16f, 0.075f, 0.025f, 1.f)));
+				Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.095f, 0.038f, 0.012f, 1.f)));
 				const FTransform CarrySocketWorld = CrowBody->GetSocketTransform(CarryBone, RTS_World);
 				const FVector Forward = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorForwardVector()).GetSafeNormal();
 				const FVector Right = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorRightVector()).GetSafeNormal();
 				const FVector Down = CarrySocketWorld.InverseTransformVectorNoScale(FVector::DownVector).GetSafeNormal();
-				const FVector BundleCenter = Forward * (CarryBone == HeadBone ? 14.f : 4.f) + Down * 5.f;
+				const FVector BundleCenter = Forward * (CarryBone == HeadBone ? 16.f : 9.f) + Down * 2.f;
 				const FTransform TwigTransforms[] = {
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward - Right * 0.10f + Down * 0.05f).GetSafeNormal()),
-						BundleCenter - Right * 3.5f, FVector(0.018f, 0.018f, 0.15f)),
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, Forward),
-						BundleCenter, FVector(0.018f, 0.018f, 0.15f)),
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.08f - Down * 0.04f).GetSafeNormal()),
-						BundleCenter + Right * 3.5f + Down, FVector(0.018f, 0.018f, 0.15f))
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward - Right * 0.28f + Down * 0.10f).GetSafeNormal()),
+						BundleCenter - Right * 3.f, FVector(0.012f, 0.012f, 0.20f)),
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.18f - Down * 0.06f).GetSafeNormal()),
+						BundleCenter + Right * 1.5f, FVector(0.014f, 0.014f, 0.24f)),
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.42f + Down * 0.22f).GetSafeNormal()),
+						BundleCenter + Right * 3.5f + Down * 1.5f, FVector(0.010f, 0.010f, 0.16f)),
+					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward * 0.36f - Down * 0.93f).GetSafeNormal()),
+						BundleCenter + Forward * 1.f - Down * 4.f, FVector(0.009f, 0.009f, 0.16f))
 				};
 				for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
 			}
@@ -265,7 +272,12 @@ namespace
 		USceneComponent* VisualRoot = NewObject<USceneComponent>(Raven, TEXT("RavenProceduralVisualRoot"), RF_Transient);
 		Raven->AddInstanceComponent(VisualRoot);
 		VisualRoot->SetupAttachment(PlaceholderBody);
-		VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation());
+		const float CapsuleHalfHeight = Raven->GetCapsuleComponent()
+			? Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+		// The procedural legs reach 42 cm below their body-centered origin. Compensate
+		// for the character capsule's height so the feet meet the floor when grounded.
+		VisualRoot->SetRelativeLocation(-PlaceholderBody->GetRelativeLocation() +
+			FVector(0.f, 0.f, 42.f - CapsuleHalfHeight));
 		VisualRoot->SetRelativeRotation(FRotator::ZeroRotator);
 		VisualRoot->SetRelativeScale3D(FVector::OneVector);
 		VisualRoot->RegisterComponent();
@@ -311,7 +323,7 @@ namespace
 		AppendEllipsoid(Pupils, FVector(7.5f, 15.1f, 2.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
 		AddRavenMesh(Raven, HeadPivot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
 
-		// A small warm-brown bundle sits at the bill while the existing forage state says
+		// A warm-brown bundle projects beyond the bill while the existing forage state says
 		// twigs are carried. It is presentation-only and never affects collision or nav.
 		UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 		if (TwigMesh)
@@ -320,20 +332,23 @@ namespace
 			Raven->AddInstanceComponent(Twigs);
 			Twigs->SetupAttachment(HeadPivot);
 			Twigs->SetStaticMesh(TwigMesh);
-			Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.16f, 0.075f, 0.025f, 1.f)));
+			Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.095f, 0.038f, 0.012f, 1.f)));
 			Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			Twigs->SetCanEverAffectNavigation(false);
 			Twigs->SetGenerateOverlapEvents(false);
 			const FTransform TwigTransforms[] = {
 				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, -0.10f, 0.13f).GetSafeNormal()),
-					FVector(50.f, -2.5f, -8.f), FVector(0.034f, 0.034f, 0.24f)),
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, -0.16f, 0.10f).GetSafeNormal()),
+					FVector(51.f, -2.5f, -14.f), FVector(0.012f, 0.012f, 0.20f)),
 				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.08f, -0.12f).GetSafeNormal()),
-					FVector(49.f, 0.f, -10.f), FVector(0.034f, 0.034f, 0.24f)),
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.24f, -0.08f).GetSafeNormal()),
+					FVector(50.f, 0.f, -15.f), FVector(0.014f, 0.014f, 0.24f)),
 				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.15f, 0.04f).GetSafeNormal()),
-					FVector(48.f, 2.5f, -7.f), FVector(0.034f, 0.034f, 0.24f))
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.42f, 0.22f).GetSafeNormal()),
+					FVector(49.f, 3.f, -13.f), FVector(0.010f, 0.010f, 0.16f)),
+				FTransform(
+					FQuat::FindBetweenNormals(FVector::UpVector, FVector(0.36f, 0.10f, 0.93f).GetSafeNormal()),
+					FVector(50.f, -1.f, -10.f), FVector(0.009f, 0.009f, 0.16f))
 			};
 			for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
 			Twigs->SetVisibility(false, false);
@@ -1741,6 +1756,7 @@ void ARavenAgentAIController::Build(FName Target)
 				return;
 			}
 			bCarryingTwigs = true;
+			UpdateCarriedTwigVisual();
 			ReportAction(Fact);
 			return;
 		}
@@ -1757,6 +1773,7 @@ void ARavenAgentAIController::Build(FName Target)
 		// Keep this observed patch visually honest too if a fixture or map contains a second actor with the same site ID.
 		Patch->GatherForageableTwigs();
 		bCarryingTwigs = true;
+		UpdateCarriedTwigVisual();
 		ReportAction(TEXT("GatherTwigs: You gathered the visible fallen-twig bundle into your beak; the site is depleted until a later Island day. Nothing else was found, and nothing has been built yet."));
 		return;
 	}
@@ -1791,6 +1808,7 @@ void ARavenAgentAIController::Build(FName Target)
 	const int32 NewLayers = WorldState->AddNestLayer(Target, SupportLocation, Memory ? Memory->GetResolvedAgentId() : GetPawn()->GetName());
 	if (NewLayers == 0) { ReportAction(TEXT("Weaving failed: the change could not be kept, so nothing lasting occurred. You are still carrying your twigs.")); return; }
 	bCarryingTwigs = false;
+	UpdateCarriedTwigVisual();
 	WovenUntil.Add(Target, FPlatformTime::Seconds() + 240);
 	const FString Fact = FString::Printf(TEXT("%s: You wove your twigs into %s; it now has %d of %d layers. This change stays in the world after this session. It is a nest you made, not an assigned home, and it does not change how you rest."),
 		*Target.ToString(), NewLayers == 1 ? TEXT("the first ring of a new nest") : TEXT("the nest"), NewLayers, UIslandWorldStateSubsystem::MaxNestLayers);

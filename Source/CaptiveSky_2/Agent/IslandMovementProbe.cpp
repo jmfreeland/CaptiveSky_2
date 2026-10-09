@@ -701,6 +701,7 @@ private:
 		FName ForageLandingTag;
 		FTimerHandle PollTimer;
 		FTimerHandle ExitTimer;
+		FTimerHandle ScreenshotTimer;
 		FVector StartLocation = FVector::ZeroVector;
 		double StartedAt = 0.0;
 		double QueuedAt = 0.0;
@@ -1134,23 +1135,34 @@ private:
 		if (World) World->GetTimerManager().ClearTimer(State->PollTimer);
 		LogMinnowProbeSummary(State);
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Isolated movement probe finished: %s."), bSuccess ? TEXT("success") : TEXT("failure"));
+		bool bDeferredGatherScreenshot = false;
 		if (bSuccess && State->bGatherTwigsAfterMove && FParse::Param(FCommandLine::Get(), TEXT("SpectatorShots")))
 		{
 			FString ScreenshotDirectory;
-			if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorScreenshotDir="), ScreenshotDirectory) && !ScreenshotDirectory.IsEmpty())
+			if (World && FParse::Value(FCommandLine::Get(), TEXT("SpectatorScreenshotDir="), ScreenshotDirectory) && !ScreenshotDirectory.IsEmpty())
 			{
 				IFileManager::Get().MakeDirectory(*ScreenshotDirectory, true);
 				const FString ScreenshotPath = FPaths::Combine(ScreenshotDirectory, TEXT("Raven_Wrack_GatherTwigs.png"));
-				FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
-				UE_LOG(LogIslandMovementProbe, Log, TEXT("Successful Raven GatherTwigs probe screenshot queued at %s."), *ScreenshotPath);
+				const TWeakObjectPtr<UWorld> WeakWorld(World);
+				World->GetTimerManager().SetTimer(State->ScreenshotTimer,
+					FTimerDelegate::CreateLambda([WeakWorld, ScreenshotPath]()
+					{
+						if (!WeakWorld.IsValid()) return;
+						FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
+						UE_LOG(LogIslandMovementProbe, Log, TEXT("Settled Raven GatherTwigs screenshot queued at %s."), *ScreenshotPath);
+					}), 0.75f, false);
+				bDeferredGatherScreenshot = true;
 			}
 		}
-		if (bSuccess && State->PostCompletionHoldSeconds > 0.0 && World)
+		const double EffectiveHoldSeconds = bDeferredGatherScreenshot
+			? FMath::Max(State->PostCompletionHoldSeconds, 1.0)
+			: State->PostCompletionHoldSeconds;
+		if (bSuccess && EffectiveHoldSeconds > 0.0 && World)
 		{
-			UE_LOG(LogIslandMovementProbe, Log, TEXT("Holding the runtime view for %.1f seconds before the bounded diagnostic exit."), State->PostCompletionHoldSeconds);
+			UE_LOG(LogIslandMovementProbe, Log, TEXT("Holding the runtime view for %.1f seconds before the bounded diagnostic exit."), EffectiveHoldSeconds);
 			World->GetTimerManager().SetTimer(State->ExitTimer,
 				FTimerDelegate::CreateLambda([]() { FPlatformMisc::RequestExit(false); }),
-				static_cast<float>(State->PostCompletionHoldSeconds), false);
+				static_cast<float>(EffectiveHoldSeconds), false);
 			return;
 		}
 		FPlatformMisc::RequestExit(false);
