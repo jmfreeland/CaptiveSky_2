@@ -317,10 +317,33 @@ Isolated observation: [`memory.jsonl`](../../Saved/NavBoundsTest/AsterListeningS
 Pre-interaction: [`002_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStonesGlowPeak3s/002_Listening_Stones__Resonance_Close.png).
 Resonance frame: [`003_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStonesGlowPeak3s/003_Listening_Stones__Resonance_Close.png).
 
-Next: improve the prototype stone silhouettes and give the landmark a readable
-close-up composition, then keep moving-PIE performance separate from this
-fixed-view interaction sample. Do not claim persistence: the response is
-intentionally transient.
+## Transient cairn silhouette refinement (2026-10-09)
+
+The first interaction close-up showed that equal-sized stacked rocks still
+read as soft blockout towers. The transient presentation now tapers each stack
+from full footprint at the base to 70% at the crown (previously 90%) and gives
+the layer centers a little more lateral stagger. The map proxies, collision,
+navigation, and shared persistent world remain unchanged.
+
+The root UE 5.8.3 editor target compiled and linked successfully. Focused
+`CaptiveSky2.Agent.ListeningStonePresentation` automation passed, including a
+new check that each cairn narrows toward its upper stones, alongside the
+existing proxy-bounds, collision, navigation, and transient-lifetime checks.
+A 1600x900 afternoon Game capture of the current root project also completed;
+it used an isolated data root, disabled resident thinking and Python, and ended
+at its 60-second cap with zero model requests. The upper taper is visible in
+the render, but the stones still look like oversized rounded prototypes rather
+than authored cairns. No content asset or map was edited.
+
+Test log: [`ListeningStonePresentationAutomationRetry.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/ListeningStonePresentationAutomationRetry.log).
+Game log: [`ListeningStoneCairnShapeGame.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/ListeningStoneCairnShapeGame.log).
+Render: [`005_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStoneCairnShape/005_Listening_Stones__Resonance_Close.png).
+
+Next: inspect the newly loaded Tripo `StoneCairn` mesh as a candidate for a
+more intentional landmark silhouette before wiring any project content into
+the transient presentation. Keep the inspection/edit of Content separate from
+this code-only milestone, then measure ordinary moving-PIE performance on its
+own.
 
 ## Current Tideglass foliage and dragonfly view (2026-10-09)
 

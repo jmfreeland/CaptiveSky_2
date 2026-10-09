@@ -107,7 +107,7 @@ bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const F
 			!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER) return false;
 		const int32 SegmentCount = FMath::Clamp(
 			FMath::CeilToInt(TargetHeight / (SegmentHeight * 0.78f)), 2, 7);
-		const float OffsetRadius = FMath::Min(LocalExtent.X, LocalExtent.Y) * 0.12f;
+		const float OffsetRadius = FMath::Min(LocalExtent.X, LocalExtent.Y) * 0.20f;
 		TArray<FVector> LayerScales;
 		TArray<FQuat> LayerRotations;
 		TArray<FBoxSphereBounds> LayerBounds;
@@ -119,7 +119,9 @@ bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const F
 		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
 		{
 			const float CourseAlpha = static_cast<float>(Layer) / static_cast<float>(SegmentCount - 1);
-			const float Taper = FMath::Lerp(1.f, 0.90f, CourseAlpha);
+			// A stronger crown taper stops tall blockout proxies from reading as
+			// stacks of equally sized cartoon boulders while preserving their base.
+			const float Taper = FMath::Lerp(1.f, 0.70f, CourseAlpha);
 			const float ScaleVariation[] = { 1.00f, 0.98f, 0.96f, 0.94f, 0.92f };
 			const FVector Scale(StoneScale * ScaleVariation[Layer % UE_ARRAY_COUNT(ScaleVariation)] * Taper);
 			const FQuat Variation(FVector::UpVector,

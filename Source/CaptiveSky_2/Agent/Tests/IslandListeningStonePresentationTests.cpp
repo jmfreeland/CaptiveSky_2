@@ -120,6 +120,7 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("Rock material slot %d uses the dedicated transient stone surface"), MaterialIndex),
 				Cast<UMaterialInstanceDynamic>(Presentation->Stones->GetMaterial(MaterialIndex)) != nullptr);
 		}
+		TMap<int32, TArray<TPair<float, float>>> CairnLayerScales;
 		for (int32 Index = 0; Index < Presentation->GetStoneCount(); ++Index)
 		{
 			FTransform Instance;
@@ -142,6 +143,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			}
 			if (Proxies.IsValidIndex(ClosestProxyIndex))
 			{
+				CairnLayerScales.FindOrAdd(ClosestProxyIndex).Add(
+					TPair<float, float>(Instance.GetLocation().Z, Scale.X));
 				const FBoxSphereBounds& ProxyBounds = Proxies[ClosestProxyIndex]->GetStaticMeshComponent()->Bounds;
 				const FVector Delta = Instance.GetLocation() - ProxyBounds.Origin;
 				TestTrue(FString::Printf(TEXT("Stacked rock %d remains inside the original proxy bounds"), Index),
@@ -157,6 +160,16 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 					ProxyBottom, ShortenedTop),
 					RenderedBounds.Origin.Z - RenderedBounds.BoxExtent.Z >= ProxyBottom - 2.f &&
 					RenderedBounds.Origin.Z + RenderedBounds.BoxExtent.Z <= ShortenedTop + 2.f);
+			}
+		}
+		for (const TPair<int32, TArray<TPair<float, float>>>& Cairn : CairnLayerScales)
+		{
+			TArray<TPair<float, float>> Layers = Cairn.Value;
+			Layers.Sort([](const TPair<float, float>& A, const TPair<float, float>& B) { return A.Key < B.Key; });
+			if (Layers.Num() >= 2)
+			{
+				TestTrue(FString::Printf(TEXT("Cairn %d narrows toward its upper stones"), Cairn.Key),
+					Layers.Last().Value <= Layers[0].Value * 0.82f);
 			}
 		}
 		for (int32 Index = 0; Index < Proxies.Num(); ++Index)
