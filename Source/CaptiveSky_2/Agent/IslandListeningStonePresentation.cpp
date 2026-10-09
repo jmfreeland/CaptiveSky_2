@@ -17,7 +17,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogListeningStonePresentation, Log, All);
 namespace
 {
 	constexpr TCHAR ListeningStoneRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
-	constexpr TCHAR EngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
+	constexpr TCHAR ListeningStoneEngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
 	constexpr float ChimeDurationSeconds = 2.8f;
 }
 
@@ -285,7 +285,7 @@ bool UIslandListeningStonePresentationSubsystem::FindStoneProxies(UWorld* World,
 	{
 		UStaticMeshComponent* MeshComponent = It->GetStaticMeshComponent();
 		const UStaticMesh* Mesh = MeshComponent ? MeshComponent->GetStaticMesh() : nullptr;
-		if (!Mesh || Mesh->GetPathName() != EngineCubeMeshPath) continue;
+		if (!Mesh || Mesh->GetPathName() != ListeningStoneEngineCubeMeshPath) continue;
 
 		const FVector Local = MarkerTransform.InverseTransformPosition(It->GetActorLocation());
 		const FVector Extent = MeshComponent->Bounds.BoxExtent;
