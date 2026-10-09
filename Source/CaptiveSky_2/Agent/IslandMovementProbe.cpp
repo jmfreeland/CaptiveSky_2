@@ -427,7 +427,10 @@ private:
 		const FString ActionState = Controller->DescribeActionState();
 		const bool bComplete = RavenController
 			? !Controller->IsActionInProgress() &&
-				(ActionState.Contains(TEXT("Reached the flight destination")) || ActionState.Contains(TEXT("short ground hop")))
+				(ActionState.Contains(TEXT("Reached the flight destination")) ||
+				 ActionState.Contains(TEXT("short ground hop")) ||
+				 ActionState.Contains(TEXT("Landed and perched on solid support")) ||
+				 ActionState.Contains(TEXT("Already perched at this site")))
 			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving &&
 				ActionState.Contains(TEXT("Reached the requested destination"));
 		// The Raven may need to cross a large portion of the Island to reach a

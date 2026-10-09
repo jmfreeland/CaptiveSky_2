@@ -75,6 +75,25 @@ from the saved start were capsule-blocked, but the target-aware staging move fou
 clear approaches afterward. Aster reached the stones after 1,079 cm in 3.0 simulated
 seconds, again with zero model requests.
 
+Raven movement probes now treat the explicit “Landed and perched on solid support”
+and “Already perched at this site” outcomes as completed arrivals, alongside flight
+arrival. This prevents a valid physical perch from being reported as an unfinished
+probe. In separate 120-second, zero-model-request runs, Raven returned to Roost_East
+from its existing perch in 659 cm / 3.0 simulated seconds, and returned to Roost_West
+in 613 cm / 3.0 simulated seconds. An Innkeeper grounded at the inn also reached
+ListeningStones in 1,067 cm / 2.0 simulated seconds, with all 18 direct candidate
+routes clear from that start. These are bounded checks, not general reachability
+guarantees.
+
+The normal read-only Raven site inspections found upward-facing support beneath both
+roost markers. At each, none of five local overhead probes found solid cover or
+intersected the approximate mature-spruce crown envelope; each was also exposed to
+the current horizontal wind on a six-metre upwind trace. These clues do not establish
+weatherproofing, branch strength, nest suitability, ownership, or an assigned home.
+No nest or map/collision state was created or changed. A future sheltered-perch
+improvement should first identify or author a genuinely covered location, then repeat
+the physical approach and sensory inspection there.
+
 ## Logs
 
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/LandmarkNavAudit_Final.log`
@@ -84,10 +103,15 @@ seconds, again with zero model requests.
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterListeningStonesMove.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/PawnBlockerAudit_Methods.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/BlockedGroundMoveApproach.log`
+- `../../Saved/Playtests/Codex_RavenRoostReturn_20261009/RavenRoostEastMove.log`
+- `../../Saved/Playtests/Codex_RavenRoostReturn_20261009/RavenRoostEastInspect.log`
+- `../../Saved/Playtests/Codex_RavenRoostReturn_20261009/RavenRoostWestInspect.log`
+- `../../Saved/Playtests/Codex_RavenRoostReturn_20261009/InnkeeperListeningStonesMove.log`
 
 ## Next
 
 Preserve the authored Roost collision and use the staging behavior where it is needed.
-These successful routes cover Aster's saved start only, not every resident or every
-approach. Next, exercise a raven roost return and a second grounded start before making
-any wider claim about landmark reachability.
+These successful routes cover only the tested starts and approaches, not every
+resident or every landmark route. For a true raven shelter, first locate a covered
+perch with favorable wind exposure; do not infer one from the current Roost_East or
+Roost_West markers.
