@@ -405,6 +405,15 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nearby meadow flowers share a botanical color patch"),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71));
+	const FVector FlowerPocketA = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0);
+	const FVector FlowerPocketB = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 1);
+	TestTrue(TEXT("Flower pocket offsets are deterministic, bounded, and spaced for separate stems"),
+		FlowerPocketA.Equals(AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0)) &&
+		FlowerPocketA.Size2D() >= 550.f && FlowerPocketA.Size2D() <= 600.f &&
+		FlowerPocketB.Size2D() >= 825.f && FlowerPocketB.Size2D() <= 875.f &&
+		FVector::Dist2D(FlowerPocketA, FlowerPocketB) >= 475.f);
+	TestTrue(TEXT("Flower pockets have a strict three-instance-per-site ceiling"),
+		AIslandWeather::MeadowFlowersPerPocket == 3);
 	int32 MeadowFlowerSpeciesCounts[AIslandWeather::MeadowFlowerSpeciesCount] = {};
 	for (int32 X = 0; X < 12; ++X)
 		for (int32 Y = 0; Y < 12; ++Y)

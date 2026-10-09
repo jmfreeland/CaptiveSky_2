@@ -69,6 +69,8 @@ public:
 	static constexpr float StormWindBoost = 0.9f;
 	/** Number of visually distinct Fab flower meshes used for the capped meadow accents. */
 	static constexpr int32 MeadowFlowerSpeciesCount = 8;
+	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
+	static constexpr int32 MeadowFlowersPerPocket = 3;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
@@ -223,6 +225,8 @@ private:
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);
 	/** Select one stable Fab flower species for a world-space meadow patch. */
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed);
+	/** Stable member offset for a small flower pocket; member indices start at zero. */
+	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);

@@ -469,6 +469,20 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	return static_cast<int32>(Hash % MeadowFlowerSpeciesCount);
 }
 
+FVector AIslandWeather::SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex)
+{
+	if (MemberIndex < 0 || MemberIndex >= MeadowFlowersPerPocket - 1) return FVector::ZeroVector;
+	uint32 Hash = static_cast<uint32>(Seed) * 0x9e3779b9u + 0x85ebca6bu;
+	Hash ^= Hash >> 16;
+	Hash *= 0x7feb352du;
+	Hash ^= Hash >> 15;
+	const float Phase = static_cast<float>(Hash) / static_cast<float>(MAX_uint32) * 2.f * PI;
+	constexpr float GoldenAngle = 2.39996323f;
+	const float Angle = Phase + GoldenAngle * MemberIndex;
+	const float Radius = 575.f + 275.f * MemberIndex;
+	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+}
+
 FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 	double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
 {
@@ -1221,12 +1235,61 @@ void AIslandWeather::InitializeGroundCover()
 					? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
 				if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 				{
-					// Scatter a sparse, bounded pool of flower candidates through the same valid-terrain
-					// mask as the meadow. Reserve a deterministic share for a visible ListeningStones
-					// annulus, so its flowering edge reads separately from the anonymous far meadow.
+					// Scatter a bounded pool of small, same-species flower pockets through valid terrain.
+					// Reserve deterministic pocket anchors around ListeningStones so the flowering edge
+					// reads as an intentional local meadow rather than isolated anonymous specks.
 					constexpr int32 MaxFlowerAttemptsPerSite = 3;
+					constexpr int32 MaxPocketMemberAttempts = 3;
 					constexpr float FlowerMinSpacing = 475.f;
 					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
+					auto TryPlaceMeadowFlower = [&](const FVector& Candidate, bool bListeningStonesMeadowSite,
+						int32 ForcedSpeciesIndex) -> bool
+					{
+						bool bTooClose = false;
+						for (const FVector& Exclusion : ExclusionLocations)
+							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerMinSpacing) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingTree : SpruceLocations)
+								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
+						if (bTooClose) return false;
+
+						FHitResult FlowerHit;
+						++MeadowFlowerTraceCount;
+						if (!GetWorld()->LineTraceSingleByChannel(FlowerHit,
+							FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
+							FlowerHit.GetActor() != IslandLandscape || FlowerHit.ImpactNormal.Z < 0.72f || FlowerHit.ImpactPoint.Z < SeaLevel + 100.f)
+							return false;
+
+						const int32 SpeciesIndex = ForcedSpeciesIndex == INDEX_NONE
+							? SelectMeadowFlowerVariant(Candidate, WeatherSeed) : ForcedSpeciesIndex;
+						UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers.IsValidIndex(SpeciesIndex)
+							? IslandMeadowFlowers[SpeciesIndex] : nullptr;
+						const FBoxSphereBounds FlowerBounds = FlowerSpecies && FlowerSpecies->GetStaticMesh()
+							? FlowerSpecies->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
+						if (!FlowerSpecies || FlowerBounds.BoxExtent.Z <= KINDA_SMALL_NUMBER) return false;
+
+						const float TargetHeight = MeadowFlowerRandom.FRandRange(55.f, 90.f);
+						const FVector Scale(TargetHeight / (2.f * FlowerBounds.BoxExtent.Z));
+						const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, FlowerHit.ImpactNormal);
+						const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
+							FMath::DegreesToRadians(MeadowFlowerRandom.FRandRange(0.f, 360.f)));
+						const FVector MeshBottom(FlowerBounds.Origin.X, FlowerBounds.Origin.Y,
+							FlowerBounds.Origin.Z - FlowerBounds.BoxExtent.Z);
+						const FVector Location = FlowerHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+						FlowerSpecies->AddInstance(FTransform(Rotation, Location, Scale), true);
+						RhododendronLocations.Add(FlowerHit.ImpactPoint);
+						++GroundCoverFlowerCount;
+						++MeadowFlowerPatchCount;
+						if (bListeningStonesMeadowSite) ++ListeningStonesMeadowFlowerCount;
+						++MeadowFlowerSpeciesCounts[SpeciesIndex];
+						return true;
+					};
 					for (int32 SiteIndex = 0; SiteIndex < MeadowFlowerCandidateSites && !ValidMeadowTerrainCells.IsEmpty(); ++SiteIndex)
 					{
 						bool bPlacedMeadowFlower = false;
@@ -1247,47 +1310,21 @@ void AIslandWeather::InitializeGroundCover()
 								Candidate = FVector(Cell.X + MeadowFlowerRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
 									Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
 							}
-							bool bTooClose = false;
-							for (const FVector& Exclusion : ExclusionLocations)
-								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
-							if (bTooClose) continue;
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerMinSpacing) { bTooClose = true; break; }
-							if (!bTooClose)
-								for (const FVector& ExistingTree : SpruceLocations)
-									if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
-							if (!bTooClose)
-								for (const FVector& ExistingShrub : ShrubLocations)
-									if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
-							if (bTooClose) continue;
-
-							FHitResult FlowerHit;
-							++MeadowFlowerTraceCount;
-							if (!GetWorld()->LineTraceSingleByChannel(FlowerHit,
-								FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
-								FlowerHit.GetActor() != IslandLandscape || FlowerHit.ImpactNormal.Z < 0.72f || FlowerHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
-
-							const int32 SpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
-							UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers.IsValidIndex(SpeciesIndex)
-								? IslandMeadowFlowers[SpeciesIndex] : nullptr;
-							const FBoxSphereBounds FlowerBounds = FlowerSpecies && FlowerSpecies->GetStaticMesh()
-								? FlowerSpecies->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
-							if (!FlowerSpecies || FlowerBounds.BoxExtent.Z <= KINDA_SMALL_NUMBER) continue;
-							const float TargetHeight = MeadowFlowerRandom.FRandRange(55.f, 90.f);
-							const FVector Scale(TargetHeight / (2.f * FlowerBounds.BoxExtent.Z));
-							const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, FlowerHit.ImpactNormal);
-							const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
-								FMath::DegreesToRadians(MeadowFlowerRandom.FRandRange(0.f, 360.f)));
-							const FVector MeshBottom(FlowerBounds.Origin.X, FlowerBounds.Origin.Y,
-								FlowerBounds.Origin.Z - FlowerBounds.BoxExtent.Z);
-							const FVector Location = FlowerHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
-							FlowerSpecies->AddInstance(FTransform(Rotation, Location, Scale), true);
-							RhododendronLocations.Add(FlowerHit.ImpactPoint);
-							++GroundCoverFlowerCount;
-							++MeadowFlowerPatchCount;
-							if (bListeningStonesMeadowSite) ++ListeningStonesMeadowFlowerCount;
-							++MeadowFlowerSpeciesCounts[SpeciesIndex];
+							const int32 SiteSpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
+							if (!TryPlaceMeadowFlower(Candidate, bListeningStonesMeadowSite, SiteSpeciesIndex)) continue;
 							bPlacedMeadowFlower = true;
+							for (int32 MemberIndex = 0; MemberIndex < MeadowFlowersPerPocket - 1; ++MemberIndex)
+							{
+								for (int32 MemberAttempt = 0; MemberAttempt < MaxPocketMemberAttempts; ++MemberAttempt)
+								{
+									const int32 MemberSeed = static_cast<int32>(static_cast<uint32>(WeatherSeed) ^
+										(static_cast<uint32>(SiteIndex) + 1u) * 0x9e3779b9u ^
+										(static_cast<uint32>(MemberIndex) + 1u) * 0x85ebca6bu ^
+										static_cast<uint32>(MemberAttempt) * 0xc2b2ae35u);
+									const FVector MemberCandidate = Candidate + SelectMeadowFlowerPocketOffset(MemberSeed, MemberIndex);
+									if (TryPlaceMeadowFlower(MemberCandidate, bListeningStonesMeadowSite, SiteSpeciesIndex)) break;
+								}
+							}
 						}
 					}
 				}
