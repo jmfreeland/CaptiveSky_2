@@ -38,8 +38,8 @@ struct CAPTIVESKY_2_API FIslandBasinState
 	float Water = 0.f;
 	TArray<FIslandBasinLeaf> Leaves;
 
-	/** Water level after Seconds of Rain (0..1) and sun (sine of elevation, -1..1). Rain fills it; sun and a little air dry it. Pure. */
-	static float Advance(float Water, float Rain, float SunHeight, float Seconds);
+	/** Water level after Seconds of Rain (0..1), sun (sine of elevation, -1..1), and wind speed (cm/s). Rain fills it; sun and wind dry it. Pure. */
+	static float Advance(float Water, float Rain, float SunHeight, float Seconds, float WindSpeed = 0.f);
 	/** Set a leaf afloat for an agent on Today. Reports what happened. */
 	EIslandBasinFloat FloatLeaf(const FString& AgentId, int32 Today, int32 Seed);
 	int32 LeavesFrom(const FString& AgentId) const;

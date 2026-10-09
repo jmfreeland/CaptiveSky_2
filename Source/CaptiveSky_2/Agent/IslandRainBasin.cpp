@@ -37,15 +37,17 @@ namespace
 	constexpr float LeafWaterRadius = 30.f;
 }
 
-float FIslandBasinState::Advance(float Water, float Rain, float SunHeight, float Seconds)
+float FIslandBasinState::Advance(float Water, float Rain, float SunHeight, float Seconds, float WindSpeed)
 {
-	if (!FMath::IsFinite(Water) || !FMath::IsFinite(Rain) || !FMath::IsFinite(SunHeight) || !FMath::IsFinite(Seconds) || Seconds <= 0.f)
+	if (!FMath::IsFinite(Water) || !FMath::IsFinite(Rain) || !FMath::IsFinite(SunHeight) || !FMath::IsFinite(Seconds) ||
+		!FMath::IsFinite(WindSpeed) || Seconds <= 0.f)
 		return FMath::Clamp(FMath::IsFinite(Water) ? Water : 0.f, 0.f, 1.f);
 	Water = FMath::Clamp(Water, 0.f, 1.f);
 	const float Falling = FMath::Clamp(Rain, 0.f, 1.f);
 	// A passing sprinkle wets the stone but does not gather in the hollow.
 	if (Falling > 0.05f) Water += Falling * Seconds / FillSecondsAtFullRain;
-	Water -= (NightDryRate + SunDryRate * FMath::Clamp(SunHeight, 0.f, 1.f)) * Seconds;
+	const float WindDrying = 1.f + FMath::Clamp(WindSpeed / 600.f, 0.f, 1.f);
+	Water -= (NightDryRate + SunDryRate * FMath::Clamp(SunHeight, 0.f, 1.f)) * WindDrying * Seconds;
 	return FMath::Clamp(Water, 0.f, 1.f);
 }
 
@@ -415,7 +417,8 @@ void UIslandRainBasinSubsystem::Tick(float DeltaTime)
 	const UIslandEnvironmentSubsystem* Environment = World ? World->GetSubsystem<UIslandEnvironmentSubsystem>() : nullptr;
 	if (!State.bPlaced || !Environment) return;
 	const float Before = State.Water;
-	State.Water = FIslandBasinState::Advance(State.Water, Environment->GetRainIntensity(), Environment->GetSunHeight(), DeltaTime);
+	State.Water = FIslandBasinState::Advance(State.Water, Environment->GetRainIntensity(), Environment->GetSunHeight(),
+		DeltaTime, Environment->GetWindSpeed());
 	if (!FMath::IsNearlyEqual(State.Water, Before)) bDirty = true;
 	SinceSave += DeltaTime;
 	SinceShow += DeltaTime;

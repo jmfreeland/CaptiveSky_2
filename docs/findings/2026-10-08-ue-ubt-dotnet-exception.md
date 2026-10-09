@@ -356,3 +356,15 @@ Evidence: [`Codex_RavenBranchAudit_Runtime.log`](../../Saved/CompileScratch/Code
 [`Codex_Continuation_CaptiveSky2_Agent_SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_Continuation_CaptiveSky2_Agent_SessionSafety.log),
 and
 [`Codex_Continuation_CaptiveSky2_Agent_BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_Continuation_CaptiveSky2_Agent_BlockedGroundMoveApproach.log).
+
+### Repeated popup reported during a later turn (2026-10-10, 00:50 local)
+
+The user supplied another screenshot of the same generic `dotnet.exe -
+Application Error` dialog with exception `0xe0434352` and address
+`0x00007FF841A2483A`. At inspection time, no `dotnet.exe`, UBT, AutomationTool,
+or Unreal process was running. The Application log had no matching `.NET
+Runtime`, `Application Error`, or WER record in the preceding 24 hours, so this
+occurrence still cannot be mapped to a managed exception or executable owner.
+The isolated basin automation had just completed successfully; its log does
+not establish that it caused or owned the desktop dialog. The code and address
+alone remain insufficient to attribute the popup.

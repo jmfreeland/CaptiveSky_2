@@ -20,12 +20,20 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Heavy rain fills it"), FIslandBasinState::Advance(0.f, 1.f, -0.5f, 120.f) > 0.4f);
 	TestEqual(TEXT("Rain cannot overfill it"), FIslandBasinState::Advance(0.9f, 1.f, 0.f, 600.f), 1.f);
 	TestTrue(TEXT("A sprinkle gathers nothing"), FIslandBasinState::Advance(0.f, 0.03f, 0.f, 600.f) <= 0.f);
+	TestTrue(TEXT("Heavy rain still fills the basin in a strong wind"), FIslandBasinState::Advance(0.f, 1.f, -0.5f, 120.f, 600.f) > 0.4f);
 	const float Noon = FIslandBasinState::Advance(0.5f, 0.f, 1.f, 300.f);
 	const float Night = FIslandBasinState::Advance(0.5f, 0.f, -1.f, 300.f);
 	TestTrue(TEXT("Sun dries it faster than night"), Noon < Night && Night < 0.5f);
+	const float CalmNight = FIslandBasinState::Advance(0.5f, 0.f, -1.f, 300.f, 0.f);
+	const float BreezyNight = FIslandBasinState::Advance(0.5f, 0.f, -1.f, 300.f, 600.f);
+	TestTrue(TEXT("Breezy night dries it faster than calm night"), BreezyNight < CalmNight);
+	const float CalmNoon = FIslandBasinState::Advance(0.5f, 0.f, 1.f, 300.f, 0.f);
+	const float BreezyNoon = FIslandBasinState::Advance(0.5f, 0.f, 1.f, 300.f, 600.f);
+	TestTrue(TEXT("Breeze also speeds sunny-day drying"), BreezyNoon < CalmNoon);
 	TestTrue(TEXT("It stays above zero while drying slowly"), FIslandBasinState::Advance(0.5f, 0.f, 1.f, 10.f) > 0.49f);
 	TestEqual(TEXT("It never dries below zero"), FIslandBasinState::Advance(0.01f, 0.f, 1.f, 3600.f), 0.f);
 	TestEqual(TEXT("No time passing changes nothing"), FIslandBasinState::Advance(0.4f, 1.f, 1.f, 0.f), 0.4f);
+	TestEqual(TEXT("A non-finite wind sample leaves the water unchanged"), FIslandBasinState::Advance(0.4f, 0.f, 1.f, 10.f, NAN), 0.4f);
 	const float Nonsense = FIslandBasinState::Advance(NAN, 5.f, -9.f, 50.f);
 	TestTrue(TEXT("Non-finite water is treated as dry and stays in range"), Nonsense >= 0.f && Nonsense <= 1.f);
 
