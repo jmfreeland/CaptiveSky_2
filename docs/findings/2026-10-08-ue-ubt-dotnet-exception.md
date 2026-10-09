@@ -140,6 +140,35 @@ its adjacent `AutoSDKInfo.txt` is scratch output. The build and test used the
 isolated scratch project's binaries and data root; the open editor and its
 unsaved material were not altered.
 
+### Bounded Game startup correlation (2026-10-09, 02:36 local)
+
+A new isolated UE 5.8.3 Game launch started as PID 41764 at 02:36:31. Its log
+records `Launching UnrealBuildTool... -Mode=ValidatePlatforms` at 02:36:35;
+at that same time, a new `dotnet.exe` (PID 43908) appeared from UE's bundled
+.NET 10 directory. The process remained at 0.16 CPU seconds while the Game log
+stopped at `TurnkeySupport` startup. The live `AutoSDKInfo.txt` was unchanged
+from the preceding successful run at 02:33 and still said `Result: Succeeded`,
+so it is not evidence that this new validation completed.
+
+The desktop still showed the generic `0xe0434352` dialog during this run. The
+window was exposed under `csrss.exe`, so there is still no direct window-to-PID
+link or managed exception stack. The simultaneous bundled host, validation
+launch, idle child, and stalled Game startup make this the strongest correlation
+so far, but do not prove that PID 43908 owned the dialog or reveal the underlying
+exception. After the log remained unchanged for over a minute, only this run's
+Game process and newly spawned .NET process were stopped; the interactive editor
+(PID 828) was left running. The previous bounded run and latest automation both
+completed with `AutoSDK ReturnCode: 0`; this intermittent failure is not a
+reproducible failure on every launch. No matching recent `.NET Runtime` or
+`Application Error` event supplied a stack.
+
+Evidence: [`Codex_MinnowEyes2_Game.log`](../../Saved/Playtests/Codex_MinnowEyes2_20261009/Codex_MinnowEyes2_Game.log)
+and the 02:33 `Codex_MinnowEyes2_Automation.log`
+([compile scratch log](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowEyes2_Automation.log)).
+Before another visual run, correlate the visible popup with the fresh process
+tree and preserve the new `AutoSDKInfo` output; do not disable platform
+validation or change global Windows/.NET settings based on this correlation.
+
 ## Scope and next step
 
 The exception investigation did not change Windows permissions or disable SDK
