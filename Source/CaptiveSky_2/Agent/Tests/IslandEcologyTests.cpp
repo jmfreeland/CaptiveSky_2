@@ -100,6 +100,21 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		// Existing fixture interactions rely on seeing distant local gust markers; keep that
 		// expectation independent of the intentionally tighter runtime default.
 		SwayFocusRadius->Set(3000.f, ECVF_SetByCode);
+	IConsoleVariable* LandscapeDensity = IConsoleManager::Get().FindConsoleVariable(TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"));
+	const float PreviousLandscapeDensity = LandscapeDensity ? LandscapeDensity->GetFloat() : 1.f;
+	ON_SCOPE_EXIT
+	{
+		if (LandscapeDensity) LandscapeDensity->Set(PreviousLandscapeDensity, ECVF_SetByCode);
+	};
+	if (TestNotNull(TEXT("Broad meadow-density control is registered"), LandscapeDensity))
+	{
+		LandscapeDensity->Set(0.65f, ECVF_SetByCode);
+		TestTrue(TEXT("Broad meadow density accepts a reversible reduced value"),
+			FMath::IsNearlyEqual(LandscapeDensity->GetFloat(), 0.65f));
+		LandscapeDensity->Set(1.f, ECVF_SetByCode);
+		TestTrue(TEXT("Broad meadow density can restore the authored default"),
+			FMath::IsNearlyEqual(LandscapeDensity->GetFloat(), 1.f));
+	}
 	IConsoleVariable* SwayUpdateInterval = IConsoleManager::Get().FindConsoleVariable(TEXT("CaptiveSky.Island.FoliageSwayUpdateIntervalSeconds"));
 	if (TestNotNull(TEXT("CPU foliage sway update interval CVar is registered"), SwayUpdateInterval))
 	{

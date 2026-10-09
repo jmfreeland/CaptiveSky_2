@@ -44,6 +44,10 @@ static TAutoConsoleVariable<float> CVarIslandFoliageSwayUpdateIntervalSeconds(
 	TEXT("CaptiveSky.Island.FoliageSwayUpdateIntervalSeconds"), 1.f,
 	TEXT("Seconds between CPU foliage and spruce instance-transform sway updates. Clamped to 0.1..2.0 seconds; material wind remains continuous."),
 	ECVF_Default);
+static TAutoConsoleVariable<float> CVarIslandGroundCoverLandscapeDensity(
+	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 1.f,
+	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. 1 preserves the authored density; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
+	ECVF_Default);
 
 namespace
 {
@@ -872,8 +876,12 @@ void AIslandWeather::InitializeGroundCover()
 				++AddedForAnchor;
 			}
 		}
+		float RequestedLandscapeDensity = CVarIslandGroundCoverLandscapeDensity.GetValueOnGameThread();
+		FParse::Value(FCommandLine::Get(), TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity="), RequestedLandscapeDensity);
+		const float LandscapeDensity = FMath::Clamp(RequestedLandscapeDensity, 0.f, 1.f);
+		const int32 ScaledMeadowCandidateBudget = FMath::RoundToInt(MeadowCandidateBudget * LandscapeDensity);
 		const int32 LandscapeCandidateCount = FMath::Max(0,
-			MeadowCandidateBudget - MeadowCenters.Num() * MeadowCandidatesPerAnchorPatch);
+			ScaledMeadowCandidateBudget - MeadowCenters.Num() * MeadowCandidatesPerAnchorPatch);
 		const float LandscapeWidth = FMath::Max(1.f, BoundsExtent.X * 2.f);
 		const float LandscapeHeight = FMath::Max(1.f, BoundsExtent.Y * 2.f);
 		const float TerrainCellSize = FMath::Max(MinimumMeadowTerrainCellSize,
@@ -923,8 +931,8 @@ void AIslandWeather::InitializeGroundCover()
 			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
-		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter sampled %d valid terrain cells and placed %d ground-cover instances after %d bounded traces (budget %d)."),
-			ValidMeadowTerrainCells.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount, MeadowCandidateBudget);
+		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter sampled %d valid terrain cells and placed %d ground-cover instances after %d bounded traces (budget %d, density %.2f)."),
+			ValidMeadowTerrainCells.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount, ScaledMeadowCandidateBudget, LandscapeDensity);
 
 		// Add a few distant spruce groves to break up the low meadow skyline. These are decorative
 		// HISM instances well outside landmark clearances; they never collide or affect navigation.
