@@ -13,8 +13,13 @@ the next weave restores it naturally with the remaining nest.
 
 `CaptiveSky2.Agent.IslandNest` now checks the base's visible instance count,
 low/flat placement, deterministic reconstruction, and the existing alternating
-rim courses with the added base offset. Both edited translation units compiled
-successfully with the cached UE 5.8.3 response configuration and VS 18. This was
-compile-only: no UHT pass, module link, or automation run was performed, so the
-new behavior is not yet runtime-validated. A visual capture is still needed to
-judge the placeholder geometry in the live Island.
+rim courses with the added base offset. The isolated UE 5.8.3 editor target
+built successfully (158 actions, including UHT and module link) with
+`-NoHotReloadFromIDE`, keeping the open editor's binaries untouched. Then
+`CaptiveSky2.Agent.IslandNest` passed in that scratch editor with NullRHI,
+Python and agent thinking disabled, zero model requests, a 60-second realtime
+cap, and scratch-only world data:
+[`Codex_IslandNest_20261009.log`](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/Codex_IslandNest_20261009.log).
+The log contains temporary-world teardown warnings, but the test completed
+successfully with exit code 0 and no failed assertions. A visual capture is
+still needed to judge the placeholder geometry in the live Island.
