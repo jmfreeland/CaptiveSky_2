@@ -75,8 +75,8 @@ public:
 	static constexpr float StrideLength = 75.f;
 	static constexpr float MinWalkSpeed = 40.f;
 	static constexpr float PrintWetness = 0.15f;
-	static constexpr int32 WearStartSteps = 24;
-	static constexpr int32 WearFullSteps = 160;
+	static constexpr int32 WearStartSteps = 4;
+	static constexpr int32 WearFullSteps = 40;
 	static constexpr float WearDrawRadius = 5500.f;
 
 	/** Seconds a print lasts on ground of this wetness; zero when too dry to leave one. */

@@ -332,7 +332,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, FVector(1000.f, 1000.f, 0.f)));
 	WornTrail.LastDecayDay = 1;
 	TestTrue(TEXT("A later Island day weathers the saved path ledger"), WornTrail.WeatherTo(31));
-	TestEqual(TEXT("Thirty days of unused path weathering return the full-wear cell to 56 steps"), WornTrail.StepsAt(TrailCellPoint), 56);
+	TestEqual(TEXT("Thirty days of unused path weathering leave a faint 10-step trace"), WornTrail.StepsAt(TrailCellPoint), 10);
 	TestFalse(TEXT("Regrown grass returns beyond the thinner aged trail"),
 		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, TrailCellPoint + FVector(100.f, 0.f, 0.f)));
 	const TArray<FVector> NoCompetingHabitats;

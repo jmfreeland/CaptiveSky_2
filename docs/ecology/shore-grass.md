@@ -431,3 +431,34 @@ navigable route from the spawn; its isolated ledger stayed empty. Treat the
 landmark as currently unreachable from that start rather than as evidence of a
 trail-system failure. Raven route persistence also remains unverified because
 the existing raven travel probes are airborne rather than grounded.
+
+## Repeated Aster route wear (2026-10-09)
+
+The current-source UE 5.8.3 main-project build succeeded. Six isolated,
+request-free Aster moves to the tagged Tideglass pool used the same grounded
+approach each time: 779 cm from the spawn to a clear 9 m nav route in 1.5
+simulated seconds. The persistent ledger accumulated 36 footfall samples in six
+cells, with the busiest cell reaching 10 steps. Each Game run had a 60-second
+real-time cap and exited normally. Logs:
+[first route](../../Saved/Logs/Codex_AsterMoveToTideglassAfterGround_20261009.log),
+[second](../../Saved/Logs/Codex_AsterMoveToTideglassRepeat2_20261009.log),
+[third](../../Saved/Logs/Codex_AsterMoveToTideglassRepeat3_20261009.log),
+[fourth](../../Saved/Logs/Codex_AsterMoveToTideglassRepeat4_20261009.log),
+[fifth](../../Saved/Logs/Codex_AsterMoveToTideglassRepeat5_20261009.log), and
+[sixth](../../Saved/Logs/Codex_AsterMoveToTideglassRepeat6_20261009.log).
+The first probe was delayed six world-seconds so Aster could finish landing; an
+immediate move issued while he was still falling fails and is not representative
+of grounded landmark travel.
+
+The previous 24/160-step wear curve showed no plant clearance after these six
+real movements. The curve now starts at 4 and reaches full wear at 40: a single
+traversal's one-or-two samples per cell remain below onset, while repeated use
+can produce a local clearing over repeated returns rather than dozens of
+sessions. At the observed maximum of 10 steps, the curve has begun to clear the
+grass without reaching full wear. The trail automation compares progress within
+this tunable range, and the ecology regression expects a fully worn cell to
+weather from 40 to a faint 10-step trace after 30 unused Island days. This
+tuning change passed the current-source UE 5.8.3 build and focused `IslandTrail`
+and `GroundCover` automations with zero model requests. A matched visual capture
+is still needed before its appearance can be called verified. Automation log:
+[Codex_TrailWearTune_Automation_20261010.log](../../Saved/Logs/Codex_TrailWearTune_Automation_20261010.log).

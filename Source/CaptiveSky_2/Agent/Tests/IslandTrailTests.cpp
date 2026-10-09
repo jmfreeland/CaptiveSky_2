@@ -21,7 +21,9 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Half-dried ground shrinks it"), Trail::PrintScale(1.f, Life, 0.06f) < 1.f);
 
 	TestEqual(TEXT("A few footfalls wear nothing"), Trail::WearAmount(Trail::WearStartSteps), 0.f);
-	TestTrue(TEXT("More footfalls wear more"), Trail::WearAmount(60) < Trail::WearAmount(120));
+	const int32 FirstMidpoint = Trail::WearStartSteps + (Trail::WearFullSteps - Trail::WearStartSteps) / 3;
+	const int32 SecondMidpoint = Trail::WearStartSteps + (Trail::WearFullSteps - Trail::WearStartSteps) * 2 / 3;
+	TestTrue(TEXT("Repeated passes wear the same ground progressively"), Trail::WearAmount(FirstMidpoint) < Trail::WearAmount(SecondMidpoint));
 	TestEqual(TEXT("A well-used path is fully worn"), Trail::WearAmount(Trail::WearFullSteps), 1.f);
 	TestEqual(TEXT("Wear is capped"), Trail::WearAmount(100000), 1.f);
 	const FLinearColor Dry = Trail::WearColor(0.f);
