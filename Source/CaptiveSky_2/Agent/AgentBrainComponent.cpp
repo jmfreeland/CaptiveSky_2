@@ -249,7 +249,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearbyBeings += TEXT(" At close range, you can see a small bundle of fallen twigs held in the raven's beak; that visible clue does not tell you what it plans to do.");
 			}
-			if (NearestVisibleRaven->IsShowingDirectedAttention() && NearestRavenDistanceSquared <= FMath::Square(800.f))
+			if (NearestVisibleRaven->IsShowingDirectedAttention() && NearestRavenDistanceSquared <= FMath::Square(400.f))
 			{
 				NearbyBeings += TEXT(" Close enough to notice, the raven's head is briefly turned toward something; you cannot tell what has caught its attention.");
 			}

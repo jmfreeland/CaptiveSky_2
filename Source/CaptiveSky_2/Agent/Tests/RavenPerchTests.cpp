@@ -354,7 +354,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					TestTrue(TEXT("A nearby resident can notice the raven's brief head turn without being told what caused it"),
 						NearbyRavenObservation.Contains(TEXT("the raven's head is briefly turned toward something")) &&
 						NearbyRavenObservation.Contains(TEXT("cannot tell what has caught its attention")));
-					CuriousResident->SetActorLocation(RavenPositionBeforeRainBasin + FVector(0.f, -900.f, 0.f));
+					CuriousResident->SetActorLocation(RavenPositionBeforeRainBasin + FVector(0.f, -500.f, 0.f));
 					const FString DistantRavenObservation = CuriousResidentBrain->BuildSituationSummary(NoMessageContext);
 					TestFalse(TEXT("The brief head-turn cue is omitted beyond close visual range"),
 						DistantRavenObservation.Contains(TEXT("the raven's head is briefly turned toward something")));
