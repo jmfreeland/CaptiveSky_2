@@ -21,6 +21,8 @@ public:
 
 	/** Startle briefly, moving away from a quiet observer before returning to grazing. */
 	void RespondToQuietObservation(const FVector& ObserverLocation);
+	/** True only during the stag's temporary, non-startled look toward a nearby resident. */
+	bool IsQuietlyNoticingResident() const { return bNoticingResident && !bMoving && !bStartled && !bResting; }
 	/** Sleep in place at night; wake into the ordinary grazing routine in daylight. */
 	void SetResting(bool bShouldRest);
 	bool IsResting() const { return bResting; }

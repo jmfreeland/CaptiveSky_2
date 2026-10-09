@@ -6,6 +6,7 @@
 
 class AIslandArrangement;
 class AIslandDewActor;
+class AIslandForestStag;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
 class AIslandRainBasin;
@@ -66,7 +67,7 @@ public:
 			LocomotionState == ERavenLocomotionState::Perched) && !IsResting();
 		return bCanAttend && (ListeningStoneAttentionRemaining > 0.f || MinnowRippleAttentionRemaining > 0.f ||
 			RainBasinAttentionRemaining > 0.f || DewGlintAttentionRemaining > 0.f || WindMoteAttentionRemaining > 0.f ||
-			CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f);
+			CrabScurryAttentionRemaining > 0.f || ResidentAttentionRemaining > 0.f || WildlifeAttentionRemaining > 0.f);
 	}
 	/** Maximum visible distance for selecting an exact open-ground landing target. */
 	static constexpr float GroundLandingVisibilityRange = 3500.f;
@@ -97,6 +98,7 @@ private:
 	friend class FIslandCurioTest;
 	friend class FIslandArrangementTest;
 	friend class FIslandGuestBookTest;
+	friend class FIslandForestStagTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
 	FVector CruiseTarget = FVector::ZeroVector;
@@ -145,7 +147,9 @@ private:
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
 	TWeakObjectPtr<AIslandRainBasin> LastNoticedRainBasin;
 	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
+	TWeakObjectPtr<AIslandForestStag> WildlifeAttentionTarget;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
+	TSet<TWeakObjectPtr<AIslandForestStag>> NoticedWildlifeInNearbyGroup;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
 	FVector DewGlintLocation = FVector::ZeroVector;
@@ -153,6 +157,7 @@ private:
 	FVector MinnowRippleLocation = FVector::ZeroVector;
 	FVector RainBasinLocation = FVector::ZeroVector;
 	FVector CrabScurryLocation = FVector::ZeroVector;
+	FVector WildlifeAttentionLocation = FVector::ZeroVector;
 	FVector ResidentAttentionLocation = FVector::ZeroVector;
 	float ListeningStoneAttentionRemaining = 0.f;
 	float DewGlintAttentionRemaining = 0.f;
@@ -160,6 +165,7 @@ private:
 	float MinnowRippleAttentionRemaining = 0.f;
 	float RainBasinAttentionRemaining = 0.f;
 	float CrabScurryAttentionRemaining = 0.f;
+	float WildlifeAttentionRemaining = 0.f;
 	float ResidentAttentionRemaining = 0.f;
 	float ListeningStoneCheckRemaining = 0.f;
 	static constexpr float ListeningStoneAttentionDuration = 2.4f;
@@ -168,6 +174,7 @@ private:
 	static constexpr float MinnowRippleAttentionDuration = 1.6f;
 	static constexpr float RainBasinAttentionDuration = 1.8f;
 	static constexpr float CrabScurryAttentionDuration = 1.5f;
+	static constexpr float WildlifeAttentionDuration = 1.6f;
 	static constexpr float ResidentAttentionDuration = 1.8f;
 	/** Remaining legs of a planned flight (climb over an obstacle, cross, descend). */
 	TArray<FVector> FlightWaypoints;
@@ -206,6 +213,7 @@ private:
 	void CheckForNearbyRainBasin();
 	void CheckForNearbyCrabScurry();
 	void CheckForNearbyResidentPresence();
+	void CheckForNearbyWildlifePresence();
 	void UpdateCarriedTwigVisual();
 	FVector MakeCruiseTarget(bool bForceCuriosityForProbe = false) const;
 	bool TraceGround(const FVector& DesiredLocation, FVector& OutGroundLocation) const;

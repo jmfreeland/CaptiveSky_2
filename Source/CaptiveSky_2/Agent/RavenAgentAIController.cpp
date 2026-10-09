@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "IslandDew.h"
+#include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
@@ -646,6 +647,14 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			FadeInSeconds = 0.25f;
 			FadeOutSeconds = 1.25f;
 		}
+		else if (WildlifeAttentionRemaining > 0.f)
+		{
+			FocusLocation = WildlifeAttentionLocation;
+			AttentionRemaining = WildlifeAttentionRemaining;
+			AttentionDuration = WildlifeAttentionDuration;
+			FadeInSeconds = 0.25f;
+			FadeOutSeconds = 1.05f;
+		}
 
 		if (!Raven || AttentionRemaining <= 0.f || AttentionDuration <= 0.f)
 		{
@@ -798,6 +807,24 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			const float Elapsed = ResidentAttentionDuration - ResidentAttentionRemaining;
 			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
 				(1.f - FMath::SmoothStep(1.25f, ResidentAttentionDuration, Elapsed));
+			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
+			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
+				FMath::Max(0.f, DeltaSeconds), 7.f));
+			return;
+		}
+	}
+	if (WildlifeAttentionRemaining > 0.f)
+	{
+		if (const APawn* Raven = GetPawn())
+		{
+			const FVector LocalDirection = Raven->GetActorTransform().InverseTransformVectorNoScale(
+				WildlifeAttentionLocation - Raven->GetActorLocation()).GetSafeNormal();
+			FRotator FocusOffset = LocalDirection.Rotation();
+			FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -10.f, 10.f);
+			FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -20.f, 20.f);
+			const float Elapsed = WildlifeAttentionDuration - WildlifeAttentionRemaining;
+			const float AttentionAlpha = FMath::SmoothStep(0.f, 0.25f, Elapsed) *
+				(1.f - FMath::SmoothStep(1.05f, WildlifeAttentionDuration, Elapsed));
 			const FRotator FocusPose = IdlePose + FocusOffset * AttentionAlpha;
 			Head->SetRelativeRotation(FMath::RInterpTo(Head->GetRelativeRotation(), FocusPose,
 				FMath::Max(0.f, DeltaSeconds), 7.f));
@@ -1092,6 +1119,69 @@ void ARavenAgentAIController::CheckForNearbyResidentPresence()
 		ResidentAttentionLocation = ClosestResidentAttentionLocation;
 		ResidentAttentionRemaining = ResidentAttentionDuration;
 	}
+}
+
+void ARavenAgentAIController::CheckForNearbyWildlifePresence()
+{
+	const APawn* Raven = GetPawn();
+	if (!GetWorld() || !Raven || IsResting() || IsShowingDirectedAttention() ||
+		(LocomotionState != ERavenLocomotionState::Grounded && LocomotionState != ERavenLocomotionState::Perched))
+	{
+		return;
+	}
+
+	constexpr float NoticeRadius = 500.f;
+	constexpr float ForgetRadius = 700.f;
+	constexpr float MaximumHeightDifference = 250.f;
+	bool bStagRemainsNearby = false;
+	AIslandForestStag* ClosestEligibleStag = nullptr;
+	float ClosestDistanceSquared = FMath::Square(NoticeRadius);
+	FVector ClosestStagAttentionLocation = FVector::ZeroVector;
+	for (TActorIterator<AIslandForestStag> It(GetWorld()); It; ++It)
+	{
+		AIslandForestStag* Stag = *It;
+		if (!IsValid(Stag)) continue;
+		const FVector Offset = Stag->GetActorLocation() - Raven->GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+			continue;
+
+		bStagRemainsNearby = true;
+		const TWeakObjectPtr<AIslandForestStag> StagWeak(Stag);
+		if (DistanceSquared > FMath::Square(NoticeRadius) || !Stag->IsQuietlyNoticingResident() ||
+			NoticedWildlifeInNearbyGroup.Contains(StagWeak) ||
+			(ClosestEligibleStag && DistanceSquared >= ClosestDistanceSquared))
+		{
+			continue;
+		}
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenWildlifeAttention), false, Raven);
+		Query.AddIgnoredActor(Stag);
+		FHitResult Hit;
+		const FVector RavenEye = Raven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
+		const FVector StagHead = Stag->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+		if (GetWorld()->LineTraceSingleByChannel(Hit, RavenEye, StagHead, ECC_Visibility, Query) &&
+			Hit.GetActor() != Stag)
+		{
+			continue;
+		}
+
+		ClosestEligibleStag = Stag;
+		ClosestDistanceSquared = DistanceSquared;
+		ClosestStagAttentionLocation = StagHead;
+	}
+
+	if (!bStagRemainsNearby)
+	{
+		NoticedWildlifeInNearbyGroup.Reset();
+		return;
+	}
+
+	if (!ClosestEligibleStag) return;
+	NoticedWildlifeInNearbyGroup.Add(ClosestEligibleStag);
+	WildlifeAttentionTarget = ClosestEligibleStag;
+	WildlifeAttentionLocation = ClosestStagAttentionLocation;
+	WildlifeAttentionRemaining = WildlifeAttentionDuration;
 }
 
 void ARavenAgentAIController::UpdateCarriedTwigVisual()
@@ -1878,6 +1968,32 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	MinnowRippleAttentionRemaining = FMath::Max(0.f, MinnowRippleAttentionRemaining - SafeDelta);
 	RainBasinAttentionRemaining = FMath::Max(0.f, RainBasinAttentionRemaining - SafeDelta);
 	CrabScurryAttentionRemaining = FMath::Max(0.f, CrabScurryAttentionRemaining - SafeDelta);
+	if (WildlifeAttentionRemaining > 0.f)
+	{
+		AIslandForestStag* AttendedStag = WildlifeAttentionTarget.Get();
+		const bool bSettled = LocomotionState == ERavenLocomotionState::Grounded ||
+			LocomotionState == ERavenLocomotionState::Perched;
+		bool bWildlifeStillEligible = IsValid(AttendedStag) && AttendedStag->IsQuietlyNoticingResident() &&
+			bSettled && !IsResting();
+		if (bWildlifeStillEligible)
+		{
+			const FVector Offset = AttendedStag->GetActorLocation() - Raven->GetActorLocation();
+			bWildlifeStillEligible = FMath::Abs(Offset.Z) <= 250.f && Offset.SizeSquared2D() <= FMath::Square(700.f);
+			if (bWildlifeStillEligible)
+			{
+				WildlifeAttentionLocation = AttendedStag->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+			}
+		}
+		if (!bWildlifeStillEligible)
+		{
+			WildlifeAttentionRemaining = FMath::Min(WildlifeAttentionRemaining, 0.4f);
+		}
+	}
+	WildlifeAttentionRemaining = FMath::Max(0.f, WildlifeAttentionRemaining - SafeDelta);
+	if (WildlifeAttentionRemaining <= 0.f)
+	{
+		WildlifeAttentionTarget.Reset();
+	}
 	if (ResidentAttentionRemaining > 0.f)
 	{
 		AAutonomousAgentCharacter* AttendedResident = ResidentAttentionTarget.Get();
@@ -1917,6 +2033,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 		CheckForNearbyWindMote();
 		CheckForNearbyCrabScurry();
 		CheckForNearbyResidentPresence();
+		CheckForNearbyWildlifePresence();
 	}
 	UpdateWingAnimation(DeltaSeconds);
 	UpdateHeadAnimation(DeltaSeconds);

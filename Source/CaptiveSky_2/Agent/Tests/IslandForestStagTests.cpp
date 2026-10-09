@@ -287,6 +287,7 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		RavenController->LocomotionState = ERavenLocomotionState::Perched;
 		Deer->CheckForNearbyRavenFlyby();
 		TestFalse(TEXT("A perched raven does not startle the stag"), Deer->IsStartled());
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 120.f));
 		Deer->BeginGrazing();
 		Deer->bResidentPresenceNearby = false;
 		Deer->ResidentPresenceCooldownRemaining = 0.f;
@@ -299,7 +300,54 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The perched Raven response uses the existing look-around animation"),
 			Deer->GetDeerMesh()->GetSingleNodeInstance() &&
 			Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+		TestTrue(TEXT("The stag exposes only its calm, temporary resident-notice state to companion sensing"),
+			Deer->IsQuietlyNoticingResident());
 		TestFalse(TEXT("Noticing a perched companion makes no model request"), RavenBrain && RavenBrain->bRequestInFlight);
+
+		// The settled Raven returns one small look while the stag is quietly noticing it.
+		// Existing sensory priorities and the already-visited chime must not be displaced.
+		RavenController->LastNoticedListeningChime = Chime;
+		RavenController->ListeningStoneAttentionRemaining = 0.f;
+		RavenController->MinnowRippleAttentionRemaining = 0.f;
+		RavenController->RainBasinAttentionRemaining = 0.f;
+		RavenController->DewGlintAttentionRemaining = 0.f;
+		RavenController->WindMoteAttentionRemaining = 0.f;
+		RavenController->CrabScurryAttentionRemaining = 0.f;
+		RavenController->ResidentAttentionRemaining = 0.f;
+		RavenController->WildlifeAttentionRemaining = 0.f;
+		RavenController->NoticedWildlifeInNearbyGroup.Reset();
+		RavenController->ListeningStoneCheckRemaining = 0.f;
+		const FVector RavenLocationBeforeLook = RavenPawn->GetActorLocation();
+		RavenController->Tick(0.3f);
+		TestTrue(TEXT("A settled Raven gives one brief directed glance to a stag quietly noticing it"),
+			RavenController->IsShowingDirectedAttention() &&
+			RavenController->WildlifeAttentionTarget.Get() == Deer);
+		TestTrue(TEXT("The reciprocal glance does not move the Raven or start a model request"),
+			RavenPawn->GetActorLocation().Equals(RavenLocationBeforeLook) && !RavenBrain->bRequestInFlight);
+		RavenController->WildlifeAttentionRemaining = 0.f;
+		RavenController->ListeningStoneAttentionRemaining = 0.f;
+		RavenController->MinnowRippleAttentionRemaining = 0.f;
+		RavenController->RainBasinAttentionRemaining = 0.f;
+		RavenController->DewGlintAttentionRemaining = 0.f;
+		RavenController->WindMoteAttentionRemaining = 0.f;
+		RavenController->CrabScurryAttentionRemaining = 0.f;
+		RavenController->ResidentAttentionRemaining = 0.f;
+		RavenController->CheckForNearbyWildlifePresence();
+		TestTrue(TEXT("The same stag cannot retrigger a glance while the pair remain together"),
+			FMath::IsNearlyZero(RavenController->WildlifeAttentionRemaining));
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-800.f, 0.f, 120.f));
+		RavenController->CheckForNearbyWildlifePresence();
+		TestTrue(TEXT("Leaving the 7 m group range clears the one-shot nearby-wildlife marker"),
+			RavenController->NoticedWildlifeInNearbyGroup.IsEmpty());
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 120.f));
+		TestTrue(TEXT("The stag is still giving its brief calm look when the Raven returns"),
+			Deer->IsQuietlyNoticingResident());
+		TestTrue(TEXT("The Raven is still settled and no other cue owns its attention"),
+			RavenController->LocomotionState == ERavenLocomotionState::Perched &&
+			!RavenController->IsResting() && !RavenController->IsShowingDirectedAttention());
+		RavenController->CheckForNearbyWildlifePresence();
+		TestTrue(TEXT("Leaving the local group and returning rearms a full-duration wildlife glance"),
+			FMath::IsNearlyEqual(RavenController->WildlifeAttentionRemaining, ARavenAgentAIController::WildlifeAttentionDuration));
 
 		RavenController->LocomotionState = ERavenLocomotionState::Flying;
 		Deer->SetResting(true);
