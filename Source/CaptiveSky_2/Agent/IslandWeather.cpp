@@ -12,6 +12,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandForestStag.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandTrail.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -417,6 +418,23 @@ bool AIslandWeather::IsWithinCurioGroundCoverClearance(const FVector& Position, 
 	return FVector::DistSquared2D(Position, CurioPosition) < FMath::Square(ClearanceRadius);
 }
 
+bool AIslandWeather::IsGroundCoverWithinWornTrailClearance(const FIslandTrailLedger& TrailLedger, const FVector& Position)
+{
+	if (TrailLedger.Cells.IsEmpty() || Position.ContainsNaN()) return false;
+	const FIntPoint CenterCell = FIslandTrailLedger::CellFor(Position);
+	for (int32 OffsetX = -1; OffsetX <= 1; ++OffsetX)
+		for (int32 OffsetY = -1; OffsetY <= 1; ++OffsetY)
+		{
+			const FIslandTrailCell* TrailCell = TrailLedger.Cells.Find(CenterCell + FIntPoint(OffsetX, OffsetY));
+			if (!TrailCell) continue;
+			const float Wear = UIslandTrailSubsystem::WearAmount(TrailCell->Steps);
+			if (Wear <= 0.f) continue;
+			const float ClearanceRadius = FMath::Lerp(45.f, 130.f, Wear);
+			if (FVector::DistSquared2D(Position, TrailCell->Position) <= FMath::Square(ClearanceRadius)) return true;
+		}
+	return false;
+}
+
 float AIslandWeather::CalculateGroundCoverWetEdgeMoisture(const FVector& Position, const FVector& TideglassAnchor,
 	const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius)
 {
@@ -542,6 +560,7 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverInstanceCount = 0;
+	GroundCoverTrailClearedInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
@@ -577,8 +596,15 @@ void AIslandWeather::InitializeGroundCover()
 		for (TActorIterator<AIslandCurio> It(GetWorld()); It; ++It)
 			ScatterCurios.Add(It->GetRecord());
 	UE_LOG(LogIslandWeather, Log, TEXT("Ground-cover scatter keeps clearances around %d curio(s)."), ScatterCurios.Num());
-	auto PlaceFoliage = [this, GrassC, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
+	const UIslandTrailSubsystem* TrailSubsystem = GetWorld()->GetSubsystem<UIslandTrailSubsystem>();
+	const FIslandTrailLedger* TrailLedger = TrailSubsystem ? &TrailSubsystem->GetLedger() : nullptr;
+	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
+		if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, GroundHit.ImpactPoint))
+		{
+			++GroundCoverTrailClearedInstanceCount;
+			return;
+		}
 		for (const FIslandCurioRecord& Curio : ScatterCurios)
 			if (IsWithinCurioGroundCoverClearance(GroundHit.ImpactPoint, Curio.Location, Curio.Kind)) return;
 		const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal);
@@ -731,6 +757,11 @@ void AIslandWeather::InitializeGroundCover()
 				{
 					if (GroundCoverWetlandCount - CattailsBeforePool >= CattailsPerPool) break;
 					const FVector Candidate = Landmark->GetActorLocation() + Offset.GetLocation();
+					if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, Candidate))
+					{
+						++GroundCoverTrailClearedInstanceCount;
+						continue;
+					}
 					bool bTooClose = false;
 					for (const FVector& ExistingCattail : CattailLocations)
 						if (FVector::Dist2D(Candidate, ExistingCattail) < CattailMinimumSpacing) { bTooClose = true; break; }
@@ -1477,6 +1508,7 @@ void AIslandWeather::ClearGroundCover()
 	SwayedSpruceIndices.Reset();
 	SpruceCells.Reset();
 	GroundCoverInstanceCount = 0;
+	GroundCoverTrailClearedInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;

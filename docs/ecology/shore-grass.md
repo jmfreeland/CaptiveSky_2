@@ -353,3 +353,27 @@ readable, while cover still forms a dense foreground and broad patchy midground.
 Next, compare the same camera with plugin content resolved, then art-direct a
 walkable opening and distinct near/mid/far plant masses without raising the
 global budget.
+
+## Persistent trail clearings (2026-10-09)
+
+Ground-cover initialization now reads the existing persistent trail ledger.
+Candidates within a clearance that grows linearly from 45 cm at the start of
+wear to 130 cm at full wear are skipped, so frequently walked routes become
+narrow open traces without removing nearby untouched plants. The filter covers
+the existing grass/ground-plant scatter and Tideglass wet-edge candidates; it
+does not alter trail persistence, navigation, or per-frame foliage work. As
+both systems are transiently rebuilt at world start, current wear is reflected
+on the next ground-cover scatter, while the trail subsystem's existing daily
+decay lets unused clearings recover on later starts.
+
+The UE 5.8.3 scratch editor target built successfully, and the focused
+`CaptiveSky2.Agent.GroundCover` automation passed. Besides checking the narrow
+radius at empty, partially worn, and fully worn trail levels, its fixture seeds
+a full-wear cell beneath an actual deterministic grass placement, reruns
+scatter, and verifies that every skipped placement is reflected in the final
+instance total. Validation was headless with resident thinking disabled and
+zero model requests; no map or authored asset was changed. Log:
+[ground-cover automation](../../Saved/Logs/Codex_TrailClearance_GroundCover_20261009.log).
+This is behavioral validation, not a rendered path-clearance comparison. A
+useful follow-up is a matched Island frame with a deliberately seeded path,
+then a later-day frame showing regrowth after ledger decay.

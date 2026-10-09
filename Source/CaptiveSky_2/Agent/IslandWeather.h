@@ -20,6 +20,7 @@ class UMaterialInterface;
 class UAudioComponent;
 class UVolumetricCloudComponent;
 class USoundWaveProcedural;
+struct FIslandTrailLedger;
 
 struct FIslandTransientGust
 {
@@ -180,6 +181,7 @@ private:
 	int32 ActiveRainStreakCount = 0;
 	int32 ActiveRainGroundImpactCount = 0;
 	int32 GroundCoverInstanceCount = 0;
+	int32 GroundCoverTrailClearedInstanceCount = 0;
 	int32 GroundCoverMeadowInstanceCount = 0;
 	int32 GroundCoverTreeCount = 0;
 	int32 GroundCoverShrubCount = 0;
@@ -214,6 +216,8 @@ private:
 		const TArray<FVector>& OtherAnchors);
 	/** Keep a resident-scale open patch around lasting curios so meadow cover cannot bury them. */
 	static bool IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind);
+	/** Thin transient vegetation around sufficiently worn persistent footpaths, with clearance scaled to wear. */
+	static bool IsGroundCoverWithinWornTrailClearance(const FIslandTrailLedger& TrailLedger, const FVector& Position);
 	/** Fade a Tideglass wet-edge habitat into the meadow unless another landmark owns the patch. */
 	static float CalculateGroundCoverWetEdgeMoisture(const FVector& Position, const FVector& TideglassAnchor,
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);

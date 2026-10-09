@@ -11,6 +11,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
+#include "IslandTrail.h"
 #include "IslandWindMoteEffect.h"
 #include "Components/PointLightComponent.h"
 #include "Components/BoxComponent.h"
@@ -313,6 +314,22 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(160.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::SeedPod));
 	TestFalse(TEXT("Small trail stones clear only their immediate footprint"),
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(70.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::PaleStone));
+	FIslandTrailLedger WornTrail;
+	const FVector TrailCellPoint(75.f, 75.f, 0.f);
+	for (int32 Step = 0; Step < UIslandTrailSubsystem::WearStartSteps; ++Step)
+		WornTrail.AddStep(TrailCellPoint, FVector::UpVector);
+	TestFalse(TEXT("A barely visible trail does not clear plants before wear begins"),
+		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, TrailCellPoint));
+	for (int32 Step = UIslandTrailSubsystem::WearStartSteps; Step < UIslandTrailSubsystem::WearFullSteps; ++Step)
+		WornTrail.AddStep(TrailCellPoint, FVector::UpVector);
+	TestTrue(TEXT("A well-worn trail clears ground cover underfoot"),
+		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, TrailCellPoint));
+	TestTrue(TEXT("The path clearance stays close to the worn trace"),
+		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, TrailCellPoint + FVector(100.f, 0.f, 0.f)));
+	TestFalse(TEXT("The path leaves adjacent plants beyond its narrow edge intact"),
+		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, TrailCellPoint + FVector(140.f, 0.f, 0.f)));
+	TestFalse(TEXT("An unrelated unwalked cell retains its vegetation"),
+		AIslandWeather::IsGroundCoverWithinWornTrailClearance(WornTrail, FVector(1000.f, 1000.f, 0.f)));
 	const TArray<FVector> NoCompetingHabitats;
 	TestEqual(TEXT("The pool margin begins at full wet-edge influence"),
 		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(500.f, 0.f, 0.f), FVector::ZeroVector,
@@ -745,6 +762,17 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
 	const int32 GroundCoverCountAfterFirstInitialization = Weather->GroundCoverInstanceCount;
+	UHierarchicalInstancedStaticMeshComponent* TrailSampleComponent = nullptr;
+	const TArray<UHierarchicalInstancedStaticMeshComponent*> GrassComponents = { Weather->ShoreGrassA, Weather->ShoreGrassB, GrassC,
+		Weather->ShoreGroundPlants, Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB, Weather->ShoreGroundPlantLowC, Weather->ShoreGroundPlantLowD };
+	FTransform TrailSampleTransform;
+	for (UHierarchicalInstancedStaticMeshComponent* GrassComponent : GrassComponents)
+		if (GrassComponent && GrassComponent->GetInstanceCount() > 0 && GrassComponent->GetInstanceTransform(0, TrailSampleTransform, false))
+		{
+			TrailSampleComponent = GrassComponent;
+			break;
+		}
+	TestNotNull(TEXT("The fixture provides a real grass placement for the trail integration test"), TrailSampleComponent);
 	Weather->InitializeGroundCover();
 	TestEqual(TEXT("Repeated initialization does not duplicate the ground cover"), Weather->GroundCoverInstanceCount, GroundCoverCountAfterFirstInitialization);
 	TestEqual(TEXT("The marker-only fixture has no landscape spruce groves"), Weather->GroundCoverTreeCount, 0);
@@ -768,6 +796,26 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cleared ground cover is hidden"), !Weather->ShoreGrassA->IsVisible() && !Weather->ShoreGrassB->IsVisible() && !GrassC->IsVisible() && !Weather->ShoreGroundPlants->IsVisible() &&
 		!Weather->ShoreGroundPlantLowA->IsVisible() && !Weather->ShoreGroundPlantLowB->IsVisible() &&
 		!Weather->ShoreGroundPlantLowC->IsVisible() && !Weather->ShoreGroundPlantLowD->IsVisible() && !Weather->IslandSpruce->IsVisible() && !Weather->IslandShrubs->IsVisible());
+	if (TrailSampleComponent)
+	{
+		UIslandTrailSubsystem* Trails = World->GetSubsystem<UIslandTrailSubsystem>();
+		TestNotNull(TEXT("The world fixture provides the persistent trail subsystem"), Trails);
+		if (Trails)
+		{
+			Trails->bAllowStorage = false;
+			FIslandTrailLedger& TrailLedger = Trails->GetLedgerMutable();
+			TrailLedger.Cells.Reset();
+			const FVector TrailPoint = TrailSampleComponent->GetComponentTransform().TransformPosition(TrailSampleTransform.GetLocation());
+			for (int32 Step = 0; Step < UIslandTrailSubsystem::WearFullSteps; ++Step)
+				TrailLedger.AddStep(TrailPoint, FVector::UpVector);
+			Weather->InitializeGroundCover();
+			TestTrue(TEXT("A well-worn persistent path suppresses real scatter candidates"), Weather->GroundCoverTrailClearedInstanceCount > 0);
+			TestEqual(TEXT("Every skipped ground-cover candidate is reflected in the placement total"),
+				Weather->GroundCoverInstanceCount + Weather->GroundCoverTrailClearedInstanceCount, GroundCoverCountAfterFirstInitialization);
+			Weather->ClearGroundCover();
+			TrailLedger.Cells.Reset();
+		}
+	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return true;
