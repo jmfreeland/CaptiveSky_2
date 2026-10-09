@@ -231,3 +231,24 @@ contains the matching return code and later successful game/probe shutdown;
 `CurrentAsterMoveToListeningStones.log` records the same code in a second
 isolated launch. The direct validation's requested workspace log was not
 created.
+
+### Isolated nest build and render (2026-10-09)
+
+A sandboxed `Build.bat` invocation for the nest scratch project launched the
+bundled `dotnet.exe` but remained at 0.12 CPU seconds for over a minute and did
+not create its requested workspace log. Only that build was interrupted. This
+matches the documented UBT per-user log-access stall in the restricted
+execution context; it is not evidence of a source-level build error.
+
+With approved elevated access to UBT's per-user log location, the same isolated
+scratch target completed UHT, compiled, and linked successfully. The focused
+`CaptiveSky2.Agent.IslandNest` automation passed, and the real-RHI
+`CaptiveSky2.Visual.Viewpoints` capture passed for the nest close-up. The UE
+startup logs still recorded `UBT AutoSDK ReturnCode: -532462766` on these runs,
+while the editor continued through content load and the tests completed with
+exit code 0. The scratch `AutoSDKInfo.txt` itself reported a successful
+platform-validation result. This strengthens the correlation between UE's
+bundled .NET/Turnkey path and the generic popup signature, but still does not
+prove which process owns a visible dialog or provide its managed exception
+type/stack. No Windows ACL, SDK configuration, or validation settings were
+changed.

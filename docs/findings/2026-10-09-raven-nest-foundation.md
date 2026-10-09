@@ -65,7 +65,25 @@ engine-cylinder twigs read as placeholder geometry rather than natural woven
 branches. The [close-up frame](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Viewpoints/2026-10-09_040320_h12.0/04a_RavenNestCloseup.png)
 is an isolated editor-world preview, not a Game/PIE or final-art validation.
 
-Next: refine the placeholder twig silhouette/material using an available
-project branch asset if one fits, then judge it in both this close view and a
-normal-distance Game frame. Keep the scratch data root and live editor's
-unsaved state separate.
+## Tapered twig silhouette and shadow pass (2026-10-09)
+
+No branch mesh was available in the project content search. A visual-only
+placeholder refinement now pairs each cylinder twig with two short,
+site-seeded cone tips. The body, tip, and storm-debris components remain
+collisionless and off navigation; twig meshes no longer cast hard shadows
+across the small rock perch. The seed and instance transforms remain stable
+when the same nest is rebuilt. This does not add shelter, support, or new
+persistent state.
+
+The `CaptiveSky2.Agent.IslandNest` automation passed in the UE 5.8.3
+scratch editor with model requests disabled and a 60-second realtime cap. It
+checks opposing tip orientation, visible extension past the twig bodies,
+deterministic reconstruction, collision/navigation policy, storm damage, and
+shadow policy. The `CaptiveSky2.Visual.Viewpoints` test also passed with a real
+RHI, scratch world-state root, and only the RavenNestCloseup view. The scratch
+copy of that viewpoint was moved closer solely to judge the silhouette; this
+iteration did not edit the project camera. The [zoomed preview](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Viewpoints/2026-10-09_043134_h12.0/04a_RavenNestCloseup.png)
+shows the weave without the previous hard black nest-shadow cluster. The
+remaining brown rods are still engine primitives, not natural branch art; a
+proper twig mesh is the next art-quality step if an available/free asset fits.
+The user's open editor and its unsaved materials were left untouched.

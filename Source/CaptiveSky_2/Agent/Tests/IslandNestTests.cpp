@@ -180,12 +180,55 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("A shallow woven base sits beneath the first twig layer"), It->GetVisibleTwigCount(),
 			AIslandNest::FoundationTwigCount + AIslandNest::TwigsPerLayer);
+		TestEqual(TEXT("Every woven twig has two visual-only tapered ends"), It->GetVisibleTwigTipCount(),
+			2 * It->GetVisibleTwigCount());
 		TestTrue(TEXT("Nest rests on the support surface, not the marker in the air"), FMath::IsNearlyEqual(It->GetActorLocation().Z, SupportTop, 4.f));
 		TestTrue(TEXT("Nest is visual only and cannot alter perch support"), It->GetActorEnableCollision() == false || It->GetRootComponent()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 
 		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
 		TestNotNull(TEXT("The visible nest exposes its foundation instances for inspection"), TwigInstances);
 		if (!TwigInstances) continue;
+		UInstancedStaticMeshComponent* TipInstances = It->TwigTips;
+		TestNotNull(TEXT("Tapered ends use a separate batched visual component"), TipInstances);
+		if (TipInstances)
+		{
+			TestTrue(TEXT("Twig tips use Unreal's built-in cone primitive"), TipInstances->GetStaticMesh() &&
+				TipInstances->GetStaticMesh()->GetName().Contains(TEXT("Cone")));
+			TestTrue(TEXT("Tapered ends stay collisionless, shadowless, and off navigation"),
+				TipInstances->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+				!TipInstances->CastShadow && !TipInstances->CanEverAffectNavigation());
+			TestTrue(TEXT("Woven bodies and storm debris do not cast hard shadows onto the tiny roost"),
+				!TwigInstances->CastShadow && It->FallenTwigs && !It->FallenTwigs->CastShadow);
+		}
+		TArray<FTransform> SeededTipTransforms;
+		if (TipInstances)
+		{
+			for (int32 Index = 0; Index < 2; ++Index)
+			{
+				FTransform TipTransform;
+				TestTrue(FString::Printf(TEXT("Tapered end %d has a visible instance transform"), Index),
+					TipInstances->GetInstanceTransform(Index, TipTransform, false));
+				SeededTipTransforms.Add(TipTransform);
+			}
+			FTransform BodyTransform, PositiveTip, NegativeTip;
+			if (TwigInstances->GetInstanceTransform(0, BodyTransform, false) &&
+				TipInstances->GetInstanceTransform(0, PositiveTip, false) &&
+				TipInstances->GetInstanceTransform(1, NegativeTip, false))
+			{
+				const FVector BodyAxis = BodyTransform.GetRotation().RotateVector(FVector::UpVector).GetSafeNormal();
+				const FVector PositiveAxis = PositiveTip.GetRotation().RotateVector(FVector::UpVector).GetSafeNormal();
+				const FVector NegativeAxis = NegativeTip.GetRotation().RotateVector(FVector::UpVector).GetSafeNormal();
+				TestTrue(TEXT("The first cone points out along one end of the twig"), FVector::DotProduct(BodyAxis, PositiveAxis) > 0.98f);
+				TestTrue(TEXT("The second cone points out along the opposite end of the twig"), FVector::DotProduct(BodyAxis, NegativeAxis) < -0.98f);
+				const float HalfTwigLength = 50.f * BodyTransform.GetScale3D().Z;
+				const float PositiveTipEnd = FVector::DotProduct(PositiveTip.GetLocation() - BodyTransform.GetLocation(), BodyAxis) +
+					50.f * PositiveTip.GetScale3D().Z;
+				const float NegativeTipEnd = -FVector::DotProduct(NegativeTip.GetLocation() - BodyTransform.GetLocation(), BodyAxis) +
+					50.f * NegativeTip.GetScale3D().Z;
+				TestTrue(TEXT("The positive tip exposes a short, visible taper beyond the twig body"), PositiveTipEnd > HalfTwigLength * 1.2f);
+				TestTrue(TEXT("The negative tip exposes the same short taper beyond the twig body"), NegativeTipEnd > HalfTwigLength * 1.2f);
+			}
+		}
 		TArray<FTransform> FoundationTransforms;
 		for (int32 Index = 0; Index < AIslandNest::FoundationTwigCount; ++Index)
 		{
@@ -202,6 +245,20 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 			}
 		}
 		It->SetWoven(Site, 1);
+		TestEqual(TEXT("Rebuilding the same weave retains both tapered ends per twig"), It->GetVisibleTwigTipCount(),
+			2 * It->GetVisibleTwigCount());
+		if (TipInstances)
+		{
+			for (int32 Index = 0; Index < SeededTipTransforms.Num(); ++Index)
+			{
+				FTransform RebuiltTip;
+				const bool bFoundTip = TipInstances->GetInstanceTransform(Index, RebuiltTip, false);
+				TestTrue(FString::Printf(TEXT("Tapered end %d remains after repeating the same weave"), Index), bFoundTip);
+				if (bFoundTip)
+					TestTrue(FString::Printf(TEXT("Tapered end %d remains deterministic for its site"), Index),
+						SeededTipTransforms[Index].Equals(RebuiltTip, 0.01f));
+			}
+		}
 		for (int32 Index = 0; Index < FoundationTransforms.Num(); ++Index)
 		{
 			FTransform RebuiltTransform;
@@ -244,6 +301,7 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
 		TestNotNull(TEXT("The visible nest exposes its instance weave for inspection"), TwigInstances);
 		if (!TwigInstances || TwigInstances->GetInstanceCount() != AIslandNest::FoundationTwigCount + 2 * AIslandNest::TwigsPerLayer) continue;
+		TestEqual(TEXT("Both woven courses keep matching tapered ends"), It->GetVisibleTwigTipCount(), 2 * TwigInstances->GetInstanceCount());
 		for (int32 Layer = 0; Layer < 2; ++Layer)
 		{
 			for (int32 Twig = 0; Twig < AIslandNest::TwigsPerLayer; ++Twig)
@@ -274,6 +332,9 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 			{ return Mark.Contains(TEXT("nest at TestNestRoost")); }));
 	TestEqual(TEXT("A fresh storm tear renders fallen twigs below the nest"),
 		WovenNest ? WovenNest->GetVisibleFallenTwigCount() : 0, AIslandNest::StormDebrisTwigCount);
+	TestEqual(TEXT("Storm debris receives the same paired tapered ends"),
+		WovenNest ? WovenNest->GetVisibleTwigTipCount() : 0,
+		WovenNest ? 2 * (WovenNest->GetVisibleTwigCount() + WovenNest->GetVisibleFallenTwigCount()) : 0);
 
 	// Bystanders perceive the nest but not who made it.
 	ACharacter* Bystander = World->SpawnActor<ACharacter>(FVector(0.f, 400.f, 302.f), FRotator::ZeroRotator);
@@ -290,6 +351,8 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Re-weaving repairs the nest and clears its storm-damage mark"), Nest && Nest->Layers == 2 && Nest->StormDamagedDay == -1);
 	TestEqual(TEXT("Repair removes the visible fallen-twig debris"),
 		WovenNest ? WovenNest->GetVisibleFallenTwigCount() : -1, 0);
+	TestEqual(TEXT("Repair also removes every loose debris tip"),
+		WovenNest ? WovenNest->GetVisibleTwigTipCount() : -1, WovenNest ? 2 * WovenNest->GetVisibleTwigCount() : -1);
 	const FString BystanderView = BystanderBrain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby resident can come across the repaired nest"), BystanderView.Contains(TEXT("A small nest of woven twigs")) && BystanderView.Contains(TEXT("2 of 5 layers")));
 	TestTrue(TEXT("The maker is not revealed to someone who did not see it"), BystanderView.Contains(TEXT("did not see who made it")) && !BystanderView.Contains(Raven->GetName()));

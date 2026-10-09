@@ -7,9 +7,9 @@
 class UInstancedStaticMeshComponent;
 
 /**
- * Visible form of a persistent nest record. Twigs are placeholder cylinders woven into a
- * shallow bowl; their arrangement is seeded by the site tag so the same nest looks the same
- * every session. Purely visual: no collision, so it never changes the perch support check.
+ * Visible form of a persistent nest record. Low-poly engine primitives form a shallow woven
+ * bowl with short tapered twig ends; their arrangement is seeded by the site tag so the same
+ * nest looks the same every session. Purely visual: no collision or perch-support changes.
  */
 UCLASS()
 class CAPTIVESKY_2_API AIslandNest : public AActor
@@ -26,11 +26,17 @@ public:
 	void SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebris = false);
 	int32 GetWovenLayers() const { return WovenLayers; }
 	int32 GetVisibleTwigCount() const;
+	int32 GetVisibleTwigTipCount() const;
 	int32 GetVisibleFallenTwigCount() const;
 
 private:
+	friend class FIslandNestTest;
+
 	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
 	TObjectPtr<UInstancedStaticMeshComponent> Twigs;
+
+	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
+	TObjectPtr<UInstancedStaticMeshComponent> TwigTips;
 
 	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
 	TObjectPtr<UInstancedStaticMeshComponent> FallenTwigs;

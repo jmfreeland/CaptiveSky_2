@@ -4,23 +4,56 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
+namespace
+{
+	void AddTwigWithTaperedTips(UInstancedStaticMeshComponent* TwigBodies, UInstancedStaticMeshComponent* TwigTips,
+		const FTransform& TwigTransform)
+	{
+		if (!TwigBodies) return;
+		TwigBodies->AddInstance(TwigTransform, false);
+		if (!TwigTips || !TwigTips->GetStaticMesh()) return;
+
+		const FVector Scale = TwigTransform.GetScale3D();
+		const FVector Axis = TwigTransform.TransformVector(FVector::UpVector).GetSafeNormal();
+		const float HalfTwigLength = 50.f * FMath::Abs(Scale.Z);
+		const float TipOffset = HalfTwigLength * 0.84f;
+		const FVector TipScale(Scale.X * 0.70f, Scale.Y * 0.70f, Scale.Z * 0.46f);
+		const FQuat TwigRotation = TwigTransform.GetRotation();
+		const FQuat TurnTipOutward(FVector::ForwardVector, PI);
+
+		// Engine cone primitives taper to one point. Keep most of each cone inside the
+		// body, but expose a short narrow end that remains legible beyond the nest close-up.
+		TwigTips->AddInstance(FTransform(TwigRotation, TwigTransform.GetLocation() + Axis * TipOffset, TipScale), false);
+		TwigTips->AddInstance(FTransform(TwigRotation * TurnTipOutward,
+			TwigTransform.GetLocation() - Axis * TipOffset, TipScale), false);
+	}
+}
+
 AIslandNest::AIslandNest()
 {
 	Twigs = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Twigs"));
 	RootComponent = Twigs;
 	Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Twigs->SetCanEverAffectNavigation(false);
+	Twigs->SetCastShadow(false);
+	TwigTips = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("TwigTips"));
+	TwigTips->SetupAttachment(Twigs);
+	TwigTips->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	TwigTips->SetCanEverAffectNavigation(false);
+	TwigTips->SetCastShadow(false);
 	FallenTwigs = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("FallenTwigs"));
 	FallenTwigs->SetupAttachment(Twigs);
 	FallenTwigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FallenTwigs->SetCanEverAffectNavigation(false);
 	FallenTwigs->SetCastShadow(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigTipMesh(TEXT("/Engine/BasicShapes/Cone.Cone"));
 	if (TwigMesh.Succeeded())
 	{
 		Twigs->SetStaticMesh(TwigMesh.Object);
 		FallenTwigs->SetStaticMesh(TwigMesh.Object);
 	}
+	if (TwigTipMesh.Succeeded()) TwigTips->SetStaticMesh(TwigTipMesh.Object);
 	Tags.AddUnique(TEXT("IslandNest"));
 	Tags.AddUnique(TEXT("AgentMade"));
 }
@@ -28,6 +61,11 @@ AIslandNest::AIslandNest()
 int32 AIslandNest::GetVisibleTwigCount() const
 {
 	return Twigs->GetInstanceCount();
+}
+
+int32 AIslandNest::GetVisibleTwigTipCount() const
+{
+	return TwigTips ? TwigTips->GetInstanceCount() : 0;
 }
 
 int32 AIslandNest::GetVisibleFallenTwigCount() const
@@ -48,11 +86,13 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 		else if (UMaterialInstanceDynamic* Tint = Twigs->CreateAndSetMaterialInstanceDynamic(0))
 			Tint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.22f, 0.13f, 0.06f));
 	}
+	if (TwigTips) TwigTips->SetMaterial(0, Twigs->GetMaterial(0));
 	FallenTwigs->SetMaterial(0, Twigs->GetMaterial(0));
 
 	// Seeded by the site so a persisted nest keeps the same weave every session.
 	FRandomStream Weave(static_cast<int32>(GetTypeHash(SiteTag.ToString())));
 	Twigs->ClearInstances();
+	if (TwigTips) TwigTips->ClearInstances();
 	FallenTwigs->ClearInstances();
 	if (WovenLayers > 0)
 	{
@@ -71,7 +111,7 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 			const float AxisYaw = bAlongX ? 0.f : 90.f;
 			const FRotator Lie(90.f + Weave.FRandRange(-4.f, 4.f), AxisYaw + Weave.FRandRange(-3.f, 3.f), 0.f);
 			const float TwigLength = Weave.FRandRange(0.31f, 0.35f);
-			Twigs->AddInstance(FTransform(Lie, Position, FVector(0.022f, 0.022f, TwigLength)));
+			AddTwigWithTaperedTips(Twigs, TwigTips, FTransform(Lie, Position, FVector(0.022f, 0.022f, TwigLength)));
 		}
 	}
 	for (int32 Layer = 0; Layer < WovenLayers; ++Layer)
@@ -89,7 +129,7 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 			const FRotator Lie(90.f + Weave.FRandRange(-14.f, 14.f),
 				FMath::RadiansToDegrees(Angle) + 90.f + WeaveDirection + Weave.FRandRange(-8.f, 8.f), 0.f);
 			const FVector Scale(0.022f, 0.022f, Weave.FRandRange(0.26f, 0.38f));
-			Twigs->AddInstance(FTransform(Lie, Position, Scale));
+			AddTwigWithTaperedTips(Twigs, TwigTips, FTransform(Lie, Position, Scale));
 		}
 	}
 	if (bShowStormDebris)
@@ -102,7 +142,8 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 			const FVector Position(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Debris.FRandRange(1.f, 3.f));
 			const FRotator Lie(90.f + Debris.FRandRange(-18.f, 18.f),
 				FMath::RadiansToDegrees(Angle) + Debris.FRandRange(-65.f, 65.f), Debris.FRandRange(-12.f, 12.f));
-			FallenTwigs->AddInstance(FTransform(Lie, Position, FVector(0.022f, 0.022f, Debris.FRandRange(0.26f, 0.38f))));
+			AddTwigWithTaperedTips(FallenTwigs, TwigTips,
+				FTransform(Lie, Position, FVector(0.022f, 0.022f, Debris.FRandRange(0.26f, 0.38f))));
 		}
 	}
 }
