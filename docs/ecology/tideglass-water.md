@@ -504,3 +504,16 @@ the water visually and should be treated separately. Evidence:
 [automation](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowDorsalMark2_Automation.log),
 [bounded Game](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Codex_MinnowDorsalMark_Game.log),
 and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Screenshots/000_MinnowStartleMidPulse.png).
+
+### Pool-edge grass observation (2026-10-09)
+
+The low-angle mid-pulse frame shows grass silhouettes crossing the visible water surface, but the
+current Tideglass Game log reports a 306 cm ground-cover clearance. The focused
+`CaptiveSky2.Agent.GroundCover` regression also passed: in its synthetic Tideglass fixture,
+561 instances were placed and none entered the 464 cm pool-edge exclusion margin. The fixture
+does not prove every saved-map instance transform, so this is not a full spatial audit of the
+rendered Island; together with the overhead grass-free footprint capture and the absence of a
+reported Game clearance violation, the low-angle overlap is most consistent with foreground
+occlusion rather than grass planted in water. Do not widen the ecology exclusion ring on this
+image alone; improve the approach sightline or judge the edge from a higher camera instead.
+Regression log: [`Codex_PoolEdgeAudit_GroundCover.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_PoolEdgeAudit_GroundCover.log).
