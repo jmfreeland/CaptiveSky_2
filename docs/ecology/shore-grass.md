@@ -407,3 +407,27 @@ and [ground-cover automation](../../Saved/Logs/Codex_TrailDecay_GroundCover_2026
 This proves the procedural response using synthetic ledger data; next, confirm
 that ordinary Aster and raven travel create and preserve a route in an isolated
 resident play session.
+
+## Aster footfall integration check (2026-10-08)
+
+An isolated UE 5.8.3 Game run issued Aster's ordinary grounded wander through
+`Island.MoveProbe Agent_Aster_01 Wander`, with resident thinking disabled, a
+120-second realtime ceiling, and zero model requests. Aster completed a
+1,793 cm move in 3.5 simulated seconds. The session wrote 15 occupied cells to
+its fresh `Island.trails.json` ledger, following the traversed hillside from
+approximately `(-100324, 100882)` to `(-99155, 99674)` world cm. This confirms
+that controller-driven grounded movement reaches the existing footfall sampler
+and persists route samples on session shutdown. The data root was isolated under
+`Saved/CompileScratch/Codex_TideglassLunarValidation_20261008/Project/Saved/Playtests/CurrentAsterGroundedWander/WorldData/`;
+the [runtime log](../../Saved/Logs/CurrentAsterGroundedWander.log) records the
+successful completion, and the saved ledger records the 15 cells.
+
+This is a single traversal, not a mature path: each cell has only one recorded
+step, below the repeated-use threshold for visible ground-cover wear. Repeated
+ordinary visits are still needed to verify that a familiar route accumulates
+wear and that the visible clearing survives a later session. An attempted direct
+move from Aster's spawn to `ListeningStones` failed because that target had no
+navigable route from the spawn; its isolated ledger stayed empty. Treat the
+landmark as currently unreachable from that start rather than as evidence of a
+trail-system failure. Raven route persistence also remains unverified because
+the existing raven travel probes are airborne rather than grounded.
