@@ -23,3 +23,31 @@ cap, and scratch-only world data:
 The log contains temporary-world teardown warnings, but the test completed
 successfully with exit code 0 and no failed assertions. A visual capture is
 still needed to judge the placeholder geometry in the live Island.
+
+## Isolated visual-preview attempt (not visually verified)
+
+To keep the user's open editor, unsaved materials, and live world state
+untouched, a three-layer `Roost_West` nest preview was placed in the scratch
+project's `WorldData/WorldState/Island.json` at the recorded perch point
+`(-100640, 101250, 3079.11)`. This fixture is isolated from the main
+`WorldState` directory.
+
+The first offscreen capture attempt exited before map load because the installed
+Derived Data Cache graph had no writable node; the log explicitly recommends
+`-DDC-ForceMemoryCache`. Retrying with that option and scratch-local cache and
+shader-working paths got through DDC initialization, but then spent over a
+minute compiling cold PCD3D_SM6 editor shaders. The test never reached map or
+viewpoint output. The scratch editor used about 4.3 GiB and its shader workers
+about 3.4 GiB while the existing editor remained open; the run was interrupted
+through its own command session, and its process tree exited. No screenshot was
+produced and the nest's appearance remains unverified.
+
+Both launches recorded `UBT AutoSDK ReturnCode: -532462766` (`0xE0434352`),
+including the retry that progressed into shader compilation. This confirms the
+same managed-exception code can recur during a bounded scratch-editor launch,
+but it is not a fatal blocker by itself and does not identify the managed stack
+or prove that every desktop popup has this source. The retry's immediate
+blocker was the cold, memory-only shader cache. Next visual attempt should use a
+writable persistent DDC/cache already populated for the required editor shaders,
+then capture only the Wind Arch / West Roost viewpoint. Keep the scratch data
+root and the live editor's unsaved state separate.
