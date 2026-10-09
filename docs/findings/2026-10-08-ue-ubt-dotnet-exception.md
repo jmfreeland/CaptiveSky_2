@@ -252,3 +252,24 @@ bundled .NET/Turnkey path and the generic popup signature, but still does not
 prove which process owns a visible dialog or provide its managed exception
 type/stack. No Windows ACL, SDK configuration, or validation settings were
 changed.
+
+### Sandboxed UBT access exception reproduced (2026-10-09)
+
+An un-elevated UBT build from the Codex workspace reproduced an unhandled CLR
+exception with `System.UnauthorizedAccessException`: UBT could not enumerate
+`C:\Users\freel\AppData\Local\UnrealBuildTool` while backing up its trace.
+Retrying in UBT session mode bypassed that trace folder but then failed while
+writing/reading
+`C:\Users\freel\AppData\Local\UnrealEngine\Intermediate\Build\UnrealBuildTool.Env.BuildConfiguration.xml`.
+Both are outside the project workspace and blocked by the command sandbox.
+
+With an explicitly elevated build command, the same isolated target compiled
+and linked successfully in 9.9 seconds. The focused Minnow automation passed,
+and a bounded real-RHI Game probe exited normally with zero model requests. No
+ACL, SDK-validation setting, or project configuration was changed. This gives
+one reproducible source for a generic `0xe0434352`-style dialog during
+sandboxed UBT use; it does **not** prove that every dialog seen in the user's
+interactive Unreal session has this cause. If the popup recurs outside an
+agent build, its owning process and matching Windows event are still needed.
+
+Build output: [`Codex_RippleTint_VisualPolish_Build_20261009.log`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/Codex_RippleTint_VisualPolish_Build_20261009.log).
