@@ -189,10 +189,10 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 	}
 
 	// Landmark-centred probes alone can miss useful spaces between landmarks. Cover the
-	// walkable extent with a coarse 15 m grid, retaining the same bank length, route-detour,
+	// walkable extent with a 7.5 m grid, retaining the same bank length, route-detour,
 	// and obstruction checks. This is a shortlist pass, not an exhaustive geometric proof.
 	constexpr float GridMargin = 3000.f;
-	constexpr float GridSpacing = 1500.f;
+	constexpr float GridSpacing = 750.f;
 	const float GridMinX = NavBounds.Min.X + GridMargin;
 	const float GridMaxX = NavBounds.Max.X - GridMargin;
 	const float GridMinY = NavBounds.Min.Y + GridMargin;
