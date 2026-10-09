@@ -62,7 +62,7 @@ public:
 		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Finds a nearby physical-clear waypoint when the navmesh route disagrees with collision. */
 	static bool FindGroundedClearanceWaypoint(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
-		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
+		const FVector& TargetLocation, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
@@ -129,6 +129,7 @@ private:
 	float FurthestWanderDistance = 0.f;
 	bool bCurrentMoveIsWander = false;
 	FName PendingGroundMoveTargetName;
+	FName PendingGroundMoveTargetTag;
 	bool bPendingGroundLandmarkRecoveryMove = false;
 	int32 GroundedLandmarkRecoveryAttempts = 0;
 	double NextThinkAt = 0;

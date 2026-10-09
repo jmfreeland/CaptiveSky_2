@@ -301,19 +301,21 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 	return bFoundGoal;
 }
 bool AAutonomousAgentAIController::FindGroundedClearanceWaypoint(UNavigationSystemV1* Navigation, UWorld* World,
-	APawn* Pawn, FNavLocation& OutGoal, AActor* PathfindingContext)
+	APawn* Pawn, const FVector& TargetLocation, FNavLocation& OutGoal, AActor* PathfindingContext)
 {
 	if (!Navigation || !World || !Pawn) return false;
 	ANavigationData* NavData = Navigation->GetNavDataForProps(Pawn->GetNavAgentPropertiesRef());
 	if (!NavData) return false;
 
 	const FVector Origin = Pawn->GetActorLocation();
-	float BestPathLength = TNumericLimits<float>::Max();
+	const float StartingTargetDistance = FVector::Dist2D(Origin, TargetLocation);
+	float BestScore = -TNumericLimits<float>::Max();
+	float BestProgress = 0.f;
 	int32 ClearRouteCount = 0;
-	for (int32 Attempt = 0; Attempt < 48; ++Attempt)
+	for (int32 Attempt = 0; Attempt < 96; ++Attempt)
 	{
 		FNavLocation Candidate;
-		if (!Navigation->GetRandomReachablePointInRadius(Origin, 1000.f, Candidate, NavData) ||
+		if (!Navigation->GetRandomReachablePointInRadius(Origin, 2500.f, Candidate, NavData) ||
 			FVector::DistSquared2D(Origin, Candidate.Location) < FMath::Square(175.f)) continue;
 
 		const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
@@ -322,15 +324,21 @@ bool AAutonomousAgentAIController::FindGroundedClearanceWaypoint(UNavigationSyst
 			!IsWanderPathPhysicallyClear(World, Route, Pawn)) continue;
 
 		++ClearRouteCount;
-		if (Route->GetPathLength() >= BestPathLength) continue;
-		BestPathLength = Route->GetPathLength();
+		const float TargetProgress = StartingTargetDistance - FVector::Dist2D(Candidate.Location, TargetLocation);
+		// Prefer a genuinely useful detour toward the requested destination. A
+		// shortest-hop waypoint can merely move a few metres around one blocker,
+		// leaving the next physically clear route blocked by the same scenery.
+		const float Score = TargetProgress - Route->GetPathLength() * 0.1f;
+		if (Score <= BestScore) continue;
+		BestScore = Score;
+		BestProgress = TargetProgress;
 		OutGoal = Candidate;
 	}
 	UE_LOG(LogAutonomousAgentAI, Log,
-		TEXT("Grounded landmark recovery found %d capsule-clear staging routes; %s."),
+		TEXT("Grounded landmark recovery found %d capsule-clear staging routes; %s (target progress %.0f cm)."),
 		ClearRouteCount, ClearRouteCount > 0
-			? *FString::Printf(TEXT("selected %s at %.0f cm"), *OutGoal.Location.ToCompactString(), BestPathLength)
-			: TEXT("no safe staging waypoint"));
+			? *FString::Printf(TEXT("selected %s"), *OutGoal.Location.ToCompactString())
+			: TEXT("no safe staging waypoint"), BestProgress);
 	return ClearRouteCount > 0;
 }
 bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
@@ -680,14 +688,14 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 	if (bPendingGroundLandmarkRecoveryMove)
 	{
 		const FName TargetActorName = PendingGroundMoveTargetName;
+		const FName TargetTag = PendingGroundMoveTargetTag;
 		bPendingGroundLandmarkRecoveryMove = false;
 		if (Result.IsSuccess())
 		{
 			AActor* Target = nullptr;
 			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 				if (It->GetFName() == TargetActorName) { Target = *It; break; }
-			const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
-			if (!TargetTag.IsNone())
+			if (Target && !TargetTag.IsNone())
 			{
 				UE_LOG(LogAutonomousAgentAI, Log,
 					TEXT("Reached capsule-clear staging ground for %s; recomputing the landmark approach from the new position."),
@@ -700,6 +708,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 			}
 		}
 		PendingGroundMoveTargetName = NAME_None;
+		PendingGroundMoveTargetTag = NAME_None;
 		GroundedLandmarkRecoveryAttempts = 0;
 		ReportAction(Result.IsSuccess()
 			? TEXT("Movement did not resume: the landmark disappeared before the clear approach could continue.")
@@ -716,6 +725,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		if (ControlledPawn && !TargetTag.IsNone() && IslandInteractionUtility::CanInspect(ControlledPawn, Target))
 		{
 			PendingGroundMoveTargetName = NAME_None;
+			PendingGroundMoveTargetTag = NAME_None;
 			GroundedLandmarkRecoveryAttempts = 0;
 			ReportAction(FString::Printf(
 				TEXT("The route to the projected ground point was blocked, but you stopped within clear inspection range of %s. You may inspect or interact from this reachable approach; you did not reach the marker itself."),
@@ -724,6 +734,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		}
 	}
 	PendingGroundMoveTargetName = NAME_None;
+	PendingGroundMoveTargetTag = NAME_None;
 	GroundedLandmarkRecoveryAttempts = 0;
 	ReportAction(Result.IsSuccess() ? TEXT("Reached the requested destination. Arrival is complete; it does not imply an interaction or a discovery.") : TEXT("Movement did not complete (blocked, cancelled, or unreachable). Choose a reachable destination instead of repeating this route."));
 }
@@ -904,6 +915,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		return;
 	}
 	PendingGroundMoveTargetName = NAME_None;
+	PendingGroundMoveTargetTag = NAME_None;
 	bPendingGroundLandmarkRecoveryMove = false;
 
 	switch (Decision.ActionType)
@@ -1066,14 +1078,16 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			if (!bHasGroundedApproach)
 			{
 				FNavLocation StagingGoal;
-				if (bGroundedWalker && GroundedLandmarkRecoveryAttempts < 2 &&
-					FindGroundedClearanceWaypoint(NavSys, GetWorld(), ControlledPawn, StagingGoal, ControlledPawn))
+				if (bGroundedWalker && GroundedLandmarkRecoveryAttempts < 3 &&
+					FindGroundedClearanceWaypoint(NavSys, GetWorld(), ControlledPawn, TargetActor->GetActorLocation(),
+						StagingGoal, ControlledPawn))
 				{
 					const EPathFollowingRequestResult::Type RecoveryResult = MoveToLocation(StagingGoal.Location,
 						WanderAcceptanceRadius, true, true, false, false, nullptr, false);
 					if (RecoveryResult == EPathFollowingRequestResult::RequestSuccessful)
 					{
 						PendingGroundMoveTargetName = TargetActor->GetFName();
+						PendingGroundMoveTargetTag = TargetTag;
 						bPendingGroundLandmarkRecoveryMove = true;
 						++GroundedLandmarkRecoveryAttempts;
 						ReportAction(TEXT("The direct landmark route conflicts with nearby scenery. Moving to a physically clear nearby point to find a path around it; no interaction has happened yet."));
@@ -1096,9 +1110,14 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				Route && Route->IsValid() ? *FString::Printf(TEXT(", %.0f m"), Route->GetPathLength() / 100.f) : TEXT(""),
 				Route ? Route->PathPoints.Num() : 0);
 			PendingGroundMoveTargetName = TargetActor->GetFName();
+			PendingGroundMoveTargetTag = TargetTag;
 			const EPathFollowingRequestResult::Type Result = MoveToLocation(GroundGoal.Location,
 				50.f, true, true, false, true, nullptr, false);
-			if (Result != EPathFollowingRequestResult::RequestSuccessful) PendingGroundMoveTargetName = NAME_None;
+			if (Result != EPathFollowingRequestResult::RequestSuccessful)
+			{
+				PendingGroundMoveTargetName = NAME_None;
+				PendingGroundMoveTargetTag = NAME_None;
+			}
 			ReportAction(Result == EPathFollowingRequestResult::Failed ? TEXT("Movement failed: no navigable route to that target.") : Result == EPathFollowingRequestResult::AlreadyAtGoal ? TEXT("Already at this destination. Do not keep requesting arrival; inspect once, wait, or rest.") : TEXT("Movement started; arrival is not yet complete."));
 		}
 		else

@@ -14,8 +14,12 @@ the available range and path-following could stop short of it.
 Grounded landmark approaches now use the existing grounded-target projection helper,
 which checks nearby floor before an elevated fallback. The controller tests five
 stand-off radii (150, 200, 250, 325, and 375 cm), capsule-sweeps complete routes, and
-keeps the planned body position 100 cm inside the shared interaction range. The added
-development-only `Island.LandmarkNavAudit [DelaySeconds]` command reports these
+keeps the planned body position 100 cm inside the shared interaction range. Staging
+recovery preserves the requested target tag even for movement-only targets the
+interaction helper does not recognize. It samples capsule-clear reachable waypoints
+within 25 m and prefers forward progress toward the requested target, rather than
+repeatedly choosing the nearest short hop. The added development-only
+`Island.LandmarkNavAudit [DelaySeconds]` command reports these
 projection, route, and capsule-clearance checks for each tagged movement landmark;
 it never moves an actor or interacts with the world. Supplying a delay from 5 to 90
 seconds releases the runtime async-load nav lock, requests a navigation build, and
@@ -45,20 +49,35 @@ The final non-interactive direct-route audit covered five movement-eligible land
 | RainBasin | 20 | 4 | Best clear route was 581 cm. |
 
 These are direct routes from one start position, not reachability verdicts. A zero
-direct-route clearance can still be recoverable by the existing staging behavior.
-The WindArch run demonstrates that for this landmark; Inn and RainBasin should be
-physically tested before changing their collision or movement rules. Several blocked
-sweeps hit a grass mesh actor, so its pawn collision deserves inspection before any
-vegetation collision is altered.
+direct-route clearance can still be recoverable through staging. The WindArch run
+demonstrates this for an interaction landmark. Aster also reached RainBasin in 494 cm
+and 1.0 simulated second, with no interaction requested. The InnCounter probe first
+exposed a recovery bug: staging retried by resolving the target through an interaction
+helper, which does not recognize movement-only counters. After preserving the original
+tag, the probe exposed a second issue: the old nearest-waypoint heuristic repeatedly
+chose short hops inside the same cluttered region. The target-aware selector chose a
+capsule-clear stage 1,412 cm closer to InnCounter; from there, five of sixteen candidate
+approaches were clear, and Aster arrived after 1,998 cm in 4.0 simulated seconds.
+Both bounded runs used a 120-second watchdog and zero model requests.
+
+The physical sweeps identified both the large `SM_Rock` and map-placed grass actors as
+Pawn-channel blockers. Grass actors reported `affects-nav=1` and `pawn-response=2`
+(`ECR_Block`). This is useful evidence, not yet a reason to weaken vegetation collision:
+check whether those individual map actors are intended walkable cover before changing
+their collision.
 
 ## Logs
 
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/LandmarkNavAudit_Final.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterWindArchMove_Final.log`
+- `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterRainBasinMove.log`
+- `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/AsterInnCounterMove_AfterFix4.log`
 - `../../Saved/Playtests/Codex_LandmarkNavAudit_20261009/BlockedGroundMoveApproach.log`
 
 ## Next
 
-Check whether the grass actor that blocks some direct sweeps actually blocks the
-walker's Pawn channel, then run bounded InnCounter and RainBasin moves. Preserve the
-staging fallback unless those probes show a real failure after recovery.
+Inspect the specific grass actors that block Pawn sweeps and confirm whether they are
+intentional map dressing or stray collision objects. Avoid broad changes to generated
+vegetation or `IslandWeather.*`; the current evidence points to individual map actors.
+Then test the same staging behavior from a second saved start so the successful
+InnCounter route is not mistaken for universal reachability.
