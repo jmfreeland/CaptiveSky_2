@@ -25,12 +25,13 @@ terrain scatter using a separate data root: 1,779,869 grass/ground-cover
 instances and 990 Fab meadow flowers across the 512 candidate sites, including
 21 flowers in the ListeningStones annulus and all eight species. Flower
 placement used 1,085 bounded traces; the per-site maximum remains three. The
-log records the 60-second/zero-request safeguards, but this bootstrap log ends
-after scatter without a normal watchdog/shutdown line, so it proves placement
-only—not a complete play session.
+run reached its 60.1-second real-time cap with zero model requests and shut
+down normally. It used NullRHI, so this verifies a complete bounded
+simulation/bootstrap and the placement counts, but not rendered flower-group
+readability or frame rate.
 
 Evidence: [automation log](../../Saved/Logs/Codex_MeadowFlowerPockets_Automation_20261010.log)
-and [saved-Island bootstrap log](../../Saved/Logs/Codex_MeadowFlowerPockets_Game_20261010.log).
+and [bounded saved-Island Game log](../../Saved/Logs/Codex_MeadowFlowerPockets_Game_20261010.log).
 The roughly 631-instance increase over the previous 359-flower baseline still
 needs a matched rendered view and frame-time profile. The grouping intent and
 placement bounds are verified; gameplay-scale readability and performance are
