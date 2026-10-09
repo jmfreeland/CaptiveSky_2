@@ -301,3 +301,27 @@ exception stack are still unknown. No SDK, Windows permission, or validation
 setting was changed.
 
 Evidence: [`Codex_MoveWarm_20261009.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_MoveWarm_20261009/Codex_MoveWarm_20261009.log); [`Profile(20261009_131932).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_131932%29.csv).
+
+### Focused automation startup correlation (2026-10-09, 14:34–14:36 local)
+
+Two fresh UE 5.8.3 commandlet startups for `CaptiveSky2.Agent.BlockedGroundMoveApproach`
+and `CaptiveSky2.Agent.SessionSafety` each logged
+`LogTargetPlatformManager: UBT AutoSDK ReturnCode: -532462766`, the same signed
+code as `0xe0434352`. Both automation tests then completed successfully and
+the commandlets exited through `Automation Test Queue Empty`; the first
+asserted the blocked-move interaction fallback, and the second checked the
+zero-request and real-time safety behavior. No gameplay or automation failure
+followed the AutoSDK return code.
+
+This repeats the code during a controlled startup and strengthens the
+association with UE's bundled .NET/Turnkey AutoSDK path. It still does not
+prove that this process owned the screenshot's dialog, identify the managed
+exception type, or show that the same issue occurs in the user's interactive
+editor. The latest Application-log query again found no matching
+`.NET Runtime`/`Application Error` event with a managed stack. Continue to
+capture a live process tree if the popup recurs; do not disable validation or
+change Windows ACLs based on the code alone.
+
+Evidence: [`BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/BlockedGroundMoveApproach.log)
+and
+[`SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/SessionSafety.log).

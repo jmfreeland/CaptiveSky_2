@@ -465,7 +465,8 @@ private:
 					const FString InteractionResult = Controller->DescribeActionState();
 					UE_LOG(LogIslandMovementProbe, Log, TEXT("Issued the resident's normal interact action for %s after arrival: %s"),
 						*State->TargetTag.ToString(), *InteractionResult);
-					if (!InteractionResult.Contains(TEXT("You crouched by"), ESearchCase::IgnoreCase))
+					const FString ExpectedInteractionPrefix = State->TargetTag.ToString() + TEXT(":");
+					if (!InteractionResult.Contains(ExpectedInteractionPrefix, ESearchCase::IgnoreCase))
 					{
 						UE_LOG(LogIslandMovementProbe, Error, TEXT("Movement arrived, but the normal interaction did not turn over %s."),
 							*State->TargetTag.ToString());

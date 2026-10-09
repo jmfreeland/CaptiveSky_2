@@ -22,6 +22,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -182,6 +183,153 @@ bool AAutonomousAgentAIController::FindGroundedResidentApproachGoal(UNavigationS
 		bFoundGoal = true;
 	}
 	return bFoundGoal;
+}
+bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World,
+	APawn* Pawn, const FVector& MoverLocation, const FVector& TargetLocation,
+	const FNavAgentProperties& AgentProperties, FNavLocation& OutGoal, AActor* PathfindingContext)
+{
+	const UCapsuleComponent* Capsule = Pawn ? Pawn->FindComponentByClass<UCapsuleComponent>() : nullptr;
+	if (!Navigation || !World || !Pawn || !Capsule) return false;
+
+	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	FCollisionQueryParams StartOverlapQuery(SCENE_QUERY_STAT(AgentLandmarkSpawnClearance), false, Pawn);
+	FHitResult StartOverlapHit;
+	const bool bStartsOverlapped = World->SweepSingleByChannel(StartOverlapHit, MoverLocation, MoverLocation,
+		FQuat::Identity, ECC_Pawn, Capsule->GetCollisionShape(), StartOverlapQuery);
+	if (bStartsOverlapped)
+	{
+		UE_LOG(LogAutonomousAgentAI, Log, TEXT("Grounded landmark mover starts overlapping %s at %s."),
+			StartOverlapHit.GetActor() ? *StartOverlapHit.GetActor()->GetName() : TEXT("<no actor>"),
+			*StartOverlapHit.ImpactPoint.ToCompactString());
+	}
+	FNavLocation Start;
+	const FVector StartOnFloor = MoverLocation - FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+	if (!ProjectGroundedTarget(Navigation, StartOnFloor, AgentProperties, Start)) return false;
+
+	TArray<FVector> TestedGoals;
+	float BestPathLength = TNumericLimits<float>::Max();
+	bool bFoundGoal = false;
+	int32 ProjectedCandidates = 0;
+	int32 InRangeCandidates = 0;
+	int32 CompleteRoutes = 0;
+	int32 ClearRoutes = 0;
+	int32 BlockedRoutes = 0;
+	FVector PreferredApproach = BuildGroundedResidentApproachPoint(Start.Location, TargetLocation);
+	FVector PreferredDirection = PreferredApproach - TargetLocation;
+	PreferredDirection.Z = 0.f;
+	if (!PreferredDirection.Normalize()) PreferredDirection = FVector::ForwardVector;
+	const float PreferredAngle = FMath::Atan2(PreferredDirection.Y, PreferredDirection.X);
+	for (const float Radius : { 250.f, 325.f, 375.f })
+	{
+		for (int32 Side = 0; Side < 8; ++Side)
+		{
+			const float Angle = PreferredAngle + Side * (PI / 4.f);
+			const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+			const FVector DesiredApproach = TargetLocation + Direction * Radius;
+			FNavLocation CandidateGoal;
+			if (!Navigation->ProjectPointToNavigation(DesiredApproach, CandidateGoal,
+				FVector(100.f, 100.f, 120.f), &AgentProperties)) continue;
+			++ProjectedCandidates;
+			if (TestedGoals.ContainsByPredicate([&CandidateGoal](const FVector& Existing)
+				{ return FVector::DistSquared2D(Existing, CandidateGoal.Location) < FMath::Square(50.f); })) continue;
+			TestedGoals.Add(CandidateGoal.Location);
+
+			const FVector BodyCenter = CandidateGoal.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+			if (FVector::DistSquared(BodyCenter, TargetLocation) >
+				FMath::Square(IslandInteractionUtility::DefaultInteractionRange - 25.f)) continue;
+			++InRangeCandidates;
+
+			const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
+				World, Start.Location, CandidateGoal.Location, PathfindingContext ? PathfindingContext : Pawn);
+			if (!Route || !Route->IsValid() || Route->IsPartial()) continue;
+			++CompleteRoutes;
+			if (Route->PathPoints.Num() < 2) continue;
+
+			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AgentLandmarkCapsuleClearance), false, Pawn);
+			const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
+			bool bPhysicallyClear = true;
+			FHitResult FirstBlocker;
+			int32 BlockedSegment = INDEX_NONE;
+			for (int32 PointIndex = 1; PointIndex < Route->PathPoints.Num(); ++PointIndex)
+			{
+				const FVector SegmentStart = Route->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+				const FVector SegmentEnd = Route->PathPoints[PointIndex] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+				if (World->SweepSingleByChannel(FirstBlocker, SegmentStart, SegmentEnd, FQuat::Identity,
+					ECC_Pawn, CapsuleShape, QueryParams))
+				{
+					bPhysicallyClear = false;
+					BlockedSegment = PointIndex;
+					break;
+				}
+			}
+			if (!bPhysicallyClear)
+			{
+				++BlockedRoutes;
+				if (BlockedRoutes == 1)
+				{
+					const UPrimitiveComponent* BlockingComponent = FirstBlocker.GetComponent();
+					const UStaticMeshComponent* BlockingMesh = Cast<UStaticMeshComponent>(BlockingComponent);
+					const UStaticMesh* StaticMesh = BlockingMesh ? BlockingMesh->GetStaticMesh() : nullptr;
+					UE_LOG(LogAutonomousAgentAI, Log,
+						TEXT("Landmark capsule sweep first blocked at segment %d near %s by %s (%s, mesh %s, affects-nav %d, pawn-response %d, bounds %s +/- %s)."),
+						BlockedSegment, *FirstBlocker.ImpactPoint.ToCompactString(),
+						FirstBlocker.GetActor() ? *FirstBlocker.GetActor()->GetName() : TEXT("<no actor>"),
+						BlockingComponent ? *BlockingComponent->GetName() : TEXT("<no component>"),
+						StaticMesh ? *StaticMesh->GetPathName() : TEXT("<no static mesh>"),
+						BlockingComponent && BlockingComponent->CanEverAffectNavigation(),
+						BlockingComponent ? static_cast<int32>(BlockingComponent->GetCollisionResponseToChannel(ECC_Pawn)) : -1,
+						BlockingComponent ? *BlockingComponent->Bounds.Origin.ToCompactString() : TEXT("<unknown>"),
+						BlockingComponent ? *BlockingComponent->Bounds.BoxExtent.ToCompactString() : TEXT("<unknown>"));
+				}
+				continue;
+			}
+			++ClearRoutes;
+			if (Route->GetPathLength() >= BestPathLength) continue;
+
+			OutGoal = CandidateGoal;
+			BestPathLength = Route->GetPathLength();
+			bFoundGoal = true;
+		}
+	}
+	UE_LOG(LogAutonomousAgentAI, Log,
+		TEXT("Grounded landmark approach at %s: %d projected, %d in inspection range, %d complete routes, %d capsule-blocked, %d capsule-clear; %s."),
+		*TargetLocation.ToCompactString(), ProjectedCandidates, InRangeCandidates, CompleteRoutes, BlockedRoutes, ClearRoutes,
+		bFoundGoal ? *FString::Printf(TEXT("selected %s at %.0f cm path length"), *OutGoal.Location.ToCompactString(), BestPathLength)
+			: TEXT("no candidate qualified"));
+	return bFoundGoal;
+}
+bool AAutonomousAgentAIController::FindGroundedClearanceWaypoint(UNavigationSystemV1* Navigation, UWorld* World,
+	APawn* Pawn, FNavLocation& OutGoal, AActor* PathfindingContext)
+{
+	if (!Navigation || !World || !Pawn) return false;
+	ANavigationData* NavData = Navigation->GetNavDataForProps(Pawn->GetNavAgentPropertiesRef());
+	if (!NavData) return false;
+
+	const FVector Origin = Pawn->GetActorLocation();
+	float BestPathLength = TNumericLimits<float>::Max();
+	int32 ClearRouteCount = 0;
+	for (int32 Attempt = 0; Attempt < 48; ++Attempt)
+	{
+		FNavLocation Candidate;
+		if (!Navigation->GetRandomReachablePointInRadius(Origin, 1000.f, Candidate, NavData) ||
+			FVector::DistSquared2D(Origin, Candidate.Location) < FMath::Square(175.f)) continue;
+
+		const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(
+			World, Origin, Candidate.Location, PathfindingContext ? PathfindingContext : Pawn);
+		if (!IsUsableWanderPath(Route, Origin, Candidate.Location) ||
+			!IsWanderPathPhysicallyClear(World, Route, Pawn)) continue;
+
+		++ClearRouteCount;
+		if (Route->GetPathLength() >= BestPathLength) continue;
+		BestPathLength = Route->GetPathLength();
+		OutGoal = Candidate;
+	}
+	UE_LOG(LogAutonomousAgentAI, Log,
+		TEXT("Grounded landmark recovery found %d capsule-clear staging routes; %s."),
+		ClearRouteCount, ClearRouteCount > 0
+			? *FString::Printf(TEXT("selected %s at %.0f cm"), *OutGoal.Location.ToCompactString(), BestPathLength)
+			: TEXT("no safe staging waypoint"));
+	return ClearRouteCount > 0;
 }
 bool AAutonomousAgentAIController::IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay)
 {
@@ -527,6 +675,35 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		}
 	}
 	bCurrentMoveIsWander = false;
+	if (bPendingGroundLandmarkRecoveryMove)
+	{
+		const FName TargetActorName = PendingGroundMoveTargetName;
+		bPendingGroundLandmarkRecoveryMove = false;
+		if (Result.IsSuccess())
+		{
+			AActor* Target = nullptr;
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				if (It->GetFName() == TargetActorName) { Target = *It; break; }
+			const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
+			if (!TargetTag.IsNone())
+			{
+				UE_LOG(LogAutonomousAgentAI, Log,
+					TEXT("Reached capsule-clear staging ground for %s; recomputing the landmark approach from the new position."),
+					*TargetTag.ToString());
+				FAgentDecision Retry;
+				Retry.ActionType = EAgentActionType::MoveTo;
+				Retry.ActionTarget = TargetTag.ToString();
+				ActOnDecision(Retry);
+				return;
+			}
+		}
+		PendingGroundMoveTargetName = NAME_None;
+		GroundedLandmarkRecoveryAttempts = 0;
+		ReportAction(Result.IsSuccess()
+			? TEXT("Movement did not resume: the landmark disappeared before the clear approach could continue.")
+			: TEXT("The clear-ground detour was blocked or cancelled; choose a different destination."));
+		return;
+	}
 	if (Result.Code == EPathFollowingResult::Blocked)
 	{
 		APawn* ControlledPawn = GetPawn();
@@ -537,6 +714,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		if (ControlledPawn && !TargetTag.IsNone() && IslandInteractionUtility::CanInspect(ControlledPawn, Target))
 		{
 			PendingGroundMoveTargetName = NAME_None;
+			GroundedLandmarkRecoveryAttempts = 0;
 			ReportAction(FString::Printf(
 				TEXT("The route to the projected ground point was blocked, but you stopped within clear inspection range of %s. You may inspect or interact from this reachable approach; you did not reach the marker itself."),
 				*TargetTag.ToString()));
@@ -544,6 +722,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		}
 	}
 	PendingGroundMoveTargetName = NAME_None;
+	GroundedLandmarkRecoveryAttempts = 0;
 	ReportAction(Result.IsSuccess() ? TEXT("Reached the requested destination. Arrival is complete; it does not imply an interaction or a discovery.") : TEXT("Movement did not complete (blocked, cancelled, or unreachable). Choose a reachable destination instead of repeating this route."));
 }
 void AAutonomousAgentAIController::InspectTarget(FName Target)
@@ -711,6 +890,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 
 	UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s decided: \"%s\" (Action=%d)"), *GetName(), *Decision.Thought, static_cast<int32>(Decision.ActionType));
 
+	GroundedLandmarkRecoveryAttempts = 0;
 	ActOnDecision(Decision);
 }
 
@@ -722,6 +902,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		return;
 	}
 	PendingGroundMoveTargetName = NAME_None;
+	bPendingGroundLandmarkRecoveryMove = false;
 
 	switch (Decision.ActionType)
 	{
@@ -869,13 +1050,38 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				break;
 			}
 
-			// Shared landmarks can be elevated bird targets. Grounded bodies need a
-			// nearby walkable goal, not the airborne marker or a partial-path endpoint.
+			// Grounded residents should approach a landmark from clear ground rather than
+			// walking toward its marker, which may sit inside the landmark's collision.
 			UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 			FNavLocation GroundGoal;
-			if (!ProjectGroundedTarget(NavSys, TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal))
+			const ACharacter* MoverCharacter = Cast<ACharacter>(ControlledPawn);
+			const bool bGroundedWalker = MoverCharacter && MoverCharacter->GetCharacterMovement() &&
+				MoverCharacter->GetCharacterMovement()->IsMovingOnGround();
+			const bool bHasGroundedApproach = bGroundedWalker
+				? FindGroundedLandmarkApproachGoal(NavSys, GetWorld(), ControlledPawn, ControlledPawn->GetActorLocation(),
+					TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal, ControlledPawn)
+				: ProjectGroundedTarget(NavSys, TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal);
+			if (!bHasGroundedApproach)
 			{
-				ReportAction(TEXT("Movement failed: no walkable ground near that marker. Choose another destination."));
+				FNavLocation StagingGoal;
+				if (bGroundedWalker && GroundedLandmarkRecoveryAttempts < 2 &&
+					FindGroundedClearanceWaypoint(NavSys, GetWorld(), ControlledPawn, StagingGoal, ControlledPawn))
+				{
+					const EPathFollowingRequestResult::Type RecoveryResult = MoveToLocation(StagingGoal.Location,
+						WanderAcceptanceRadius, true, true, false, false, nullptr, false);
+					if (RecoveryResult == EPathFollowingRequestResult::RequestSuccessful)
+					{
+						PendingGroundMoveTargetName = TargetActor->GetFName();
+						bPendingGroundLandmarkRecoveryMove = true;
+						++GroundedLandmarkRecoveryAttempts;
+						ReportAction(TEXT("The direct landmark route conflicts with nearby scenery. Moving to a physically clear nearby point to find a path around it; no interaction has happened yet."));
+						break;
+					}
+				}
+				GroundedLandmarkRecoveryAttempts = 0;
+				ReportAction(bGroundedWalker
+					? TEXT("Movement failed: no physically clear, complete ground route reaches an inspectable approach to that landmark. Choose another destination.")
+					: TEXT("Movement failed: no walkable ground near that marker. Choose another destination."));
 				break;
 			}
 			const UNavigationPath* Route = NavSys

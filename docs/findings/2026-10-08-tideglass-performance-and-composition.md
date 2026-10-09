@@ -504,10 +504,43 @@ p95, 47.46 ms p99, and 59.01 ms maximum. Render-thread time averaged 14.92 ms
 and GPU time 12.22 ms. The earlier delayed scratch probe did complete this
 same physical Aster-to-Stones move (1,377 cm in 3 simulated seconds), after
 waiting roughly 78 seconds from play-safety initialization and confirming a
-complete nav route. That suggests the direct attempt may have started before
-the runtime route was ready, but is not enough to establish the cause. Repeat
-with the longer warm-up and a capture window that overlaps the actual move.
+complete nav route. At the time, this left the cause unresolved; later capsule
+sweeps showed that nav connectivity was present but the direct route crossed a
+large blocking rock. See “Collision-aware Aster landmark recovery” below.
 
 Log: [`Codex_AsterWalking_D3D12_Move.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_AsterWalking_D3D12_20261009/Codex_AsterWalking_D3D12_Move.log).
 CSV: [`Profile(20261009_135043).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_135043%29.csv).
 Earlier successful delayed route: [`AsterListeningStonesInteractD3D12Final.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/AsterListeningStonesInteractD3D12Final.log).
+
+### Collision-aware Aster landmark recovery (2026-10-09)
+
+The repeated 143 cm stop was not a nav-build warm-up issue. A fresh runtime
+probe had a complete 14 m nav route, but its capsule sweep met
+`/Game/StarterContent/Props/SM_Rock.SM_Rock` at the first segment. That rock's
+bounds are roughly 7.7 × 7.8 × 4.0 m, centered at (-100640, 101250, 2825),
+across the navmesh's direct corridor from Aster's saved start. The complete
+nav route therefore disagreed with pawn collision.
+
+Grounded landmark moves now search eight-way stand-off candidates at 250, 325,
+and 375 cm, require a complete route that passes a capsule sweep, and keep the
+goal inside inspection range. If none qualifies, Aster can take up to two
+nearby, complete, capsule-clear staging routes and recompute the landmark
+approach from each new position. Staging does not inspect or change the target.
+The diagnostic logs the first blocking mesh when navigation and collision
+disagree.
+
+A rendered UE 5.8.3 D3D12 `Island.MoveProbe Agent_Aster_01 ListeningStones
+Interact` then followed two clear-ground staging moves, found a clear 16 m
+approach, traveled 1,390 cm in 3.0 simulated seconds, and produced the normal
+wind-tuned ListeningStones resonance. The bounded session ended after 28.5
+real seconds with zero model requests (120-second watchdog; zero-request cap).
+The final probe result was success. Build and test validation also passed:
+`CaptiveSky2.Agent.BlockedGroundMoveApproach` and
+`CaptiveSky2.Agent.SessionSafety` both completed successfully.
+
+Runtime log:
+[`Codex_AsterGroundedLandmark_Verified.log`](../../Saved/Playtests/Codex_AsterGroundedLandmark_20261009/Codex_AsterGroundedLandmark_Verified.log).
+Automation logs:
+[`BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/BlockedGroundMoveApproach.log)
+and
+[`SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/SessionSafety.log).

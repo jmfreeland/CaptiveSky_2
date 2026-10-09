@@ -10,6 +10,7 @@
 class UNavigationPath;
 class UNavigationSystemV1;
 class ACharacter;
+class APawn;
 struct FNavAgentProperties;
 struct FNavLocation;
 struct FIslandTrailLedger;
@@ -55,6 +56,13 @@ public:
 	static bool FindGroundedResidentApproachGoal(UNavigationSystemV1* Navigation, const FVector& MoverLocation,
 		const FVector& TargetLocation, const FNavAgentProperties& AgentProperties, float CapsuleHalfHeight,
 		float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
+	/** Finds a nearby, physically clear complete route for a grounded resident to inspect a landmark. */
+	static bool FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
+		const FVector& MoverLocation, const FVector& TargetLocation, const FNavAgentProperties& AgentProperties,
+		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
+	/** Finds a nearby physical-clear waypoint when the navmesh route disagrees with collision. */
+	static bool FindGroundedClearanceWaypoint(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
+		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
@@ -121,6 +129,8 @@ private:
 	float FurthestWanderDistance = 0.f;
 	bool bCurrentMoveIsWander = false;
 	FName PendingGroundMoveTargetName;
+	bool bPendingGroundLandmarkRecoveryMove = false;
+	int32 GroundedLandmarkRecoveryAttempts = 0;
 	double NextThinkAt = 0;
 	double NextRestAt = 0;
 	TMap<FName, double> InspectedUntil;
