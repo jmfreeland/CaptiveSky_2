@@ -12,6 +12,7 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStonePresentationTest, "CaptiveSky2.Agent.ListeningStonePresentation",
@@ -112,6 +113,13 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Replacement render component is collisionless"), Presentation->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Replacement forms do not affect navigation"), Presentation->Stones->CanEverAffectNavigation());
 		TestTrue(TEXT("Existing Starter Content rock is used"), Presentation->Stones->GetStaticMesh() == Rock);
+		const int32 RockMaterialSlotCount = FMath::Max(1, Rock->GetStaticMaterials().Num());
+		AddInfo(FString::Printf(TEXT("Starter Content SM_Rock has %d static material slot(s)."), Rock->GetStaticMaterials().Num()));
+		for (int32 MaterialIndex = 0; MaterialIndex < RockMaterialSlotCount; ++MaterialIndex)
+		{
+			TestTrue(FString::Printf(TEXT("Rock material slot %d uses the dedicated transient stone surface"), MaterialIndex),
+				Cast<UMaterialInstanceDynamic>(Presentation->Stones->GetMaterial(MaterialIndex)) != nullptr);
+		}
 		for (int32 Index = 0; Index < Presentation->GetStoneCount(); ++Index)
 		{
 			FTransform Instance;
