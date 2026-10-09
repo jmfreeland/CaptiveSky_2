@@ -178,3 +178,24 @@ support paths instead of repeating the known restricted invocation. If a
 desktop-editor popup recurs, capture its owning PID and the `ValidatePlatforms`
 or `VerifySdk` child stack before restarting Windows. The editor and its
 unsaved state were not changed during this A/B check.
+
+## 2026-10-09 RavenPerch and AutoSDK follow-up
+
+A later bounded UE 5.8.3 `UnrealEditor-Cmd` launch against the same scratch
+project successfully ran `CaptiveSky2.Agent.RavenPerch`. Resident thinking and
+Python were disabled, the request cap was zero, and the real-time play cap was
+60 seconds. The test passed; no source, map, or authored Content was changed.
+The run's direct `ValidatePlatforms` AutoSDK log completed successfully, but
+UE's subsequent startup path still logged `UBT AutoSDK ReturnCode: -532462766`
+(`0xE0434352`) and continued into the passing automation. This confirms that
+the matching code can recur as a non-fatal UBT AutoSDK startup result; it still
+does not reveal the managed exception behind the desktop dialog or prove all
+popups share that cause. The corrected run used scratch-local DDC and shader
+working directories. An earlier attempt without the shader override failed
+separately when UE could not create files in the default shader working
+directory, before automation began. Evidence: the [bounded RavenPerch log](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/Codex_RavenPerch_BoundedRepeat_20261009.log) and its [AutoSDK validation log](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/AutoSDKInfo.txt).
+
+Next, if the desktop dialog appears again, correlate its timestamp and owning
+process with the UBT AutoSDK child while preserving the visible editor state.
+The current successful automation is evidence that the code path can be
+non-fatal, not a fix for the CLR exception.
