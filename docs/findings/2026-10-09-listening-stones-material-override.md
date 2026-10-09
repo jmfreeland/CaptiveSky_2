@@ -16,19 +16,34 @@ and checks every slot on the transient component for a dynamic override.
 ## Verification and limits
 
 - The two touched translation units compiled successfully with the cached UE
-  5.8.3 response files and the installed MSVC 14.44 toolchain. This is syntax
-  and translation-unit compile evidence only; no module link or automation test
-  ran.
-- A normal scratch `CaptiveSky_2Editor` build started at 03:01 local but stalled
-  in UBT's bundled .NET platform-validation child before compiler output. Its
-  `AutoSDKInfo.txt` remained unchanged from the previous day. Only the two
-  processes from that scratch build were stopped; the open editor was not
-  touched. This reproduces the earlier Turnkey startup problem, not a source
-  compile failure.
-- No new Game/PIE capture was taken, so the surface's in-world appearance is
-  still unverified. Once UBT validation proceeds, build the scratch target, run
-  `CaptiveSky2.Agent.ListeningStonePresentation`, and take a matched Listening
-  Stones close-up to confirm the default texture no longer leaks through.
+- A full UE 5.8.3 scratch editor build succeeded (47 actions), including
+  `IslandListeningStonePresentation.cpp` and its test. `UBT AutoSDK ReturnCode`
+  was 0.
+- `CaptiveSky2.Agent.ListeningStonePresentation` passed. The regression logs
+  one `SM_Rock` material slot and verifies it resolves to the transient dynamic
+  stone surface. Log:
+  [`Codex_ListeningStones_Override_Automation_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_ListeningStones_Override_Automation_20261009.log).
+- The first editor-only viewpoint capture showed the unchanged blue map proxies,
+  as expected: that preview does not start Game and therefore does not exercise
+  the transient Game presentation. A bounded real-RHI Game run then loaded the
+  current scratch binaries, replaced the proxies with the runtime cairns, and
+  saved a warmed noon frame at
+  [`002_Stone_Presentation_Close.png`](../../Saved/CompileScratch/Claude_Props/Saved/GameShots/Codex_ListeningStones_Override_Noon_20261009/002_Stone_Presentation_Close.png).
+  It used an isolated data root, disabled thinking, a zero-request ceiling, and
+  a 60-second real-time cap; it exited normally after 60.2 seconds with zero
+  model requests. Log:
+  [`Codex_ListeningStones_Override_GameNoon_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_ListeningStones_Override_GameNoon_20261009.log).
+- The all-slot override is in effect, but the warmed frame still reads as
+  strongly light/dark stacked rock. Since `SM_Rock` has only one material slot,
+  extra slot coverage was not the visual bottleneck. The current frame does not
+  distinguish whether the remaining contrast comes from the base surface,
+  direct lighting, or self-shadowing at layer seams. Next: evaluate the
+  candidate surface and the stack silhouette separately under matched daylight
+  and shadow views before changing the tall landmarks again. Keep the imported
+  small mossy `StoneCairn` prop separate; it is too wide to scale into these
+  narrow 2.2–3.0 m proxies.
 
 No map or Content asset was changed; the presentation remains transient and the
-saved proxy actors remain authoritative.
+saved proxy actors remain authoritative. Scratch output uses
+`Saved/CompileScratch/Claude_Props`; no user world state or open editor assets
+were modified.
