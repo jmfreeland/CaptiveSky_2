@@ -9,6 +9,7 @@
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
 #include "IslandDew.h"
+#include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
@@ -751,6 +752,55 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				}
 			}
 		}
+		}
+		const FVector RavenLocationBeforeWildlifeGlance = BlueprintRaven->GetActorLocation();
+		AIslandForestStag* QuietlyNoticingStag = World->SpawnActor<AIslandForestStag>(
+			RavenLocationBeforeWildlifeGlance + FVector(0.f, 450.f, 0.f), FRotator::ZeroRotator);
+		TestNotNull(TEXT("A nearby stag can be created for the Raven's reciprocal attention cue"), QuietlyNoticingStag);
+		if (QuietlyNoticingStag)
+		{
+			QuietlyNoticingStag->bMoving = false;
+			QuietlyNoticingStag->bStartled = false;
+			QuietlyNoticingStag->bResting = false;
+			QuietlyNoticingStag->bNoticingResident = true;
+			TestTrue(TEXT("The wildlife cue is driven by the stag's calm notice state"),
+				QuietlyNoticingStag->IsQuietlyNoticingResident());
+			BlueprintController->ListeningStoneAttentionRemaining = 0.f;
+			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
+			BlueprintController->RainBasinAttentionRemaining = 0.f;
+			BlueprintController->DewGlintAttentionRemaining = 0.f;
+			BlueprintController->WindMoteAttentionRemaining = 0.f;
+			BlueprintController->CrabScurryAttentionRemaining = 0.f;
+			BlueprintController->ResidentAttentionRemaining = 0.f;
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
+			BlueprintController->ListeningStoneCheckRemaining = 1.f;
+			USceneComponent* AttentionVisual = BlueprintHeadPivot
+				? static_cast<USceneComponent*>(BlueprintHeadPivot)
+				: static_cast<USceneComponent*>(BlueprintRiggedCrow);
+			TestNotNull(TEXT("The Raven has an active visual attention rig"), AttentionVisual);
+			const FRotator AttentionRest = BlueprintHeadPivot
+				? BlueprintController->RavenHeadRestRotation
+				: BlueprintController->RiggedCrowRestRotation;
+			if (AttentionVisual)
+				AttentionVisual->SetRelativeRotation(AttentionRest);
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("The settled Raven selects the stag's calm, visible look"),
+				BlueprintController->WildlifeAttentionTarget.Get() == QuietlyNoticingStag &&
+				BlueprintController->WildlifeAttentionRemaining > 1.5f);
+			BlueprintController->Tick(0.25f);
+			if (AttentionVisual)
+			{
+				const float WildlifeGlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+					AttentionRest.Yaw, AttentionVisual->GetRelativeRotation().Yaw));
+				TestTrue(TEXT("The Raven's actual head rig turns toward the stag's quiet notice"),
+					WildlifeGlanceYaw > 3.f && WildlifeGlanceYaw <= 25.f);
+			}
+			TestTrue(TEXT("Returning the stag's glance leaves Raven in place"),
+				BlueprintRaven->GetActorLocation().Equals(RavenLocationBeforeWildlifeGlance, 0.1f));
+			QuietlyNoticingStag->Destroy();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
 		}
 		BlueprintController->UnPossess();
 		BlueprintController->Destroy();
