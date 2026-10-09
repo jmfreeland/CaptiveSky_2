@@ -410,19 +410,22 @@ void AIslandTidepoolMinnows::CachePoolSwimmingBounds()
 	bHasPoolSwimmingBounds = true;
 }
 
-FVector AIslandTidepoolMinnows::ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation) const
+FVector AIslandTidepoolMinnows::ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation, float EdgeClearanceCm) const
 {
 	if (!bHasPoolSwimmingBounds) return DesiredRelativeLocation;
 
 	FVector ClampedWorldLocation = GetActorTransform().TransformPosition(DesiredRelativeLocation);
 	FVector2D PoolOffset(ClampedWorldLocation.X - PoolSurfaceBoundsOrigin.X,
 		ClampedWorldLocation.Y - PoolSurfaceBoundsOrigin.Y);
-	const FVector2D NormalizedOffset(PoolOffset.X / PoolSwimmingRadii.X, PoolOffset.Y / PoolSwimmingRadii.Y);
+	const FVector2D SafeRadii(
+		FMath::Max(1.f, PoolSwimmingRadii.X - FMath::Max(0.f, EdgeClearanceCm)),
+		FMath::Max(1.f, PoolSwimmingRadii.Y - FMath::Max(0.f, EdgeClearanceCm)));
+	const FVector2D NormalizedOffset(PoolOffset.X / SafeRadii.X, PoolOffset.Y / SafeRadii.Y);
 	const float NormalizedDistance = NormalizedOffset.Size();
 	if (NormalizedDistance > 1.f)
 	{
-		PoolOffset.X = NormalizedOffset.X / NormalizedDistance * PoolSwimmingRadii.X;
-		PoolOffset.Y = NormalizedOffset.Y / NormalizedDistance * PoolSwimmingRadii.Y;
+		PoolOffset.X = NormalizedOffset.X / NormalizedDistance * SafeRadii.X;
+		PoolOffset.Y = NormalizedOffset.Y / NormalizedDistance * SafeRadii.Y;
 		ClampedWorldLocation.X = PoolSurfaceBoundsOrigin.X + PoolOffset.X;
 		ClampedWorldLocation.Y = PoolSurfaceBoundsOrigin.Y + PoolOffset.Y;
 	}
@@ -507,10 +510,14 @@ void AIslandTidepoolMinnows::CreateScatterSurfaceCue(const FVector& ObserverLoca
 	}
 	if (!NearestFish) return;
 
-	// The closest fish to a quiet approach breaks the surface as the rest of the
-	// school fans away. Keep the cue short, tide-locked, and visually secondary.
+	// Keep the short cue near the closest fish, but pull its full 72 cm ring inside
+	// the measured shallow-water footprint so an edge-swimming school does not
+	// leave the visible ripple stranded on the bank.
 	const FVector FishLocation = NearestFish->GetComponentLocation();
-	const FVector RippleLocation(FishLocation.X, FishLocation.Y, GetActorLocation().Z + GetTideOffsetCm() - 24.f);
+	const FVector SafeRippleCenter = GetActorTransform().TransformPosition(
+		ClampToPoolSwimmingBounds(GetActorTransform().InverseTransformPosition(FishLocation), StartleRippleEdgeClearanceCm));
+	const FVector RippleLocation(SafeRippleCenter.X, SafeRippleCenter.Y,
+		GetActorLocation().Z + GetTideOffsetCm() - 24.f);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.ObjectFlags |= RF_Transient;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

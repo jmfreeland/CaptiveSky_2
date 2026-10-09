@@ -93,6 +93,16 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		}
 		return true;
 	};
+	auto IsInsideStartleRippleFootprint = [&School](const FVector& WorldLocation)
+	{
+		if (!School->bHasPoolSwimmingBounds) return false;
+		const float SafeRadiusX = FMath::Max(1.f, School->PoolSwimmingRadii.X - AIslandTidepoolMinnows::StartleRippleEdgeClearanceCm);
+		const float SafeRadiusY = FMath::Max(1.f, School->PoolSwimmingRadii.Y - AIslandTidepoolMinnows::StartleRippleEdgeClearanceCm);
+		const FVector2D NormalizedOffset(
+			(WorldLocation.X - School->PoolSurfaceBoundsOrigin.X) / SafeRadiusX,
+			(WorldLocation.Y - School->PoolSurfaceBoundsOrigin.Y) / SafeRadiusY);
+		return NormalizedOffset.Size() <= 1.001f;
+	};
 	TestTrue(TEXT("Every fish begins within the measured shallow-water footprint"), AreFishInsidePoolFootprint());
 	Weather->RefreshNightEcology();
 	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->DayMinnowSchool.Get() == School);
@@ -282,7 +292,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		{
 			NearestFishDistanceSquared = DistanceSquared;
 			const FVector FishLocation = FishBody->GetComponentLocation();
-			ExpectedStartleRippleLocation = FVector(FishLocation.X, FishLocation.Y,
+			const FVector SafeRippleCenter = School->GetActorTransform().TransformPosition(
+				School->ClampToPoolSwimmingBounds(School->GetActorTransform().InverseTransformPosition(FishLocation),
+					AIslandTidepoolMinnows::StartleRippleEdgeClearanceCm));
+			ExpectedStartleRippleLocation = FVector(SafeRippleCenter.X, SafeRippleCenter.Y,
 				School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f);
 		}
 	}
@@ -317,8 +330,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The surface ring has a broad enough band to remain legible over moving water"),
 			StartleRingSection && StartleRingSection->ProcVertexBuffer.Num() >= 2 &&
 			FVector::Dist(StartleRingSection->ProcVertexBuffer[0].Position, StartleRingSection->ProcVertexBuffer[1].Position) >= 0.09f);
-		TestTrue(TEXT("The cue starts at the nearest fish on the current Tideglass surface"),
+		TestTrue(TEXT("The cue stays near the nearest fish while keeping its full ring inside the safe water footprint"),
 			ObserverStartleRipple->GetActorLocation().Equals(ExpectedStartleRippleLocation, 0.1f));
+		TestTrue(TEXT("The observer-triggered ring's full radius clears the pool edge"),
+			IsInsideStartleRippleFootprint(ObserverStartleRipple->GetActorLocation()));
 		ObserverStartleRipple->Tick(0.5f);
 		TestTrue(TEXT("The visible surface ring expands while the startle cue fades"),
 			ObserverStartleRipple->StartleRing->GetRelativeScale3D().X > 12.f);
@@ -520,7 +535,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			{
 				NearestFishDistanceSquared = DistanceSquared;
 				const FVector FishLocation = FishBody->GetComponentLocation();
-				ExpectedRavenRippleLocation = FVector(FishLocation.X, FishLocation.Y,
+				const FVector SafeRippleCenter = School->GetActorTransform().TransformPosition(
+					School->ClampToPoolSwimmingBounds(School->GetActorTransform().InverseTransformPosition(FishLocation),
+						AIslandTidepoolMinnows::StartleRippleEdgeClearanceCm));
+				ExpectedRavenRippleLocation = FVector(SafeRippleCenter.X, SafeRippleCenter.Y,
 					School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f);
 			}
 		}
@@ -540,8 +558,10 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("A low Raven pass creates one transient surface cue for the scattering school"), RavenStartleRippleCount, 1);
 		if (RavenStartleRipple)
 		{
-			TestTrue(TEXT("The Raven-triggered cue is tide-locked beneath the nearest fish"),
+			TestTrue(TEXT("The Raven-triggered cue is tide-locked near the nearest fish and inset from the bank"),
 				RavenStartleRipple->GetActorLocation().Equals(ExpectedRavenRippleLocation, 0.1f));
+			TestTrue(TEXT("The Raven-triggered ring's full radius clears the pool edge"),
+				IsInsideStartleRippleFootprint(RavenStartleRipple->GetActorLocation()));
 			School->CheckForNearbyRavenDisturbance();
 			int32 RepeatedRavenRippleCount = 0;
 			for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)

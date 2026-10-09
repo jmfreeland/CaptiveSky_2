@@ -36,6 +36,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
 	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
+	static constexpr float StartleRippleEdgeClearanceCm = 120.f;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
@@ -73,7 +74,7 @@ private:
 	float GetSurfacePulseAlpha() const;
 	float GetTideOffsetCm() const;
 	void CachePoolSwimmingBounds();
-	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation) const;
+	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation, float EdgeClearanceCm = 0.f) const;
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNaturalSurfaceRipple();
