@@ -47,3 +47,32 @@ No map or Content asset was changed; the presentation remains transient and the
 saved proxy actors remain authoritative. Scratch output uses
 `Saved/CompileScratch/Claude_Props`; no user world state or open editor assets
 were modified.
+
+## Procedural standing-stone iteration (2026-10-09)
+
+The stacked Starter Content rocks still read as a cartoon cairn when stretched
+across these narrow 2.2–3.0 m proxies. The transient presentation now builds one
+seeded, tapered procedural stone per proxy, with a small uneven cap instead of
+a needle point. The map cubes continue to own collision and navigation; the new
+meshes are collisionless and do not affect nav. A lower slate `Color` value was
+needed for noon lighting: the face at pixel (330, 600) sampled RGB
+(187, 184, 174) at tint (0.055, 0.058, 0.060), then (146, 142, 131) after
+reducing it to (0.015, 0.017, 0.018). The final close capture also samples
+(137, 133, 119) on the third stone. This is visibly more restrained than the
+near-ivory frame, but remains a smooth, untextured blockout surface rather than
+finished stone.
+
+The UE 5.8.3 scratch editor build succeeded (five actions for the tint change,
+then four for the chipped cap), and
+`CaptiveSky2.Agent.ListeningStonePresentation` passed after both changes. The
+last real-RHI Game run captured a warmed noon frame at
+[`003_Stone_Presentation_Close.png`](../../Saved/CompileScratch/Claude_Props/Saved/GameShots/Codex_StandingStoneChippedCap_20261009/003_Stone_Presentation_Close.png).
+It disabled resident thinking and Python, used isolated world data, and ended
+normally at its 60.0-second real-time cap with zero model requests. The frame
+confirms the cap and tint render, not final art quality: the close camera makes
+the smooth stones dominate, so texture/lichen, scale and ordinary gameplay
+framing remain open for another art pass.
+
+Logs: [`Codex_StandingStoneChippedCap_Build_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_StandingStoneChippedCap_Build_20261009.log),
+[`Codex_StandingStoneChippedCap_Automation_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_StandingStoneChippedCap_Automation_20261009.log),
+and [`Codex_StandingStoneChippedCap_Game_20261009.log`](../../Saved/Logs/Codex_StandingStoneChippedCap_Game_20261009.log).

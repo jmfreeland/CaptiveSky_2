@@ -2,9 +2,9 @@
 
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
-#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
@@ -16,9 +16,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogListeningStonePresentation, Log, All);
 
 namespace
 {
-	constexpr TCHAR ListeningStoneRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
 	constexpr TCHAR ListeningStoneEngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
 	constexpr float ChimeDurationSeconds = 2.8f;
+	constexpr int32 StoneRingCount = 6;
+	constexpr int32 StoneSideCount = 9;
 }
 
 AListeningStonePresentation::AListeningStonePresentation()
@@ -27,16 +28,19 @@ AListeningStonePresentation::AListeningStonePresentation()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 	PrimaryActorTick.TickInterval = 0.1f;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	Stones = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("StoneMonoliths"));
-	Stones->SetupAttachment(RootComponent);
-	Stones->SetMobility(EComponentMobility::Movable);
-	Stones->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Stones->SetCanEverAffectNavigation(false);
-	Stones->SetGenerateOverlapEvents(false);
-	Stones->SetCastShadow(true);
 
 	for (int32 Index = 0; Index < 3; ++Index)
 	{
+		UProceduralMeshComponent* Stone = CreateDefaultSubobject<UProceduralMeshComponent>(
+			*FString::Printf(TEXT("ListeningStone_%d"), Index));
+		Stone->SetupAttachment(RootComponent);
+		Stone->SetMobility(EComponentMobility::Movable);
+		Stone->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Stone->SetCanEverAffectNavigation(false);
+		Stone->SetGenerateOverlapEvents(false);
+		Stone->SetCastShadow(true);
+		Stones.Add(Stone);
+
 		UPointLightComponent* Light = CreateDefaultSubobject<UPointLightComponent>(
 			*FString::Printf(TEXT("StoneResonanceLight_%d"), Index));
 		Light->SetupAttachment(RootComponent);
@@ -53,7 +57,7 @@ AListeningStonePresentation::AListeningStonePresentation()
 
 int32 AListeningStonePresentation::GetStoneCount() const
 {
-	return Stones ? Stones->GetInstanceCount() : 0;
+	return Stones.Num();
 }
 
 bool AListeningStonePresentation::ShouldResonateForWind(float PreviousSpeed, float CurrentSpeed)
@@ -62,99 +66,117 @@ bool AListeningStonePresentation::ShouldResonateForWind(float PreviousSpeed, flo
 		CurrentSpeed >= 90.f && CurrentSpeed - PreviousSpeed >= 45.f;
 }
 
-bool AListeningStonePresentation::BuildStoneForms(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
+bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransform,
 	const TArray<AStaticMeshActor*>& Proxies)
 {
-	if (!Stones || !RockMesh || Proxies.Num() != 3 || ResonanceLights.Num() != 3) return false;
-	const FVector RockExtent = RockMesh->GetBounds().BoxExtent;
-	if (RockExtent.IsNearlyZero()) return false;
-
-	Stones->SetStaticMesh(RockMesh);
-	// Starter Content's mottled M_Rock reads almost black in shadow and stark white in direct
-	// sun. Keep its irregular mesh silhouette, but use the same known Color-parameter engine
-	// surface as other island stones to avoid the source texture's extreme mottling.
+	if (Stones.Num() != 3 || Proxies.Num() != 3 || ResonanceLights.Num() != 3) return false;
+	// A single rounded mesh repeated in courses reads as a cartoon cairn at the scale of these
+	// tall proxies. Build one tapered, irregular standing stone per proxy instead; the result
+	// is transient, while the saved cubes continue to own collision and navigation.
 	UMaterialInterface* BaseSurface = LoadObject<UMaterialInterface>(nullptr,
 		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	UMaterialInstanceDynamic* StoneSurface = BaseSurface ? UMaterialInstanceDynamic::Create(BaseSurface, this) : nullptr;
-	if (!StoneSurface) return false;
-	StoneSurface->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.28f, 0.26f, 0.22f));
-	// SM_Rock can carry more than one material section. Override every slot so no
-	// section silently keeps the original high-contrast M_Rock texture.
-	const int32 MaterialSlotCount = FMath::Max(1, RockMesh->GetStaticMaterials().Num());
-	for (int32 MaterialIndex = 0; MaterialIndex < MaterialSlotCount; ++MaterialIndex)
-		Stones->SetMaterial(MaterialIndex, StoneSurface);
-	Stones->ClearInstances();
+	if (!BaseSurface) return false;
+	const float RingZ[StoneRingCount] = { 0.f, 0.10f, 0.31f, 0.58f, 0.82f, 0.95f };
+	const float RingRadius[StoneRingCount] = { 0.56f, 0.88f, 0.83f, 0.72f, 0.53f, 0.31f };
+	const FLinearColor StoneColors[3] = {
+		FLinearColor(0.015f, 0.017f, 0.018f),
+		FLinearColor(0.018f, 0.017f, 0.015f),
+		FLinearColor(0.016f, 0.018f, 0.020f)
+	};
 	for (int32 Index = 0; Index < Proxies.Num(); ++Index)
 	{
 		const AStaticMeshActor* Proxy = Proxies[Index];
 		const UStaticMeshComponent* ProxyMesh = Proxy ? Proxy->GetStaticMeshComponent() : nullptr;
-		if (!ProxyMesh || !ProxyMesh->GetStaticMesh()) return false;
+		UProceduralMeshComponent* Stone = Stones[Index];
+		if (!ProxyMesh || !ProxyMesh->GetStaticMesh() || !Stone) return false;
 
 		const FBoxSphereBounds& Bounds = ProxyMesh->Bounds;
 		const FVector Center = MarkerTransform.InverseTransformPosition(Bounds.Origin);
 		const FVector WorldExtent = Bounds.BoxExtent;
 		const FVector LocalExtent = MarkerTransform.InverseTransformVectorNoScale(WorldExtent).GetAbs();
 		const FQuat LocalRotation = MarkerTransform.InverseTransformRotation(Proxy->GetActorQuat());
-
-		// The old one-rock-per-proxy fit stretched the same mesh to the blockout's tall,
-		// narrow dimensions. Build a small cairn instead: every rock keeps its aspect ratio,
-		// while overlapping layers fill the original silhouette without changing its target.
-		const float FootprintScale = FMath::Min(LocalExtent.X / RockExtent.X, LocalExtent.Y / RockExtent.Y);
-		const float StoneScale = FootprintScale * 0.72f;
-		const float SegmentHeight = RockExtent.Z * StoneScale * 2.f;
 		const float TargetHeight = LocalExtent.Z * 2.f * StoneHeightRatio;
-		if (!FMath::IsFinite(SegmentHeight) || SegmentHeight <= KINDA_SMALL_NUMBER ||
-			!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER) return false;
-		const int32 SegmentCount = FMath::Clamp(
-			FMath::CeilToInt(TargetHeight / (SegmentHeight * 0.78f)), 2, 7);
-		const float OffsetRadius = FMath::Min(LocalExtent.X, LocalExtent.Y) * 0.20f;
-		TArray<FVector> LayerScales;
-		TArray<FQuat> LayerRotations;
-		TArray<FBoxSphereBounds> LayerBounds;
-		LayerScales.Reserve(SegmentCount);
-		LayerRotations.Reserve(SegmentCount);
-		LayerBounds.Reserve(SegmentCount);
-		float MaximumLayerHalfHeight = 0.f;
+		const float RadiusX = LocalExtent.X * 0.48f;
+		const float RadiusY = LocalExtent.Y * 0.48f;
+		if (!FMath::IsFinite(TargetHeight) || TargetHeight <= KINDA_SMALL_NUMBER ||
+			RadiusX <= KINDA_SMALL_NUMBER || RadiusY <= KINDA_SMALL_NUMBER) return false;
 
-		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		TArray<FVector2D> UVs;
+		Vertices.Reserve(StoneRingCount * StoneSideCount + 2);
+		UVs.Reserve(StoneRingCount * StoneSideCount + 2);
+		Triangles.Reserve((StoneRingCount - 1) * StoneSideCount * 6 + StoneSideCount * 6);
+		const float BottomZ = Center.Z - LocalExtent.Z;
+		FRandomStream ShapeRandom(0x531A + Index * 7919);
+		const float RotationOffset = ShapeRandom.FRandRange(-0.28f, 0.28f);
+		for (int32 Ring = 0; Ring < StoneRingCount; ++Ring)
 		{
-			const float CourseAlpha = static_cast<float>(Layer) / static_cast<float>(SegmentCount - 1);
-			// A stronger crown taper stops tall blockout proxies from reading as
-			// stacks of equally sized cartoon boulders while preserving their base.
-			const float Taper = FMath::Lerp(1.f, 0.70f, CourseAlpha);
-			const float ScaleVariation[] = { 1.00f, 0.98f, 0.96f, 0.94f, 0.92f };
-			const FVector Scale(StoneScale * ScaleVariation[Layer % UE_ARRAY_COUNT(ScaleVariation)] * Taper);
-			const FQuat Variation(FVector::UpVector,
-				FMath::DegreesToRadians(Index * 23.f + Layer * 31.f));
-			const FQuat Rotation = LocalRotation * Variation;
-			const FBoxSphereBounds RelativeBounds = RockMesh->GetBounds().TransformBy(
-				FTransform(Rotation, FVector::ZeroVector, Scale));
-			MaximumLayerHalfHeight = FMath::Max(MaximumLayerHalfHeight, RelativeBounds.BoxExtent.Z);
-			LayerScales.Add(Scale);
-			LayerRotations.Add(Rotation);
-			LayerBounds.Add(RelativeBounds);
+			const float Alpha = RingZ[Ring];
+			const float DriftX = FMath::Sin(Alpha * PI * 1.6f + Index) * RadiusX * 0.10f;
+			const float DriftY = FMath::Cos(Alpha * PI * 1.35f + Index * 0.7f) * RadiusY * 0.09f;
+			for (int32 Side = 0; Side < StoneSideCount; ++Side)
+			{
+				const float Angle = RotationOffset + 2.f * PI * Side / StoneSideCount;
+				const float AngularVariation = ShapeRandom.FRandRange(0.88f, 1.12f);
+				const float Radius = RingRadius[Ring] * AngularVariation;
+				const float CapVariation = Ring == StoneRingCount - 1 ? ShapeRandom.FRandRange(-0.025f, 0.015f) : 0.f;
+				const FVector LocalPoint(
+					Center.X + DriftX + FMath::Cos(Angle) * RadiusX * Radius,
+					Center.Y + DriftY + FMath::Sin(Angle) * RadiusY * Radius,
+					BottomZ + (Alpha + CapVariation) * TargetHeight);
+				Vertices.Add(LocalRotation.RotateVector(LocalPoint - Center) + Center);
+				UVs.Add(FVector2D(static_cast<float>(Side) / StoneSideCount, Alpha));
+			}
+		}
+		const int32 BottomCenterIndex = Vertices.Add(LocalRotation.RotateVector(FVector(Center.X, Center.Y, BottomZ) - Center) + Center);
+		UVs.Add(FVector2D(0.5f, 0.f));
+		// Chipped, slightly uneven cap reads as broken stone rather than a perfect spire.
+		const int32 CapCenterIndex = Vertices.Add(LocalRotation.RotateVector(
+			FVector(Center.X, Center.Y, BottomZ + RingZ[StoneRingCount - 1] * TargetHeight) - Center) + Center);
+		UVs.Add(FVector2D(0.5f, 1.f));
+		for (int32 Ring = 0; Ring < StoneRingCount - 1; ++Ring)
+		{
+			for (int32 Side = 0; Side < StoneSideCount; ++Side)
+			{
+				const int32 NextSide = (Side + 1) % StoneSideCount;
+				const int32 A = Ring * StoneSideCount + Side;
+				const int32 B = Ring * StoneSideCount + NextSide;
+				const int32 C = (Ring + 1) * StoneSideCount + NextSide;
+				const int32 D = (Ring + 1) * StoneSideCount + Side;
+				Triangles.Add(A);
+				Triangles.Add(B);
+				Triangles.Add(C);
+				Triangles.Add(A);
+				Triangles.Add(C);
+				Triangles.Add(D);
+			}
+		}
+		const int32 TopRingStart = (StoneRingCount - 1) * StoneSideCount;
+		const int32 BottomRingStart = 0;
+		for (int32 Side = 0; Side < StoneSideCount; ++Side)
+		{
+			const int32 NextSide = (Side + 1) % StoneSideCount;
+			Triangles.Add(BottomCenterIndex);
+			Triangles.Add(BottomRingStart + NextSide);
+			Triangles.Add(BottomRingStart + Side);
+			Triangles.Add(TopRingStart + Side);
+			Triangles.Add(TopRingStart + NextSide);
+			Triangles.Add(CapCenterIndex);
 		}
 
-		const float AvailableCenterSpan = TargetHeight - 2.f * MaximumLayerHalfHeight;
-		if (!FMath::IsFinite(AvailableCenterSpan) || AvailableCenterSpan < 0.f) return false;
-		const float Spacing = FMath::Min(SegmentHeight * 0.74f, AvailableCenterSpan / (SegmentCount - 1));
-		const float StoneBottom = Center.Z - LocalExtent.Z;
-		for (int32 Layer = 0; Layer < SegmentCount; ++Layer)
-		{
-			const float EdgeFactor = (Layer == 0 || Layer == SegmentCount - 1) ? 0.35f : 1.f;
-			const float Angle = FMath::DegreesToRadians(Index * 67.f + Layer * 137.5f);
-			const FVector LayerOffset(
-				FMath::Cos(Angle) * OffsetRadius * EdgeFactor,
-				FMath::Sin(Angle) * OffsetRadius * EdgeFactor,
-				MaximumLayerHalfHeight + Layer * Spacing);
-			const float BoundsCenterZ = StoneBottom + LayerOffset.Z;
-			const float PivotZ = BoundsCenterZ - LayerBounds[Layer].Origin.Z;
-			const FVector InstanceLocation(Center.X + LayerOffset.X, Center.Y + LayerOffset.Y, PivotZ);
-			Stones->AddInstance(FTransform(LayerRotations[Layer], InstanceLocation, LayerScales[Layer]));
-		}
+		Stone->ClearAllMeshSections();
+		const TArray<FVector> Normals;
+		const TArray<FLinearColor> VertexColors;
+		const TArray<FProcMeshTangent> Tangents;
+		Stone->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, false);
+		UMaterialInstanceDynamic* StoneSurface = UMaterialInstanceDynamic::Create(BaseSurface, Stone);
+		if (!StoneSurface) return false;
+		StoneSurface->SetVectorParameterValue(TEXT("Color"), StoneColors[Index]);
+		Stone->SetMaterial(0, StoneSurface);
 		ResonanceLights[Index]->SetRelativeLocation(Center);
 	}
-	return GetStoneCount() >= 6;
+	return GetStoneCount() == 3;
 }
 
 void AListeningStonePresentation::BeginResonance(float WindSpeed)
@@ -321,18 +343,11 @@ void UIslandListeningStonePresentationSubsystem::ApplyPresentation(UWorld* World
 	TArray<AStaticMeshActor*> Proxies;
 	if (!FindStoneProxies(World, Marker, Proxies)) return;
 
-	UStaticMesh* RockMesh = LoadObject<UStaticMesh>(nullptr, ListeningStoneRockMeshPath);
-	if (!RockMesh)
-	{
-		UE_LOG(LogListeningStonePresentation, Warning, TEXT("Listening Stones rock mesh did not load: %s"), ListeningStoneRockMeshPath);
-		return;
-	}
-
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AListeningStonePresentation* Presentation = World->SpawnActor<AListeningStonePresentation>(Marker->GetActorLocation(), Marker->GetActorRotation(), Spawn);
-	if (!Presentation || !Presentation->BuildStoneForms(RockMesh, Marker->GetActorTransform(), Proxies))
+	if (!Presentation || !Presentation->BuildStoneForms(Marker->GetActorTransform(), Proxies))
 	{
 		if (Presentation) Presentation->Destroy();
 		UE_LOG(LogListeningStonePresentation, Warning, TEXT("Listening Stones could not build three fitted rock forms."));
@@ -348,7 +363,7 @@ void UIslandListeningStonePresentationSubsystem::ApplyPresentation(UWorld* World
 		Proxy->SetActorHiddenInGame(true);
 	}
 	PresentationActor = Presentation;
-	UE_LOG(LogListeningStonePresentation, Log, TEXT("Three cube visuals now present as transient collisionless stacked rock cairns; map proxies remain unchanged."));
+	UE_LOG(LogListeningStonePresentation, Log, TEXT("Three cube visuals now present as transient collisionless irregular standing stones; map proxies remain unchanged."));
 }
 
 void UIslandListeningStonePresentationSubsystem::RestorePresentation()

@@ -3,7 +3,6 @@
 #include "Agent/IslandFirefly.h"
 #include "Agent/IslandListeningStonePresentation.h"
 #include "Agent/IslandListeningStonesChime.h"
-#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -13,6 +12,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ProceduralMeshComponent.h"
 #include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStonePresentationTest, "CaptiveSky2.Agent.ListeningStonePresentation",
@@ -65,9 +65,7 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 
 	ATargetPoint* Marker = World->SpawnActor<ATargetPoint>(FVector::ZeroVector, FRotator::ZeroRotator);
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	UStaticMesh* Rock = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock"));
-	if (!TestNotNull(TEXT("Synthetic Listening Stones marker spawns"), Marker) || !TestNotNull(TEXT("Engine cube resolves"), Cube) ||
-		!TestNotNull(TEXT("Starter Content rock resolves"), Rock))
+	if (!TestNotNull(TEXT("Synthetic Listening Stones marker spawns"), Marker) || !TestNotNull(TEXT("Engine cube resolves"), Cube))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -108,69 +106,48 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Game start creates a transient stone presentation"), Presentation);
 	if (Presentation)
 	{
-		TestTrue(TEXT("The three blockout proxies become a small stack of individual rock forms"),
-			Presentation->GetStoneCount() >= 6 && Presentation->GetStoneCount() <= 21);
-		TestTrue(TEXT("Replacement render component is collisionless"), Presentation->Stones->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
-		TestFalse(TEXT("Replacement forms do not affect navigation"), Presentation->Stones->CanEverAffectNavigation());
-		TestTrue(TEXT("Existing Starter Content rock is used"), Presentation->Stones->GetStaticMesh() == Rock);
-		const int32 RockMaterialSlotCount = FMath::Max(1, Rock->GetStaticMaterials().Num());
-		AddInfo(FString::Printf(TEXT("Starter Content SM_Rock has %d static material slot(s)."), Rock->GetStaticMaterials().Num()));
-		for (int32 MaterialIndex = 0; MaterialIndex < RockMaterialSlotCount; ++MaterialIndex)
-		{
-			TestTrue(FString::Printf(TEXT("Rock material slot %d uses the dedicated transient stone surface"), MaterialIndex),
-				Cast<UMaterialInstanceDynamic>(Presentation->Stones->GetMaterial(MaterialIndex)) != nullptr);
-		}
-		TMap<int32, TArray<TPair<float, float>>> CairnLayerScales;
+		TestEqual(TEXT("Each blockout proxy becomes one independent standing-stone mesh"), Presentation->GetStoneCount(), 3);
+		const FLinearColor ExpectedStoneColors[] = {
+			FLinearColor(0.015f, 0.017f, 0.018f), FLinearColor(0.018f, 0.017f, 0.015f), FLinearColor(0.016f, 0.018f, 0.020f)
+		};
 		for (int32 Index = 0; Index < Presentation->GetStoneCount(); ++Index)
 		{
-			FTransform Instance;
-			TestTrue(FString::Printf(TEXT("Stacked rock %d has a valid transform"), Index), Presentation->Stones->GetInstanceTransform(Index, Instance, true));
-			const FVector Scale = Instance.GetScale3D();
-			TestTrue(FString::Printf(TEXT("Stacked rock %d keeps a natural, uniform aspect ratio"), Index),
-				FMath::IsNearlyEqual(Scale.X, Scale.Y, 0.001f) && FMath::IsNearlyEqual(Scale.Y, Scale.Z, 0.001f));
+			UProceduralMeshComponent* Stone = Presentation->Stones[Index];
+			TestNotNull(FString::Printf(TEXT("Standing stone %d has a procedural mesh"), Index), Stone);
+			if (!Stone) continue;
+			TestTrue(FString::Printf(TEXT("Standing stone %d is collisionless"), Index),
+				Stone->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+			TestFalse(FString::Printf(TEXT("Standing stone %d does not affect navigation"), Index),
+				Stone->CanEverAffectNavigation());
+			const FProcMeshSection* Section = Stone->GetProcMeshSection(0);
+			TestTrue(FString::Printf(TEXT("Standing stone %d has a closed, detailed mesh"), Index),
+				Section && Section->ProcIndexBuffer.Num() >= 200 && Section->ProcVertexBuffer.Num() >= 50);
+			UMaterialInstanceDynamic* StoneSurface = Cast<UMaterialInstanceDynamic>(Stone->GetMaterial(0));
+			TestNotNull(FString::Printf(TEXT("Standing stone %d uses its transient stone surface"), Index), StoneSurface);
+			if (StoneSurface && ExpectedStoneColors[Index].R > 0.f)
+			{
+				TestTrue(FString::Printf(TEXT("Standing stone %d retains its restrained slate tint"), Index),
+					StoneSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(ExpectedStoneColors[Index], 0.001f));
+			}
+			if (!Section || !Proxies.IsValidIndex(Index)) continue;
 
-			int32 ClosestProxyIndex = INDEX_NONE;
-			float ClosestHorizontalDistanceSquared = TNumericLimits<float>::Max();
-			for (int32 ProxyIndex = 0; ProxyIndex < Proxies.Num(); ++ProxyIndex)
+			const FBoxSphereBounds& ProxyBounds = Proxies[Index]->GetStaticMeshComponent()->Bounds;
+			const float ProxyBottom = ProxyBounds.Origin.Z - ProxyBounds.BoxExtent.Z;
+			const float ExpectedTop = ProxyBottom + 2.f * ProxyBounds.BoxExtent.Z * AListeningStonePresentation::StoneHeightRatio;
+			float MinimumZ = TNumericLimits<float>::Max();
+			float MaximumZ = -TNumericLimits<float>::Max();
+			bool bInsideProxyFootprint = true;
+			for (const FProcMeshVertex& Vertex : Section->ProcVertexBuffer)
 			{
-				const FVector Delta = Instance.GetLocation() - Proxies[ProxyIndex]->GetStaticMeshComponent()->Bounds.Origin;
-				const float HorizontalDistanceSquared = FVector(Delta.X, Delta.Y, 0.f).SizeSquared();
-				if (HorizontalDistanceSquared < ClosestHorizontalDistanceSquared)
-				{
-					ClosestHorizontalDistanceSquared = HorizontalDistanceSquared;
-					ClosestProxyIndex = ProxyIndex;
-				}
+				const FVector WorldPosition = Stone->GetComponentTransform().TransformPosition(Vertex.Position);
+				MinimumZ = FMath::Min(MinimumZ, WorldPosition.Z);
+				MaximumZ = FMath::Max(MaximumZ, WorldPosition.Z);
+				bInsideProxyFootprint &= FMath::Abs(WorldPosition.X - ProxyBounds.Origin.X) <= ProxyBounds.BoxExtent.X + 1.f &&
+					FMath::Abs(WorldPosition.Y - ProxyBounds.Origin.Y) <= ProxyBounds.BoxExtent.Y + 1.f;
 			}
-			if (Proxies.IsValidIndex(ClosestProxyIndex))
-			{
-				CairnLayerScales.FindOrAdd(ClosestProxyIndex).Add(
-					TPair<float, float>(Instance.GetLocation().Z, Scale.X));
-				const FBoxSphereBounds& ProxyBounds = Proxies[ClosestProxyIndex]->GetStaticMeshComponent()->Bounds;
-				const FVector Delta = Instance.GetLocation() - ProxyBounds.Origin;
-				TestTrue(FString::Printf(TEXT("Stacked rock %d remains inside the original proxy bounds"), Index),
-					FMath::Abs(Delta.X) <= ProxyBounds.BoxExtent.X + 1.f &&
-					FMath::Abs(Delta.Y) <= ProxyBounds.BoxExtent.Y + 1.f &&
-					FMath::Abs(Delta.Z) <= ProxyBounds.BoxExtent.Z + 1.f);
-
-				const FBoxSphereBounds RenderedBounds = Rock->GetBounds().TransformBy(Instance);
-				const float ProxyBottom = ProxyBounds.Origin.Z - ProxyBounds.BoxExtent.Z;
-				const float ShortenedTop = ProxyBottom + 2.f * ProxyBounds.BoxExtent.Z * AListeningStonePresentation::StoneHeightRatio;
-				TestTrue(FString::Printf(TEXT("Stacked rock %d stays planted in the shortened silhouette band (render %.1f..%.1f, band %.1f..%.1f)"),
-					Index, RenderedBounds.Origin.Z - RenderedBounds.BoxExtent.Z, RenderedBounds.Origin.Z + RenderedBounds.BoxExtent.Z,
-					ProxyBottom, ShortenedTop),
-					RenderedBounds.Origin.Z - RenderedBounds.BoxExtent.Z >= ProxyBottom - 2.f &&
-					RenderedBounds.Origin.Z + RenderedBounds.BoxExtent.Z <= ShortenedTop + 2.f);
-			}
-		}
-		for (const TPair<int32, TArray<TPair<float, float>>>& Cairn : CairnLayerScales)
-		{
-			TArray<TPair<float, float>> Layers = Cairn.Value;
-			Layers.Sort([](const TPair<float, float>& A, const TPair<float, float>& B) { return A.Key < B.Key; });
-			if (Layers.Num() >= 2)
-			{
-				TestTrue(FString::Printf(TEXT("Cairn %d narrows toward its upper stones"), Cairn.Key),
-					Layers.Last().Value <= Layers[0].Value * 0.82f);
-			}
+			TestTrue(FString::Printf(TEXT("Standing stone %d stays inside the original proxy footprint"), Index), bInsideProxyFootprint);
+			TestTrue(FString::Printf(TEXT("Standing stone %d is planted within the shortened proxy silhouette"), Index),
+				MinimumZ >= ProxyBottom - 1.f && MaximumZ <= ExpectedTop + 1.f && MaximumZ > MinimumZ);
 		}
 		for (int32 Index = 0; Index < Proxies.Num(); ++Index)
 		{

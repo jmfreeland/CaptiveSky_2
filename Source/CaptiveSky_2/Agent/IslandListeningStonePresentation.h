@@ -6,7 +6,7 @@
 #include "IslandListeningStonePresentation.generated.h"
 
 class AStaticMeshActor;
-class UInstancedStaticMeshComponent;
+class UProceduralMeshComponent;
 class UPointLightComponent;
 class UStaticMesh;
 class AIslandWeather;
@@ -30,7 +30,7 @@ private:
 	friend class FIslandListeningStonePresentationTest;
 	static constexpr float StoneHeightRatio = 0.58f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")
-	TObjectPtr<UInstancedStaticMeshComponent> Stones;
+	TArray<TObjectPtr<UProceduralMeshComponent>> Stones;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")
 	TArray<TObjectPtr<UPointLightComponent>> ResonanceLights;
 	float ResonanceElapsed = 0.f;
@@ -42,8 +42,7 @@ private:
 	double LastAmbientChimeAt = -1000.0;
 	bool bHasAmbientWindSample = false;
 	TWeakObjectPtr<AIslandWeather> Weather;
-	bool BuildStoneForms(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
-		const TArray<AStaticMeshActor*>& Proxies);
+	bool BuildStoneForms(const FTransform& MarkerTransform, const TArray<AStaticMeshActor*>& Proxies);
 	virtual void BeginPlay() override;
 	void CheckForNaturalGust(float DeltaSeconds);
 	void ObserveAmbientWind(float CurrentSpeed);
