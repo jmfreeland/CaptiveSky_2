@@ -279,6 +279,41 @@ then test one tagged landmark arrival and interaction in a render-enabled
 session. Keep that separate from the still-unverified user-controlled PIE
 route and 30-FPS target.
 
+## Rendered Aster-to-Listening-Stones interaction (2026-10-09)
+
+An isolated UE 5.8.3 D3D12 Game run released the startup `AsyncLoadLock`, built
+dynamic navigation, then issued Aster's normal `MoveTo` followed by the normal
+`Interact` action for `ListeningStones`. Agent thinking and Python were
+disabled; the world-data directory was isolated; the 120-second real-time cap
+ended normally after 102.0 seconds with zero model requests. The probe waited
+for the corrected nav rebuild before dispatch and did not use the open editor.
+
+Aster moved 1,377 cm in 3.0 simulated seconds from his normal runtime start to
+the stone marker. The controller reported a complete 15 m route (six points),
+then the normal interaction returned: “Your inspection woke a quiet, layered
+resonance in the ListeningStones,” tuned to local wind and fading after a few
+seconds. The isolated Aster memory file recorded that action result. The
+controller's status string immediately appended its 300-second inspection
+cooldown after the successful result; that cooldown message is not a failed
+interaction. The interaction explicitly leaves no lasting world change, and
+this run used `-nosound`, so it validates the action/result path, not audible
+playback or the transient visual effect.
+
+The same rendered session captured all 600 CSV frames at 1600x900 over 10.37
+seconds, including the short walk and interaction. FrameTime was 17.27 ms mean,
+16.45 ms p50, 21.05 ms p95 (47.5 FPS), and 93.01 ms maximum. This clears the
+30-FPS p95 screen in this short fixed-view sample, but its hitch maximum and
+stationary spectator camera mean it is not a moving-PIE or user-controlled
+gameplay pass.
+
+Log: [`AsterListeningStonesInteractD3D12Final.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/AsterListeningStonesInteractD3D12Final.log).
+CSV: [`Profile(20261009_080330).csv`](../../Saved/NavBoundsTest/Project/Saved/Profiling/CSV/Profile%2820261009_080330%29.csv).
+Isolated observation: [`memory.jsonl`](../../Saved/NavBoundsTest/AsterListeningStonesInteractionWorldRetry/Agents/Agent_Aster_01/memory.jsonl).
+
+Next: capture the transient stone lights/chime from a close landmark camera,
+then keep moving-PIE performance separate from this fixed-view interaction
+sample. Do not claim persistence: the response is intentionally transient.
+
 ## Current Tideglass foliage and dragonfly view (2026-10-09)
 
 The current shared source passed `CaptiveSky2.Visual.Viewpoints` in an isolated
