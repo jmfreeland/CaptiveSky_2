@@ -295,9 +295,14 @@ resonance in the ListeningStones,” tuned to local wind and fading after a few
 seconds. The isolated Aster memory file recorded that action result. The
 controller's status string immediately appended its 300-second inspection
 cooldown after the successful result; that cooldown message is not a failed
-interaction. The interaction explicitly leaves no lasting world change, and
-this run used `-nosound`, so it validates the action/result path, not audible
-playback or the transient visual effect.
+interaction. The interaction explicitly leaves no lasting world change. The
+first probe used `-nosound`, so it did not validate audio output. A subsequent
+isolated close-camera run with normal audio enabled captured the stones before
+and about 1.3 seconds after the action; the latter frame shows a brief cyan
+highlight on the outer stone forms. This verifies that the transient light
+response renders, though it is subtle and the underlying stone silhouettes
+remain obvious blockout-style prototypes. It does not confirm what a human
+listener hears on their output device.
 
 The same rendered session captured all 600 CSV frames at 1600x900 over 10.37
 seconds, including the short walk and interaction. FrameTime was 17.27 ms mean,
@@ -309,10 +314,13 @@ gameplay pass.
 Log: [`AsterListeningStonesInteractD3D12Final.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/AsterListeningStonesInteractD3D12Final.log).
 CSV: [`Profile(20261009_080330).csv`](../../Saved/NavBoundsTest/Project/Saved/Profiling/CSV/Profile%2820261009_080330%29.csv).
 Isolated observation: [`memory.jsonl`](../../Saved/NavBoundsTest/AsterListeningStonesInteractionWorldRetry/Agents/Agent_Aster_01/memory.jsonl).
+Pre-interaction: [`002_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStonesGlowPeak3s/002_Listening_Stones__Resonance_Close.png).
+Resonance frame: [`003_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStonesGlowPeak3s/003_Listening_Stones__Resonance_Close.png).
 
-Next: capture the transient stone lights/chime from a close landmark camera,
-then keep moving-PIE performance separate from this fixed-view interaction
-sample. Do not claim persistence: the response is intentionally transient.
+Next: improve the prototype stone silhouettes and give the landmark a readable
+close-up composition, then keep moving-PIE performance separate from this
+fixed-view interaction sample. Do not claim persistence: the response is
+intentionally transient.
 
 ## Current Tideglass foliage and dragonfly view (2026-10-09)
 
