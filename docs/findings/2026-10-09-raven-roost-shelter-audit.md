@@ -89,6 +89,35 @@ authored East spruce as a currently queryable branch perch; it does not rule
 out other trees or surfaces outside the sampled mesh bounds. Log:
 `Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Logs/Codex_RavenBranchAudit_Runtime.log`.
 
+## Authored static-mesh support survey
+
+Because the East spruce did not expose a usable branch surface, a bounded
+read-only Game-world survey checked authored `AStaticMeshActor` collision
+within 300 m of `Roost_East`. `Island.RavenSupportAudit` sampled complex
+visibility collision on a 150 cm grid, then required both an upward-facing
+surface and acceptance by the Raven controller's existing perch-support test.
+It also counted overhead-cover clues and local wind, deduplicating covered
+candidates by mesh component. The tagged `IslandInn` was explicitly excluded
+from candidate results so an indoor surface could not be mistaken for a wild
+roost.
+
+In the isolated UE 5.8.3 scratch Game, 146 authored mesh components were
+considered across 450 complex samples. The survey found 120 upward-facing hits
+and 101 points accepted by the Raven support test. All 29 points with any
+overhead clue belonged to the indoor `IslandInn` and were excluded; there were
+zero covered, supported candidates on non-Inn static-mesh actors. No map,
+Raven, nest, or saved world state changed. Log:
+`Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Logs/Codex_RavenSupportAudit_Runtime2.log`.
+
+This is not a whole-world proof: the scan is limited to static-mesh actors
+whose collision blocks visibility, within the bounded East-roost radius and
+20,000-trace ceiling. It does not sample foliage instances, landscape, or
+mesh components owned by other actor classes. It nevertheless provides no
+authored static-mesh alternative to the exposed East perch in the surveyed
+area. The scratch startup also logged unrelated UE 5.8 Toolset Python import
+errors (`unreal.ToolsetDefinition` / `PythonTestRunner` unavailable); despite
+those plugin errors, it loaded the Island and completed the scan.
+
 The scratch process remained alive beyond 150 real seconds despite the
 120-second runtime cap and was stopped by its exact process ID. The scan had
 already completed before shutdown. This is a runtime-cap limitation, not
@@ -96,7 +125,7 @@ evidence that the authored editor session is hung.
 
 ## Unreal/.NET startup exception note
 
-All three scratch Game runs launched from this restricted Codex shell logged
+The earlier scratch Game runs launched from the restricted Codex shell logged
 `LogTargetPlatformManager: UBT AutoSDK ReturnCode: -532462766` while invoking
 UnrealBuildTool's `-Mode=ValidatePlatforms` child. That signed return code is
 `0xE0434352`, matching the generic CLR exception code in the user's dialog.
@@ -104,6 +133,13 @@ Read-only inspection in this shell also confirmed that
 `C:\Users\freel\AppData\Local\UnrealBuildTool` is inaccessible here. Running
 the same UE 5.8.3 build and focused editor automation with the required
 user-level access then completed successfully, including `Win64 VALID`.
+
+The latest read-only static-mesh survey ran with the required user-level
+access and logged `UBT AutoSDK ReturnCode: 0`; it completed normally. Thus the
+restricted-shell AutoSDK failure is a plausible source for matching dialogs
+when launching from that context, but it is not reproduced by every scratch
+launch and is not established as the source of the user's recurring desktop
+dialogs.
 
 This is a strong explanation for the matching code when Unreal is launched
 from this restricted tool context, but does not establish the cause of a dialog
@@ -115,11 +151,12 @@ entry was available to expose the managed exception's stack trace.
 
 If Raven is to have a truly sheltered nest location, authoring a new perch or
 changing the saved Island layout is likely necessary; the existing East tree
-bounds are only a lead, not a validated site. Before that binary Content/map
+bounds are only a lead, not a validated site, and the surveyed authored
+static-mesh actors yielded no alternative. Before that binary Content/map
 change, inspect the candidate visually and prove support, overhead cover, wind
 exposure, approach clearance, and a bounded Raven landing. No map change is
-included in this milestone. The runtime scan suggests a dedicated elevated
-branch perch (with explicit collision/support) may be needed; the current
-landscape-supported markers cannot stand in for a tree roost.
+included in this milestone. A dedicated elevated branch perch (with explicit
+collision/support) may be needed; the current landscape-supported markers
+cannot stand in for a tree roost.
 
 Log: [`Codex_RavenRoostShelterAudit_Focused_20261009.log`](../../Saved/Logs/Codex_RavenRoostShelterAudit_Focused_20261009.log).

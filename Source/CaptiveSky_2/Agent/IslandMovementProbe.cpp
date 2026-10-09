@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Engine/TargetPoint.h"
+#include "Engine/StaticMeshActor.h"
 #include "Components/SceneComponent.h"
 #include "Components/ActorComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -425,6 +426,185 @@ public:
 			return;
 		}
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Raven accepted the transient branch perch; the normal controller tick is handling landing."));
+	}
+
+	static void RunRavenSupportAudit(const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || !World->IsGameWorld())
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Island.RavenSupportAudit requires a running game world."));
+			return;
+		}
+		const bool bRuntimeReady = Args.ContainsByPredicate([](const FString& Arg)
+			{ return Arg.Equals(TEXT("RuntimeReady"), ESearchCase::IgnoreCase); });
+		if (!bRuntimeReady)
+		{
+			TWeakObjectPtr<UWorld> WeakWorld(World);
+			FTimerHandle RetryTimer;
+			World->GetTimerManager().SetTimer(RetryTimer, FTimerDelegate::CreateLambda([WeakWorld, Args]()
+			{
+				TArray<FString> RetryArgs = Args;
+				RetryArgs.Add(TEXT("RuntimeReady"));
+				if (UWorld* RetryWorld = WeakWorld.Get())
+					FIslandMovementProbeCommand::RunRavenSupportAudit(RetryArgs, RetryWorld);
+			}), 5.f, false);
+			UE_LOG(LogIslandMovementProbe, Log, TEXT("Raven support audit queued for five Game-world seconds."));
+			return;
+		}
+
+		float ScanRadiusCm = 30000.f;
+		float GridSpacingCm = 150.f;
+		for (const FString& Arg : Args)
+		{
+			double Value = 0.0;
+			if (Arg.StartsWith(TEXT("RadiusCm="), ESearchCase::IgnoreCase) &&
+				LexTryParseString(Value, *Arg.RightChop(9)))
+				ScanRadiusCm = FMath::Clamp(static_cast<float>(Value), 1000.f, 60000.f);
+			else if (Arg.StartsWith(TEXT("GridSpacingCm="), ESearchCase::IgnoreCase) &&
+				LexTryParseString(Value, *Arg.RightChop(14)))
+				GridSpacingCm = FMath::Clamp(static_cast<float>(Value), 75.f, 500.f);
+		}
+
+		ARavenAgentAIController* RavenController = nullptr;
+		AActor* EastRoost = nullptr;
+		AIslandWeather* Weather = nullptr;
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (!EastRoost && It->ActorHasTag(TEXT("Roost_East")) && It->ActorHasTag(TEXT("RavenPerch"))) EastRoost = *It;
+			if (!RavenController)
+				if (APawn* Pawn = Cast<APawn>(*It)) RavenController = Cast<ARavenAgentAIController>(Pawn->GetController());
+			if (!Weather) Weather = Cast<AIslandWeather>(*It);
+		}
+		APawn* Raven = RavenController ? RavenController->GetPawn() : nullptr;
+		ACharacter* RavenCharacter = Cast<ACharacter>(Raven);
+		if (!EastRoost || !RavenController || !Raven || !RavenCharacter)
+		{
+			UE_LOG(LogIslandMovementProbe, Error,
+				TEXT("Raven support audit needs the East roost and a possessed live Raven character."));
+			return;
+		}
+
+		const FVector Center = EastRoost->GetActorLocation();
+		const float HalfHeight = RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ATargetPoint* Site = World->SpawnActor<ATargetPoint>(Center, FRotator::ZeroRotator, Spawn);
+		if (!Site)
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven support audit could not create its transient marker."));
+			return;
+		}
+		Site->Tags.Add(TEXT("RavenPerch"));
+		Site->Tags.Add(TEXT("RavenNestSite"));
+
+		struct FSupportedMeshPoint
+		{
+			FVector Location = FVector::ZeroVector;
+			FVector Normal = FVector::UpVector;
+			TWeakObjectPtr<UStaticMeshComponent> Component;
+			FString ActorName;
+			FString MeshPath;
+			float DistanceSquared = TNumericLimits<float>::Max();
+			float WindSpeed = 0.f;
+			int32 CoverCount = 0;
+		};
+		TArray<FSupportedMeshPoint> CoveredPoints;
+		int32 MeshComponentsConsidered = 0;
+		int32 SurfaceTraceCount = 0;
+		int32 UpwardSurfaceHits = 0;
+		int32 SupportedSurfacePoints = 0;
+		int32 InnCoverPointsExcluded = 0;
+		constexpr int32 MaximumSurfaceTraces = 20000;
+		const float MaxSupportedMeshExtent = 5000.f;
+		FCollisionQueryParams SurfaceQuery(SCENE_QUERY_STAT(RavenAuthoredPerchSurface), true, Raven);
+		SurfaceQuery.AddIgnoredActor(Site);
+
+		for (TActorIterator<AStaticMeshActor> It(World); It && SurfaceTraceCount < MaximumSurfaceTraces; ++It)
+		{
+			AStaticMeshActor* MeshActor = *It;
+			if (!IsValid(MeshActor)) continue;
+			TArray<UStaticMeshComponent*> Meshes;
+			MeshActor->GetComponents<UStaticMeshComponent>(Meshes);
+			for (UStaticMeshComponent* Mesh : Meshes)
+			{
+				if (!Mesh || !Mesh->GetStaticMesh() || !Mesh->IsQueryCollisionEnabled() ||
+					Mesh->GetCollisionResponseToChannel(ECC_Visibility) != ECR_Block) continue;
+				const FBox Bounds = Mesh->Bounds.GetBox();
+				const FVector Extent = Bounds.GetExtent();
+				if (!Bounds.IsValid || Extent.X > MaxSupportedMeshExtent || Extent.Y > MaxSupportedMeshExtent ||
+					Extent.Z > MaxSupportedMeshExtent || FVector::DistSquared2D(Bounds.GetCenter(), Center) >
+					FMath::Square(ScanRadiusCm + Extent.Size2D())) continue;
+				++MeshComponentsConsidered;
+
+				const float HorizontalRadius = FMath::Max(Extent.X, Extent.Y);
+				for (float OffsetX = -Extent.X; OffsetX <= Extent.X && SurfaceTraceCount < MaximumSurfaceTraces; OffsetX += GridSpacingCm)
+				{
+					for (float OffsetY = -Extent.Y; OffsetY <= Extent.Y && SurfaceTraceCount < MaximumSurfaceTraces; OffsetY += GridSpacingCm)
+					{
+						if (FVector2D(OffsetX, OffsetY).SizeSquared() > FMath::Square(HorizontalRadius)) continue;
+						const FVector TraceTop(Bounds.GetCenter().X + OffsetX, Bounds.GetCenter().Y + OffsetY, Bounds.Max.Z + 100.f);
+						const FVector TraceBottom(TraceTop.X, TraceTop.Y, Bounds.Min.Z - 100.f);
+						FHitResult SurfaceHit;
+						++SurfaceTraceCount;
+						if (!World->LineTraceSingleByChannel(SurfaceHit, TraceTop, TraceBottom, ECC_Visibility, SurfaceQuery) ||
+							SurfaceHit.GetActor() != MeshActor || SurfaceHit.GetComponent() != Mesh || SurfaceHit.ImpactNormal.Z < 0.65f) continue;
+						++UpwardSurfaceHits;
+						const FVector CandidateLocation = SurfaceHit.ImpactPoint + FVector(0.f, 0.f, HalfHeight + 2.f);
+						Site->SetActorLocation(CandidateLocation, false, nullptr, ETeleportType::TeleportPhysics);
+						FHitResult SupportHit;
+						if (!RavenController->HasSuitablePerchSupport(Site, &SupportHit) ||
+							SupportHit.GetActor() != MeshActor || SupportHit.GetComponent() != Mesh) continue;
+						++SupportedSurfacePoints;
+
+						FSupportedMeshPoint Point;
+						Point.Location = CandidateLocation;
+						Point.Normal = SurfaceHit.ImpactNormal;
+						Point.Component = Mesh;
+						Point.ActorName = MeshActor->GetActorNameOrLabel();
+						Point.MeshPath = Mesh->GetStaticMesh()->GetPathName();
+						Point.DistanceSquared = FVector::DistSquared2D(Raven->GetActorLocation(), CandidateLocation);
+						Point.CoverCount = RavenController->CountOverheadCoverProbes(Site);
+						if (Weather) Point.WindSpeed = Weather->GetLocalWind(CandidateLocation, Raven).Size2D();
+						if (MeshActor->ActorHasTag(TEXT("IslandInn")) && Point.CoverCount > 0)
+						{
+							++InnCoverPointsExcluded;
+							continue;
+						}
+						if (Point.CoverCount <= 0) continue;
+						const int32 ExistingIndex = CoveredPoints.IndexOfByPredicate([Mesh](const FSupportedMeshPoint& Existing)
+							{ return Existing.Component.Get() == Mesh; });
+						if (ExistingIndex == INDEX_NONE)
+							CoveredPoints.Add(MoveTemp(Point));
+						else if (Point.CoverCount > CoveredPoints[ExistingIndex].CoverCount ||
+							(Point.CoverCount == CoveredPoints[ExistingIndex].CoverCount && Point.DistanceSquared < CoveredPoints[ExistingIndex].DistanceSquared))
+							CoveredPoints[ExistingIndex] = MoveTemp(Point);
+					}
+				}
+			}
+		}
+
+		CoveredPoints.Sort([](const FSupportedMeshPoint& A, const FSupportedMeshPoint& B)
+		{
+			if (A.CoverCount != B.CoverCount) return A.CoverCount > B.CoverCount;
+			return A.DistanceSquared < B.DistanceSquared;
+		});
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Read-only Raven support audit around Roost_East: radius=%.0f cm spacing=%.0f cm, %d authored mesh components considered, %d complex visibility samples, %d upward surface hits, %d supported mesh points, %d covered points on non-Inn components, %d covered Inn points excluded."),
+			ScanRadiusCm, GridSpacingCm, MeshComponentsConsidered, SurfaceTraceCount, UpwardSurfaceHits,
+			SupportedSurfacePoints, CoveredPoints.Num(), InnCoverPointsExcluded);
+		for (int32 Index = 0; Index < FMath::Min(16, CoveredPoints.Num()); ++Index)
+		{
+			const FSupportedMeshPoint& Point = CoveredPoints[Index];
+			UE_LOG(LogIslandMovementProbe, Log,
+				TEXT("Covered mesh perch candidate %d: actor=%s mesh=%s location=%s normal=%s overhead=%d/5 wind=%.1f m/s RavenXYDistance=%.0f cm."),
+				Index + 1, *Point.ActorName, *Point.MeshPath, *Point.Location.ToCompactString(),
+				*Point.Normal.ToCompactString(), Point.CoverCount, Point.WindSpeed / 100.f, FMath::Sqrt(Point.DistanceSquared));
+		}
+		if (CoveredPoints.IsEmpty())
+			UE_LOG(LogIslandMovementProbe, Warning,
+				TEXT("No authored static-mesh surface within the scan bounds passed both upward Raven support and an overhead-cover clue; no map or Raven state changed."));
+		Site->Destroy();
 	}
 
 	static void Run(const TArray<FString>& Args, UWorld* World)
@@ -922,3 +1102,8 @@ static FAutoConsoleCommandWithWorldAndArgs GRavenBranchAuditCommand(
 	TEXT("Island.RavenBranchAudit"),
 	TEXT("Read-only scan of the authored spruce_half_01 mesh nearest Roost_East for real upward-facing perch surfaces; append Land to request the best transient site only if it also reaches 3/5 overhead-cover clues."),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::RunRavenBranchAudit));
+
+static FAutoConsoleCommandWithWorldAndArgs GRavenSupportAuditCommand(
+	TEXT("Island.RavenSupportAudit"),
+	TEXT("Read-only scan of authored static-mesh collision within RadiusCm=1000..60000 of Roost_East for upward Raven support plus overhead-cover clues; deduplicates mesh candidates and excludes IslandInn interior surfaces. GridSpacingCm=75..500. No map or Raven state is changed."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::RunRavenSupportAudit));
