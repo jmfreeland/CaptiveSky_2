@@ -11,6 +11,7 @@
 #include "Components/ActorComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
 #include "GameFramework/Character.h"
@@ -236,6 +237,194 @@ public:
 					*Controller->AssessRoostSite(Candidate));
 				Candidate->Destroy();
 			} ), 0.25f, true);
+	}
+
+	static void RunRavenBranchAudit(const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || !World->IsGameWorld())
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Island.RavenBranchAudit requires a running game world."));
+			return;
+		}
+		const bool bRuntimeReady = Args.ContainsByPredicate([](const FString& Arg)
+			{ return Arg.Equals(TEXT("RuntimeReady"), ESearchCase::IgnoreCase); });
+		if (!bRuntimeReady)
+		{
+			TWeakObjectPtr<UWorld> WeakWorld(World);
+			FTimerHandle RetryTimer;
+			World->GetTimerManager().SetTimer(RetryTimer, FTimerDelegate::CreateLambda([WeakWorld, Args]()
+			{
+				TArray<FString> RetryArgs = Args;
+				RetryArgs.Add(TEXT("RuntimeReady"));
+				if (UWorld* RetryWorld = WeakWorld.Get())
+					FIslandMovementProbeCommand::RunRavenBranchAudit(RetryArgs, RetryWorld);
+			}), 5.f, false);
+			UE_LOG(LogIslandMovementProbe, Log, TEXT("Branch audit queued for five Game-world seconds so the Raven and foliage can finish startup."));
+			return;
+		}
+
+		ARavenAgentAIController* RavenController = nullptr;
+		AActor* EastRoost = nullptr;
+		AActor* TreeActor = nullptr;
+		UStaticMeshComponent* TreeComponent = nullptr;
+		float BestTreeDistance = TNumericLimits<float>::Max();
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (!EastRoost && It->ActorHasTag(TEXT("Roost_East")) && It->ActorHasTag(TEXT("RavenPerch"))) EastRoost = *It;
+			if (!RavenController)
+				if (APawn* Pawn = Cast<APawn>(*It)) RavenController = Cast<ARavenAgentAIController>(Pawn->GetController());
+		}
+		if (!EastRoost || !RavenController || !RavenController->GetPawn())
+		{
+			UE_LOG(LogIslandMovementProbe, Error,
+				TEXT("Branch audit needs the East roost marker and a possessed live Raven."));
+			return;
+		}
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			TArray<UStaticMeshComponent*> Meshes;
+			It->GetComponents<UStaticMeshComponent>(Meshes);
+			for (UStaticMeshComponent* Mesh : Meshes)
+			{
+				if (!Mesh || !Mesh->GetStaticMesh() || Mesh->GetStaticMesh()->GetName() != TEXT("spruce_half_01")) continue;
+				const float Distance = FVector::DistSquared2D(Mesh->GetComponentLocation(), EastRoost->GetActorLocation());
+				if (Distance < BestTreeDistance)
+				{
+					BestTreeDistance = Distance;
+					TreeActor = *It;
+					TreeComponent = Mesh;
+				}
+			}
+		}
+		if (!TreeActor || !TreeComponent)
+		{
+			UE_LOG(LogIslandMovementProbe, Error,
+				TEXT("Branch audit needs the East roost, a possessed live Raven, and the nearest authored spruce_half_01 actor."));
+			return;
+		}
+		if (BestTreeDistance > FMath::Square(1200.f))
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Nearest authored spruce is %.0f cm from Roost_East, beyond the 12 m branch-audit limit."), FMath::Sqrt(BestTreeDistance));
+			return;
+		}
+
+		const FBox TreeBounds = TreeComponent->Bounds.GetBox();
+		if (!TreeBounds.IsValid)
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Nearest authored spruce has invalid world bounds."));
+			return;
+		}
+		const bool bVisibilityBlocks = TreeComponent->GetCollisionResponseToChannel(ECC_Visibility) == ECR_Block;
+		const bool bQueryCollision = TreeComponent->IsQueryCollisionEnabled();
+		const ACharacter* Raven = Cast<ACharacter>(RavenController->GetPawn());
+		if (!Raven)
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Branch audit's live Raven pawn is not an ACharacter."));
+			return;
+		}
+		const float HalfHeight = Raven ? Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ATargetPoint* Site = World->SpawnActor<ATargetPoint>(TreeBounds.GetCenter(), FRotator::ZeroRotator, Spawn);
+		if (!Site)
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Branch audit could not create its transient candidate marker."));
+			return;
+		}
+		Site->Tags.Add(TEXT("RavenPerch"));
+		Site->Tags.Add(TEXT("RavenNestSite"));
+		const AActor* IgnoredRaven = Raven;
+		FCollisionQueryParams TreeQuery(SCENE_QUERY_STAT(RavenSpruceBranchSurface), true, IgnoredRaven);
+		TreeQuery.AddIgnoredActor(Site);
+
+		const float ScanStepCm = 75.f;
+		const FVector Extent = TreeBounds.GetExtent();
+		const FVector TreeCenter = TreeComponent->GetComponentLocation();
+		int32 SurfaceTraceCount = 0;
+		int32 TreeSurfaceHitCount = 0;
+		int32 SupportedBranchCount = 0;
+		struct FBranchCandidate
+		{
+			FVector Location = FVector::ZeroVector;
+			float RavenDistance = TNumericLimits<float>::Max();
+			int32 CoverCount = INDEX_NONE;
+			FVector SurfaceNormal = FVector::UpVector;
+		};
+		FBranchCandidate Best;
+		for (float OffsetX = -Extent.X; OffsetX <= Extent.X; OffsetX += ScanStepCm)
+		{
+			for (float OffsetY = -Extent.Y; OffsetY <= Extent.Y; OffsetY += ScanStepCm)
+			{
+				const FVector2D Offset(OffsetX, OffsetY);
+				if (Offset.SizeSquared() > FMath::Square(FMath::Max(Extent.X, Extent.Y))) continue;
+				const FVector TraceTop(TreeCenter.X + OffsetX, TreeCenter.Y + OffsetY, TreeBounds.Max.Z + 100.f);
+				const FVector TraceBottom(TreeCenter.X + OffsetX, TreeCenter.Y + OffsetY, TreeBounds.Min.Z - 100.f);
+				FHitResult SurfaceHit;
+				++SurfaceTraceCount;
+				if (!World->LineTraceSingleByChannel(SurfaceHit, TraceTop, TraceBottom, ECC_Visibility, TreeQuery) ||
+					SurfaceHit.GetActor() != TreeActor || SurfaceHit.GetComponent() != TreeComponent) continue;
+				++TreeSurfaceHitCount;
+				if (SurfaceHit.ImpactNormal.Z < 0.65f || FVector::Dist2D(SurfaceHit.ImpactPoint, TreeCenter) < 80.f) continue;
+				const FVector CandidateLocation = SurfaceHit.ImpactPoint + FVector(0.f, 0.f, HalfHeight + 2.f);
+				Site->SetActorLocation(CandidateLocation, false, nullptr, ETeleportType::TeleportPhysics);
+				FHitResult SupportHit;
+				if (!RavenController->HasSuitablePerchSupport(Site, &SupportHit) || SupportHit.GetActor() != TreeActor) continue;
+				++SupportedBranchCount;
+				const int32 CoverCount = RavenController->CountOverheadCoverProbes(Site);
+				const float RavenDistance = FVector::DistSquared(Raven->GetActorLocation(), CandidateLocation);
+				if (Best.CoverCount > CoverCount ||
+					(Best.CoverCount == CoverCount && Best.RavenDistance <= RavenDistance)) continue;
+				Best.Location = CandidateLocation;
+				Best.RavenDistance = RavenDistance;
+				Best.CoverCount = CoverCount;
+				Best.SurfaceNormal = SurfaceHit.ImpactNormal;
+			}
+		}
+
+		Site->SetActorLocation(Best.Location, false, nullptr, ETeleportType::TeleportPhysics);
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Transient East-spruce branch scan: actor=%s mesh=%s, distance=%.0f cm, bounds=%s, queryCollision=%d blocksVisibility=%d, %d complex visibility samples, %d hit the spruce, %d upward supported branch points."),
+			*TreeActor->GetActorNameOrLabel(), *TreeComponent->GetStaticMesh()->GetPathName(), FMath::Sqrt(BestTreeDistance),
+			*TreeBounds.GetExtent().ToCompactString(), bQueryCollision, bVisibilityBlocks,
+			SurfaceTraceCount, TreeSurfaceHitCount, SupportedBranchCount);
+		if (SupportedBranchCount == 0)
+		{
+			UE_LOG(LogIslandMovementProbe, Warning,
+				TEXT("No queryable upward-facing spruce branch surface passed the Raven support test; no map or Raven state changed."));
+			Site->Destroy();
+			return;
+		}
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Best supported branch point=%s normal=%s cover=%d/5, Raven distance=%.0f cm; assessment=%s"),
+			*Best.Location.ToCompactString(), *Best.SurfaceNormal.ToCompactString(), Best.CoverCount,
+			FMath::Sqrt(Best.RavenDistance), *RavenController->AssessRoostSite(Site));
+
+		const bool bRequestLanding = Args.ContainsByPredicate([](const FString& Arg)
+			{ return Arg.Equals(TEXT("Land"), ESearchCase::IgnoreCase); });
+		if (!bRequestLanding || Best.CoverCount < 3)
+		{
+			if (bRequestLanding && Best.CoverCount < 3)
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("Branch landing not attempted: the best real mesh surface did not meet the 3/5 overhead-cover screen."));
+			Site->Destroy();
+			return;
+		}
+		if (RavenController->LocomotionState != ERavenLocomotionState::Perched || RavenController->IsActionInProgress())
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Branch landing not attempted: live Raven must already be settled with no action in progress."));
+			Site->Destroy();
+			return;
+		}
+		Site->SetActorLocation(Best.Location, false, nullptr, ETeleportType::TeleportPhysics);
+		const FName CandidateTag(TEXT("Codex_RavenBranchCandidate"));
+		Site->Tags.Add(CandidateTag);
+		if (!RavenController->RequestPerch(CandidateTag))
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven rejected the transient supported branch request."));
+			Site->Destroy();
+			return;
+		}
+		UE_LOG(LogIslandMovementProbe, Log, TEXT("Raven accepted the transient branch perch; the normal controller tick is handling landing."));
 	}
 
 	static void Run(const TArray<FString>& Args, UWorld* World)
@@ -728,3 +917,8 @@ static FAutoConsoleCommandWithWorldAndArgs GRavenShelterAuditCommand(
 	TEXT("Island.RavenShelterAudit"),
 	TEXT("Read-only scan of runtime supported Raven sites near Roost_East; optional RadiusCm=1000..30000 and GridSpacingCm=200..1500; append Land to attempt a transient, bounded perch landing only when overhead cover is at least 3/5."),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::RunRavenShelterAudit));
+
+static FAutoConsoleCommandWithWorldAndArgs GRavenBranchAuditCommand(
+	TEXT("Island.RavenBranchAudit"),
+	TEXT("Read-only scan of the authored spruce_half_01 mesh nearest Roost_East for real upward-facing perch surfaces; append Land to request the best transient site only if it also reaches 3/5 overhead-cover clues."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::RunRavenBranchAudit));

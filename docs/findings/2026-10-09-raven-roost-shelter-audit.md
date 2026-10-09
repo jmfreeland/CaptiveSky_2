@@ -72,9 +72,31 @@ map, foliage, Raven, nest, or world-state changes were made.
 
 Runtime logs: `Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Logs/Codex_RavenShelterAudit_Runtime.log` and `Codex_RavenShelterAudit_WideRuntime.log`.
 
+## Authored East spruce branch-support audit
+
+The nearest authored tree has query collision enabled and blocks visibility
+traces, so a separate scan checked whether it exposes an upward-facing surface
+that the Raven's existing support test accepts. `Island.RavenBranchAudit`
+waits five Game seconds, samples complex visibility collision over the
+`Roost_East_Spruce` mesh bounds, and is read-only unless explicitly passed a
+`Land` argument (not used here). It does not edit the saved map or Raven state.
+
+In the isolated UE 5.8.3 scratch Game, the tree actor was 255 cm from the East
+marker; its mesh bounds were approximately 311 x 307 x 670 cm. Of 53 complex
+visibility samples, 20 hit the spruce, but zero were upward-facing supported
+branch points. No landing was requested. This scan therefore rejects the
+authored East spruce as a currently queryable branch perch; it does not rule
+out other trees or surfaces outside the sampled mesh bounds. Log:
+`Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Logs/Codex_RavenBranchAudit_Runtime.log`.
+
+The scratch process remained alive beyond 150 real seconds despite the
+120-second runtime cap and was stopped by its exact process ID. The scan had
+already completed before shutdown. This is a runtime-cap limitation, not
+evidence that the authored editor session is hung.
+
 ## Unreal/.NET startup exception note
 
-Both Game runs launched from this restricted Codex shell logged
+All three scratch Game runs launched from this restricted Codex shell logged
 `LogTargetPlatformManager: UBT AutoSDK ReturnCode: -532462766` while invoking
 UnrealBuildTool's `-Mode=ValidatePlatforms` child. That signed return code is
 `0xE0434352`, matching the generic CLR exception code in the user's dialog.
