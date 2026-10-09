@@ -85,7 +85,7 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowStartleImpact()
 {
 	DurationSeconds = 1.15f;
 	SurfaceRadius = 72.f;
-	PeakLightIntensity = 5.f;
+	PeakLightIntensity = 2.4f;
 	Tags.AddUnique(TEXT("MinnowImpact"));
 	Tags.AddUnique(TEXT("MinnowStartleImpact"));
 	EnsureStartleRingMaterial();
@@ -117,7 +117,7 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		StartleRing->SetRelativeScale3D(FVector(RingRadius, RingRadius, 1.f));
 		if (StartleRingMaterial)
 		{
-			const FLinearColor RingTint = FLinearColor(0.035f, 0.58f, 0.72f) * Pulse;
+			const FLinearColor RingTint = FLinearColor(0.025f, 0.40f, 0.52f) * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);

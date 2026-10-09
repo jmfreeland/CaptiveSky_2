@@ -319,7 +319,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The startle ripple is brief, broad enough to notice, and contained near the fish in the shallows"),
 			FMath::IsNearlyEqual(ObserverStartleRipple->DurationSeconds, 1.15f) &&
 			FMath::IsNearlyEqual(ObserverStartleRipple->SurfaceRadius, 72.f) &&
-			ObserverStartleRipple->PeakLightIntensity > 1.35f && ObserverStartleRipple->PeakLightIntensity <= 5.f);
+			ObserverStartleRipple->PeakLightIntensity > 1.35f && ObserverStartleRipple->PeakLightIntensity <= 2.4f);
 		TestTrue(TEXT("A startle response renders a visible continuous surface ring in addition to its moving highlights"),
 			ObserverStartleRipple->StartleRing && ObserverStartleRipple->StartleRing->IsVisible() &&
 			ObserverStartleRipple->StartleRing->GetProcMeshSection(0) != nullptr &&
