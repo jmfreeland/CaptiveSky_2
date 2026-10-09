@@ -219,7 +219,7 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 	PreferredDirection.Z = 0.f;
 	if (!PreferredDirection.Normalize()) PreferredDirection = FVector::ForwardVector;
 	const float PreferredAngle = FMath::Atan2(PreferredDirection.Y, PreferredDirection.X);
-	for (const float Radius : { 250.f, 325.f, 375.f })
+	for (const float Radius : { 150.f, 200.f, 250.f, 325.f, 375.f })
 	{
 		for (int32 Side = 0; Side < 8; ++Side)
 		{
@@ -227,8 +227,10 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 			const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
 			const FVector DesiredApproach = TargetLocation + Direction * Radius;
 			FNavLocation CandidateGoal;
-			if (!Navigation->ProjectPointToNavigation(DesiredApproach, CandidateGoal,
-				FVector(100.f, 100.f, 120.f), &AgentProperties)) continue;
+			// Match the grounded target projection used elsewhere: a narrow single
+			// projection can miss a nearby floor polygon around rocks, arches, or
+			// map markers, even when a clear stand-off position is within range.
+			if (!ProjectGroundedTarget(Navigation, DesiredApproach, AgentProperties, CandidateGoal)) continue;
 			++ProjectedCandidates;
 			if (TestedGoals.ContainsByPredicate([&CandidateGoal](const FVector& Existing)
 				{ return FVector::DistSquared2D(Existing, CandidateGoal.Location) < FMath::Square(50.f); })) continue;
@@ -236,7 +238,7 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 
 			const FVector BodyCenter = CandidateGoal.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
 			if (FVector::DistSquared(BodyCenter, TargetLocation) >
-				FMath::Square(IslandInteractionUtility::DefaultInteractionRange - 25.f)) continue;
+				FMath::Square(IslandInteractionUtility::DefaultInteractionRange - IslandInteractionUtility::GroundedApproachRangeMargin)) continue;
 			++InRangeCandidates;
 
 			const UNavigationPath* Route = Navigation->FindPathToLocationSynchronously(

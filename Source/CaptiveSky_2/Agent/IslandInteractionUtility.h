@@ -9,6 +9,9 @@ class UWorld;
 namespace IslandInteractionUtility
 {
 	static constexpr float DefaultInteractionRange = 400.f;
+	// Keep grounded arrival points comfortably inside the inspection threshold after
+	// path-following acceptance radius and capsule-overlap stopping are applied.
+	static constexpr float GroundedApproachRangeMargin = 100.f;
 
 	/** Resolve the stable interaction name for a visible landmark or nearby wild creature. */
 	CAPTIVESKY_2_API FName GetTargetTag(const AActor* Target);
