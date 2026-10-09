@@ -278,3 +278,49 @@ Next: make any future direct ground-movement probe wait for landing first,
 then test one tagged landmark arrival and interaction in a render-enabled
 session. Keep that separate from the still-unverified user-controlled PIE
 route and 30-FPS target.
+
+## Current Tideglass foliage and dragonfly view (2026-10-09)
+
+The current shared source passed `CaptiveSky2.Visual.Viewpoints` in an isolated
+UE 5.8.3 editor process. The run used `-ViewpointOnly=Tideglass
+-ViewpointGroundCover -ViewpointTideglassDragonflies -ViewpointNoWorldState
+-ViewpointHour=11`, disabled agent thinking, and set the model-request ceiling
+to zero. The 30-FPS interactive-frame wait eventually sustained 30.39 FPS for
+five seconds after 29 seconds of waiting. The capture gate reported:
+
+| View | Wall-clock capture FPS | p95 frame throughput | Valid intervals |
+|---|---:|---:|---:|
+| Tideglass overview | 53.23 | 34.09 FPS | 50 |
+| Ground detail | 59.62 | 58.15 FPS | 50 |
+| Dragonfly close-up | 59.32 | 57.36 FPS | 50 |
+
+The preview contained exactly three transient daytime dragonflies and the
+current wet edge contained seven Typha cattails plus three Phalaris grass
+instances. The `Viewpoints` automation completed successfully, and preview
+actors were destroyed. These offscreen SceneCapture results clear the current
+30-FPS p95 screen, but do not establish moving gameplay performance.
+
+Visual inspection found that the overview still has a large white pool proxy,
+gray vertical blockout landmarks, and a broad exposed brown ground surface.
+The close dragonfly is easier to inspect but still reads as a procedural
+placeholder: smooth body ellipsoids and pale, leaf-like wing membranes. Neither
+image is a finished highlight. Landscape materials and variety are already
+being worked in the shared tree; keep this capture as a before image and
+revisit the composition after that work lands. Do not scale the fauna population
+to compensate for the silhouette.
+
+The first launch attempt aborted before the Island loaded because the shader
+compiler could not write beneath the default user-profile working directory.
+The successful retry pointed `-ShaderWorkingDir` into the ignored scratch
+directory. It used no persistent world-state and ran the editor in isolation;
+the user's main editor was not touched.
+
+Log: [`Codex_CurrentTideglassGate_20261009b.log`](../../Saved/CompileScratch/Codex_CurrentTideglassGate_20261009/Codex_CurrentTideglassGate_20261009b.log).
+CSV: [`Profile(20261009_073324).csv`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Profiling/CSV/Profile%2820261009_073324%29.csv).
+Overview: [`02_Tideglass.png`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Viewpoints/2026-10-09_073406_h11.0/02_Tideglass.png).
+Ground detail: [`02a_TideglassGroundDetail.png`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Viewpoints/2026-10-09_073406_h11.0/02a_TideglassGroundDetail.png).
+Dragonfly: [`02e_TideglassDragonflyClose.png`](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Viewpoints/2026-10-09_073406_h11.0/02e_TideglassDragonflyClose.png).
+
+Next: once the landscape-material WIP settles, rerun the same views against its
+updated composition. Separately profile a real moving resident/player route
+with warmed shaders; the offscreen capture gate is not that test.
