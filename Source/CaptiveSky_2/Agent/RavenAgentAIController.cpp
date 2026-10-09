@@ -1403,10 +1403,18 @@ void ARavenAgentAIController::BeginGroundLandingAt(FName SiteTag)
 	{
 		if (VisibleSites >= 3) break;
 		const FVector View = Candidate.Location + FVector(0.f, 0.f, 30.f);
-		if (FVector::DistSquared(GetPawn()->GetActorLocation(), View) > FMath::Square(GroundLandingVisibilityRange)) continue;
+		const float Distance = FVector::Dist(GetPawn()->GetActorLocation(), View);
+		if (Distance > GroundLandingVisibilityRange) continue;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenLandingSiteVisibility), false, GetPawn());
 		FHitResult Hit;
-		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), View, ECC_Visibility, Query)) continue;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, GetPawn()->GetActorLocation(), View, ECC_Visibility, Query))
+		{
+			UE_LOG(LogRavenAgentAI, Warning,
+				TEXT("Landing site %s at %s (%.0f cm away) is hidden from the Raven by %s at %s."),
+				*Candidate.Id.ToString(), *Candidate.Location.ToCompactString(), Distance,
+				*GetNameSafe(Hit.GetActor()), *Hit.ImpactPoint.ToCompactString());
+			continue;
+		}
 		++VisibleSites;
 		if (Candidate.Id == SiteTag) { Site = &Candidate; break; }
 	}
@@ -1881,6 +1889,36 @@ bool ARavenAgentAIController::AdvanceTowardsTarget(float DeltaSeconds)
 	if (!Direction.IsNearlyZero()) Raven->SetActorRotation(FRotator(0.f, Direction.Rotation().Yaw, 0.f));
 	if (Hit.bBlockingHit)
 	{
+		const ACharacter* RavenCharacter = Cast<ACharacter>(Raven);
+		const float HalfHeight = RavenCharacter
+			? RavenCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
+			: 45.f;
+		const float GroundContactError = FVector::Dist(Hit.Location, MovementTarget);
+		const float GroundHeightError = FMath::Abs(Hit.ImpactPoint.Z - (MovementTarget.Z - HalfHeight - 2.f));
+		if (LocomotionState == ERavenLocomotionState::Landing && Hit.ImpactNormal.Z >= 0.7f &&
+			GroundContactError <= 25.f && GroundHeightError <= 25.f)
+		{
+			// The swept capsule naturally contacts the traced ground a fraction before
+			// its target center. Treat only a matching, upward floor contact as landing;
+			// walls and raised obstacles remain failed flight obstructions.
+			const bool bLandedAtArrangementSite = bLandingAtArrangementSite;
+			Raven->SetActorLocation(MovementTarget, false, nullptr, ETeleportType::TeleportPhysics);
+			SetGrounded();
+			if (bLandedAtArrangementSite)
+			{
+				if (FindForageableTwigPatch())
+					ReportAction(TEXT("Landed on the verified open-ground site. A visible bundle of fallen twigs is within reach if you choose to gather it."));
+				else if (FindForageableDriftwood())
+					ReportAction(TEXT("Landed on the verified open-ground site beside fresh storm-fallen driftwood. You may gather a small bundle of loose twigs if you choose."));
+				else
+					ReportAction(TEXT("Landed on the verified open-ground site, but there is no visible twig bundle within reach. No resource was gathered."));
+			}
+			else
+			{
+				ReportAction(TEXT("Landed safely on open ground. Nothing was gathered; you may look around or choose another flight."));
+			}
+			return true;
+		}
 		// Obstruction is not a successful landing/perch. Stop and allow another decision.
 		FlightWaypoints.Reset();
 		bHasTakeoffEscapeTarget = false;

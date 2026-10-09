@@ -148,7 +148,9 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Gathering again cannot create a bundle after the visible pile is depleted"), Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	Decide(TEXT("GatherTwigs"));
 	TestFalse(TEXT("A depleted patch refuses another bundle"), Controller->bCarryingTwigs);
-	TestTrue(TEXT("The refusal says no visible twigs remain nearby"), Controller->DescribeActionState().Contains(TEXT("no available fallen twigs")));
+	TestTrue(TEXT("The refusal explains that no fresh driftwood remains within reach"),
+		Controller->DescribeActionState().Contains(TEXT("No fresh driftwood lies within reach")) &&
+		Controller->DescribeActionState().Contains(TEXT("no twigs were gathered")));
 	TestTrue(TEXT("An occluded nearby pile is not offered or consumed"), OccludedForagePatch && OccludedForagePatch->HasForageableTwigs() &&
 		!Controller->DescribeBuildOptions().Contains(TEXT("build target: GatherTwigs")));
 	ForageOccluderBox->SetCollisionEnabled(ECollisionEnabled::NoCollision);

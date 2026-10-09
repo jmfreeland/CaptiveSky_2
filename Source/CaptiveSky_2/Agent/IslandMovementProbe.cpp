@@ -650,11 +650,17 @@ public:
 		State->bWanderProbe = PositionalArgs.Num() > 1 && PositionalArgs[1].Equals(TEXT("Wander"), ESearchCase::IgnoreCase);
 		State->bForceCuriosityProbe = State->bWanderProbe && PositionalArgs.Num() > 2 && PositionalArgs[2].Equals(TEXT("Curious"), ESearchCase::IgnoreCase);
 		State->bInteractAfterMove = !State->bWanderProbe && !State->bApproachProbe && PositionalArgs.Num() > 2 && PositionalArgs[2].Equals(TEXT("Interact"), ESearchCase::IgnoreCase);
+		State->bGatherTwigsAfterMove = !State->bWanderProbe && !State->bApproachProbe && PositionalArgs.Num() > 2 && PositionalArgs[2].Equals(TEXT("GatherTwigs"), ESearchCase::IgnoreCase);
+		const bool bExplicitForageLandingTag = State->bGatherTwigsAfterMove && PositionalArgs.Num() > 3 && PositionalArgs[3].StartsWith(TEXT("ArrangingGround_"));
+		State->ForageLandingTag = bExplicitForageLandingTag
+			? FName(*PositionalArgs[3])
+			: (State->bGatherTwigsAfterMove && PositionalArgs.Num() > 1 && PositionalArgs[1].StartsWith(TEXT("ArrangingGround_"))
+				? FName(*PositionalArgs[1]) : NAME_None);
 		State->TargetTag = State->bApproachProbe
 			? FName(PositionalArgs.Num() > 2 ? *PositionalArgs[2] : TEXT("ApproachAgent_Raven_01"))
 			: FName(PositionalArgs.Num() > 1 ? *PositionalArgs[1] : TEXT("InnDoorLantern"));
 		State->PerchTag = State->bApproachProbe ? FName(PositionalArgs.Num() > 3 ? *PositionalArgs[3] : TEXT("Roost_East")) : NAME_None;
-		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : (State->bInteractAfterMove ? 3 : INDEX_NONE));
+		const int32 StartOverrideIndex = State->bApproachProbe ? 4 : (State->bWanderProbe ? (State->bForceCuriosityProbe ? 3 : 2) : (State->bGatherTwigsAfterMove ? (bExplicitForageLandingTag ? 4 : (State->ForageLandingTag.IsNone() ? INDEX_NONE : 3)) : (State->bInteractAfterMove ? 3 : INDEX_NONE)));
 		if (StartOverrideIndex != INDEX_NONE && PositionalArgs.Num() > StartOverrideIndex)
 		{
 			if (PositionalArgs.Num() <= StartOverrideIndex + 2)
@@ -692,6 +698,7 @@ private:
 		FName MoverTag;
 		FName TargetTag;
 		FName PerchTag;
+		FName ForageLandingTag;
 		FTimerHandle PollTimer;
 		FTimerHandle ExitTimer;
 		FVector StartLocation = FVector::ZeroVector;
@@ -704,6 +711,8 @@ private:
 		int32 StartupPolls = 0;
 		bool bMoveStarted = false;
 		bool bInteractAfterMove = false;
+		bool bGatherTwigsAfterMove = false;
+		bool bForageLandingRequested = false;
 		bool bWaitingForGround = false;
 		bool bWanderProbe = false;
 		bool bForceCuriosityProbe = false;
@@ -1013,6 +1022,7 @@ private:
 				(ActionState.Contains(TEXT("Reached the flight destination")) ||
 				 ActionState.Contains(TEXT("short ground hop")) ||
 				 ActionState.Contains(TEXT("Landed and perched on solid support")) ||
+				 ActionState.Contains(TEXT("Landed on the verified open-ground site")) ||
 				 ActionState.Contains(TEXT("Already perched at this site")))
 			: Controller->GetMoveStatus() != EPathFollowingStatus::Moving &&
 				ActionState.Contains(TEXT("Reached the requested destination"));
@@ -1060,6 +1070,54 @@ private:
 						return;
 					}
 				}
+				else if (State->bGatherTwigsAfterMove)
+				{
+					ARavenAgentAIController* ForageController = Cast<ARavenAgentAIController>(Controller);
+					if (!ForageController)
+					{
+						UE_LOG(LogIslandMovementProbe, Error, TEXT("GatherTwigs post-action requires the Raven's controller."));
+						Finish(State, false);
+						return;
+					}
+					if (ForageController->LocomotionState != ERavenLocomotionState::Grounded && !State->bForageLandingRequested)
+					{
+						if (State->ForageLandingTag.IsNone())
+						{
+							UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven reached the forage target in flight; supply its visible ArrangingGround landing-site tag before GatherTwigs."));
+							Finish(State, false);
+							return;
+						}
+						FAgentDecision Landing;
+						Landing.bValid = true;
+						Landing.ActionType = EAgentActionType::Land;
+						Landing.ActionTarget = State->ForageLandingTag.ToString();
+						ForageController->ActOnDecision(Landing);
+						State->bForageLandingRequested = true;
+						const FString LandingResult = ForageController->DescribeActionState();
+						UE_LOG(LogIslandMovementProbe, Log, TEXT("Requested the Raven's normal ground landing at %s before GatherTwigs: %s"),
+							*State->ForageLandingTag.ToString(), *LandingResult);
+						if (!LandingResult.Contains(TEXT("Flight to the listed open-ground site started"), ESearchCase::IgnoreCase))
+						{
+							UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven could not begin the requested ground landing before GatherTwigs."));
+							Finish(State, false);
+							return;
+						}
+						return;
+					}
+					FAgentDecision Decision;
+					Decision.bValid = true;
+					Decision.ActionType = EAgentActionType::Build;
+					Decision.ActionTarget = TEXT("GatherTwigs");
+					ForageController->ActOnDecision(Decision);
+					const FString BuildResult = ForageController->DescribeActionState();
+					UE_LOG(LogIslandMovementProbe, Log, TEXT("Issued the Raven's normal GatherTwigs build action after arrival: %s"), *BuildResult);
+					if (!ForageController->bCarryingTwigs)
+					{
+						UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven reached the target, but GatherTwigs did not report a carried bundle."));
+						Finish(State, false);
+						return;
+					}
+				}
 			}
 			else
 			{
@@ -1076,6 +1134,17 @@ private:
 		if (World) World->GetTimerManager().ClearTimer(State->PollTimer);
 		LogMinnowProbeSummary(State);
 		UE_LOG(LogIslandMovementProbe, Log, TEXT("Isolated movement probe finished: %s."), bSuccess ? TEXT("success") : TEXT("failure"));
+		if (bSuccess && State->bGatherTwigsAfterMove && FParse::Param(FCommandLine::Get(), TEXT("SpectatorShots")))
+		{
+			FString ScreenshotDirectory;
+			if (FParse::Value(FCommandLine::Get(), TEXT("SpectatorScreenshotDir="), ScreenshotDirectory) && !ScreenshotDirectory.IsEmpty())
+			{
+				IFileManager::Get().MakeDirectory(*ScreenshotDirectory, true);
+				const FString ScreenshotPath = FPaths::Combine(ScreenshotDirectory, TEXT("Raven_Wrack_GatherTwigs.png"));
+				FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("Successful Raven GatherTwigs probe screenshot queued at %s."), *ScreenshotPath);
+			}
+		}
 		if (bSuccess && State->PostCompletionHoldSeconds > 0.0 && World)
 		{
 			UE_LOG(LogIslandMovementProbe, Log, TEXT("Holding the runtime view for %.1f seconds before the bounded diagnostic exit."), State->PostCompletionHoldSeconds);
@@ -1090,7 +1159,7 @@ private:
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
-	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Add DelaySeconds=0..30 for camera warm-up and HoldSeconds=0..20 for post-success observation. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact] [optional-start-x start-y start-z]|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
+	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Add DelaySeconds=0..30 for camera warm-up and HoldSeconds=0..20 for post-success observation. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact [optional-start-x start-y start-z]|GatherTwigs [landing-site-tag [optional-start-x start-y start-z]]]|Wander [Curious] [optional-start-x start-y start-z]]; GatherTwigs uses target-tag as the landing site when it is ArrangingGround_*; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));
 
 static FAutoConsoleCommandWithWorldAndArgs GRavenShelterAuditCommand(
