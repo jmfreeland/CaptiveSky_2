@@ -8,6 +8,8 @@
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -51,6 +53,18 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	Clock->CurrentHour = 12.f;
 	Clock->DayNumber = 1;
 	Habitat->Tags.Add(TEXT("TideglassPool"));
+	AStaticMeshActor* PoolSurfaceActor = World->SpawnActor<AStaticMeshActor>(Habitat->GetActorLocation(), FRotator::ZeroRotator, Spawn);
+	UStaticMesh* PoolFootprint = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (!TestNotNull(TEXT("Synthetic Tideglass footprint actor spawned"), PoolSurfaceActor) ||
+		!TestNotNull(TEXT("Engine pool-footprint sphere is available"), PoolFootprint))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	PoolSurfaceActor->GetStaticMeshComponent()->SetStaticMesh(PoolFootprint);
+	PoolSurfaceActor->SetActorScale3D(FVector(4.f, 4.f, 0.1f));
+	PoolSurfaceActor->GetStaticMeshComponent()->UpdateBounds();
 	Weather->RefreshNightEcology();
 	AIslandTidepoolMinnows* School = Weather->DayMinnowSchool.Get();
 	if (!TestNotNull(TEXT("One daytime school appears at Tideglass"), School))
@@ -61,7 +75,25 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	}
 	School->Weather = Weather;
 	School->IslandClock = Clock;
+	School->CachePoolSwimmingBounds();
 	School->ConfigureAppearance();
+	School->UpdateSchool(0.f);
+	TestTrue(TEXT("The school derives a swim boundary from the tagged pool's flattened sphere"), School->bHasPoolSwimmingBounds);
+	auto AreFishInsidePoolFootprint = [&School]()
+	{
+		if (!School->bHasPoolSwimmingBounds) return false;
+		for (UProceduralMeshComponent* Minnow : School->Fish)
+		{
+			if (!Minnow) return false;
+			const FVector Location = Minnow->GetComponentLocation();
+			const FVector2D NormalizedOffset(
+				(Location.X - School->PoolSurfaceBoundsOrigin.X) / School->PoolSwimmingRadii.X,
+				(Location.Y - School->PoolSurfaceBoundsOrigin.Y) / School->PoolSwimmingRadii.Y);
+			if (NormalizedOffset.Size() > 1.001f) return false;
+		}
+		return true;
+	};
+	TestTrue(TEXT("Every fish begins within the measured shallow-water footprint"), AreFishInsidePoolFootprint());
 	Weather->RefreshNightEcology();
 	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->DayMinnowSchool.Get() == School);
 	TestTrue(TEXT("The school is wild life, not a landmark, pet, or nest site"),
@@ -275,6 +307,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) ScatteredCenter += Minnow->GetRelativeLocation();
 	ScatteredCenter /= School->Fish.Num();
 	TestTrue(TEXT("The school visibly fans away from a quiet observer"), ScatteredCenter.X > BeforeScatter.X + 80.f);
+	TestTrue(TEXT("The full quiet scatter keeps every fish within the pool's shallow-water footprint"), AreFishInsidePoolFootprint());
 	School->Tick(2.f);
 	FVector RegroupedCenter = FVector::ZeroVector;
 	for (UProceduralMeshComponent* Minnow : School->Fish) if (Minnow) RegroupedCenter += Minnow->GetRelativeLocation();
@@ -308,6 +341,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		if (Minnow) ExpandedCircleRadius += FVector::Dist2D(Minnow->GetRelativeLocation(), CircleCenter);
 	ExpandedCircleRadius /= School->Fish.Num();
 	TestTrue(TEXT("The school visibly widens rather than fleeing the pool"), ExpandedCircleRadius > OriginalCircleRadius * 1.4f);
+	TestTrue(TEXT("A surface pulse widens the orbit without carrying fish onto the surrounding shore"), AreFishInsidePoolFootprint());
 	School->Tick(0.9f);
 	TestTrue(*FString::Printf(TEXT("The surface response decays back to the normal orbit (%.4f seconds remain)"), School->SurfacePulseRemaining),
 		FMath::IsNearlyZero(School->SurfacePulseRemaining, 0.01f));

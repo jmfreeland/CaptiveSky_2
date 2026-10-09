@@ -35,6 +35,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
+	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
@@ -49,6 +50,8 @@ private:
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	FVector ScatterDirection = FVector::ZeroVector;
+	FVector PoolSurfaceBoundsOrigin = FVector::ZeroVector;
+	FVector2D PoolSwimmingRadii = FVector2D::ZeroVector;
 	float ScatterRemaining = 0.f;
 	float SurfacePulseRemaining = 0.f;
 	float SurfacePulseCooldownRemaining = 0.f;
@@ -62,10 +65,13 @@ private:
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float Phase = 0.73f;
+	bool bHasPoolSwimmingBounds = false;
 
 	float GetScatterAlpha() const;
 	float GetSurfacePulseAlpha() const;
 	float GetTideOffsetCm() const;
+	void CachePoolSwimmingBounds();
+	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation) const;
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNaturalSurfaceRipple();

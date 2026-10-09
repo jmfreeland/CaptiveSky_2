@@ -460,3 +460,28 @@ checks. Evidence:
 [`automation`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowPostStartle_Automation.log),
 [`bounded Game`](../../Saved/Playtests/Codex_MinnowPostStartle_20261009/Codex_MinnowPostStartle_WarmCache_Game.log),
 and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowPostStartle_20261009/ScreenshotsWarmCache/000_MinnowStartleMidPulse.png).
+
+## Minnow swim footprint containment (2026-10-09)
+
+The visible orbit and scatter could carry fish beyond the shallow Tideglass pool. At school start,
+the minnow actor now caches the tagged pool surface's world-space bounds and clamps each desired
+swim position to an elliptical surface envelope: 85% of each horizontal half-extent, with a further
+10 cm body clearance. The same bound applies during idle swimming, Raven/visitor scatter, and the
+surface-pulse orbit; maps without a recognized pool surface retain the prior unbounded behavior.
+The focused regression uses a flattened tagged pool mesh and checks every fish at startup, after
+quiet-attention scatter, and during the widened pulse orbit.
+
+UE 5.8.3 scratch Editor build and `CaptiveSky2.Agent.TidepoolMinnows` automation passed. A bounded
+Game run then triggered an actual Raven low flyby: five samples were inside the cue envelope, and
+the five fish's centroid shifted at most 63 cm during that envelope and 110 cm from the cue-time
+baseline across 22 post-startle samples. The Raven completed its 1,653 cm route in four simulated
+seconds; the run exited normally, with agent thinking disabled, zero model requests, and a
+60-second real-time cap. The mid-pulse frame shows the scatter and cyan surface ring over the pool.
+Evidence: [build](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowPoolBounds2_UBT.log),
+[automation](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowPoolBounds2_Automation.log),
+[bounded Game](../../Saved/Playtests/Codex_MinnowPoolBounds_20261009/Codex_MinnowPoolBounds_Game.log),
+and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowPoolBounds_20261009/Screenshots/000_MinnowStartleMidPulse.png).
+
+This contains the school within the measured pool bounds, but the primitive fish still need a more
+distinctive gameplay-distance silhouette; the screenshot also shows shore vegetation overlapping
+the water in screen space, which remains a separate presentation issue.

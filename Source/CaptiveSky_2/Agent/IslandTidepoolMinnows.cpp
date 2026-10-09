@@ -253,8 +253,51 @@ void AIslandTidepoolMinnows::BeginPlay()
 		IslandClock = *It;
 		break;
 	}
+	CachePoolSwimmingBounds();
 	ConfigureAppearance();
 	UpdateSchool(0.f);
+}
+
+void AIslandTidepoolMinnows::CachePoolSwimmingBounds()
+{
+	bHasPoolSwimmingBounds = false;
+	PoolSwimmingRadii = FVector2D::ZeroVector;
+	if (!GetWorld()) return;
+
+	UStaticMeshComponent* PoolSurface = UIslandTideglassSubsystem::FindPoolSurface(GetWorld());
+	if (!PoolSurface) return;
+	const FBoxSphereBounds& Bounds = PoolSurface->Bounds;
+	const float BodyClearanceCm = 10.f;
+	PoolSwimmingRadii = FVector2D(
+		FMath::Max(0.f, Bounds.BoxExtent.X * PoolSwimmingFootprintFraction - BodyClearanceCm),
+		FMath::Max(0.f, Bounds.BoxExtent.Y * PoolSwimmingFootprintFraction - BodyClearanceCm));
+	if (PoolSwimmingRadii.X <= KINDA_SMALL_NUMBER || PoolSwimmingRadii.Y <= KINDA_SMALL_NUMBER)
+	{
+		PoolSwimmingRadii = FVector2D::ZeroVector;
+		return;
+	}
+
+	PoolSurfaceBoundsOrigin = Bounds.Origin;
+	bHasPoolSwimmingBounds = true;
+}
+
+FVector AIslandTidepoolMinnows::ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation) const
+{
+	if (!bHasPoolSwimmingBounds) return DesiredRelativeLocation;
+
+	FVector ClampedWorldLocation = GetActorTransform().TransformPosition(DesiredRelativeLocation);
+	FVector2D PoolOffset(ClampedWorldLocation.X - PoolSurfaceBoundsOrigin.X,
+		ClampedWorldLocation.Y - PoolSurfaceBoundsOrigin.Y);
+	const FVector2D NormalizedOffset(PoolOffset.X / PoolSwimmingRadii.X, PoolOffset.Y / PoolSwimmingRadii.Y);
+	const float NormalizedDistance = NormalizedOffset.Size();
+	if (NormalizedDistance > 1.f)
+	{
+		PoolOffset.X = NormalizedOffset.X / NormalizedDistance * PoolSwimmingRadii.X;
+		PoolOffset.Y = NormalizedOffset.Y / NormalizedDistance * PoolSwimmingRadii.Y;
+		ClampedWorldLocation.X = PoolSurfaceBoundsOrigin.X + PoolOffset.X;
+		ClampedWorldLocation.Y = PoolSurfaceBoundsOrigin.Y + PoolOffset.Y;
+	}
+	return GetActorTransform().InverseTransformPosition(ClampedWorldLocation);
 }
 
 void AIslandTidepoolMinnows::ConfigureAppearance()
@@ -490,7 +533,7 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
-		Minnow->SetRelativeLocation(IdleOffset + ScatterOffset * ScatterAlpha);
+		Minnow->SetRelativeLocation(ClampToPoolSwimmingBounds(IdleOffset + ScatterOffset * ScatterAlpha));
 
 		FVector Facing(-FMath::Sin(Angle), FMath::Cos(Angle), 0.f);
 		Facing += ScatterDirection * (ScatterAlpha * 1.2f);
