@@ -20,6 +20,7 @@ class CAPTIVESKY_2_API UIslandTideglassSubsystem : public UTickableWorldSubsyste
 
 public:
 	static const TCHAR* MaterialPath;
+	static const TCHAR* RippleMaterialPath;
 	static constexpr float TidalDayHours = 24.84f;
 	static constexpr float MaximumTideOffsetCm = 14.f;
 	/** Small semidiurnal tide: spring range follows new/full moon, reduced at quarter moons. */
@@ -36,6 +37,8 @@ public:
 
 	/** Creates the transient water surface, applies Material, and hides the blockout until restoration. */
 	bool ApplyPoolMaterial(UMaterialInterface* Material);
+	/** Pushes one short-lived world-space impulse into the transient water material, when supported. */
+	bool TriggerSurfaceRipple(const FVector& WorldCenter, float DurationSeconds, float RadiusCm, float Strength);
 	/** Restores the blockout's prior visibility and destroys the generated surface. */
 	void RestorePoolMaterial();
 	bool IsApplied() const { return AppliedTo.IsValid(); }

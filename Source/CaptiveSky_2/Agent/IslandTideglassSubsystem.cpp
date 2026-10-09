@@ -16,6 +16,7 @@
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
 
 const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_GrazingReadable.M_TideglassPool_GrazingReadable");
+const TCHAR* UIslandTideglassSubsystem::RippleMaterialPath = TEXT("/Game/Materials/M_TideglassPool_Ripple.M_TideglassPool_Ripple");
 
 float UIslandTideglassSubsystem::TideOffsetCm(float IslandHour, int32 IslandDay)
 {
@@ -206,6 +207,25 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 	return true;
 }
 
+bool UIslandTideglassSubsystem::TriggerSurfaceRipple(const FVector& WorldCenter, float DurationSeconds, float RadiusCm, float Strength)
+{
+	if (!GetWorld() || !RuntimeSurface || !FMath::IsFinite(WorldCenter.X)
+		|| !FMath::IsFinite(WorldCenter.Y) || !FMath::IsFinite(WorldCenter.Z)) return false;
+	UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(RuntimeSurface->GetMaterial(0));
+	if (!Material) return false;
+
+	const float SafeDuration = FMath::Clamp(FMath::IsFinite(DurationSeconds) ? DurationSeconds : 1.f, 0.1f, 5.f);
+	const float SafeRadius = FMath::Clamp(FMath::IsFinite(RadiusCm) ? RadiusCm : 0.f, 1.f, 500.f);
+	const float SafeStrength = FMath::Clamp(FMath::IsFinite(Strength) ? Strength : 0.f, 0.f, 1.f);
+	Material->SetVectorParameterValue(TEXT("RippleCenter"), FLinearColor(WorldCenter.X, WorldCenter.Y, 0.f, 1.f));
+	Material->SetScalarParameterValue(TEXT("RippleStartTime"), GetWorld()->GetTimeSeconds());
+	Material->SetScalarParameterValue(TEXT("RippleSpeedCmPerSecond"), SafeRadius / SafeDuration);
+	Material->SetScalarParameterValue(TEXT("RippleDurationSeconds"), SafeDuration);
+	Material->SetScalarParameterValue(TEXT("RippleWidthCm"), FMath::Clamp(SafeRadius * 0.34f, 12.f, 36.f));
+	Material->SetScalarParameterValue(TEXT("RippleAmplitude"), SafeStrength);
+	return true;
+}
+
 void UIslandTideglassSubsystem::TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material)
 {
 	if (!Material) return;
@@ -361,12 +381,21 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 	ApplyShoreStonePresentation();
 
-	UMaterialInterface* Material = MaterialOverride
-		? MaterialOverride.Get()
-		: LoadObject<UMaterialInterface>(nullptr, MaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	UMaterialInterface* Material = MaterialOverride.Get();
 	if (!Material)
 	{
-		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water is unavailable: could not load %s; the white blockout surface remains visible."), MaterialPath);
+		Material = LoadObject<UMaterialInterface>(nullptr, RippleMaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Material)
+		{
+			Material = LoadObject<UMaterialInterface>(nullptr, MaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+			if (Material)
+				UE_LOG(LogIslandTideglass, Warning,
+					TEXT("Tideglass ripple material is unavailable; using the readable water fallback at %s."), MaterialPath);
+		}
+	}
+	if (!Material)
+	{
+		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water is unavailable: could not load %s or %s; the white blockout surface remains visible."), RippleMaterialPath, MaterialPath);
 		return;
 	}
 	if (!ApplyPoolMaterial(Material))

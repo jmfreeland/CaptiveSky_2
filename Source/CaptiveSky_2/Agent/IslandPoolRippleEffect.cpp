@@ -1,4 +1,5 @@
 #include "IslandPoolRippleEffect.h"
+#include "IslandTideglassSubsystem.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -78,6 +79,7 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowImpact()
 	SurfaceRadius = 48.f;
 	PeakLightIntensity = 0.65f;
 	Tags.AddUnique(TEXT("MinnowImpact"));
+	TriggerWaterRipple(0.42f);
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
 }
 
@@ -89,8 +91,16 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowStartleImpact()
 	Tags.AddUnique(TEXT("MinnowImpact"));
 	Tags.AddUnique(TEXT("MinnowStartleImpact"));
 	EnsureStartleRingMaterial();
+	TriggerWaterRipple(0.62f);
 	if (StartleRing) StartleRing->SetVisibility(true, true);
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
+}
+
+void AIslandPoolRippleEffect::TriggerWaterRipple(float Strength)
+{
+	if (!GetWorld()) return;
+	if (UIslandTideglassSubsystem* Tideglass = GetWorld()->GetSubsystem<UIslandTideglassSubsystem>())
+		Tideglass->TriggerSurfaceRipple(GetActorLocation(), DurationSeconds, SurfaceRadius, Strength);
 }
 
 float AIslandPoolRippleEffect::WindRippleActivity(float HorizontalWindSpeed)

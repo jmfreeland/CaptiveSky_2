@@ -50,5 +50,6 @@ private:
 	float PeakLightIntensity = 55.f;
 	void BuildStartleRing();
 	void EnsureStartleRingMaterial();
+	void TriggerWaterRipple(float Strength);
 	void UpdateRipple(float Alpha);
 };

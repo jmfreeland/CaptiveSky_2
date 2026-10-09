@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "Agent/IslandPoolRippleEffect.h"
 #include "Agent/IslandTideglassSubsystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -18,11 +19,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTideglassSurfaceTest, "CaptiveSky2.Agent
 bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 {
 	UMaterialInterface* PoolWater = LoadObject<UMaterialInterface>(nullptr, UIslandTideglassSubsystem::MaterialPath);
+	UMaterialInterface* RippleWater = LoadObject<UMaterialInterface>(nullptr, UIslandTideglassSubsystem::RippleMaterialPath);
 	if (PoolWater)
 		TestEqual(TEXT("The prototype water remains a stable opaque surface over the shallow blockout mesh"),
 			PoolWater->GetBlendMode(), BLEND_Opaque);
-	else
+	else if (!RippleWater)
 		AddInfo(TEXT("Optional generated material is absent; use Scripts/Create-TideglassPoolMaterial.py before play to enable the visual swap."));
+	if (RippleWater)
+		TestEqual(TEXT("The generated ripple water material remains opaque"), RippleWater->GetBlendMode(), BLEND_Opaque);
+	else
+		AddInfo(TEXT("Optional material-driven ripple asset is absent; set CAPTIVESKY_TIDEGLASS_MATERIAL_NAME=M_TideglassPool_Ripple and run Scripts/Create-TideglassPoolMaterial.py."));
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
 		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
@@ -70,8 +76,8 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("All four synthetic shore-stone collision proxies spawn"), ShoreStoneProxies.Num(), 4);
 
 			TestTrue(TEXT("The subsystem finds the flattened sphere beside the tagged pool"), Tideglass->FindPoolSurface(World) == Surface);
-			UMaterialInterface* StartupMaterial = PoolWater ? PoolWater : PreviewWater;
-			Tideglass->MaterialOverride = PoolWater ? nullptr : PreviewWater;
+			UMaterialInterface* StartupMaterial = RippleWater ? RippleWater : PoolWater ? PoolWater : PreviewWater;
+			Tideglass->MaterialOverride = (RippleWater || PoolWater) ? nullptr : PreviewWater;
 			World->BeginPlay();
 			TestTrue(TEXT("Normal Game-world BeginPlay applies its default asset or isolated preview fallback"), Tideglass->IsApplied());
 			UProceduralMeshComponent* RuntimeWater = Cast<UProceduralMeshComponent>(Tideglass->AppliedTo.Get());
@@ -82,7 +88,7 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 				TestNotNull(TEXT("The play-session water uses a transient material instance"), RuntimeMaterial);
 				TestTrue(TEXT("The transient water material keeps the configured base asset"),
 					RuntimeMaterial && RuntimeMaterial->Parent == StartupMaterial);
-				if (PoolWater && RuntimeMaterial)
+				if ((RippleWater || PoolWater) && RuntimeMaterial)
 				{
 					TestTrue(TEXT("The calm pool tint is a deep, low-saturation teal"),
 						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("CalmPoolColor")).Equals(FLinearColor(0.0022f, 0.016f, 0.025f, 1.f), 0.001f));
@@ -90,6 +96,20 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmNormalGain")), 1.35f, 0.001f));
 					TestTrue(TEXT("The calmer water softens broad highlights while retaining surface detail"),
 						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("CalmRoughness")), 0.34f, 0.001f));
+				}
+				if (RippleWater && RuntimeMaterial)
+				{
+					const FVector RippleCenter(123.f, -456.f, 78.f);
+					AIslandPoolRippleEffect* MinnowImpact = World->SpawnActor<AIslandPoolRippleEffect>(RippleCenter, FRotator::ZeroRotator);
+					TestNotNull(TEXT("A transient minnow surface disturbance can spawn beside the water"), MinnowImpact);
+					if (MinnowImpact) MinnowImpact->ConfigureAsMinnowStartleImpact();
+					TestTrue(TEXT("The water material receives the impulse in world-space XY"),
+						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("RippleCenter")).Equals(FLinearColor(RippleCenter.X, RippleCenter.Y, 0.f, 1.f), 0.1f));
+					TestTrue(TEXT("The ring-front speed matches the interaction's radius and duration"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleSpeedCmPerSecond")), 72.f / 1.15f, 0.01f));
+					TestTrue(TEXT("The interaction sets a finite, restrained ripple amplitude"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleAmplitude")), 0.62f, 0.001f));
+					if (MinnowImpact) MinnowImpact->Destroy();
 				}
 				const FProcMeshSection* WaterSection = RuntimeWater->GetProcMeshSection(0);
 				TestTrue(TEXT("The water surface follows the saved blockout component transform"),

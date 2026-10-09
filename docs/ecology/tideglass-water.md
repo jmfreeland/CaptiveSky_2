@@ -551,3 +551,36 @@ still a simple emissive annulus rather than a true water-normal/refraction distu
 [automation](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/MinnowTint_Automation.log),
 [bounded Game](../../Saved/Playtests/Codex_MinnowTint_20261009/Codex_MinnowTint_Retry_Game.log),
 and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowTint_20261009/ScreenshotsRetry/000_MinnowStartleMidPulse.png).
+
+### Minnow wakes in the water material (2026-10-09)
+
+Minnow breaks and school-startle cues now also send a short-lived radial normal impulse to the
+transient Tideglass surface. Its origin is world-space XY; the material animates the expanding
+front and fades it over the configured lifetime. The subdued emissive annulus remains as a
+secondary cue. This changes reflection normals only: it does not displace water geometry, create
+a splash, or alter collision. There is currently one material impulse slot, so a newer event
+replaces an overlapping one.
+
+The runtime prefers a separate `/Game/Materials/M_TideglassPool_Ripple` asset and falls back to
+the existing `M_TideglassPool_GrazingReadable` surface if it is absent. The generated `.uasset`
+is in ignored `Content/`; recreate it with UE 5.8.3 and
+`CAPTIVESKY_TIDEGLASS_MATERIAL_NAME=M_TideglassPool_Ripple` set for the Python-commandlet process.
+The generator refuses to overwrite existing assets and leaves the authored map material alone.
+
+Validation: the isolated UE 5.8.3 Editor target built and linked; `CaptiveSky2.Agent.IslandTideglass`
+and `CaptiveSky2.Agent.TidepoolMinnows` passed. The Tideglass test now spawns an actual
+`AIslandPoolRippleEffect` in a synthetic Game world and checks that its minnow-startle setup
+updates the runtime material's center, wave-front speed, and strength. The generator log reports
+material creation and successful script execution; its shutdown also reports the known inaccessible
+installed-DDC/Zen cache, so the successful package load and runtime test—not the overall commandlet
+exit summary—are the validation evidence. Logs:
+[build](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/Codex_RippleTint_UBT_Final.log),
+[Tideglass automation](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/Codex_RippleTint_Automation_Final.log),
+[minnow automation](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/Codex_RippleTint_MinnowAutomation_Resume.log),
+and [material generation](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/CreateRippleMaterial_MemoryDDC.log).
+
+No new Game screenshot is claimed: Windows recorded a `0x113` graphics-kernel bugcheck earlier
+that morning. Keep the real-RHI mid-pulse capture deferred until the machine's graphics stability
+is understood; automation verifies wiring and parameters, not the rendered appearance. On the
+next safe capture, judge the surface disturbance and annulus together, then decide whether the
+single impulse slot needs to become a small overlap buffer.

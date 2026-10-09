@@ -15,6 +15,7 @@ import unreal
 MATERIAL_NAME = os.environ.get("CAPTIVESKY_TIDEGLASS_MATERIAL_NAME", "M_TideglassPool_Lively")
 MATERIAL_PATH = "/Game/Materials/" + MATERIAL_NAME
 IS_GRAZING_READABLE_CANDIDATE = MATERIAL_NAME == "M_TideglassPool_GrazingReadable"
+IS_RIPPLE_VARIANT = MATERIAL_NAME == "M_TideglassPool_Ripple"
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WAVE_NORMAL = "/Water/Textures/Normals/T_Water_TilingNormal_Waves_02"
 MEL = unreal.MaterialEditingLibrary
@@ -42,6 +43,12 @@ def binary(material, cls, a, b, x, y, a_pin="", b_pin=""):
     return node
 
 
+def unary(material, cls, source, x, y):
+    node = expr(material, cls, x, y)
+    link(source, node)
+    return node
+
+
 def scalar(material, name, value, x, y):
     return expr(material, unreal.MaterialExpressionScalarParameter, x, y,
                 parameter_name=name, default_value=value, group="Tideglass Water")
@@ -52,6 +59,10 @@ def vector(material, name, rgb, x, y):
                 parameter_name=name,
                 default_value=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0),
                 group="Tideglass Water")
+
+
+def constant(material, value, x, y):
+    return expr(material, unreal.MaterialExpressionConstant, x, y, r=value)
 
 
 def collection_value(material, collection, name, x, y):
@@ -131,8 +142,65 @@ def build():
                                  scalar(material, "WeatherNormalGain", 1.4, -250, 500), 0, 400),
                           200, 250)
     weather_slope = binary(material, unreal.MaterialExpressionMultiply, slope, weather_gain, 400, 200)
+    final_slope = weather_slope
+
+    if IS_RIPPLE_VARIANT:
+        # A short-lived radial normal front makes surface breaks deform the water's own
+        # reflections. Runtime code drives the world-space origin and impulse age; the
+        # fallback grazing-readable material remains unchanged if this asset is absent.
+        ripple_center = vector(material, "RippleCenter", (0.0, 0.0, 0.0), -1800, 1120)
+        ripple_center_xy = mask(material, ripple_center, -1600, 1120, r=True, g=True)
+        ripple_offset = binary(material, unreal.MaterialExpressionSubtract,
+                               world_xy, ripple_center_xy, -1400, 1120)
+        ripple_distance = binary(material, unreal.MaterialExpressionDistance,
+                                 world_xy, ripple_center_xy, -1200, 980)
+        ripple_age = binary(material, unreal.MaterialExpressionMax,
+                            binary(material, unreal.MaterialExpressionSubtract,
+                                   time, scalar(material, "RippleStartTime", 0.0, -1600, 1320),
+                                   -1400, 1320),
+                            constant(material, 0.0, -1400, 1420), -1200, 1280)
+        ripple_front_radius = binary(material, unreal.MaterialExpressionMultiply,
+                                      ripple_age,
+                                      scalar(material, "RippleSpeedCmPerSecond", 64.0, -1200, 1480),
+                                      -1000, 1280)
+        distance_from_front = unary(material, unreal.MaterialExpressionAbs,
+                                     binary(material, unreal.MaterialExpressionSubtract,
+                                            ripple_distance, ripple_front_radius, -800, 1120),
+                                     -600, 1120)
+        front_width = scalar(material, "RippleWidthCm", 24.0, -800, 1280)
+        front_fraction = unary(material, unreal.MaterialExpressionSaturate,
+                               binary(material, unreal.MaterialExpressionDivide,
+                                      distance_from_front, front_width, -400, 1120),
+                               -200, 1120)
+        front_profile = binary(material, unreal.MaterialExpressionSubtract,
+                               constant(material, 1.0, -200, 1280),
+                               front_fraction, 0, 1120)
+        softened_front = expr(material, unreal.MaterialExpressionPower, 200, 1120)
+        link(front_profile, softened_front, "Base")
+        link(constant(material, 2.0, 0, 1280), softened_front, "Exp")
+        ripple_age_fraction = unary(material, unreal.MaterialExpressionSaturate,
+                                    binary(material, unreal.MaterialExpressionDivide,
+                                           ripple_age,
+                                           scalar(material, "RippleDurationSeconds", 1.15, -400, 1440),
+                                           -200, 1440),
+                                    0, 1440)
+        ripple_fade = binary(material, unreal.MaterialExpressionSubtract,
+                             constant(material, 1.0, 200, 1480), ripple_age_fraction, 400, 1440)
+        ripple_envelope = binary(material, unreal.MaterialExpressionMultiply,
+                                 softened_front, ripple_fade, 600, 1260)
+        ripple_strength = binary(material, unreal.MaterialExpressionMultiply,
+                                 ripple_envelope,
+                                 scalar(material, "RippleAmplitude", 0.0, 400, 1420),
+                                 800, 1260)
+        ripple_direction = expr(material, unreal.MaterialExpressionNormalize, -1200, 1640)
+        link(ripple_offset, ripple_direction)
+        ripple_slope = binary(material, unreal.MaterialExpressionMultiply,
+                              ripple_direction, ripple_strength, 1000, 1260)
+        final_slope = binary(material, unreal.MaterialExpressionAdd,
+                             weather_slope, ripple_slope, 1200, 360)
+
     normal_xy = expr(material, unreal.MaterialExpressionAppendVector, 600, 200)
-    link(weather_slope, normal_xy, "A")
+    link(final_slope, normal_xy, "A")
     link(expr(material, unreal.MaterialExpressionConstant, 400, 360, r=1.0), normal_xy, "B")
     normalized = expr(material, unreal.MaterialExpressionNormalize, 800, 200)
     link(normal_xy, normalized)
