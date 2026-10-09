@@ -110,3 +110,34 @@ request ceiling in place, asking whether the Raven discovers and chooses this
 multi-step project over time. Until then, an empty nest list is an honest
 world-state result, and the generated close-up should not be presented as a
 portrait of an existing nest.
+
+## First capped live-autonomy observation (2026-10-09)
+
+A standalone Game run used an isolated data root, a 300-second real-time ceiling,
+a six-model-request ceiling, disabled Python, and a warm local memory DDC. The
+Island became ready after 39.8 seconds. Play ended itself after 81.9 real seconds
+at exactly six requests, with no requests still in flight and a normal Unreal
+shutdown. The primary world's state and resident memories were not used as the
+write destination:
+[`RavenAgency.log`](../../Saved/Playtests/Codex_RavenNestAgency_20261009_retry/RavenAgency.log)
+and the isolated
+[`World/`](../../Saved/Playtests/Codex_RavenNestAgency_20261009_retry/World/).
+
+The first model-driven choices were not scripted toward the nest. Raven
+approached a Tideglass dragonfly, then considered the rain basin and chose to
+watch the dragonfly. Aster chose a gentle approach toward Raven, then created an
+eight-stone arrangement at `ArrangingGround_1`, titled “A Pause Between.” The
+Innkeeper also moved independently. This is direct evidence of varied curiosity
+and small, persistent world-making within the request cap. It is not evidence
+that Raven rejected nesting: this run started with a fresh isolated memory
+store, so his existing 879 primary-world records—including the earlier recorded
+nest wish—were not in his prompt. He did not gather twigs or weave during the
+six requests.
+
+Do not copy Aster's isolated arrangement or seed a nest into the primary save.
+The next useful agency check is a separately bounded isolated run with a
+read-only copy of the existing memories, preserving the normal choice to ignore
+nesting. Before spending more model requests, first verify the old wish can be
+retrieved in the actual nearby-roost situation; retrieval uses a 24-hour
+recency half-life, so a September conversation may be crowded out by newer
+experience even when the scene mentions a nest.
