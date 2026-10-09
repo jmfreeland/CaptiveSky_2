@@ -83,6 +83,8 @@ public:
 	static float PrintLifetime(float Wetness);
 	/** 0..1 size of a print: full until it begins to dry out, then shrinking away. Wetness is the ground now. */
 	static float PrintScale(float Age, float Life, float Wetness);
+	/** True when a print needs a transform write: visible prints animate, hidden slots stay untouched. */
+	static bool ShouldRefreshPrintInstance(bool bActive, bool bRendered, float Scale);
 	/** 0..1 how worn a cell is after this many footfalls. */
 	static float WearAmount(int32 Steps);
 	/** Dusty when dry, dark mud when the ground is wet. */
@@ -122,6 +124,7 @@ private:
 		double Born = 0.0;
 		float Life = 0.f;
 		bool bActive = false;
+		bool bRendered = false;
 	};
 
 	TWeakObjectPtr<AIslandTrailMarks> Marks;

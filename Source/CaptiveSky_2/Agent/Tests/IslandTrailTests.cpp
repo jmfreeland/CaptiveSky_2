@@ -19,6 +19,12 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("And is gone at the end"), Trail::PrintScale(Life, Life, 0.8f), 0.f);
 	TestEqual(TEXT("A print dries away with the ground"), Trail::PrintScale(1.f, Life, 0.f), 0.f);
 	TestTrue(TEXT("Half-dried ground shrinks it"), Trail::PrintScale(1.f, Life, 0.06f) < 1.f);
+	TestFalse(TEXT("An unused hidden print slot needs no transform update"), Trail::ShouldRefreshPrintInstance(false, false, 0.f));
+	TestTrue(TEXT("A visible active print refreshes as it shrinks"), Trail::ShouldRefreshPrintInstance(true, true, 0.5f));
+	TestTrue(TEXT("A newly visible print receives its first transform"), Trail::ShouldRefreshPrintInstance(true, false, 0.5f));
+	TestTrue(TEXT("A print that just dried receives one hide transform"), Trail::ShouldRefreshPrintInstance(true, true, 0.f));
+	TestFalse(TEXT("A hidden dried print is not rewritten every tick"), Trail::ShouldRefreshPrintInstance(true, false, 0.f));
+	TestTrue(TEXT("An expired visible print receives one hide transform"), Trail::ShouldRefreshPrintInstance(false, true, 0.f));
 
 	TestEqual(TEXT("A few footfalls wear nothing"), Trail::WearAmount(Trail::WearStartSteps), 0.f);
 	const int32 FirstMidpoint = Trail::WearStartSteps + (Trail::WearFullSteps - Trail::WearStartSteps) / 3;

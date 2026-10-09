@@ -198,6 +198,11 @@ float UIslandTrailSubsystem::PrintScale(float Age, float Life, float Wetness)
 	return Fade * Wet;
 }
 
+bool UIslandTrailSubsystem::ShouldRefreshPrintInstance(bool bActive, bool bRendered, float Scale)
+{
+	return bRendered || (bActive && Scale > 0.01f);
+}
+
 float UIslandTrailSubsystem::WearAmount(int32 Steps)
 {
 	return FMath::SmoothStep(static_cast<float>(WearStartSteps), static_cast<float>(WearFullSteps), static_cast<float>(Steps));
@@ -358,6 +363,7 @@ void UIslandTrailSubsystem::RefreshPrints(double Now, float Wetness)
 	UInstancedStaticMeshComponent* Layer = Actor->Prints;
 	while (Layer->GetInstanceCount() < PrintRing.Num()) Layer->AddInstance(FTransform(FQuat::Identity, FVector::ZeroVector, FVector(0.0001f)));
 	const FVector Footprint(0.28f, 0.12f, 0.03f);
+	int32 LastRefreshIndex = INDEX_NONE;
 	for (int32 I = 0; I < PrintRing.Num(); ++I)
 	{
 		FPrint& Print = PrintRing[I];
@@ -367,10 +373,20 @@ void UIslandTrailSubsystem::RefreshPrints(double Now, float Wetness)
 			Scale = PrintScale(static_cast<float>(Now - Print.Born), Print.Life, Wetness);
 			if (Now - Print.Born >= Print.Life) Print.bActive = false;
 		}
+		if (ShouldRefreshPrintInstance(Print.bActive, Print.bRendered, Scale)) LastRefreshIndex = I;
+	}
+	for (int32 I = 0; I <= LastRefreshIndex; ++I)
+	{
+		FPrint& Print = PrintRing[I];
+		const float Scale = Print.bActive
+			? PrintScale(static_cast<float>(Now - Print.Born), Print.Life, Wetness)
+			: 0.f;
+		if (!ShouldRefreshPrintInstance(Print.bActive, Print.bRendered, Scale)) continue;
 		const FTransform T = Scale > 0.01f
 			? FTransform(Print.Rotation, Print.Position, Footprint * Scale)
 			: FTransform(FQuat::Identity, Print.Position, FVector(0.0001f));
-		Layer->UpdateInstanceTransform(I, T, true, I == PrintRing.Num() - 1, true);
+		Layer->UpdateInstanceTransform(I, T, true, I == LastRefreshIndex, true);
+		Print.bRendered = Scale > 0.01f;
 	}
 }
 
