@@ -169,6 +169,40 @@ Before another visual run, correlate the visible popup with the fresh process
 tree and preserve the new `AutoSDKInfo` output; do not disable platform
 validation or change global Windows/.NET settings based on this correlation.
 
+### Headless automation versus D3D12 Game startup (2026-10-09, 02:47–02:50 local)
+
+An isolated headless `RavenPerch` automation run started at 02:47:51. Its log
+recorded `UBT AutoSDK ReturnCode: -532462766` at 02:47:54, then completed
+`CaptiveSky2.Agent.RavenPerch` successfully at 02:48:25 and exited normally.
+This reproduces the code without preventing the focused test from passing.
+
+A fresh D3D12 Game launch started at 02:49:07. At 02:49:12 it launched UBT
+platform validation and a new bundled .NET 10 `dotnet.exe` appeared. The Game
+log stopped at `TurnkeySupport`; the .NET process remained nearly idle, and
+`AutoSDKInfo.txt` was stale from the prior successful run. After about 55
+seconds without progress, only that Game launch and its newly created .NET
+process were stopped. The interactive editor (PID 828) remained running.
+
+The generic `0xe0434352` dialog was visible during the Game attempt, but Windows
+exposed the window under `csrss.exe`; no direct owner, managed exception stack,
+or matching recent .NET/Application Error/WER event was recovered. Together,
+these runs strengthen the lead that the intermittent popup is associated with
+UE's bundled UBT/Turnkey validation during standalone Game startup, but they do
+not prove ownership or root cause. Preserve a process dump/child-process trace
+and the fresh validation output on the next recurrence; do not suppress platform
+validation based on this evidence.
+
+Evidence: [`Codex_RavenPerchCheck_Automation.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_RavenPerchCheck_Automation.log)
+and [`Codex_MinnowEyes3_Game.log`](../../Saved/Playtests/Codex_MinnowEyes3_20261009/Codex_MinnowEyes3_Game.log).
+
+A later read-only snapshot while the same dialog was visible found the
+interactive editor (PID 828) but no new UBT/Game child. The only other
+`dotnet.exe` processes had started on 2026-09-29 and 2026-10-01; their command
+lines were unavailable. A 30-minute Application-log query returned no matching
+.NET Runtime, Application Error, WER, exception-code, or UBT event. This
+snapshot does not link the displayed dialog to either older process and does
+not supersede the earlier Game-startup correlation.
+
 ## Scope and next step
 
 The exception investigation did not change Windows permissions or disable SDK
