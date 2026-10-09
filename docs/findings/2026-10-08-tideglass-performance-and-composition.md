@@ -339,11 +339,37 @@ Test log: [`ListeningStonePresentationAutomationRetry.log`](../../Saved/NavBound
 Game log: [`ListeningStoneCairnShapeGame.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/ListeningStoneCairnShapeGame.log).
 Render: [`005_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStoneCairnShape/005_Listening_Stones__Resonance_Close.png).
 
-Next: inspect the newly loaded Tripo `StoneCairn` mesh as a candidate for a
-more intentional landmark silhouette before wiring any project content into
-the transient presentation. Keep the inspection/edit of Content separate from
-this code-only milestone, then measure ordinary moving-PIE performance on its
-own.
+Next: keep the small Tripo cairn distinct from the tall Listening Stones. If
+those totems are to receive authored silhouettes, inspect a slender standing
+stone or a set of individual stackable rocks before changing their transient
+presentation. Once the shared landscape material work lands, repeat the
+Tideglass composition captures and separately profile a moving-PIE route.
+
+## Tripo StoneCairn candidate audit (2026-10-09)
+
+The imported source preview and local import report confirm a well-textured,
+mossy pile of rounded stones. Its LOD0 has 6,361 vertices, a single material
+slot, box collision, and bounds of 103 × 110 × 85.3 cm. The in-world close
+capture shows this asset already placed as the separate `StonesCairn` prop;
+it reads as a small grounded cairn, partly screened by the current foreground.
+
+It is not a like-for-like replacement for the three transient Listening Stones:
+their saved proxy heights are 224, 268, and 302 cm, with narrow footprints.
+Uniformly scaling this complete pile to those heights would make it roughly
+2.7–3.9 m across, while fitting its width would leave it under a metre tall.
+Keep the Tripo asset as the small mossy cairn rather than stretching it or
+duplicating its already-stacked geometry across those totems. The existing
+Starter Content rock stack remains the reversible runtime treatment for the
+tall silhouettes.
+
+If those tall landmarks are to become authored meshes, the useful next asset
+shape is either a slender standing stone at roughly the proxy dimensions, or
+several separate low-profile rocks suitable for the current layered stack.
+No `Content/` package or map was changed during this audit.
+
+Source preview: [`preview.png`](../../Saved/CaptiveSky/Tripo/StoneCairn/preview.png).
+Import report: [`import.json`](../../Saved/CaptiveSky/Tripo/StoneCairn/import.json).
+Current in-world comparison: [`005_Listening_Stones__Resonance_Close.png`](../../Saved/NavBoundsTest/Project/Saved/Screenshots/ListeningStoneCairnShape/005_Listening_Stones__Resonance_Close.png).
 
 ## Current Tideglass foliage and dragonfly view (2026-10-09)
 
