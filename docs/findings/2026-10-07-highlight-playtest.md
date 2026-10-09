@@ -84,3 +84,31 @@ supported elevated roost/branch or a clear circulation edge for the portrait,
 and resolve the streaming-pool warning before calling a runtime frame a
 highlight. These are failed composition experiments, not claims that Raven is
 missing or that the runtime is crashing.
+
+## Golden-hour route recheck (2026-10-09)
+
+A standalone UE 5.8.3 Game capture loaded the current Island map and traversed
+the saved viewpoints at 17:00. Agent thinking and Python were disabled, world
+state was isolated, the installed DDC was avoided with `-DDC-ForceMemoryCache`,
+and the session used a 75-second realtime cap plus a one-request ceiling. The
+world became ready in 44 seconds; all 11 unique viewpoints were captured at
+1600×900 before the session ended normally after 75.3 seconds with zero model
+requests. UBT AutoSDK validation returned 0 on this run, and the runtime log
+does not reproduce the matching CLR exit code. This is a successful bounded
+launch, not evidence that every prior desktop exception is resolved; no
+matching Windows event or managed exception stack was captured. Log:
+[`Capture.log`](../../Saved/Playtests/Codex_HighlightRetry_20261009c/Capture.log);
+frames: [`Screenshots/`](../../Saved/Playtests/Codex_HighlightRetry_20261009c/Screenshots/).
+
+The route still does not yield a polished hero image. The Wind Arch overlook
+has appealing golden sky and tree color but the segmented pillars dominate the
+frame; Tideglass reads as a small, dark pool within an abrupt ground-cover
+boundary, while the middle distance remains broad and brown. The ground-detail
+view is overfilled and dark. The configured Raven nest close-up frames a large
+rock, not a visible nest or bird, and the inn exterior remains white blockout
+geometry. These are Game-rendered composition observations; the pass did not
+sample frame-time performance, prove PIE behavior, or use the user's normal
+world-state data. The best current candidate for future art direction is the
+Wind Arch horizon/tree composition, but its pillars should be simplified or
+reframed before using it as a showcase image. The saved viewpoint file was
+read-only during this pass.
