@@ -325,3 +325,34 @@ change Windows ACLs based on the code alone.
 Evidence: [`BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/BlockedGroundMoveApproach.log)
 and
 [`SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/SessionSafety.log).
+
+### Latest scratch Game and safety regressions (2026-10-09, 16:31–16:41 local)
+
+A fresh NullRHI scratch Game launch for the read-only Raven branch-support scan
+again logged `UBT AutoSDK ReturnCode: -532462766`. The Island loaded and the
+scan completed (53 visibility samples; no supported branch point), so the
+return code did not stop that runtime work. The process did not end within its
+150-second outer bound and was stopped by its exact process ID after the scan;
+the session log has no managed exception type or stack trace. The existing
+`AutoSDKInfo.txt` in that scratch directory was older than this launch, so its
+earlier `Result: Succeeded` cannot be used as the result of this validation
+attempt.
+
+Two subsequent UE 5.8.3 NullRHI commandlet runs each logged the same return
+code, then passed `CaptiveSky2.Agent.SessionSafety` and
+`CaptiveSky2.Agent.BlockedGroundMoveApproach` respectively, with exit code 0.
+They verify the request/time safeguards and collision-aware staging behavior
+still pass on the current scratch build; neither exposes the AutoSDK child's
+managed exception.
+
+This is another controlled correlation to UE's UBT/Turnkey startup path, not
+proof that it owns the user's visible `dotnet.exe` dialog. The screenshot's
+generic code and address alone still cannot establish the process or stack.
+The safe next diagnostic remains capturing the process tree and fresh UBT
+output while the popup is actually visible; no validation settings, SDKs, or
+Windows permissions were changed.
+
+Evidence: [`Codex_RavenBranchAudit_Runtime.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Logs/Codex_RavenBranchAudit_Runtime.log),
+[`Codex_Continuation_CaptiveSky2_Agent_SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_Continuation_CaptiveSky2_Agent_SessionSafety.log),
+and
+[`Codex_Continuation_CaptiveSky2_Agent_BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_Continuation_CaptiveSky2_Agent_BlockedGroundMoveApproach.log).
