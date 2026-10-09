@@ -86,5 +86,6 @@ private:
 	FString ResolveAgentId() const;
 	FString GetLegacyMemoryFilePath() const;
 
-	static float ScoreRecord(const FAgentMemoryRecord& Record, const TArray<FString>& SituationWords, float HalfLifeHours);
+	static float ScoreRecord(const FAgentMemoryRecord& Record, const TArray<FString>& SituationWords,
+		const TSet<FString>& SituationContentWords, float HalfLifeHours);
 };

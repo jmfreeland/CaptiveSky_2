@@ -57,6 +57,58 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	// --- Durable topic recall: an old, distinct wish should survive newer unrelated dialogue ---
+	{
+		const FString WishId = TEXT("AutomationTest_MemoryDurableWish");
+		const FString WishDir = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / WishId);
+		IFileManager::Get().DeleteDirectory(*WishDir, false, true);
+		UAgentMemoryComponent* WishMemory = NewObject<UAgentMemoryComponent>(GetTransientPackage());
+		WishMemory->AgentId = WishId;
+		FAgentMemoryRecord OldWish = WishMemory->MakeMemory(EAgentMemoryType::Conversation,
+			TEXT("I replied to CaptiveSky via discord: \"A few: give the Island changing weather, varied wind currents, and quiet places where a raven can nest undisturbed. Let objects and paths sometimes move, vanish, or appear for reasons that are not immediately explained. I’d also like other living things with their own habits—not merely decorations—and the freedom to approach, leave, and discover at my own pace. Most importantly, keep some corners genuinely wild and unfinished.\""),
+			0.5f, { TEXT("conversation"), TEXT("external"), TEXT("discord"), TEXT("speech") });
+		OldWish.Timestamp = FDateTime::UtcNow() - FTimespan::FromDays(27.0);
+		WishMemory->AppendMemory(OldWish);
+		FAgentMemoryRecord SingleWordMemory = WishMemory->MakeMemory(EAgentMemoryType::Conversation,
+			TEXT("I once saw a raven fly over the sea."), 0.5f, { TEXT("conversation"), TEXT("external") });
+		SingleWordMemory.Timestamp = OldWish.Timestamp;
+		WishMemory->AppendMemory(SingleWordMemory);
+		const TArray<FString> RecentObservations = {
+			TEXT("I watched pale moonlight reveal a hidden waterfall beneath the old bridge."),
+			TEXT("I followed a moth around a copper lantern near the western shore."),
+			TEXT("Wild thyme smelled sharp after rain beside the steep green meadow."),
+			TEXT("A fox called from beyond the sleeping village while I listened."),
+			TEXT("I found a blue shell buried near the northern tide pools."),
+			TEXT("Warm stone rested underfoot in the late afternoon sun.")
+		};
+		for (const FString& Observation : RecentObservations)
+		{
+			FAgentMemoryRecord Recent = WishMemory->MakeMemory(EAgentMemoryType::Observation, Observation, 0.65f, { TEXT("action-result") });
+			Recent.Timestamp = FDateTime::UtcNow();
+			WishMemory->AppendMemory(Recent);
+		}
+		const TArray<FString> RecentDialogue = {
+			TEXT("I spoke with Aster about silver light crossing the western stones."),
+			TEXT("I told the Innkeeper that warm tea was pleasant after rain."),
+			TEXT("Aster asked whether the eastern path was quiet before sunrise."),
+			TEXT("The Innkeeper described clouds gathering above the distant hills.")
+		};
+		for (const FString& Line : RecentDialogue)
+		{
+			FAgentMemoryRecord Recent = WishMemory->MakeMemory(EAgentMemoryType::Conversation, Line, 0.5f, { TEXT("conversation"), TEXT("agent-to-agent") });
+			Recent.Timestamp = FDateTime::UtcNow();
+			WishMemory->AppendMemory(Recent);
+		}
+
+		const FString RoostSituation = TEXT("At a nearby roost, the raven can weave a nest from fallen twigs gathered from the ground. The changing weather and varied wind currents shape this perch; gathering and weaving are optional, and you may explore elsewhere.");
+		const TArray<FAgentMemoryRecord> RoostContext = WishMemory->GetRelevantContext(500, RoostSituation);
+		TestTrue(TEXT("A 27-day-old nest wish is recalled in a nearby-roost situation despite newer unrelated dialogue"),
+			RoostContext.ContainsByPredicate([&OldWish](const FAgentMemoryRecord& Record) { return Record.Id == OldWish.Id; }));
+		TestFalse(TEXT("A single shared word does not promote a stale, unrelated raven memory"),
+			RoostContext.ContainsByPredicate([&SingleWordMemory](const FAgentMemoryRecord& Record) { return Record.Id == SingleWordMemory.Id; }));
+		IFileManager::Get().DeleteDirectory(*WishDir, false, true);
+	}
+
 	// --- Token budget actually limits how many records come back ---
 	{
 		const TArray<FAgentMemoryRecord> Tiny = Reader->GetRelevantContext(1, TEXT("anything"));

@@ -141,3 +141,30 @@ nesting. Before spending more model requests, first verify the old wish can be
 retrieved in the actual nearby-roost situation; retrieval uses a 24-hour
 recency half-life, so a September conversation may be crowded out by newer
 experience even when the scene mentions a nest.
+
+## Long-term topical recall regression (2026-10-09)
+
+The existing 24-hour recency half-life had made the 27-day-old recorded wish
+score below four newer, unrelated conversations. With a 500-token context
+budget, the old wish was omitted. A topical anchor now adds a recency-independent
+score only when at least two distinct, non-common words match the current
+situation; one shared term alone does not promote an old memory. This changes
+recall priority, not Raven's available actions or chosen behavior.
+
+The `Agent.MemoryComponent` fixture uses the saved wish text, a nearby-roost
+scene that mentions nest-building, weather, and wind, six diverse recent
+observations, four recent unrelated conversations, and an old Raven memory that
+shares only one content word. The old wish was retrieved inside the bounded
+context while the one-word match was not. The UE 5.8.3 scratch editor target
+built successfully, and the focused automation passed with NullRHI, thinking
+disabled, zero model requests, a 60-second cap, and a scratch-only data root:
+[`Codex_MemoryRecallRegression_20261009.log`](../../Saved/Logs/Codex_MemoryRecallRegression_20261009.log).
+
+This is retrieval evidence, not proof the live Raven will act on that memory.
+The proposed one-request, 90-second isolated observation was blocked by the
+safety review because it would transmit a copy of Raven's saved personal memory
+to a model endpoint that was not explicitly identified/authorized. No live model
+request was made, and the temporary isolated copy was removed; the primary save
+remains unchanged. A future live observation needs explicit authorization for
+that data transfer, or should use a synthetic/redacted memory fixture instead.
+Nesting remains optional either way.

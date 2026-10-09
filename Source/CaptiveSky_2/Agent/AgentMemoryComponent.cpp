@@ -215,23 +215,42 @@ static void TokenizeLower(const FString& In, TArray<FString>& OutWords)
 	Cleaned.ParseIntoArrayWS(OutWords);
 }
 
-float UAgentMemoryComponent::ScoreRecord(const FAgentMemoryRecord& Record, const TArray<FString>& SituationWords, float HalfLifeHours)
+static bool IsMeaningfulContextWord(const FString& Word)
+{
+	if (Word.Len() < 3) return false;
+	static const TSet<FString> StopWords = {
+		TEXT("about"), TEXT("after"), TEXT("again"), TEXT("also"), TEXT("among"), TEXT("and"), TEXT("are"), TEXT("because"), TEXT("before"),
+		TEXT("being"), TEXT("but"), TEXT("can"), TEXT("could"), TEXT("does"), TEXT("each"), TEXT("for"), TEXT("from"), TEXT("have"), TEXT("into"), TEXT("just"),
+		TEXT("most"), TEXT("much"), TEXT("only"), TEXT("other"), TEXT("over"), TEXT("same"), TEXT("some"), TEXT("such"),
+		TEXT("than"), TEXT("that"), TEXT("their"), TEXT("them"), TEXT("then"), TEXT("there"), TEXT("these"), TEXT("they"),
+		TEXT("this"), TEXT("those"), TEXT("the"), TEXT("through"), TEXT("under"), TEXT("very"), TEXT("was"), TEXT("were"), TEXT("what"), TEXT("when"),
+		TEXT("where"), TEXT("which"), TEXT("while"), TEXT("will"), TEXT("with"), TEXT("would"), TEXT("your"), TEXT("you"), TEXT("not")
+	};
+	return !StopWords.Contains(Word);
+}
+
+float UAgentMemoryComponent::ScoreRecord(const FAgentMemoryRecord& Record, const TArray<FString>& SituationWords,
+	const TSet<FString>& SituationContentWords, float HalfLifeHours)
 {
 	// Recency: exponential decay against the configured half-life.
 	const double AgeHours = (FDateTime::UtcNow() - Record.Timestamp).GetTotalHours();
 	const float RecencyScore = FMath::Exp(-static_cast<float>(FMath::Max(AgeHours, 0.0)) / FMath::Max(HalfLifeHours, 0.01f));
+	TArray<FString> RecordContentTokens;
+	TokenizeLower(Record.Text, RecordContentTokens);
+	TArray<FString> RecordWords = RecordContentTokens;
+	for (const FString& Tag : Record.Tags)
+	{
+		// Preserve the existing keyword-match behavior for tags as whole strings.
+		RecordWords.Add(Tag.ToLower());
+		TArray<FString> TagWords;
+		TokenizeLower(Tag, TagWords);
+		RecordContentTokens.Append(TagWords);
+	}
 
 	// Keyword overlap: fraction of situation words that appear in this record's text/tags.
 	float OverlapScore = 0.f;
 	if (SituationWords.Num() > 0)
 	{
-		TArray<FString> RecordWords;
-		TokenizeLower(Record.Text, RecordWords);
-		for (const FString& Tag : Record.Tags)
-		{
-			RecordWords.Add(Tag.ToLower());
-		}
-
 		int32 Matches = 0;
 		for (const FString& Word : SituationWords)
 		{
@@ -243,8 +262,20 @@ float UAgentMemoryComponent::ScoreRecord(const FAgentMemoryRecord& Record, const
 		OverlapScore = static_cast<float>(Matches) / static_cast<float>(SituationWords.Num());
 	}
 
+	// Recent dialogue can otherwise crowd out an older, specific memory even when
+	// the current scene clearly returns to that topic. A two-term content match is
+	// a stronger cue than incidental overlap on articles or common verbs; it earns
+	// a recency-independent boost without turning one shared word into a goal.
+	TSet<FString> RecordContentWords;
+	for (const FString& Word : RecordContentTokens)
+		if (IsMeaningfulContextWord(Word)) RecordContentWords.Add(Word);
+	int32 DistinctContentMatches = 0;
+	for (const FString& Word : SituationContentWords)
+		if (RecordContentWords.Contains(Word)) ++DistinctContentMatches;
+	const float ContextAnchorBonus = DistinctContentMatches >= 2 ? 0.5f : 0.f;
+
 	// Weights are a deliberately simple, documented starting point -- tune freely.
-	return 0.4f * RecencyScore + 0.4f * Record.Importance + 0.2f * OverlapScore;
+	return FMath::Min(1.f, 0.4f * RecencyScore + 0.4f * Record.Importance + 0.2f * OverlapScore + ContextAnchorBonus);
 }
 
 TArray<FAgentMemoryRecord> UAgentMemoryComponent::GetRelevantContext(int32 MaxTokens, const FString& Situation) const
@@ -253,11 +284,14 @@ TArray<FAgentMemoryRecord> UAgentMemoryComponent::GetRelevantContext(int32 MaxTo
 
 	TArray<FString> SituationWords;
 	TokenizeLower(Situation, SituationWords);
+	TSet<FString> SituationContentWords;
+	for (const FString& Word : SituationWords)
+		if (IsMeaningfulContextWord(Word)) SituationContentWords.Add(Word);
 
 	TArray<FAgentMemoryRecord> Scored = Cache;
 	for (FAgentMemoryRecord& Record : Scored)
 	{
-		Record.RelevanceScore = ScoreRecord(Record, SituationWords, RecencyHalfLifeHours);
+		Record.RelevanceScore = ScoreRecord(Record, SituationWords, SituationContentWords, RecencyHalfLifeHours);
 	}
 
 	Scored.Sort([](const FAgentMemoryRecord& A, const FAgentMemoryRecord& B)
