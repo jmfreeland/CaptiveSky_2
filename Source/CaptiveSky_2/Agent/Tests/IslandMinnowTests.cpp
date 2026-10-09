@@ -102,15 +102,18 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The shallow-water school has a small bounded population"), School->Fish.Num(), 5);
 	TestEqual(TEXT("Each fish has one animated forked caudal fin"), School->Tails.Num(), School->Fish.Num());
 	TestEqual(TEXT("Each fish has a dorsal fin and paired pectoral fins"), School->BodyFins.Num(), School->Fish.Num());
+	TestEqual(TEXT("Each fish has one visual-only dorsal flash mark"), School->DorsalMarks.Num(), School->Fish.Num());
 	TArray<FLinearColor> FishColors;
 	for (int32 Index = 0; Index < School->Fish.Num(); ++Index)
 	{
 		UProceduralMeshComponent* Minnow = School->Fish[Index];
 		UProceduralMeshComponent* Tail = School->Tails.IsValidIndex(Index) ? School->Tails[Index] : nullptr;
 		UProceduralMeshComponent* Fins = School->BodyFins.IsValidIndex(Index) ? School->BodyFins[Index] : nullptr;
+		UProceduralMeshComponent* DorsalMark = School->DorsalMarks.IsValidIndex(Index) ? School->DorsalMarks[Index] : nullptr;
 		const FProcMeshSection* BodySection = Minnow ? Minnow->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* TailSection = Tail ? Tail->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* FinsSection = Fins ? Fins->GetProcMeshSection(0) : nullptr;
+		const FProcMeshSection* MarkSection = DorsalMark ? DorsalMark->GetProcMeshSection(0) : nullptr;
 		TestTrue(TEXT("Tapered minnow bodies are procedural, visual-only, and nonblocking"),
 			BodySection && BodySection->ProcVertexBuffer.Num() == 86 && BodySection->ProcIndexBuffer.Num() == 504 &&
 			Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
@@ -143,6 +146,11 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			Fins && FinsSection && Fins->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Fins->CastShadow);
 		TestTrue(TEXT("The dorsal and paired pectoral fins are double-sided triangles"),
 			FinsSection && FinsSection->ProcVertexBuffer.Num() == 18 && FinsSection->ProcIndexBuffer.Num() == 18);
+		TestTrue(TEXT("A narrow dorsal flash follows the fish's back without collision or shadows"),
+			DorsalMark && MarkSection && MarkSection->ProcVertexBuffer.Num() == 14 && MarkSection->ProcIndexBuffer.Num() == 36 &&
+			DorsalMark->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !DorsalMark->CastShadow &&
+			MarkSection->SectionLocalBox.Min.X <= -4.8f && MarkSection->SectionLocalBox.Max.X >= 4.8f &&
+			MarkSection->SectionLocalBox.Min.Y <= -0.34f && MarkSection->SectionLocalBox.Max.Y >= 0.34f);
 		TestTrue(TEXT("Each tail fin is positioned just behind the body tail stock"),
 			Tail && Tail->GetRelativeLocation().X <= -7.5f);
 		if (TailSection)
@@ -185,6 +193,12 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Tail and body fins share a darker, stable accent material"),
 				FinMaterial && Fins && Tail->GetMaterial(0) == Fins->GetMaterial(0) &&
 				FinColor.Equals(FishColor * 0.55f, 0.001f));
+			UMaterialInstanceDynamic* MarkMaterial = DorsalMark ? Cast<UMaterialInstanceDynamic>(DorsalMark->GetMaterial(0)) : nullptr;
+			const FLinearColor MarkColor = MarkMaterial ? MarkMaterial->K2_GetVectorParameterValue(TEXT("Color")) : FLinearColor::Black;
+			TestTrue(TEXT("Dorsal marks add a restrained warm contrast without changing the natural body palette"),
+				MarkMaterial && FMath::Max(MarkColor.R, FMath::Max(MarkColor.G, MarkColor.B)) >
+				FMath::Max(FishColor.R, FMath::Max(FishColor.G, FishColor.B)) + 0.1f &&
+				MarkColor.R <= 0.65f && MarkColor.G <= 0.65f);
 		}
 	}
 	TestEqual(TEXT("Every fish receives an individual visual color"), FishColors.Num(), School->Fish.Num());

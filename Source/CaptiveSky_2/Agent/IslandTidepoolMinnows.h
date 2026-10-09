@@ -45,6 +45,8 @@ private:
 	TArray<TObjectPtr<UProceduralMeshComponent>> Tails;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> BodyFins;
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TArray<TObjectPtr<UProceduralMeshComponent>> DorsalMarks;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInterface> BaseShapeMaterial;
 	TWeakObjectPtr<AIslandWeather> Weather;

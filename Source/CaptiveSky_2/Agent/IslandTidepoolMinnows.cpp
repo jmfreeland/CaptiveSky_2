@@ -190,6 +190,61 @@ void BuildBodyFins(UProceduralMeshComponent* Fins)
 	const TArray<int32> Triangles = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
 	BuildDoubleSidedTriangles(Fins, Vertices, Triangles);
 }
+
+void BuildDorsalMark(UProceduralMeshComponent* Mark)
+{
+	if (!Mark) return;
+
+	// A narrow, muted dorsal flash sits just above the body surface, where it
+	// remains readable from the elevated pool-edge viewpoints.
+	static constexpr int32 StationCount = 7;
+	static constexpr float Width = 0.34f;
+	static constexpr float SurfaceOffset = 0.06f;
+	static constexpr float XPositions[StationCount] = { -4.8f, -3.2f, -1.6f, 0.f, 1.6f, 3.2f, 4.8f };
+	static constexpr float RingX[StationCount] = { -7.0f, -5.8f, -4.0f, -1.0f, 3.0f, 6.2f, 8.0f };
+	static constexpr float RingRadiusY[StationCount] = { 0.55f, 1.05f, 1.55f, 1.95f, 1.80f, 1.25f, 0.52f };
+	static constexpr float RingRadiusZ[StationCount] = { 0.55f, 1.15f, 1.60f, 1.95f, 1.85f, 1.40f, 0.65f };
+	TArray<FVector> Vertices;
+	TArray<int32> Triangles;
+	TArray<FVector> Normals;
+	TArray<FVector2D> UVs;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	Vertices.Reserve(StationCount * 2);
+	Normals.Reserve(StationCount * 2);
+	UVs.Reserve(StationCount * 2);
+	Colors.Reserve(StationCount * 2);
+	Tangents.Reserve(StationCount * 2);
+	Triangles.Reserve((StationCount - 1) * 6);
+
+	for (int32 Index = 0; Index < StationCount; ++Index)
+	{
+		const float X = XPositions[Index];
+		int32 Ring = 0;
+		while (Ring < StationCount - 2 && X > RingX[Ring + 1]) ++Ring;
+		const float Alpha = FMath::Clamp((X - RingX[Ring]) / (RingX[Ring + 1] - RingX[Ring]), 0.f, 1.f);
+		const float RadiusY = FMath::Lerp(RingRadiusY[Ring], RingRadiusY[Ring + 1], Alpha);
+		const float RadiusZ = FMath::Lerp(RingRadiusZ[Ring], RingRadiusZ[Ring + 1], Alpha);
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			const float Y = Side == 0 ? -Width : Width;
+			const float Z = RadiusZ * FMath::Sqrt(FMath::Max(0.f, 1.f - FMath::Square(Y / RadiusY))) + SurfaceOffset;
+			Vertices.Add(FVector(X, Y, Z));
+			Normals.Add(FVector::UpVector);
+			UVs.Add(FVector2D(static_cast<float>(Index) / (StationCount - 1), static_cast<float>(Side)));
+			Colors.Add(FLinearColor::White);
+			Tangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
+		}
+	}
+
+	for (int32 Index = 0; Index < StationCount - 1; ++Index)
+	{
+		const int32 A = Index * 2;
+		const int32 B = A + 2;
+		Triangles.Append({ A, B, B + 1, A, B + 1, A + 1 });
+	}
+	Mark->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+}
 }
 
 AIslandTidepoolMinnows::AIslandTidepoolMinnows()
@@ -206,6 +261,7 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 	Fish.Reserve(FishCount);
 	Tails.Reserve(FishCount);
 	BodyFins.Reserve(FishCount);
+	DorsalMarks.Reserve(FishCount);
 	for (int32 Index = 0; Index < FishCount; ++Index)
 	{
 		const FName ComponentName(*FString::Printf(TEXT("Minnow_%d"), Index));
@@ -237,6 +293,16 @@ AIslandTidepoolMinnows::AIslandTidepoolMinnows()
 		Fins->SetCanEverAffectNavigation(false);
 		Fins->SetGenerateOverlapEvents(false);
 		BodyFins.Add(Fins);
+
+		const FName MarkName(*FString::Printf(TEXT("MinnowDorsalMark_%d"), Index));
+		UProceduralMeshComponent* Mark = CreateDefaultSubobject<UProceduralMeshComponent>(MarkName);
+		Mark->SetupAttachment(Minnow);
+		BuildDorsalMark(Mark);
+		Mark->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Mark->SetCastShadow(false);
+		Mark->SetCanEverAffectNavigation(false);
+		Mark->SetGenerateOverlapEvents(false);
+		DorsalMarks.Add(Mark);
 	}
 }
 
@@ -327,6 +393,13 @@ void AIslandTidepoolMinnows::ConfigureAppearance()
 			FinMaterial->SetVectorParameterValue(TEXT("BaseColor"), FinColor);
 			if (Tails.IsValidIndex(Index) && Tails[Index]) Tails[Index]->SetMaterial(0, FinMaterial);
 			if (BodyFins.IsValidIndex(Index) && BodyFins[Index]) BodyFins[Index]->SetMaterial(0, FinMaterial);
+
+			const FLinearColor DorsalMarkColor = FMath::Lerp(SchoolPalette[Index % FishCount], FLinearColor(0.70f, 0.62f, 0.38f), 0.65f);
+			UMaterialInstanceDynamic* DorsalMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			if (!DorsalMaterial) continue;
+			DorsalMaterial->SetVectorParameterValue(TEXT("Color"), DorsalMarkColor);
+			DorsalMaterial->SetVectorParameterValue(TEXT("BaseColor"), DorsalMarkColor);
+			if (DorsalMarks.IsValidIndex(Index) && DorsalMarks[Index]) DorsalMarks[Index]->SetMaterial(0, DorsalMaterial);
 		}
 	}
 }

@@ -485,3 +485,22 @@ and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowPoolBounds_20261009
 This contains the school within the measured pool bounds, but the primitive fish still need a more
 distinctive gameplay-distance silhouette; the screenshot also shows shore vegetation overlapping
 the water in screen space, which remains a separate presentation issue.
+
+## Minnow dorsal flash for overhead readability (2026-10-09)
+
+The pool-edge frame showed the school as small dark shapes against the cyan surface. Each fish now
+has a narrow warm-silver dorsal flash that follows the tapered back, using a per-fish tint derived
+from its existing natural body color. It is a separate procedural strip with no collision, overlap,
+shadow, or navigation effect; the fish body palette and scale are unchanged. Regression checks cover
+the strip's dimensions, visual-only settings, and minimum contrast while keeping the accent subdued.
+
+The UE 5.8.3 scratch Editor build succeeded and `CaptiveSky2.Agent.TidepoolMinnows` passed. A
+bounded Raven flyby capture exited normally after 32.3 real seconds with zero model requests; six
+samples entered the low-flyby envelope, with 109 cm maximum school-centroid movement over 26
+post-startle samples. The dorsal flash adds a visible back highlight in the pool-edge frame, though
+the fish remain small and do not yet read as a distinct species. Shore vegetation still overlaps
+the water visually and should be treated separately. Evidence:
+[build](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowDorsalMark_UBT.log),
+[automation](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowDorsalMark2_Automation.log),
+[bounded Game](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Codex_MinnowDorsalMark_Game.log),
+and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Screenshots/000_MinnowStartleMidPulse.png).
