@@ -8,6 +8,32 @@
 #include "NavigationData.h"
 #include "NavigationSystem.h"
 
+namespace
+{
+bool IsLikelyVegetationObstacle(const AActor& Actor, const UStaticMeshComponent& Component)
+{
+	FString SearchableName = Actor.GetName().ToLower();
+#if WITH_EDITOR
+	SearchableName += TEXT(" ");
+	SearchableName += Actor.GetActorLabel().ToLower();
+#endif
+	if (const UStaticMesh* Mesh = Component.GetStaticMesh())
+	{
+		SearchableName += TEXT(" ");
+		SearchableName += Mesh->GetPathName().ToLower();
+	}
+
+	static const TCHAR* const VegetationTokens[] = {
+		TEXT("tree"), TEXT("spruce"), TEXT("sapling"), TEXT("pine"), TEXT("oak"), TEXT("birch"),
+		TEXT("cedar"), TEXT("maple"), TEXT("willow"), TEXT("foliage"), TEXT("grass"), TEXT("flower"),
+		TEXT("plant"), TEXT("shrub"), TEXT("bush"), TEXT("fern"), TEXT("reed"), TEXT("cattail")
+	};
+	for (const TCHAR* Token : VegetationTokens)
+		if (SearchableName.Contains(Token)) return true;
+	return false;
+}
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandCrossingSiteAuditTest, "CaptiveSky2.Agent.CrossingSiteAudit",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
@@ -93,6 +119,8 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 		FString Description;
 	};
 	TArray<FCrossingCandidate> Candidates;
+	TArray<FString> FilteredVegetationAssets;
+	int32 FilteredVegetationProbeCount = 0;
 	constexpr float Diagonal = 0.70710678f;
 	const FVector RadialAxes[] = {
 		FVector(1.f, 0.f, 0.f), FVector(Diagonal, Diagonal, 0.f),
@@ -156,6 +184,12 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 					ObstacleActor->ActorHasTag(TEXT("IslandLandmark")) || ObstacleActor->ActorHasTag(TEXT("IslandInn")) ||
 					ObstacleActor->ActorHasTag(TEXT("IslandLife")) ||
 					FVector::Dist2D(Hit.ImpactPoint, Landmark->GetActorLocation()) < 500.f) continue;
+				if (IsLikelyVegetationObstacle(*ObstacleActor, *ObstacleMesh))
+				{
+					++FilteredVegetationProbeCount;
+					if (const UStaticMesh* Mesh = ObstacleMesh->GetStaticMesh()) FilteredVegetationAssets.AddUnique(Mesh->GetPathName());
+					continue;
+				}
 
 				const FString ObstacleName = ObstacleActor->GetName();
 				const FString ObstacleAsset = ObstacleMesh && ObstacleMesh->GetStaticMesh()
@@ -235,6 +269,12 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 					for (const FVector& LandmarkCenter : LandmarkCenters)
 						bNearLandmark |= FVector::Dist2D(Hit.ImpactPoint, LandmarkCenter) < 500.f;
 					if (bNearLandmark) continue;
+					if (IsLikelyVegetationObstacle(*ObstacleActor, *ObstacleMesh))
+					{
+						++FilteredVegetationProbeCount;
+						if (const UStaticMesh* Mesh = ObstacleMesh->GetStaticMesh()) FilteredVegetationAssets.AddUnique(Mesh->GetPathName());
+						continue;
+					}
 
 					const FString ObstacleName = ObstacleActor->GetName();
 					const FString ObstacleAsset = ObstacleMesh->GetStaticMesh()
@@ -260,6 +300,11 @@ bool FIslandCrossingSiteAuditTest::RunTest(const FString& Parameters)
 				}
 			}
 		}
+	}
+	if (FilteredVegetationProbeCount > 0)
+	{
+		AddInfo(FString::Printf(TEXT("Rejected %d otherwise qualifying probe(s) because the direct-trace blocker name or asset path looks botanical (heuristic only; no site is approved): %s."),
+			FilteredVegetationProbeCount, *FString::Join(FilteredVegetationAssets, TEXT(", "))));
 	}
 
 	Candidates.Sort([](const FCrossingCandidate& A, const FCrossingCandidate& B)
