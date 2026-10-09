@@ -114,6 +114,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		const FProcMeshSection* TailSection = Tail ? Tail->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* FinsSection = Fins ? Fins->GetProcMeshSection(0) : nullptr;
 		const FProcMeshSection* MarkSection = DorsalMark ? DorsalMark->GetProcMeshSection(0) : nullptr;
+		const FProcMeshSection* EyeSection = DorsalMark ? DorsalMark->GetProcMeshSection(1) : nullptr;
+		const FProcMeshSection* PupilSection = DorsalMark ? DorsalMark->GetProcMeshSection(2) : nullptr;
 		TestTrue(TEXT("Tapered minnow bodies are procedural, visual-only, and nonblocking"),
 			BodySection && BodySection->ProcVertexBuffer.Num() == 86 && BodySection->ProcIndexBuffer.Num() == 504 &&
 			Minnow->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Minnow->CastShadow);
@@ -151,6 +153,11 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			DorsalMark->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !DorsalMark->CastShadow &&
 			MarkSection->SectionLocalBox.Min.X <= -4.8f && MarkSection->SectionLocalBox.Max.X >= 4.8f &&
 			MarkSection->SectionLocalBox.Min.Y <= -0.34f && MarkSection->SectionLocalBox.Max.Y >= 0.34f);
+		TestTrue(TEXT("Paired eyes sit on both head flanks as small visual-only mesh details"),
+			EyeSection && EyeSection->ProcVertexBuffer.Num() == 18 && EyeSection->ProcIndexBuffer.Num() == 48 &&
+			EyeSection->SectionLocalBox.Min.X > 3.9f && EyeSection->SectionLocalBox.Max.X < 5.f &&
+			EyeSection->SectionLocalBox.Min.Y < -1.f && EyeSection->SectionLocalBox.Max.Y > 1.f &&
+			PupilSection && PupilSection->ProcVertexBuffer.Num() == 18 && PupilSection->ProcIndexBuffer.Num() == 48);
 		TestTrue(TEXT("Each tail fin is positioned just behind the body tail stock"),
 			Tail && Tail->GetRelativeLocation().X <= -7.5f);
 		if (TailSection)
@@ -199,6 +206,13 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 				MarkMaterial && FMath::Max(MarkColor.R, FMath::Max(MarkColor.G, MarkColor.B)) >
 				FMath::Max(FishColor.R, FMath::Max(FishColor.G, FishColor.B)) + 0.1f &&
 				MarkColor.R <= 0.65f && MarkColor.G <= 0.65f);
+			UMaterialInstanceDynamic* EyeMaterial = DorsalMark ? Cast<UMaterialInstanceDynamic>(DorsalMark->GetMaterial(1)) : nullptr;
+			UMaterialInstanceDynamic* PupilMaterial = DorsalMark ? Cast<UMaterialInstanceDynamic>(DorsalMark->GetMaterial(2)) : nullptr;
+			const FLinearColor IrisColor = EyeMaterial ? EyeMaterial->K2_GetVectorParameterValue(TEXT("Color")) : FLinearColor::Black;
+			const FLinearColor PupilColor = PupilMaterial ? PupilMaterial->K2_GetVectorParameterValue(TEXT("Color")) : FLinearColor::White;
+			TestTrue(TEXT("Amber irises and dark pupils add a restrained, readable fish-face cue"),
+				EyeMaterial && PupilMaterial && IrisColor.R > 0.75f && IrisColor.G > 0.5f && IrisColor.B < 0.4f &&
+				FMath::Max(PupilColor.R, FMath::Max(PupilColor.G, PupilColor.B)) < 0.1f);
 		}
 	}
 	TestEqual(TEXT("Every fish receives an individual visual color"), FishColors.Num(), School->Fish.Num());

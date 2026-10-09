@@ -244,6 +244,69 @@ void BuildDorsalMark(UProceduralMeshComponent* Mark)
 		Triangles.Append({ A, B, B + 1, A, B + 1, A + 1 });
 	}
 	Mark->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+
+	auto GetBodyRadiiAt = [](float X)
+	{
+		int32 Ring = 0;
+		while (Ring < StationCount - 2 && X > RingX[Ring + 1]) ++Ring;
+		const float Alpha = FMath::Clamp((X - RingX[Ring]) / (RingX[Ring + 1] - RingX[Ring]), 0.f, 1.f);
+		return FVector2D(FMath::Lerp(RingRadiusY[Ring], RingRadiusY[Ring + 1], Alpha),
+			FMath::Lerp(RingRadiusZ[Ring], RingRadiusZ[Ring + 1], Alpha));
+	};
+	auto SurfaceYAt = [&GetBodyRadiiAt](float X, float Z, float Side, float Offset)
+	{
+		const FVector2D Radii = GetBodyRadiiAt(X);
+		const float SideY = Radii.X * FMath::Sqrt(FMath::Max(0.f, 1.f - FMath::Square(Z / Radii.Y))) + Offset;
+		return Side * SideY;
+	};
+	auto BuildEyesSection = [&](int32 SectionIndex, float Radius, float SurfaceOffset, float CenterXOffset, float CenterZOffset)
+	{
+		TArray<FVector> EyeVertices;
+		TArray<int32> EyeTriangles;
+		TArray<FVector> EyeNormals;
+		TArray<FVector2D> EyeUVs;
+		TArray<FLinearColor> EyeColors;
+		TArray<FProcMeshTangent> EyeTangents;
+		EyeVertices.Reserve(18);
+		EyeTriangles.Reserve(48);
+		EyeNormals.Reserve(18);
+		EyeUVs.Reserve(18);
+		EyeColors.Reserve(18);
+		EyeTangents.Reserve(18);
+		for (int32 SideIndex = 0; SideIndex < 2; ++SideIndex)
+		{
+			const float Side = SideIndex == 0 ? -1.f : 1.f;
+			const float CenterX = 4.45f + CenterXOffset;
+			const float CenterZ = 0.66f + CenterZOffset;
+			const int32 FirstVertex = EyeVertices.Num();
+			EyeVertices.Add(FVector(CenterX, SurfaceYAt(CenterX, CenterZ, Side, SurfaceOffset), CenterZ));
+			EyeNormals.Add(FVector(0.f, Side, 0.f));
+			EyeUVs.Add(FVector2D(0.5f, 0.5f));
+			EyeColors.Add(FLinearColor::White);
+			EyeTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
+			for (int32 Segment = 0; Segment < 8; ++Segment)
+			{
+				const float Angle = 2.f * PI * Segment / 8.f;
+				const float X = CenterX + FMath::Cos(Angle) * Radius;
+				const float Z = CenterZ + FMath::Sin(Angle) * Radius;
+				EyeVertices.Add(FVector(X, SurfaceYAt(X, Z, Side, SurfaceOffset), Z));
+				EyeNormals.Add(FVector(0.f, Side, 0.f));
+				EyeUVs.Add(FVector2D(0.5f + 0.5f * FMath::Cos(Angle), 0.5f + 0.5f * FMath::Sin(Angle)));
+				EyeColors.Add(FLinearColor::White);
+				EyeTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
+			}
+			for (int32 Segment = 0; Segment < 8; ++Segment)
+			{
+				const int32 Current = FirstVertex + 1 + Segment;
+				const int32 Next = FirstVertex + 1 + (Segment + 1) % 8;
+				if (Side > 0.f) EyeTriangles.Append({ FirstVertex, Next, Current });
+				else EyeTriangles.Append({ FirstVertex, Current, Next });
+			}
+		}
+		Mark->CreateMeshSection_LinearColor(SectionIndex, EyeVertices, EyeTriangles, EyeNormals, EyeUVs, EyeColors, EyeTangents, false);
+	};
+	BuildEyesSection(1, 0.46f, 0.11f, 0.f, 0.f);
+	BuildEyesSection(2, 0.19f, 0.20f, 0.08f, 0.04f);
 }
 }
 
@@ -400,6 +463,20 @@ void AIslandTidepoolMinnows::ConfigureAppearance()
 			DorsalMaterial->SetVectorParameterValue(TEXT("Color"), DorsalMarkColor);
 			DorsalMaterial->SetVectorParameterValue(TEXT("BaseColor"), DorsalMarkColor);
 			if (DorsalMarks.IsValidIndex(Index) && DorsalMarks[Index]) DorsalMarks[Index]->SetMaterial(0, DorsalMaterial);
+
+			UMaterialInstanceDynamic* EyeMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			if (!EyeMaterial) continue;
+			const FLinearColor IrisColor(0.88f, 0.63f, 0.25f);
+			EyeMaterial->SetVectorParameterValue(TEXT("Color"), IrisColor);
+			EyeMaterial->SetVectorParameterValue(TEXT("BaseColor"), IrisColor);
+			if (DorsalMarks.IsValidIndex(Index) && DorsalMarks[Index]) DorsalMarks[Index]->SetMaterial(1, EyeMaterial);
+
+			UMaterialInstanceDynamic* PupilMaterial = UMaterialInstanceDynamic::Create(BaseShapeMaterial, this);
+			if (!PupilMaterial) continue;
+			const FLinearColor PupilColor(0.035f, 0.028f, 0.018f);
+			PupilMaterial->SetVectorParameterValue(TEXT("Color"), PupilColor);
+			PupilMaterial->SetVectorParameterValue(TEXT("BaseColor"), PupilColor);
+			if (DorsalMarks.IsValidIndex(Index) && DorsalMarks[Index]) DorsalMarks[Index]->SetMaterial(2, PupilMaterial);
 		}
 	}
 }

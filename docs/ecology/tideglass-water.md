@@ -505,6 +505,23 @@ the water visually and should be treated separately. Evidence:
 [bounded Game](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Codex_MinnowDorsalMark_Game.log),
 and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowDorsalMark_20261009/Screenshots/000_MinnowStartleMidPulse.png).
 
+### Paired eye accents (2026-10-09)
+
+Each fish now has a small amber iris and dark pupil on both head flanks. The procedural discs follow
+the tapered body profile and occupy separate non-colliding, non-shadowing mesh sections; body scale,
+movement, and fish-school behavior are unchanged. `CaptiveSky2.Agent.TidepoolMinnows` checks the
+paired geometry and the two restrained material colors. The UE 5.8.3 scratch build and focused
+automation passed with resident thinking disabled and model requests capped at zero:
+[build](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowEyes_UBT.log) and
+[automation](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_MinnowEyes2_Automation.log).
+
+The follow-up bounded Game launch did not reach the Island: it stalled during UBT
+`ValidatePlatforms` while a newly spawned UE-bundled .NET 10 process idled, so there is no post-eye
+Game frame yet. The paired details are implemented and compile-tested, but their readability at
+pool-edge distance is not visually verified. Keep the fish scale unchanged; review them in a fresh
+bounded Game capture when the intermittent validation startup succeeds. See the
+[startup correlation note](../findings/2026-10-08-ue-ubt-dotnet-exception.md#bounded-game-startup-correlation-2026-10-09-0236-local).
+
 ### Pool-edge grass observation (2026-10-09)
 
 The low-angle mid-pulse frame shows grass silhouettes crossing the visible water surface, but the
