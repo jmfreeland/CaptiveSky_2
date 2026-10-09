@@ -39,6 +39,18 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 		const TArray<FIslandWrackPiece> Pieces = AIslandWrack::Layout(ThisKind, 5);
 		TestTrue(TEXT("A heap has pieces"), Pieces.Num() >= 1 && Pieces.Num() <= 10);
 		TestEqual(TEXT("A heap is the same each time"), AIslandWrack::Layout(ThisKind, 5).Num(), Pieces.Num());
+		if (ThisKind == Kind::Driftwood)
+		{
+			TestTrue(TEXT("Storm-fallen wood has a broken multi-branch silhouette"), Pieces.Num() >= 3);
+			float Longest = 0.f;
+			float Shortest = TNumericLimits<float>::Max();
+			for (const FIslandWrackPiece& Piece : Pieces)
+			{
+				Longest = FMath::Max(Longest, Piece.Transform.GetScale3D().Z);
+				Shortest = FMath::Min(Shortest, Piece.Transform.GetScale3D().Z);
+			}
+			TestTrue(TEXT("Loose branches are shorter than the main limb"), Shortest < Longest * 0.65f);
+		}
 		for (const FIslandWrackPiece& Piece : Pieces)
 		{
 			const FVector Spot = Piece.Transform.GetLocation();

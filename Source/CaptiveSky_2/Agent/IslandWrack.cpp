@@ -287,18 +287,37 @@ TArray<FIslandWrackPiece> AIslandWrack::Layout(EIslandWrackKind Kind, int32 Seed
 	{
 	case EIslandWrackKind::Driftwood:
 	{
-		const int32 Logs = 1 + Random.RandRange(0, 2);
+		// A single primitive log reads like a pipe at shore-view distance. Give each
+		// fall a compact, broken silhouette: one or two heavier limbs with several
+		// smaller storm-snapped branches laid across the sand.
+		const int32 Logs = 1 + Random.RandRange(0, 1);
 		for (int32 I = 0; I < Logs; ++I)
 		{
-			const float Length = Random.FRandRange(150.f, 320.f) * (I == 0 ? 1.f : 0.7f);
-			const float Thick = Random.FRandRange(9.f, 22.f);
-			const float Angle = Random.FRandRange(-0.4f, 0.4f);
-			const FVector Direction = FVector(FMath::Cos(Angle), FMath::Sin(Angle), Random.FRandRange(-0.04f, 0.12f)).GetSafeNormal();
-			FVector Offset = FVector::ZeroVector;
-			if (I > 0) Offset = FVector(Random.FRandRange(-100.f, 100.f), (Random.FRand() < 0.5f ? -1.f : 1.f) * Random.FRandRange(45.f, 120.f), 0.f);
+			const float Angle = Random.FRandRange(-0.4f, 0.4f) + (I == 0 ? 0.f : PI * 0.5f);
+			const float Length = Random.FRandRange(145.f, 275.f) * (I == 0 ? 1.f : 0.72f);
+			const float Thick = Random.FRandRange(12.f, 23.f) * (I == 0 ? 1.f : 0.8f);
+			FVector Offset = I == 0 ? FVector::ZeroVector : FVector(Random.FRandRange(-45.f, 45.f), Random.FRandRange(-45.f, 45.f), 0.f);
 			Offset.Z = Ground + Thick * 0.35f;
-			const FQuat Rotation = FRotationMatrix::MakeFromZX(Direction, FVector::UpVector).ToQuat();
-			Out.Add({FTransform(Rotation, Offset, FVector(Thick / 100.f, Thick / 100.f, Length / 100.f))});
+			const FVector MainDirection = FVector(FMath::Cos(Angle), FMath::Sin(Angle), Random.FRandRange(-0.05f, 0.1f)).GetSafeNormal();
+			const FQuat MainRotation = FRotationMatrix::MakeFromZX(MainDirection, FVector::UpVector).ToQuat();
+			Out.Add({FTransform(MainRotation, Offset, FVector(Thick / 100.f, Thick / 100.f, Length / 100.f))});
+
+			const FVector Side(-FMath::Sin(Angle), FMath::Cos(Angle), 0.f);
+			const int32 Branches = 2 + Random.RandRange(0, 1);
+			for (int32 Branch = 0; Branch < Branches; ++Branch)
+			{
+				const float SideSign = Random.FRand() < 0.5f ? -1.f : 1.f;
+				const float BranchAngle = Angle + SideSign * Random.FRandRange(0.45f, 0.95f);
+				const float BranchLength = Random.FRandRange(55.f, 105.f);
+				const float BranchThick = Random.FRandRange(4.5f, 8.f);
+				const float Along = Random.FRandRange(-0.28f, 0.28f) * Length;
+				const float Across = SideSign * Random.FRandRange(8.f, 24.f);
+				FVector BranchOffset = Offset + MainDirection * Along + Side * Across;
+				BranchOffset.Z = Ground + BranchThick * 0.5f;
+				const FVector BranchDirection = FVector(FMath::Cos(BranchAngle), FMath::Sin(BranchAngle), Random.FRandRange(0.08f, 0.28f)).GetSafeNormal();
+				const FQuat BranchRotation = FRotationMatrix::MakeFromZX(BranchDirection, FVector::UpVector).ToQuat();
+				Out.Add({FTransform(BranchRotation, BranchOffset, FVector(BranchThick / 100.f, BranchThick / 100.f, BranchLength / 100.f))});
+			}
 		}
 		break;
 	}
