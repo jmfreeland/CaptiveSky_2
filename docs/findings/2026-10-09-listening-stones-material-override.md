@@ -106,3 +106,15 @@ Therefore no existing surface is a verified drop-in: the next material pass
 must check texture projection/tiling on the actual transient mesh and judge a
 matched in-game render before keeping it. No Content asset was changed in this
 audit.
+
+**Local candidate discovered after the render audit (2026-10-09):** the project
+also contains `/Game/Materials/M_StandingStoneRockSurface` as a 15,733-byte
+material asset, last written at 17:52 local time. The current presentation code
+does not reference that path; it still loads Engine `BasicShapeMaterial` and
+sets only its `Color` parameter. The local material's graph, dependencies, UV
+response, and appearance have not been inspected, so its name is not evidence
+that it solves the texture problem. Next, inspect it read-only and, if its
+inputs suit the procedural UVs, test it transiently in the same noon and shadow
+views. Keep it out of `Content/` edits and do not replace the current surface
+until a matched real-RHI capture shows a genuine improvement. No runtime code
+or binary asset was changed in this follow-up.
