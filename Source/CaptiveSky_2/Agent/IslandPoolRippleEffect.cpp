@@ -117,7 +117,9 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		StartleRing->SetRelativeScale3D(FVector(RingRadius, RingRadius, 1.f));
 		if (StartleRingMaterial)
 		{
-			const FLinearColor RingTint = FLinearColor(0.025f, 0.40f, 0.52f) * Pulse;
+			// The moving point lights provide the readable cue; keep the continuous band
+			// subdued so it reads as a passing water ripple rather than a neon marker.
+			const FLinearColor RingTint = FLinearColor(0.008f, 0.12f, 0.15f) * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);

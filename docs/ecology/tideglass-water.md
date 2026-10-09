@@ -534,3 +534,20 @@ reported Game clearance violation, the low-angle overlap is most consistent with
 occlusion rather than grass planted in water. Do not widen the ecology exclusion ring on this
 image alone; improve the approach sightline or judge the edge from a higher camera instead.
 Regression log: [`Codex_PoolEdgeAudit_GroundCover.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_PoolEdgeAudit_GroundCover.log).
+
+### Soften the Raven-triggered minnow ring (2026-10-09)
+
+The mid-pulse Tideglass capture showed the startle cue's continuous annulus still reading as a
+bright cyan marker; the preceding intensity adjustment affected only its separate moving point
+lights. Lowered the annulus' transient emissive tint from `(0.025, 0.40, 0.52)` to
+`(0.008, 0.12, 0.15)`, leaving its radius, timing, scatter response, and light highlights
+unchanged. The focused minnow regression now checks the ring's mid-pulse material value.
+
+The UE 5.8.3 scratch Editor target built successfully (158 actions), and
+`CaptiveSky2.Agent.TidepoolMinnows` passed. A real-RHI Game pass completed the Raven's bounded
+curiosity wander and shut down normally after 32.4 real seconds with zero model requests under
+the 45-second cap. Its mid-pulse capture shows the ring dimmer and centered over the pool; it is
+still a simple emissive annulus rather than a true water-normal/refraction disturbance. Evidence:
+[automation](../../Saved/CompileScratch/Codex_RippleTint_20261009/Saved/Logs/MinnowTint_Automation.log),
+[bounded Game](../../Saved/Playtests/Codex_MinnowTint_20261009/Codex_MinnowTint_Retry_Game.log),
+and [mid-pulse screenshot](../../Saved/Playtests/Codex_MinnowTint_20261009/ScreenshotsRetry/000_MinnowStartleMidPulse.png).

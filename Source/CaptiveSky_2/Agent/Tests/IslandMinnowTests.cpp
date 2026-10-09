@@ -337,6 +337,9 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		ObserverStartleRipple->Tick(0.5f);
 		TestTrue(TEXT("The visible surface ring expands while the startle cue fades"),
 			ObserverStartleRipple->StartleRing->GetRelativeScale3D().X > 12.f);
+		const FLinearColor StartleRingPulse = ObserverStartleRipple->StartleRingMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+		TestTrue(TEXT("The continuous ring stays below the older bright-cyan emissive treatment"),
+			StartleRingPulse.G > 0.08f && StartleRingPulse.G < 0.20f && StartleRingPulse.B < 0.24f);
 		School->RespondToQuietObservation(Visitor->GetActorLocation());
 		int32 RepeatedStartleRippleCount = 0;
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
