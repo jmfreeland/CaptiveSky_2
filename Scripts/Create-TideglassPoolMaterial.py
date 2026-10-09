@@ -15,7 +15,7 @@ import unreal
 MATERIAL_NAME = os.environ.get("CAPTIVESKY_TIDEGLASS_MATERIAL_NAME", "M_TideglassPool_Lively")
 MATERIAL_PATH = "/Game/Materials/" + MATERIAL_NAME
 IS_GRAZING_READABLE_CANDIDATE = MATERIAL_NAME == "M_TideglassPool_GrazingReadable"
-IS_RIPPLE_VARIANT = MATERIAL_NAME == "M_TideglassPool_Ripple"
+IS_RIPPLE_VARIANT = MATERIAL_NAME in ("M_TideglassPool_Ripple", "M_TideglassPool_RippleWake")
 COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WAVE_NORMAL = "/Water/Textures/Normals/T_Water_TilingNormal_Waves_02"
 MEL = unreal.MaterialEditingLibrary
@@ -163,21 +163,50 @@ def build():
                                       ripple_age,
                                       scalar(material, "RippleSpeedCmPerSecond", 64.0, -1200, 1480),
                                       -1000, 1280)
-        distance_from_front = unary(material, unreal.MaterialExpressionAbs,
-                                     binary(material, unreal.MaterialExpressionSubtract,
-                                            ripple_distance, ripple_front_radius, -800, 1120),
-                                     -600, 1120)
-        front_width = scalar(material, "RippleWidthCm", 24.0, -800, 1280)
-        front_fraction = unary(material, unreal.MaterialExpressionSaturate,
-                               binary(material, unreal.MaterialExpressionDivide,
-                                      distance_from_front, front_width, -400, 1120),
-                               -200, 1120)
-        front_profile = binary(material, unreal.MaterialExpressionSubtract,
-                               constant(material, 1.0, -200, 1280),
-                               front_fraction, 0, 1120)
-        softened_front = expr(material, unreal.MaterialExpressionPower, 200, 1120)
-        link(front_profile, softened_front, "Base")
-        link(constant(material, 2.0, 0, 1280), softened_front, "Exp")
+        front_width = scalar(material, "RippleWidthCm", 16.0, -800, 1280)
+
+        def softened_ring_profile(ring_radius, y):
+            distance_from_ring = unary(material, unreal.MaterialExpressionAbs,
+                                        binary(material, unreal.MaterialExpressionSubtract,
+                                               ripple_distance, ring_radius, -800, y),
+                                        -600, y)
+            ring_fraction = unary(material, unreal.MaterialExpressionSaturate,
+                                  binary(material, unreal.MaterialExpressionDivide,
+                                         distance_from_ring, front_width, -400, y),
+                                  -200, y)
+            ring_profile = binary(material, unreal.MaterialExpressionSubtract,
+                                  constant(material, 1.0, -200, y + 80),
+                                  ring_fraction, 0, y)
+            softened = expr(material, unreal.MaterialExpressionPower, 200, y)
+            link(ring_profile, softened, "Base")
+            link(constant(material, 2.0, 0, y + 80), softened, "Exp")
+            return softened
+
+        # A leading ring alone reads as a graphic outline. Leave two weaker,
+        # expanding crests behind it so the pool itself shows the passing wave train.
+        ripple_train = softened_ring_profile(ripple_front_radius, 1120)
+        ripple_spacing = scalar(material, "RippleSpacingCm", 24.0, -1000, 1600)
+        for trail_index, trail_weight, y in ((1, 0.38, 1720), (2, 0.18, 2020)):
+            trail_offset = binary(material, unreal.MaterialExpressionMultiply,
+                                  ripple_spacing, constant(material, float(trail_index), -1000, y + 100),
+                                  -800, y + 100)
+            trail_radius = binary(material, unreal.MaterialExpressionSubtract,
+                                  ripple_front_radius, trail_offset, -600, y)
+            trail_radius_active = unary(material, unreal.MaterialExpressionSaturate,
+                                        binary(material, unreal.MaterialExpressionDivide,
+                                               trail_radius, ripple_spacing, -400, y + 120),
+                                        -200, y + 120)
+            safe_trail_radius = binary(material, unreal.MaterialExpressionMax,
+                                       trail_radius, constant(material, 0.0, -400, y + 220),
+                                       -200, y + 40)
+            trail_profile = softened_ring_profile(safe_trail_radius, y + 320)
+            gated_profile = binary(material, unreal.MaterialExpressionMultiply,
+                                    trail_profile, trail_radius_active, 0, y + 320)
+            weighted_profile = binary(material, unreal.MaterialExpressionMultiply,
+                                      gated_profile, constant(material, trail_weight, 200, y + 420),
+                                      200, y + 320)
+            ripple_train = binary(material, unreal.MaterialExpressionAdd,
+                                  ripple_train, weighted_profile, 400, y + 300)
         ripple_age_fraction = unary(material, unreal.MaterialExpressionSaturate,
                                     binary(material, unreal.MaterialExpressionDivide,
                                            ripple_age,
@@ -187,7 +216,7 @@ def build():
         ripple_fade = binary(material, unreal.MaterialExpressionSubtract,
                              constant(material, 1.0, 200, 1480), ripple_age_fraction, 400, 1440)
         ripple_envelope = binary(material, unreal.MaterialExpressionMultiply,
-                                 softened_front, ripple_fade, 600, 1260)
+                                 ripple_train, ripple_fade, 600, 1260)
         ripple_strength = binary(material, unreal.MaterialExpressionMultiply,
                                  ripple_envelope,
                                  scalar(material, "RippleAmplitude", 0.0, 400, 1420),

@@ -343,7 +343,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			ObserverStartleRipple->StartleRing->GetRelativeScale3D().X > 12.f);
 		const FLinearColor StartleRingPulse = ObserverStartleRipple->StartleRingMaterial->K2_GetVectorParameterValue(TEXT("Color"));
 		TestTrue(TEXT("The continuous ring is subdued, desaturated teal rather than a bright-cyan marker"),
-			StartleRingPulse.G > 0.04f && StartleRingPulse.G < 0.09f && StartleRingPulse.B < 0.11f);
+			StartleRingPulse.G > 0.012f && StartleRingPulse.G < 0.03f &&
+			StartleRingPulse.B > 0.016f && StartleRingPulse.B < 0.035f);
 		School->RespondToQuietObservation(Visitor->GetActorLocation());
 		int32 RepeatedStartleRippleCount = 0;
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)

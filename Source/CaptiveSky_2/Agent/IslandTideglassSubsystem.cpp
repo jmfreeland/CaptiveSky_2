@@ -16,7 +16,7 @@
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglass, Log, All);
 
 const TCHAR* UIslandTideglassSubsystem::MaterialPath = TEXT("/Game/Materials/M_TideglassPool_GrazingReadable.M_TideglassPool_GrazingReadable");
-const TCHAR* UIslandTideglassSubsystem::RippleMaterialPath = TEXT("/Game/Materials/M_TideglassPool_Ripple.M_TideglassPool_Ripple");
+const TCHAR* UIslandTideglassSubsystem::RippleMaterialPath = TEXT("/Game/Materials/M_TideglassPool_RippleWake.M_TideglassPool_RippleWake");
 
 float UIslandTideglassSubsystem::TideOffsetCm(float IslandHour, int32 IslandDay)
 {
@@ -221,7 +221,8 @@ bool UIslandTideglassSubsystem::TriggerSurfaceRipple(const FVector& WorldCenter,
 	Material->SetScalarParameterValue(TEXT("RippleStartTime"), GetWorld()->GetTimeSeconds());
 	Material->SetScalarParameterValue(TEXT("RippleSpeedCmPerSecond"), SafeRadius / SafeDuration);
 	Material->SetScalarParameterValue(TEXT("RippleDurationSeconds"), SafeDuration);
-	Material->SetScalarParameterValue(TEXT("RippleWidthCm"), FMath::Clamp(SafeRadius * 0.34f, 12.f, 36.f));
+	Material->SetScalarParameterValue(TEXT("RippleWidthCm"), FMath::Clamp(SafeRadius * 0.22f, 10.f, 24.f));
+	Material->SetScalarParameterValue(TEXT("RippleSpacingCm"), FMath::Clamp(SafeRadius / 3.f, 16.f, 42.f));
 	Material->SetScalarParameterValue(TEXT("RippleAmplitude"), SafeStrength);
 	return true;
 }

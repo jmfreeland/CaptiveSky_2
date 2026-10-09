@@ -107,6 +107,10 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 						RuntimeMaterial->K2_GetVectorParameterValue(TEXT("RippleCenter")).Equals(FLinearColor(RippleCenter.X, RippleCenter.Y, 0.f, 1.f), 0.1f));
 					TestTrue(TEXT("The ring-front speed matches the interaction's radius and duration"),
 						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleSpeedCmPerSecond")), 72.f / 1.15f, 0.01f));
+					TestTrue(TEXT("The wave-train spacing follows the pool-scale startle radius"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleSpacingCm")), 24.f, 0.01f));
+					TestTrue(TEXT("The leading and trailing wave crests stay broad but separated"),
+						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleWidthCm")), 15.84f, 0.01f));
 					TestTrue(TEXT("The interaction sets a finite, restrained ripple amplitude"),
 						FMath::IsNearlyEqual(RuntimeMaterial->K2_GetScalarParameterValue(TEXT("RippleAmplitude")), 0.62f, 0.001f));
 					if (MinnowImpact) MinnowImpact->Destroy();

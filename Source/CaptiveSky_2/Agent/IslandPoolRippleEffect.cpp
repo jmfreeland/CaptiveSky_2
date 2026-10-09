@@ -129,7 +129,7 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		{
 			// The moving highlights carry most of the cue. Keep this wider band dark,
 			// desaturated teal so it feels embedded in the pool instead of drawn on it.
-			const FLinearColor RingTint = FLinearColor(0.004f, 0.065f, 0.075f) * Pulse;
+			const FLinearColor RingTint = FLinearColor(0.001f, 0.018f, 0.022f) * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);
