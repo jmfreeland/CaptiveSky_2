@@ -329,7 +329,11 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			? ObserverStartleRipple->StartleRing->GetProcMeshSection(0) : nullptr;
 		TestTrue(TEXT("The surface ring has a broad enough band to remain legible over moving water"),
 			StartleRingSection && StartleRingSection->ProcVertexBuffer.Num() >= 2 &&
-			FVector::Dist(StartleRingSection->ProcVertexBuffer[0].Position, StartleRingSection->ProcVertexBuffer[1].Position) >= 0.09f);
+			FVector::Dist(StartleRingSection->ProcVertexBuffer[0].Position, StartleRingSection->ProcVertexBuffer[1].Position) >= 0.21f);
+		TestTrue(TEXT("The surface ring has a gently irregular shoreline instead of a perfect geometric circle"),
+			StartleRingSection && StartleRingSection->ProcVertexBuffer.Num() >= 4 &&
+			FMath::Abs(StartleRingSection->ProcVertexBuffer[1].Position.Size() -
+				StartleRingSection->ProcVertexBuffer[3].Position.Size()) > 0.001f);
 		TestTrue(TEXT("The cue stays near the nearest fish while keeping its full ring inside the safe water footprint"),
 			ObserverStartleRipple->GetActorLocation().Equals(ExpectedStartleRippleLocation, 0.1f));
 		TestTrue(TEXT("The observer-triggered ring's full radius clears the pool edge"),
@@ -338,8 +342,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The visible surface ring expands while the startle cue fades"),
 			ObserverStartleRipple->StartleRing->GetRelativeScale3D().X > 12.f);
 		const FLinearColor StartleRingPulse = ObserverStartleRipple->StartleRingMaterial->K2_GetVectorParameterValue(TEXT("Color"));
-		TestTrue(TEXT("The continuous ring stays below the older bright-cyan emissive treatment"),
-			StartleRingPulse.G > 0.08f && StartleRingPulse.G < 0.20f && StartleRingPulse.B < 0.24f);
+		TestTrue(TEXT("The continuous ring is subdued, desaturated teal rather than a bright-cyan marker"),
+			StartleRingPulse.G > 0.04f && StartleRingPulse.G < 0.09f && StartleRingPulse.B < 0.11f);
 		School->RespondToQuietObservation(Visitor->GetActorLocation());
 		int32 RepeatedStartleRippleCount = 0;
 		for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)

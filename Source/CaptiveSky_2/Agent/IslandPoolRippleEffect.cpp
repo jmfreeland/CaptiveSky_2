@@ -127,9 +127,9 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		StartleRing->SetRelativeScale3D(FVector(RingRadius, RingRadius, 1.f));
 		if (StartleRingMaterial)
 		{
-			// The moving point lights provide the readable cue; keep the continuous band
-			// subdued so it reads as a passing water ripple rather than a neon marker.
-			const FLinearColor RingTint = FLinearColor(0.008f, 0.12f, 0.15f) * Pulse;
+			// The moving highlights carry most of the cue. Keep this wider band dark,
+			// desaturated teal so it feels embedded in the pool instead of drawn on it.
+			const FLinearColor RingTint = FLinearColor(0.004f, 0.065f, 0.075f) * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);
@@ -149,9 +149,9 @@ void AIslandPoolRippleEffect::BuildStartleRing()
 	if (!StartleRing) return;
 
 	constexpr int32 SegmentCount = 64;
-	// A narrow ring disappears among the prototype water's broad specular facets.
-	// Keep this a soft band, but give it enough surface area to read at game scale.
-	constexpr float InnerRadius = 0.90f;
+	// A narrow perfect circle read like a marker in the runtime capture. Broaden the
+	// band and gently vary its radius so the moving cue feels like a real surface wave.
+	constexpr float InnerRadius = 0.78f;
 	TArray<FVector> Vertices;
 	TArray<int32> Triangles;
 	TArray<FVector> Normals;
@@ -170,8 +170,11 @@ void AIslandPoolRippleEffect::BuildStartleRing()
 		const float Angle = 2.f * PI * Index / SegmentCount;
 		const float CosAngle = FMath::Cos(Angle);
 		const float SinAngle = FMath::Sin(Angle);
-		Vertices.Add(FVector(CosAngle * InnerRadius, SinAngle * InnerRadius, 0.f));
-		Vertices.Add(FVector(CosAngle, SinAngle, 0.f));
+		const float RadiusVariation = 1.f + 0.035f * FMath::Sin(Angle * 3.f + 0.4f)
+			+ 0.018f * FMath::Sin(Angle * 7.f - 0.9f);
+		Vertices.Add(FVector(CosAngle * InnerRadius * RadiusVariation,
+			SinAngle * InnerRadius * RadiusVariation, 0.f));
+		Vertices.Add(FVector(CosAngle * RadiusVariation, SinAngle * RadiusVariation, 0.f));
 		for (int32 Edge = 0; Edge < 2; ++Edge)
 		{
 			Normals.Add(FVector::UpVector);
