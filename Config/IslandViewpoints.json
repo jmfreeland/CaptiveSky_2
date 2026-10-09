@@ -201,6 +201,27 @@
 			"min_height": 300
 		},
 		{
+			"name": "04a_RavenNestCloseup",
+			"from": {
+				"tag": "Roost_West",
+				"offset": [
+					650,
+					-650,
+					220
+				]
+			},
+			"look": {
+				"tag": "Roost_West",
+				"offset": [
+					0,
+					0,
+					-60
+				]
+			},
+			"fov": 45,
+			"min_height": 160
+		},
+		{
 			"name": "05_StonesFirefly",
 			"from": {
 				"tag": "ListeningStones",
