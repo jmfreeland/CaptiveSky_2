@@ -92,6 +92,7 @@ protected:
 private:
 	friend class FIslandMovementProbeCommand;
 	friend class FRavenPerchTest;
+	friend class FRavenShelterCandidateAuditTest;
 	friend class FIslandRavenWingCaptureTest;
 	friend class FIslandNestTest;
 	friend class FRavenFlightTest;

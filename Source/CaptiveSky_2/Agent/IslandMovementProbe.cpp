@@ -2,11 +2,15 @@
 #include "AutonomousAgentCharacter.h"
 #include "AgentMemoryComponent.h"
 #include "RavenAgentAIController.h"
+#include "IslandWeather.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Engine/TargetPoint.h"
 #include "Components/SceneComponent.h"
 #include "Components/ActorComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
 #include "GameFramework/Character.h"
@@ -24,6 +28,216 @@ DEFINE_LOG_CATEGORY_STATIC(LogIslandMovementProbe, Log, All);
 class FIslandMovementProbeCommand
 {
 public:
+	static void RunRavenShelterAudit(const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || !World->IsGameWorld())
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Island.RavenShelterAudit requires a running game world."));
+			return;
+		}
+		const bool bRuntimeReady = Args.ContainsByPredicate([](const FString& Arg)
+			{ return Arg.Equals(TEXT("RuntimeReady"), ESearchCase::IgnoreCase); });
+		if (!bRuntimeReady)
+		{
+			TWeakObjectPtr<UWorld> WeakWorld(World);
+			FTimerHandle RetryTimer;
+			World->GetTimerManager().SetTimer(RetryTimer, FTimerDelegate::CreateLambda([WeakWorld, Args]()
+			{
+				TArray<FString> RetryArgs = Args;
+				RetryArgs.Add(TEXT("RuntimeReady"));
+				if (UWorld* RetryWorld = WeakWorld.Get())
+					FIslandMovementProbeCommand::RunRavenShelterAudit(RetryArgs, RetryWorld);
+			}), 5.f, false);
+			UE_LOG(LogIslandMovementProbe, Log, TEXT("Shelter audit queued for five Game-world seconds so residents and IslandWeather can finish startup."));
+			return;
+		}
+
+		ARavenAgentAIController* RavenController = nullptr;
+		AIslandWeather* Weather = nullptr;
+		AActor* EastRoost = nullptr;
+		for (TActorIterator<AIslandWeather> It(World); It; ++It) { Weather = *It; break; }
+		for (TActorIterator<AActor> It(World); It; ++It)
+		{
+			if (!EastRoost && It->ActorHasTag(TEXT("Roost_East")) && It->ActorHasTag(TEXT("RavenPerch"))) EastRoost = *It;
+			if (!RavenController)
+				if (APawn* Pawn = Cast<APawn>(*It)) RavenController = Cast<ARavenAgentAIController>(Pawn->GetController());
+		}
+		if (!Weather || !EastRoost || !RavenController || !RavenController->GetPawn())
+		{
+			UE_LOG(LogIslandMovementProbe, Error,
+				TEXT("Shelter audit needs IslandWeather, the tagged Roost_East marker, and a possessed live Raven."));
+			return;
+		}
+
+		TArray<UHierarchicalInstancedStaticMeshComponent*> GroundCoverComponents;
+		Weather->GetComponents<UHierarchicalInstancedStaticMeshComponent>(GroundCoverComponents);
+		int64 GroundCoverInstances = 0;
+		int32 SpruceInstances = 0;
+		for (const UHierarchicalInstancedStaticMeshComponent* Component : GroundCoverComponents)
+		{
+			if (!Component) continue;
+			GroundCoverInstances += Component->GetInstanceCount();
+			if (Component->GetName() == TEXT("IslandSpruce")) SpruceInstances = Component->GetInstanceCount();
+		}
+		if (SpruceInstances == 0)
+		{
+			UE_LOG(LogIslandMovementProbe, Error,
+				TEXT("Shelter audit stopped: runtime IslandWeather has no initialized IslandSpruce HISM instances; canopy evidence would be incomplete (total other HISM instances=%lld)."),
+				GroundCoverInstances);
+			return;
+		}
+
+		struct FCandidate
+		{
+			FVector Location = FVector::ZeroVector;
+			float Distance = TNumericLimits<float>::Max();
+			int32 CoverCount = -1;
+			bool bWindSheltered = false;
+			FString SupportLabel;
+			FString WindReport;
+		};
+		FCandidate Best;
+		int32 SupportedCount = 0;
+		const FVector Center = EastRoost->GetActorLocation();
+		float SearchRadiusCm = 3000.f;
+		float GridSpacingCm = 300.f;
+		for (const FString& Arg : Args)
+		{
+			float OptionValue = 0.f;
+			if (Arg.StartsWith(TEXT("RadiusCm="), ESearchCase::IgnoreCase))
+			{
+				if (!LexTryParseString(OptionValue, *Arg.RightChop(9)) || OptionValue < 1000.f || OptionValue > 30000.f)
+				{
+					UE_LOG(LogIslandMovementProbe, Error, TEXT("RadiusCm must be a number from 1000 to 30000."));
+					return;
+				}
+				SearchRadiusCm = OptionValue;
+			}
+			else if (Arg.StartsWith(TEXT("GridSpacingCm="), ESearchCase::IgnoreCase))
+			{
+				if (!LexTryParseString(OptionValue, *Arg.RightChop(14)) || OptionValue < 200.f || OptionValue > 1500.f)
+				{
+					UE_LOG(LogIslandMovementProbe, Error, TEXT("GridSpacingCm must be a number from 200 to 1500."));
+					return;
+				}
+				GridSpacingCm = OptionValue;
+			}
+		}
+		const ACharacter* Raven = Cast<ACharacter>(RavenController->GetPawn());
+		const float HalfHeight = Raven ? Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 45.f;
+		FActorSpawnParameters Spawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ATargetPoint* Site = World->SpawnActor<ATargetPoint>(Center, FRotator::ZeroRotator, Spawn);
+		if (!Site)
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Shelter audit could not create its transient candidate marker."));
+			return;
+		}
+		Site->Tags.Add(TEXT("RavenPerch"));
+		Site->Tags.Add(TEXT("RavenNestSite"));
+		FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(RavenShelterCandidateGround), false, Raven);
+		for (TActorIterator<APawn> It(World); It; ++It) GroundQuery.AddIgnoredActor(*It);
+
+		for (float OffsetX = -SearchRadiusCm; OffsetX <= SearchRadiusCm; OffsetX += GridSpacingCm)
+		{
+			for (float OffsetY = -SearchRadiusCm; OffsetY <= SearchRadiusCm; OffsetY += GridSpacingCm)
+			{
+				if (FVector2D(OffsetX, OffsetY).SizeSquared() > FMath::Square(SearchRadiusCm)) continue;
+				const FVector TraceTop = Center + FVector(OffsetX, OffsetY, 2000.f);
+				const FVector TraceBottom = Center + FVector(OffsetX, OffsetY, -4000.f);
+				FHitResult GroundHit;
+				if (!World->LineTraceSingleByChannel(GroundHit, TraceTop, TraceBottom, ECC_Visibility, GroundQuery) ||
+					GroundHit.ImpactNormal.Z < 0.5f) continue;
+
+				const FVector CandidateLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, HalfHeight + 5.f);
+				Site->SetActorLocation(CandidateLocation, false, nullptr, ETeleportType::TeleportPhysics);
+				FHitResult SupportHit;
+				if (!RavenController->HasSuitablePerchSupport(Site, &SupportHit)) continue;
+				++SupportedCount;
+				const int32 CoverCount = RavenController->CountOverheadCoverProbes(Site);
+				const FString WindReport = Weather->DescribeWindShelterAt(CandidateLocation, Raven);
+				const bool bWindSheltered = WindReport.Contains(TEXT("Solid geometry currently blocks"));
+				const float Distance = FVector::Distance(Center, CandidateLocation);
+				const bool bBetter = Best.CoverCount < 0 || CoverCount > Best.CoverCount ||
+					(CoverCount == Best.CoverCount && bWindSheltered && !Best.bWindSheltered) ||
+					(CoverCount == Best.CoverCount && bWindSheltered == Best.bWindSheltered && Distance < Best.Distance);
+				if (!bBetter) continue;
+				Best.Location = CandidateLocation;
+				Best.Distance = Distance;
+				Best.CoverCount = CoverCount;
+				Best.bWindSheltered = bWindSheltered;
+				Best.SupportLabel = SupportHit.GetActor() ? SupportHit.GetActor()->GetActorNameOrLabel() : TEXT("unknown support actor");
+				Best.WindReport = WindReport;
+			}
+		}
+
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Runtime East-roost shelter scan: verified %lld HISM foliage instances across %d components, including %d IslandSpruce instances; %d supported points in %.0f m at %.0f cm spacing."),
+			GroundCoverInstances, GroundCoverComponents.Num(), SpruceInstances, SupportedCount, SearchRadiusCm / 100.f, GridSpacingCm);
+		if (Best.CoverCount < 0)
+		{
+			UE_LOG(LogIslandMovementProbe, Warning, TEXT("No upward-supported candidate was found; no Raven action or map change occurred."));
+			Site->Destroy();
+			return;
+		}
+		UE_LOG(LogIslandMovementProbe, Log,
+			TEXT("Best runtime candidate at %s, %.0f cm from East marker; overhead clue %d/5; support=%s; wind=%s"),
+			*Best.Location.ToCompactString(), Best.Distance, Best.CoverCount, *Best.SupportLabel, *Best.WindReport);
+
+		const bool bRequestLanding = Args.ContainsByPredicate([](const FString& Arg)
+			{ return Arg.Equals(TEXT("Land"), ESearchCase::IgnoreCase); });
+		if (!bRequestLanding || Best.CoverCount < 3)
+		{
+			if (bRequestLanding && Best.CoverCount < 3)
+				UE_LOG(LogIslandMovementProbe, Log, TEXT("Landing not attempted: candidate did not meet the conservative 3/5 overhead-cover screen."));
+			Site->Destroy();
+			return;
+		}
+		if (RavenController->LocomotionState != ERavenLocomotionState::Perched || RavenController->IsActionInProgress())
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Landing not attempted: live Raven must already be settled on a perch with no action in progress."));
+			Site->Destroy();
+			return;
+		}
+
+		Site->SetActorLocation(Best.Location, false, nullptr, ETeleportType::TeleportPhysics);
+		const FName CandidateTag(TEXT("Codex_RavenShelterCandidate"));
+		Site->Tags.Add(CandidateTag);
+		if (!RavenController->RequestPerch(CandidateTag))
+		{
+			UE_LOG(LogIslandMovementProbe, Error, TEXT("Raven rejected the transient candidate perch request."));
+			Site->Destroy();
+			return;
+		}
+
+		TWeakObjectPtr<UWorld> WeakWorld(World);
+		TWeakObjectPtr<ARavenAgentAIController> WeakController(RavenController);
+		TWeakObjectPtr<ACharacter> WeakRaven(const_cast<ACharacter*>(Raven));
+		TWeakObjectPtr<ATargetPoint> WeakSite(Site);
+		const double StartedAt = World->GetTimeSeconds();
+		TSharedRef<FTimerHandle> PollTimer = MakeShared<FTimerHandle>();
+		World->GetTimerManager().SetTimer(*PollTimer, FTimerDelegate::CreateLambda(
+			[WeakWorld, WeakController, WeakRaven, WeakSite, StartedAt, PollTimer]()
+			{
+				UWorld* AuditWorld = WeakWorld.Get();
+				ARavenAgentAIController* Controller = WeakController.Get();
+				ACharacter* Bird = WeakRaven.Get();
+				ATargetPoint* Candidate = WeakSite.Get();
+				if (!AuditWorld || !Controller || !Bird || !Candidate) return;
+				const bool bLanded = Controller->LocomotionState == ERavenLocomotionState::Perched &&
+					FVector::DistSquared(Bird->GetActorLocation(), Candidate->GetActorLocation()) <= FMath::Square(20.f);
+				if (!bLanded && AuditWorld->GetTimeSeconds() - StartedAt < 30.0) return;
+				AuditWorld->GetTimerManager().ClearTimer(*PollTimer);
+				UE_LOG(LogIslandMovementProbe, Log,
+					TEXT("Transient Raven candidate landing %s after %.1f simulated seconds; final=%s; site=%s"),
+					bLanded ? TEXT("succeeded") : TEXT("did not complete within 30 simulated seconds"),
+					AuditWorld->GetTimeSeconds() - StartedAt, *Bird->GetActorLocation().ToCompactString(),
+					*Controller->AssessRoostSite(Candidate));
+				Candidate->Destroy();
+			} ), 0.25f, true);
+	}
+
 	static void Run(const TArray<FString>& Args, UWorld* World)
 	{
 		if (!World || !World->IsGameWorld())
@@ -509,3 +723,8 @@ static FAutoConsoleCommandWithWorldAndArgs GIslandMovementProbeCommand(
 	TEXT("Island.MoveProbe"),
 	TEXT("Safely probes a runtime resident move, wander, or approach with agent thinking disabled. Add DelaySeconds=0..30 for camera warm-up and HoldSeconds=0..20 for post-success observation. Usage: Island.MoveProbe [mover-tag] [target-tag [Interact] [optional-start-x start-y start-z]|Wander [Curious] [optional-start-x start-y start-z]]; for a perched-raven approach: Island.MoveProbe [mover-tag] Approach [raven-approach-tag] [roost-tag] [optional-start-x start-y start-z]"),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::Run));
+
+static FAutoConsoleCommandWithWorldAndArgs GRavenShelterAuditCommand(
+	TEXT("Island.RavenShelterAudit"),
+	TEXT("Read-only scan of runtime supported Raven sites near Roost_East; optional RadiusCm=1000..30000 and GridSpacingCm=200..1500; append Land to attempt a transient, bounded perch landing only when overhead cover is at least 3/5."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FIslandMovementProbeCommand::RunRavenShelterAudit));

@@ -19,6 +19,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -1117,6 +1118,178 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			Probe->Destroy();
 		}
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenShelterCandidateAuditTest,
+	"CaptiveSky2.Agent.RavenShelterCandidateAudit",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRavenShelterCandidateAuditTest::RunTest(const FString& Parameters)
+{
+	UWorld* Island = nullptr;
+	for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		if (Context.WorldType == EWorldType::Editor && Context.World() && Context.World()->GetMapName() == TEXT("Island"))
+		{
+			Island = Context.World();
+			break;
+		}
+	if (!TestNotNull(TEXT("Saved Island is loaded for the transient roost-candidate audit"), Island)) return false;
+
+	AActor* EastRoost = nullptr;
+	AIslandWeather* Weather = nullptr;
+	for (TActorIterator<AActor> It(Island); It; ++It)
+	{
+		if (!EastRoost && It->ActorHasTag(TEXT("Roost_East")) && It->ActorHasTag(TEXT("RavenPerch"))) EastRoost = *It;
+		if (!Weather) Weather = Cast<AIslandWeather>(*It);
+	}
+	if (!TestNotNull(TEXT("Roost_East marker exists"), EastRoost) ||
+		!TestNotNull(TEXT("Island spatial weather is available"), Weather)) return false;
+	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherHISMs;
+	Weather->GetComponents<UHierarchicalInstancedStaticMeshComponent>(WeatherHISMs);
+	int32 SpruceInstances = 0;
+	for (const UHierarchicalInstancedStaticMeshComponent* Component : WeatherHISMs)
+		if (Component && Component->GetName() == TEXT("IslandSpruce")) SpruceInstances = Component->GetInstanceCount();
+	const bool bCanAssessRuntimeCanopy = SpruceInstances > 0;
+
+	UClass* RavenClass = LoadClass<ACharacter>(nullptr, TEXT("/Game/Agents/BP_Raven_Placeholder.BP_Raven_Placeholder_C"));
+	if (!TestNotNull(TEXT("Raven placeholder is available for transient landing"), RavenClass)) return false;
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ACharacter* Raven = Island->SpawnActor<ACharacter>(RavenClass,
+		EastRoost->GetActorLocation(), FRotator::ZeroRotator, Spawn);
+	ARavenAgentAIController* Pilot = Island->SpawnActor<ARavenAgentAIController>(FVector::ZeroVector,
+		FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Transient Raven spawned"), Raven) || !TestNotNull(TEXT("Transient controller spawned"), Pilot))
+	{
+		if (Pilot) Pilot->Destroy();
+		if (Raven) Raven->Destroy();
+		return false;
+	}
+	for (TActorIterator<APawn> It(Island); It; ++It)
+		if (*It != Raven) Raven->GetCapsuleComponent()->IgnoreActorWhenMoving(*It, true);
+	Pilot->Possess(Raven);
+	// The authored East marker is already physically supported. Start the transient
+	// body in that known-good perched state so this audit measures candidate access,
+	// not a separate climb through the tree above the marker.
+	Pilot->LocomotionState = ERavenLocomotionState::Perched;
+	Pilot->SetFlyingMovement(true);
+	TestTrue(TEXT("Transient Raven begins on the known supported East marker"),
+		Raven->GetActorLocation().Equals(EastRoost->GetActorLocation(), 2.f));
+
+	struct FCandidate
+	{
+		FVector Location = FVector::ZeroVector;
+		float Distance = 0.f;
+		int32 CoverCount = 0;
+		bool bWindSheltered = false;
+		FString SupportLabel;
+		FString WindReport;
+	};
+	FCandidate Best;
+	Best.Distance = TNumericLimits<float>::Max();
+	Best.CoverCount = INDEX_NONE;
+	bool bHasBestCandidate = false;
+	int32 SupportedPointCount = 0;
+	const FVector Center = EastRoost->GetActorLocation();
+	constexpr float SearchRadiusCm = 3000.f;
+	constexpr float GridSpacingCm = 500.f;
+	const float CapsuleHalfHeight = Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	for (float OffsetX = -SearchRadiusCm; OffsetX <= SearchRadiusCm; OffsetX += GridSpacingCm)
+	{
+		for (float OffsetY = -SearchRadiusCm; OffsetY <= SearchRadiusCm; OffsetY += GridSpacingCm)
+		{
+			const FVector2D Offset(OffsetX, OffsetY);
+			if (Offset.SizeSquared() > FMath::Square(SearchRadiusCm)) continue;
+			const FVector TraceTop = Center + FVector(OffsetX, OffsetY, 2000.f);
+			const FVector TraceBottom = Center + FVector(OffsetX, OffsetY, -4000.f);
+			FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(RavenShelterCandidateGround), false, Raven);
+			for (TActorIterator<APawn> It(Island); It; ++It) GroundQuery.AddIgnoredActor(*It);
+			FHitResult GroundHit;
+			if (!Island->LineTraceSingleByChannel(GroundHit, TraceTop, TraceBottom, ECC_Visibility, GroundQuery) ||
+				GroundHit.ImpactNormal.Z < 0.5f) continue;
+
+			const FVector CandidateLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, CapsuleHalfHeight + 5.f);
+			AActor* CandidateSite = Island->SpawnActor<ATargetPoint>(CandidateLocation, FRotator::ZeroRotator, Spawn);
+			if (!CandidateSite) continue;
+			CandidateSite->Tags.Add(TEXT("RavenPerch"));
+			CandidateSite->Tags.Add(TEXT("RavenNestSite"));
+			FHitResult SupportHit;
+			if (!Pilot->HasSuitablePerchSupport(CandidateSite, &SupportHit))
+			{
+				CandidateSite->Destroy();
+				continue;
+			}
+			++SupportedPointCount;
+			const int32 CoverCount = bCanAssessRuntimeCanopy
+				? Pilot->CountOverheadCoverProbes(CandidateSite) : INDEX_NONE;
+			const FString WindReport = Weather->DescribeWindShelterAt(CandidateLocation, Raven);
+			const bool bWindSheltered = WindReport.Contains(TEXT("Solid geometry currently blocks"));
+			const float Distance = FVector::Distance(Center, CandidateLocation);
+			const bool bBetter = !bHasBestCandidate || CoverCount > Best.CoverCount ||
+				(CoverCount == Best.CoverCount && bWindSheltered && !Best.bWindSheltered) ||
+				(CoverCount == Best.CoverCount && bWindSheltered == Best.bWindSheltered && Distance < Best.Distance);
+			if (bBetter)
+			{
+				Best.Location = CandidateLocation;
+				Best.Distance = Distance;
+				Best.CoverCount = CoverCount;
+				Best.bWindSheltered = bWindSheltered;
+				Best.SupportLabel = SupportHit.GetActor()
+					? SupportHit.GetActor()->GetActorLabel() : TEXT("unknown support actor");
+				Best.WindReport = WindReport;
+				bHasBestCandidate = true;
+			}
+			CandidateSite->Destroy();
+		}
+	}
+
+	if (SupportedPointCount == 0)
+	{
+		AddInfo(TEXT("No supported candidate points were found within 30 m of Roost_East using the 5 m grid. No map or world state changed."));
+	}
+	else
+	{
+		AddInfo(FString::Printf(TEXT("Editor-world East-side transient scan (radius 3000 cm, grid 500 cm): %d supported points; IslandSpruce instances=%d; best at %s, %.0f cm from the authored marker; overhead clue=%s; support=%s; wind=%s"),
+			SupportedPointCount, SpruceInstances, *Best.Location.ToCompactString(), Best.Distance,
+			bCanAssessRuntimeCanopy ? *FString::Printf(TEXT("%d/5"), Best.CoverCount) : TEXT("indeterminate"),
+			*Best.SupportLabel, *Best.WindReport));
+	}
+
+	if (SupportedPointCount > 0 && bCanAssessRuntimeCanopy && Best.CoverCount >= 3)
+	{
+		AActor* CandidateSite = Island->SpawnActor<ATargetPoint>(Best.Location, FRotator::ZeroRotator, Spawn);
+		if (CandidateSite)
+		{
+			CandidateSite->Tags.Add(TEXT("RavenPerch"));
+			CandidateSite->Tags.Add(TEXT("RavenNestSite"));
+			const bool bApproachStarted = Pilot->BeginPerchAt(CandidateSite);
+			for (int32 Frame = 0; bApproachStarted && Frame < 30 * 60 &&
+				Pilot->LocomotionState != ERavenLocomotionState::Perched; ++Frame)
+				Pilot->Tick(1.f / 60.f);
+			const bool bLanded = bApproachStarted && Pilot->LocomotionState == ERavenLocomotionState::Perched &&
+				FVector::DistSquared(Raven->GetActorLocation(), Best.Location) <= FMath::Square(15.f);
+			AddInfo(FString::Printf(TEXT("Physical candidate landing: %s; final=%s; assessment=%s; wind=%s"),
+				bLanded ? TEXT("success") : TEXT("failed"), *Raven->GetActorLocation().ToCompactString(),
+				*Pilot->AssessRoostSite(CandidateSite), *Weather->DescribeWindShelterAt(Best.Location, Raven)));
+			if (!bLanded) AddError(TEXT("A nearby supported point with at least three overhead clues did not accept a bounded Raven landing."));
+			CandidateSite->Destroy();
+		}
+	}
+	else if (SupportedPointCount > 0 && !bCanAssessRuntimeCanopy)
+	{
+		AddInfo(TEXT("The editor world has no initialized IslandSpruce HISM instances, so canopy/rain-cover results are indeterminate; use Island.RavenShelterAudit in a running Game world."));
+	}
+	else if (SupportedPointCount > 0)
+	{
+		AddInfo(TEXT("No supported point reached the three-of-five overhead-cover screen, so no physical candidate landing was attempted."));
+	}
+
+	Pilot->UnPossess();
+	Pilot->Destroy();
+	Raven->Destroy();
 	return true;
 }
 
