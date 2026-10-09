@@ -83,6 +83,9 @@ bool UAgentPlaySessionSubsystem::IsExpired() const
 	{
 		return true;
 	}
+	// A zero request budget is a no-model diagnostic mode, not an immediate
+	// request-budget shutdown. The real-time cap remains its session deadline.
+	if (MaxModelRequests <= 0) return false;
 	if (!HasReachedRequestCap()) return false;
 	if (ModelRequestsInFlight <= 0) return true;
 	return RequestCapReachedAt >= 0.0 && Now() - RequestCapReachedAt >= RequestDrainGraceSeconds;

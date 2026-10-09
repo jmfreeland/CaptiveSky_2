@@ -68,9 +68,13 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	UAgentPlaySessionSubsystem* NoModelRequests = NewObject<UAgentPlaySessionSubsystem>(Instance);
 	NoModelRequests->StartedAt = FPlatformTime::Seconds();
 	NoModelRequests->MaxModelRequests = 0;
-	TestTrue(TEXT("Zero model-request cap immediately expires a drained bounded session"), NoModelRequests->IsExpired());
+	NoModelRequests->MaxRealtimeSeconds = 60.f;
+	TestFalse(TEXT("Zero model-request cap does not end a no-model diagnostic session early"), NoModelRequests->IsExpired());
 	TestFalse(TEXT("Zero model-request cap rejects the first reservation"), NoModelRequests->TryReserveModelRequest());
 	TestEqual(TEXT("Rejected zero-cap reservation does not increment the count"), NoModelRequests->ModelRequests, 0);
+	NoModelRequests->StartedAt = FPlatformTime::Seconds() - 2.0;
+	NoModelRequests->MaxRealtimeSeconds = 1.f;
+	TestTrue(TEXT("Zero model-request cap still obeys the real-time watchdog"), NoModelRequests->IsExpired());
 
 	UAgentPlaySessionSubsystem* TimedOutDrain = NewObject<UAgentPlaySessionSubsystem>(Instance);
 	TimedOutDrain->StartedAt = FPlatformTime::Seconds();
@@ -138,7 +142,7 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	UAgentPlaySessionSubsystem* ZeroRequestContinuous = MakeContinuous(2000.0);
 	ZeroRequestContinuous->bHasExplicitRequestCap = true;
 	ZeroRequestContinuous->MaxModelRequests = 0;
-	TestTrue(TEXT("Continuous play with an explicit zero request cap expires before any call"), ZeroRequestContinuous->IsExpired());
+	TestFalse(TEXT("Continuous play with an explicit zero request cap can continue without model calls"), ZeroRequestContinuous->IsExpired());
 	TestFalse(TEXT("Continuous play with an explicit zero request cap rejects reservations"),
 		ZeroRequestContinuous->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));

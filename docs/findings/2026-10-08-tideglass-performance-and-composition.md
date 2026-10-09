@@ -453,16 +453,61 @@ vegetation with warmed caches; keep the same strict time/request safeguards.
 
 The measured run above requested `-CaptiveSkyMaxModelRequests=0`, but the then-
 current minimum clamp raised that to one. The request-limit clamp now accepts
-the closed range 0–120; a zero cap is immediately exhausted and refuses every
-reservation in both bounded and explicitly capped continuous play. The
+the closed range 0–120; a zero cap refuses every reservation in both bounded
+and explicitly capped continuous play, but does not itself end the session.
+The bounded real-time watchdog remains the end condition for a no-model
+diagnostic run. The
 `Start-Spectator.ps1 -MaxModelRequests` validator now accepts zero as well.
 Configured defaults remain unchanged (120 requests), the maximum remains 120,
 and the real-time watchdog still clamps to 1–1800 seconds.
 
 The UE 5.8.3 scratch editor target rebuilt successfully after the change, and
 `CaptiveSky2.Agent.SessionSafety` passed under NullRHI. Its regression checks
-zero-cap CLI parsing, no-call bounded and continuous sessions, and rejection
-without incrementing request counts; the test made no provider calls. The
+zero-cap CLI parsing, no-call bounded and continuous sessions, rejection
+without incrementing request counts, and that zero request allowance still
+honors the wall-clock deadline; the test made no provider calls. The
 focused automation used the process-local memory DDC fallback because the
 workspace cannot access the user's profile DDC. Log:
 [`Codex_ZeroRequestCap_Final_Automation.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_ZeroRequestCap_Final_20261009/Codex_ZeroRequestCap_Final_Automation.log).
+
+The zero-request behavior was also exercised in a rendered UE 5.8.3 D3D12
+Game session at 1600×900 on the RTX 4080 Laptop GPU. It stayed alive for the
+configured 120.2 real seconds, made zero model requests, and exited normally.
+A 600-frame profile of the slow Listening Stones establishing view measured
+17.52 ms average frame time, 16.36 ms median, 25.80 ms p95, 52.21 ms p99, and
+64.35 ms maximum. Render-thread time averaged 17.28 ms versus 11.32 ms GPU
+time; this short view clears the 30-FPS p95 threshold but has a pronounced
+long tail. Unreal reported at least 500 unprecached PSO creation hitches
+during this cold startup.
+
+This run does **not** validate resident movement: although the route probe was
+included in the command line, no nav-probe dispatch or movement completion was
+recorded in the log. Treat it only as a rendered zero-request/watchdog check
+and a fixed-view profile. Log:
+[`Codex_AsterWalking_D3D12_WarmDDC.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_AsterWalking_D3D12_20261009/Codex_AsterWalking_D3D12_WarmDDC.log).
+CSV:
+[`Profile(20261009_134535).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_134535%29.csv).
+
+### Direct Aster movement follow-up (2026-10-09)
+
+The older `Island.NavBuildProbe` helper was scratch-only and absent from the
+current-source scratch build. A direct `Island.MoveProbe` was queued instead.
+It issued Aster's move from (-100400, 100960, 2823) toward ListeningStones at
+(-101650, 101600, 2650), but stopped after 143 cm / 6.5 simulated seconds with
+the movement action reporting blocked, cancelled, or unreachable. The bounded
+run ended after 52.7 real seconds and made zero model requests. This is a
+failed route probe, not a successful walk.
+
+The 600-frame capture in that run ended just before the move issued, so it is
+still a fixed-view sample: 15.08 ms mean frame time, 13.98 ms median, 22.52 ms
+p95, 47.46 ms p99, and 59.01 ms maximum. Render-thread time averaged 14.92 ms
+and GPU time 12.22 ms. The earlier delayed scratch probe did complete this
+same physical Aster-to-Stones move (1,377 cm in 3 simulated seconds), after
+waiting roughly 78 seconds from play-safety initialization and confirming a
+complete nav route. That suggests the direct attempt may have started before
+the runtime route was ready, but is not enough to establish the cause. Repeat
+with the longer warm-up and a capture window that overlaps the actual move.
+
+Log: [`Codex_AsterWalking_D3D12_Move.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_AsterWalking_D3D12_20261009/Codex_AsterWalking_D3D12_Move.log).
+CSV: [`Profile(20261009_135043).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_135043%29.csv).
+Earlier successful delayed route: [`AsterListeningStonesInteractD3D12Final.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/AsterListeningStonesInteractD3D12Final.log).
