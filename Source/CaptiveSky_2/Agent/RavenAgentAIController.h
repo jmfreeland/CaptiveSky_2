@@ -14,7 +14,7 @@ class AIslandTidepoolCrab;
 class AIslandWindMoteEffect;
 class AIslandWrack;
 class AAutonomousAgentCharacter;
-class UInstancedStaticMeshComponent;
+class UProceduralMeshComponent;
 class UAnimSequence;
 class USkeletalMeshComponent;
 UENUM(BlueprintType)
@@ -121,7 +121,7 @@ private:
 	TWeakObjectPtr<UObject> LeftWing;
 	TWeakObjectPtr<UObject> RightWing;
 	TWeakObjectPtr<UObject> RavenHeadPivot;
-	TWeakObjectPtr<UInstancedStaticMeshComponent> CarriedTwigVisual;
+	TWeakObjectPtr<UProceduralMeshComponent> CarriedTwigVisual;
 	TWeakObjectPtr<USkeletalMeshComponent> RiggedCrowBody;
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimSequence> CrowIdleAnimation;

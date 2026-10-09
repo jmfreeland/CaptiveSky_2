@@ -178,6 +178,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Every legacy static-mesh placeholder part is hidden behind the procedural raven"), bAllPlaceholderPartsHidden);
 		UProceduralMeshComponent* BlueprintBody = nullptr;
 		UProceduralMeshComponent* BlueprintHead = nullptr;
+		UProceduralMeshComponent* BlueprintTwigs = nullptr;
 		UProceduralMeshComponent* BlueprintLeftFeathers = nullptr;
 		UProceduralMeshComponent* BlueprintRightFeathers = nullptr;
 		USceneComponent* BlueprintHeadPivot = nullptr;
@@ -191,6 +192,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			if (!Component) continue;
 			if (Component->GetName() == TEXT("RavenBodyMesh")) BlueprintBody = Component;
 			if (Component->GetName() == TEXT("RavenHeadMesh")) BlueprintHead = Component;
+			if (Component->GetName() == TEXT("RavenCarriedTwigs")) BlueprintTwigs = Component;
 			if (Component->GetName() == TEXT("RavenLeftWingFeathers")) BlueprintLeftFeathers = Component;
 			if (Component->GetName() == TEXT("RavenRightWingFeathers")) BlueprintRightFeathers = Component;
 		}
@@ -207,8 +209,57 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		BlueprintRaven->GetComponents<USkeletalMeshComponent>(BlueprintSkeletalMeshes);
 		for (USkeletalMeshComponent* Component : BlueprintSkeletalMeshes)
 			if (Component && Component->GetFName() == TEXT("RavenRiggedCrowBody")) { BlueprintRiggedCrow = Component; break; }
+		TestNotNull(TEXT("The raven has a procedural forked twig bundle ready to reveal on gathering"), BlueprintTwigs);
+		if (BlueprintTwigs)
+		{
+			const FProcMeshSection* TwigSection = BlueprintTwigs->GetProcMeshSection(0);
+			TestTrue(TEXT("Carried branchlets use nontrivial tapered and forked geometry"),
+				TwigSection && TwigSection->ProcIndexBuffer.Num() > 600 && TwigSection->SectionLocalBox.GetSize().Size() > 30.f);
+			if (TwigSection && BlueprintHeadPivot && BlueprintTwigs->GetAttachParent() == BlueprintHeadPivot)
+			{
+				const FVector BeakTip(38.f, 0.f, -9.f);
+				float ClosestTwigRootDistanceSquared = TNumericLimits<float>::Max();
+				for (const FProcMeshVertex& Vertex : TwigSection->ProcVertexBuffer)
+					ClosestTwigRootDistanceSquared = FMath::Min(ClosestTwigRootDistanceSquared,
+						FVector::DistSquared(Vertex.Position, BeakTip));
+				TestTrue(TEXT("The fallback twig bundle begins at the procedural beak tip, not out in front of it"),
+					ClosestTwigRootDistanceSquared <= FMath::Square(2.5f));
+			}
+			TestTrue(TEXT("The carried twig mesh stays hidden and collision-free until gathered"),
+				BlueprintTwigs->bHiddenInGame && BlueprintTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+				!BlueprintTwigs->CanEverAffectNavigation());
+		}
 		if (BlueprintRiggedCrow)
 		{
+			const FName TwigCarrySocket = BlueprintTwigs ? BlueprintTwigs->GetAttachSocketName() : NAME_None;
+			const FReferenceSkeleton& CrowSkeleton = BlueprintRiggedCrow->GetSkeletalMeshAsset()->GetRefSkeleton();
+			FString RelevantCrowBones;
+			for (int32 BoneIndex = 0; BoneIndex < CrowSkeleton.GetNum(); ++BoneIndex)
+			{
+				const FName BoneName = CrowSkeleton.GetBoneName(BoneIndex);
+				const FString LowerBoneName = BoneName.ToString().ToLower();
+				if (LowerBoneName.Contains(TEXT("head")) || LowerBoneName.Contains(TEXT("beak")) ||
+					LowerBoneName.Contains(TEXT("bill")))
+					RelevantCrowBones += (RelevantCrowBones.IsEmpty() ? TEXT("") : TEXT(", ")) + BoneName.ToString();
+			}
+			AddInfo(FString::Printf(TEXT("Rigged Raven twig anchor: socket=%s; head/beak/bill bones=[%s]; socket world=%s; bundle world=%s"),
+				*TwigCarrySocket.ToString(), *RelevantCrowBones,
+				*BlueprintRiggedCrow->GetSocketTransform(TwigCarrySocket, RTS_World).GetLocation().ToCompactString(),
+				BlueprintTwigs ? *BlueprintTwigs->GetComponentLocation().ToCompactString() : TEXT("missing")));
+			TestTrue(TEXT("Rigged Raven twig mesh is attached to its selected skeletal carry bone"),
+				BlueprintTwigs && BlueprintTwigs->GetAttachParent() == BlueprintRiggedCrow &&
+				!TwigCarrySocket.IsNone() && CrowSkeleton.FindBoneIndex(TwigCarrySocket) != INDEX_NONE);
+			if (BlueprintTwigs)
+			{
+				const FProcMeshSection* TwigSection = BlueprintTwigs->GetProcMeshSection(0);
+				float ClosestTwigRootToSocketSquared = TNumericLimits<float>::Max();
+				if (TwigSection)
+					for (const FProcMeshVertex& Vertex : TwigSection->ProcVertexBuffer)
+						ClosestTwigRootToSocketSquared = FMath::Min(ClosestTwigRootToSocketSquared,
+							Vertex.Position.SizeSquared());
+				TestTrue(TEXT("The rigged bundle starts at the head/bill anchor, not detached in front of it"),
+					ClosestTwigRootToSocketSquared <= FMath::Square(9.f));
+			}
 			TestNotNull(TEXT("The imported Crow has its idle animation"), BlueprintController->CrowIdleAnimation.Get());
 			TestNotNull(TEXT("The imported Crow has its flight animation"), BlueprintController->CrowFlyAnimation.Get());
 			TestTrue(TEXT("The rigged Crow is visual-only for collision and navigation"),

@@ -5,7 +5,6 @@
 #include "IslandArrangement.h"
 #include "IslandWrack.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
@@ -97,6 +96,73 @@ namespace
 			}
 	}
 
+	static void AppendTaperedTwig(FRavenProcMeshData& Data, const FVector& Start, const FVector& End,
+		float StartRadius, float EndRadius, int32 Sides = 6)
+	{
+		const FVector Axis = (End - Start).GetSafeNormal();
+		if (Axis.IsNearlyZero() || Sides < 3) return;
+		FVector BasisA = FVector::CrossProduct(Axis, FVector::UpVector).GetSafeNormal();
+		if (BasisA.IsNearlyZero()) BasisA = FVector::CrossProduct(Axis, FVector::RightVector).GetSafeNormal();
+		const FVector BasisB = FVector::CrossProduct(Axis, BasisA).GetSafeNormal();
+		const int32 Base = Data.Vertices.Num();
+		for (int32 Ring = 0; Ring < 2; ++Ring)
+		{
+			const FVector Center = Ring == 0 ? Start : End;
+			const float Radius = Ring == 0 ? StartRadius : EndRadius;
+			for (int32 Side = 0; Side < Sides; ++Side)
+			{
+				const float Angle = 2.f * PI * static_cast<float>(Side) / static_cast<float>(Sides);
+				const FVector Radial = (BasisA * FMath::Cos(Angle) + BasisB * FMath::Sin(Angle)).GetSafeNormal();
+				Data.Vertices.Add(Center + Radial * Radius);
+				Data.Normals.Add(Radial);
+				Data.UVs.Add(FVector2D(static_cast<float>(Side) / static_cast<float>(Sides), static_cast<float>(Ring)));
+				Data.Colors.Add(FLinearColor::White);
+			}
+		}
+		for (int32 Side = 0; Side < Sides; ++Side)
+		{
+			const int32 Next = (Side + 1) % Sides;
+			const int32 A = Base + Side;
+			const int32 B = Base + Next;
+			const int32 C = Base + Sides + Side;
+			const int32 D = Base + Sides + Next;
+			Data.Triangles.Append({ A, B, D, A, D, C, D, B, A, C, D, A });
+		}
+		// Tiny, tapered caps keep the cut end from reading as a hollow pipe.
+		const int32 StartCenter = Data.Vertices.Add(Start);
+		Data.Normals.Add(-Axis);
+		Data.UVs.Add(FVector2D::ZeroVector);
+		Data.Colors.Add(FLinearColor::White);
+		const int32 EndCenter = Data.Vertices.Add(End);
+		Data.Normals.Add(Axis);
+		Data.UVs.Add(FVector2D(1.f, 1.f));
+		Data.Colors.Add(FLinearColor::White);
+		for (int32 Side = 0; Side < Sides; ++Side)
+		{
+			const int32 Next = (Side + 1) % Sides;
+			Data.Triangles.Append({ StartCenter, Base + Next, Base + Side, StartCenter, Base + Side, Base + Next });
+			Data.Triangles.Append({ EndCenter, Base + Sides + Side, Base + Sides + Next,
+				EndCenter, Base + Sides + Next, Base + Sides + Side });
+		}
+	}
+
+	static void AppendForkedTwigBundle(FRavenProcMeshData& Data, const FVector& Origin,
+		const FVector& Forward, const FVector& Right, const FVector& Up)
+	{
+		const auto Point = [&](float Along, float Lateral, float Vertical)
+		{
+			return Origin + Forward * Along + Right * Lateral + Up * Vertical;
+		};
+		// Three slim, slightly bent stems with naturally broken side branches. The small
+		// tapered ends and forks remain readable at a distance without becoming a rigid bar.
+		AppendTaperedTwig(Data, Point(0.f, -2.f, 0.f), Point(31.f, -4.f, 2.f), 0.9f, 0.18f);
+		AppendTaperedTwig(Data, Point(15.f, -3.f, 1.f), Point(23.f, -5.f, 9.f), 0.46f, 0.10f, 5);
+		AppendTaperedTwig(Data, Point(2.f, 2.f, -3.f), Point(28.f, 3.f, -5.f), 0.72f, 0.16f);
+		AppendTaperedTwig(Data, Point(13.f, 3.f, -4.f), Point(21.f, 5.f, 4.f), 0.40f, 0.08f, 5);
+		AppendTaperedTwig(Data, Point(3.f, 6.f, 1.f), Point(25.f, 8.f, 5.f), 0.62f, 0.14f);
+		AppendTaperedTwig(Data, Point(14.f, 7.f, 3.f), Point(21.f, 10.f, -3.f), 0.34f, 0.07f, 5);
+	}
+
 	static void AppendRavenWing(FRavenProcMeshData& Data, float Side)
 	{
 		const FVector Outline[] = {
@@ -143,13 +209,13 @@ namespace
 	}
 
 	static UProceduralMeshComponent* AddRavenMesh(ACharacter* Raven, USceneComponent* Parent, FName Name,
-		FRavenProcMeshData&& Data, UMaterialInterface* Material)
+		FRavenProcMeshData&& Data, UMaterialInterface* Material, FName SocketName = NAME_None)
 	{
 		if (!Raven || !Parent || Data.Vertices.IsEmpty() || Data.Triangles.IsEmpty()) return nullptr;
 		UProceduralMeshComponent* Mesh = NewObject<UProceduralMeshComponent>(Raven, Name, RF_Transient);
 		if (!Mesh) return nullptr;
 		Raven->AddInstanceComponent(Mesh);
-		Mesh->SetupAttachment(Parent);
+		Mesh->SetupAttachment(Parent, SocketName);
 		Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Mesh->SetCanEverAffectNavigation(false);
 		Mesh->SetGenerateOverlapEvents(false);
@@ -235,37 +301,23 @@ namespace
 				}
 			}
 			if (CarryBone.IsNone()) CarryBone = HeadBone;
-			UInstancedStaticMeshComponent* Twigs = NewObject<UInstancedStaticMeshComponent>(Raven, TEXT("RavenCarriedTwigs"), RF_Transient);
-			Raven->AddInstanceComponent(Twigs);
-			Twigs->SetupAttachment(CrowBody, CarryBone);
-			Twigs->SetRelativeLocation(FVector::ZeroVector);
-			if (UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+			const FTransform CarrySocketWorld = CrowBody->GetSocketTransform(CarryBone, RTS_World);
+			const FVector Forward = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorForwardVector()).GetSafeNormal();
+			const FVector Right = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorRightVector()).GetSafeNormal();
+			const FVector Down = CarrySocketWorld.InverseTransformVectorNoScale(FVector::DownVector).GetSafeNormal();
+			// This Crow has only a head bone, not a bill bone. Start inside the head so
+			// the bundle emerges through the beak rather than appearing to float ahead.
+			const FVector BundleOrigin = Forward * (CarryBone == HeadBone ? -8.f : 4.f) +
+				(CarryBone == HeadBone ? FVector::ZeroVector : Down);
+			FRavenProcMeshData TwigsData;
+			AppendForkedTwigBundle(TwigsData, BundleOrigin, Forward, Right, -Down);
+			if (UProceduralMeshComponent* Twigs = AddRavenMesh(Raven, CrowBody, TEXT("RavenCarriedTwigs"),
+				MoveTemp(TwigsData), MakeRavenMaterial(Raven, FLinearColor(0.055f, 0.022f, 0.008f, 1.f)), CarryBone))
 			{
-				Twigs->SetStaticMesh(TwigMesh);
-				Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.095f, 0.038f, 0.012f, 1.f)));
-				const FTransform CarrySocketWorld = CrowBody->GetSocketTransform(CarryBone, RTS_World);
-				const FVector Forward = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorForwardVector()).GetSafeNormal();
-				const FVector Right = CarrySocketWorld.InverseTransformVectorNoScale(Raven->GetActorRightVector()).GetSafeNormal();
-				const FVector Down = CarrySocketWorld.InverseTransformVectorNoScale(FVector::DownVector).GetSafeNormal();
-				const FVector BundleCenter = Forward * (CarryBone == HeadBone ? 16.f : 9.f) + Down * 2.f;
-				const FTransform TwigTransforms[] = {
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward - Right * 0.28f + Down * 0.10f).GetSafeNormal()),
-						BundleCenter - Right * 3.f, FVector(0.012f, 0.012f, 0.20f)),
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.18f - Down * 0.06f).GetSafeNormal()),
-						BundleCenter + Right * 1.5f, FVector(0.014f, 0.014f, 0.24f)),
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward + Right * 0.42f + Down * 0.22f).GetSafeNormal()),
-						BundleCenter + Right * 3.5f + Down * 1.5f, FVector(0.010f, 0.010f, 0.16f)),
-					FTransform(FQuat::FindBetweenNormals(FVector::UpVector, (Forward * 0.36f - Down * 0.93f).GetSafeNormal()),
-						BundleCenter + Forward * 1.f - Down * 4.f, FVector(0.009f, 0.009f, 0.16f))
-				};
-				for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
+				Twigs->SetCastShadow(false);
+				Twigs->SetVisibility(false, false);
+				Twigs->SetHiddenInGame(true, false);
 			}
-			Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Twigs->SetCanEverAffectNavigation(false);
-			Twigs->SetGenerateOverlapEvents(false);
-			Twigs->SetVisibility(false, false);
-			Twigs->SetHiddenInGame(true, false);
-			Twigs->RegisterComponent();
 			return;
 		}
 
@@ -323,37 +375,19 @@ namespace
 		AppendEllipsoid(Pupils, FVector(7.5f, 15.1f, 2.5f), FVector(2.f, 1.f, 2.2f), 8, 5);
 		AddRavenMesh(Raven, HeadPivot, TEXT("RavenPupilMesh"), MoveTemp(Pupils), MakeRavenMaterial(Raven, FLinearColor(0.003f, 0.004f, 0.006f, 1.f)));
 
-		// A warm-brown bundle projects beyond the bill while the existing forage state says
-		// twigs are carried. It is presentation-only and never affects collision or nav.
-		UStaticMesh* TwigMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-		if (TwigMesh)
+		// A tapered forked bundle projects beyond the bill while the existing forage state
+		// says twigs are carried. It is presentation-only and never affects collision or nav.
+		FRavenProcMeshData TwigsData;
+		// The procedural beak tip is (38, 0, -9) in this pivot's local frame. Start
+		// the bundle there so its roots visibly meet the bill instead of floating ahead.
+		AppendForkedTwigBundle(TwigsData, FVector(38.f, 0.f, -9.f), FVector::ForwardVector,
+			FVector::RightVector, FVector::UpVector);
+		if (UProceduralMeshComponent* Twigs = AddRavenMesh(Raven, HeadPivot, TEXT("RavenCarriedTwigs"),
+			MoveTemp(TwigsData), MakeRavenMaterial(Raven, FLinearColor(0.055f, 0.022f, 0.008f, 1.f))))
 		{
-			UInstancedStaticMeshComponent* Twigs = NewObject<UInstancedStaticMeshComponent>(Raven, TEXT("RavenCarriedTwigs"), RF_Transient);
-			Raven->AddInstanceComponent(Twigs);
-			Twigs->SetupAttachment(HeadPivot);
-			Twigs->SetStaticMesh(TwigMesh);
-			Twigs->SetMaterial(0, MakeRavenMaterial(Raven, FLinearColor(0.095f, 0.038f, 0.012f, 1.f)));
-			Twigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Twigs->SetCanEverAffectNavigation(false);
-			Twigs->SetGenerateOverlapEvents(false);
-			const FTransform TwigTransforms[] = {
-				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, -0.16f, 0.10f).GetSafeNormal()),
-					FVector(51.f, -2.5f, -14.f), FVector(0.012f, 0.012f, 0.20f)),
-				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.24f, -0.08f).GetSafeNormal()),
-					FVector(50.f, 0.f, -15.f), FVector(0.014f, 0.014f, 0.24f)),
-				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(1.f, 0.42f, 0.22f).GetSafeNormal()),
-					FVector(49.f, 3.f, -13.f), FVector(0.010f, 0.010f, 0.16f)),
-				FTransform(
-					FQuat::FindBetweenNormals(FVector::UpVector, FVector(0.36f, 0.10f, 0.93f).GetSafeNormal()),
-					FVector(50.f, -1.f, -10.f), FVector(0.009f, 0.009f, 0.16f))
-			};
-			for (const FTransform& TwigTransform : TwigTransforms) Twigs->AddInstance(TwigTransform, false);
+			Twigs->SetCastShadow(false);
 			Twigs->SetVisibility(false, false);
 			Twigs->SetHiddenInGame(true, false);
-			Twigs->RegisterComponent();
 		}
 
 		for (const float Side : { -1.f, 1.f })
@@ -487,7 +521,7 @@ void ARavenAgentAIController::CacheWingComponents(APawn* Raven)
 		}
 		else if (ComponentName == TEXT("RavenCarriedTwigs"))
 		{
-			CarriedTwigVisual = Cast<UInstancedStaticMeshComponent>(Component);
+			CarriedTwigVisual = Cast<UProceduralMeshComponent>(Component);
 		}
 		else if (ComponentName == TEXT("RavenLeftWingPivot"))
 		{
@@ -1202,7 +1236,7 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 
 void ARavenAgentAIController::UpdateCarriedTwigVisual()
 {
-	if (UInstancedStaticMeshComponent* Twigs = CarriedTwigVisual.Get())
+	if (UProceduralMeshComponent* Twigs = CarriedTwigVisual.Get())
 	{
 		Twigs->SetVisibility(bCarryingTwigs, true);
 		Twigs->SetHiddenInGame(!bCarryingTwigs, true);
