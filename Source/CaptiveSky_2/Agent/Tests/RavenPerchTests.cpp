@@ -809,27 +809,34 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	const FVector BlueprintRavenOriginalLocation = BlueprintRaven ? BlueprintRaven->GetActorLocation() : FVector::ZeroVector;
 	if (BlueprintRaven) BlueprintRaven->SetActorLocation(Raven->GetActorLocation() + FVector(5000.f, 0.f, 0.f));
 	Controller->bCarryingTwigs = true;
+	AsterBody->SetActorLocation(Raven->GetActorLocation() + FVector(300.f, 0.f, 0.f));
 	const FString AsterSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("Aster is not offered bird-sized roosts as movement targets"), AsterSituation.Contains(TEXT("move_to target: TestRoost")));
 	TestTrue(TEXT("Aster receives the raven's visible perched activity as a transient nearby cue"),
-		AsterSituation.Contains(TEXT("In clear view, the raven is perched")) && AsterSituation.Contains(TEXT("about 7 metres away")));
+		AsterSituation.Contains(TEXT("In clear view, the raven is perched")) && AsterSituation.Contains(TEXT("about 3 metres away")));
 	TestTrue(TEXT("Aster can notice the carried twigs without being told the raven's intent"),
 		AsterSituation.Contains(TEXT("bundle of fallen twigs held in the raven's beak")) &&
 		AsterSituation.Contains(TEXT("does not tell you what it plans to do")));
+	AsterBody->SetActorLocation(Raven->GetActorLocation() + FVector(400.f, 0.f, 0.f));
+	const FString BeyondTwigDetailRangeSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Raven activity remains visible just beyond close-range twig detail"),
+		BeyondTwigDetailRangeSituation.Contains(TEXT("In clear view, the raven is perched")));
+	TestFalse(TEXT("The twig detail is omitted just beyond its 3.5 m visual threshold"),
+		BeyondTwigDetailRangeSituation.Contains(TEXT("bundle of fallen twigs")));
 	AsterBody->SetActorLocation(Raven->GetActorLocation() + FVector(1600.f, 0.f, 0.f));
 	const FString DistantRavenSituation = AsterBrain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("Raven activity remains visible at the broader awareness range"), DistantRavenSituation.Contains(TEXT("In clear view, the raven is perched")));
 	TestFalse(TEXT("The finer foraging detail is reserved for close range"), DistantRavenSituation.Contains(TEXT("bundle of fallen twigs")));
-	AsterBody->SetActorLocation(FVector(0.f, 400.f, 302.f));
+	AsterBody->SetActorLocation(Raven->GetActorLocation() + FVector(300.f, 0.f, 0.f));
 	AActor* RavenOccluder = World->SpawnActor<AActor>();
 	if (TestNotNull(TEXT("Aster-raven visibility blocker fixture spawned"), RavenOccluder))
 	{
 		UBoxComponent* OccluderBox = NewObject<UBoxComponent>(RavenOccluder);
 		RavenOccluder->SetRootComponent(OccluderBox);
-		OccluderBox->SetBoxExtent(FVector(100.f, 100.f, 150.f));
+		OccluderBox->SetBoxExtent(FVector(60.f, 60.f, 150.f));
 		OccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
 		OccluderBox->RegisterComponent();
-		OccluderBox->SetWorldLocation(FVector(300.f, 200.f, 332.f));
+		OccluderBox->SetWorldLocation((AsterBody->GetActorLocation() + Raven->GetActorLocation()) * 0.5f + FVector(0.f, 0.f, 80.f));
 		TestFalse(TEXT("Aster does not receive the raven activity cue through solid cover"),
 			AsterBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("In clear view, the raven is perched")));
 		TestFalse(TEXT("Aster does not receive the carried-twig cue through solid cover"),
@@ -1140,6 +1147,11 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("The active Raven body is the imported Crow asset"), RiggedCrow->GetSkeletalMeshAsset() == AvailableCrowAsset);
 		TestTrue(TEXT("The rigged Crow does not layer the procedural fallback wing meshes"), !LeftWing && !RightWing);
+		const FName CarrySocket = CarriedTwigs->GetAttachSocketName();
+		const FTransform CarrySocketWorld = RiggedCrow->GetSocketTransform(CarrySocket, RTS_World);
+		AddInfo(FString::Printf(TEXT("Twig carry socket=%s crowLocation=%s socketWorld=%s crowScale=%s"),
+			*CarrySocket.ToString(), *Raven->GetActorLocation().ToCompactString(), *CarrySocketWorld.GetLocation().ToCompactString(),
+			*RiggedCrow->GetComponentScale().ToCompactString()));
 		UMaterialInterface* CrowMaterial = RiggedCrow->GetMaterial(0);
 		TestNotNull(TEXT("The imported Crow keeps its authored feather material"), CrowMaterial);
 		if (bHasIslandCrowAsset && IslandCrowMaterial)
