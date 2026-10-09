@@ -12,7 +12,8 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Thirty minute maximum"), UAgentPlaySessionSubsystem::ClampDuration(99999), 1800.0);
 	TestEqual(TEXT("Zero cannot disable watchdog"), UAgentPlaySessionSubsystem::ClampDuration(0), 1.0);
 	TestEqual(TEXT("Short smoke-test duration"), UAgentPlaySessionSubsystem::ClampDuration(12), 12.0);
-	TestEqual(TEXT("Request budget has a positive floor"), UAgentPlaySessionSubsystem::ClampRequestLimit(0), 1);
+	TestEqual(TEXT("Zero model-request budget is a valid closed cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(0), 0);
+	TestEqual(TEXT("Negative model-request budgets clamp to zero"), UAgentPlaySessionSubsystem::ClampRequestLimit(-1), 0);
 	TestEqual(TEXT("Request budget cannot exceed hard cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(1000), 120);
 	float SessionSeconds = 1800.f;
 	int32 SessionRequests = 120;
@@ -33,7 +34,11 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	SessionRequests = 120;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=0 -CaptiveSkyMaxModelRequests=0"), SessionSeconds, SessionRequests);
 	TestEqual(TEXT("Command line cannot disable real-time cap"), SessionSeconds, 1.f);
-	TestEqual(TEXT("Command line cannot disable request cap"), SessionRequests, 1);
+	TestEqual(TEXT("Command line zero request cap disables all model calls"), SessionRequests, 0);
+	SessionSeconds = 1800.f;
+	SessionRequests = 120;
+	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=12"), SessionSeconds, SessionRequests);
+	TestEqual(TEXT("Omitting the request override preserves the configured request cap"), SessionRequests, 120);
 	TestEqual(TEXT("Legacy 15-second Blueprint interval is bounded"), AAutonomousAgentAIController::BackgroundDelay(0, 15), 60.0);
 	TestEqual(TEXT("Repeats back off"), AAutonomousAgentAIController::BackgroundDelay(3, 60), 240.0);
 	TestEqual(TEXT("Backoff capped at five minutes"), AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
@@ -59,6 +64,13 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	Session->CompleteModelRequest();
 	TestTrue(TEXT("Drained request budget expires the session"), Session->IsExpired());
 	TestEqual(TEXT("Completed calls leave no requests in flight"), Session->ModelRequestsInFlight, 0);
+
+	UAgentPlaySessionSubsystem* NoModelRequests = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	NoModelRequests->StartedAt = FPlatformTime::Seconds();
+	NoModelRequests->MaxModelRequests = 0;
+	TestTrue(TEXT("Zero model-request cap immediately expires a drained bounded session"), NoModelRequests->IsExpired());
+	TestFalse(TEXT("Zero model-request cap rejects the first reservation"), NoModelRequests->TryReserveModelRequest());
+	TestEqual(TEXT("Rejected zero-cap reservation does not increment the count"), NoModelRequests->ModelRequests, 0);
 
 	UAgentPlaySessionSubsystem* TimedOutDrain = NewObject<UAgentPlaySessionSubsystem>(Instance);
 	TimedOutDrain->StartedAt = FPlatformTime::Seconds();
@@ -123,6 +135,12 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 		ExplicitlyRequestCapped->TryReserveModelRequest(TEXT("Aster")));
 	ExplicitlyRequestCapped->CompleteModelRequest();
 	TestTrue(TEXT("Continuous play ends once its explicitly capped request drains"), ExplicitlyRequestCapped->IsExpired());
+	UAgentPlaySessionSubsystem* ZeroRequestContinuous = MakeContinuous(2000.0);
+	ZeroRequestContinuous->bHasExplicitRequestCap = true;
+	ZeroRequestContinuous->MaxModelRequests = 0;
+	TestTrue(TEXT("Continuous play with an explicit zero request cap expires before any call"), ZeroRequestContinuous->IsExpired());
+	TestFalse(TEXT("Continuous play with an explicit zero request cap rejects reservations"),
+		ZeroRequestContinuous->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("A fresh launch has half a burst to spend"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestFalse(TEXT("One resident cannot fire requests back to back"), Continuous->TryReserveModelRequest(TEXT("Aster")));
 	TestTrue(TEXT("The first accepted request creates a durable daily ledger"), FPaths::FileExists(Ledger));

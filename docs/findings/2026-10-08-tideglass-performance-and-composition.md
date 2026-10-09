@@ -448,3 +448,21 @@ CSV: [`Profile(20261009_131932).csv`](../../Saved/CompileScratch/Codex_Vegetatio
 
 Next: profile a player-controlled route or a resident moving through the dense
 vegetation with warmed caches; keep the same strict time/request safeguards.
+
+### Explicit zero-request cap follow-up (2026-10-09)
+
+The measured run above requested `-CaptiveSkyMaxModelRequests=0`, but the then-
+current minimum clamp raised that to one. The request-limit clamp now accepts
+the closed range 0–120; a zero cap is immediately exhausted and refuses every
+reservation in both bounded and explicitly capped continuous play. The
+`Start-Spectator.ps1 -MaxModelRequests` validator now accepts zero as well.
+Configured defaults remain unchanged (120 requests), the maximum remains 120,
+and the real-time watchdog still clamps to 1–1800 seconds.
+
+The UE 5.8.3 scratch editor target rebuilt successfully after the change, and
+`CaptiveSky2.Agent.SessionSafety` passed under NullRHI. Its regression checks
+zero-cap CLI parsing, no-call bounded and continuous sessions, and rejection
+without incrementing request counts; the test made no provider calls. The
+focused automation used the process-local memory DDC fallback because the
+workspace cannot access the user's profile DDC. Log:
+[`Codex_ZeroRequestCap_Final_Automation.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_ZeroRequestCap_Final_20261009/Codex_ZeroRequestCap_Final_Automation.log).

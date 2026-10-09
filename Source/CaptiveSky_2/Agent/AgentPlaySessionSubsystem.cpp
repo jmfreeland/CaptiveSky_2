@@ -24,7 +24,7 @@ double UAgentPlaySessionSubsystem::ClampDuration(double Requested)
 
 int32 UAgentPlaySessionSubsystem::ClampRequestLimit(int32 Requested)
 {
-	return FMath::Clamp(Requested, 1, 120);
+	return FMath::Clamp(Requested, 0, 120);
 }
 
 void UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests,

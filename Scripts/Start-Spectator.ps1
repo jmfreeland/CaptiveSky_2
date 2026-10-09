@@ -70,7 +70,7 @@ param(
 	[switch]$Continuous,
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
-	[ValidateRange(1, 120)][Nullable[int]]$MaxModelRequests,
+	[ValidateRange(0, 120)][Nullable[int]]$MaxModelRequests,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
 
