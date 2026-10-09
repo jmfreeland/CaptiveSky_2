@@ -596,8 +596,16 @@ void AIslandWeather::InitializeGroundCover()
 		for (TActorIterator<AIslandCurio> It(GetWorld()); It; ++It)
 			ScatterCurios.Add(It->GetRecord());
 	UE_LOG(LogIslandWeather, Log, TEXT("Ground-cover scatter keeps clearances around %d curio(s)."), ScatterCurios.Num());
-	const UIslandTrailSubsystem* TrailSubsystem = GetWorld()->GetSubsystem<UIslandTrailSubsystem>();
-	const FIslandTrailLedger* TrailLedger = TrailSubsystem ? &TrailSubsystem->GetLedger() : nullptr;
+	FIslandTrailLedger TrailLedgerForScatter;
+	const FIslandTrailLedger* TrailLedger = nullptr;
+	if (const UIslandTrailSubsystem* TrailSubsystem = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
+	{
+		TrailLedgerForScatter = TrailSubsystem->GetLedger();
+		// The trail subsystem may process day-boundary weathering after this actor's deferred scatter.
+		// Use a current-day snapshot so the very first scatter after a saved day change can regrow cover.
+		TrailLedgerForScatter.WeatherTo(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+		TrailLedger = &TrailLedgerForScatter;
+	}
 	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
 		if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, GroundHit.ImpactPoint))

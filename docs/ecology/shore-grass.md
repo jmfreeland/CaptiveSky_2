@@ -374,6 +374,36 @@ scatter, and verifies that every skipped placement is reflected in the final
 instance total. Validation was headless with resident thinking disabled and
 zero model requests; no map or authored asset was changed. Log:
 [ground-cover automation](../../Saved/Logs/Codex_TrailClearance_GroundCover_20261009.log).
-This is behavioral validation, not a rendered path-clearance comparison. A
-useful follow-up is a matched Island frame with a deliberately seeded path,
-then a later-day frame showing regrowth after ledger decay.
+
+## Seeded-path Game comparison (2026-10-09)
+
+Matched 1600×900 UE 5.8.3 D3D12 standalone Game captures used isolated world
+data, a synthetic persistent Tideglass footpath, resident thinking disabled,
+and zero model requests. The no-trail scatter placed 1,779,869 ground-cover
+instances; the full-wear route placed 1,779,519 (350 fewer). At a close
+oblique view the route is a legible bare-soil corridor with low cover and
+broadleaf patches still framing its edges. The wider, near-ground camera shows
+little obvious change, so this reads best as a local discovery rather than a
+landscape-wide visual effect. Compare [no trail](../../Saved/CompileScratch/Codex_TrailClearanceVisual_20261009/BaselineClose/Screenshots/001_Close.png)
+and [full wear](../../Saved/CompileScratch/Codex_TrailClearanceVisual_20261009/WithTrailClose/Screenshots/001_Close.png).
+
+A 30-day aging fixture began with 160 steps per cell, last weathered on Island
+day 1, and an isolated clock on day 31. Aging reduced those cells to 56 steps.
+The next scatter placed 1,779,790 ground-cover instances: 271 of the 350
+previously suppressed placements had returned, while a faint route remained.
+This exposed and fixed a start-order lag: the trail subsystem's day-boundary
+weathering could run after ground-cover initialization. Scatter now ages a
+local ledger snapshot to the current Island day before filtering candidates;
+the subsystem still owns mutation and persistence. The regression test checks
+the 160-to-56 step decay, and the first day-31 Game scatter now reflects that
+partial regrowth. [Day-31 regrowth frame](../../Saved/CompileScratch/Codex_TrailClearanceVisual_20261009/RegrowthImmediate/Screenshots/001_Close.png).
+
+Each Game run ended within its 20- or 60-second realtime cap with zero model
+requests, and all test data remained under `Saved/CompileScratch`. Logs:
+[no-trail baseline](../../Saved/Logs/Codex_TrailClearanceVisual_CloseBaseline_20261009.log),
+[full-wear run](../../Saved/Logs/Codex_TrailClearanceVisual_WithTrail_20261009.log),
+[day-31 immediate regrowth](../../Saved/Logs/Codex_TrailClearanceVisual_RegrowthImmediate_20261009.log),
+and [ground-cover automation](../../Saved/Logs/Codex_TrailDecay_GroundCover_20261009.log).
+This proves the procedural response using synthetic ledger data; next, confirm
+that ordinary Aster and raven travel create and preserve a route in an isolated
+resident play session.
