@@ -1439,19 +1439,121 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		if (BlockerCount == 0)
 			break;
 	}
-	AddInfo(FString::Printf(TEXT("Resident-attention selected camera at %s with %d blocked subject traces"),
-		*AttentionCameraLocation.ToCompactString(), AttentionCameraBlockers));
-	Camera->SetActorLocationAndRotation(AttentionCameraLocation, (AttentionLookAt - AttentionCameraLocation).Rotation());
-	TestTrue(TEXT("Calm resident attention screenshot is saved"), SavePose(TEXT("03_ResidentAttention.png")));
-	AttentionResident->Destroy();
-	Controller->ResidentAttentionRemaining = 0.f;
-	Controller->ResidentAttentionTarget.Reset();
-	Controller->NoticedResidentsInNearbyGroup.Reset();
-	if (HeadPivot)
-		HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
-	if (RiggedCrow)
-		RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
-	ForagePatch->SetActorHiddenInGame(false);
+		AddInfo(FString::Printf(TEXT("Resident-attention selected camera at %s with %d blocked subject traces"),
+			*AttentionCameraLocation.ToCompactString(), AttentionCameraBlockers));
+		Camera->SetActorLocationAndRotation(AttentionCameraLocation, (AttentionLookAt - AttentionCameraLocation).Rotation());
+		TestTrue(TEXT("Calm resident attention screenshot is saved"), SavePose(TEXT("03_ResidentAttention.png")));
+		AttentionResident->Destroy();
+
+		const FVector RavenLocationBeforeStagGlance = Raven->GetActorLocation();
+		FVector StagGround = FVector::ZeroVector;
+		const FVector StagGroundCandidate = ForageGround + FVector(260.f, 0.f, 0.f);
+		FHitResult StagGroundHit;
+		const bool bFoundStagGround = Island->LineTraceSingleByChannel(StagGroundHit,
+			StagGroundCandidate + FVector(0.f, 0.f, 1600.f),
+			StagGroundCandidate - FVector(0.f, 0.f, 3000.f), ECC_Visibility) &&
+			StagGroundHit.ImpactNormal.Z >= 0.8f;
+		if (bFoundStagGround) StagGround = StagGroundHit.ImpactPoint;
+		AIslandForestStag* NoticingStag = bFoundStagGround
+			? Island->SpawnActor<AIslandForestStag>(StagGround, FRotator(0.f, 180.f, 0.f), Spawn)
+			: nullptr;
+		TestNotNull(TEXT("Nearby walkable ground supports the transient stag glance capture"), NoticingStag);
+		if (NoticingStag)
+		{
+			NoticingStag->bMoving = false;
+			NoticingStag->bStartled = false;
+			NoticingStag->bResting = false;
+			NoticingStag->bNoticingResident = true;
+			TestTrue(TEXT("The staged stag has the real calm-notice animation available"),
+				NoticingStag->LookAroundAnimation && NoticingStag->DeerMesh);
+			if (NoticingStag->DeerMesh && NoticingStag->LookAroundAnimation)
+			{
+				NoticingStag->DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+				NoticingStag->DeerMesh->PlayAnimation(NoticingStag->LookAroundAnimation, false);
+			}
+			Controller->ListeningStoneAttentionRemaining = 0.f;
+			Controller->MinnowRippleAttentionRemaining = 0.f;
+			Controller->RainBasinAttentionRemaining = 0.f;
+			Controller->DewGlintAttentionRemaining = 0.f;
+			Controller->WindMoteAttentionRemaining = 0.f;
+			Controller->CrabScurryAttentionRemaining = 0.f;
+			Controller->ResidentAttentionRemaining = 0.f;
+			Controller->WildlifeAttentionRemaining = 0.f;
+			Controller->NoticedWildlifeInNearbyGroup.Reset();
+			Controller->ListeningStoneCheckRemaining = 1.f;
+			const FRotator RavenRotationBeforeStagGlance = Raven->GetActorRotation();
+			Raven->SetActorRotation(FRotator(RavenRotationBeforeStagGlance.Pitch, 90.f,
+				RavenRotationBeforeStagGlance.Roll));
+			if (HeadPivot) HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
+			if (RiggedCrow) RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
+			Controller->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("The settled Raven selects the stag's calm, visible look for the capture"),
+				Controller->WildlifeAttentionTarget.Get() == NoticingStag &&
+				Controller->WildlifeAttentionRemaining > 1.5f);
+			Controller->Tick(0.25f);
+			USceneComponent* AttentionVisual = HeadPivot
+				? HeadPivot
+				: static_cast<USceneComponent*>(RiggedCrow);
+			TestNotNull(TEXT("The Raven attention turn drives the active rendered body"), AttentionVisual);
+			if (AttentionVisual)
+			{
+				const FRotator RestPose = HeadPivot
+					? Controller->RavenHeadRestRotation
+					: Controller->RiggedCrowRestRotation;
+				const float GlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+					RestPose.Yaw, AttentionVisual->GetRelativeRotation().Yaw));
+				TestTrue(TEXT("The rendered Raven head visibly turns toward the noticing stag"),
+					GlanceYaw > 3.f && GlanceYaw <= 25.f);
+			}
+			TestTrue(TEXT("The reciprocal glance leaves the Raven actor in place"),
+				Raven->GetActorLocation().Equals(RavenLocationBeforeStagGlance, 0.1f));
+
+			const FVector StagLookAt = (Raven->GetActorLocation() + NoticingStag->GetActorLocation()) * 0.5f +
+				FVector(0.f, 0.f, 65.f);
+			const FVector StagCameraOffsets[] = {
+				FVector(0.f, -820.f, 280.f), FVector(0.f, 820.f, 280.f),
+				FVector(0.f, -940.f, 320.f), FVector(0.f, 940.f, 320.f),
+				FVector(-960.f, 0.f, 320.f), FVector(960.f, 0.f, 320.f)
+			};
+			FCollisionQueryParams StagCameraQuery(SCENE_QUERY_STAT(RavenStagGlanceCapture), false, Camera);
+			StagCameraQuery.AddIgnoredActor(Raven);
+			StagCameraQuery.AddIgnoredActor(NoticingStag);
+			FVector StagCameraLocation = StagLookAt + StagCameraOffsets[0];
+			int32 StagCameraBlockers = MAX_int32;
+			for (const FVector& Offset : StagCameraOffsets)
+			{
+				const FVector Candidate = StagLookAt + Offset;
+				FHitResult RavenHit;
+				FHitResult StagHit;
+				const bool bRavenBlocked = Island->LineTraceSingleByChannel(RavenHit, Candidate,
+					Raven->GetActorLocation() + FVector(0.f, 0.f, 45.f), ECC_Visibility, StagCameraQuery);
+				const bool bStagBlocked = Island->LineTraceSingleByChannel(StagHit, Candidate,
+					NoticingStag->GetActorLocation() + FVector(0.f, 0.f, 60.f), ECC_Visibility, StagCameraQuery);
+				const int32 BlockerCount = static_cast<int32>(bRavenBlocked) + static_cast<int32>(bStagBlocked);
+				if (BlockerCount < StagCameraBlockers)
+				{
+					StagCameraBlockers = BlockerCount;
+					StagCameraLocation = Candidate;
+				}
+				if (BlockerCount == 0) break;
+			}
+			AddInfo(FString::Printf(TEXT("Raven–stag capture camera=%s blockedSubjects=%d"),
+				*StagCameraLocation.ToCompactString(), StagCameraBlockers));
+			Camera->SetActorLocationAndRotation(StagCameraLocation, (StagLookAt - StagCameraLocation).Rotation());
+			TestTrue(TEXT("The real-RHI Raven–stag reciprocal glance frame is saved"), SavePose(TEXT("10_RavenStagGlance.png")));
+			NoticingStag->Destroy();
+			Raven->SetActorRotation(RavenRotationBeforeStagGlance);
+		}
+		Controller->WildlifeAttentionRemaining = 0.f;
+		Controller->WildlifeAttentionTarget.Reset();
+		Controller->ResidentAttentionRemaining = 0.f;
+		Controller->ResidentAttentionTarget.Reset();
+		Controller->NoticedResidentsInNearbyGroup.Reset();
+		if (HeadPivot)
+			HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
+		if (RiggedCrow)
+			RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
+		ForagePatch->SetActorHiddenInGame(false);
 	}
 	Camera->SetActorLocationAndRotation(ForageCameraLocation, (ForageLookAt - ForageCameraLocation).Rotation());
 	Controller->bCarryingTwigs = true;

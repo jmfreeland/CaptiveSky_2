@@ -36,6 +36,7 @@ protected:
 private:
 	friend class FIslandForestStagTest;
 	friend class FRavenPerchTest;
+	friend class FIslandRavenWingCaptureTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<USkeletalMeshComponent> DeerMesh;
 	UPROPERTY(Transient)
