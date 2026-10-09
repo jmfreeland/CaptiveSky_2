@@ -76,3 +76,33 @@ framing remain open for another art pass.
 Logs: [`Codex_StandingStoneChippedCap_Build_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_StandingStoneChippedCap_Build_20261009.log),
 [`Codex_StandingStoneChippedCap_Automation_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_StandingStoneChippedCap_Automation_20261009.log),
 and [`Codex_StandingStoneChippedCap_Game_20261009.log`](../../Saved/Logs/Codex_StandingStoneChippedCap_Game_20261009.log).
+
+## Rejected procedural lichen overlay (2026-10-09)
+
+A collisionless second procedural-mesh section was tested as a quick lichen
+surface. The focused `ListeningStonePresentation` automation passed, but four
+matched real-RHI noon frames showed dark, occasionally blue-black flecks rather
+than natural moss. Raising the green tint and spreading marks across every
+side face did not fix the appearance. The code was removed; the current runtime
+stones remain the simpler smooth, collisionless forms, and no map or Content
+asset changed. This confirms the missing quality is a real textured surface,
+not additional decal geometry. Diagnostic frame:
+[`004_Stone_Presentation_Close.png`](../../Saved/CompileScratch/Claude_Props/Saved/GameShots/Codex_ListeningStoneLichen_bright_20261009/004_Stone_Presentation_Close.png);
+log: [`Codex_ListeningStones_Lichen_bright_Game_20261009.log`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_ListeningStones_Lichen_bright_Game_20261009.log).
+
+Next, test a genuine rock/lichen PBR material on the transient meshes under a
+matched noon view, keeping the existing proxy collision and navigation. Do not
+reintroduce flat colored patches unless a render proves they read as surface
+growth at ordinary gameplay distance.
+
+## Candidate asset check (2026-10-09)
+
+The library contains a Tripo `StoneCairn` material and its color, normal, and
+ORM textures, as well as several Fab rock/moss surface texture sets. The Tripo
+cairn mesh was previously rejected for these narrow, tall proxies because its
+silhouette is too broad; its material is not yet proven to suit the procedural
+stone UVs. The Fab sets are texture assets, not ready-to-assign materials.
+Therefore no existing surface is a verified drop-in: the next material pass
+must check texture projection/tiling on the actual transient mesh and judge a
+matched in-game render before keeping it. No Content asset was changed in this
+audit.
