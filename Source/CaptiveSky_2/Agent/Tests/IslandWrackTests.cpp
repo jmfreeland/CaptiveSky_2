@@ -7,6 +7,9 @@
 #include "IslandDayNight.h"
 #include "IslandInteractionUtility.h"
 #include "IslandWrack.h"
+#include "RavenAgentAIController.h"
+#include "GameFramework/Character.h"
+#include "EngineUtils.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
 #include "Misc/Paths.h"
@@ -67,7 +70,7 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A malformed tag is not wrack"), Wrack::ItemIdFromTag(FName(TEXT("Wrack_x"))), 0);
 
 	FIslandWrackLedger RavenAwareness;
-	const int32 NearestShorefall = RavenAwareness.Add(Kind::Kelp, FVector(55674.f, 0.f, 0.f), 0.f, 11, 10).Id;
+	const int32 NearestShorefall = RavenAwareness.Add(Kind::Driftwood, FVector(55674.f, 0.f, 0.f), 0.f, 11, 10).Id;
 	RavenAwareness.Add(Kind::Shells, FVector(58000.f, 0.f, 0.f), 0.f, 12, 10);
 	const int32 AlreadyTurned = RavenAwareness.Add(Kind::Driftwood, FVector(54000.f, 0.f, 0.f), 0.f, 13, 10).Id;
 	FIslandWrackItem TurnedItem;
@@ -80,6 +83,8 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Already-turned wrack is not offered again"), RavenShoreCue.Contains(Wrack::TargetTagFor(AlreadyTurned).ToString()));
 	TestFalse(TEXT("Wrack beyond the Raven's awareness radius is omitted"), RavenShoreCue.Contains(TEXT("Wrack_4")));
 	TestFalse(TEXT("Nearby wrack remains in the local observation channel"), RavenShoreCue.Contains(TEXT("Wrack_5")));
+	TestTrue(TEXT("An untouched distant driftwood fall offers optional nest foraging"),
+		RavenShoreCue.Contains(TEXT("gather a small bundle")) && RavenShoreCue.Contains(TEXT("GatherTwigs")));
 
 	FIslandWrackLedger Ledger;
 	const int32 A = Ledger.Add(Kind::Driftwood, FVector(100.f, 200.f, 30.f), 45.f, 123, 10).Id;
@@ -107,6 +112,24 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Seed survives"), Reloaded->Seed, 123);
 	}
 	TestEqual(TEXT("New ids keep counting after a reload"), Loaded.Add(Kind::Shells, FVector::ZeroVector, 0.f, 1, 11).Id, B + 1);
+
+	FIslandWrackLedger Forage;
+	const int32 TurnedDriftwoodId = Forage.Add(Kind::Driftwood, FVector::ZeroVector, 0.f, 3, 1).Id;
+	FIslandWrackItem Foraged;
+	Forage.Turn(TurnedDriftwoodId, TEXT("Aster"), Foraged);
+	TestFalse(TEXT("Aster's inspected driftwood discovery is not taken for nest material"),
+		Forage.GatherDriftwoodTwigs(TurnedDriftwoodId, Foraged));
+	const int32 KelpId = Forage.Add(Kind::Kelp, FVector::ZeroVector, 0.f, 4, 1).Id;
+	TestFalse(TEXT("Kelp cannot be gathered as twigs"), Forage.GatherDriftwoodTwigs(KelpId, Foraged));
+	const int32 FreshDriftwoodId = Forage.Add(Kind::Driftwood, FVector(5.f, 0.f, 0.f), 0.f, 5, 1).Id;
+	TestTrue(TEXT("Fresh unturned driftwood yields one loose-twig bundle"),
+		Forage.GatherDriftwoodTwigs(FreshDriftwoodId, Foraged));
+	TestEqual(TEXT("The bundle comes from the selected driftwood"), Foraged.Id, FreshDriftwoodId);
+	TestNull(TEXT("Gathered driftwood is removed from the shore ledger"), Forage.Find(FreshDriftwoodId));
+	FIslandWrackLedger ForageReloaded;
+	TestTrue(TEXT("The shore reloads after foraging"), ForageReloaded.FromJson(Forage.ToJson()));
+	TestNull(TEXT("The gathered piece stays absent after reload"), ForageReloaded.Find(FreshDriftwoodId));
+	TestNotNull(TEXT("Unrelated wrack remains after the Raven forages"), ForageReloaded.Find(KelpId));
 
 	FIslandWrackLedger Garbage;
 	Garbage.Add(Kind::Shells, FVector::ZeroVector, 0.f, 1, 0);
@@ -207,5 +230,99 @@ bool FIslandWrackBottleInteractionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The test-only shore file was written"), FFileHelper::LoadFileToString(SavedWrack, *WrackPath));
 	TestTrue(TEXT("The bottle's opened state and note survive reloading"), Reloaded.FromJson(SavedWrack) &&
 		Reloaded.Find(Float.Id) && Reloaded.Find(Float.Id)->bTurned && Reloaded.Find(Float.Id)->Find.Contains(EarlierThought));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWrackRavenForageTest, "CaptiveSky2.Agent.IslandWrackRavenForage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWrackRavenForageTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Transient Raven foraging world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	const FString TestFolder = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/WrackRavenForage"));
+	const FString TestStem = FPaths::Combine(TestFolder, FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	const FString WrackPath = TestStem + TEXT("_wrack.json");
+	const FString ChroniclePath = TestStem + TEXT("_chronicle.jsonl");
+	const FString BlockedSavePath = TestStem + TEXT("_blocked_save");
+	IFileManager::Get().MakeDirectory(*TestFolder, true);
+	ON_SCOPE_EXIT
+	{
+		IFileManager::Get().Delete(*WrackPath, false, true);
+		IFileManager::Get().Delete(*(WrackPath + TEXT(".tmp")), false, true);
+		IFileManager::Get().Delete(*ChroniclePath, false, true);
+		IFileManager::Get().Delete(*(BlockedSavePath + TEXT(".tmp")), false, true);
+		IFileManager::Get().DeleteDirectory(*BlockedSavePath, false, true);
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+
+	UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>();
+	UIslandChronicleSubsystem* Chronicle = World->GetSubsystem<UIslandChronicleSubsystem>();
+	if (!TestNotNull(TEXT("Shore ledger exists"), Wrack) || !TestNotNull(TEXT("Chronicle exists"), Chronicle)) return false;
+	Wrack->StorageFileOverride = WrackPath;
+	Chronicle->ChronicleFileOverride = ChroniclePath;
+	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>();
+	if (!TestNotNull(TEXT("Island day is available"), Clock)) return false;
+	Clock->DayNumber = 4;
+	World->BeginPlay();
+
+	ACharacter* Raven = World->SpawnActor<ACharacter>(FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator);
+	ARavenAgentAIController* Controller = World->SpawnActor<ARavenAgentAIController>();
+	if (!TestNotNull(TEXT("Raven body exists"), Raven) || !TestNotNull(TEXT("Raven controller exists"), Controller)) return false;
+	Controller->Possess(Raven);
+	const int32 DriftwoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector(160.f, 0.f, 0.f), 0.f, 88, 4).Id;
+	const int32 FloatId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Float,
+		FVector(180.f, 100.f, 0.f), 0.f, 89, 4).Id;
+	Wrack->SyncActors(4);
+
+	TestTrue(TEXT("A nearby untouched driftwood source is offered as an optional nest forage"),
+		Controller->DescribeBuildOptions().Contains(TEXT("storm-fallen driftwood")) &&
+		Controller->DescribeBuildOptions().Contains(TEXT("GatherTwigs")));
+	Controller->LocomotionState = ERavenLocomotionState::Flying;
+	Controller->Build(FName(TEXT("GatherTwigs")));
+	TestFalse(TEXT("The Raven cannot forage while flying"), Controller->bCarryingTwigs);
+	TestNotNull(TEXT("A refused airborne forage leaves the driftwood on the shore"), Wrack->GetLedger().Find(DriftwoodId));
+
+	Controller->LocomotionState = ERavenLocomotionState::Grounded;
+	Controller->Build(FName(TEXT("GatherTwigs")));
+	TestTrue(TEXT("The grounded Raven carries one bundle after gathering driftwood"), Controller->bCarryingTwigs);
+	TestNull(TEXT("Gathered driftwood is removed from the persistent ledger"), Wrack->GetLedger().Find(DriftwoodId));
+	bool bGatheredDriftwoodActorRemains = false;
+	for (TActorIterator<AIslandWrack> It(World); It; ++It)
+		bGatheredDriftwoodActorRemains |= It->GetItemId() == DriftwoodId;
+	TestFalse(TEXT("The gathered driftwood actor disappears from the shore"), bGatheredDriftwoodActorRemains);
+	TestNotNull(TEXT("Other storm wrack remains untouched"), Wrack->GetLedger().Find(FloatId));
+	FString SavedWrack;
+	FIslandWrackLedger Reloaded;
+	TestTrue(TEXT("The forage change was written to the isolated shore file"), FFileHelper::LoadFileToString(SavedWrack, *WrackPath));
+	TestTrue(TEXT("The storm ledger reloads after foraging"), Reloaded.FromJson(SavedWrack));
+	TestNull(TEXT("The driftwood does not respawn after a reload"), Reloaded.Find(DriftwoodId));
+	TestNotNull(TEXT("Unrelated float state survives reload"), Reloaded.Find(FloatId));
+
+	const int32 SaveFailureDriftwoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector(170.f, 0.f, 0.f), 0.f, 90, 4).Id;
+	Wrack->SyncActors(4);
+	Controller->bCarryingTwigs = false;
+	IFileManager::Get().MakeDirectory(*BlockedSavePath, true);
+	Wrack->StorageFileOverride = BlockedSavePath;
+	AddExpectedError(TEXT("Failed to save wrack ledger"), EAutomationExpectedErrorFlags::Contains, 1);
+	Controller->Build(FName(TEXT("GatherTwigs")));
+	TestFalse(TEXT("A failed save does not grant an unrecorded bundle"), Controller->bCarryingTwigs);
+	TestNotNull(TEXT("A failed save restores the source driftwood to the ledger"), Wrack->GetLedger().Find(SaveFailureDriftwoodId));
+	bool bRestoredDriftwoodActor = false;
+	for (TActorIterator<AIslandWrack> It(World); It; ++It)
+		bRestoredDriftwoodActor |= It->GetItemId() == SaveFailureDriftwoodId;
+	TestTrue(TEXT("A failed save leaves the source visible on the shore"), bRestoredDriftwoodActor);
+	Wrack->StorageFileOverride = WrackPath;
+	TestTrue(TEXT("The isolated test ledger can be safely flushed after the failure probe"), Wrack->Save());
 	return true;
 }

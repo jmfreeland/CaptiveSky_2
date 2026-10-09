@@ -57,6 +57,8 @@ struct CAPTIVESKY_2_API FIslandWrackLedger
 	const FIslandWrackItem* Find(int32 Id) const;
 	/** Lift an item and look underneath. Reports whether this call turned it, it was already turned, or it is gone. */
 	EIslandWrackTurn Turn(int32 Id, const FString& AgentId, FIslandWrackItem& OutItem);
+	/** Remove a fresh, unturned driftwood item when its loose twigs are gathered. */
+	bool GatherDriftwoodTwigs(int32 Id, FIslandWrackItem& OutItem);
 	FString ToJson() const;
 	bool FromJson(const FString& Json);
 };
@@ -132,6 +134,8 @@ public:
 	int32 DepositAfterStorm(int32 Today, int32 Count = 0);
 	/** Turn an item over. OutFact says what happened. Returns false when there is no such item. */
 	bool Examine(int32 ItemId, int32 Today, const FString& AgentId, FString& OutFact);
+	/** Gather one fresh driftwood bundle; removal is saved before the visual actor is removed. */
+	bool GatherDriftwoodTwigs(int32 ItemId, const FString& AgentId, FString& OutFact);
 	/** What a resident at Position notices of wrack near them, with move_to/interact targets. Empty when none. */
 	FString DescribeNearby(const FVector& Position, int32 Today) const;
 	/** Optional distant shore cue for the Raven only; grounded residents still receive strictly local observations. */
@@ -156,6 +160,7 @@ protected:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
 private:
+	friend class FIslandWrackRavenForageTest;
 	TMap<int32, TWeakObjectPtr<AIslandWrack>> Actors;
 	FIslandWrackLedger Ledger;
 	bool bDirty = false;
@@ -164,6 +169,6 @@ private:
 
 	FString GetStorageFilePath() const;
 	void Load();
-	void Save();
+	bool Save();
 	void SyncActors(int32 Today);
 };

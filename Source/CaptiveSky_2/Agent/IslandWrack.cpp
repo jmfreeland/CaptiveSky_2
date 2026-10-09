@@ -162,6 +162,19 @@ EIslandWrackTurn FIslandWrackLedger::Turn(int32 Id, const FString& AgentId, FIsl
 	return bAlready ? EIslandWrackTurn::AlreadyTurned : EIslandWrackTurn::Turned;
 }
 
+bool FIslandWrackLedger::GatherDriftwoodTwigs(int32 Id, FIslandWrackItem& OutItem)
+{
+	const int32 Index = Items.IndexOfByPredicate([Id](const FIslandWrackItem& Candidate)
+		{ return Candidate.Id == Id; });
+	if (!Items.IsValidIndex(Index)) return false;
+	const FIslandWrackItem& Candidate = Items[Index];
+	// A resident's discovery stays available to everyone; only untouched driftwood can be foraged.
+	if (Candidate.Kind != EIslandWrackKind::Driftwood || Candidate.bTurned) return false;
+	OutItem = Candidate;
+	Items.RemoveAt(Index);
+	return true;
+}
+
 FString FIslandWrackLedger::ToJson() const
 {
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
@@ -524,15 +537,24 @@ void UIslandWrackSubsystem::Load()
 	}
 }
 
-void UIslandWrackSubsystem::Save()
+bool UIslandWrackSubsystem::Save()
 {
-	bDirty = false;
 	const FString Path = GetStorageFilePath();
-	if (Path.IsEmpty()) return;
+	if (Path.IsEmpty()) return false;
+	if (IFileManager::Get().DirectoryExists(*Path))
+	{
+		UE_LOG(LogIslandWrack, Error, TEXT("Failed to save wrack ledger to %s: destination is a directory."), *Path);
+		return false;
+	}
 	const FString Temporary = Path + TEXT(".tmp");
 	if (!FFileHelper::SaveStringToFile(Ledger.ToJson(), *Temporary, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM) ||
 		!IFileManager::Get().Move(*Path, *Temporary, true, true))
+	{
 		UE_LOG(LogIslandWrack, Error, TEXT("Failed to save wrack ledger to %s"), *Path);
+		return false;
+	}
+	bDirty = false;
+	return true;
 }
 
 void UIslandWrackSubsystem::SyncActors(int32 Today)
@@ -728,6 +750,35 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 	return true;
 }
 
+bool UIslandWrackSubsystem::GatherDriftwoodTwigs(int32 ItemId, const FString& AgentId, FString& OutFact)
+{
+	if (!bAllowStorage || GetStorageFilePath().IsEmpty())
+	{
+		OutFact = TEXT("This shore cannot safely remember a gathered bundle right now; the driftwood was left untouched.");
+		return false;
+	}
+
+	const FIslandWrackLedger Previous = Ledger;
+	FIslandWrackItem Gathered;
+	if (!Ledger.GatherDriftwoodTwigs(ItemId, Gathered))
+	{
+		OutFact = TEXT("There is no fresh, untouched driftwood bundle within reach; nothing was gathered.");
+		return false;
+	}
+	bDirty = true;
+	if (!Save())
+	{
+		Ledger = Previous;
+		OutFact = TEXT("The shore could not save the change, so the driftwood was left where it was.");
+		return false;
+	}
+	SyncActors(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+	OutFact = TEXT("You pulled a small bundle of loose branchlets from the storm-fallen driftwood. The larger piece is gone from the shore, and you carry the twigs in your beak; nothing else was taken.");
+	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("wrack_forage"), AgentId,
+		TEXT("Gathered a small bundle of loose branchlets from storm-fallen driftwood for a nest."));
+	return true;
+}
+
 FString UIslandWrackSubsystem::DescribeNearby(const FVector& Position, int32 Today) const
 {
 	TArray<TPair<float, const FIslandWrackItem*>> Near;
@@ -773,6 +824,13 @@ FString UIslandWrackSubsystem::DescribeShoreForRaven(const TArray<FIslandWrackIt
 		Out += FString::Printf(TEXT(" Another unturned piece lies elsewhere along the shore (move_to target: %s)."), *TargetTagFor(Distant[1].Value->Id).ToString());
 	if (Distant.Num() > 2)
 		Out += FString::Printf(TEXT(" %d more fresh pieces lie along the shore."), Distant.Num() - 2);
+	for (const TPair<float, const FIslandWrackItem*>& Entry : Distant)
+	{
+		if (Entry.Value->Kind != EIslandWrackKind::Driftwood) continue;
+		Out += FString::Printf(TEXT(" Untouched storm-fallen driftwood also lies at %s; if the Raven lands and moves close, it may gather a small bundle of loose branchlets for its nest (build target: GatherTwigs). This is optional, and gathering it does not oblige it to weave a nest."),
+			*TargetTagFor(Entry.Value->Id).ToString());
+		break;
+	}
 	return Out;
 }
 

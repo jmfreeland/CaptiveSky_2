@@ -3,6 +3,7 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentRestPresentationComponent.h"
 #include "IslandArrangement.h"
+#include "IslandWrack.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -1658,13 +1659,42 @@ AIslandArrangement* ARavenAgentAIController::FindForageableTwigPatch() const
 	return BestPatch;
 }
 
+AIslandWrack* ARavenAgentAIController::FindForageableDriftwood() const
+{
+	const APawn* Body = GetPawn();
+	UIslandWrackSubsystem* Wrack = GetWorld() ? GetWorld()->GetSubsystem<UIslandWrackSubsystem>() : nullptr;
+	if (!Body || LocomotionState != ERavenLocomotionState::Grounded || !Wrack) return nullptr;
+	AIslandWrack* Best = nullptr;
+	float BestDistanceSquared = FMath::Square(250.f);
+	for (TActorIterator<AIslandWrack> It(GetWorld()); It; ++It)
+	{
+		const FIslandWrackItem* Item = Wrack->GetLedger().Find(It->GetItemId());
+		if (!Item || Item->Kind != EIslandWrackKind::Driftwood || Item->bTurned) continue;
+		const FVector Delta = It->GetActorLocation() - Body->GetActorLocation();
+		if (FMath::Abs(Delta.Z) > 250.f || Delta.SizeSquared2D() >= BestDistanceSquared) continue;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenDriftwoodForageVisibility), false, Body);
+		Query.AddIgnoredActor(*It);
+		FHitResult VisibilityHit;
+		if (GetWorld()->LineTraceSingleByChannel(VisibilityHit,
+			Body->GetActorLocation() + FVector(0.f, 0.f, 20.f), It->GetActorLocation() + FVector(0.f, 0.f, 15.f),
+			ECC_Visibility, Query)) continue;
+		BestDistanceSquared = Delta.SizeSquared2D();
+		Best = *It;
+	}
+	return Best;
+}
+
 FString ARavenAgentAIController::DescribeBuildOptions() const
 {
 	if (!GetPawn() || !GetWorld()) return FString();
 	if (LocomotionState == ERavenLocomotionState::Grounded && !bCarryingTwigs)
-		return FindForageableTwigPatch()
-			? TEXT("A small visible pile of fallen twigs lies beside you; you may gather its bundle into your beak (build target: GatherTwigs). This site yields at most one bundle per Island day and can renew when the day advances; carrying twigs does not oblige you to build anything.")
-			: TEXT("There are no fallen twigs within reach here. Fly to a listed open-ground ArrangingGround site with a visible twig pile, land, and look there; gathering is optional.");
+	{
+		if (FindForageableTwigPatch())
+			return TEXT("A small visible pile of fallen twigs lies beside you; you may gather its bundle into your beak (build target: GatherTwigs). This site yields at most one bundle per Island day and can renew when the day advances; carrying twigs does not oblige you to build anything.");
+		if (FindForageableDriftwood())
+			return TEXT("Fresh storm-fallen driftwood lies beside you. If you wish, gather a small bundle of its loose branchlets into your beak (build target: GatherTwigs); the larger piece will be taken from the shore. Untouched driftwood only; carrying twigs does not oblige you to build.");
+		return TEXT("There are no fallen twigs or fresh driftwood within reach here. You may fly to a listed open-ground ArrangingGround site with a visible twig pile, or follow a nearby Raven shorefall cue to look for untouched driftwood. Gathering is optional.");
+	}
 	FString Result = bCarryingTwigs ? TEXT(" You are carrying a small bundle of fallen twigs.") : FString();
 	const AActor* Site = FindPerchedNestSite();
 	if (!Site) return Result;
@@ -1688,6 +1718,24 @@ void ARavenAgentAIController::Build(FName Target)
 		if (LocomotionState != ERavenLocomotionState::Grounded) { ReportAction(TEXT("Twigs can only be gathered while standing on the ground. Nothing was gathered.")); return; }
 		if (bCarryingTwigs) { ReportAction(TEXT("You are already carrying a bundle of twigs; there is no room in your beak for more.")); return; }
 		AIslandArrangement* Patch = FindForageableTwigPatch();
+		if (!Patch)
+		{
+			AIslandWrack* Driftwood = FindForageableDriftwood();
+			UIslandWrackSubsystem* Wrack = GetWorld() ? GetWorld()->GetSubsystem<UIslandWrackSubsystem>() : nullptr;
+			const UAgentMemoryComponent* Memory = GetPawn() ? GetPawn()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+			const FString AgentId = Memory ? Memory->GetResolvedAgentId() : (GetPawn() ? GetPawn()->GetName() : FString());
+			FString Fact;
+			if (!Driftwood || !Wrack || !Wrack->GatherDriftwoodTwigs(Driftwood->GetItemId(), AgentId, Fact))
+			{
+				ReportAction(Fact.IsEmpty()
+					? TEXT("No fresh driftwood lies within reach, or it is screened from view; no twigs were gathered.")
+					: Fact);
+				return;
+			}
+			bCarryingTwigs = true;
+			ReportAction(Fact);
+			return;
+		}
 		UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
 		const UAgentMemoryComponent* Memory = GetPawn() ? GetPawn()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
 		const FString AgentId = Memory ? Memory->GetResolvedAgentId() : (GetPawn() ? GetPawn()->GetName() : FString());

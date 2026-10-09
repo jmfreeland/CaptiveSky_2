@@ -12,6 +12,7 @@ class AIslandPoolRippleEffect;
 class AIslandRainBasin;
 class AIslandTidepoolCrab;
 class AIslandWindMoteEffect;
+class AIslandWrack;
 class AAutonomousAgentCharacter;
 class UInstancedStaticMeshComponent;
 class UAnimSequence;
@@ -99,6 +100,7 @@ private:
 	friend class FIslandCurioTest;
 	friend class FIslandArrangementTest;
 	friend class FIslandGuestBookTest;
+	friend class FIslandWrackRavenForageTest;
 	friend class FIslandForestStagTest;
 	FVector MovementTarget = FVector::ZeroVector;
 	FVector PerchTarget = FVector::ZeroVector;
@@ -185,6 +187,7 @@ private:
 
 	AActor* FindPerchedNestSite() const;
 	AIslandArrangement* FindForageableTwigPatch() const;
+	AIslandWrack* FindForageableDriftwood() const;
 	void Build(FName Target);
 
 	void SetFlyingMovement(bool bFlying) const;
