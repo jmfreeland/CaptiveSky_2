@@ -416,3 +416,35 @@ Dragonfly: [`02e_TideglassDragonflyClose.png`](../../Saved/CompileScratch/Codex_
 Next: once the landscape-material WIP settles, rerun the same views against its
 updated composition. Separately profile a real moving resident/player route
 with warmed shaders; the offscreen capture gate is not that test.
+
+## Bounded opening spectator-view profile (2026-10-09)
+
+An isolated UE 5.8.3 D3D12 Game run loaded the current Island and captured 120
+CSV frames during the opening `Shore Approach` spectator view at 1280×720. This
+is a slow establishing-camera drift, not a player/resident traversal. Agent
+thinking was disabled, the data root was isolated, and the configured limits
+were 45 real seconds and zero model requests. The session recorded zero
+requests and closed normally after 45.2 seconds from safety-subsystem
+initialization.
+
+The 120-frame sample measured 14.77 ms average frame time, 13.82 ms median,
+19.32 ms p95, 30.56 ms p99, and 46.43 ms maximum (67.7 average / 51.7 p95 FPS).
+That clears the project's 30-FPS p95 floor in this short spectator segment.
+It is not a moving traversal, a broad gameplay sample, or a packaged build
+result. Unreal still reported 400 unprecached D3D12 PSO creation hitches
+during startup, so treat the peak frame and first-use hitching separately from
+the measured post-startup sample. The earlier cold screenshot still displayed
+“Preparing Shaders” and is not a highlight or a visual baseline.
+
+The game log also recorded `UBT AutoSDK ReturnCode: -532462766`; it nevertheless
+loaded the Island, accepted the CSV profile command, and exited normally. This
+adds another successful runtime correlation, not a root-cause diagnosis for the
+separate `dotnet.exe` dialog. The command-line request limit of zero is clamped
+to one by the current subsystem; disabled agent thinking and the observed zero
+request count kept this run model-free in practice.
+
+Log: [`Codex_MoveWarm_20261009.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_MoveWarm_20261009/Codex_MoveWarm_20261009.log).
+CSV: [`Profile(20261009_131932).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_131932%29.csv).
+
+Next: profile a player-controlled route or a resident moving through the dense
+vegetation with warmed caches; keep the same strict time/request safeguards.

@@ -281,3 +281,23 @@ The denser crossing-site automation rebuilt in the isolated `Codex_NestFoundatio
 This confirms the controlled elevated path is healthy and can validate the project; it does not identify the owner of the user's separate popup or establish that every occurrence is caused by sandboxed UBT. Continue to avoid un-elevated UBT invocations that cannot access its documented per-user trace/config paths, but do not change Windows permissions, uninstall SDKs, or disable validation. If a popup appears outside one of our restricted build attempts, capture its process tree at that moment before attributing it.
 
 Build/test evidence: [`Codex_CrossingSiteAudit_Dense_20261009.log`](../../Saved/Logs/Codex_CrossingSiteAudit_Dense_20261009.log); refreshed scratch SDK report: `Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/AutoSDKInfo.txt`.
+
+### Bounded Game rerun with the validation return code (2026-10-09, 13:18–13:20 local)
+
+An isolated D3D12 Game launch again logged `UBT AutoSDK ReturnCode:
+-532462766`. Startup also reported that it could not launch the Zen version
+utility from the user-profile install directory because process creation was
+denied, and it fell back to its legacy version check. Despite those warnings,
+the Island loaded, the delayed 120-frame CSV command was accepted, and the
+play-session watchdog ended the run after 45.1 real seconds with zero model
+requests; deinitialization logged 45.2 seconds and the engine exited normally.
+
+This is another example of the validation return code coexisting with a
+successful bounded Game session, not proof that the displayed `dotnet.exe`
+dialog came from that process. A 15-minute Application-log query after the run
+found no matching `.NET Runtime` or `Application Error` event, and no
+`dotnet.exe`, UBT, or Unreal process remained. The dialog's owner and managed
+exception stack are still unknown. No SDK, Windows permission, or validation
+setting was changed.
+
+Evidence: [`Codex_MoveWarm_20261009.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Playtests/Codex_MoveWarm_20261009/Codex_MoveWarm_20261009.log); [`Profile(20261009_131932).csv`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Profiling/CSV/Profile%2820261009_131932%29.csv).
