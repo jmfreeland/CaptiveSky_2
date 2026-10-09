@@ -329,6 +329,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("An invalid zero-width wet-edge band has no influence"),
 		AIslandWeather::CalculateGroundCoverWetEdgeMoisture(FVector(500.f, 0.f, 0.f), FVector::ZeroVector,
 			NoCompetingHabitats, 500.f, 500.f), 0.f);
+	int32 DryEdgeBroadleafPatches = 0;
 	int32 WetEdgeBroadleafPatches = 0;
 	for (int32 X = -8; X < 8; ++X)
 		for (int32 Y = -8; Y < 8; ++Y)
@@ -339,6 +340,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			const int32 WetEdgeSpecies = AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 1.f);
 			TestEqual(TEXT("A dry Tideglass margin retains its original deterministic meadow choice"), DryEdgeSpecies, NormalSpecies);
 			TestEqual(TEXT("Wetness never selects a species slot outside the existing foliage set"), WetEdgeSpecies >= 0 && WetEdgeSpecies <= 10, true);
+			if (DryEdgeSpecies < 5) ++DryEdgeBroadleafPatches;
 			if (WetEdgeSpecies < 5) ++WetEdgeBroadleafPatches;
 			TestEqual(TEXT("Wet-edge species remain coherent within a 7 m botanical patch"), WetEdgeSpecies,
 				AIslandWeather::SelectGroundCoverVariant(Position + FVector(200.f, 200.f, 0.f), 71, 0.f, 1.f));
@@ -346,7 +348,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 				AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 2.f));
 		}
 	TestTrue(TEXT("The wet edge measurably favours broadleaf cover without forcing a monoculture"),
-		WetEdgeBroadleafPatches > 120 && WetEdgeBroadleafPatches < 220);
+		WetEdgeBroadleafPatches >= DryEdgeBroadleafPatches + 60 && WetEdgeBroadleafPatches < 220);
 	for (int32 X = -8; X < 8; ++X)
 		for (int32 Y = -8; Y < 8; ++Y)
 		{

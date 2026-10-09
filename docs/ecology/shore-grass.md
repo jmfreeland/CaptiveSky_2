@@ -325,3 +325,31 @@ The focused `CaptiveSky2.Agent.IslandWeather` test passed in a UE 5.8.3 scratch 
 The 30-FPS startup gate stabilized at 37.00 FPS, but the gameplay-scale SceneCapture measured 32.69 FPS wall-clock throughput and only 23.84 FPS p95, failing the existing 30-FPS p95 floor. Separate runs of the same view measured 33.21 FPS p95 for `groundplants` only (pass), 27.39 for `grass` only (fail), 29.28 for `woodland` only (fail), and 35.65 for the combined `meadow` layer (pass). The non-monotonic results are not a reliable per-layer cost attribution; they show that the isolated offscreen-render numbers vary with composition and run conditions. The full-scene failure remains real for this capture, but a paired actual-Game ablation/profile is needed before changing the density budget or blaming a particular species. The full-cover image still reads as an uninterrupted mass of sedges over brown ground rather than a legible wet-edge habitat ([full-cover frame](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Viewpoints/2026-10-09_110747_h11.0/02a_TideglassGroundDetail.png)). Logs: [full cover](../../Saved/Logs/Codex_PhilarisGroundCover_RHI_20261009.log), [ground plants only](../../Saved/Logs/Codex_PhilarisGroundplantsOnly_RHI_20261009.log), [grass only](../../Saved/Logs/Codex_PhilarisGrassOnly_RHI_20261009.log), [woodland only](../../Saved/Logs/Codex_PhilarisWoodlandOnly_RHI_20261009.log), [meadow only](../../Saved/Logs/Codex_PhilarisMeadowOnly_RHI_20261009.log), and [focused weather test](../../Saved/Logs/Codex_UserPhalaris_WIP_IslandWeather_20261009.log).
 
 This was a local working-tree check, not evidence that the current Phalaris capture edits are committed or that the full game sustains 30 FPS. Existing actual-Game profiling separately found roughly 28,000 foliage transform updates per frame; before reducing the visual budget, the next useful experiment is a reversible sway ablation in the user-owned `IslandWeather.*` area, followed by a matched actual-Game profile. Preserve the 30-FPS floor and the new wet-edge species; do not infer that the 10-instance Typha/Phalaris band caused this failure.
+
+## Wet-edge broadleaf balance pass (2026-10-09)
+
+The wettest Tideglass patches now convert more of the existing grass candidates
+to the five broadleaf forms (`0.38` to `0.52` wet-edge conversion weight). This
+changes species identity only: the 10-plant Typha/Phalaris band, grass candidate
+budget, collision, navigation, pool clearance, and HISM component count remain
+unchanged. The focused UE 5.8.3 `CaptiveSky2.Agent.GroundCover` automation passed;
+its deterministic sample requires the saturated wet edge to produce at least 60
+more broadleaf selections than the dry baseline without becoming a monoculture.
+
+A 1600×900 D3D12 standalone Game capture rendered four Island landmarks and
+showed a broader leaf community around Tideglass. The runtime scatter placed
+1,779,869 landscape ground-cover instances plus the existing 10 wet-edge
+plants. A separate 600-frame fixed-view profile measured 14.33 ms p50 and
+22.00 ms p95 frame time (45.5 FPS at p95), with 41.96 ms p99 and 50.01 ms max;
+the 60.3-second run ended normally with zero model requests. This clears the
+30-FPS p95 floor for that single fixed view, not moving play or packaged builds.
+
+The [Tideglass Game frame](../../Saved/CompileScratch/Codex_WetEdgeBroadleaf_20261009/Screenshots/002_TideglassPool.png)
+is a useful current composition reference, not a matched before/after proof.
+The scratch log also reports unresolved `WaterEditor` and PlantFactory material
+imports; the plant geometry rendered, but validate the exact materials in the
+installed project before treating this capture as final art. The near pool is
+readable, while cover still forms a dense foreground and broad patchy midground.
+Next, compare the same camera with plugin content resolved, then art-direct a
+walkable opening and distinct near/mid/far plant masses without raising the
+global budget.

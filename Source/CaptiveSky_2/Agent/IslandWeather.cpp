@@ -387,7 +387,7 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	const float WetPatchThreshold = static_cast<float>((Hash >> 18) % 1024u) / 1024.f;
 	// Let some existing grass candidates turn into broadleaf-rich patches along the pool.
 	// This changes the local plant community without adding instances or another mesh component.
-	if (FMath::Clamp(WetEdgeMoisture, 0.f, 1.f) * 0.38f > WetPatchThreshold)
+	if (FMath::Clamp(WetEdgeMoisture, 0.f, 1.f) * 0.52f > WetPatchThreshold)
 		return static_cast<int32>((Hash >> 8) % 5u);
 	// Five broadleaf forms share one slot each; the three grass meshes share two slots each.
 	// The resulting 5:6 broadleaf-to-grass balance adds understorey variety without adding instances.
