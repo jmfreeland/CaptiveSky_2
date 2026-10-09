@@ -118,3 +118,39 @@ inputs suit the procedural UVs, test it transiently in the same noon and shadow
 views. Keep it out of `Content/` edits and do not replace the current surface
 until a matched real-RHI capture shows a genuine improvement. No runtime code
 or binary asset was changed in this follow-up.
+
+## Local PBR surface and calibrated transient tint (2026-10-09)
+
+The candidate is a real texture-driven rocky surface: its package references
+base-color, normal, and ORM textures from the local Fab `Rocky_Ground_wfjjecl`
+set, and UE reports one vector parameter named `Color`. The Game-only
+Listening Stones now load that material and set its `Color` (plus the common
+`BaseColor` compatibility name). If the local material cannot load, the
+transient replacement is skipped and the saved map proxies remain visible.
+No `.uasset`, map, collision, or navigation data was changed.
+
+The first PBR capture exposed an overly dark result and a prominent vertical
+artifact. A matched sample at pixel (830, 650), same camera and noon hour, was
+RGB (111, 103, 89), compared with (161, 152, 133) on the earlier smooth-slate
+surface. Raising the per-stone linear tint to roughly (0.12–0.155) brought the
+same point to (148, 133, 111): a textured, weathered warm-gray stone without
+the original pale, smooth blockout look. The procedural UV seam also now has a
+duplicated position at U=1 on each ring, preventing the closing face from
+interpolating across the full 0-to-1 texture range. Darker flecks and streaks
+remain in the material's appearance and should be judged in the ordinary
+landmark approach, not mistaken for a final lichen pass.
+
+Verification: UE 5.8.3 scratch editor build succeeded; the focused
+`CaptiveSky2.Agent.ListeningStonePresentation` automation passed, including
+candidate loading, the material's actual `Color` parameter, position-matched
+0/1 UV seams, collisionless replacement meshes, and unchanged proxy collision
+and navigation. The real-RHI Game run used the matched close camera at noon,
+disabled resident thinking and Python, allowed zero model requests, and exited
+normally at its 60-second real-time cap. Warm frame:
+[`003_Stone_PBR__Warm40.png`](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/GameShots/Codex_StandingStonePBR_Balanced_20261009/003_Stone_PBR__Warm40.png).
+Logs:
+[`Codex_StandingStonePBR_FinalCheck_Automation_20261009.log`](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/Codex_StandingStonePBR_FinalCheck_Automation_20261009.log),
+[`Codex_StandingStonePBR_Balanced_Game_20261009.log`](../../Saved/CompileScratch/Codex_NestFoundation_20261009/Saved/Logs/Codex_StandingStonePBR_Balanced_Game_20261009.log).
+The source references the local material path; since `Content/` is not tracked,
+the surface asset itself remains machine-local and the saved proxies are the
+safe fallback on a checkout without it.

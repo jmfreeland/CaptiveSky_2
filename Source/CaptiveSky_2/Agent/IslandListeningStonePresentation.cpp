@@ -17,9 +17,11 @@ DEFINE_LOG_CATEGORY_STATIC(LogListeningStonePresentation, Log, All);
 namespace
 {
 	constexpr TCHAR ListeningStoneEngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
+	constexpr TCHAR ListeningStoneRockSurfacePath[] = TEXT("/Game/Materials/M_StandingStoneRockSurface.M_StandingStoneRockSurface");
 	constexpr float ChimeDurationSeconds = 2.8f;
 	constexpr int32 StoneRingCount = 6;
 	constexpr int32 StoneSideCount = 9;
+	constexpr int32 StoneRingVertexCount = StoneSideCount + 1;
 }
 
 AListeningStonePresentation::AListeningStonePresentation()
@@ -74,14 +76,19 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 	// tall proxies. Build one tapered, irregular standing stone per proxy instead; the result
 	// is transient, while the saved cubes continue to own collision and navigation.
 	UMaterialInterface* BaseSurface = LoadObject<UMaterialInterface>(nullptr,
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"), nullptr, LOAD_NoWarn | LOAD_Quiet);
-	if (!BaseSurface) return false;
+		ListeningStoneRockSurfacePath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!BaseSurface)
+	{
+		UE_LOG(LogListeningStonePresentation, Warning, TEXT("Listening Stones could not load the local rock surface %s."), ListeningStoneRockSurfacePath);
+		return false;
+	}
 	const float RingZ[StoneRingCount] = { 0.f, 0.10f, 0.31f, 0.58f, 0.82f, 0.95f };
 	const float RingRadius[StoneRingCount] = { 0.56f, 0.88f, 0.83f, 0.72f, 0.53f, 0.31f };
+	// The textured PBR surface needs a substantially lighter tint than the old flat blockout material.
 	const FLinearColor StoneColors[3] = {
-		FLinearColor(0.015f, 0.017f, 0.018f),
-		FLinearColor(0.018f, 0.017f, 0.015f),
-		FLinearColor(0.016f, 0.018f, 0.020f)
+		FLinearColor(0.12f, 0.135f, 0.15f),
+		FLinearColor(0.14f, 0.135f, 0.12f),
+		FLinearColor(0.125f, 0.14f, 0.155f)
 	};
 	for (int32 Index = 0; Index < Proxies.Num(); ++Index)
 	{
@@ -104,8 +111,8 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		TArray<FVector> Vertices;
 		TArray<int32> Triangles;
 		TArray<FVector2D> UVs;
-		Vertices.Reserve(StoneRingCount * StoneSideCount + 2);
-		UVs.Reserve(StoneRingCount * StoneSideCount + 2);
+		Vertices.Reserve(StoneRingCount * StoneRingVertexCount + 2);
+		UVs.Reserve(StoneRingCount * StoneRingVertexCount + 2);
 		Triangles.Reserve((StoneRingCount - 1) * StoneSideCount * 6 + StoneSideCount * 6);
 		const float BottomZ = Center.Z - LocalExtent.Z;
 		FRandomStream ShapeRandom(0x531A + Index * 7919);
@@ -128,6 +135,11 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 				Vertices.Add(LocalRotation.RotateVector(LocalPoint - Center) + Center);
 				UVs.Add(FVector2D(static_cast<float>(Side) / StoneSideCount, Alpha));
 			}
+			// Duplicate the seam vertex so the closing face interpolates over the small U step
+			// between adjacent samples instead of smearing almost the entire texture.
+			const FVector SeamVertex = Vertices[Ring * StoneRingVertexCount];
+			Vertices.Add(SeamVertex);
+			UVs.Add(FVector2D(1.f, Alpha));
 		}
 		const int32 BottomCenterIndex = Vertices.Add(LocalRotation.RotateVector(FVector(Center.X, Center.Y, BottomZ) - Center) + Center);
 		UVs.Add(FVector2D(0.5f, 0.f));
@@ -139,11 +151,10 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		{
 			for (int32 Side = 0; Side < StoneSideCount; ++Side)
 			{
-				const int32 NextSide = (Side + 1) % StoneSideCount;
-				const int32 A = Ring * StoneSideCount + Side;
-				const int32 B = Ring * StoneSideCount + NextSide;
-				const int32 C = (Ring + 1) * StoneSideCount + NextSide;
-				const int32 D = (Ring + 1) * StoneSideCount + Side;
+				const int32 A = Ring * StoneRingVertexCount + Side;
+				const int32 B = A + 1;
+				const int32 C = (Ring + 1) * StoneRingVertexCount + Side + 1;
+				const int32 D = (Ring + 1) * StoneRingVertexCount + Side;
 				Triangles.Add(A);
 				Triangles.Add(B);
 				Triangles.Add(C);
@@ -152,11 +163,11 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 				Triangles.Add(D);
 			}
 		}
-		const int32 TopRingStart = (StoneRingCount - 1) * StoneSideCount;
+		const int32 TopRingStart = (StoneRingCount - 1) * StoneRingVertexCount;
 		const int32 BottomRingStart = 0;
 		for (int32 Side = 0; Side < StoneSideCount; ++Side)
 		{
-			const int32 NextSide = (Side + 1) % StoneSideCount;
+			const int32 NextSide = Side + 1;
 			Triangles.Add(BottomCenterIndex);
 			Triangles.Add(BottomRingStart + NextSide);
 			Triangles.Add(BottomRingStart + Side);
@@ -173,6 +184,7 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		UMaterialInstanceDynamic* StoneSurface = UMaterialInstanceDynamic::Create(BaseSurface, Stone);
 		if (!StoneSurface) return false;
 		StoneSurface->SetVectorParameterValue(TEXT("Color"), StoneColors[Index]);
+		StoneSurface->SetVectorParameterValue(TEXT("BaseColor"), StoneColors[Index]);
 		Stone->SetMaterial(0, StoneSurface);
 		ResonanceLights[Index]->SetRelativeLocation(Center);
 	}

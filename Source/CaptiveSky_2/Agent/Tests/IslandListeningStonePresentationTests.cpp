@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 #include <limits>
 
@@ -107,8 +108,26 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	if (Presentation)
 	{
 		TestEqual(TEXT("Each blockout proxy becomes one independent standing-stone mesh"), Presentation->GetStoneCount(), 3);
+		UMaterialInterface* CandidateRockSurface = LoadObject<UMaterialInterface>(nullptr,
+			TEXT("/Game/Materials/M_StandingStoneRockSurface.M_StandingStoneRockSurface"));
+		TestNotNull(TEXT("The project rock-surface candidate loads for the transient stones"), CandidateRockSurface);
+		bool bCandidateHasTintParameter = false;
+		if (CandidateRockSurface)
+		{
+			TArray<FMaterialParameterInfo> VectorParameters;
+			TArray<FGuid> VectorParameterIds;
+			CandidateRockSurface->GetAllVectorParameterInfo(VectorParameters, VectorParameterIds);
+			for (const FMaterialParameterInfo& Parameter : VectorParameters)
+			{
+				bCandidateHasTintParameter |= Parameter.Name == TEXT("Color") || Parameter.Name == TEXT("BaseColor");
+				AddInfo(FString::Printf(TEXT("Standing-stone vector parameter: %s"), *Parameter.Name.ToString()));
+			}
+			AddInfo(FString::Printf(TEXT("Standing-stone surface exposes %d vector parameter(s); tint parameter found: %s"),
+				VectorParameters.Num(), bCandidateHasTintParameter ? TEXT("yes") : TEXT("no")));
+		}
+		TestTrue(TEXT("The project rock-surface candidate exposes a supported tint parameter"), bCandidateHasTintParameter);
 		const FLinearColor ExpectedStoneColors[] = {
-			FLinearColor(0.015f, 0.017f, 0.018f), FLinearColor(0.018f, 0.017f, 0.015f), FLinearColor(0.016f, 0.018f, 0.020f)
+			FLinearColor(0.12f, 0.135f, 0.15f), FLinearColor(0.14f, 0.135f, 0.12f), FLinearColor(0.125f, 0.14f, 0.155f)
 		};
 		for (int32 Index = 0; Index < Presentation->GetStoneCount(); ++Index)
 		{
@@ -122,11 +141,29 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			const FProcMeshSection* Section = Stone->GetProcMeshSection(0);
 			TestTrue(FString::Printf(TEXT("Standing stone %d has a closed, detailed mesh"), Index),
 				Section && Section->ProcIndexBuffer.Num() >= 200 && Section->ProcVertexBuffer.Num() >= 50);
+			if (Section && Section->ProcVertexBuffer.Num() >= 62)
+			{
+				bool bTextureSeamIsClosed = true;
+				for (int32 Ring = 0; Ring < 6; ++Ring)
+				{
+					const FProcMeshVertex& First = Section->ProcVertexBuffer[Ring * 10];
+					const FProcMeshVertex& Seam = Section->ProcVertexBuffer[Ring * 10 + 9];
+					bTextureSeamIsClosed &= First.Position.Equals(Seam.Position, 0.01f) &&
+						FMath::IsNearlyEqual(First.UV0.X, 0.f) && FMath::IsNearlyEqual(Seam.UV0.X, 1.f);
+				}
+				TestTrue(FString::Printf(TEXT("Standing stone %d has a position-matched, non-smearing texture seam"), Index),
+					bTextureSeamIsClosed);
+			}
 			UMaterialInstanceDynamic* StoneSurface = Cast<UMaterialInstanceDynamic>(Stone->GetMaterial(0));
 			TestNotNull(FString::Printf(TEXT("Standing stone %d uses its transient stone surface"), Index), StoneSurface);
+			if (StoneSurface && CandidateRockSurface)
+			{
+				TestTrue(FString::Printf(TEXT("Standing stone %d uses the local PBR rock candidate"), Index),
+					StoneSurface->Parent == CandidateRockSurface);
+			}
 			if (StoneSurface && ExpectedStoneColors[Index].R > 0.f)
 			{
-				TestTrue(FString::Printf(TEXT("Standing stone %d retains its restrained slate tint"), Index),
+				TestTrue(FString::Printf(TEXT("Standing stone %d retains its calibrated rock tint"), Index),
 					StoneSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(ExpectedStoneColors[Index], 0.001f));
 			}
 			if (!Section || !Proxies.IsValidIndex(Index)) continue;
