@@ -9,6 +9,7 @@
 
 class UNavigationPath;
 class UNavigationSystemV1;
+class UCapsuleComponent;
 class ACharacter;
 class APawn;
 struct FNavAgentProperties;
@@ -60,6 +61,10 @@ public:
 	static bool FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
 		const FVector& MoverLocation, const FVector& TargetLocation, const FNavAgentProperties& AgentProperties,
 		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
+	/** Sweeps a resident capsule along a nav route, allowing walkable landscape contact but rejecting obstacles. */
+	static bool IsCapsulePathPhysicallyClear(const UWorld* World, const UNavigationPath* Path,
+		const UCapsuleComponent* Capsule, const AActor* IgnoredActor, int32* OutBlockingSegment = nullptr,
+		FHitResult* OutBlocker = nullptr);
 	/** Finds a nearby physical-clear waypoint when the navmesh route disagrees with collision. */
 	static bool FindGroundedClearanceWaypoint(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
 		const FVector& TargetLocation, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);

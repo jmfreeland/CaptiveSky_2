@@ -1,5 +1,6 @@
 #include "CoreMinimal.h"
 #include "AgentMemoryComponent.h"
+#include "AutonomousAgentAIController.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
@@ -166,35 +167,28 @@ static void AuditMovementLandmarks(UWorld* World)
 				++Complete;
 				if (Path->PathPoints.Num() < 2) continue;
 
-				FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(IslandLandmarkNavAudit), false, Aster);
-				const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
-				bool bPhysicallyClear = true;
+				int32 BlockedSegment = INDEX_NONE;
 				FHitResult Blocker;
-				for (int32 PointIndex = 1; PointIndex < Path->PathPoints.Num(); ++PointIndex)
+				const bool bPhysicallyClear = AAutonomousAgentAIController::IsCapsulePathPhysicallyClear(
+					World, Path, Capsule, Aster, &BlockedSegment, &Blocker);
+				if (!bPhysicallyClear)
 				{
-					const FVector SegmentStart = Path->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, HalfHeight + 2.f);
-					const FVector SegmentEnd = Path->PathPoints[PointIndex] + FVector(0.f, 0.f, HalfHeight + 2.f);
-					if (World->SweepSingleByChannel(Blocker, SegmentStart, SegmentEnd, FQuat::Identity,
-						ECC_Pawn, CapsuleShape, QueryParams))
-						{
-							bPhysicallyClear = false;
-							++Blocked;
-							if (FirstBlockerSummary.IsEmpty())
-							{
-								const AActor* BlockingActor = Blocker.GetActor();
-								const UPrimitiveComponent* BlockingComponent = Blocker.GetComponent();
-								const UStaticMeshComponent* BlockingMesh = Cast<UStaticMeshComponent>(BlockingComponent);
-								const UStaticMesh* StaticMesh = BlockingMesh ? BlockingMesh->GetStaticMesh() : nullptr;
-								FirstBlockerSummary = FString::Printf(TEXT("first blocked by %s / %s, mesh %s at %s"),
-									BlockingActor ? *BlockingActor->GetName() : TEXT("<no actor>"),
-									BlockingComponent ? *BlockingComponent->GetName() : TEXT("<no component>"),
-									StaticMesh ? *StaticMesh->GetPathName() : TEXT("<no static mesh>"),
-									*Blocker.ImpactPoint.ToCompactString());
-							}
-							break;
+					++Blocked;
+					if (FirstBlockerSummary.IsEmpty())
+					{
+						const AActor* BlockingActor = Blocker.GetActor();
+						const UPrimitiveComponent* BlockingComponent = Blocker.GetComponent();
+						const UStaticMeshComponent* BlockingMesh = Cast<UStaticMeshComponent>(BlockingComponent);
+						const UStaticMesh* StaticMesh = BlockingMesh ? BlockingMesh->GetStaticMesh() : nullptr;
+						FirstBlockerSummary = FString::Printf(TEXT("first blocked at segment %d by %s / %s, mesh %s at %s"),
+							BlockedSegment,
+							BlockingActor ? *BlockingActor->GetName() : TEXT("<no actor>"),
+							BlockingComponent ? *BlockingComponent->GetName() : TEXT("<no component>"),
+							StaticMesh ? *StaticMesh->GetPathName() : TEXT("<no static mesh>"),
+							*Blocker.ImpactPoint.ToCompactString());
 					}
+					continue;
 				}
-				if (!bPhysicallyClear) continue;
 				++Clear;
 				if (Path->GetPathLength() < BestLength)
 				{

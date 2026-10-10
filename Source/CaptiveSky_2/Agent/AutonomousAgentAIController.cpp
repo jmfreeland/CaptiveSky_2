@@ -19,6 +19,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandTrail.h"
 #include "IslandWorldStateSubsystem.h"
+#include "LandscapeHeightfieldCollisionComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -184,6 +185,49 @@ bool AAutonomousAgentAIController::FindGroundedResidentApproachGoal(UNavigationS
 	}
 	return bFoundGoal;
 }
+bool AAutonomousAgentAIController::IsCapsulePathPhysicallyClear(const UWorld* World, const UNavigationPath* Path,
+	const UCapsuleComponent* Capsule, const AActor* IgnoredActor, int32* OutBlockingSegment, FHitResult* OutBlocker)
+{
+	if (OutBlockingSegment) *OutBlockingSegment = INDEX_NONE;
+	if (OutBlocker) *OutBlocker = FHitResult();
+	if (!World || !Path || !Capsule || Path->PathPoints.Num() < 2) return false;
+
+	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
+	const ACharacter* Character = Cast<ACharacter>(IgnoredActor);
+	const UCharacterMovementComponent* CharacterMovement = Character ? Character->GetCharacterMovement() : nullptr;
+	const float WalkableFloorZ = CharacterMovement ? CharacterMovement->GetWalkableFloorZ() : 0.7f;
+
+	for (int32 PointIndex = 1; PointIndex < Path->PathPoints.Num(); ++PointIndex)
+	{
+		const FVector SegmentStart = Path->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		const FVector SegmentEnd = Path->PathPoints[PointIndex] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AgentCapsulePathClearance), false, IgnoredActor);
+		int32 IgnoredLandscapeContacts = 0;
+		FHitResult Hit;
+		while (World->SweepSingleByChannel(Hit, SegmentStart, SegmentEnd, FQuat::Identity,
+			ECC_Pawn, CapsuleShape, QueryParams))
+		{
+			const ULandscapeHeightfieldCollisionComponent* LandscapeCollision =
+				Cast<ULandscapeHeightfieldCollisionComponent>(Hit.GetComponent());
+			const bool bWalkableGroundContact = LandscapeCollision && Hit.ImpactNormal.Z >= WalkableFloorZ;
+			if (bWalkableGroundContact && IgnoredLandscapeContacts < 16)
+			{
+				// The navmesh already establishes this as walkable support. A capsule sweep
+				// otherwise reports the heightfield floor itself as an obstacle on every path.
+				QueryParams.AddIgnoredComponent(LandscapeCollision);
+				++IgnoredLandscapeContacts;
+				continue;
+			}
+
+			if (OutBlockingSegment) *OutBlockingSegment = PointIndex;
+			if (OutBlocker) *OutBlocker = Hit;
+			return false;
+		}
+	}
+	return true;
+}
+
 bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World,
 	APawn* Pawn, const FVector& MoverLocation, const FVector& TargetLocation,
 	const FNavAgentProperties& AgentProperties, FNavLocation& OutGoal, AActor* PathfindingContext)
@@ -247,24 +291,9 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 			++CompleteRoutes;
 			if (Route->PathPoints.Num() < 2) continue;
 
-			FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AgentLandmarkCapsuleClearance), false, Pawn);
-			const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
-			bool bPhysicallyClear = true;
 			FHitResult FirstBlocker;
 			int32 BlockedSegment = INDEX_NONE;
-			for (int32 PointIndex = 1; PointIndex < Route->PathPoints.Num(); ++PointIndex)
-			{
-				const FVector SegmentStart = Route->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
-				const FVector SegmentEnd = Route->PathPoints[PointIndex] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
-				if (World->SweepSingleByChannel(FirstBlocker, SegmentStart, SegmentEnd, FQuat::Identity,
-					ECC_Pawn, CapsuleShape, QueryParams))
-				{
-					bPhysicallyClear = false;
-					BlockedSegment = PointIndex;
-					break;
-				}
-			}
-			if (!bPhysicallyClear)
+			if (!IsCapsulePathPhysicallyClear(World, Route, Capsule, Pawn, &BlockedSegment, &FirstBlocker))
 			{
 				++BlockedRoutes;
 				if (BlockedRoutes == 1)
@@ -353,20 +382,7 @@ bool AAutonomousAgentAIController::IsUsableWanderPath(const UNavigationPath* Pat
 bool AAutonomousAgentAIController::IsWanderPathPhysicallyClear(const UWorld* World, const UNavigationPath* Path, const APawn* Pawn)
 {
 	const UCapsuleComponent* Capsule = Pawn ? Pawn->FindComponentByClass<UCapsuleComponent>() : nullptr;
-	if (!World || !Path || !Capsule || Path->PathPoints.Num() < 2) return false;
-
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AgentWanderCapsuleClearance), false, Pawn);
-	const FCollisionShape CapsuleShape = Capsule->GetCollisionShape();
-	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-	for (int32 PointIndex = 1; PointIndex < Path->PathPoints.Num(); ++PointIndex)
-	{
-		const FVector SegmentStart = Path->PathPoints[PointIndex - 1] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
-		const FVector SegmentEnd = Path->PathPoints[PointIndex] + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
-		FHitResult Hit;
-		if (World->SweepSingleByChannel(Hit, SegmentStart, SegmentEnd, FQuat::Identity,
-			ECC_Pawn, CapsuleShape, QueryParams)) return false;
-	}
-	return true;
+	return IsCapsulePathPhysicallyClear(World, Path, Capsule, Pawn);
 }
 float AAutonomousAgentAIController::WanderNoveltyScore(const FVector& Candidate, const TArray<FVector>& RecentDestinations)
 {

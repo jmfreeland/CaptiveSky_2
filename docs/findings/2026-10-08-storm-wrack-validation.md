@@ -200,9 +200,37 @@ static/offline bake. Evidence:
 [`IslandNavBoundsPrepareCorrected.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/IslandNavBoundsPrepareCorrected.log),
 [`NavBoundsCorrectedRuntimeProbe.log`](../../Saved/NavBoundsTest/Project/Saved/Logs/NavBoundsCorrectedRuntimeProbe.log).
 
-The next validation is a bounded physical Aster move on an isolated copy with
-the corrected bounds; separately, test whether an offline `Build Paths` bake
-can persist navigation. Do not save or alter the live Island while its editor
-state is unsaved. Epic documents static navigation as offline/saved and dynamic
-navigation as supporting runtime generation ([generation modes](https://dev.epicgames.com/documentation/unreal-engine/overview-of-how-to-modify-the-navigation-mesh-in-unreal-engine),
+### Physical Aster shore interaction on current source
+
+An isolated current-source scratch project (`Saved/NavBoundsTest/ProjectCurrent`)
+was built successfully with UE 5.8.3. Its corrected-bounds map and runtime data
+were kept separate from the saved Island. In a NullRHI run capped at 360 real
+seconds, with agent thinking disabled and a zero-model-request ceiling, dynamic
+Recast generated a complete 570 m route from Aster's spawn to `Wrack_1`.
+
+The first capsule-clearance sweep had treated walkable Landscape heightfield
+contacts as blockers, rejecting every candidate despite the complete navmesh
+route. A shared route-sweep helper now treats only walkable Landscape contacts
+(using the character movement component's walkable-floor threshold) as support;
+other collision hits remain blockers. The corrected audit found 18 of 18
+complete in-range approaches capsule-clear for `Wrack_1`, and all five storm
+wrack items had at least 16 clear candidate routes.
+
+Aster physically traveled 55,611 cm in 94 simulated seconds and reached the
+shore. The normal resident interaction turned over `Wrack_1` and revealed a
+snarl of fishing line; the isolated `Island.wrack.json` records
+`turned: true`, the find, and `by: Agent_Aster_01`. The probe's immediately
+following duplicate interaction was rate-limited because Aster had already
+inspected it, not because the first interaction failed. The run ended normally
+after 140.5 real seconds, with zero model requests and none in flight. Evidence:
+[`clearance build log`](../../Saved/NavBoundsTest/ProjectCurrent/Saved/Logs/AsterShoreClearanceFix2_Build.log),
+[`bounded Aster shore run`](../../Saved/Playtests/Codex_AsterShoreClearanceFix2_20261010/AsterShoreClearanceFix2.log),
+[`isolated wrack state`](../../Saved/Playtests/Codex_AsterShoreClearanceFix2_20261010/World/WorldState/Island.wrack.json).
+
+This verifies the dynamic corrected-bounds scratch setup, not a saved static
+navmesh bake. Persisting the enlarged bounds or a static/offline `Build Paths`
+bake into the authored map remains separate work; do not save or alter the live
+Island while its editor state is unsaved. Epic documents static navigation as
+offline/saved and dynamic navigation as supporting runtime generation
+([generation modes](https://dev.epicgames.com/documentation/unreal-engine/overview-of-how-to-modify-the-navigation-mesh-in-unreal-engine),
 [basic navigation and Build Paths](https://dev.epicgames.com/documentation/unreal-engine/basic-navigation-in-unreal-engine?lang=en-US)).
