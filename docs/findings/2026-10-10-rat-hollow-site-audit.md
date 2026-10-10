@@ -37,11 +37,33 @@ established that PVE and the PlantFactory content plugin load in an isolated
 UE 5.8.3 scratch project, but did not validate interactive authoring or output
 quality.
 
+## PCG forest follow-up
+
+The live editor contains one instance of `/Game/PCG/PCG_World_Forest`:
+`PCG_ForestVolume_Island`. Its world bounds are approximately X/Y `-92,366`
+to `-67,373` / `-92,369` to `-67,439` cm (about 25 km on each side). The graph
+has 18 enabled nodes and 18 edges, with separate surface samplers for trees
+(0.056 points/m²), grass (1 point/m²), and rocks (0.0204 points/m²). Its graph
+parameter schema is empty, so this broad volume has no exposed density or
+region controls. This establishes an existing PCG system to build on, not a
+validated Rat site or proof that every visible plant came from this graph.
+
+A provisional footprint-sized sample around `(-80000, -80000)` was rejected:
+vertical traces spanning the hollow's roughly 2.6 x 1.4 m footprint returned
+first-hit heights from 940 to about 1,277 cm. `SceneTools.trace_world` reports
+only distance, not the hit actor/component, so the samples cannot distinguish
+landscape, water, and vegetation collisions or prove ground slope. The live
+MCP toolsets also expose no navigation-clearance query. No coordinate was
+recorded and the Island map remains unchanged.
+
 ## Next step
 
-Find or build a separate, genuinely sheltered fallen-wood pocket, then verify
-the entrance orientation, terrain contact, and rat-sized navigation clearance
-before recording a location or spawning Fenrus. Do not reuse the Raven's roost
-just because its fallen-wood actor is nearby. A small PVE/Megaplant preview is
-appropriate only after the editor session has the PlantFactory mount and the
-selected pocket can be checked at gameplay scale.
+Find or build a separate, genuinely sheltered fallen-wood pocket with a
+landscape-only ground sample and a rat-sized nav clearance check before
+recording a location or spawning Fenrus. Do not reuse the Raven's roost or
+guess a point inside the broad PCG volume. If a world-local check is not
+available, add a scoped site-audit probe that identifies the trace hit actor
+and queries the navigation system; do not save a provisional placement. A
+small PVE/Megaplant preview is appropriate only after the editor session has
+the PlantFactory mount and the selected pocket can be checked at gameplay
+scale.
