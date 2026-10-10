@@ -24,6 +24,7 @@ Run like Create-LandscapeShoreMaterial.py (headless scratch editor); preview wit
   Scripts/Capture-Viewpoints.ps1 -Hour 12 -Only TideglassGroundDetail -LandscapeParent /Game/Materials/M_Island_Textured_ShoreSubstrate
 """
 
+import os
 import traceback
 
 import unreal
@@ -38,6 +39,9 @@ COLLECTION_PATH = "/Game/Environment/MPC_IslandEnvironment"
 WETNESS_PARAMETER = "Wetness"
 GROUP = "Shore Film"
 SEA_LEVEL_CM = 940.0
+AUTHORED = "/Game/Materials/MI_Island_Landscape"
+AUTHORED_BACKUP = "/Game/Materials/MI_Island_Landscape_PreShoreBackup"   # made by Create-LandscapeShoreMaterial.py
+SHORE_PARENT = "/Game/Materials/M_Island_Textured_Shore"
 
 MEL = unreal.MaterialEditingLibrary
 
@@ -132,6 +136,19 @@ def build():
     collection = unreal.load_asset(COLLECTION_PATH)
     if not (noise and collection and unreal.load_asset(BASE_PARENT) and unreal.load_asset(BASE_INSTANCE)):
         raise RuntimeError("Missing an input asset; run Create-LandscapeShoreMaterial.py first")
+    # Authoring: LANDSCAPE_SHORE_AUTHOR=1 reparents the map's MI_Island_Landscape onto this Substrate graph; =0 puts it back on the
+    # legacy shore graph (M_Island_Textured_Shore); unset leaves it as it is. The parent is deleted and rebuilt below, so detach first.
+    mode = os.environ.get("LANDSCAPE_SHORE_AUTHOR", "")
+    authored = unreal.load_asset(AUTHORED)
+    authored_was_subs = bool(authored) and PARENT_OUT.rsplit("/", 1)[-1] in authored.get_editor_property("parent").get_path_name()
+    if authored_was_subs:
+        authored.set_editor_property("parent", unreal.load_asset(SHORE_PARENT))
+        MEL.update_material_instance(authored)
+        unreal.EditorAssetLibrary.save_asset(AUTHORED)
+    elif mode == "1" and not unreal.EditorAssetLibrary.does_asset_exist(AUTHORED_BACKUP):
+        if not unreal.EditorAssetLibrary.duplicate_asset(AUTHORED, AUTHORED_BACKUP):
+            raise RuntimeError("Could not back up " + AUTHORED)
+        unreal.EditorAssetLibrary.save_asset(AUTHORED_BACKUP)
     delete_if_exists(INSTANCE_OUT)
     delete_if_exists(PARENT_OUT)
     m = unreal.EditorAssetLibrary.duplicate_asset(BASE_PARENT, PARENT_OUT)
@@ -182,7 +199,10 @@ def build():
     weighted = expr(m, unreal.MaterialExpressionSubstrateWeight, X0 + 3300, Y0 + 700)
     link_any(film, weighted, ["A"])
     link_any(coverage, weighted, ["Weight"])
-    layer = expr(m, unreal.MaterialExpressionSubstrateVerticalLayering, X0 + 3600, Y0 + 300)
+    # Parameter blending merges the film and the ground into ONE BSDF by mixing their inputs instead of evaluating both layers.
+    # Without it this variant cost +70% pixel-shader instructions over the wet graph; it is the Substrate cost lever for a surface that covers the screen.
+    layer = expr(m, unreal.MaterialExpressionSubstrateVerticalLayering, X0 + 3600, Y0 + 300, use_parameter_blending=True)
+    log("vertical layer parameter blending: {}".format(layer.get_editor_property("use_parameter_blending")))
     link_any(weighted, layer, ["Top"])
     link_any(conv, layer, ["Bottom", "Base"])   # the header calls it Base; the editor shows Bottom
     log("pins used: {}".format(used))
@@ -202,6 +222,12 @@ def build():
     if not unreal.EditorAssetLibrary.save_asset(INSTANCE_OUT):
         raise RuntimeError("Could not save " + INSTANCE_OUT)
     log("built {} -> {}".format(INSTANCE_OUT, instance.get_editor_property("parent").get_path_name()))
+    if mode == "1" or (authored_was_subs and mode != "0"):
+        authored.set_editor_property("parent", m)
+        MEL.update_material_instance(authored)
+        if not unreal.EditorAssetLibrary.save_asset(AUTHORED):
+            raise RuntimeError("Could not save " + AUTHORED)
+    log("{} now uses {}".format(AUTHORED, authored.get_editor_property("parent").get_path_name()))
 
 
 try:
