@@ -6,7 +6,7 @@ its script and rerun (10-60 s). Exports land in `Saved/CaptiveSky/ComfyBlender/<
 local; only these scripts are in git). Same review-then-import idea as `Saved/CaptiveSky/Tripo/`, but geometry and textures are
 authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
-The 11 props made so far (index with sizes/tris/materials, on disk): `Saved/CaptiveSky/ComfyBlender/ASSETS.md`.
+The 21 scripted props made so far (index with sizes/tris/materials, on disk): `Saved/CaptiveSky/ComfyBlender/ASSETS.md`.
 
 ## Layout
 
@@ -114,9 +114,7 @@ Use [`docs/asset-import-pipeline.md`](../../docs/asset-import-pipeline.md) and `
 
 ## The well
 
-`SM_Well_01` was built interactively in a live Blender session (the build code was never saved as a script), then baked and exported with
-`legacy_well/bake_well.py` from a scene file kept outside the repo. It exports fine and is in the index, but it is **not reproducible from a script**: to make it
-editable, re-author it as `assets/well.py` with the same builders (it needs a block-ring builder: jittered wedge blocks per course around a circle).
+The well is now reproducible from `assets/well.py`, like the other current props. `legacy_well/` preserves the earlier one-off bake/export utilities as history; edit and rebuild `assets/well.py` for current changes.
 
 ## Gotchas hit so far
 

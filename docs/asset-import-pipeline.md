@@ -21,6 +21,12 @@ The report is local and ignored with the generated pack. Keep the source script 
 
 As of 2026-10-10, the NoticeBoard and StoneLantern are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; the embedded collisions are one box and one convex hull respectively. The StoneLantern emissive slot is assigned, but both props still need an in-editor lighting/material review before either is placed on the Island.
 
+## Fab cache check — European Aspen
+
+The local Fab cache at `D:\Projects - Athena\Unreal\Fab_Cache\VaultCache\FabLibrary\Megaplants__European_Aspen-ffa90e1a\usd\` contains four tree-variant USD files, a foliage USD, and four Dynamic Wind JSON sidecars. Fab metadata identifies the asset as `UE_5.8`, but this download is USD format only: there are no Unreal `.uasset` files or separate image textures in the cached folder. Treat these as import candidates, not as a ready-to-use Unreal pack; the presence of material/shader data in USD does not establish that all referenced textures or the authored Unreal setup are available.
+
+Fab's cached listing describes an Unreal Engine format as well as USD and says the pack uses the Procedural Vegetation Editor and experimental Nanite Foliage workflow. Prefer downloading the Unreal Engine format for UE 5.8 if available in the Fab Vault. Otherwise, test the USD and its dependencies in an isolated import location before adding anything to `/Game` or the Island map. No cache files were modified during this check.
+
 ## Resident proposals
 
 Residents can use `request_upgrade` for any existing world object or feature, not just props produced by this pipeline: vegetation (including a specific instance), structures, paths, water, lighting, sound, or a broader level feature. A target can be omitted for a genuinely world-wide suggestion. Proposals are appended to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` for human review; the action does not edit an asset, run a generator, import content, or place anything in the level. The proposal's `target`, `upgrade_kind` (`aesthetic`, `variation`, or `functionality`), and concise description are carried through so a human can decide how to fulfill it—via this asset pipeline, a code change, an authored Unreal asset, or no change.
