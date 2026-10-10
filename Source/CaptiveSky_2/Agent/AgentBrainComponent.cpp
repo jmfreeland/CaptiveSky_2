@@ -35,6 +35,7 @@
 #include "IslandRainBasin.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandListeningStonesChime.h"
+#include "IslandForestFox.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -682,8 +683,16 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		if (NearestWoodlandDeer)
 			NearbyBeings += FString::Printf(TEXT(" A wild stag is grazing near the woodland edge by Wind Arch, about %.0f metres away. It is independent, not a companion or movement target; simply watching from a respectful distance is fine. If it is within four metres, you may Interact with target WoodlandDeer to observe quietly; it may bound a short way toward cover, then resume grazing. Do not follow, feed, touch, or claim it."), FMath::Sqrt(WoodlandDeerDistanceSquared) / 100.f);
 		if (NearestWoodlandFox)
+		{
 			NearbyBeings += FString::Printf(TEXT(" A wild fox is at the Wind Arch woodland edge, about %.0f metres away. It is independent, not a companion or movement target. If it is within four metres, you may Interact with target WoodlandFox to watch quietly; if awake, it may pause to look toward you and then trot toward cover. Do not follow, feed, touch, or claim it."),
 				FMath::Sqrt(WoodlandFoxDistanceSquared) / 100.f);
+			if (WoodlandFoxDistanceSquared <= FMath::Square(600.f))
+			{
+				if (const AIslandForestFox* Fox = Cast<AIslandForestFox>(NearestWoodlandFox);
+					Fox && Fox->IsRespondingToQuietObserver())
+					NearbyBeings += TEXT(" The fox has paused and is briefly looking toward a nearby observer; the glance is fleeting, and you cannot know what it intends.");
+			}
+		}
 		if (NearestMinnowSchool)
 			NearbyBeings += FString::Printf(TEXT(" A small school of minnows is circling in the Tideglass shallows, about %.0f metres away. They are wild, not companions or movement targets. If the school is within four metres, you may Interact with target MinnowSchool to watch quietly; the fish will scatter briefly and regroup. Do not touch, catch, or claim them."), FMath::Sqrt(MinnowSchoolDistanceSquared) / 100.f);
 		if (NearestTidepoolCrab)

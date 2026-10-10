@@ -206,4 +206,7 @@ does not repeat while the local resident group stays within 8.5 m. Resting and
 waking foxes remain undisturbed. This is a short wildlife reaction, not speech
 or new conscious agency: it adds no memory, world state or model request.
 `CaptiveSky2.Agent.WoodlandFox` checks the cue, one-shot/rearm behavior, and
-cooldown. Rendered in-world timing and framing still need a bounded Game view.
+cooldown. While the glance is active, a nearby resident's existing situation
+summary now reports the brief look but explicitly avoids inferring intent; the
+fact disappears when the look ends and does not add memory or a thought request.
+Rendered in-world timing and framing still need a bounded Game view.

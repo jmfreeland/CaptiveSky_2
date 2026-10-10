@@ -121,11 +121,18 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	Fox->CheckForNearbyResident();
 	TestTrue(TEXT("An awake fox gives one brief look to a visible, unhurried resident"),
 		Fox->bNoticing && Fox->bResidentPresenceNearby && Fox->NoticeRemaining > 0.f);
+	const FString FoxLookingSummary = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby resident can perceive the fox's actual fleeting look without inferring intent"),
+		FoxLookingSummary.Contains(TEXT("briefly looking toward a nearby observer")) &&
+		FoxLookingSummary.Contains(TEXT("cannot know what it intends")));
 	const float FirstNoticeRemaining = Fox->NoticeRemaining;
 	Fox->CheckForNearbyResident();
 	TestTrue(TEXT("A resident group cannot restart the same fox glance"),
 		Fox->bNoticing && Fox->NoticeRemaining == FirstNoticeRemaining);
 	Fox->bNoticing = false;
+	const FString OrdinaryFoxSummary = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("The brief look leaves no lasting observation after it ends"),
+		OrdinaryFoxSummary.Contains(TEXT("briefly looking toward a nearby observer")));
 	Observer->SetActorLocation(FVector(-700.f, 0.f, 0.f));
 	Fox->CheckForNearbyResident();
 	TestTrue(TEXT("Presence stays latched while a resident remains inside the wider rearm range"),

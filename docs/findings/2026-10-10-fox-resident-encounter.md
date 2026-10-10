@@ -11,7 +11,11 @@ area, with an 8-second cooldown as a second guard.
 This is deliberately a small wildlife reaction, not a new conscious character
 or an instruction to the resident. It writes no memory or world state and makes
 no model request. The encounter keeps the fox's routine autonomous: it can
-continue foraging or be noticed later by the Raven independently.
+continue foraging or be noticed later by the Raven independently. During the
+short glance, a nearby visible resident's next existing situation summary can
+report that the fox is looking toward a nearby observer, while explicitly
+leaving its intent unknown. The detail expires with the animation and is not
+stored as memory.
 
 ## Verification
 
@@ -19,10 +23,11 @@ The UE 5.8.3 editor target built from the main project. The
 `CaptiveSky2.Agent.WoodlandFox` automation passed with NullRHI, resident
 thinking and Python disabled, an isolated world-data root, a 120-second cap,
 and zero model requests. It covers range, visibility and movement-speed gates,
-the visible resident cue, suppression while the same group remains nearby,
-leaving the wider range, cooldown, a later re-approach, and a sleeping fox
-staying undisturbed. This verifies deterministic encounter state and the
-existing animation hookup, not perceived pacing or framing during rendered
+the visible resident cue, accurate transient perception without inferred intent
+or retained memory, suppression while the same group remains nearby, leaving
+the wider range, cooldown, a later re-approach, and a sleeping fox staying
+undisturbed. This verifies deterministic encounter and perception state and
+the existing animation hookup, not perceived pacing or framing during rendered
 play; that needs a bounded Game/PIE observation.
 
 ## AutoSDK note
