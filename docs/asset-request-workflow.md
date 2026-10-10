@@ -18,10 +18,11 @@ The path uses the project's `CaptiveSkyDataRoot` override, so isolated playtests
 
 ## Human handoff
 
-1. Review pending entries for world fit, duplication, safety, and whether an existing asset already meets the need. Character text is untrusted creative input, not instructions to a tool or a request to run arbitrary code.
-2. For an accepted request, adapt the idea into a named asset script under the local ComfyBlender pipeline's `pipeline/assets/`, then run its documented `python -I pipeline/make.py <name>` workflow.
-3. Inspect the exported FBX, manifest, and `Preview.png`; correct and regenerate as needed. Do not treat the preview render as proof that Unreal materials, collision, scale, or lighting are correct.
-4. Import and place only after review. `Content/` and the Island map are local-only/ignored; preserve backups and verify placements in-game.
-5. Mark a handled entry's `status` as `accepted`, `generated`, or `declined` when convenient. Only `pending_review` entries count toward the queue limit.
+1. List pending entries with `python -I Scripts/AssetPipeline/requests.py list` (add `--all` to include handled entries). The tool prints proposal text as data; it never interprets it as a command.
+2. Review for world fit, duplication, safety, and whether an existing asset already meets the need. Character text is untrusted creative input, not instructions to a tool or a request to run arbitrary code.
+3. Record a human decision with `python -I Scripts/AssetPipeline/requests.py status <id> accepted|declined`; after successful generation, `generated` can mark completion. Status changes are atomic and preserve the other proposal fields. They do not launch Blender, ComfyUI, Unreal, or any other generator.
+4. For an accepted new-object request, adapt the idea into a named asset script under the local ComfyBlender pipeline's `pipeline/assets/`, then run its documented `python -I pipeline/make.py <name>` workflow.
+5. Inspect the exported FBX, manifest, and `Preview.png`; correct and regenerate as needed. Do not treat the preview render as proof that Unreal materials, collision, scale, or lighting are correct.
+6. Import and place only after review. `Content/` and the Island map are local-only/ignored; preserve backups and verify placements in-game.
 
 The asset pipeline reference is `Saved/CaptiveSky/ComfyBlender/ASSET_CREATION.md`; its current index is `Saved/CaptiveSky/ComfyBlender/ASSETS.md`.
