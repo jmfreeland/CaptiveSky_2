@@ -18,6 +18,27 @@ project. They do **not** confirm package loadability, `StaticMesh` versus
 wind response, or runtime performance. No map or asset was modified, and none
 of the new trees has been placed in the world.
 
+## Candidate native PVE route
+
+The UE 5.8.3 install contains the Procedural Vegetation Editor plugin binaries.
+Its descriptor at
+`Engine/Plugins/Experimental/ProceduralVegetationEditor/ProceduralVegetationEditor.uplugin`
+describes a node-graph editor for Nanite-ready vegetation and loading
+species presets; it marks the plugin experimental and disabled by default.
+The descriptor declares dependencies on Dataflow, GeometryScripting, PCG, and
+DynamicWind. The four Fab folders contain `PVE_*` data/preset packages, so PVE
+is a plausible intended path for these species; the project does not list the
+PVE plugin as enabled.
+
+As an offline clue only, scanning the serialized strings of all 16 A-D
+`Tree_*` packages found `ProceduralVegetation` and `SkeletalMesh` strings, but
+no `StaticMesh` string. Package strings can come from references and do not
+prove the exported object's class. This makes a direct HISM drop-in assumption
+especially unsafe, while leaving the plugin-native preset route worth testing.
+The next controlled step is to load one preset with PVE enabled in an isolated
+editor/project, confirm the generated output type and its materials/wind, then
+preview a small number of trees before changing the main project configuration.
+
 `Scripts/Inspect-MegaplantAssets.py` is a read-only UE 5.8.3 audit for all A-D
 tree variants and each family’s PVE assets. It reports loaded asset classes,
 mesh bounds, LOD count, material slots, and whether each tree asset is a static
