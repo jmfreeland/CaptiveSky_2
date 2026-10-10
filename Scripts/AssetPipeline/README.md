@@ -6,7 +6,7 @@ its script and rerun (10-60 s). Exports land in `Saved/CaptiveSky/ComfyBlender/<
 local; only these scripts are in git). Same review-then-import idea as `Saved/CaptiveSky/Tripo/`, but geometry and textures are
 authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
-The 21 scripted props made so far (index with sizes/tris/materials, on disk): `Saved/CaptiveSky/ComfyBlender/ASSETS.md`.
+The generated index currently covers 21 reviewed props: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory now has 22 prop scripts; `RatHollow` has a successful local FBX build, but remains unimported and visually unreviewed until the open Unreal editor can be closed safely.
 
 ## Layout
 
