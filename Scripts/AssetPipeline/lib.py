@@ -38,7 +38,7 @@ PLAIN = {
     "dirt": dict(BaseColor=[0.12, 0.085, 0.055], Roughness=1.0),
     "ember": dict(BaseColor=[0.05, 0.02, 0.01], Roughness=0.8, Emissive=[1.0, 0.35, 0.08], EmissiveStrength=6.0),
     "rune": dict(BaseColor=[0.02, 0.03, 0.04], Roughness=0.6, Emissive=[0.35, 0.85, 1.0], EmissiveStrength=8.0),
-    "lanternglow": dict(BaseColor=[0.1, 0.07, 0.03], Roughness=0.5, Emissive=[1.0, 0.62, 0.22], EmissiveStrength=5.0),
+    "lanternglow": dict(BaseColor=[0.1, 0.07, 0.03], Roughness=0.5, Emissive=[1.0, 0.34, 0.06], EmissiveStrength=1.2),
     "mortar": dict(BaseColor=[0.07, 0.065, 0.06], Roughness=0.95),
     "coal": dict(BaseColor=[0.04, 0.02, 0.015], Roughness=0.9, Emissive=[1.0, 0.28, 0.05], EmissiveStrength=7.0),
     "awning": dict(BaseColor=[0.52, 0.11, 0.09], Roughness=0.9),
