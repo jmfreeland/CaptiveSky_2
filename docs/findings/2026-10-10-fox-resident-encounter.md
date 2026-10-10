@@ -47,6 +47,21 @@ the fox's bounded retreat.
 Evidence: [`WoodlandFox group-latch regression`](../../Saved/Playtests/Codex_WoodlandFox_GroupLatch_20261010/WoodlandFox.log),
 [`RavenPerch compatibility regression`](../../Saved/Playtests/Codex_RavenPerch_GroupLatchRegression_20261010/RavenPerch.log).
 
+### Respectful wildlife movement boundary (2026-10-10)
+
+A bounded UE 5.8.3 real-D3D12 probe confirmed that `WoodlandFox` is not a valid
+resident movement target. Aster's requested `MoveTo` was rejected with the
+ordinary safeguard: wildlife are not movement targets; residents may observe
+from a respectful distance or interact quietly when already close, but do not
+chase, feed, touch, or claim them. No movement or fox encounter occurred in
+that probe; it exited normally after 29.9 real seconds with zero model requests.
+UBT AutoSDK validation returned 0 on this approved launch.
+
+This is the intended independence boundary, not a movement regression. Fox
+resident-notice behavior should be validated through an incidental slow
+pass-by or an already-nearby quiet interaction, not by directing a resident at
+the fox. Log: [`FoxEncounterPhysical.log`](../../Saved/Playtests/Codex_FoxEncounterPhysical_20261010/FoxEncounterPhysical.log).
+
 ### Rendered staging
 
 `CaptiveSky2.Visual.WoodlandFoxResidentGlance` passed in UE 5.8.3 on D3D12 with
