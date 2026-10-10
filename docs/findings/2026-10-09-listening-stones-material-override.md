@@ -154,3 +154,27 @@ Logs:
 The source references the local material path; since `Content/` is not tracked,
 the surface asset itself remains machine-local and the saved proxies are the
 safe fallback on a checkout without it.
+
+## Transient lichen weathering (2026-10-10)
+
+Each runtime standing stone now receives eight deterministic, irregular lichen
+islands around its full circumference. The patches sample the exact triangles
+of the generated rock mesh, sit just proud of the surface, and reuse the local
+PBR material with a subdued olive tint. A fixed close real-D3D12 frame shows
+one patch reading on the near stone; at this distance it adds a small natural
+color break without covering the rock texture. Ordinary approach-distance
+readability is still unverified, so patch size should not be increased until a
+journey-view comparison is made.
+
+The change is Game/PIE-only and visual-only. The original map proxies still own
+collision and navigation; no map, Content asset, or persistent world state was
+changed. The UE 5.8.3 editor build succeeded and
+`CaptiveSky2.Agent.ListeningStonePresentation` passed under NullRHI, with
+assertions for the eight-patch geometry, the transient material tint, bounds,
+collisionless presentation meshes, and unchanged proxy collision/navigation.
+A separate D3D12 spectator capture used an isolated data root, disabled
+resident thinking and Python, allowed zero model requests, and exited normally
+after 35.3 real seconds. Frame: [`001_Lichen__Close.png`](../../Playtests/Codex_StoneLichen_20261010_final/ScreenshotsCoverage/001_Lichen__Close.png).
+Automation and Game logs:
+[`StoneLichenAutomation_Coverage.log`](../../Playtests/Codex_StoneLichen_20261010_final/StoneLichenAutomation_Coverage.log),
+[`StoneLichenGame_Coverage.log`](../../Playtests/Codex_StoneLichen_20261010_final/StoneLichenGame_Coverage.log).

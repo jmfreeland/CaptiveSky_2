@@ -141,6 +141,9 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			const FProcMeshSection* Section = Stone->GetProcMeshSection(0);
 			TestTrue(FString::Printf(TEXT("Standing stone %d has a closed, detailed mesh"), Index),
 				Section && Section->ProcIndexBuffer.Num() >= 200 && Section->ProcVertexBuffer.Num() >= 50);
+			const FProcMeshSection* LichenSection = Stone->GetProcMeshSection(1);
+			TestTrue(FString::Printf(TEXT("Standing stone %d has eight separate collisionless lichen islands"), Index),
+				LichenSection && LichenSection->ProcVertexBuffer.Num() == 72 && LichenSection->ProcIndexBuffer.Num() == 192);
 			if (Section && Section->ProcVertexBuffer.Num() >= 62)
 			{
 				bool bTextureSeamIsClosed = true;
@@ -166,6 +169,13 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 				TestTrue(FString::Printf(TEXT("Standing stone %d retains its calibrated rock tint"), Index),
 					StoneSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(ExpectedStoneColors[Index], 0.001f));
 			}
+			UMaterialInstanceDynamic* LichenSurface = Cast<UMaterialInstanceDynamic>(Stone->GetMaterial(1));
+			TestNotNull(FString::Printf(TEXT("Standing stone %d uses a transient textured lichen overlay"), Index), LichenSurface);
+			if (LichenSurface)
+			{
+				TestTrue(FString::Printf(TEXT("Standing stone %d keeps the lichen tint subdued and moss-green"), Index),
+					LichenSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(FLinearColor(0.28f, 0.40f, 0.12f), 0.001f));
+			}
 			if (!Section || !Proxies.IsValidIndex(Index)) continue;
 
 			const FBoxSphereBounds& ProxyBounds = Proxies[Index]->GetStaticMeshComponent()->Bounds;
@@ -185,6 +195,19 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("Standing stone %d stays inside the original proxy footprint"), Index), bInsideProxyFootprint);
 			TestTrue(FString::Printf(TEXT("Standing stone %d is planted within the shortened proxy silhouette"), Index),
 				MinimumZ >= ProxyBottom - 1.f && MaximumZ <= ExpectedTop + 1.f && MaximumZ > MinimumZ);
+			if (LichenSection)
+			{
+				bool bLichenInsideProxy = true;
+				for (const FProcMeshVertex& Vertex : LichenSection->ProcVertexBuffer)
+				{
+					const FVector WorldPosition = Stone->GetComponentTransform().TransformPosition(Vertex.Position);
+					bLichenInsideProxy &= FMath::Abs(WorldPosition.X - ProxyBounds.Origin.X) <= ProxyBounds.BoxExtent.X + 2.f &&
+						FMath::Abs(WorldPosition.Y - ProxyBounds.Origin.Y) <= ProxyBounds.BoxExtent.Y + 2.f &&
+						WorldPosition.Z >= ProxyBottom - 1.f && WorldPosition.Z <= ExpectedTop + 2.f;
+				}
+				TestTrue(FString::Printf(TEXT("Standing stone %d lichen hugs the visual surface and remains within the proxy bounds"), Index),
+					bLichenInsideProxy);
+			}
 		}
 		for (int32 Index = 0; Index < Proxies.Num(); ++Index)
 		{

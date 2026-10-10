@@ -111,9 +111,15 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		TArray<FVector> Vertices;
 		TArray<int32> Triangles;
 		TArray<FVector2D> UVs;
+		TArray<FVector> LichenVertices;
+		TArray<int32> LichenTriangles;
+		TArray<FVector2D> LichenUVs;
 		Vertices.Reserve(StoneRingCount * StoneRingVertexCount + 2);
 		UVs.Reserve(StoneRingCount * StoneRingVertexCount + 2);
 		Triangles.Reserve((StoneRingCount - 1) * StoneSideCount * 6 + StoneSideCount * 6);
+		LichenVertices.Reserve(8 * 9);
+		LichenTriangles.Reserve(8 * 8 * 3);
+		LichenUVs.Reserve(8 * 9);
 		const float BottomZ = Center.Z - LocalExtent.Z;
 		FRandomStream ShapeRandom(0x531A + Index * 7919);
 		const float RotationOffset = ShapeRandom.FRandRange(-0.28f, 0.28f);
@@ -176,16 +182,80 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 			Triangles.Add(CapCenterIndex);
 		}
 
+		// Small, deterministic lichen islands follow the generated rock surface and reuse its
+		// texture. They are a separate visual-only section: no collision, navigation, or saved
+		// landscape/landmark data is changed.
+		auto SampleStoneSurface = [&](const float Alpha, const float Angle)
+		{
+			int32 UpperRing = 1;
+			while (UpperRing < StoneRingCount - 1 && Alpha > RingZ[UpperRing]) ++UpperRing;
+			const int32 LowerRing = UpperRing - 1;
+			const float RingFraction = FMath::GetMappedRangeValueClamped(
+				FVector2D(RingZ[LowerRing], RingZ[UpperRing]), FVector2D(0.f, 1.f), Alpha);
+			float WrappedAngle = FMath::Fmod(Angle - RotationOffset, 2.f * PI);
+			if (WrappedAngle < 0.f) WrappedAngle += 2.f * PI;
+			const float SidePosition = WrappedAngle * StoneSideCount / (2.f * PI);
+			const int32 Side = FMath::Clamp(FMath::FloorToInt(SidePosition), 0, StoneSideCount - 1);
+			const float SideFraction = SidePosition - Side;
+			const int32 LowerStart = LowerRing * StoneRingVertexCount + Side;
+			const int32 UpperStart = UpperRing * StoneRingVertexCount + Side;
+			const FVector& A = Vertices[LowerStart];
+			const FVector& B = Vertices[LowerStart + 1];
+			const FVector& C = Vertices[UpperStart + 1];
+			const FVector& D = Vertices[UpperStart];
+			// Match the rock section's A-B-C / A-C-D diagonal so the thin overlay cannot
+			// drift through the bilinear quad surface between its vertices.
+			const FVector SurfacePoint = RingFraction <= SideFraction
+				? A * (1.f - SideFraction) + B * (SideFraction - RingFraction) + C * RingFraction
+				: A * (1.f - RingFraction) + C * SideFraction + D * (RingFraction - SideFraction);
+			const FVector Outward = LocalRotation.RotateVector(FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f)).GetSafeNormal();
+			return SurfacePoint + Outward * 6.5f;
+		};
+
+		FRandomStream LichenRandom(0x71C4 + Index * 3571);
+		for (int32 Patch = 0; Patch < 8; ++Patch)
+		{
+			const float CenterAngle = RotationOffset + 2.f * PI * (Patch + 0.5f) / 8.f + LichenRandom.FRandRange(-0.08f, 0.08f);
+			const float CenterAlpha = LichenRandom.FRandRange(0.16f, 0.62f);
+			const float HalfAngle = LichenRandom.FRandRange(0.20f, 0.28f);
+			const float HalfHeight = LichenRandom.FRandRange(0.04f, 0.065f);
+			const int32 CenterVertex = LichenVertices.Add(SampleStoneSurface(CenterAlpha, CenterAngle));
+			LichenUVs.Add(FVector2D(CenterAngle / (2.f * PI), CenterAlpha));
+			const int32 PerimeterStart = LichenVertices.Num();
+			for (int32 Point = 0; Point < 8; ++Point)
+			{
+				const float Theta = 2.f * PI * Point / 8.f;
+				const float EdgeScale = LichenRandom.FRandRange(0.82f, 1.18f);
+				const float Angle = CenterAngle + FMath::Cos(Theta) * HalfAngle * EdgeScale;
+				const float Height = CenterAlpha + FMath::Sin(Theta) * HalfHeight * EdgeScale;
+				LichenVertices.Add(SampleStoneSurface(Height, Angle));
+				LichenUVs.Add(FVector2D(Angle / (2.f * PI), Height));
+			}
+			for (int32 Point = 0; Point < 8; ++Point)
+			{
+				LichenTriangles.Add(CenterVertex);
+				LichenTriangles.Add(PerimeterStart + Point);
+				LichenTriangles.Add(PerimeterStart + ((Point + 1) % 8));
+			}
+		}
+
 		Stone->ClearAllMeshSections();
 		const TArray<FVector> Normals;
 		const TArray<FLinearColor> VertexColors;
 		const TArray<FProcMeshTangent> Tangents;
 		Stone->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, VertexColors, Tangents, false);
+		Stone->CreateMeshSection_LinearColor(1, LichenVertices, LichenTriangles, Normals, LichenUVs, VertexColors, Tangents, false);
 		UMaterialInstanceDynamic* StoneSurface = UMaterialInstanceDynamic::Create(BaseSurface, Stone);
 		if (!StoneSurface) return false;
 		StoneSurface->SetVectorParameterValue(TEXT("Color"), StoneColors[Index]);
 		StoneSurface->SetVectorParameterValue(TEXT("BaseColor"), StoneColors[Index]);
 		Stone->SetMaterial(0, StoneSurface);
+		UMaterialInstanceDynamic* LichenSurface = UMaterialInstanceDynamic::Create(BaseSurface, Stone);
+		if (!LichenSurface) return false;
+		const FLinearColor LichenTint(0.28f, 0.40f, 0.12f);
+		LichenSurface->SetVectorParameterValue(TEXT("Color"), LichenTint);
+		LichenSurface->SetVectorParameterValue(TEXT("BaseColor"), LichenTint);
+		Stone->SetMaterial(1, LichenSurface);
 		ResonanceLights[Index]->SetRelativeLocation(Center);
 	}
 	return GetStoneCount() == 3;
