@@ -250,3 +250,59 @@ because their SDKs are not installed/configured. This confirms that the
 standalone AutoSDK validation path works with approved access now, but it did
 not reproduce the desktop dialog or the editor's full `VerifySdk` launch. The
 managed exception behind this particular popup remains unknown.
+
+## 2026-10-10 — bounded Game startup with isolated cache
+
+A real-D3D12 spectator capture was attempted using the current fixed viewpoints,
+an isolated data root, zero model requests, and a 60-second in-world cap. The
+first sandboxed launch stopped before world startup with a fatal DDC error:
+Unreal found no writable nodes in its `Installed` cache graph. Its log also
+reported access denied while invoking the per-user Zen utility and attempting
+to update the installed Zen server. The process exited with code 3.
+
+Retrying with the memory-cache bypass removed the DDC fatal but stalled at
+`ValidatePlatforms` for the 180-second startup limit; its log never recorded an
+AutoSDK result. With approved access to the UE per-user paths, the same platform
+validation returned code 0. The next cold D3D12 startup used a writable,
+playtest-local DDC and shader-working directory, then spent the six-minute
+startup budget compiling shaders (16 local workers remained active). It had
+loaded the project module and begun building missing engine material
+shadermaps, but never reached `LogWorld: Bringing World /Game/Maps/Island up
+for play`; the startup watchdog terminated only that Game process tree. No
+gameplay capture, frame-rate sample, resident turn, or model request occurred.
+
+This separates three conditions: sandbox-denied cache/build-tool access,
+successful approved Win64 AutoSDK validation, and a very cold first-run shader
+cache that still delays map startup. The isolated cache is retained under
+`Saved/Playtests/Codex_WorldLifeReview_20261010/LocalDDC` for a later bounded
+retry, which should reuse it rather than rebuild from memory. The desktop
+`dotnet.exe` popup did not recur during the approved run, so these results still
+do not attribute every popup to Unreal or explain its managed stack.
+
+Evidence: [sandbox DDC failure](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview.log),
+[sandboxed ValidatePlatforms stall](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_DDCBypass.log),
+[approved AutoSDK/shader startup](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_ApprovedRun.log),
+[local-cache retry](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_LocalCache.log).
+
+## 2026-10-10 — warmed-cache rendered startup
+
+After allowing the approved run to populate a writable DDC and shader-working
+directory under the isolated playtest, a retry reached `/Game/Maps/Island` in
+25.9 seconds. The real-D3D12 spectator session ended normally at 90.3 seconds
+with zero model requests. A preceding warm-up session reached the Island in
+62.1 seconds, ran for 60.2 seconds, and also ended with zero requests. This
+confirms the multi-minute delay was a cold shader/asset cache, not a persistent
+editor hang; keep reusing the playtest-local cache for future bounded checks.
+
+The user's edited `Roost_West` close-up was reviewed in that isolated world. It
+shows the natural ledge/rock and nearby vegetation, not a woven nest: this
+fresh data root has no nest record, and Raven's nesting remains an optional
+multi-step choice. No nest was seeded to improve the frame. The higher
+temporary angle reveals the inn-side woodland edge but still is not a hero
+capture; treat it as scene-layout evidence only. No frame-rate sample was
+taken.
+
+Evidence: [60-second warm-up log](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_LocalCacheRetry.log),
+[90-second focused-roost log](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_RavenNest.log),
+[close-up capture](../../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_RavenNest/001_Nest__Closeup.png),
+[higher-angle capture](../../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_RavenOverlook/001_Nest__Closeup.png).

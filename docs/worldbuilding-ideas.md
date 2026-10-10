@@ -236,3 +236,29 @@ unknown. No speech, memory, persistent state, or model request is added. UE
 thinking disabled, zero model requests, and a 60-second watchdog. This verifies
 the bounded interaction, not how often it occurs or reads during ordinary play;
 no Game capture was made. Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
+
+## 2026-10-10 — Tideglass gameplay habitat baseline
+
+A bounded UE 5.8.3 real-D3D12 Game capture at 11:00 used an isolated data
+root, a warmed playtest-local DDC, thinking disabled, and zero model requests.
+The Island became ready in 25.8 seconds; the session ended normally after
+90.3 seconds. In the wide Tideglass view, the pond edge, fish, dragonflies,
+grazing stag, and flying birds appeared together; the stag changed pose over
+the captured sequence. This is rendered Game evidence of the existing light
+ecology, not a model-driven agency sample.
+
+The same view's 300-frame CSV profile measured 15.95 ms mean frame time and
+19.66 ms p95 (about 51 FPS p95) on this RTX 4080 Laptop GPU, above the 30-FPS
+floor for this one composition. A close water-edge view measured 25.18 ms p95
+(about 40 FPS), also above the floor. These short, fixed-view samples are not
+player traversal or target-hardware guarantees. The close frame is nearly
+walled by reeds; the wider frame reads as a wet edge, but the far brown ground
+and thin tree line remain sparse, and the inn edge and tall stone proxies still
+look like blockout. Continue the ecological composition/material pass, then
+repeat the wide Game profile and separately test player traversal.
+
+Evidence: [wide gameplay frame](../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_TideglassOverlook/007_Habitat__Overlook.png),
+[close-edge frame](../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_Tideglass/004_Life__Closeup.png),
+[wide-view CSV profile](../Saved/Profiling/CSV/Profile%2820261010_063512%29.csv),
+[close-view CSV profile](../Saved/Profiling/CSV/Profile%2820261010_063135%29.csv),
+[wide-view Game log](../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_TideglassOverlook.log).
