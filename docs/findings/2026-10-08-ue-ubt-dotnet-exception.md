@@ -368,3 +368,31 @@ occurrence still cannot be mapped to a managed exception or executable owner.
 The isolated basin automation had just completed successfully; its log does
 not establish that it caused or owned the desktop dialog. The code and address
 alone remain insufficient to attribute the popup.
+
+### User-reported trigger pattern (2026-10-10)
+
+The user reports that the dialog consistently occurs while Unreal is building
+or running, but cannot identify the exact moment within that workflow. This
+narrows the useful capture window to Unreal build/startup/runtime activity and
+fits the repeated historical correlation with UE's bundled .NET/UBT Turnkey
+platform-validation child. It still does not prove the popup belongs to that
+child: the managed exception type, stack, and dialog-owning process remain
+unobserved. On the next occurrence, preserve the dialog and correlate the
+active Unreal/dotnet process tree with the fresh engine and UBT logs; do not
+change validation, SDK, or Windows permission settings based on this pattern
+alone.
+
+To avoid needing to catch the exact moment, the opt-in
+[`Watch-UnrealDotnet.ps1`](../../Scripts/Watch-UnrealDotnet.ps1) watcher samples
+Unreal/UBT/dotnet process IDs and command lines once per second and records
+matching Application error events to a local JSONL file under
+`Saved/Diagnostics/`. Start it in PowerShell before opening/building Unreal with
+`./Scripts/Watch-UnrealDotnet.ps1`; it runs for up to two hours or until Ctrl+C.
+It changes no system settings. This is process/event correlation, not a crash
+dump: a very short-lived process or an error absent from the Application log
+can still escape capture. Review the local log before sharing it.
+The script passed PowerShell syntax parsing, but its runtime smoke test was
+blocked because the current PowerShell execution policy disables loading
+scripts. No process-scoped or persistent policy override was attempted, so
+runtime logging remains unverified until the user-approved execution method is
+available.
