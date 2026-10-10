@@ -48,6 +48,16 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("An identical pending upgrade is rejected"), IslandAssetRequestQueue::AppendRequest(
 		TEXT("Agent_Raven_01"), TEXT("Add a sheltered perch to the upper beam"), RequestId, Error,
 		InboxPath, TEXT("upgrade"), TEXT("WindArch_UpperBeam"), TEXT("functionality")));
+	TestTrue(TEXT("Upgrade targets are not restricted to pipeline-generated props (for example, an individual foliage instance)"),
+		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Aster_01"), TEXT("Add a small patch of late-summer flowers"), RequestId, Error,
+			InboxPath, TEXT("upgrade"), TEXT("IslandShrubs.Alder_07.Instance_12"), TEXT("variation")));
+	TestTrue(TEXT("A level-wide proposal may omit a single-object target"),
+		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Raven_01"), TEXT("Make the shore more sheltered from the prevailing wind"), RequestId, Error,
+			InboxPath, TEXT("upgrade"), FString(), TEXT("functionality")));
+	TestTrue(TEXT("The review inbox preserves arbitrary object and world-level targets"),
+		FFileHelper::LoadFileToString(InboxContents, *InboxPath) &&
+		InboxContents.Contains(TEXT("IslandShrubs.Alder_07.Instance_12")) &&
+		InboxContents.Contains(TEXT("shore more sheltered from the prevailing wind")));
 
 	const FString LegacyInboxPath = FPaths::Combine(TestDirectory, TEXT("legacy-inbox.jsonl"));
 	const FString LegacyRecord = TEXT("{\n  \"id\": \"legacy\",\n  \"requester\": \"Agent_Aster_01\",\n  \"description\": \"A small weatherproof bird shelter\",\n  \"pipeline\": \"ComfyBlender\",\n  \"status\": \"pending_review\"\n}\n");
