@@ -8,6 +8,12 @@ home patch. Resting and waking foxes do not respond. A response occurs once for
 the local group; the encounter rearms only after all residents leave the 8.5 m
 area, with an 8-second cooldown as a second guard.
 
+If a resident group arrives while a wildlife-initiated glance is already in
+progress, the fox now treats them as part of that same encounter. It latches the
+existing local-group guard and keeps the original retreat destination instead
+of being redirected toward a second nearby observer on the next presence check.
+The normal resident response to an already-foraging fox is unchanged.
+
 This is deliberately a small wildlife reaction, not a new conscious character
 or an instruction to the resident. It writes no memory or world state and makes
 no model request. The encounter keeps the fox's routine autonomous: it can
@@ -30,6 +36,16 @@ undisturbed. This verifies deterministic encounter and perception state and
 the existing animation hookup, not perceived pacing or framing during rendered
 play; the encounter was invoked directly by the rendered fixture below, so this
 is not proof of its autonomous encounter frequency.
+
+The follow-up UE 5.8.3 build and `CaptiveSky2.Agent.WoodlandFox` regression also
+passed with thinking disabled and zero requests. The new case stages a nearby
+resident group during an active wildlife glance and verifies that it is latched
+without changing the retreat target; the separate `CaptiveSky2.Agent.RavenPerch`
+regression passed unchanged afterward, preserving the Raven's staged glance and
+the fox's bounded retreat.
+
+Evidence: [`WoodlandFox group-latch regression`](../../Saved/Playtests/Codex_WoodlandFox_GroupLatch_20261010/WoodlandFox.log),
+[`RavenPerch compatibility regression`](../../Saved/Playtests/Codex_RavenPerch_GroupLatchRegression_20261010/RavenPerch.log).
 
 ### Rendered staging
 

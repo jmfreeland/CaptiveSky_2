@@ -168,8 +168,23 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("An awake fox pauses to look before retreating"), Fox->bNoticing && !Fox->bMoving && Fox->NoticeRemaining > 0.f);
 	const float HomeRadius = FVector::Dist2D(Fox->HomeLocation, Fox->TargetLocation);
 	TestTrue(TEXT("The response target remains inside its 6.5 m home patch"), HomeRadius <= 650.1f);
+	Fox->bResidentPresenceNearby = false;
+	Fox->ResidentPresenceCooldownRemaining = 0.f;
+	TestTrue(TEXT("A separate nearby wildlife cue can start its own brief look"),
+		Fox->RespondToQuietObservation(Fox->GetActorLocation() + FVector(0.f, 450.f, 0.f)) && Fox->bNoticing);
+	const FVector WildlifeRetreatTarget = Fox->TargetLocation;
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("A resident group arriving during a wildlife glance joins that encounter without redirecting it"),
+		Fox->bResidentPresenceNearby && Fox->ResidentPresenceCooldownRemaining > 0.f &&
+		Fox->TargetLocation.Equals(WildlifeRetreatTarget, 0.1f));
 	Fox->bNoticing = false;
 	Fox->bMoving = true;
+	const FVector WildlifeRetreatTargetWhileMoving = Fox->TargetLocation;
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("The same resident group cannot redirect the existing wildlife-triggered retreat"),
+		Fox->TargetLocation.Equals(WildlifeRetreatTargetWhileMoving, 0.1f));
+	Fox->bResidentPresenceNearby = false;
+	Fox->ResidentPresenceCooldownRemaining = 0.f;
 	Fox->TargetLocation = Fox->GetActorLocation() + FVector(50.f, 0.f, 0.f);
 	TestTrue(TEXT("A quiet resident can redirect a fox already on a short forage step"),
 		Fox->RespondToQuietObservation(Observer->GetActorLocation()) && Fox->bNoticing && !Fox->bMoving);

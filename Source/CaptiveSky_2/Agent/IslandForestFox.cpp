@@ -96,8 +96,17 @@ void AIslandForestFox::CheckForNearbyResident()
 
 	if (!bResidentWithinRearmRange) bResidentPresenceNearby = false;
 	if (!QuietResident || bResidentPresenceNearby || bResting || bWaking ||
-		bNoticing || ResidentPresenceCooldownRemaining > 0.f)
+		ResidentPresenceCooldownRemaining > 0.f)
 		return;
+	if (bNoticing)
+	{
+		// A nearby resident group that arrives during an already-started wildlife
+		// glance belongs to the same encounter; don't redirect the retreat to a
+		// different observer on the fox's next scheduled presence check.
+		bResidentPresenceNearby = true;
+		ResidentPresenceCooldownRemaining = 8.f;
+		return;
+	}
 
 	// One nearby group earns a single wary look and retreat, with no repeated
 	// response until the residents leave the wider woodland-edge area.
