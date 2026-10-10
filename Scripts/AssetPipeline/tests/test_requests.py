@@ -45,6 +45,25 @@ class RequestInboxTests(unittest.TestCase):
         )
         self.assertEqual(updated["pipeline"], "human_review")
 
+    def test_request_must_be_accepted_before_generation(self):
+        self.inbox.write_text(
+            json.dumps({"id": "req-1", "status": "pending_review", "description": "A sheltered perch"}) + "\n",
+            encoding="utf-8",
+        )
+        before = self.inbox.read_text(encoding="utf-8")
+        self.assertEqual(asset_requests.main(["--inbox", str(self.inbox), "status", "req-1", "generated"]), 2)
+        self.assertEqual(self.inbox.read_text(encoding="utf-8"), before)
+
+    def test_accepted_request_can_be_generated_but_terminal_status_cannot_change(self):
+        self.inbox.write_text(
+            json.dumps({"id": "req-1", "status": "accepted", "description": "A sheltered perch"}) + "\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(asset_requests.main(["--inbox", str(self.inbox), "status", "req-1", "generated"]), 0)
+        generated = self.inbox.read_text(encoding="utf-8")
+        self.assertEqual(asset_requests.main(["--inbox", str(self.inbox), "status", "req-1", "declined"]), 2)
+        self.assertEqual(self.inbox.read_text(encoding="utf-8"), generated)
+
     def test_malformed_or_duplicate_inbox_fails_closed(self):
         malformed = '{"id":"valid"}\nnot json\n'
         self.inbox.write_text(malformed, encoding="utf-8")

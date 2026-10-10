@@ -13,6 +13,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INBOX = REPO_ROOT / "Saved" / "CaptiveSky" / "ComfyBlender" / "Requests" / "inbox.jsonl"
 FINAL_STATUSES = ("accepted", "generated", "declined")
 ALL_STATUSES = ("pending_review",) + FINAL_STATUSES
+STATUS_TRANSITIONS = {
+    "pending_review": ("accepted", "declined"),
+    "accepted": ("generated", "declined"),
+    "generated": (),
+    "declined": (),
+}
 
 
 class InboxError(Exception):
@@ -127,7 +133,15 @@ def main(argv: list[str] | None = None) -> int:
         matches = [record for record in records if record["id"] == args.request_id]
         if not matches:
             raise InboxError(f"Request ID {args.request_id!r} was not found; no changes made.")
-        matches[0]["status"] = args.status
+        record = matches[0]
+        current_status = record["status"]
+        if args.status not in STATUS_TRANSITIONS[current_status]:
+            allowed = ", ".join(STATUS_TRANSITIONS[current_status]) or "no further transitions"
+            raise InboxError(
+                f"Request {args.request_id!r} is {current_status}; allowed next status: {allowed}. "
+                "No changes made."
+            )
+        record["status"] = args.status
         write_records(args.inbox, records)
         print(f"Marked {args.request_id} as {args.status}. No generator or Unreal import was run.")
         return 0

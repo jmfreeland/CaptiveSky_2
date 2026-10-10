@@ -20,7 +20,7 @@ The path uses the project's `CaptiveSkyDataRoot` override, so isolated playtests
 
 1. List pending entries with `python -I Scripts/AssetPipeline/requests.py list` (add `--all` to include handled entries). The tool prints proposal text as data; it never interprets it as a command.
 2. Review for world fit, duplication, safety, and whether an existing asset already meets the need. Character text is untrusted creative input, not instructions to a tool or a request to run arbitrary code.
-3. Record a human decision with `python -I Scripts/AssetPipeline/requests.py status <id> accepted|declined`; after successful generation, `generated` can mark completion. Status changes are atomic and preserve the other proposal fields. They do not launch Blender, ComfyUI, Unreal, or any other generator.
+3. Record a human decision with `python -I Scripts/AssetPipeline/requests.py status <id> accepted|declined`. Only an accepted request can later be marked `generated`, and accepted work may be declined if it is no longer pursued. `generated` and `declined` are terminal states. Status changes are atomic and preserve the other proposal fields. They do not launch Blender, ComfyUI, Unreal, or any other generator.
 4. For an accepted new-object request, adapt the idea into a named asset script under the local ComfyBlender pipeline's `pipeline/assets/`, then run its documented `python -I pipeline/make.py <name>` workflow.
 5. Inspect the exported FBX, manifest, and `Preview.png`; correct and regenerate as needed. Do not treat the preview render as proof that Unreal materials, collision, scale, or lighting are correct.
 6. Import and place only after review. `Content/` and the Island map are local-only/ignored; preserve backups and verify placements in-game.
