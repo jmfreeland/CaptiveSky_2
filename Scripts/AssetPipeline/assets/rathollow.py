@@ -57,7 +57,7 @@ def _hollow_log(A):
     _bridge(bm, outer[1], inner[0])
     for first, second in zip(inner, inner[1:]):
         _bridge(bm, first, second)
-    _cap(bm, inner[-1], inner_stations[-1][0], inner_stations[-1][2])
+    # Keep the tunnel open to the dark backing below; a wood cap here hides the cavity.
 
     A._finish(bm, "hollowBark", "wood", (0, 0, 0), (0, 0, 0), "box", "X", 1.0, True, 55)
 

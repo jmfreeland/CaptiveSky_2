@@ -21,7 +21,7 @@ After import, inspect the `unreal_import.json` report in the selected source pac
 
 The report is local and ignored with the generated pack. Keep the source script and manifest as the editable/golden source; do not hand-edit imported meshes as a substitute. Only place the asset after its appearance, scale, and collision have been reviewed.
 
-As of 2026-10-10, the NoticeBoard, StoneLantern, and RatHollow are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; NoticeBoard and RatHollow use embedded boxes, while StoneLantern uses one convex hull. The RatHollow's side profile and material assignment are confirmed in the Static Mesh Editor, but its entrance-facing view, scene scale/concealment, and nav/clearance still need inspection before placement. The StoneLantern emissive slot is assigned, but its in-world lighting/material review is still outstanding.
+As of 2026-10-10, the NoticeBoard, StoneLantern, and RatHollow are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; NoticeBoard and RatHollow use embedded boxes, while StoneLantern uses one convex hull. The RatHollow's entrance view exposed a source-model cap occluding the cavity; the source fix is committed separately and the local Unreal copy awaits regeneration/reimport before placement. Its scene scale/concealment and nav/clearance also remain untested. The StoneLantern emissive slot is assigned, but its in-world lighting/material review is still outstanding.
 
 ## Fab cache check — Megaplants
 
