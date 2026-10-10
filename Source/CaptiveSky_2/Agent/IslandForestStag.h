@@ -37,6 +37,7 @@ protected:
 
 private:
 	friend class FIslandForestStagTest;
+	friend class FIslandFoxStagAwarenessCaptureTest;
 	friend class FRavenPerchTest;
 	friend class FIslandRavenWingCaptureTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")

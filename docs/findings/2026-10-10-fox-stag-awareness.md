@@ -26,7 +26,16 @@ existing actor tick and look-around animation.
 - The same test had an older Raven leave/re-approach assertion at 7 m, while the
   current shared Raven wildlife selector uses a 14 m forget radius. The fixture
   was aligned to the current 14 m behavior; the runtime range was not changed.
-- No Game/PIE capture was made. This verifies the bounded state change, not
-  natural encounter frequency or rendered readability at gameplay distance.
+- The new `CaptiveSky2.Visual.WoodlandFoxStagAwareness` editor-world test passed
+  with the real D3D12 RHI. It stages transient Aster, fox, and stag actors,
+  verifies the uncertain witness text and calm/no-movement cue, previews the
+  live vegetation, then clears that transient preview and restores daylight.
+  No play session, persistent map edit, world-state write, or model request is made.
+- The 1600x900 capture shows all three actors at the woodland edge, but the
+  nearby Listening Stones blockout pillars and rock still intrude into the
+  frame. It proves the cue can be rendered and witnessed; it is not a polished
+  highlight or evidence of natural encounter frequency during ordinary play.
 
-Evidence: `Saved/CompileScratch/Claude_Props/Saved/Logs/FoxStagAwareness_Final.log`.
+Evidence: `Saved/CompileScratch/Claude_Props/Saved/Logs/FoxStagAwareness_Final.log`,
+`Saved/Logs/Codex_FoxStagAwareness_Composition_20261010.log`, and
+`Saved/Viewpoints/WoodlandFoxStagAwareness_/20261010_090640/01_Aster_Witnesses_FoxStagGlance.png`.

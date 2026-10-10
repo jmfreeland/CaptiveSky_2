@@ -235,7 +235,11 @@ unknown. No speech, memory, persistent state, or model request is added. UE
 5.8.3 scratch build and `CaptiveSky2.Agent.WoodlandDeer` passed with NullRHI,
 thinking disabled, zero model requests, and a 60-second watchdog. This verifies
 the bounded interaction, not how often it occurs or reads during ordinary play;
-no Game capture was made. Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
+an editor-world D3D12 frame now shows Aster witnessing the glance. The transient
+capture is verified, but the Listening Stones blockout pillars and nearby rock
+intrude on the composition; replace or move the placeholder landmark pieces and
+make a normal-distance Game capture before calling the moment visually polished.
+Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
 
 ## 2026-10-10 — Tideglass gameplay habitat baseline
 
