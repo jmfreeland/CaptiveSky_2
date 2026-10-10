@@ -110,9 +110,7 @@ into `Library/Sources/stone_face/` and `.../moss/`. Changing a library texture u
 
 ## Import into Unreal
 
-Another agent is building the importer (`Scripts/Import-ComfyBlenderAsset.py`, `docs/asset-import-pipeline.md`; see `COORDINATION.md`). By hand: import
-`SM_<Asset>_01.fbx` with Combine Meshes on, Import Normals, Import Materials off; Normal textures `Normalmap`, ORM sRGB off + `Masks`; library textures tile;
-build materials from `manifest.json`; confirm the `UCX_`/`UBX_` meshes became collision. `Content/` is gitignored and local-only: tell the user before changing it.
+Use [`docs/asset-import-pipeline.md`](../../docs/asset-import-pipeline.md) and `Scripts/Import-ComfyBlenderAsset.py` to import one local pack into `/Game/Generated/ComfyBlender/<Asset>/` without editing the Island map. The NoticeBoard has been imported and its bounds, five material assignments, and embedded box collision match the manifest in Unreal. Its rendered appearance has not yet been visually reviewed. `Content/` is gitignored and local-only; inspect the imported asset in Unreal before map placement.
 
 ## The well
 
@@ -141,6 +139,6 @@ editable, re-author it as `assets/well.py` with the same builders (it needs a bl
 
 ## Limits (2026-10-10)
 
-- Nothing is imported or checked in-engine (scale, materials, collision, emissive strength).
+- The NoticeBoard import's scale, material assignments, and embedded collision were checked in Unreal; visual appearance has not yet been reviewed. Other generated props remain unimported/unverified.
 - Moss/dampness/per-block variation are baked: no runtime wetness or moss controls. Library textures tile uniformly (planks and straw repeat). Water is a static disc.
 - Collision is coarse (cylinders/boxes). PBR maps are heuristics from one colour image. Meshes are 660 to 8,414 triangles: not tuned for LODs or Nanite settings.
