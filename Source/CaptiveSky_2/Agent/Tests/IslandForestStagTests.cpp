@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "AgentBrainComponent.h"
+#include "IslandForestFox.h"
 #include "IslandForestStag.h"
 #include "IslandLightning.h"
 #include "IslandListeningStonesChime.h"
@@ -335,9 +336,9 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 		RavenController->CheckForNearbyWildlifePresence();
 		TestTrue(TEXT("The same stag cannot retrigger a glance while the pair remain together"),
 			FMath::IsNearlyZero(RavenController->WildlifeAttentionRemaining));
-		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-800.f, 0.f, 120.f));
+		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-1500.f, 0.f, 120.f));
 		RavenController->CheckForNearbyWildlifePresence();
-		TestTrue(TEXT("Leaving the 7 m group range clears the one-shot nearby-wildlife marker"),
+		TestTrue(TEXT("Leaving the 14 m group forget range clears the one-shot nearby-wildlife marker"),
 			RavenController->NoticedWildlifeInNearbyGroup.IsEmpty());
 		RavenPawn->SetActorLocation(Deer->GetActorLocation() + FVector(-250.f, 0.f, 120.f));
 		TestTrue(TEXT("The stag is still giving its brief calm look when the Raven returns"),
@@ -370,6 +371,93 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	{
 		RavenPawn->RemoveInstanceComponent(RavenBrain);
 		RavenBrain->DestroyComponent();
+	}
+
+	// Keep the test fox out of the earlier Raven-group fixture; the ecology cue
+	// must not change another section's nearby-wildlife accounting.
+	AIslandForestFox* Fox = World->SpawnActor<AIslandForestFox>(
+		Deer->GetActorLocation() + FVector(700.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("The nearby woodland fox is available to the stag's local awareness"), Fox);
+	if (Fox)
+	{
+		Deer->BeginGrazing();
+		Deer->FoxPresenceCooldownRemaining = 0.f;
+		Deer->bFoxPresenceNearby = false;
+		const FVector DeerLocationBeforeFoxNotice = Deer->GetActorLocation();
+		Fox->SetActorLocation(DeerLocationBeforeFoxNotice + FVector(800.f, 0.f, 0.f));
+		Deer->CheckForNearbyFox();
+		TestFalse(TEXT("An awake fox outside the 7.5 m notice range does not draw the stag's attention"), Deer->bNoticingFox);
+
+		Fox->SetActorLocation(DeerLocationBeforeFoxNotice + FVector(700.f, 0.f, 0.f));
+		AStaticMeshActor* FoxOccluder = World->SpawnActor<AStaticMeshActor>(
+			DeerLocationBeforeFoxNotice + FVector(350.f, 0.f, 75.f), FRotator::ZeroRotator, Spawn);
+		if (FoxOccluder)
+		{
+			if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+			{
+				FoxOccluder->GetStaticMeshComponent()->SetStaticMesh(Cube);
+				FoxOccluder->SetActorScale3D(FVector(0.3f, 0.3f, 1.5f));
+				FoxOccluder->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+				FoxOccluder->GetStaticMeshComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+			}
+		}
+		TestNotNull(TEXT("A temporary wall can test whether the stag needs a clear fox sightline"), FoxOccluder);
+		Deer->CheckForNearbyFox();
+		TestFalse(TEXT("A wall between the animals prevents the stag from noticing the fox"), Deer->bNoticingFox);
+		if (FoxOccluder) FoxOccluder->Destroy();
+
+		Deer->CheckForNearbyFox();
+		TestTrue(TEXT("A visible, awake fox inside 7.5 m draws one brief look from the grazing stag"),
+			Deer->IsQuietlyNoticingFox());
+		TestTrue(TEXT("The fox cue uses the imported look-around animation"), Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+			Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+		TestTrue(TEXT("Noticing the fox neither moves nor startles the stag"),
+			Deer->GetActorLocation().Equals(DeerLocationBeforeFoxNotice) && !Deer->bStartled && !Deer->bMoving);
+		TestTrue(TEXT("The local fox encounter is one-shot and rate-limited"),
+			Deer->FoxNoticeRemaining > 0.f && Deer->FoxPresenceCooldownRemaining == 18.f);
+		UAgentBrainComponent* WitnessBrain = Observer
+			? NewObject<UAgentBrainComponent>(Observer, TEXT("FoxStagWitnessBrain")) : nullptr;
+		if (WitnessBrain) Observer->AddInstanceComponent(WitnessBrain);
+		TestNotNull(TEXT("A nearby resident can observe the quiet wildlife moment"), WitnessBrain);
+		if (WitnessBrain)
+		{
+			const FString WildlifeMoment = WitnessBrain->BuildSituationSummary(FAgentConversationContext());
+			TestTrue(TEXT("A resident who can see both animals receives only the brief, uncertain fox/stag observation"),
+				WildlifeMoment.Contains(TEXT("The stag has briefly lifted its head toward the nearby fox")) &&
+				WildlifeMoment.Contains(TEXT("you cannot know what it will do next")));
+			TestFalse(TEXT("The observation does not assign predator intent or predict a chase"),
+				WildlifeMoment.Contains(TEXT("predator")) || WildlifeMoment.Contains(TEXT("will chase")));
+			Observer->RemoveInstanceComponent(WitnessBrain);
+			WitnessBrain->DestroyComponent();
+		}
+		const float FoxNoticeRemaining = Deer->FoxNoticeRemaining;
+		Deer->CheckForNearbyFox();
+		TestEqual(TEXT("A fox remaining nearby cannot restart the same look"), Deer->FoxNoticeRemaining, FoxNoticeRemaining);
+		Deer->Tick(FoxNoticeRemaining + 0.1f);
+		TestFalse(TEXT("The stag resumes ordinary grazing when the brief fox glance ends"), Deer->bNoticingFox);
+		Fox->SetActorLocation(DeerLocationBeforeFoxNotice + FVector(1100.f, 0.f, 0.f));
+		Deer->CheckForNearbyFox();
+		TestFalse(TEXT("Leaving the 10.5 m local area rearms the fox-presence latch"), Deer->bFoxPresenceNearby);
+		Fox->SetActorLocation(DeerLocationBeforeFoxNotice + FVector(700.f, 0.f, 0.f));
+		Deer->FoxPresenceCooldownRemaining = 0.f;
+		Deer->CheckForNearbyFox();
+		TestTrue(TEXT("A visible fox can draw a later look after it leaves and returns"), Deer->bNoticingFox);
+		Deer->Tick(Deer->FoxNoticeRemaining + 0.1f);
+
+		Fox->SetResting(true);
+		Deer->bFoxPresenceNearby = false;
+		Deer->FoxPresenceCooldownRemaining = 0.f;
+		Deer->CheckForNearbyFox();
+		TestTrue(TEXT("A resting fox is not disturbed or treated as an active encounter"), Fox->IsResting() && !Deer->bNoticingFox);
+
+		Fox->SetResting(false);
+		Deer->SetResting(true);
+		Deer->bFoxPresenceNearby = false;
+		Deer->FoxPresenceCooldownRemaining = 0.f;
+		Deer->CheckForNearbyFox();
+		TestTrue(TEXT("A resting stag remains undisturbed by a nearby waking fox"), Deer->IsResting() && !Deer->bNoticingFox);
+		Deer->SetResting(false);
+		Fox->Destroy();
 	}
 
 	GEngine->DestroyWorldContext(World);

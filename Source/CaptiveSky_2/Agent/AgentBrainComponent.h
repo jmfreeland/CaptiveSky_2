@@ -105,6 +105,7 @@ private:
 	friend class FIslandTideglassTideTest;
 	friend class FIslandWindArchPresentationTest;
 	friend class FIslandForestFoxTest;
+	friend class FIslandForestStagTest;
 	friend class FIslandFoxResidentGlanceCaptureTest;
 	friend class FAgentArrangementReflectionPromptTest;
 	friend class FAgentLingeringTest;

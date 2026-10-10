@@ -36,6 +36,7 @@
 #include "IslandInnHearthSubsystem.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandForestFox.h"
+#include "IslandForestStag.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -681,7 +682,17 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		if (NearestFirefly)
 			NearbyBeings += FString::Printf(TEXT(" A small firefly glow is drifting independently nearby, about %.0f metres away. It is wild, not a companion or movement target. If one drifts within four metres, you may Interact with target Firefly to quietly watch its natural pulse; do not touch, capture, or claim it."), FMath::Sqrt(FireflyDistanceSquared) / 100.f);
 		if (NearestWoodlandDeer)
+		{
 			NearbyBeings += FString::Printf(TEXT(" A wild stag is grazing near the woodland edge by Wind Arch, about %.0f metres away. It is independent, not a companion or movement target; simply watching from a respectful distance is fine. If it is within four metres, you may Interact with target WoodlandDeer to observe quietly; it may bound a short way toward cover, then resume grazing. Do not follow, feed, touch, or claim it."), FMath::Sqrt(WoodlandDeerDistanceSquared) / 100.f);
+			if (NearestWoodlandFox)
+			{
+				if (const AIslandForestStag* Stag = Cast<AIslandForestStag>(NearestWoodlandDeer);
+					Stag && Stag->IsQuietlyNoticingFox())
+				{
+					NearbyBeings += TEXT(" The stag has briefly lifted its head toward the nearby fox. It may have noticed the other animal, but you cannot know what it will do next.");
+				}
+			}
+		}
 		if (NearestWoodlandFox)
 		{
 			NearbyBeings += FString::Printf(TEXT(" A wild fox is at the Wind Arch woodland edge, about %.0f metres away. It is independent, not a companion or movement target. If it is within four metres, you may Interact with target WoodlandFox to watch quietly; if awake, it may pause to look toward you and then trot toward cover. Do not follow, feed, touch, or claim it."),

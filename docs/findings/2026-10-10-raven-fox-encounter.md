@@ -6,8 +6,10 @@ height difference, the Raven briefly looks toward an eligible fox; it does not
 move. The fox looks back, pauses, then retreats a short distance away while
 remaining inside its 6.5 m home patch. A resting or waking fox is ignored.
 Existing stag recognition remains in the same nearest-wildlife selection, and a
-nearby group is acknowledged only once until it leaves the Raven's 7 m forget
-radius. Higher-priority attention cues still take precedence.
+nearby group is acknowledged only once until it leaves the Raven's 14 m forget
+radius. The older 7 m fixture wording was stale; the current shared wildlife
+selection uses the same 14 m forget range for both stag and fox. Higher-priority
+attention cues still take precedence.
 
 This is a transient, nonverbal wildlife response: it adds no model call,
 conversation, memory, or persistent world state. It does not make the fox a

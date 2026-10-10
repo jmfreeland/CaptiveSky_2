@@ -7,6 +7,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "IslandForestFox.h"
 #include "IslandLightning.h"
 #include "IslandListeningStonesChime.h"
 #include "RavenAgentAIController.h"
@@ -72,11 +73,13 @@ void AIslandForestStag::BeginGrazing()
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
+	bNoticingFox = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
+	FoxNoticeRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
 }
@@ -121,7 +124,7 @@ void AIslandForestStag::CheckForNearbyResident()
 
 	if (!bResidentWithinRearmRange) bResidentPresenceNearby = false;
 	if (!QuietResident || bResidentPresenceNearby || bResting || bWakingUp || bMoving ||
-		bStartled || bListeningToChime || bNoticingResident ||
+		bStartled || bListeningToChime || bNoticingResident || bNoticingFox ||
 		ResidentPresenceCooldownRemaining > 0.f || !LookAroundAnimation)
 		return;
 
@@ -131,6 +134,60 @@ void AIslandForestStag::CheckForNearbyResident()
 	bNoticingResident = true;
 	ResidentNoticeRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
 	ResidentPresenceCooldownRemaining = 8.f;
+	ActivityRemaining = 0.f;
+	if (DeerMesh)
+	{
+		DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		DeerMesh->PlayAnimation(LookAroundAnimation, false);
+	}
+}
+
+void AIslandForestStag::CheckForNearbyFox()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	constexpr float NoticeRadius = 750.f;
+	constexpr float RearmRadius = 1050.f;
+	bool bFoxWithinRearmRange = false;
+	AIslandForestFox* VisibleAwakeFox = nullptr;
+
+	for (TActorIterator<AIslandForestFox> It(World); It; ++It)
+	{
+		AIslandForestFox* Fox = *It;
+		if (!IsValid(Fox) || Fox->IsHidden()) continue;
+
+		const float DistanceSquared = FVector::DistSquared2D(GetActorLocation(), Fox->GetActorLocation());
+		if (DistanceSquared > FMath::Square(RearmRadius)) continue;
+		bFoxWithinRearmRange = true;
+		if (DistanceSquared > FMath::Square(NoticeRadius) ||
+			!Fox->CanRespondToQuietObservation() || Fox->IsStartled())
+			continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandForestStagFoxAwareness), false, this);
+		FHitResult Hit;
+		const FVector StagEye = GetActorLocation() + FVector(0.f, 0.f, 85.f);
+		const FVector FoxHead = Fox->GetActorLocation() + FVector(0.f, 0.f, 70.f);
+		if (World->LineTraceSingleByChannel(Hit, StagEye, FoxHead, ECC_Visibility, Query) &&
+			Hit.GetActor() != Fox)
+			continue;
+
+		VisibleAwakeFox = Fox;
+		break;
+	}
+
+	if (!bFoxWithinRearmRange) bFoxPresenceNearby = false;
+	if (!VisibleAwakeFox || bFoxPresenceNearby || bResting || bWakingUp || bMoving || bStartled ||
+		bListeningToChime || bNoticingResident || bNoticingFox || FoxPresenceCooldownRemaining > 0.f ||
+		!LookAroundAnimation)
+		return;
+
+	// The stag registers an awake fox without treating every nearby encounter as a chase.
+	// Keep the cue local, quiet, and one-shot until the fox leaves the wider woodland patch.
+	bFoxPresenceNearby = true;
+	bNoticingFox = true;
+	FoxNoticeRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
+	FoxPresenceCooldownRemaining = 18.f;
 	ActivityRemaining = 0.f;
 	if (DeerMesh)
 	{
@@ -185,7 +242,7 @@ void AIslandForestStag::CheckForNearbyRavenFlyby()
 
 void AIslandForestStag::CheckForNearbyListeningStonesChime()
 {
-	if (!GetWorld() || bResting || bWakingUp || bMoving || bStartled || bListeningToChime ||
+	if (!GetWorld() || bResting || bWakingUp || bMoving || bStartled || bListeningToChime || bNoticingFox ||
 		ListeningStonesCooldownRemaining > 0.f || !LookAroundAnimation)
 		return;
 
@@ -247,9 +304,11 @@ void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
+	bNoticingFox = false;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
+	FoxNoticeRemaining = 0.f;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -285,12 +344,14 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
+	bNoticingFox = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
+	FoxNoticeRemaining = 0.f;
 	if (bResting)
 	{
 		PlayLoop(SleepAnimation);
@@ -319,6 +380,7 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - Delta);
 	ListeningStonesCooldownRemaining = FMath::Max(0.f, ListeningStonesCooldownRemaining - Delta);
 	ResidentPresenceCooldownRemaining = FMath::Max(0.f, ResidentPresenceCooldownRemaining - Delta);
+	FoxPresenceCooldownRemaining = FMath::Max(0.f, FoxPresenceCooldownRemaining - Delta);
 	ThunderCheckRemaining -= Delta;
 	if (ThunderCheckRemaining <= 0.f)
 	{
@@ -343,6 +405,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		ResidentPresenceCheckRemaining = 0.35f;
 		CheckForNearbyResident();
 	}
+	FoxPresenceCheckRemaining -= Delta;
+	if (FoxPresenceCheckRemaining <= 0.f)
+	{
+		FoxPresenceCheckRemaining = 0.5f;
+		CheckForNearbyFox();
+	}
 	if (bResting) return;
 	if (bWakingUp)
 	{
@@ -360,6 +428,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	{
 		ResidentNoticeRemaining -= Delta;
 		if (ResidentNoticeRemaining <= 0.f) BeginGrazing();
+		return;
+	}
+	if (bNoticingFox)
+	{
+		FoxNoticeRemaining -= Delta;
+		if (FoxNoticeRemaining <= 0.f) BeginGrazing();
 		return;
 	}
 	if (!bMoving)

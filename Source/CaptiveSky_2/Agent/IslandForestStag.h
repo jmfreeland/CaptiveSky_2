@@ -23,6 +23,8 @@ public:
 	void RespondToQuietObservation(const FVector& ObserverLocation);
 	/** True only during the stag's temporary, non-startled look toward a nearby resident. */
 	bool IsQuietlyNoticingResident() const { return bNoticingResident && !bMoving && !bStartled && !bResting; }
+	/** True only during the stag's brief, non-startled awareness of a nearby awake fox. */
+	bool IsQuietlyNoticingFox() const { return bNoticingFox && !bMoving && !bStartled && !bResting; }
 	/** Sleep in place at night; wake into the ordinary grazing routine in daylight. */
 	void SetResting(bool bShouldRest);
 	bool IsResting() const { return bResting; }
@@ -63,14 +65,19 @@ private:
 	float ListeningStonesCooldownRemaining = 0.f;
 	float ResidentPresenceCheckRemaining = 0.f;
 	float ResidentPresenceCooldownRemaining = 0.f;
+	float FoxPresenceCheckRemaining = 0.f;
+	float FoxPresenceCooldownRemaining = 0.f;
 	float ListeningRemaining = 0.f;
 	float ResidentNoticeRemaining = 0.f;
+	float FoxNoticeRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bWakingUp = false;
 	bool bListeningToChime = false;
 	bool bNoticingResident = false;
 	bool bResidentPresenceNearby = false;
+	bool bNoticingFox = false;
+	bool bFoxPresenceNearby = false;
 	bool bStartled = false;
 	bool bResting = false;
 	TWeakObjectPtr<AIslandLightning> LastHeardThunder;
@@ -79,6 +86,7 @@ private:
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseWanderTarget(FVector& OutTarget) const;
 	void CheckForNearbyResident();
+	void CheckForNearbyFox();
 	void CheckForNearbyRavenFlyby();
 	void CheckForNearbyListeningStonesChime();
 	void StartMove(const FVector& Target, bool bRun);

@@ -222,3 +222,17 @@ Crow's turn while the actor stays still; the bounded headless
 The close capture is still framed against the pale Crow/mannequin blockout, so
 normal-distance readability in the planted world remains to be judged. Details:
 [attention readability finding](findings/2026-10-10-raven-attention-readability.md).
+
+## 2026-10-10 — A quiet fox–stag moment
+
+When an awake fox is visible within 7.5 m, a grazing stag now gives one short
+look-around instead of chasing or fleeing. The cue is local and one-shot until
+the fox leaves a 10.5 m area, with an 18-second cooldown; a resting/waking fox
+or a resting, waking, moving, or otherwise occupied stag is left alone. A
+nearby resident who can see both animals may notice the stag briefly looking
+toward the fox, while the prompt explicitly leaves its reason and next action
+unknown. No speech, memory, persistent state, or model request is added. UE
+5.8.3 scratch build and `CaptiveSky2.Agent.WoodlandDeer` passed with NullRHI,
+thinking disabled, zero model requests, and a 60-second watchdog. This verifies
+the bounded interaction, not how often it occurs or reads during ordinary play;
+no Game capture was made. Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
