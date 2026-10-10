@@ -1,5 +1,5 @@
 {
-  "_comment": "Generated Tripo props placed into the Island map by Scripts/Place-IslandProps.py. asset = folder name under /Game/Generated/Tripo (made by Scripts/Tripo.py + Import-TripoAsset.py). x, y in cm; z is dropped onto the ground and z_offset adds to it; yaw in degrees. Edit and re-run: the script rebuilds every actor tagged TripoProp and touches nothing else.",
+  "_comment": "Generated props placed into the Island map by Scripts/Place-IslandProps.py. Use asset_path for any imported StaticMesh object path; legacy asset = folder name under /Game/Generated/Tripo still works. x, y in cm; z is dropped onto the ground and z_offset adds to it; yaw in degrees. A successful run replaces actors tagged GeneratedProp (and legacy TripoProp); PLACE_PROPS_DRYRUN=1 preflights without changing the level.",
   "props": [
     {"id": "InnLanternPost_East", "asset": "LanternPost", "x": -99840, "y": 103770, "yaw": 90},
     {"id": "InnLanternPost_West", "asset": "LanternPost", "x": -100290, "y": 103870, "yaw": -90},

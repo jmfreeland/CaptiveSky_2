@@ -1,15 +1,15 @@
 """Places the generated props listed in Config/IslandProps.json into /Game/Maps/Island.
 
-Every prop becomes a StaticMeshActor labelled Prop_<id>, tagged TripoProp and <id>, dropped onto the landscape (or
-whatever solid surface is under it) at its x, y. Reruns first destroy every actor tagged TripoProp, so editing the
-JSON and rerunning moves, adds or removes props without touching anything else in the map. The log reports the
-surface hit, the ground slope under each prop's footprint and any prop whose mesh is missing.
+Each prop becomes a StaticMeshActor labelled Prop_<id> and tagged GeneratedProp and <id>. Set `asset_path` to use any
+imported Unreal StaticMesh; legacy entries with `asset` still resolve under /Game/Generated/Tripo. A normal run
+preflights every mesh and placement before replacing any managed actors. Dry-run reports the same ground/slope plan
+without destroying, spawning, or saving actors.
 
 Content/ is gitignored, so back up Content/Maps/Island.umap first (the map is saved at the end).
 
 Run headless with the editor closed:
   UnrealEditor-Cmd.exe <uproject> -ExecutePythonScript=<this file> -unattended -NoZen -abslog=<abs log>
-Set PLACE_PROPS_DRYRUN=1 to place and report without saving.
+Set PLACE_PROPS_DRYRUN=1 to inspect the plan without changing the level.
 """
 
 import json
@@ -19,7 +19,8 @@ import traceback
 import unreal
 
 MAP = "/Game/Maps/Island"
-TAG = "TripoProp"
+TAG = "GeneratedProp"
+LEGACY_TAG = "TripoProp"
 ROOT = "/Game/Generated/Tripo"
 CONFIG = os.path.join(unreal.Paths.project_dir(), "Config", "IslandProps.json")
 SLOPE_WARN_CM = 60.0
@@ -27,6 +28,17 @@ SLOPE_WARN_CM = 60.0
 
 def log(message):
     unreal.log("[PlaceProps] " + str(message))
+
+
+def mesh_asset_path(prop, tripo_root=ROOT):
+    """Use an explicit asset object path, or retain the legacy Tripo folder convention."""
+    explicit = prop.get("asset_path")
+    if explicit:
+        return str(explicit)
+    name = prop.get("asset")
+    if not name:
+        raise ValueError("{} needs either asset_path or asset".format(prop.get("id", "prop")))
+    return "{0}/{1}/{1}/StaticMeshes/{1}".format(tripo_root, name)
 
 
 def ground(world, x, y):
@@ -57,27 +69,47 @@ def run():
     unreal.EditorLevelLibrary.load_level(MAP)
     world = unreal.EditorLevelLibrary.get_editor_world()
 
-    for actor in unreal.EditorLevelLibrary.get_all_level_actors():
-        if TAG in [str(t) for t in actor.tags]:
-            unreal.EditorLevelLibrary.destroy_actor(actor)
-
-    placed = 0
+    dry_run = os.environ.get("PLACE_PROPS_DRYRUN") == "1"
+    planned = []
+    failures = []
     for prop in props:
-        name = prop["asset"]
-        path = "{0}/{1}/{1}/StaticMeshes/{1}".format(ROOT, name)
+        name = prop.get("asset", prop.get("id", "prop"))
+        path = mesh_asset_path(prop)
         mesh = unreal.load_asset(path)
         if not mesh:
-            log("SKIP {}: missing mesh {}".format(prop["id"], path))
+            failures.append("{}: missing mesh {}".format(prop["id"], path))
             continue
         x, y = float(prop["x"]), float(prop["y"])
         z, surface = ground(world, x, y)
         if z is None:
-            log("SKIP {}: nothing under ({:.0f}, {:.0f})".format(prop["id"], x, y))
+            failures.append("{}: nothing under ({:.0f}, {:.0f})".format(prop["id"], x, y))
             continue
         box = mesh.get_bounding_box()
         radius = max(box.max.x - box.min.x, box.max.y - box.min.y) / 2.0
         slope = footprint_slope(world, x, y, radius)
         z += float(prop.get("z_offset", 0.0))
+        planned.append((prop, name, mesh, path, x, y, z, surface, slope))
+
+    for failure in failures:
+        log("PREFLIGHT FAILED " + failure)
+    if failures and not dry_run:
+        raise RuntimeError("Preflight found {} invalid prop(s); managed actors were left untouched".format(len(failures)))
+
+    for prop, name, _mesh, path, x, y, z, surface, slope in planned:
+        log("{} {:<14} {} ({:.0f}, {:.0f}, {:.0f}) on {}  slope {:.0f} cm{}".format(
+            "WOULD PLACE" if dry_run else "READY", name, path, x, y, z, surface, slope,
+            "  <-- STEEP" if slope > SLOPE_WARN_CM else ""))
+
+    if dry_run:
+        log("dry run: {} ready, {} failed; level unchanged".format(len(planned), len(failures)))
+        return
+
+    for actor in unreal.EditorLevelLibrary.get_all_level_actors():
+        if {TAG, LEGACY_TAG}.intersection(str(tag) for tag in actor.tags):
+            unreal.EditorLevelLibrary.destroy_actor(actor)
+
+    placed = 0
+    for prop, _name, mesh, _path, x, y, z, surface, slope in planned:
         actor = unreal.EditorLevelLibrary.spawn_actor_from_class(
             unreal.StaticMeshActor, unreal.Vector(x, y, z), unreal.Rotator(roll=0.0, pitch=0.0, yaw=float(prop.get("yaw", 0.0))))
         actor.set_actor_label("Prop_" + prop["id"])
@@ -86,18 +118,14 @@ def run():
         component.set_mobility(unreal.ComponentMobility.STATIC)
         component.set_static_mesh(mesh)
         placed += 1
-        log("{:<22} {:<14} ({:.0f}, {:.0f}, {:.0f}) on {}  slope {:.0f} cm{}".format(
-            prop["id"], name, x, y, z, surface, slope, "  <-- STEEP" if slope > SLOPE_WARN_CM else ""))
 
     log("placed {} of {}".format(placed, len(props)))
-    if os.environ.get("PLACE_PROPS_DRYRUN") == "1":
-        log("dry run: not saving")
-        return
     log("saved level: {}".format(unreal.EditorLevelLibrary.save_current_level()))
     log("saved dirty packages: {}".format(unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)))
 
 
-try:
-    run()
-except Exception:
-    unreal.log_error("[PlaceProps] " + traceback.format_exc())
+if __name__ == "__main__":
+    try:
+        run()
+    except Exception:
+        unreal.log_error("[PlaceProps] " + traceback.format_exc())

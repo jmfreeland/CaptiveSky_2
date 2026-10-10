@@ -8,6 +8,8 @@ authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
 The generated index currently covers 21 reviewed props: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory now has 22 prop scripts; `RatHollow` has a successful local FBX build, but remains unimported and visually unreviewed until the open Unreal editor can be closed safely.
 
+After importing a reviewed mesh, `Config/IslandProps.json` can reference it with an explicit Unreal object path, for example `"asset_path": "/Game/Generated/ComfyBlender/RatHollow/SM_RatHollow_01"`. The placement script still accepts legacy `"asset"` entries under `/Game/Generated/Tripo`. It preflights all meshes and ground samples before replacing generated-prop actors; `PLACE_PROPS_DRYRUN=1` reports the plan without destroying, spawning, or saving actors. Do not add the Rat's location until the hollow has been imported and checked in the world.
+
 ## Layout
 
 ```
