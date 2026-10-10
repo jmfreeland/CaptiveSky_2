@@ -250,8 +250,13 @@ namespace
 
 		// Prefer the free, rigged Crow when it is present in this checkout. The procedural
 		// raven below remains a runtime fallback for projects without the optional pack.
+		// A purpose-built raven (heavier bill, wedge tail; Scripts/AssetPipeline/creatures/raven.py) shares the Crow
+		// skeleton, so it is preferred when imported and every crow animation still applies.
 		USkeletalMesh* CrowAsset = LoadObject<USkeletalMesh>(nullptr,
-			TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow_CaptiveSky.SK_Crow_CaptiveSky"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			TEXT("/Game/Characters/Creatures/Raven/SK_Raven_01.SK_Raven_01"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!CrowAsset)
+			CrowAsset = LoadObject<USkeletalMesh>(nullptr,
+				TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow_CaptiveSky.SK_Crow_CaptiveSky"), nullptr, LOAD_NoWarn | LOAD_Quiet);
 		if (!CrowAsset)
 			CrowAsset = LoadObject<USkeletalMesh>(nullptr,
 				TEXT("/Game/AnimalVarietyPack/Crow/Meshes/SK_Crow.SK_Crow"), nullptr, LOAD_NoWarn | LOAD_Quiet);
