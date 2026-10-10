@@ -25,7 +25,7 @@
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFoxStagAwarenessCaptureTest,
 	"CaptiveSky2.Visual.WoodlandFoxStagAwareness",
-	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandFoxStagAwarenessCaptureTest::RunTest(const FString& Parameters)
 {
@@ -35,13 +35,17 @@ bool FIslandFoxStagAwarenessCaptureTest::RunTest(const FString& Parameters)
 		TWeakObjectPtr<AIslandDayNight> DayNight;
 		float OriginalStartHour = 9.f;
 		float OriginalCurrentHour = 9.f;
+		bool bClearGroundCoverPreview = false;
 		TArray<TWeakObjectPtr<AActor>> Actors;
+		TArray<TPair<TWeakObjectPtr<AActor>, bool>> HiddenActors;
 
 		~FCaptureCleanup()
 		{
 			for (const TWeakObjectPtr<AActor>& Actor : Actors)
 				if (Actor.IsValid()) Actor->Destroy();
-			if (Weather.IsValid()) Weather->ClearGroundCoverPreview();
+			for (const TPair<TWeakObjectPtr<AActor>, bool>& HiddenActor : HiddenActors)
+				if (HiddenActor.Key.IsValid()) HiddenActor.Key->SetActorHiddenInGame(HiddenActor.Value);
+			if (Weather.IsValid() && bClearGroundCoverPreview) Weather->ClearGroundCoverPreview();
 			if (DayNight.IsValid())
 			{
 				DayNight->StartHour = OriginalStartHour;
@@ -56,13 +60,21 @@ bool FIslandFoxStagAwarenessCaptureTest::RunTest(const FString& Parameters)
 
 	UWorld* Island = nullptr;
 	for (const FWorldContext& Context : GEngine->GetWorldContexts())
-		if (Context.WorldType == EWorldType::Editor && Context.World() &&
+		if ((Context.WorldType == EWorldType::Game || Context.WorldType == EWorldType::PIE) && Context.World() &&
 			Context.World()->GetMapName() == TEXT("Island"))
 		{
 			Island = Context.World();
 			break;
 		}
-	if (!TestNotNull(TEXT("The saved Island editor world is loaded for the fox–stag capture"), Island))
+	if (!Island)
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+			if (Context.WorldType == EWorldType::Editor && Context.World() &&
+				Context.World()->GetMapName() == TEXT("Island"))
+			{
+				Island = Context.World();
+				break;
+			}
+	if (!TestNotNull(TEXT("The saved Island world is loaded for the fox–stag capture"), Island))
 		return false;
 
 	AActor* WindArch = nullptr;
@@ -79,6 +91,19 @@ bool FIslandFoxStagAwarenessCaptureTest::RunTest(const FString& Parameters)
 		TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C"));
 	if (!TestNotNull(TEXT("Aster's resident placeholder is available for the transient capture"), ResidentClass))
 		return false;
+
+	// In Game context, keep the staged pair distinct from the live ambient wildlife.
+	// Restore their exact visibility states after the screenshot is saved.
+	for (TActorIterator<AIslandForestStag> It(Island); It; ++It)
+	{
+		Cleanup.HiddenActors.Emplace(*It, It->IsHidden());
+		It->SetActorHiddenInGame(true);
+	}
+	for (TActorIterator<AIslandForestFox> It(Island); It; ++It)
+	{
+		Cleanup.HiddenActors.Emplace(*It, It->IsHidden());
+		It->SetActorHiddenInGame(true);
+	}
 
 	// Start from the real runtime fox site, then find a small, flat, visible three-actor
 	// composition nearby. No saved actor, level, or world-state location is authored.
@@ -216,7 +241,11 @@ bool FIslandFoxStagAwarenessCaptureTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("The Island weather actor can supply its reversible meadow preview"), Weather))
 		return false;
 	Cleanup.Weather = Weather;
-	Weather->InitializeGroundCover();
+	if (Weather->GroundCoverInstanceCount == 0)
+	{
+		Weather->InitializeGroundCover();
+		Cleanup.bClearGroundCoverPreview = true;
+	}
 	TestTrue(TEXT("The capture retains live meadow ecology around the animals"),
 		Weather->GroundCoverInstanceCount > 0 && Weather->GroundCoverMeadowInstanceCount > 0);
 	AddInfo(FString::Printf(TEXT("Transient scene ecology: %d ground-cover instances, %d meadow instances, %d trees, and %d shrubs."),

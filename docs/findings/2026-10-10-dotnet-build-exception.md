@@ -16,6 +16,20 @@ wildlife captures passed, and the process watcher observed their clean exits.
 No matching managed exception event appeared during those observed runs. This
 does not rule out an intermittent failure outside the observation window.
 
+Separate Unreal failure evidence was found in the 2026-10-10 06:03 crash report:
+it is an `UnrealEditor` Game-mode assert, not a `dotnet.exe` exception. The
+installed `Installed` Derived Data Cache graph had no writable node. Unreal
+reported that the configured common cache under
+`C:/Users/freel/AppData/Local/UnrealEngine/Common/DerivedDataCache` was
+read-only (its access check returned Windows error 5); Zen cache startup also
+reported access denied and a failed server-version copy. That report is
+consistent with a separate cache-permission/configuration problem during
+launch, but it does not identify the cause of the managed exception shown in
+the Windows dialog. A later isolated Game launch supplied the project's
+`Saved/LocalDDC` explicitly and completed successfully. Future comparison
+should record whether the failing launch uses the common cache or an explicit
+writable DDC path.
+
 There is separate machine-level evidence of a graphics-kernel failure: Windows
 logged bugcheck `0x00000113` with an unexpected reboot on 2026-10-09. This may
 be relevant to Unreal graphics stability, but there is not enough evidence to

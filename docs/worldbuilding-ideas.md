@@ -233,12 +233,13 @@ nearby resident who can see both animals may notice the stag briefly looking
 toward the fox, while the prompt explicitly leaves its reason and next action
 unknown. No speech, memory, persistent state, or model request is added. UE
 5.8.3 scratch build and `CaptiveSky2.Agent.WoodlandDeer` passed with NullRHI,
-thinking disabled, zero model requests, and a 60-second watchdog. This verifies
-the bounded interaction, not how often it occurs or reads during ordinary play;
-an editor-world D3D12 frame now shows Aster witnessing the glance. The transient
-capture is verified, but the Listening Stones blockout pillars and nearby rock
-intrude on the composition; replace or move the placeholder landmark pieces and
-make a normal-distance Game capture before calling the moment visually polished.
+thinking disabled, zero model requests, and a 60-second watchdog. A standalone
+Game-context D3D12 capture now shows the runtime stone presentation with Aster
+witnessing the glance; its 30-FPS gate held 36.24 FPS for five seconds. The
+frame is staged and still includes pale placeholder-looking stones at lower
+left, so it proves runtime composition and renderability, not natural encounter
+frequency or a polished highlight. The earlier Editor-context frame showed
+saved proxy geometry and is not representative of runtime stones.
 Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
 
 ## 2026-10-10 — Tideglass gameplay habitat baseline
