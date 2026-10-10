@@ -53,13 +53,30 @@ Coverage = max(rain film, waterline film): rain film is the wet stage's puddle n
 at `FilmShoreAmount` 0.7. Note the puddle numbers duplicate the wet stage's; they are not linked.
 Pin gotcha found while building: the Vertical Layer's `Base` input is named **`Bottom`** for `connect_material_expressions`.
 
-## What was and was not verified
+## Verification results (2026-10-10)
 
-- Both builders exit 0 and the assets saved; the editor log shows no material/shader errors. **That is not proof they render**: shader compilation finishes asynchronously after
-  the script, and nothing was captured.
-- Whether the landscape pipeline accepts a Substrate **Front Material** is the open risk for the Substrate variant. Failure signs: the landscape renders as the checkerboard
-  fallback, black, or a `LandscapeRender.cpp` ensure / material compile error in the log (the earlier puddle-debug materials failed this way).
-- The legacy shore variant is low risk: it is the wet graph with extra nodes ahead of the existing stage.
+Codex ran the captures on the main project (`Saved/Logs/Codex_Shore{Baseline,Legacy,Substrate}_20261010.log`, frames in
+`Saved/Viewpoints/2026-10-10_{135837,140148,140439}_h12.0/01_ShoreApproach.png`, hour 12); Claude read the frames. All three runs passed `CaptiveSky2.Visual.Viewpoints`.
+
+- **Legacy shore variant renders and the sand is where it should be.** A beach band appears along the foreground waterline with an organic, noisy upper edge, meeting the
+  Water plugin's turquoise shallows; the rowboat sits on it. No checkerboard, black, magenta or errors. The ground away from the beach is not changed by the material
+  (the sand mask is zero there); the pixel differences elsewhere are the sky and the **cloud shadows on the ground**, because each capture is a separate process with a different
+  dynamic cloud state. So the baseline-vs-shore frames are not a controlled pixel comparison, and there is no same-session baseline-vs-parent pair in the harness yet.
+- **The Substrate variant also renders.** The landscape pipeline accepts a Substrate Front Material: no fallback, no error. It differs from the legacy variant in the right place:
+  a darker, glossier damp-sand band along the waterline instead of pale sand fading straight into the shallows (beach-region mean difference 9.4/255 vs 5.7 on plain ground).
+  The film's rain/puddle part was **not** exercised (dry frame); pair it with `-CompareLandscapeWetness` / `-LandscapeWetness 1` to see it.
+- **The sand is bright.** In the legacy frame the beach reads about (218, 203, 177) mean RGB against about (98, 94, 87) for the surrounding ground, about 2.2 times brighter (not clipped:
+  0% of sand pixels at 250 or more). The builder script now has a `SandAlbedoScale` parameter (default 0.8) for this; **the assets have not been rebuilt with it yet**, because a rebuild
+  deletes and recreates the materials a capture may be using. Until then, tune `SandDampDarken` or rebuild. The sand grain is not visible at this camera distance.
+- **Not yet checked:** other viewpoints (`00_Survey`, `02a_TideglassGroundDetail`, `04_WindArchOverlook`), hour 17 / low sun, wet versus dry, frame time (the Substrate variant adds a closure per pixel on the
+  landscape), whether the sand band suits the rest of the shore (the band is derived from sea level Z=940, not measured), and in-game (PIE) behaviour. The authored `MI_Island_Landscape` is unchanged.
+
+## Pitfalls hit while verifying
+
+- Git Bash rewrites an argument that starts with `/` (`-ViewpointLandscapeParent=/Game/...` became `C:/Program Files/Git/Game/...`), so the test reported "Landscape preview parent material loaded" is null. Use PowerShell,
+  or `MSYS_NO_PATHCONV=1`. The package path (`/Game/Materials/M_Island_Textured_Shore`) is fine.
+- Starting a second editor beside the user's editor exhausted memory (commit 98%). Separately, running ComfyUI on the same GPU while the editor held 8.3 of its 9.2 GB VRAM budget coincided with an editor
+  `D3D12` GPU page-fault crash (dump `Saved/Logs/D3D12.0.2026.10.10-13.31.37.nv-gpudmp`). Do not run ComfyUI or Blender GPU bakes beside an open editor.
 
 ## How to test (no authored asset needs to change)
 

@@ -258,7 +258,9 @@ def build():
                 sampler_source=unreal.SamplerSourceMode.SSM_WRAP_WORLD_GROUP_SETTINGS)
     link(tile_b, bc_b, "UVs")
     macro = scalar(m, "SandMacroMix", 0.4, X0 + 1000, Y0 + 1850)
-    sand_color = lerp(m, bc_a, bc_b, macro, X0 + 1300, Y0 + 1500)
+    # SandAlbedoScale: the generated sand reads about 2x brighter than the island's ground at noon (218 vs 98 mean in the
+    # first ShoreApproach capture), so a global scale lets it sit in the scene. 1.0 = the texture as generated.
+    sand_color = mul(m, lerp(m, bc_a, bc_b, macro, X0 + 1300, Y0 + 1500), scalar(m, "SandAlbedoScale", 0.8, X0 + 1300, Y0 + 1400), X0 + 1500, Y0 + 1500)
 
     n_a = tex_param(m, "Shore Sand Normal", n_tex, S.SAMPLERTYPE_NORMAL, X0 + 1000, Y0 + 2000)
     link(tile_a, n_a, "UVs")
