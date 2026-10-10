@@ -59,6 +59,18 @@ def describe(actor, paths, tags):
         ";".join(paths))
 
 
+def candidate_kind(actor_label, actor_name, paths, tags):
+    """Classify as an explicit marker or a weak name hint; neither proves suitability."""
+    if HOLLOW_TAGS.intersection(tags):
+        return "tagged"
+    if not paths:
+        return None
+    identity = "{} {} {}".format(actor_label, actor_name, " ".join(paths))
+    if WOOD_HINT.search(identity) and not NON_HOLLOW_HINT.search(identity):
+        return "hint"
+    return None
+
+
 def main():
     unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH)
     actors = unreal.EditorLevelLibrary.get_all_level_actors()
@@ -69,13 +81,11 @@ def main():
     for actor in actors:
         tags = actor_tags(actor)
         paths = mesh_paths(actor)
-        if HOLLOW_TAGS.intersection(tags):
+        kind = candidate_kind(actor.get_actor_label(), actor.get_name(), paths, tags)
+        if kind == "tagged":
             tagged.append((actor, paths, tags))
             continue
-        if not paths:
-            continue
-        identity = "{} {} {}".format(actor.get_actor_label(), actor.get_name(), " ".join(paths))
-        if WOOD_HINT.search(identity) and not NON_HOLLOW_HINT.search(identity):
+        if kind == "hint":
             hinted.append((actor, paths, tags))
 
     unreal.log("[RatHollowAudit] explicit_hollow_tags={} name_or_mesh_hints={}".format(len(tagged), len(hinted)))
@@ -88,8 +98,9 @@ def main():
     unreal.log("[RatHollowAudit] COMPLETE; inspect candidates visually and verify nav/capsule clearance before spawning.")
 
 
-try:
-    main()
-except Exception:
-    unreal.log_error("[RatHollowAudit] FAILED " + traceback.format_exc())
-    raise
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        unreal.log_error("[RatHollowAudit] FAILED " + traceback.format_exc())
+        raise
