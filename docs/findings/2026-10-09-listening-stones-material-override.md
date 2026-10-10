@@ -157,20 +157,21 @@ safe fallback on a checkout without it.
 
 ## Transient lichen weathering (2026-10-10)
 
-Each runtime standing stone now receives eight deterministic, irregular lichen
+Each runtime standing stone now receives six deterministic, irregular lichen
 islands around its full circumference. The patches sample the exact triangles
 of the generated rock mesh, sit just proud of the surface, and reuse the local
-PBR material with a subdued olive tint. A fixed close real-D3D12 frame shows
-one patch reading on the near stone; at this distance it adds a small natural
-color break without covering the rock texture. Ordinary approach-distance
-readability is still unverified, so patch size should not be increased until a
-journey-view comparison is made.
+PBR material with a subdued, deeper olive tint. The original eight smaller
+patches were too easy to lose at the ordinary approach distance, so the six
+current patches are wider and taller without becoming continuous bands. The
+close real-D3D12 frame shows an individual patch on the near stone; the matched
+9 m Game view keeps the lichen as quiet surface mottling rather than a bright
+decal or new focal point.
 
 The change is Game/PIE-only and visual-only. The original map proxies still own
 collision and navigation; no map, Content asset, or persistent world state was
 changed. The UE 5.8.3 editor build succeeded and
 `CaptiveSky2.Agent.ListeningStonePresentation` passed under NullRHI, with
-assertions for the eight-patch geometry, the transient material tint, bounds,
+assertions for the six-patch geometry, the transient material tint, bounds,
 collisionless presentation meshes, and unchanged proxy collision/navigation.
 A separate D3D12 spectator capture used an isolated data root, disabled
 resident thinking and Python, allowed zero model requests, and exited normally
@@ -178,3 +179,38 @@ after 35.3 real seconds. Frame: [`001_Lichen__Close.png`](../../Playtests/Codex_
 Automation and Game logs:
 [`StoneLichenAutomation_Coverage.log`](../../Playtests/Codex_StoneLichen_20261010_final/StoneLichenAutomation_Coverage.log),
 [`StoneLichenGame_Coverage.log`](../../Playtests/Codex_StoneLichen_20261010_final/StoneLichenGame_Coverage.log).
+
+### Ordinary-distance validation attempt (2026-10-10)
+
+The configured `03_ListeningStones` approach resolves to a camera about 9 m
+from the landmark. A one-view editor capture with the ground-cover preview
+completed at 57.58 FPS wall-clock throughput / 50.47 FPS p95, but the editor
+world still renders the saved gray map proxies rather than the transient Game
+stones. Its `CaptiveSky2.Visual.Viewpoints` suite also failed an existing Fab
+flower/rhododendron population-cap assertion in the user's modified viewpoint
+test file. The image therefore cannot judge the lichen and the suite failure
+does not implicate the lichen presentation.
+
+A standalone Game retry used this same camera in a one-shot spectator profile,
+an isolated data root, 11:00 clock override, thinking/Python disabled, zero
+model requests, and a 60-second play cap. UE did not reach its world-ready
+marker within the 180-second startup watchdog; the log advanced only to
+`PreObjectSystemReady`, so no ordinary-distance Game frame was captured. The
+watchdog terminated only that launched Game process tree. No map or normal
+world-state data was written. This cold-start attempt is not evidence of a
+lichen or Game runtime crash.
+
+Artifacts: [`editor proxy capture log`](../../Saved/Logs/Codex_LichenJourneyCheck_20261010.log),
+[`standalone Game startup log`](../../Saved/Playtests/Codex_LichenJourney_D3D12/LichenJourneyGame.log),
+and the isolated [`one-shot camera profile`](../../Saved/Playtests/Codex_LichenJourney_D3D12/LichenJourneyView.json).
+
+The warmed retry reached world-ready in 29.6 seconds, and the six-patch source
+rebuilt successfully before capture. `CaptiveSky2.Agent.ListeningStonePresentation`
+passed with NullRHI, including patch count/tint, bounds, collision, and proxy
+ownership checks. The 1600×900 D3D12 Game session then ran for 60.3 seconds and
+exited normally with zero model requests. At the 9 m view, lichen remains a
+small, quiet mottling on the stones, not individually prominent at this
+composition; no larger increase is warranted from this evidence. Frame:
+[`012_Lichen__Journey.png`](../../Saved/Playtests/Codex_LichenJourney_D3D12/ScreenshotsBroad/012_Lichen__Journey.png).
+Focused automation: [`ListeningStoneAutomation_Broad.log`](../../Saved/Playtests/Codex_LichenJourney_D3D12/ListeningStoneAutomation_Broad.log).
+Bounded Game log: [`LichenJourneyGame_Broad.log`](../../Saved/Playtests/Codex_LichenJourney_D3D12/LichenJourneyGame_Broad.log).

@@ -117,9 +117,9 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		Vertices.Reserve(StoneRingCount * StoneRingVertexCount + 2);
 		UVs.Reserve(StoneRingCount * StoneRingVertexCount + 2);
 		Triangles.Reserve((StoneRingCount - 1) * StoneSideCount * 6 + StoneSideCount * 6);
-		LichenVertices.Reserve(8 * 9);
-		LichenTriangles.Reserve(8 * 8 * 3);
-		LichenUVs.Reserve(8 * 9);
+		LichenVertices.Reserve(6 * 9);
+		LichenTriangles.Reserve(6 * 8 * 3);
+		LichenUVs.Reserve(6 * 9);
 		const float BottomZ = Center.Z - LocalExtent.Z;
 		FRandomStream ShapeRandom(0x531A + Index * 7919);
 		const float RotationOffset = ShapeRandom.FRandRange(-0.28f, 0.28f);
@@ -213,12 +213,12 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		};
 
 		FRandomStream LichenRandom(0x71C4 + Index * 3571);
-		for (int32 Patch = 0; Patch < 8; ++Patch)
+		for (int32 Patch = 0; Patch < 6; ++Patch)
 		{
-			const float CenterAngle = RotationOffset + 2.f * PI * (Patch + 0.5f) / 8.f + LichenRandom.FRandRange(-0.08f, 0.08f);
+			const float CenterAngle = RotationOffset + 2.f * PI * (Patch + 0.5f) / 6.f + LichenRandom.FRandRange(-0.08f, 0.08f);
 			const float CenterAlpha = LichenRandom.FRandRange(0.16f, 0.62f);
-			const float HalfAngle = LichenRandom.FRandRange(0.20f, 0.28f);
-			const float HalfHeight = LichenRandom.FRandRange(0.04f, 0.065f);
+			const float HalfAngle = LichenRandom.FRandRange(0.30f, 0.36f);
+			const float HalfHeight = LichenRandom.FRandRange(0.08f, 0.11f);
 			const int32 CenterVertex = LichenVertices.Add(SampleStoneSurface(CenterAlpha, CenterAngle));
 			LichenUVs.Add(FVector2D(CenterAngle / (2.f * PI), CenterAlpha));
 			const int32 PerimeterStart = LichenVertices.Num();
@@ -252,7 +252,7 @@ bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransf
 		Stone->SetMaterial(0, StoneSurface);
 		UMaterialInstanceDynamic* LichenSurface = UMaterialInstanceDynamic::Create(BaseSurface, Stone);
 		if (!LichenSurface) return false;
-		const FLinearColor LichenTint(0.28f, 0.40f, 0.12f);
+		const FLinearColor LichenTint(0.21f, 0.33f, 0.08f);
 		LichenSurface->SetVectorParameterValue(TEXT("Color"), LichenTint);
 		LichenSurface->SetVectorParameterValue(TEXT("BaseColor"), LichenTint);
 		Stone->SetMaterial(1, LichenSurface);

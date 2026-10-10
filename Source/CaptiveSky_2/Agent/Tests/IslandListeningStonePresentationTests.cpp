@@ -142,8 +142,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			TestTrue(FString::Printf(TEXT("Standing stone %d has a closed, detailed mesh"), Index),
 				Section && Section->ProcIndexBuffer.Num() >= 200 && Section->ProcVertexBuffer.Num() >= 50);
 			const FProcMeshSection* LichenSection = Stone->GetProcMeshSection(1);
-			TestTrue(FString::Printf(TEXT("Standing stone %d has eight separate collisionless lichen islands"), Index),
-				LichenSection && LichenSection->ProcVertexBuffer.Num() == 72 && LichenSection->ProcIndexBuffer.Num() == 192);
+			TestTrue(FString::Printf(TEXT("Standing stone %d has six broader collisionless lichen islands"), Index),
+				LichenSection && LichenSection->ProcVertexBuffer.Num() == 54 && LichenSection->ProcIndexBuffer.Num() == 144);
 			if (Section && Section->ProcVertexBuffer.Num() >= 62)
 			{
 				bool bTextureSeamIsClosed = true;
@@ -174,7 +174,7 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			if (LichenSurface)
 			{
 				TestTrue(FString::Printf(TEXT("Standing stone %d keeps the lichen tint subdued and moss-green"), Index),
-					LichenSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(FLinearColor(0.28f, 0.40f, 0.12f), 0.001f));
+					LichenSurface->K2_GetVectorParameterValue(TEXT("Color")).Equals(FLinearColor(0.21f, 0.33f, 0.08f), 0.001f));
 			}
 			if (!Section || !Proxies.IsValidIndex(Index)) continue;
 

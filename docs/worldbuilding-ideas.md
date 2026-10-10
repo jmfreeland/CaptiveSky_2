@@ -265,13 +265,16 @@ Evidence: [wide gameplay frame](../Saved/Playtests/Codex_WorldLifeReview_2026101
 
 ## 2026-10-10 — Listening Stones gather a little lichen
 
-The three transient standing stones now carry eight deterministic, irregular
-olive lichen patches each, wrapped around the full surface and sampled against
-the same triangles as the rock mesh. This adds a small weathering cue while
+The three transient standing stones now carry six broader, irregular deep-olive
+lichen patches each, wrapped around the full surface and sampled against the
+same triangles as the rock mesh. This adds a small weathering cue while
 leaving the saved proxies, collision, navigation, and persistent world state
 untouched. The UE 5.8.3 build and focused presentation automation passed; a
 35-second D3D12 Game capture at a close approach shows a lichen patch on the
-near stone, with zero model requests. This is still a close fixed view, not a
-normal-distance art sign-off. Recheck from the ordinary Listening Stones
-journey viewpoint before changing patch scale. Details and evidence:
+near stone, with zero model requests. A matched 9 m D3D12 journey view shows
+the marks as quiet mottling rather than a prominent decal; its 60-second run
+also ended cleanly with zero requests. An editor journey-view retry only
+rendered the saved stone proxies and hit a separate existing foliage-count
+assertion; the first cold standalone Game launch timed out, but a warmed retry
+reached the world and captured the view. Details and evidence:
 [transient lichen finding](findings/2026-10-09-listening-stones-material-override.md#transient-lichen-weathering-2026-10-10).
