@@ -891,8 +891,8 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					ForagingFox->FindGround(FoxLocationBeforeNotice, FoxGroundProbe));
 				TestTrue(TEXT("An awake fox accepts a quiet observer"), ForagingFox->CanRespondToQuietObservation());
 				const FVector FoxOffsetFromRaven = ForagingFox->GetActorLocation() - BlueprintRaven->GetActorLocation();
-				TestTrue(TEXT("The staged fox is inside the Raven's 5 m notice range"),
-					FoxOffsetFromRaven.SizeSquared2D() <= FMath::Square(500.f) && FMath::Abs(FoxOffsetFromRaven.Z) <= 250.f);
+				TestTrue(TEXT("The naturally passing fox is inside the Raven's 10 m notice range"),
+					FoxOffsetFromRaven.SizeSquared2D() <= FMath::Square(1000.f) && FMath::Abs(FoxOffsetFromRaven.Z) <= 250.f);
 				FCollisionQueryParams FoxSightQuery(SCENE_QUERY_STAT(RavenWildlifeAttentionTest), false, BlueprintRaven);
 				FoxSightQuery.AddIgnoredActor(ForagingFox);
 				FHitResult FoxSightHit;
@@ -935,6 +935,61 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 					FVector::Dist2D(FoxLocationBeforeNotice, BlueprintRaven->GetActorLocation()) &&
 					FVector::Dist2D(ForagingFox->GetActorLocation(), ForagingFox->HomeLocation) <= 650.1f);
 				ForagingFox->Destroy();
+			}
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			AIslandForestFox* PassingFox = World->SpawnActor<AIslandForestFox>(
+				RavenLocationBeforeWildlifeGlance + FVector(510.f, 680.f, -100.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("An awake fox can be staged in the Raven's extended notice band"), PassingFox);
+			if (PassingFox)
+			{
+				PassingFox->HomeLocation = PassingFox->GetActorLocation();
+				const FVector Offset = PassingFox->GetActorLocation() - BlueprintRaven->GetActorLocation();
+				TestTrue(TEXT("The passing fox is farther than the old 5 m limit but inside 10 m"),
+					Offset.SizeSquared2D() > FMath::Square(500.f) && Offset.SizeSquared2D() <= FMath::Square(1000.f));
+				FCollisionQueryParams PassingSightQuery(SCENE_QUERY_STAT(RavenWildlifeAttentionTest), false, BlueprintRaven);
+				PassingSightQuery.AddIgnoredActor(PassingFox);
+				FHitResult PassingSightHit;
+				const FVector RavenEye = BlueprintRaven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
+				const FVector PassingFoxHead = PassingFox->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+				const bool bPassingSightBlocked = World->LineTraceSingleByChannel(
+					PassingSightHit, RavenEye, PassingFoxHead, ECC_Visibility, PassingSightQuery);
+				TestTrue(TEXT("The midrange fox has a clear line of sight to the Raven"),
+					!bPassingSightBlocked || PassingSightHit.GetActor() == PassingFox);
+				BlueprintController->CheckForNearbyWildlifePresence();
+				TestTrue(TEXT("A perched Raven notices and briefly startles a visible foraging fox in the extended range"),
+					BlueprintController->WildlifeAttentionTarget.Get() == PassingFox &&
+					PassingFox->IsRespondingToQuietObserver());
+				PassingFox->Destroy();
+			}
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			AIslandForestFox* BeyondRangeFox = World->SpawnActor<AIslandForestFox>(
+				RavenLocationBeforeWildlifeGlance + FVector(800.f, 800.f, -100.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("An awake fox can be staged just beyond the quiet-observation range"), BeyondRangeFox);
+			if (BeyondRangeFox)
+			{
+				BeyondRangeFox->HomeLocation = BeyondRangeFox->GetActorLocation();
+				const FVector Offset = BeyondRangeFox->GetActorLocation() - BlueprintRaven->GetActorLocation();
+				TestTrue(TEXT("The outer fox remains inside the forget window but outside the 10 m notice range"),
+					Offset.SizeSquared2D() > FMath::Square(1000.f) && Offset.SizeSquared2D() <= FMath::Square(1400.f));
+				FCollisionQueryParams OuterSightQuery(SCENE_QUERY_STAT(RavenWildlifeAttentionTest), false, BlueprintRaven);
+				OuterSightQuery.AddIgnoredActor(BeyondRangeFox);
+				FHitResult OuterSightHit;
+				const FVector OuterRavenEye = BlueprintRaven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
+				const FVector OuterFoxHead = BeyondRangeFox->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+				const bool bOuterSightBlocked = World->LineTraceSingleByChannel(
+					OuterSightHit, OuterRavenEye, OuterFoxHead, ECC_Visibility, OuterSightQuery);
+				TestTrue(TEXT("The outer fox has a clear line of sight to the Raven"),
+					!bOuterSightBlocked || OuterSightHit.GetActor() == BeyondRangeFox);
+				BlueprintController->CheckForNearbyWildlifePresence();
+				TestFalse(TEXT("A visible but distant fox does not trigger an implausibly long-range response"),
+					BeyondRangeFox->IsRespondingToQuietObserver());
+				TestFalse(TEXT("A visible but distant fox does not draw the Raven's attention"),
+					BlueprintController->WildlifeAttentionTarget.Get() == BeyondRangeFox);
+				BeyondRangeFox->Destroy();
 			}
 			SleepingFox->Destroy();
 		}

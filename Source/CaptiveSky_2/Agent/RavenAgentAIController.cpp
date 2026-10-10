@@ -1181,8 +1181,11 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 		return;
 	}
 
-	constexpr float NoticeRadius = 500.f;
-	constexpr float ForgetRadius = 700.f;
+	// Settled ravens should be able to notice wildlife a short distance away,
+	// rather than requiring the staged, nearly shoulder-to-shoulder setup used
+	// by earlier tests. Keep line of sight and the calm/awake checks below.
+	constexpr float NoticeRadius = 1000.f;
+	constexpr float ForgetRadius = 1400.f;
 	constexpr float MaximumHeightDifference = 250.f;
 	bool bWildlifeRemainsNearby = false;
 	AActor* ClosestEligibleWildlife = nullptr;
