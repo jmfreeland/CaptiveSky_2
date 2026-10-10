@@ -255,9 +255,14 @@ in the nearby group and rearms after it leaves; closer existing wildlife cues
 and higher-priority attention still win. UE 5.8.3 editor build and the
 `CaptiveSky2.Agent.RavenPerch` regression passed with NullRHI, Python disabled,
 an isolated world-state root, and a zero model-request cap. AutoSDK validation
-returned 0 on this approved run. This verifies the bounded attention logic,
-not its natural frequency or readability in a rendered scene; check that in a
-future normal-distance gameplay capture. See [Raven–dragonfly attention](findings/2026-10-10-raven-dragonfly-attention.md).
+returned 0 on this approved run. A real-D3D12 `CaptiveSky2.Visual.RavenWingMotion`
+editor-world capture also rendered the staged pair with thinking disabled and
+zero model requests ([frame](../Saved/Viewpoints/RavenWingMotion_/20261010_104406/11_RavenDragonflyGlance.png)).
+It is only a presentation check: both actors fit, but the pair is off-center,
+Raven's pale placeholder body and the thin brown ground remain obvious, and
+normal-play frequency/readability are unverified. Reframe after the current
+vegetation/material pass and revisit in bounded Game/PIE play. See
+[Raven–dragonfly attention](findings/2026-10-10-raven-dragonfly-attention.md).
 
 ## 2026-10-10 — Tideglass gameplay habitat baseline
 

@@ -1942,6 +1942,87 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 			NoticingStag->Destroy();
 			Raven->SetActorRotation(RavenRotationBeforeStagGlance);
 		}
+		AIslandTideglassDragonfly* NoticingDragonfly = Island->SpawnActor<AIslandTideglassDragonfly>(
+			Raven->GetActorLocation() + FVector(120.f, 180.f, 90.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A transient dragonfly was spawned for a rendered Raven attention capture"), NoticingDragonfly);
+		if (NoticingDragonfly)
+		{
+			NoticingDragonfly->SetColorVariant(1);
+			NoticingDragonfly->SetActorTickEnabled(false);
+			Controller->ListeningStoneAttentionRemaining = 0.f;
+			Controller->MinnowRippleAttentionRemaining = 0.f;
+			Controller->RainBasinAttentionRemaining = 0.f;
+			Controller->DewGlintAttentionRemaining = 0.f;
+			Controller->WindMoteAttentionRemaining = 0.f;
+			Controller->CrabScurryAttentionRemaining = 0.f;
+			Controller->ResidentAttentionRemaining = 0.f;
+			Controller->WildlifeAttentionRemaining = 0.f;
+			Controller->NoticedWildlifeInNearbyGroup.Reset();
+			if (HeadPivot) HeadPivot->SetRelativeRotation(Controller->RavenHeadRestRotation);
+			if (RiggedCrow) RiggedCrow->SetRelativeRotation(Controller->RiggedCrowRestRotation);
+			Controller->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("The rendered Raven selects the nearby dragonfly for its brief attention cue"),
+				Controller->WildlifeAttentionTarget.Get() == NoticingDragonfly &&
+				Controller->WildlifeAttentionRemaining > 1.5f);
+			Controller->Tick(0.25f);
+			USceneComponent* DragonflyAttentionVisual = HeadPivot
+				? static_cast<USceneComponent*>(HeadPivot)
+				: static_cast<USceneComponent*>(RiggedCrow);
+			TestNotNull(TEXT("The rendered Raven exposes its active attention visual"), DragonflyAttentionVisual);
+			if (DragonflyAttentionVisual)
+			{
+				const FRotator RestPose = HeadPivot
+					? Controller->RavenHeadRestRotation
+					: Controller->RiggedCrowRestRotation;
+				const float GlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+					RestPose.Yaw, DragonflyAttentionVisual->GetRelativeRotation().Yaw));
+				TestTrue(TEXT("The Raven's visible attention turn toward the insect stays small and bounded"),
+					GlanceYaw > 3.f && GlanceYaw <= 25.f);
+			}
+			const FVector RavenVisualFocus = RiggedCrow
+				? RiggedCrow->Bounds.Origin
+				: (HeadPivot ? HeadPivot->GetComponentLocation() : Raven->GetActorLocation());
+			const FVector DragonflyVisualFocus = NoticingDragonfly->GetActorLocation() + FVector(0.f, 0.f, 12.f);
+			const FVector DragonflyLookAt = (RavenVisualFocus + DragonflyVisualFocus) * 0.5f;
+			const FVector DragonflyCameraOffsets[] = {
+				FVector(0.f, 410.f, 150.f), FVector(0.f, -410.f, 150.f),
+				FVector(-430.f, 0.f, 160.f), FVector(430.f, 0.f, 160.f)
+			};
+			FCollisionQueryParams DragonflyCameraQuery(SCENE_QUERY_STAT(RavenDragonflyAttentionCapture), false, Camera);
+			DragonflyCameraQuery.AddIgnoredActor(Raven);
+			DragonflyCameraQuery.AddIgnoredActor(NoticingDragonfly);
+			AddInfo(FString::Printf(TEXT("Raven–dragonfly visual focus raven=%s insect=%s"),
+				*RavenVisualFocus.ToCompactString(), *DragonflyVisualFocus.ToCompactString()));
+			FVector DragonflyCameraLocation = DragonflyLookAt + DragonflyCameraOffsets[0];
+			int32 DragonflyCameraBlockers = MAX_int32;
+			for (const FVector& Offset : DragonflyCameraOffsets)
+			{
+				const FVector Candidate = DragonflyLookAt + Offset;
+				FHitResult RavenHit;
+				FHitResult InsectHit;
+				const bool bRavenBlocked = Island->LineTraceSingleByChannel(RavenHit, Candidate,
+				RavenVisualFocus, ECC_Visibility, DragonflyCameraQuery);
+				const bool bInsectBlocked = Island->LineTraceSingleByChannel(InsectHit, Candidate,
+				DragonflyVisualFocus, ECC_Visibility, DragonflyCameraQuery);
+				const int32 BlockerCount = static_cast<int32>(bRavenBlocked) + static_cast<int32>(bInsectBlocked);
+				if (BlockerCount < DragonflyCameraBlockers)
+				{
+					DragonflyCameraBlockers = BlockerCount;
+					DragonflyCameraLocation = Candidate;
+				}
+				if (BlockerCount == 0) break;
+			}
+			AddInfo(FString::Printf(TEXT("Raven–dragonfly capture camera=%s blockedSubjects=%d"),
+				*DragonflyCameraLocation.ToCompactString(), DragonflyCameraBlockers));
+			Camera->SetActorLocationAndRotation(DragonflyCameraLocation,
+				(DragonflyLookAt - DragonflyCameraLocation).Rotation());
+			const float PreviousCaptureFOV = Capture->FOVAngle;
+			Capture->FOVAngle = 55.f;
+			TestTrue(TEXT("The real-RHI Raven–dragonfly attention frame is saved"),
+				SavePose(TEXT("11_RavenDragonflyGlance.png")));
+			Capture->FOVAngle = PreviousCaptureFOV;
+			NoticingDragonfly->Destroy();
+		}
 		Controller->WildlifeAttentionRemaining = 0.f;
 		Controller->WildlifeAttentionTarget.Reset();
 		Controller->ResidentAttentionRemaining = 0.f;
