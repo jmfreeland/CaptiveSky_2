@@ -183,3 +183,13 @@ movement by the Raven, memory, or persistent state. The isolated `RavenPerch`
 automation passed with a zero-request cap. The regression is deterministic and
 does not yet establish how naturally or visibly this exchange occurs in normal
 play; see [the encounter finding](findings/2026-10-10-raven-fox-encounter.md).
+
+## 2026-10-10 — The fox settles near woodland cover
+
+After the first real-RHI view placed the resting fox in an exposed clearing, its
+spawn now searches outward from the Wind Arch approach for a grounded site 3–9 m
+from mature spruce, preferring roughly 5 m of cover while keeping at least the
+existing 14.5 m landmark clearance. The live Island chose a site 5.8 m from
+mature spruce; this was a NullRHI placement check, not a rendered visual review.
+The next useful check is a real-RHI frame at ordinary gameplay scale, then a
+matched frame-time measurement. Details and logs: [woodland fox finding](findings/2026-10-10-woodland-fox.md).

@@ -333,10 +333,11 @@ void AIslandWeather::BeginPlay()
 	// Persistent records are loaded by UIslandWorldStateSubsystem::OnWorldBeginPlay,
 	// after actor BeginPlay. Defer one tick so scatter sees the saved curio locations.
 	GetWorldTimerManager().SetTimerForNextTick(this, &AIslandWeather::InitializeGroundCover);
+	// Spawn wildlife only after the transient woodland placement data is available.
+	GetWorldTimerManager().SetTimerForNextTick(this, &AIslandWeather::RefreshNightEcology);
 	InitializeWeatherAmbience();
 	UpdateCloudRendering();
 	UpdateRainRendering();
-	RefreshNightEcology();
 	GetWorldTimerManager().SetTimer(EcologyTimerHandle, this, &AIslandWeather::RefreshNightEcology, 30.f, true, 30.f);
 }
 
@@ -468,6 +469,33 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	Hash *= 0x846ca68bu;
 	Hash ^= Hash >> 16;
 	return static_cast<int32>(Hash % MeadowFlowerSpeciesCount);
+}
+
+int32 AIslandWeather::SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& CandidateLocations,
+	const TArray<float>& NearestMatureSpruceDistances, int32 FallbackIndex)
+{
+	if (!CandidateLocations.IsValidIndex(FallbackIndex)) return INDEX_NONE;
+
+	constexpr float MinimumCoverDistance = 300.f;
+	constexpr float MaximumCoverDistance = 900.f;
+	constexpr float PreferredCoverDistance = 520.f;
+	int32 BestIndex = INDEX_NONE;
+	float BestScore = TNumericLimits<float>::Max();
+	for (int32 CandidateIndex = 0; CandidateIndex < CandidateLocations.Num(); ++CandidateIndex)
+	{
+		if (!NearestMatureSpruceDistances.IsValidIndex(CandidateIndex)) continue;
+		const float CoverDistance = NearestMatureSpruceDistances[CandidateIndex];
+		if (!FMath::IsFinite(CoverDistance) || CoverDistance < MinimumCoverDistance || CoverDistance > MaximumCoverDistance)
+			continue;
+
+		const float Score = FMath::Abs(CoverDistance - PreferredCoverDistance);
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			BestIndex = CandidateIndex;
+		}
+	}
+	return BestIndex != INDEX_NONE ? BestIndex : FallbackIndex;
 }
 
 FVector AIslandWeather::SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex)
@@ -2347,24 +2375,83 @@ void AIslandWeather::RefreshNightEcology()
 			}
 			if (!WoodlandFox.IsValid())
 			{
-				for (int32 Attempt = 0; Attempt < 8 && !WoodlandFox.IsValid(); ++Attempt)
+				TArray<FVector> SpawnCandidates;
+				TArray<float> NearestMatureSpruceDistances;
+				int32 FallbackCandidate = INDEX_NONE;
+				const bool bCanScoreSpruce = bGroundCoverInitialized && IslandSpruce && IslandSpruce->GetStaticMesh() &&
+					IslandSpruceBaseTransforms.Num() == IslandSpruce->GetInstanceCount();
+				const FBox SpruceLocalBounds = bCanScoreSpruce
+					? IslandSpruce->GetStaticMesh()->GetBoundingBox() : FBox(ForceInit);
+				const FTransform SpruceComponentTransform = bCanScoreSpruce
+					? IslandSpruce->GetComponentTransform() : FTransform::Identity;
+				const int32 SpruceCellRange = FMath::CeilToInt(900.f / GroundCoverSwayCellSize);
+
+				// Search from the established landmark clearance outward so a dense grove just
+				// beyond the original ring can shelter the fox without placing it in the approach.
+				static constexpr float FoxSpawnRadii[] = { 1450.f, 1900.f, 2350.f };
+				constexpr int32 FoxSpawnSamplesPerRing = 16;
+				for (const float SpawnRadius : FoxSpawnRadii)
 				{
-					const float Angle = 2.f * PI * (static_cast<float>(Attempt) + 0.81f) / 8.f;
-					const FVector Offset(FMath::Cos(Angle) * 1450.f, FMath::Sin(Angle) * 1450.f, 900.f);
-					const FVector TraceStart = WindArch->GetActorLocation() + Offset;
-					FHitResult GroundHit;
-					FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandWoodlandFoxSpawn), false, this);
-					Query.AddIgnoredActor(WindArch);
-					if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart,
-						TraceStart - FVector(0.f, 0.f, 2400.f), ECC_WorldStatic, Query) ||
-						!Cast<ALandscapeProxy>(GroundHit.GetActor()) || GroundHit.ImpactNormal.Z < 0.76f) continue;
+					for (int32 Attempt = 0; Attempt < FoxSpawnSamplesPerRing; ++Attempt)
+					{
+						const float Angle = 2.f * PI * (static_cast<float>(Attempt) + 0.81f) / FoxSpawnSamplesPerRing;
+						const FVector Offset(FMath::Cos(Angle) * SpawnRadius, FMath::Sin(Angle) * SpawnRadius, 900.f);
+						const FVector TraceStart = WindArch->GetActorLocation() + Offset;
+						FHitResult GroundHit;
+						FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandWoodlandFoxSpawn), false, this);
+						Query.AddIgnoredActor(WindArch);
+						if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart,
+							TraceStart - FVector(0.f, 0.f, 2400.f), ECC_WorldStatic, Query) ||
+							!Cast<ALandscapeProxy>(GroundHit.GetActor()) || GroundHit.ImpactNormal.Z < 0.76f) continue;
+						const FVector SpawnLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, 3.f);
+						if (FallbackCandidate == INDEX_NONE) FallbackCandidate = SpawnCandidates.Num();
+						SpawnCandidates.Add(SpawnLocation);
+
+						float NearestMatureSpruceDistance = -1.f;
+						if (bCanScoreSpruce && SpruceLocalBounds.IsValid)
+						{
+							const FVector LocalCandidate = SpruceComponentTransform.InverseTransformPosition(SpawnLocation);
+							const FIntPoint CandidateCell(
+								FMath::FloorToInt(LocalCandidate.X / GroundCoverSwayCellSize),
+								FMath::FloorToInt(LocalCandidate.Y / GroundCoverSwayCellSize));
+							float NearestDistanceSquared = FMath::Square(900.f);
+							for (int32 CellX = CandidateCell.X - SpruceCellRange; CellX <= CandidateCell.X + SpruceCellRange; ++CellX)
+								for (int32 CellY = CandidateCell.Y - SpruceCellRange; CellY <= CandidateCell.Y + SpruceCellRange; ++CellY)
+									if (const TArray<int32>* TreeIndices = SpruceCells.Find(FIntPoint(CellX, CellY)))
+										for (const int32 TreeIndex : *TreeIndices)
+										{
+											if (!IslandSpruceBaseTransforms.IsValidIndex(TreeIndex)) continue;
+											const FTransform& TreeTransform = IslandSpruceBaseTransforms[TreeIndex];
+											const float TreeHeight = SpruceLocalBounds.GetSize().Z *
+												FMath::Abs(TreeTransform.GetScale3D().Z) * FMath::Abs(SpruceComponentTransform.GetScale3D().Z);
+											if (TreeHeight < 900.f) continue;
+											const FVector TreeLocation = SpruceComponentTransform.TransformPosition(TreeTransform.GetLocation());
+											const float DistanceSquared = FVector::DistSquared2D(TreeLocation, SpawnLocation);
+											if (DistanceSquared < NearestDistanceSquared) NearestDistanceSquared = DistanceSquared;
+										}
+							if (NearestDistanceSquared < FMath::Square(900.f))
+								NearestMatureSpruceDistance = FMath::Sqrt(NearestDistanceSquared);
+						}
+						NearestMatureSpruceDistances.Add(NearestMatureSpruceDistance);
+					}
+				}
+
+				const int32 SelectedCandidate = SelectWoodlandFoxSpawnCandidate(
+					SpawnCandidates, NearestMatureSpruceDistances, FallbackCandidate);
+				if (SpawnCandidates.IsValidIndex(SelectedCandidate))
+				{
 					FActorSpawnParameters SpawnParameters;
 					SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 					SpawnParameters.ObjectFlags |= RF_Transient;
-					const FVector SpawnLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, 3.f);
+					const FVector SpawnLocation = SpawnCandidates[SelectedCandidate];
 					WoodlandFox = GetWorld()->SpawnActor<AIslandForestFox>(SpawnLocation, FRotator::ZeroRotator, SpawnParameters);
 					if (WoodlandFox.IsValid())
-						UE_LOG(LogIslandWeather, Log, TEXT("A transient fox emerged at the Wind Arch woodland edge at %s"), *SpawnLocation.ToCompactString());
+					{
+						const float CoverDistance = NearestMatureSpruceDistances.IsValidIndex(SelectedCandidate)
+							? NearestMatureSpruceDistances[SelectedCandidate] : -1.f;
+						UE_LOG(LogIslandWeather, Log, TEXT("A transient fox emerged at the Wind Arch woodland edge at %s (%s; nearest mature spruce: %.0f cm)"),
+							*SpawnLocation.ToCompactString(), CoverDistance >= 300.f && CoverDistance <= 900.f ? TEXT("cover-preferred site") : TEXT("grounded fallback site"), CoverDistance);
+					}
 				}
 			}
 			if (WoodlandFox.IsValid()) WoodlandFox->SetResting(!bNight);

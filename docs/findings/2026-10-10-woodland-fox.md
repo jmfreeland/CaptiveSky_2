@@ -42,9 +42,32 @@ Evidence:
 - [`real-D3D12 screenshot`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/Screenshots/004_Fox_At_Wind_Arch.png)
 - [`real-D3D12 run log`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/WoodlandFoxRealRHI_Close.log)
 
-Next, improve woodland-edge composition around the fox without moving it into
-the residents' open Wind Arch approach or harming path readability. Consider
-one more species only after the full runtime and performance check; keep
-wildlife transient, bounded, and
-non-conscious unless the project deliberately grants an animal its own
-identity, memory, personality, and request budget.
+## Woodland-cover site selection (2026-10-10)
+
+The first real-D3D12 frame showed the fox in an open clearing. The original
+eight-point 14.5 m spawn ring had no mature spruce within 9 m, so it could only
+select its first grounded fallback. The selector now samples three concentric
+rings (14.5, 19, and 23.5 m from the Wind Arch), with sixteen deterministic
+ground traces per ring. It prefers a grounded point 3–9 m from a mature spruce
+(at least 9 m tall), targeting 5.2 m; ties keep the nearer ring first. The
+14.5 m minimum remains, so the fox stays outside the immediate landmark
+approach. If no cover qualifies, the first valid grounded point remains the
+fallback.
+
+The actual-project UE 5.8.3 build succeeded and `CaptiveSky2.Agent.GroundCover`
+passed. A bounded Island Game run selected `(-102709, 98102, 2638)` cm, 580 cm
+from mature spruce; this confirms the selector used live scatter data rather
+than its fallback. The run used NullRHI, isolated world data, disabled agent
+thinking, allowed zero model requests, and ended itself at 90.1 real seconds.
+This verifies placement and the real-time/request safeguards, not rendered
+composition or frame rate. The earlier real-D3D12 fox image depicts the old
+open-clearing site and must not be treated as a visual check of the new one.
+
+Evidence: [`GroundCover automation`](../../Saved/Playtests/Codex_FoxWoodlandCover_Verify_20261010/GroundCover.log), [`bounded Island Game run`](../../Saved/Playtests/Codex_FoxWoodlandCover_Verify_20261010/FoxGame.log).
+
+Next, capture the updated site with real RHI and check the fox against the
+woodland edge, path readability, and Wind Arch approach at ordinary gameplay
+scale. Consider another species only after the visual and performance check;
+keep wildlife transient, bounded, and non-conscious unless the project
+deliberately gives an animal its own identity, memory, personality, and request
+budget.
