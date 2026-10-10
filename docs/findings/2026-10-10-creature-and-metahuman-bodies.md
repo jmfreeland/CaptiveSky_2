@@ -6,13 +6,14 @@ Goal: bodies for the human residents (MetaHuman), the raven and the rat. Status:
 - Source: `Scripts/AssetPipeline/creatures/raven.py` reshapes the Fab Crow (vertex positions only, so skeleton, skin weights and UVs are the crow's): deep arched bill 14% longer, shaggy throat, wedge tail (centre feathers 30% longer, spread tightened), heavier neck/chest/head, thicker legs.
 - Imported by `Scripts/Import-Creatures.py` **onto `SK_Crow_Skeleton`**, so every crow animation (idle, hop, takeoff, fly, landing) plays unchanged and the Raven controller's existing mapping works. Material: the existing `M_Crow_CaptiveSky` (renders near-black plumage).
 - Verified: bounds match the crow's span (extent X 51.8 cm both; bill makes Y 27.4 vs 23.9); `ANIM_Crow_Walk` resolves to its skeleton; rendered in UE with `ANIM_Crow_IdleLookAround` (side and 3/4 views).
-- Not wired in: `RavenAgentAIController.cpp` still loads `SK_Crow_CaptiveSky` first. To use the raven, load `/Game/Characters/Creatures/Raven/SK_Raven_01` in that lookup (one path). I did not edit it (Codex/other agents own that file, and it needs gameplay review at game scale: the controller scales the bird to a 112 cm span).
+- Wired in (a7a7cac): `RavenAgentAIController.cpp` now tries `SK_Raven_01` first, then `SK_Crow_CaptiveSky`, then `SK_Crow`. Uncompiled and not run in-game; the controller scales the bird to a 112 cm span, so check it at gameplay scale.
 
 ## Rat: `/Game/Characters/Creatures/Rat/SK_Rat_01`
 - Source: `creatures/rat.py` reshapes the Fab Fox (LOD0): thin bare tail, legs compressed toward the hip (about 46%) and slimmed, hunched plump body, round ears, narrow pointed snout. Slot 0 fur, slot 1 bare skin (tail, feet, nose). `creatures/rat_fur_texture.py` makes the fur BaseColor with numpy (no GPU).
 - Imported **onto `SK_Fox_Skeleton`**: all Fox animations (idle, look-around, walk, run, sleep, rest) play on it. Materials built in `Import-Creatures.py`: `M_Rat_Fur` (texture) and `M_Rat_Skin`.
 - Scale: use about 0.28x in the engine (the mesh is fox-sized, about 112 cm long including the tail, 38 cm tall). Place it by its bounds, like the raven code does (the legs are shortened, so the mesh does not stand at the fox's origin height).
-- Not wired in: nothing spawns a rat yet (`docs/residents/Agent_Rat_01` is still a draft; no `Agents/` folder or actor). Label its actor "Rat", never "Fenrus" (see `docs/residents/README.md`).
+- Resident body: `Scripts/Create-RatPlaceholder.py` creates `/Game/Agents/BP_Rat_Placeholder` (a copy of `BP_Agent_Placeholder` with `SK_Rat_01` at 0.28x, a small capsule, walk speed 140, yaw +90 so the fox-forward -Y faces +X). Spawned in a test world it stands upright and faces forward. Its animation is not driven yet (the placeholder has no locomotion AnimBP; the controller or an AnimBP must play the Fox sequences).
+- Not placed: nothing spawns a rat yet (`docs/residents/Agent_Rat_01` is still a draft; no `Agents/` folder or actor). Label its actor "Rat", never "Fenrus" (see `docs/residents/README.md`).
 - Caveat: head is still fox-like (open-mouth pose from the Fox rest pose), the fur texture is procedural and does not follow the fox UV layout, so it is plain dark brown-grey. A hand-painted or ComfyUI pass is the next step.
 
 ## Human residents (Aster, Innkeeper): `/Game/Characters/MetaHumans/MHC_Aster`, `MHC_Innkeeper`
