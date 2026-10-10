@@ -12,6 +12,7 @@ class AIslandTidepoolCrab;
 class AIslandTidepoolMinnows;
 class AIslandTideglassDragonfly;
 class AIslandForestStag;
+class AIslandForestFox;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UHierarchicalInstancedStaticMeshComponent;
@@ -124,6 +125,7 @@ private:
 	TArray<TWeakObjectPtr<AIslandTideglassDragonfly>> DayDragonflies;
 	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
 	TWeakObjectPtr<AIslandForestStag> WoodlandDeer;
+	TWeakObjectPtr<AIslandForestFox> WoodlandFox;
 	TArray<FTransform> ShoreGrassABaseTransforms;
 	TArray<FTransform> ShoreGrassBBaseTransforms;
 	TArray<FTransform> ShoreGroundPlantBaseTransforms;

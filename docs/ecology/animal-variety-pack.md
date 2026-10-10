@@ -133,3 +133,30 @@ pixel to RGB 159, 149, 130. A project-wide exposure A/B found that lowering the 
 makes the grass and shoreline nearly black, so retain `+1` and pursue a localized Raven fix. Paired
 captures: `Saved/Viewpoints/2026-10-06_142822_h21.0/` (zero) and
 `Saved/Viewpoints/2026-10-06_143348_h21.0/` (+1).
+
+## Woodland fox (2026-10-10)
+
+The free pack's fox now appears as a single transient animal at a separate point
+along the Wind Arch woodland edge. It rests during daylight and forages after
+dusk, taking short, ground-checked steps inside a 6.5 m home patch. A nearby
+resident may quietly observe it; an awake fox pauses to look and then trots
+toward cover, while a resting fox is left undisturbed. The fox is `IslandLife`,
+not a conscious resident, movement target, companion, or persistent world-state
+record. It adds no model calls or save data. The existing Raven and stag
+behaviors are unchanged.
+
+UE 5.8.3 compiled the isolated current-source project, and
+`CaptiveSky2.Agent.WoodlandFox` passed. The test checks the mesh and six matched
+non-root-motion animations, nonblocking collision, optional visible interaction,
+resident perception text, daytime rest, wake transition, and the bounded quiet
+response. A separate normal Island Game run logged the fox emerging at
+`(-101434, 101634, 2609)` cm beside Wind Arch and ended after 90.1 real seconds
+with zero model requests. The Game run used NullRHI, so its spawn and behavior
+are verified. A subsequent real-D3D12 capture at 1600x900 confirms its
+gameplay-scale silhouette and grounded daytime-rest pose; a nearby cover band
+is visible behind it, though the fox itself rests in an open clearing. The
+temporary screen-message toggle was capture-only. Logs and frame:
+[`WoodlandFoxAutomation.log`](../../Saved/Playtests/Codex_WoodlandFox_20261010/AutomationFinal/WoodlandFoxAutomation.log),
+[`WoodlandFoxGame.log`](../../Saved/Playtests/Codex_WoodlandFox_20261010/Game2/WoodlandFoxGame.log),
+[`real-RHI frame`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/Screenshots/004_Fox_At_Wind_Arch.png),
+[`real-RHI run log`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/WoodlandFoxRealRHI_Close.log).

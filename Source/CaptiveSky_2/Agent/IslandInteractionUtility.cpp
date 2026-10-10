@@ -8,6 +8,7 @@
 #include "IslandInnHearthSubsystem.h"
 #include "IslandFirefly.h"
 #include "IslandForestStag.h"
+#include "IslandForestFox.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandListeningStonePresentation.h"
 #include "IslandRainBasin.h"
@@ -27,6 +28,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 	if (Target->IsA<AIslandArrangement>()) return FName(TEXT("IslandArrangement"));
 	if (Target->ActorHasTag(TEXT("IslandLife")))
 	{
+		if (Target->ActorHasTag(TEXT("WoodlandFox"))) return FName(TEXT("WoodlandFox"));
 		if (Target->ActorHasTag(TEXT("WoodlandDeer"))) return FName(TEXT("WoodlandDeer"));
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));
 		if (Target->ActorHasTag(TEXT("TidepoolCrab"))) return FName(TEXT("TidepoolCrab"));
@@ -188,6 +190,24 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 	{
 		if (AIslandForestStag* Deer = Cast<AIslandForestStag>(Target)) Deer->RespondToQuietObservation(Observer->GetActorLocation());
 		OutFact = TEXT("A wild stag lifted its head, bounded a short way toward the nearby trees, then settled back into grazing. It remains independent; you did not touch, follow, feed, or claim it, and nothing persistent changed.");
+		return true;
+	}
+	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("WoodlandFox")))
+	{
+		if (AIslandForestFox* Fox = Cast<AIslandForestFox>(Target))
+		{
+			if (Fox->IsResting())
+			{
+				OutFact = TEXT("You quietly noticed a fox curled at the woodland edge, breathing softly in its daytime rest. You left it undisturbed; it remains wild and independent.");
+				return true;
+			}
+			if (!Fox->RespondToQuietObservation(Observer->GetActorLocation()))
+			{
+				OutFact = TEXT("You quietly observed the fox but could not get a clear response; it remained at ease or continued waking. Nothing changed.");
+				return true;
+			}
+		}
+		OutFact = TEXT("A wild fox paused to look toward you, then trotted a few paces toward cover. It remains independent; you did not follow, feed, touch, or claim it, and nothing persistent changed.");
 		return true;
 	}
 	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("TidepoolCrab")))

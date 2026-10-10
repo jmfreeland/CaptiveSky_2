@@ -11,6 +11,7 @@
 #include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandForestStag.h"
+#include "IslandForestFox.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTrail.h"
 #include "Components/VolumetricCloudComponent.h"
@@ -2290,6 +2291,8 @@ void AIslandWeather::RefreshNightEcology()
 	{
 		if (WoodlandDeer.IsValid()) WoodlandDeer->Destroy();
 		WoodlandDeer.Reset();
+		if (WoodlandFox.IsValid()) WoodlandFox->Destroy();
+		WoodlandFox.Reset();
 	}
 	else
 	{
@@ -2333,6 +2336,38 @@ void AIslandWeather::RefreshNightEcology()
 				}
 			}
 			if (WoodlandDeer.IsValid()) WoodlandDeer->SetResting(!bDay);
+
+			if (!WoodlandFox.IsValid())
+			{
+				for (AIslandForestFox* ExistingFox : TActorRange<AIslandForestFox>(GetWorld()))
+				{
+					WoodlandFox = ExistingFox;
+					break;
+				}
+			}
+			if (!WoodlandFox.IsValid())
+			{
+				for (int32 Attempt = 0; Attempt < 8 && !WoodlandFox.IsValid(); ++Attempt)
+				{
+					const float Angle = 2.f * PI * (static_cast<float>(Attempt) + 0.81f) / 8.f;
+					const FVector Offset(FMath::Cos(Angle) * 1450.f, FMath::Sin(Angle) * 1450.f, 900.f);
+					const FVector TraceStart = WindArch->GetActorLocation() + Offset;
+					FHitResult GroundHit;
+					FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandWoodlandFoxSpawn), false, this);
+					Query.AddIgnoredActor(WindArch);
+					if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart,
+						TraceStart - FVector(0.f, 0.f, 2400.f), ECC_WorldStatic, Query) ||
+						!Cast<ALandscapeProxy>(GroundHit.GetActor()) || GroundHit.ImpactNormal.Z < 0.76f) continue;
+					FActorSpawnParameters SpawnParameters;
+					SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					SpawnParameters.ObjectFlags |= RF_Transient;
+					const FVector SpawnLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, 3.f);
+					WoodlandFox = GetWorld()->SpawnActor<AIslandForestFox>(SpawnLocation, FRotator::ZeroRotator, SpawnParameters);
+					if (WoodlandFox.IsValid())
+						UE_LOG(LogIslandWeather, Log, TEXT("A transient fox emerged at the Wind Arch woodland edge at %s"), *SpawnLocation.ToCompactString());
+				}
+			}
+			if (WoodlandFox.IsValid()) WoodlandFox->SetResting(!bNight);
 		}
 	}
 

@@ -104,6 +104,7 @@ private:
 	friend class FIslandRainBasinWorldTest;
 	friend class FIslandTideglassTideTest;
 	friend class FIslandWindArchPresentationTest;
+	friend class FIslandForestFoxTest;
 	friend class FAgentArrangementReflectionPromptTest;
 	friend class FAgentLingeringTest;
 	friend class FAgentPlacesTest;
