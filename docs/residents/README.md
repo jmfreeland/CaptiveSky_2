@@ -1,10 +1,10 @@
 # Proposed residents
 
-Drafts of future residents, kept outside `Agents/` so the game and gateway never load them by accident. To bring one to life, copy its folder into `Agents/`, give it a body, and let it start with an empty memory.
+Drafts of future residents are kept outside `Agents/` so the game and gateway never load them by accident. To bring one to life, copy its identity and personality into `Agents/`, give it a body, and let it start with an empty memory.
 
-Current drafts: `Agent_Rat_01` (the rat) and `innkeeper` (a still-unnamed resident whose role and home are associated with the inn).
+Current status: `Agent_Rat_01` (the rat) has an active identity/personality profile and a user-chosen home concept, but is not yet spawned in the world; the unnamed `innkeeper` remains a draft.
 
-## Agent_Rat_01: the rat (draft, 2026-09-27)
+## Agent_Rat_01: the rat (identity draft, 2026-09-27; active profile 2026-10-10)
 
 This answers the README's *Quest for Glory* note about an unusually intelligent rat. A pointer for when the reference is settled: in *Quest for Glory*, Erasmus is the wizard and his talking rat familiar is Fenrus. This rat is deliberately neither. It's an original being with its own home on the Island and no master, in keeping with the Vision: residents are participants rather than quest dispensers, and Sierra-inspired characters should be original beings rather than reproductions.
 
@@ -21,3 +21,5 @@ What it would need before it could live in the game:
 - **Its own Discord identity,** only if it should correspond outside the Island (see `Gateway/README.md`, "Add another agent"). The bot's visible name would need the same care.
 
 Nothing here is final. Edit the voice freely; the drafts are intentionally short so lived experience can do most of the work.
+
+The user chose a **hidden hollow in fallen wood** as the rat's first home. The active profile under `Agents/Agent_Rat_01/` contains only identity and personality; its memory is intentionally absent/empty, and its place list remains empty until a real in-world hollow anchor is authored. No actor spawns yet. Do not invent a coordinate or reuse the Raven's nest as the rat's home merely because it is convenient; first find or build a distinct fallen-wood hollow and validate its ground/nav clearance.

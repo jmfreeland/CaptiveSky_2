@@ -1,8 +1,9 @@
 """Create /Game/Agents/BP_Rat_Placeholder: a resident body for the rat, cloned from BP_Agent_Placeholder.
 
 Swaps the mesh for SK_Rat_01 (Fox skeleton), scales it to a rat (~0.28), shrinks the capsule and slows the walk,
-(plays the Fox breathing idle in a loop; locomotion animation still needs an AnimBP or controller). Nothing spawns it; the rat's resident folder (docs/residents/Agent_Rat_01) is still a
-draft. Label its actor "Rat", never "Fenrus" (docs/residents/README.md).
+(plays the Fox breathing idle in a loop; locomotion animation still needs an AnimBP or controller). The rat's seed
+profile is active, but its runtime spawn still waits on a real fallen-wood hollow anchor. Label its actor "Rat",
+never "Fenrus" (docs/residents/README.md).
   UnrealEditor-Cmd <uproject> -ExecutePythonScript=Scripts/Create-RatPlaceholder.py -RenderOffscreen -NoZen
 """
 import traceback
