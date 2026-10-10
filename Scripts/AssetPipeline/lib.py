@@ -24,6 +24,8 @@ TILED = {  # key: (texture base, tile metres)
     "straw": ("T_Lib_Straw", 0.5),
     "strawcoil": ("T_Lib_Strawcoil", 0.4),
     "parchment": ("T_Lib_Parchment", 0.5),
+    "canvas": ("T_Lib_Canvas", 0.35),
+    "moss": ("T_Lib_Moss", 0.4),
 }
 PLAIN = {
     "iron": dict(BaseColor=[0.16, 0.15, 0.15], Roughness=0.4, Metallic=0.9),
@@ -37,6 +39,14 @@ PLAIN = {
     "ember": dict(BaseColor=[0.05, 0.02, 0.01], Roughness=0.8, Emissive=[1.0, 0.35, 0.08], EmissiveStrength=6.0),
     "rune": dict(BaseColor=[0.02, 0.03, 0.04], Roughness=0.6, Emissive=[0.35, 0.85, 1.0], EmissiveStrength=8.0),
     "lanternglow": dict(BaseColor=[0.1, 0.07, 0.03], Roughness=0.5, Emissive=[1.0, 0.62, 0.22], EmissiveStrength=5.0),
+    "mortar": dict(BaseColor=[0.07, 0.065, 0.06], Roughness=0.95),
+    "coal": dict(BaseColor=[0.04, 0.02, 0.015], Roughness=0.9, Emissive=[1.0, 0.28, 0.05], EmissiveStrength=7.0),
+    "awning": dict(BaseColor=[0.52, 0.11, 0.09], Roughness=0.9),
+    "cloth_blue": dict(BaseColor=[0.12, 0.2, 0.34], Roughness=0.9),
+    "felt": dict(BaseColor=[0.18, 0.13, 0.09], Roughness=0.95),
+    "mushcap": dict(BaseColor=[0.62, 0.1, 0.07], Roughness=0.55),
+    "mushstem": dict(BaseColor=[0.82, 0.77, 0.66], Roughness=0.7),
+    "pumpkin": dict(BaseColor=[0.75, 0.32, 0.05], Roughness=0.6),
 }
 
 
@@ -181,6 +191,66 @@ def bm_rock(rx, ry, rz, seed=0, sub=2, rough=0.14, flat_bottom=0.6):
         if v.co.z < -flat_bottom * rz:
             v.co.z = -flat_bottom * rz
     return bm
+
+
+def bm_torus(R, r, segs=32, rsegs=10):
+    """Ring of tube radius r around a circle of radius R in the XY plane."""
+    bm = bmesh.new()
+    verts = []
+    for i in range(segs):
+        a = 2 * math.pi * i / segs
+        c = Vector((math.cos(a), math.sin(a), 0))
+        row = []
+        for j in range(rsegs):
+            b = 2 * math.pi * j / rsegs
+            row.append(bm.verts.new(c * (R + r * math.cos(b)) + Vector((0, 0, r * math.sin(b)))))
+        verts.append(row)
+    for i in range(segs):
+        i2 = (i + 1) % segs
+        for j in range(rsegs):
+            j2 = (j + 1) % rsegs
+            bm.faces.new([verts[i][j], verts[i2][j], verts[i2][j2], verts[i][j2]])
+    return bm
+
+
+def bm_grid(points, thick=0.006):
+    """Quad surface through rows x cols of Vectors, solidified to a thin closed sheet (cloth, awning)."""
+    bm = bmesh.new()
+    rows = [[bm.verts.new(p) for p in row] for row in points]
+    for i in range(len(rows) - 1):
+        for j in range(len(rows[i]) - 1):
+            bm.faces.new([rows[i][j], rows[i][j + 1], rows[i + 1][j + 1], rows[i + 1][j]])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bmesh.ops.solidify(bm, geom=bm.faces[:], thickness=thick)
+    return bm
+
+
+def bm_block(a0, a1, z0, z1, rin, rout, rng, over=0.0, jit=0.012):
+    """One jittered wedge block of a round wall (angles a0..a1 about Z), 2 segments across for curvature."""
+    bm = bmesh.new()
+    angs = (a0, (a0 + a1) / 2, a1)
+    V = {}
+    for ai, a in enumerate(angs):
+        for ri, r in enumerate((rin - over, rout + over)):
+            for zi, z in enumerate((z0, z1)):
+                rj = r + rng.uniform(-jit, jit) * (1 if ri else 0.6)
+                zj = z + (rng.uniform(-jit / 2, jit / 2) if zi else 0)
+                V[ai, ri, zi] = bm.verts.new((rj * math.cos(a), rj * math.sin(a), zj))
+    for k in (0, 1):
+        bm.faces.new((V[k, 1, 0], V[k + 1, 1, 0], V[k + 1, 1, 1], V[k, 1, 1]))
+        bm.faces.new((V[k, 0, 0], V[k, 0, 1], V[k + 1, 0, 1], V[k + 1, 0, 0]))
+        bm.faces.new((V[k, 0, 1], V[k, 1, 1], V[k + 1, 1, 1], V[k + 1, 0, 1]))
+        bm.faces.new((V[k, 0, 0], V[k + 1, 0, 0], V[k + 1, 1, 0], V[k, 1, 0]))
+    bm.faces.new((V[0, 0, 0], V[0, 1, 0], V[0, 1, 1], V[0, 0, 1]))
+    bm.faces.new((V[2, 0, 0], V[2, 0, 1], V[2, 1, 1], V[2, 1, 0]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bmesh.ops.bevel(bm, geom=list(bm.verts) + list(bm.edges) + list(bm.faces), offset=0.011, segments=2, affect="EDGES")
+    return bm
+
+
+def align(direction, up="Y"):
+    """Euler degrees (XYZ) that point a part's local +Z along `direction` (legs, braces, tilted tubes)."""
+    return tuple(math.degrees(a) for a in Vector(direction).to_track_quat("Z", up).to_euler())
 
 
 # ------------------------------------------------------------------ materials (preview / manifest)
@@ -390,6 +460,7 @@ class Asset:
         self.name = f"SM_{folder}_01"
         self.dir = f"{ROOT}/{folder}"
         self.bake_size = bake_size
+        self.description = ""
         self.moss = (0.7, 0.42)  # (dampness height in m, moss threshold: higher = less moss)
         self.parts = []  # (object, matkey)
         self.coll = []
@@ -443,6 +514,30 @@ class Asset:
 
     def rock(self, mat, radii, loc=(0, 0, 0), rot=(0, 0, 0), seed=1, sub=2, rough=0.14, flat_bottom=0.6, tile=None, name="rock"):
         return self._finish(bm_rock(*radii, seed=seed, sub=sub, rough=rough, flat_bottom=flat_bottom), name, mat, loc, rot, "box", "Z", tile, True, 70)
+
+    def torus(self, mat, R, r, loc=(0, 0, 0), rot=(0, 0, 0), segs=32, rsegs=10, tile=None, name="torus"):
+        return self._finish(bm_torus(R, r, segs, rsegs), name, mat, loc, rot, "box", "Z", tile, True, 50)
+
+    def cloth(self, mat, points, thick=0.006, loc=(0, 0, 0), rot=(0, 0, 0), tile=None, name="cloth"):
+        """points: rows x cols of Vectors (a draped / curved surface); becomes a thin closed sheet."""
+        return self._finish(bm_grid(points, thick), name, mat, loc, rot, "box", "Z", tile, True, 60)
+
+    def block_ring(self, mat, r_in, r_out, courses, course_h, per_course=13, cap_over=0.02, tile=1.2, name="block"):
+        """A round dry-stone wall of individually jittered blocks, staggered per course; the top course is a slightly proud capstone."""
+        made = []
+        for c in range(courses):
+            n = per_course + (c % 2)
+            ws = [self.rng.uniform(0.75, 1.3) for _ in range(n)]
+            tot = sum(ws)
+            ws = [w / tot * 2 * math.pi for w in ws]
+            a = self.rng.uniform(0, 2 * math.pi)
+            z0, z1 = c * course_h + 0.008, (c + 1) * course_h - 0.004
+            cap = c == courses - 1
+            for w in ws:
+                bm = bm_block(a + 0.007, a + w - 0.007, z0, z1 + (cap_over if cap else 0), r_in - (cap_over if cap else 0), r_out, self.rng, over=(0.015 if cap else 0))
+                made.append(self._finish(bm, name, mat, (0, 0, 0), (0, 0, 0), "cyl", "Z", tile, True, 40))
+                a += w
+        return made
 
     # -- collision
     def collide_box(self, size, loc=(0, 0, 0), rot=(0, 0, 0)):
@@ -627,6 +722,7 @@ class Asset:
         d = main.dimensions
         manifest = {
             "asset": self.name,
+            "description": self.description,
             "fbx": f"{self.name}.fbx",
             "units": "centimetres (FBX_SCALE_ALL); origin = ground-centre; Z up; normals exported (Normals Only)",
             "size_cm_xyz": [round(d.x * 100), round(d.y * 100), round(d.z * 100)],

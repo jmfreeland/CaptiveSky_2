@@ -15,5 +15,6 @@ spec = importlib.util.spec_from_file_location(f"asset_{name}", f"{PIPE}/assets/{
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 A = lib.Asset(mod.NAME, getattr(mod, "BAKE_SIZE", 2048))
+A.description = " ".join((mod.__doc__ or "").split())
 mod.build(A)
 A.finalize()
