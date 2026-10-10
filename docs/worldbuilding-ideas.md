@@ -355,3 +355,14 @@ coordinate the imported-material fix with the Content owner, then build habitat
 depth with distinct mid-distance woodland groups and a clear pool approach;
 recheck the same Game view and PIE separately. See the [capture notes and
 limits](findings/2026-10-10-tideglass-layer-performance.md#bounded-1700-standalone-game-visual-recheck-2026-10-10).
+
+**Instanced StarterContent material repair (2026-10-10):** the actual Island
+Game log showed `M_Rock` and `M_Wood_Oak` falling back to Default Material on
+HISM instances. UE 5.8.3 compiled their `InstancedStaticMeshes` permutations
+without errors; both flags were saved after byte-verified backups. This should
+restore authored rock/wood surfaces where those materials are instanced, but
+the Game effect remains unverified because a live UnrealEditor process was
+present after the save. The 13 Everestian rhododendron fallbacks remain a
+separate broken graph and were not toggled. Next: once the editor closes, repeat
+the capped zero-request Tideglass Game view and verify both warning removal and
+appearance. Details and backups: [material repair finding](findings/2026-10-10-starter-instanced-materials.md).
