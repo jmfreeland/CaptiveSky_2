@@ -51,12 +51,17 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Upgrade targets are not restricted to pipeline-generated props (for example, an individual foliage instance)"),
 		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Aster_01"), TEXT("Add a small patch of late-summer flowers"), RequestId, Error,
 			InboxPath, TEXT("upgrade"), TEXT("IslandShrubs.Alder_07.Instance_12"), TEXT("variation")));
+	const FString DescriptiveTarget = TEXT("mossy stone tower beside the northern path");
+	TestTrue(TEXT("An untagged visible object can be proposed by a concise description"),
+		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Aster_01"), TEXT("Add a small sheltered perch near the top"), RequestId, Error,
+			InboxPath, TEXT("upgrade"), DescriptiveTarget, TEXT("functionality")));
 	TestTrue(TEXT("A level-wide proposal may omit a single-object target"),
 		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Raven_01"), TEXT("Make the shore more sheltered from the prevailing wind"), RequestId, Error,
 			InboxPath, TEXT("upgrade"), FString(), TEXT("functionality")));
-	TestTrue(TEXT("The review inbox preserves arbitrary object and world-level targets"),
+	TestTrue(TEXT("The review inbox preserves exact, descriptive, and world-level targets"),
 		FFileHelper::LoadFileToString(InboxContents, *InboxPath) &&
 		InboxContents.Contains(TEXT("IslandShrubs.Alder_07.Instance_12")) &&
+		InboxContents.Contains(DescriptiveTarget) &&
 		InboxContents.Contains(TEXT("shore more sheltered from the prevailing wind")));
 
 	const FString LegacyInboxPath = FPaths::Combine(TestDirectory, TEXT("legacy-inbox.jsonl"));

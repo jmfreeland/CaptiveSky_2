@@ -260,6 +260,9 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Upgrade proposals cover any existing world element and the three requested improvement kinds"),
 		SystemPrompt.Contains(TEXT("any existing object or feature in the landscape or level")) &&
 		SystemPrompt.Contains(TEXT("aesthetic")) && SystemPrompt.Contains(TEXT("variation")) && SystemPrompt.Contains(TEXT("functionality")));
+	TestTrue(TEXT("Upgrade proposals can identify an untagged visible object descriptively without inventing a name"),
+		SystemPrompt.Contains(TEXT("describe its visible kind and relative location instead")) &&
+		SystemPrompt.Contains(TEXT("do not invent a proper name")));
 	TestTrue(TEXT("Upgrade proposals remain human-reviewed suggestions that change nothing automatically"),
 		SystemPrompt.Contains(TEXT("request_upgrade")) && SystemPrompt.Contains(TEXT("not permission to change the world")));
 	const FAgentDecision LandDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
@@ -278,6 +281,11 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		UpgradeDecision.UpgradeTarget == TEXT("InnNoticeBoard") &&
 		UpgradeDecision.UpgradeKind == TEXT("functionality") &&
 		UpgradeDecision.UpgradeRequest == TEXT("Add a small weatherproof shelf for messages"));
+	const FAgentDecision DescriptiveUpgradeDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
+		TEXT("{\"thought\":\"The tower could use a perch.\",\"action\":{\"type\":\"request_upgrade\",\"upgrade_target\":\"mossy stone tower beside the northern path\",\"upgrade_kind\":\"functionality\",\"upgrade_request\":\"Add a small sheltered perch near the top\"}}"), Writer);
+	TestTrue(TEXT("The request_upgrade action preserves a descriptive target when no stable identifier is available"),
+		DescriptiveUpgradeDecision.bValid && DescriptiveUpgradeDecision.ActionType == EAgentActionType::RequestUpgrade &&
+		DescriptiveUpgradeDecision.UpgradeTarget == TEXT("mossy stone tower beside the northern path"));
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
 
 	return true;
