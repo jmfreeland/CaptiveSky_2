@@ -21,11 +21,11 @@ The report is local and ignored with the generated pack. Keep the source script 
 
 As of 2026-10-10, the NoticeBoard and StoneLantern are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; the embedded collisions are one box and one convex hull respectively. The StoneLantern emissive slot is assigned, but both props still need an in-editor lighting/material review before either is placed on the Island.
 
-## Fab cache check — European Aspen
+## Fab cache check — Megaplants
 
-The local Fab cache at `D:\Projects - Athena\Unreal\Fab_Cache\VaultCache\FabLibrary\Megaplants__European_Aspen-ffa90e1a\usd\` contains four tree-variant USD files, a foliage USD, and four Dynamic Wind JSON sidecars. Fab metadata identifies the asset as `UE_5.8`, but this download is USD format only: there are no Unreal `.uasset` files or separate image textures in the cached folder. Treat these as import candidates, not as a ready-to-use Unreal pack; the presence of material/shader data in USD does not establish that all referenced textures or the authored Unreal setup are available.
+The local Fab cache currently contains four species families under `D:\Projects - Athena\Unreal\Fab_Cache\VaultCache\FabLibrary\`: Common Hazel, European Aspen, European Beech, and Norway Maple Forest. Each has four A–D tree variants and four Dynamic Wind JSON sidecars. Hazel and Aspen include a `Foliage.usd`; Beech and Norway Maple include a `Branches.usd`. The cache contains USD files and listing metadata/thumbnails only—no Unreal `.uasset` files, FBX files, or separate image textures. The USD files are valid binary USD crates, but their presence does not establish that all material dependencies or the authored Unreal setup are available.
 
-Fab's cached listing describes an Unreal Engine format as well as USD and says the pack uses the Procedural Vegetation Editor and experimental Nanite Foliage workflow. Prefer downloading the Unreal Engine format for UE 5.8 if available in the Fab Vault. Otherwise, test the USD and its dependencies in an isolated import location before adding anything to `/Game` or the Island map. No cache files were modified during this check.
+Each cached Fab listing advertises both USD and Unreal Engine formats, but the selected/cached format is `usd`; only the Aspen metadata explicitly records target `UE_5.8`. Prefer downloading the Unreal Engine format for UE 5.8 if available in the Fab Vault, then validate a representative tree and its wind setup before placement. Otherwise, test the USD and its dependencies in an isolated import location before adding anything to `/Game` or the Island map. This inventory was read-only; no cache files or Unreal assets were changed.
 
 ## Resident proposals
 
