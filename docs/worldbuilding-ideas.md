@@ -290,6 +290,25 @@ Evidence: [wide gameplay frame](../Saved/Playtests/Codex_WorldLifeReview_2026101
 [close-view CSV profile](../Saved/Profiling/CSV/Profile%2820261010_063135%29.csv),
 [wide-view Game log](../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_TideglassOverlook.log).
 
+**Matched stationary Game repeat (2026-10-10, 11:00 Tideglass):** a later
+1600x900 real-D3D12 run used the same five-entry Tideglass motion probe (all
+five views are identical), an isolated world-data root, a playtest-local DDC,
+thinking disabled, zero model requests, and the 120-second cap. After the
+15-second profile delay, 300 frames averaged 19.08 ms; p50 was 15.56 ms and
+p95 28.24 ms (about 35 FPS at p95), narrowly above the 30-FPS floor for this
+one stationary Game composition. Thirteen of 300 frames exceeded 33.3 ms and
+the maximum was 181.85 ms; the largest sample is render-thread-heavy, so the
+p95 does not hide a fully smooth experience. This is not PIE, traversal, or a
+target-hardware guarantee. The repeat confirms the close pool life and foreground
+cover, while showing the same exposed brown far ground, thin tree row, cropped
+inn, and blockout standing stones that the landscape/material pass should
+address. Do not infer that the later profile regressed from the earlier sample:
+they are separate sessions and the hitch cause is not yet identified.
+
+Evidence: [later Game frame](../Saved/Playtests/Codex_TideglassNaturalGame_20261010/Screenshots/002_Tideglass.png),
+[later Game log](../Saved/Logs/Codex_TideglassNaturalGame_20261010_retry.log),
+[300-frame CSV](../Saved/Profiling/CSV/Profile%2820261010_105710%29.csv).
+
 ## 2026-10-10 — Listening Stones gather a little lichen
 
 The three transient standing stones now carry six broader, irregular deep-olive
