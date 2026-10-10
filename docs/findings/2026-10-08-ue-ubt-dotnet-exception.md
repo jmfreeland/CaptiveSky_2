@@ -390,9 +390,31 @@ matching Application error events to a local JSONL file under
 `./Scripts/Watch-UnrealDotnet.ps1`; it runs for up to two hours or until Ctrl+C.
 It changes no system settings. This is process/event correlation, not a crash
 dump: a very short-lived process or an error absent from the Application log
-can still escape capture. Review the local log before sharing it.
-The script passed PowerShell syntax parsing, but its runtime smoke test was
-blocked because the current PowerShell execution policy disables loading
-scripts. No process-scoped or persistent policy override was attempted, so
-runtime logging remains unverified until the user-approved execution method is
-available.
+can still escape capture. Review the local log before sharing it. The script
+was run elevated on 2026-10-10 and successfully recorded live process
+starts/exits and queried Application events.
+
+### Watched build and bounded Game retry (2026-10-10, 10:54–11:00 local)
+
+A standalone Game launch using an isolated writable DDC first failed to reach
+the world-ready marker within its six-minute startup limit while compiling a
+cold cache; the launcher stopped only that process. This was a startup timeout,
+not a reported .NET exception. Retrying with the same cache reached the world
+after 100.7 seconds, then stopped normally at 120.1 seconds with zero model
+requests. A 300-frame CSV profile and two screenshots were produced. The Game
+watcher observed UnrealEditor and its CrashReportClient monitor process, but no
+dotnet process or matching Application error event during that run.
+
+A separately watched UE 5.8.3 `Build.bat CaptiveSky_2Editor Win64 Development`
+invocation launched the engine-bundled .NET 10 `dotnet.exe` and UBT, rebuilt
+six actions, and exited successfully in 24.54 seconds. The watcher recorded
+the bundled executable path and clean process exit, with no matching
+Application error event. The desktop dialog itself was not observable during
+these tests, and an absent event does not rule out an intermittent exception;
+the result is only that these controlled runs did not reproduce a correlatable
+failure.
+
+Evidence: [`UnrealDotnetWatch_20261010_game_retry.jsonl`](../../Saved/Diagnostics/UnrealDotnetWatch_20261010_game_retry.jsonl),
+[`UnrealDotnetWatch_20261010_build.jsonl`](../../Saved/Diagnostics/UnrealDotnetWatch_20261010_build.jsonl),
+[`Codex_TideglassNaturalGame_20261010_retry.log`](../../Saved/Logs/Codex_TideglassNaturalGame_20261010_retry.log),
+and [`Profile(20261010_105710).csv`](../../Saved/Profiling/CSV/Profile(20261010_105710).csv).
