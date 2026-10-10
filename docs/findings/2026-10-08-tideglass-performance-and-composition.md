@@ -544,3 +544,37 @@ Automation logs:
 [`BlockedGroundMoveApproach.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/BlockedGroundMoveApproach.log)
 and
 [`SessionSafety.log`](../../Saved/CompileScratch/Codex_VegetationLayerAudit_20261009/Saved/Tests/Codex_LandmarkApproach_20261009/SessionSafety.log).
+
+### Visibility-aware landmark approach (2026-10-10)
+
+The collision-aware approach could still select a route ending behind scenery:
+navigation and capsule clearance alone did not guarantee that the resident
+could inspect the landmark after arriving. Candidate selection now applies the
+same range, hidden-target, and visibility trace used by normal inspection from
+each proposed body location. The inspection utility exposes that location-based
+check, and the blocked-ground-move automation covers both an occluded side and
+a clear alternate approach.
+
+The editor target rebuilt successfully, and
+`CaptiveSky2.Agent.BlockedGroundMoveApproach` plus
+`CaptiveSky2.Agent.SessionSafety` passed under NullRHI. A real UE 5.8.3 D3D12
+probe then staged around the blocking rock, selected a capsule-clear and
+inspection-visible route (13 candidates qualified), moved 1,097 cm in 4.0
+simulated seconds, and issued Aster's normal ListeningStones interaction. The
+interaction returned its wind-tuned resonance. This landmark was already
+inspected, so the result confirms the normal repeat/cooldown response rather
+than a new discovery. The isolated run exited normally after 42.6 real seconds
+with zero model requests.
+
+Runtime log:
+[`VisibleApproachGame.log`](../../Saved/Playtests/Codex_VisibleApproach_20261010/VisibleApproachGame.log).
+Rendered before/after frames are in
+[`Screenshots`](../../Saved/Playtests/Codex_VisibleApproach_20261010/Screenshots/).
+
+Separately, a Windows dialog again reported `dotnet.exe` with exception
+`0xe0434352`. That code identifies a CLR exception but not the failing
+component. At the time of this run there was no `dotnet.exe` process, matching
+Application/WER event, or per-user `dotnet.exe` crash dump; the Unreal log's
+UBT AutoSDK validation returned 0 and the game exited normally. The repeated
+dialog therefore remains unattributed and is not evidence that this navigation
+change or Unreal run crashed.

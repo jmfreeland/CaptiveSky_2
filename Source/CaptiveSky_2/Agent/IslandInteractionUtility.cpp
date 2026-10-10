@@ -93,10 +93,16 @@ AActor* IslandInteractionUtility::FindNearestVisibleTarget(const AActor* Observe
 
 bool IslandInteractionUtility::CanInspect(const AActor* Observer, const AActor* Target, float MaxRange)
 {
+	return IsValid(Observer) && CanInspectFromLocation(Observer, Target, Observer->GetActorLocation(), MaxRange);
+}
+
+bool IslandInteractionUtility::CanInspectFromLocation(const AActor* Observer, const AActor* Target,
+	const FVector& ObserverLocation, float MaxRange)
+{
 	if (!IsValid(Observer) || !IsValid(Target) || Observer == Target || !Observer->GetWorld() ||
 		Observer->GetWorld() != Target->GetWorld() ||
 		(Target->ActorHasTag(TEXT("IslandLife")) && Target->IsHidden()) ||
-		FVector::DistSquared(Observer->GetActorLocation(), Target->GetActorLocation()) > FMath::Square(FMath::Max(0.f, MaxRange)))
+		FVector::DistSquared(ObserverLocation, Target->GetActorLocation()) > FMath::Square(FMath::Max(0.f, MaxRange)))
 	{
 		return false;
 	}
@@ -108,7 +114,7 @@ bool IslandInteractionUtility::CanInspect(const AActor* Observer, const AActor* 
 	// the ground surface at the actor origin does not occlude an otherwise clear inspection.
 	if (Target->IsA<AIslandArrangement>()) End += FVector(0.f, 0.f, 50.f);
 	FHitResult Hit;
-	return !Observer->GetWorld()->LineTraceSingleByChannel(Hit, Observer->GetActorLocation(), End, ECC_Visibility, Query);
+	return !Observer->GetWorld()->LineTraceSingleByChannel(Hit, ObserverLocation, End, ECC_Visibility, Query);
 }
 
 bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString& OutFact)

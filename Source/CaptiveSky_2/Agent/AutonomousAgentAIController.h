@@ -59,7 +59,7 @@ public:
 		float SpeakingRadius, FNavLocation& OutStart, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Finds a nearby, physically clear complete route for a grounded resident to inspect a landmark. */
 	static bool FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
-		const FVector& MoverLocation, const FVector& TargetLocation, const FNavAgentProperties& AgentProperties,
+		const FVector& MoverLocation, const AActor* Target, const FNavAgentProperties& AgentProperties,
 		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Sweeps a resident capsule along a nav route, allowing walkable landscape contact but rejecting obstacles. */
 	static bool IsCapsulePathPhysicallyClear(const UWorld* World, const UNavigationPath* Path,

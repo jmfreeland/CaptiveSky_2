@@ -9,6 +9,7 @@
 #include "NavigationPath.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandInteractionUtility.h"
 #include "RavenAgentAIController.h"
 #include "IslandTrail.h"
 #include "HAL/PlatformTime.h"
@@ -104,6 +105,10 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Landmark fixture retains its intended target location"), Target->GetActorLocation().Equals(FVector(200.f, 0.f, 0.f)));
 	World->BeginPlay();
 	Controller->Possess(Observer);
+	TestTrue(TEXT("A nearby landmark can be inspected from the observer's current position"),
+		IslandInteractionUtility::CanInspect(Observer, Target));
+	TestTrue(TEXT("A proposed approach can reuse the same clear inspection rule"),
+		IslandInteractionUtility::CanInspectFromLocation(Observer, Target, FVector::ZeroVector));
 
 	auto ReportBlockedMove = [Controller, Target]()
 	{
@@ -145,6 +150,10 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 		Box->RegisterComponent();
 		Occluder->SetActorLocation(FVector(100.f, 0.f, 0.f));
 		Observer->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
+		TestFalse(TEXT("A proposed approach point behind scenery is rejected for inspection"),
+			IslandInteractionUtility::CanInspectFromLocation(Observer, Target, FVector::ZeroVector));
+		TestTrue(TEXT("A clear alternate approach point remains inspectable around that blocker"),
+			IslandInteractionUtility::CanInspectFromLocation(Observer, Target, FVector(0.f, 250.f, 0.f)));
 		ReportBlockedMove();
 		TestTrue(TEXT("A blocked resident behind an occlusion receives the ordinary failure"),
 			Controller->DescribeActionState().Contains(TEXT("Movement did not complete")) &&

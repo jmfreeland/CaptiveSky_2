@@ -229,11 +229,12 @@ bool AAutonomousAgentAIController::IsCapsulePathPhysicallyClear(const UWorld* Wo
 }
 
 bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World,
-	APawn* Pawn, const FVector& MoverLocation, const FVector& TargetLocation,
+	APawn* Pawn, const FVector& MoverLocation, const AActor* Target,
 	const FNavAgentProperties& AgentProperties, FNavLocation& OutGoal, AActor* PathfindingContext)
 {
 	const UCapsuleComponent* Capsule = Pawn ? Pawn->FindComponentByClass<UCapsuleComponent>() : nullptr;
-	if (!Navigation || !World || !Pawn || !Capsule) return false;
+	if (!Navigation || !World || !Pawn || !Capsule || !IsValid(Target) || Target->GetWorld() != World) return false;
+	const FVector TargetLocation = Target->GetActorLocation();
 
 	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
 	FCollisionQueryParams StartOverlapQuery(SCENE_QUERY_STAT(AgentLandmarkSpawnClearance), false, Pawn);
@@ -258,6 +259,8 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 	int32 CompleteRoutes = 0;
 	int32 ClearRoutes = 0;
 	int32 BlockedRoutes = 0;
+	int32 InspectionVisibleRoutes = 0;
+	int32 OccludedRoutes = 0;
 	FVector PreferredApproach = BuildGroundedResidentApproachPoint(Start.Location, TargetLocation);
 	FVector PreferredDirection = PreferredApproach - TargetLocation;
 	PreferredDirection.Z = 0.f;
@@ -315,6 +318,12 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 				continue;
 			}
 			++ClearRoutes;
+			if (!IslandInteractionUtility::CanInspectFromLocation(Pawn, Target, BodyCenter))
+			{
+				++OccludedRoutes;
+				continue;
+			}
+			++InspectionVisibleRoutes;
 			if (Route->GetPathLength() >= BestPathLength) continue;
 
 			OutGoal = CandidateGoal;
@@ -323,8 +332,9 @@ bool AAutonomousAgentAIController::FindGroundedLandmarkApproachGoal(UNavigationS
 		}
 	}
 	UE_LOG(LogAutonomousAgentAI, Log,
-		TEXT("Grounded landmark approach at %s: %d projected, %d in inspection range, %d complete routes, %d capsule-blocked, %d capsule-clear; %s."),
+		TEXT("Grounded landmark approach at %s: %d projected, %d in inspection range, %d complete routes, %d capsule-blocked, %d capsule-clear, %d visibility-blocked, %d inspection-visible; %s."),
 		*TargetLocation.ToCompactString(), ProjectedCandidates, InRangeCandidates, CompleteRoutes, BlockedRoutes, ClearRoutes,
+		OccludedRoutes, InspectionVisibleRoutes,
 		bFoundGoal ? *FString::Printf(TEXT("selected %s at %.0f cm path length"), *OutGoal.Location.ToCompactString(), BestPathLength)
 			: TEXT("no candidate qualified"));
 	return bFoundGoal;
@@ -1089,7 +1099,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 				MoverCharacter->GetCharacterMovement()->IsMovingOnGround();
 			const bool bHasGroundedApproach = bGroundedWalker
 				? FindGroundedLandmarkApproachGoal(NavSys, GetWorld(), ControlledPawn, ControlledPawn->GetActorLocation(),
-					TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal, ControlledPawn)
+					TargetActor, ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal, ControlledPawn)
 				: ProjectGroundedTarget(NavSys, TargetActor->GetActorLocation(), ControlledPawn->GetNavAgentPropertiesRef(), GroundGoal);
 			if (!bHasGroundedApproach)
 			{
