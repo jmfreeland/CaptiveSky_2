@@ -56,15 +56,19 @@ private:
 	float ActivityRemaining = 0.f;
 	float NoticeRemaining = 0.f;
 	float MoveRemaining = 0.f;
+	float ResidentPresenceCheckRemaining = 0.f;
+	float ResidentPresenceCooldownRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bNoticing = false;
+	bool bResidentPresenceNearby = false;
 	bool bStartled = false;
 	bool bResting = false;
 	bool bWaking = false;
 
 	void PlayLoop(UAnimSequence* Animation);
 	void BeginForaging();
+	void CheckForNearbyResident();
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseForageTarget(FVector& OutTarget) const;
 	void StartMove(const FVector& Target, bool bRun);

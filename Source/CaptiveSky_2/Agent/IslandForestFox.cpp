@@ -1,8 +1,10 @@
 #include "IslandForestFox.h"
 
+#include "AgentBrainComponent.h"
 #include "Animation/AnimSequence.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "EngineUtils.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "UObject/ConstructorHelpers.h"
@@ -52,6 +54,58 @@ void AIslandForestFox::BeginPlay()
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
 	BeginForaging();
+}
+
+void AIslandForestFox::CheckForNearbyResident()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	constexpr float NoticeRadius = 600.f;
+	constexpr float RearmRadius = 850.f;
+	constexpr float QuietMovementSpeed = 180.f;
+	bool bResidentWithinRearmRange = false;
+	AActor* QuietResident = nullptr;
+
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* Candidate = *It;
+		if (!IsValid(Candidate) || Candidate == this ||
+			!Candidate->FindComponentByClass<UAgentBrainComponent>())
+			continue;
+
+		const FVector Offset = Candidate->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (DistanceSquared > FMath::Square(RearmRadius)) continue;
+		bResidentWithinRearmRange = true;
+		if (DistanceSquared > FMath::Square(NoticeRadius) ||
+			Candidate->GetVelocity().SizeSquared2D() > FMath::Square(QuietMovementSpeed))
+			continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandForestFoxResidentNotice), false, this);
+		FHitResult Hit;
+		const FVector FoxEye = GetActorLocation() + FVector(0.f, 0.f, 70.f);
+		const FVector ResidentHead = Candidate->GetActorLocation() + FVector(0.f, 0.f, 65.f);
+		if (World->LineTraceSingleByChannel(Hit, FoxEye, ResidentHead, ECC_Visibility, Query) &&
+			Hit.GetActor() != Candidate)
+			continue;
+
+		QuietResident = Candidate;
+		break;
+	}
+
+	if (!bResidentWithinRearmRange) bResidentPresenceNearby = false;
+	if (!QuietResident || bResidentPresenceNearby || bResting || bWaking ||
+		bNoticing || ResidentPresenceCooldownRemaining > 0.f)
+		return;
+
+	// One nearby group earns a single wary look and retreat, with no repeated
+	// response until the residents leave the wider woodland-edge area.
+	if (RespondToQuietObservation(QuietResident->GetActorLocation()))
+	{
+		bResidentPresenceNearby = true;
+		ResidentPresenceCooldownRemaining = 8.f;
+	}
 }
 
 void AIslandForestFox::PlayLoop(UAnimSequence* Animation)
@@ -180,8 +234,15 @@ void AIslandForestFox::SetResting(bool bShouldRest)
 void AIslandForestFox::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (bResting) return;
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
+	ResidentPresenceCooldownRemaining = FMath::Max(0.f, ResidentPresenceCooldownRemaining - Delta);
+	ResidentPresenceCheckRemaining -= Delta;
+	if (ResidentPresenceCheckRemaining <= 0.f)
+	{
+		ResidentPresenceCheckRemaining = 0.35f;
+		CheckForNearbyResident();
+	}
+	if (bResting) return;
 	if (bWaking)
 	{
 		ActivityRemaining -= Delta;

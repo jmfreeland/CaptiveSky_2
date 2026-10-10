@@ -7,6 +7,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Components/SceneComponent.h"
 #include "IslandForestFox.h"
 #include "IslandInteractionUtility.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -54,6 +55,10 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Observer);
 	Observer->AddInstanceComponent(Brain);
 	Brain->RegisterComponent();
+	USceneComponent* ObserverRoot = NewObject<USceneComponent>(Observer, TEXT("ResidentRoot"));
+	Observer->SetRootComponent(ObserverRoot);
+	ObserverRoot->RegisterComponent();
+	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f));
 	TestTrue(TEXT("Nearby residents can perceive the fox as optional independent wildlife"),
 		Brain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("Interact with target WoodlandFox")));
 
@@ -88,7 +93,62 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A nearby observer can inspect without touching the fox"),
 		IslandInteractionUtility::CanInspect(Observer, Fox, 400.f));
 
+	Fox->HomeLocation = Fox->GetActorLocation();
+	Observer->SetActorLocation(FVector(-700.f, 0.f, 0.f));
+	Fox->CheckForNearbyResident();
+	TestFalse(TEXT("A resident outside the six-metre notice radius does not draw a response"), Fox->bNoticing);
+	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f));
+	AStaticMeshActor* SightBlocker = World->SpawnActor<AStaticMeshActor>(
+		FVector(-150.f, 0.f, 65.f), FRotator::ZeroRotator, Spawn);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	TestNotNull(TEXT("A visibility blocker can be staged for the wildlife cue"), SightBlocker);
+	TestNotNull(TEXT("The visibility blocker mesh resolves"), Cube);
+	if (SightBlocker && Cube)
+	{
+		SightBlocker->GetStaticMeshComponent()->SetStaticMesh(Cube);
+		SightBlocker->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		SightBlocker->GetStaticMeshComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
+		SightBlocker->GetStaticMeshComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		SightBlocker->SetActorScale3D(FVector(0.2f, 1.f, 1.f));
+	}
+	Fox->CheckForNearbyResident();
+	TestFalse(TEXT("A wall keeps the fox from reacting to an occluded resident"), Fox->bNoticing);
+	if (SightBlocker) SightBlocker->Destroy();
+	ObserverRoot->ComponentVelocity = FVector(181.f, 0.f, 0.f);
+	Fox->CheckForNearbyResident();
+	TestFalse(TEXT("A brisk resident does not draw a quiet-approach response"), Fox->bNoticing);
+	ObserverRoot->ComponentVelocity = FVector::ZeroVector;
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("An awake fox gives one brief look to a visible, unhurried resident"),
+		Fox->bNoticing && Fox->bResidentPresenceNearby && Fox->NoticeRemaining > 0.f);
+	const float FirstNoticeRemaining = Fox->NoticeRemaining;
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("A resident group cannot restart the same fox glance"),
+		Fox->bNoticing && Fox->NoticeRemaining == FirstNoticeRemaining);
+	Fox->bNoticing = false;
+	Observer->SetActorLocation(FVector(-700.f, 0.f, 0.f));
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("Presence stays latched while a resident remains inside the wider rearm range"),
+		Fox->bResidentPresenceNearby);
+	Observer->SetActorLocation(FVector(-900.f, 0.f, 0.f));
+	Fox->CheckForNearbyResident();
+	TestFalse(TEXT("A resident leaving the woodland-edge range rearms the fox encounter"),
+		Fox->bResidentPresenceNearby);
+	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f));
+	Fox->CheckForNearbyResident();
+	TestFalse(TEXT("The short cooldown prevents an immediate repeat after re-approach"), Fox->bNoticing);
+	Fox->ResidentPresenceCooldownRemaining = 0.f;
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("A later quiet approach can earn another fox glance"),
+		Fox->bNoticing && Fox->bResidentPresenceNearby);
+	Fox->bNoticing = false;
+	Fox->bResidentPresenceNearby = false;
+	Fox->ResidentPresenceCooldownRemaining = 0.f;
+
 	Fox->SetResting(true);
+	Fox->CheckForNearbyResident();
+	TestTrue(TEXT("An awake-resident cue leaves a resting fox undisturbed"),
+		Fox->IsResting() && !Fox->bNoticing);
 	FString Fact;
 	TestTrue(TEXT("Quietly observing a resting fox is a safe inspection"),
 		IslandInteractionUtility::Perform(Observer, Fox, Fact));

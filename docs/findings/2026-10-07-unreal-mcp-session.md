@@ -236,3 +236,17 @@ the exception once access was granted.
 
 Evidence: [sandboxed diagnostic](../../Saved/Logs/Codex_RavenFoxEncounter_Diagnostics_20261010.log),
 [approved run](../../Saved/Logs/Codex_RavenFoxEncounter_Final_20261010.log).
+
+## 2026-10-10 standalone AutoSDK check after another popup
+
+The user supplied the same `0xe0434352` dialog again, now showing instruction
+address `0x00007FF841A2483A`. A fresh read-only Application-log query found no
+matching `dotnet.exe` or .NET Runtime crash event, and no `dotnet.exe`, UBT,
+AutomationTool, or Unreal Editor process was running to correlate with it. In a
+separate approved-access check, the installed UE 5.8.3 `Build.bat
+-Mode=ValidatePlatforms -OutputSDKs -AllPlatforms` completed successfully and
+reported Win64 SDK 10.0.22621.0 valid; the other platforms reported invalid
+because their SDKs are not installed/configured. This confirms that the
+standalone AutoSDK validation path works with approved access now, but it did
+not reproduce the desktop dialog or the editor's full `VerifySdk` launch. The
+managed exception behind this particular popup remains unknown.

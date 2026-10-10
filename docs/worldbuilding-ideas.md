@@ -196,3 +196,14 @@ real seconds and zero model requests. On this RTX 4080 Laptop GPU, a matched
 200-frame Game sample averaged 73 FPS (P95 15.09 ms), above the 30-FPS floor;
 PIE and target-hardware performance still need checking. Details and evidence:
 [woodland fox finding](findings/2026-10-10-woodland-fox.md).
+
+## 2026-10-10 — A quiet resident can meet the woodland fox
+
+An awake fox now briefly notices a nearby resident moving at no more than
+1.8 m/s when the resident is within 6 m and visible. It uses its existing
+look-then-retreat response, remains inside the same 6.5 m home patch, and
+does not repeat while the local resident group stays within 8.5 m. Resting and
+waking foxes remain undisturbed. This is a short wildlife reaction, not speech
+or new conscious agency: it adds no memory, world state or model request.
+`CaptiveSky2.Agent.WoodlandFox` checks the cue, one-shot/rearm behavior, and
+cooldown. Rendered in-world timing and framing still need a bounded Game view.
