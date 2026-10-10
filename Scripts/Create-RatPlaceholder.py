@@ -1,7 +1,7 @@
 """Create /Game/Agents/BP_Rat_Placeholder: a resident body for the rat, cloned from BP_Agent_Placeholder.
 
 Swaps the mesh for SK_Rat_01 (Fox skeleton), scales it to a rat (~0.28), shrinks the capsule and slows the walk,
-(animation is left to the controller; IDLE below is only used by the capture check). Nothing spawns it; the rat's resident folder (docs/residents/Agent_Rat_01) is still a
+(plays the Fox breathing idle in a loop; locomotion animation still needs an AnimBP or controller). Nothing spawns it; the rat's resident folder (docs/residents/Agent_Rat_01) is still a
 draft. Label its actor "Rat", never "Fenrus" (docs/residents/README.md).
   UnrealEditor-Cmd <uproject> -ExecutePythonScript=Scripts/Create-RatPlaceholder.py -RenderOffscreen -NoZen
 """
@@ -41,6 +41,11 @@ try:
     comp.set_editor_property("relative_location", unreal.Vector(0, 0, -half_h - bottom))
     comp.set_editor_property("relative_rotation", unreal.Rotator(roll=0, pitch=0, yaw=90))
     comp.set_editor_property("animation_mode", unreal.AnimationMode.ANIMATION_SINGLE_NODE)
+    data = comp.get_editor_property("animation_data")
+    data.set_editor_property("anim_to_play", unreal.load_asset(IDLE))
+    data.set_editor_property("saved_looping", True)
+    data.set_editor_property("saved_playing", True)
+    comp.set_editor_property("animation_data", data)
     mv = cdo.get_editor_property("character_movement")
     mv.set_editor_property("max_walk_speed", 140.0)
     ea.save_asset(DST)
