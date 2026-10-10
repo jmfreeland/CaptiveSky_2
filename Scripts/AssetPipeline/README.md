@@ -110,7 +110,7 @@ into `Library/Sources/stone_face/` and `.../moss/`. Changing a library texture u
 
 ## Import into Unreal
 
-Use [`docs/asset-import-pipeline.md`](../../docs/asset-import-pipeline.md) and `Scripts/Import-ComfyBlenderAsset.py` to import one local pack into `/Game/Generated/ComfyBlender/<Asset>/` without editing the Island map. The NoticeBoard has been imported and its bounds, five material assignments, and embedded box collision match the manifest in Unreal. Its rendered appearance has not yet been visually reviewed. `Content/` is gitignored and local-only; inspect the imported asset in Unreal before map placement.
+Use [`docs/asset-import-pipeline.md`](../../docs/asset-import-pipeline.md) and `Scripts/Import-ComfyBlenderAsset.py` to import one local pack into `/Game/Generated/ComfyBlender/<Asset>/` without editing the Island map. NoticeBoard and StoneLantern have been imported; their bounds, material assignments, and embedded colliders match their manifests in Unreal. Their rendered appearance has not yet been visually reviewed. `Content/` is gitignored and local-only; inspect imported assets in Unreal before map placement.
 
 ## The well
 
@@ -139,6 +139,6 @@ editable, re-author it as `assets/well.py` with the same builders (it needs a bl
 
 ## Limits (2026-10-10)
 
-- The NoticeBoard import's scale, material assignments, and embedded collision were checked in Unreal; visual appearance has not yet been reviewed. Other generated props remain unimported/unverified.
+- NoticeBoard and StoneLantern imports' scale, material assignments, and embedded collision were checked in Unreal; neither has had an in-editor visual review or map placement. Other generated props remain unimported/unverified.
 - Moss/dampness/per-block variation are baked: no runtime wetness or moss controls. Library textures tile uniformly (planks and straw repeat). Water is a static disc.
 - Collision is coarse (cylinders/boxes). PBR maps are heuristics from one colour image. Meshes are 660 to 8,414 triangles: not tuned for LODs or Nanite settings.

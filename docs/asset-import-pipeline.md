@@ -19,6 +19,8 @@ After import, inspect the `unreal_import.json` report in the selected source pac
 
 The report is local and ignored with the generated pack. Keep the source script and manifest as the editable/golden source; do not hand-edit imported meshes as a substitute. Only place the asset after its appearance, scale, and collision have been reviewed.
 
+As of 2026-10-10, the NoticeBoard and StoneLantern are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; the embedded collisions are one box and one convex hull respectively. The StoneLantern emissive slot is assigned, but both props still need an in-editor lighting/material review before either is placed on the Island.
+
 ## Resident proposals
 
 Residents can use `request_upgrade` for any existing world object or feature, not just props produced by this pipeline: vegetation (including a specific instance), structures, paths, water, lighting, sound, or a broader level feature. A target can be omitted for a genuinely world-wide suggestion. Proposals are appended to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` for human review; the action does not edit an asset, run a generator, import content, or place anything in the level. The proposal's `target`, `upgrade_kind` (`aesthetic`, `variation`, or `functionality`), and concise description are carried through so a human can decide how to fulfill it—via this asset pipeline, a code change, an authored Unreal asset, or no change.
