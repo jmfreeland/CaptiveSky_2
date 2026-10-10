@@ -33,4 +33,14 @@ Each cached Fab listing advertises both USD and Unreal Engine formats, but the s
 
 Residents can use `request_upgrade` for any existing world object or feature, not just props produced by this pipeline: vegetation (including a specific instance), structures, paths, water, lighting, sound, or a broader level feature. A target can be omitted for a genuinely world-wide suggestion. Proposals are appended to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` for human review; the action does not edit an asset, run a generator, import content, or place anything in the level. The proposal's `target`, `upgrade_kind` (`aesthetic`, `variation`, or `functionality`), and concise description are carried through so a human can decide how to fulfill it—via this asset pipeline, a code change, an authored Unreal asset, or no change.
 
+Review resident proposals from the project root with:
+
+```powershell
+python -I Scripts/AssetPipeline/requests.py list
+python -I Scripts/AssetPipeline/requests.py list --all
+python -I Scripts/AssetPipeline/requests.py status <request-id> accepted
+```
+
+`accepted` only records the human decision; it does not invoke ComfyUI, Blender, or Unreal. For an accepted `new_object`, create or adapt a reviewed script under `Scripts/AssetPipeline/assets/`, build it with `make.py`, inspect its exported preview and manifest, and import it separately using the procedure above. For an `upgrade`, decide whether to use this asset pipeline, change code, author an Unreal asset, or decline the proposal; upgrades are not limited to pipeline-generated props. Mark the request `generated` only after the result is actually made, or `declined` if it will not be pursued. The inbox remains a review queue, not an autonomous asset-generation command channel.
+
 `CaptiveSky2.Agent.AssetRequestQueue` now exercises a structure target, a specific foliage-instance target, and a targetless world-level proposal. The focused Unreal 5.8.3 automation test passed on 2026-10-10.
