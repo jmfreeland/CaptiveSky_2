@@ -1,6 +1,6 @@
 # Rat hollow: live Island audit
 
-The requested home is a **hidden fallen-wood hollow**, separate from the Raven's roost. The editor's live MCP endpoint is available on `127.0.0.1:8000`; `/Game/Maps/Island` is loaded.
+The user has confirmed the Rat's first home should be a **hidden fallen-wood hollow**, separate from the Raven's roost. This chooses the shelter concept, not a specific coordinate: the map still needs a concealed, traversable site survey before the Rat or a home marker is placed. The editor's live MCP endpoint is available on `127.0.0.1:8000`; `/Game/Maps/Island` is loaded.
 
 ## What exists now
 
