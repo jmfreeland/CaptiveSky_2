@@ -284,6 +284,21 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A plant description never creates a movement or interaction target"),
 		VisibleSituation.Contains(TEXT("no movement or interaction target")) && !VisibleSituation.Contains(TEXT("move_to target: Cube")));
 
+	UStaticMesh* FlowerMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("flower_04_01"));
+	TestNotNull(TEXT("A transient flower-named mesh can exercise the Island's asset-label rule"), FlowerMesh);
+	Foliage->SetStaticMesh(FlowerMesh);
+	const FString FlowerSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Numbered flower asset IDs are described as wildflowers, not exposed as technical names"),
+		FlowerSituation.Contains(TEXT("patch of wildflowers")) && !FlowerSituation.Contains(TEXT("flower 04 01")));
+
+	UStaticMesh* GroundCoverMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("ground_05_01"));
+	TestNotNull(TEXT("A transient ground-cover mesh can exercise the Island's asset-label rule"), GroundCoverMesh);
+	Foliage->SetStaticMesh(GroundCoverMesh);
+	const FString GroundCoverSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Numbered ground-cover asset IDs are described perceptually"),
+		GroundCoverSituation.Contains(TEXT("patch of low groundcover")) && !GroundCoverSituation.Contains(TEXT("ground 05 01")));
+	Foliage->SetStaticMesh(Cube);
+
 	AActor* Occluder = World->SpawnActor<AActor>(FVector(150.f, 0.f, 25.f), FRotator::ZeroRotator, Spawn);
 	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
 	Occluder->SetRootComponent(OccluderBox);

@@ -57,6 +57,23 @@ namespace
 			Tendencies.Emplace(Tendency.Name, Tendency.Strength);
 		return AgentModelTier::FormatEvolvingTendencies(Tendencies);
 	}
+
+	FString DescribeVegetationMesh(const UStaticMesh& Mesh)
+	{
+		const FString Name = Mesh.GetName();
+		const FString LowerName = Name.ToLower();
+		const FString LowerPath = Mesh.GetPathName().ToLower();
+		if (LowerPath.Contains(TEXT("/flowermesh/")) || LowerName.StartsWith(TEXT("flower_"))) return TEXT("wildflowers");
+		if (LowerPath.Contains(TEXT("/groundplantmesh/")) || LowerName.StartsWith(TEXT("ground_"))) return TEXT("low groundcover");
+		if (LowerPath.Contains(TEXT("/pn_interactivespruceforest/")) || LowerName.StartsWith(TEXT("spruce_"))) return TEXT("spruce trees");
+		if (LowerName.StartsWith(TEXT("festuca_")) || LowerName.StartsWith(TEXT("phalaris_"))) return TEXT("grasses");
+
+		FString DisplayName = Name;
+		DisplayName.RemoveFromStart(TEXT("SM_"));
+		DisplayName.RemoveFromStart(TEXT("SKM_"));
+		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
+		return DisplayName + TEXT(" vegetation");
+	}
 }
 
 UAgentBrainComponent::UAgentBrainComponent()
@@ -658,10 +675,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 				if (!bFoundVisibleInstance) continue;
 
-				FString DisplayName = Mesh->GetName();
-				DisplayName.RemoveFromStart(TEXT("SM_"));
-				DisplayName.RemoveFromStart(TEXT("SKM_"));
-				DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
+				FString DisplayName = DescribeVegetationMesh(*Mesh);
 				const FName MeshName = Mesh->GetFName();
 				FNearbyPlantPatch* ExistingPatch = NearbyPlantPatches.FindByPredicate(
 					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });
@@ -690,7 +704,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const TCHAR* RelativeDirection = FMath::Abs(RightDot) > FMath::Abs(ForwardDot)
 				? (RightDot >= 0.f ? TEXT("to your right") : TEXT("to your left"))
 				: (ForwardDot >= 0.f ? TEXT("ahead of you") : TEXT("behind you"));
-			NearbyBeings += FString::Printf(TEXT(" In clear view, a nearby patch of %s vegetation is about %.0f metres %s. If you choose request_upgrade, describe this patch and its relative location; it has no movement or interaction target."),
+			NearbyBeings += FString::Printf(TEXT(" In clear view, a nearby patch of %s is about %.0f metres %s. If you choose request_upgrade, describe this patch and its relative location; it has no movement or interaction target."),
 				*Patch.DisplayName, FMath::Sqrt(Patch.DistanceSquared) / 100.f, RelativeDirection);
 		}
 
