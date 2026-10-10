@@ -1548,7 +1548,7 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	USceneComponent* HeadPivot = nullptr;
 	USceneComponent* LeftWingPivot = nullptr;
 	USceneComponent* RightWingPivot = nullptr;
-	UInstancedStaticMeshComponent* CarriedTwigs = nullptr;
+	UProceduralMeshComponent* CarriedTwigs = nullptr;
 	USkeletalMeshComponent* RiggedCrow = Controller->RiggedCrowBody.Get();
 	TArray<UProceduralMeshComponent*> WingMeshes;
 	Raven->GetComponents<UProceduralMeshComponent>(WingMeshes);
@@ -1566,8 +1566,9 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		if (Component->GetName() == TEXT("RavenHeadPivot")) HeadPivot = Component;
 		if (Component->GetName() == TEXT("RavenLeftWingPivot")) LeftWingPivot = Component;
 		if (Component->GetName() == TEXT("RavenRightWingPivot")) RightWingPivot = Component;
-		if (Component->GetName() == TEXT("RavenCarriedTwigs")) CarriedTwigs = Cast<UInstancedStaticMeshComponent>(Component);
+		if (Component->GetName() == TEXT("RavenCarriedTwigs")) CarriedTwigs = Cast<UProceduralMeshComponent>(Component);
 	}
+	FProcMeshSection* CarriedTwigSection = CarriedTwigs ? CarriedTwigs->GetProcMeshSection(0) : nullptr;
 	const bool bVisualReady = bUsingRiggedCrow
 		? (TestNotNull(TEXT("The optional rigged Crow mesh is being used for Raven"), RiggedCrow) &&
 			TestNotNull(TEXT("The rigged Crow idle animation resolved"), Controller->CrowIdleAnimation.Get()) &&
@@ -1579,7 +1580,8 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 			TestNotNull(TEXT("The procedural fallback has a right wing"), RightWing) &&
 			TestNotNull(TEXT("The left procedural wing has an animated pivot"), LeftWingPivot) &&
 			TestNotNull(TEXT("The right procedural wing has an animated pivot"), RightWingPivot));
-	if (!bVisualReady || !TestNotNull(TEXT("The beak has a hidden, instanced twig bundle ready to show on gather"), CarriedTwigs))
+	if (!bVisualReady || !TestNotNull(TEXT("The beak has a hidden procedural twig bundle ready to show on gather"), CarriedTwigs) ||
+		!TestNotNull(TEXT("The beak's procedural twig bundle has a mesh section"), CarriedTwigSection))
 	{
 		Controller->UnPossess();
 		Raven->Destroy();
@@ -1621,7 +1623,9 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 	}
 	const FRotator LeftRest = LeftWingPivot ? LeftWingPivot->GetRelativeRotation() : FRotator::ZeroRotator;
 	const FRotator RightRest = RightWingPivot ? RightWingPivot->GetRelativeRotation() : FRotator::ZeroRotator;
-	TestEqual(TEXT("The beak bundle contains three collisionless twigs"), CarriedTwigs->GetInstanceCount(), 3);
+	TestTrue(TEXT("The hidden beak bundle contains tapered, collisionless twig geometry"),
+		CarriedTwigSection->ProcVertexBuffer.Num() >= 60 && CarriedTwigSection->ProcIndexBuffer.Num() > 0 &&
+		!CarriedTwigSection->bEnableCollision);
 	TestFalse(TEXT("The beak is empty before gathering"), CarriedTwigs->IsVisible());
 
 	const FIntPoint CaptureSize(1280, 720);
@@ -1766,8 +1770,8 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		{
 			const float BodyTurn = FMath::Abs(FMath::FindDeltaAngleDegrees(
 				Controller->RiggedCrowRestRotation.Yaw, RiggedCrow->GetRelativeRotation().Yaw));
-			TestTrue(TEXT("The imported Crow visibly turns toward Aster without moving its actor"),
-				BodyTurn > 3.f && BodyTurn <= 12.f &&
+			TestTrue(TEXT("The imported Crow makes a readable turn toward Aster without moving its actor"),
+				BodyTurn >= 12.f && BodyTurn <= 18.f &&
 				Raven->GetActorLocation().Equals(ForageGround + FVector(0.f, 0.f,
 					Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), 0.1f));
 		}
@@ -1928,15 +1932,22 @@ bool FIslandRavenWingCaptureTest::RunTest(const FString& Parameters)
 		CarriedTwigs->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !CarriedTwigs->CanEverAffectNavigation());
 	if (RiggedCrow)
 	{
-		FTransform FirstTwigWorld;
-		CarriedTwigs->GetInstanceTransform(0, FirstTwigWorld, true);
 		const FTransform CarrySocketWorld = RiggedCrow->GetSocketTransform(CarriedTwigs->GetAttachSocketName(), RTS_World);
-		const FVector TwigOffsetFromHead = FirstTwigWorld.GetLocation() - CarrySocketWorld.GetLocation();
-		TestTrue(TEXT("The carried twig bundle sits ahead of and slightly below the Crow's head"),
-			FVector::DotProduct(TwigOffsetFromHead, Raven->GetActorForwardVector()) > 10.f && TwigOffsetFromHead.Z < 0.f);
-		AddInfo(FString::Printf(TEXT("Twig anchor socket=%s firstInstanceWorld=%s offsetFromSocket=%s"),
-			*CarriedTwigs->GetAttachSocketName().ToString(), *FirstTwigWorld.GetLocation().ToCompactString(),
-			*TwigOffsetFromHead.ToCompactString()));
+		float FurthestTwigProjection = TNumericLimits<float>::Lowest();
+		float LowestTwigOffset = TNumericLimits<float>::Max();
+		for (const FProcMeshVertex& TwigVertex : CarriedTwigSection->ProcVertexBuffer)
+		{
+			const FVector TwigWorld = CarriedTwigs->GetComponentTransform().TransformPosition(TwigVertex.Position);
+			const FVector TwigOffsetFromHead = TwigWorld - CarrySocketWorld.GetLocation();
+			FurthestTwigProjection = FMath::Max(FurthestTwigProjection,
+				FVector::DotProduct(TwigOffsetFromHead, Raven->GetActorForwardVector()));
+			LowestTwigOffset = FMath::Min(LowestTwigOffset, TwigOffsetFromHead.Z);
+		}
+		TestTrue(TEXT("The carried twig bundle extends ahead of and below the Crow's head"),
+			FurthestTwigProjection > 10.f && LowestTwigOffset < 0.f);
+		AddInfo(FString::Printf(TEXT("Twig anchor socket=%s meshOriginWorld=%s maxForward/lowestZ=%s"),
+			*CarriedTwigs->GetAttachSocketName().ToString(), *CarriedTwigs->GetComponentLocation().ToCompactString(),
+			*FVector(FurthestTwigProjection, 0.f, LowestTwigOffset).ToCompactString()));
 	}
 	TestTrue(TEXT("Carried twig screenshot is saved"), SavePose(TEXT("04_CarryingTwigs.png")));
 	AAutonomousAgentCharacter* DistantAster = Island->SpawnActor<AAutonomousAgentCharacter>(

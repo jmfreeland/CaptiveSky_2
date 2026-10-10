@@ -718,7 +718,7 @@ void ARavenAgentAIController::UpdateHeadAnimation(float DeltaSeconds)
 			FocusLocation - Raven->GetActorLocation()).GetSafeNormal();
 		FRotator FocusOffset = LocalDirection.Rotation();
 		FocusOffset.Pitch = FMath::Clamp(FocusOffset.Pitch, -5.f, 5.f);
-		FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -12.f, 12.f);
+		FocusOffset.Yaw = FMath::ClampAngle(FocusOffset.Yaw, -18.f, 18.f);
 		const float Elapsed = AttentionDuration - AttentionRemaining;
 		const float AttentionAlpha = FMath::SmoothStep(0.f, FadeInSeconds, Elapsed) *
 			(1.f - FMath::SmoothStep(FadeOutSeconds, AttentionDuration, Elapsed));

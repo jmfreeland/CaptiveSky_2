@@ -210,3 +210,15 @@ cooldown. While the glance is active, a nearby resident's existing situation
 summary now reports the brief look but explicitly avoids inferring intent; the
 fact disappears when the look ends and does not add memory or a thought request.
 Rendered in-world timing and framing still need a bounded Game view.
+
+## 2026-10-10 — A clearer quiet glance on the imported Crow
+
+The imported Crow's short attention pose can now turn up to 18 degrees instead
+of 12; the procedural Raven keeps its 20-degree range. Timing, priority,
+movement and model-request behavior are unchanged. The UE 5.8.3 real-D3D12
+`CaptiveSky2.Visual.RavenWingMotion` capture passed and checks the imported
+Crow's turn while the actor stays still; the bounded headless
+`CaptiveSky2.Agent.RavenPerch` regression passed too, with zero model requests.
+The close capture is still framed against the pale Crow/mannequin blockout, so
+normal-distance readability in the planted world remains to be judged. Details:
+[attention readability finding](findings/2026-10-10-raven-attention-readability.md).
