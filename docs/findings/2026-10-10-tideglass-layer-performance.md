@@ -37,3 +37,34 @@ Next, repeat the full-cover and `meadowunderstory` cases as a matched standalone
 - Woodland-only log: [`Codex_Tideglass_WoodlandOnly_20261010.log`](../../Saved/Logs/Codex_Tideglass_WoodlandOnly_20261010.log)
 - Meadow + trees log: [`Codex_Tideglass_MeadowTrees_20261010.log`](../../Saved/Logs/Codex_Tideglass_MeadowTrees_20261010.log)
 - Meadow + understory log: [`Codex_Tideglass_MeadowUnderstory_20261010.log`](../../Saved/Logs/Codex_Tideglass_MeadowUnderstory_20261010.log); [frame](../../Saved/Viewpoints/2026-10-10_165853_h11.0/02_Tideglass.png)
+
+## Bounded 17:00 standalone Game visual recheck (2026-10-10)
+
+After a sandboxed attempt remained in Turnkey before loading the Island, a
+separate elevated launch reached the saved Island and completed a 90.1-second
+real-time Game session. The spectator stayed at the Tideglass establishing
+camera; four 1600×900 frames were captured as Island time advanced from 17:00
+to 17:17. Agent thinking and Python were disabled, the world-data root was
+isolated under the playtest folder, and the session ended normally with zero
+model requests. The first frame still displayed a shader-preparation overlay;
+the later three are usable visual evidence.
+
+The late-afternoon water, moving stag, and dragonflies give the clearing some
+life, but the composition still has an overgrown foreground, a broad brown
+middle distance, sparse thin tree silhouettes, a dark/flat-looking pool surface,
+and conspicuous stacked stone proxies. This suggests the next visual pass
+should add varied, readable woodland masses in the mid-distance, open a clear
+approach to the pool, and replace or improve the proxy landmarks—not increase
+global foliage density. This was a static spectator view, not an FPS profile,
+PIE traversal, or test of resident agency; no CSV was captured. The successful
+retry does not diagnose the previously observed .NET application error.
+
+The log also reports failed `WaterBrushManager` SceneCapture-component outers
+and 15 materials missing `InstancedStaticMeshes` usage (13 Rhodo Ever instances,
+StarterContent `M_Rock`, and `M_Wood_Oak`), which therefore fall back to the
+Default Material in Game. These are warnings to audit with the Content owner,
+not proof that they caused the visual composition or startup behavior.
+
+Evidence: [clean late frame](../../Saved/Playtests/Codex_TideglassLiveliness_20261010_Elevated/Screenshots/004_Tideglass.png),
+[initial shader-preparation frame](../../Saved/Playtests/Codex_TideglassLiveliness_20261010_Elevated/Screenshots/001_Tideglass.png),
+[standalone Game log](../../Saved/Logs/Codex_TideglassLiveliness_20261010_Elevated.log).

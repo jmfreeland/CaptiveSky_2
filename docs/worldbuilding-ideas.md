@@ -340,3 +340,18 @@ placeholder-looking close dragonfly. Next: repeat full cover and
 meadow+understory as matched standalone Game and PIE profiles with other
 graphics workloads closed, then inspect a GPU trace before changing counts or
 materials. See the [full capture and limits](findings/2026-10-10-tideglass-layer-performance.md).
+
+**17:00 standalone Game visual recheck (2026-10-10):** four bounded frames at
+the same Tideglass spectator camera show the actual golden-hour pool, a moving
+stag, and active dragonflies. The late frame also confirms the continuing
+composition problem: tangled foreground, open brown mid-distance, sparse thin
+tree silhouettes, and conspicuous stacked-stone proxies. Treat this as visual
+evidence only—the 90-second run had no CSV, PIE traversal, or resident thinking
+(zero model requests). It reached the Island only on an elevated retry after a
+sandboxed launch stalled in Turnkey; this does not explain the recurring .NET
+dialog. The Game log reports 15 foliage/prop materials falling back to Default
+Material because their `InstancedStaticMeshes` usage flag is missing. Next:
+coordinate the imported-material fix with the Content owner, then build habitat
+depth with distinct mid-distance woodland groups and a clear pool approach;
+recheck the same Game view and PIE separately. See the [capture notes and
+limits](findings/2026-10-10-tideglass-layer-performance.md#bounded-1700-standalone-game-visual-recheck-2026-10-10).
