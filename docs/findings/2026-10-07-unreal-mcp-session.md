@@ -220,3 +220,19 @@ returned 0 and the session shut down normally after 60.1 seconds with zero
 model requests. The current exception's managed stack and owner remain
 unidentified; the next useful evidence is a fresh process/command line at the
 moment of another reproduction, without changing firewall settings blindly.
+
+## 2026-10-10 — Controlled AutoSDK correlation during wildlife automation
+
+While validating the Raven–fox encounter in a scratch Unreal project, a
+sandboxed `UnrealEditor-Cmd` startup logged `UBT AutoSDK ReturnCode:
+-532462766` (the signed 32-bit form of `0xE0434352`) and
+`LogWindows: Warning: CreateProc failed: Access is denied`. Re-running the same
+bounded automation with approved access to Unreal's per-user build-log path
+returned AutoSDK code `0` and the `RavenPerch` test passed. This strengthens the
+correlation between the recurring popup signature and sandbox-denied UBT
+platform validation for that launch. It does not identify the managed stack or
+prove that every popup comes from this path; the controlled run did not reproduce
+the exception once access was granted.
+
+Evidence: [sandboxed diagnostic](../../Saved/Logs/Codex_RavenFoxEncounter_Diagnostics_20261010.log),
+[approved run](../../Saved/Logs/Codex_RavenFoxEncounter_Final_20261010.log).

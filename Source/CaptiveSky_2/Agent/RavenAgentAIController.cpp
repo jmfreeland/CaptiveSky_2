@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "IslandDew.h"
+#include "IslandForestFox.h"
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
@@ -1183,55 +1184,83 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 	constexpr float NoticeRadius = 500.f;
 	constexpr float ForgetRadius = 700.f;
 	constexpr float MaximumHeightDifference = 250.f;
-	bool bStagRemainsNearby = false;
-	AIslandForestStag* ClosestEligibleStag = nullptr;
+	bool bWildlifeRemainsNearby = false;
+	AActor* ClosestEligibleWildlife = nullptr;
 	float ClosestDistanceSquared = FMath::Square(NoticeRadius);
-	FVector ClosestStagAttentionLocation = FVector::ZeroVector;
+	FVector ClosestWildlifeAttentionLocation = FVector::ZeroVector;
+	bool bClosestIsFox = false;
+	auto IsVisibleFromRaven = [this, Raven](AActor* Wildlife, const FVector& WildlifeHead)
+	{
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenWildlifeAttention), false, Raven);
+		Query.AddIgnoredActor(Wildlife);
+		FHitResult Hit;
+		const FVector RavenEye = Raven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
+		return !GetWorld()->LineTraceSingleByChannel(Hit, RavenEye, WildlifeHead, ECC_Visibility, Query) ||
+			Hit.GetActor() == Wildlife;
+	};
 	for (TActorIterator<AIslandForestStag> It(GetWorld()); It; ++It)
 	{
 		AIslandForestStag* Stag = *It;
 		if (!IsValid(Stag)) continue;
 		const FVector Offset = Stag->GetActorLocation() - Raven->GetActorLocation();
 		const float DistanceSquared = Offset.SizeSquared2D();
+		const TWeakObjectPtr<AActor> StagWeak(Stag);
 		if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+		{
+			NoticedWildlifeInNearbyGroup.Remove(StagWeak);
 			continue;
-
-		bStagRemainsNearby = true;
-		const TWeakObjectPtr<AIslandForestStag> StagWeak(Stag);
+		}
+		bWildlifeRemainsNearby = true;
 		if (DistanceSquared > FMath::Square(NoticeRadius) || !Stag->IsQuietlyNoticingResident() ||
 			NoticedWildlifeInNearbyGroup.Contains(StagWeak) ||
-			(ClosestEligibleStag && DistanceSquared >= ClosestDistanceSquared))
+			(ClosestEligibleWildlife && DistanceSquared >= ClosestDistanceSquared))
 		{
 			continue;
 		}
 
-		FCollisionQueryParams Query(SCENE_QUERY_STAT(RavenWildlifeAttention), false, Raven);
-		Query.AddIgnoredActor(Stag);
-		FHitResult Hit;
-		const FVector RavenEye = Raven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
 		const FVector StagHead = Stag->GetActorLocation() + FVector(0.f, 0.f, 85.f);
-		if (GetWorld()->LineTraceSingleByChannel(Hit, RavenEye, StagHead, ECC_Visibility, Query) &&
-			Hit.GetActor() != Stag)
+		if (!IsVisibleFromRaven(Stag, StagHead)) continue;
+		ClosestEligibleWildlife = Stag;
+		ClosestDistanceSquared = DistanceSquared;
+		ClosestWildlifeAttentionLocation = StagHead;
+	}
+
+	for (TActorIterator<AIslandForestFox> It(GetWorld()); It; ++It)
+	{
+		AIslandForestFox* Fox = *It;
+		if (!IsValid(Fox)) continue;
+		const FVector Offset = Fox->GetActorLocation() - Raven->GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const TWeakObjectPtr<AActor> FoxWeak(Fox);
+		if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+		{
+			NoticedWildlifeInNearbyGroup.Remove(FoxWeak);
+			continue;
+		}
+		bWildlifeRemainsNearby = true;
+		if (DistanceSquared > FMath::Square(NoticeRadius) || !Fox->CanRespondToQuietObservation() ||
+			NoticedWildlifeInNearbyGroup.Contains(FoxWeak) ||
+			(ClosestEligibleWildlife && DistanceSquared >= ClosestDistanceSquared))
 		{
 			continue;
 		}
 
-		ClosestEligibleStag = Stag;
+		const FVector FoxHead = Fox->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+		if (!IsVisibleFromRaven(Fox, FoxHead) || !Fox->RespondToQuietObservation(Raven->GetActorLocation())) continue;
+		ClosestEligibleWildlife = Fox;
 		ClosestDistanceSquared = DistanceSquared;
-		ClosestStagAttentionLocation = StagHead;
+		ClosestWildlifeAttentionLocation = FoxHead;
+		bClosestIsFox = true;
 	}
 
-	if (!bStagRemainsNearby)
-	{
-		NoticedWildlifeInNearbyGroup.Reset();
-		return;
-	}
-
-	if (!ClosestEligibleStag) return;
-	NoticedWildlifeInNearbyGroup.Add(ClosestEligibleStag);
-	WildlifeAttentionTarget = ClosestEligibleStag;
-	WildlifeAttentionLocation = ClosestStagAttentionLocation;
+	if (!bWildlifeRemainsNearby) NoticedWildlifeInNearbyGroup.Reset();
+	if (!ClosestEligibleWildlife) return;
+	NoticedWildlifeInNearbyGroup.Add(TWeakObjectPtr<AActor>(ClosestEligibleWildlife));
+	WildlifeAttentionTarget = ClosestEligibleWildlife;
+	WildlifeAttentionLocation = ClosestWildlifeAttentionLocation;
 	WildlifeAttentionRemaining = WildlifeAttentionDuration;
+	if (bClosestIsFox)
+		UE_LOG(LogRavenAgentAI, VeryVerbose, TEXT("The perched Raven quietly noticed a foraging fox and the fox began a short retreat."));
 }
 
 void ARavenAgentAIController::UpdateCarriedTwigVisual()
@@ -2108,18 +2137,22 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 	CrabScurryAttentionRemaining = FMath::Max(0.f, CrabScurryAttentionRemaining - SafeDelta);
 	if (WildlifeAttentionRemaining > 0.f)
 	{
-		AIslandForestStag* AttendedStag = WildlifeAttentionTarget.Get();
+		AActor* AttendedWildlife = WildlifeAttentionTarget.Get();
 		const bool bSettled = LocomotionState == ERavenLocomotionState::Grounded ||
 			LocomotionState == ERavenLocomotionState::Perched;
-		bool bWildlifeStillEligible = IsValid(AttendedStag) && AttendedStag->IsQuietlyNoticingResident() &&
-			bSettled && !IsResting();
+		bool bWildlifeStillEligible = false;
+		if (AIslandForestStag* AttendedStag = Cast<AIslandForestStag>(AttendedWildlife))
+			bWildlifeStillEligible = AttendedStag->IsQuietlyNoticingResident();
+		else if (AIslandForestFox* AttendedFox = Cast<AIslandForestFox>(AttendedWildlife))
+			bWildlifeStillEligible = AttendedFox->IsRespondingToQuietObserver();
+		bWildlifeStillEligible = bWildlifeStillEligible && bSettled && !IsResting();
 		if (bWildlifeStillEligible)
 		{
-			const FVector Offset = AttendedStag->GetActorLocation() - Raven->GetActorLocation();
+			const FVector Offset = AttendedWildlife->GetActorLocation() - Raven->GetActorLocation();
 			bWildlifeStillEligible = FMath::Abs(Offset.Z) <= 250.f && Offset.SizeSquared2D() <= FMath::Square(700.f);
 			if (bWildlifeStillEligible)
 			{
-				WildlifeAttentionLocation = AttendedStag->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+				WildlifeAttentionLocation = AttendedWildlife->GetActorLocation() + FVector(0.f, 0.f, 85.f);
 			}
 		}
 		if (!bWildlifeStillEligible)

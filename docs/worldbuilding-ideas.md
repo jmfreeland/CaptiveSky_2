@@ -173,3 +173,13 @@ When a settled Raven is within 5 m and clear sight of a stag's existing calm, te
 ## 2026-10-09 — The Raven can forage nest twigs from storm driftwood
 
 Fresh, unturned shore driftwood now offers the Raven an optional close-range source of one small twig bundle when no existing ground-pile source is available. It must land, see and approach the piece; gathering removes that larger driftwood from the shared shore ledger and is persisted before the bundle is granted. Turned discoveries, other wrack types and failed saves remain untouched. The existing Raven shore cue offers the possibility without choosing for the bird; no extra tick or model request is added. UE 5.8.3 build and three isolated wrack/Raven automation cases passed with thinking disabled and zero requests. The tests prove action and ledger behavior, not autonomous travel or natural gameplay framing; those remain the next real-RHI check. See [Raven storm-wrack foraging](findings/2026-10-09-raven-wrack-foraging.md).
+
+## 2026-10-10 — A quiet Raven–fox encounter
+
+Within 5 m and clear sight, a settled Raven can briefly return the look of an
+awake fox. The fox pauses, then retreats a short distance within its woodland
+patch; resting foxes are left undisturbed. The cue adds no model request,
+movement by the Raven, memory, or persistent state. The isolated `RavenPerch`
+automation passed with a zero-request cap. The regression is deterministic and
+does not yet establish how naturally or visibly this exchange occurs in normal
+play; see [the encounter finding](findings/2026-10-10-raven-fox-encounter.md).

@@ -18,6 +18,10 @@ public:
 
 	/** The fox notices a nearby quiet observer, then trots a short way toward cover. */
 	bool RespondToQuietObservation(const FVector& ObserverLocation);
+	/** Resting and waking foxes are not available for a brief wildlife response. */
+	bool CanRespondToQuietObservation() const { return !bResting && !bWaking; }
+	/** True only during the brief look toward a nearby observer, before retreating. */
+	bool IsRespondingToQuietObserver() const { return bNoticing; }
 	/** The woodland schedule rests the fox through daylight and wakes it after dusk. */
 	void SetResting(bool bShouldRest);
 	bool IsResting() const { return bResting; }
@@ -30,6 +34,7 @@ protected:
 
 private:
 	friend class FIslandForestFoxTest;
+	friend class FRavenPerchTest;
 
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<USkeletalMeshComponent> FoxMesh;

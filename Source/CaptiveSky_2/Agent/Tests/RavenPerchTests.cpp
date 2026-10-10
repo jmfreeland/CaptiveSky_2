@@ -9,6 +9,7 @@
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
 #include "IslandDew.h"
+#include "IslandForestFox.h"
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
@@ -29,6 +30,7 @@
 #include "Engine/SceneCapture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/Texture.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "HAL/FileManager.h"
@@ -854,6 +856,89 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			QuietlyNoticingStag->Destroy();
 			BlueprintController->WildlifeAttentionRemaining = 0.f;
 		}
+		AStaticMeshActor* FoxGround = World->SpawnActor<AStaticMeshActor>(
+			RavenLocationBeforeWildlifeGlance + FVector(450.f, 0.f, -102.f), FRotator::ZeroRotator);
+		if (FoxGround)
+		{
+			if (UStaticMesh* Plane = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane")))
+			{
+				FoxGround->GetStaticMeshComponent()->SetStaticMesh(Plane);
+				FoxGround->SetActorScale3D(FVector(20.f, 20.f, 1.f));
+			}
+		}
+		AIslandForestFox* SleepingFox = World->SpawnActor<AIslandForestFox>(
+			RavenLocationBeforeWildlifeGlance + FVector(350.f, 0.f, -100.f), FRotator::ZeroRotator);
+		TestNotNull(TEXT("A sleeping fox can be staged near the settled Raven"), SleepingFox);
+		if (SleepingFox)
+		{
+			SleepingFox->HomeLocation = SleepingFox->GetActorLocation();
+			SleepingFox->SetResting(true);
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestFalse(TEXT("The Raven leaves a resting fox undisturbed"), BlueprintController->IsShowingDirectedAttention());
+			TestFalse(TEXT("A resting fox does not begin an observer response"), SleepingFox->IsRespondingToQuietObserver());
+			AIslandForestFox* ForagingFox = World->SpawnActor<AIslandForestFox>(
+				RavenLocationBeforeWildlifeGlance + FVector(300.f, 400.f, -100.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("An awake fox can be staged within the quiet-observation range"), ForagingFox);
+			if (ForagingFox)
+			{
+				ForagingFox->HomeLocation = ForagingFox->GetActorLocation();
+				const FVector FoxLocationBeforeNotice = ForagingFox->GetActorLocation();
+				FVector FoxGroundProbe = FVector::ZeroVector;
+				TestTrue(TEXT("The encounter fixture provides traceable ground for the fox"),
+					ForagingFox->FindGround(FoxLocationBeforeNotice, FoxGroundProbe));
+				TestTrue(TEXT("An awake fox accepts a quiet observer"), ForagingFox->CanRespondToQuietObservation());
+				const FVector FoxOffsetFromRaven = ForagingFox->GetActorLocation() - BlueprintRaven->GetActorLocation();
+				TestTrue(TEXT("The staged fox is inside the Raven's 5 m notice range"),
+					FoxOffsetFromRaven.SizeSquared2D() <= FMath::Square(500.f) && FMath::Abs(FoxOffsetFromRaven.Z) <= 250.f);
+				FCollisionQueryParams FoxSightQuery(SCENE_QUERY_STAT(RavenWildlifeAttentionTest), false, BlueprintRaven);
+				FoxSightQuery.AddIgnoredActor(ForagingFox);
+				FHitResult FoxSightHit;
+				const FVector RavenEye = BlueprintRaven->GetActorLocation() + FVector(0.f, 0.f, 75.f);
+				const FVector FoxHead = ForagingFox->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+				const bool bFoxSightBlocked = World->LineTraceSingleByChannel(
+					FoxSightHit, RavenEye, FoxHead, ECC_Visibility, FoxSightQuery);
+				TestTrue(TEXT("The awake fox has an unobstructed visibility trace from the Raven"),
+					!bFoxSightBlocked || FoxSightHit.GetActor() == ForagingFox);
+				BlueprintController->CheckForNearbyWildlifePresence();
+				TestTrue(TEXT("A settled Raven notices the nearer awake fox rather than the sleeping one"),
+					BlueprintController->WildlifeAttentionTarget.Get() == ForagingFox &&
+					BlueprintController->WildlifeAttentionRemaining > 1.5f);
+				TestTrue(TEXT("The fox briefly looks toward the Raven before retreating"),
+					ForagingFox->IsRespondingToQuietObserver() && !ForagingFox->bMoving);
+				USceneComponent* FoxAttentionVisual = BlueprintHeadPivot
+					? static_cast<USceneComponent*>(BlueprintHeadPivot)
+					: static_cast<USceneComponent*>(BlueprintRiggedCrow);
+				const FRotator FoxAttentionRest = BlueprintHeadPivot
+					? BlueprintController->RavenHeadRestRotation
+					: BlueprintController->RiggedCrowRestRotation;
+				if (FoxAttentionVisual) FoxAttentionVisual->SetRelativeRotation(FoxAttentionRest);
+				BlueprintController->Tick(0.25f);
+				if (FoxAttentionVisual)
+				{
+					const float FoxGlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+						FoxAttentionRest.Yaw, FoxAttentionVisual->GetRelativeRotation().Yaw));
+					TestTrue(TEXT("The Raven's actual head rig follows the fox's brief response"),
+						FoxGlanceYaw > 3.f && FoxGlanceYaw <= 25.f);
+				}
+				TestTrue(TEXT("The Raven remains settled during the wildlife exchange"),
+					BlueprintRaven->GetActorLocation().Equals(RavenLocationBeforeWildlifeGlance, 0.1f));
+				TestTrue(TEXT("The first look does not move the fox before its response pause ends"),
+					ForagingFox->GetActorLocation().Equals(FoxLocationBeforeNotice, 0.1f));
+				ForagingFox->Tick(2.1f);
+				TestTrue(TEXT("After the pause, the awake fox starts a short retreat"), ForagingFox->bMoving);
+				ForagingFox->Tick(0.5f);
+				TestTrue(TEXT("The fox retreats farther from the Raven without exceeding its local patch"),
+					FVector::Dist2D(ForagingFox->GetActorLocation(), BlueprintRaven->GetActorLocation()) >
+					FVector::Dist2D(FoxLocationBeforeNotice, BlueprintRaven->GetActorLocation()) &&
+					FVector::Dist2D(ForagingFox->GetActorLocation(), ForagingFox->HomeLocation) <= 650.1f);
+				ForagingFox->Destroy();
+			}
+			SleepingFox->Destroy();
+		}
+		if (FoxGround) FoxGround->Destroy();
 		BlueprintController->UnPossess();
 		BlueprintController->Destroy();
 		BlueprintRaven->Destroy();

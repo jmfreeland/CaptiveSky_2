@@ -6,6 +6,7 @@
 
 class AIslandArrangement;
 class AIslandDewActor;
+class AIslandForestFox;
 class AIslandForestStag;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
@@ -150,9 +151,9 @@ private:
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
 	TWeakObjectPtr<AIslandRainBasin> LastNoticedRainBasin;
 	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
-	TWeakObjectPtr<AIslandForestStag> WildlifeAttentionTarget;
+	TWeakObjectPtr<AActor> WildlifeAttentionTarget;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
-	TSet<TWeakObjectPtr<AIslandForestStag>> NoticedWildlifeInNearbyGroup;
+	TSet<TWeakObjectPtr<AActor>> NoticedWildlifeInNearbyGroup;
 	TSet<TWeakObjectPtr<AAutonomousAgentCharacter>> NoticedResidentsInNearbyGroup;
 	FVector ListeningChimeLocation = FVector::ZeroVector;
 	FVector DewGlintLocation = FVector::ZeroVector;
