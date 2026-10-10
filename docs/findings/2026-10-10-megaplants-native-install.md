@@ -61,3 +61,26 @@ well-bounded tree in a disposable preview scene: inspect shading, wind, LODs,
 scale and GPU/CPU cost at the established Tideglass viewpoint. Only then decide
 whether to add the native species to the Island scatter and retire any USD
 workflow.
+
+## UE 5.8.3 read-only audit result (2026-10-10)
+
+The commandlet audit successfully loaded all 296 packages with PVE enabled only
+for that invocation (`-EnablePlugins=ProceduralVegetationEditor`); the project
+descriptor and user settings were not changed. Across the four families it
+found 16 A-D tree variants, all `SkeletalMesh`, and **zero** `StaticMesh` tree
+variants. Each family’s `ProceduralVegetation`,
+`ProceduralVegetationGrowthDataAsset`, and
+`ProceduralVegetationGrowerPreset` packages load with the plugin enabled. The
+PVE graph itself has a protected `Graph` property, so Unreal Python cannot
+inspect its nodes or export configuration; the read-only graph probe records
+that limitation rather than modifying assets. Logs are in
+`%TEMP%\CaptiveSkyAudit_20261010\Saved\Logs\MegaplantAudit_PVE_20261010.log`
+and `MegaplantPVEAudit_Final_20261010.log`.
+
+This confirms package compatibility/loadability, **not** that the current
+skeletal trees are HISM-ready or that generated PVE output is present. PVE
+remains experimental and disabled by default. No tree was generated or placed,
+and no USD asset should be removed yet. The next gate is an editor-side,
+single-species generation/export into a disposable preview folder, then visual,
+material, wind, LOD/Nanite, and bounded runtime checks before any map/scatter
+integration.
