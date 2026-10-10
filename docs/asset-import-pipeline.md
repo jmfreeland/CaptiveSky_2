@@ -15,11 +15,13 @@ Remove-Item Env:\COMFYBLENDER_ASSET
 
 Omit `COMFYBLENDER_ASSET` to select `NoticeBoard`, or use another folder name from `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The script only accepts simple alphanumeric/underscore names, resolves texture paths inside the generated library, imports the FBX with embedded collision and no automatic collision generation, and builds opaque materials from the manifest's BaseColor, Normal, ORM, scalar Roughness/Metallic, and Emissive entries. Existing same-named generated assets are replaced; unrelated content is left alone.
 
+When the active editor belongs to a different checkout/worktree, set `COMFYBLENDER_SOURCE_ROOT` to the absolute path of the source `Saved/CaptiveSky/ComfyBlender` folder. The destination remains `/Game/Generated/ComfyBlender/<Asset>` in the project currently open in that editor; only source files and the import report use the override.
+
 After import, inspect the `unreal_import.json` report in the selected source pack. It records imported paths, measured bounds in centimetres, material-slot assignments, and Unreal's collision-shape counts. A validation error is reported if dimensions differ from the source manifest by more than 1% (with a 2 cm floor), a manifest material slot is unassigned, or expected collision shapes are missing. This verifies import metadata, not visual quality: open the asset in the editor and inspect material appearance, collision in the Static Mesh Editor, lighting, and scale in a test scene before placing anything on the Island map.
 
 The report is local and ignored with the generated pack. Keep the source script and manifest as the editable/golden source; do not hand-edit imported meshes as a substitute. Only place the asset after its appearance, scale, and collision have been reviewed.
 
-As of 2026-10-10, the NoticeBoard and StoneLantern are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; the embedded collisions are one box and one convex hull respectively. The StoneLantern emissive slot is assigned, but both props still need an in-editor lighting/material review before either is placed on the Island.
+As of 2026-10-10, the NoticeBoard, StoneLantern, and RatHollow are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; NoticeBoard and RatHollow use embedded boxes, while StoneLantern uses one convex hull. The RatHollow's side profile and material assignment are confirmed in the Static Mesh Editor, but its entrance-facing view, scene scale/concealment, and nav/clearance still need inspection before placement. The StoneLantern emissive slot is assigned, but its in-world lighting/material review is still outstanding.
 
 ## Fab cache check — Megaplants
 

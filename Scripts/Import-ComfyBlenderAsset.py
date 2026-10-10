@@ -21,7 +21,10 @@ import unreal
 ASSET_NAME = os.environ.get("COMFYBLENDER_ASSET", "NoticeBoard")
 DESTINATION_NAME = os.environ.get("COMFYBLENDER_DESTINATION", ASSET_NAME)
 PROJECT_DIR = unreal.Paths.project_dir()
-SOURCE_ROOT = os.path.normpath(os.path.join(PROJECT_DIR, "Saved", "CaptiveSky", "ComfyBlender"))
+SOURCE_ROOT = os.path.realpath(os.environ.get(
+    "COMFYBLENDER_SOURCE_ROOT",
+    os.path.join(PROJECT_DIR, "Saved", "CaptiveSky", "ComfyBlender"),
+))
 DEST_ROOT = "/Game/Generated/ComfyBlender"
 
 
