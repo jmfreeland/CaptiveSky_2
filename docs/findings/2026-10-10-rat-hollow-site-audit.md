@@ -76,15 +76,37 @@ shows the fox in tall grass in an open clearing; the nearest mature spruce is
 about 8.15 m away. That is not a hidden hollow site either. Screenshot:
 [`Fox woodland-edge frame`](../../Saved/Playtests/Codex_FoxCover_SparsePocket_Retry_20261010/Screenshots/001_Fox__Woodland_Edge.png).
 
+## Bounded runtime search (2026-10-10)
+
+The read-only `Island.RatHollowSiteAudit` probe was run in an isolated
+NullRHI game against 12 overlapping circles distributed across the known
+Recast bounds (centers X `-104000`, `-100000`, `-96000`; Y `97000`, `100000`,
+`103000`, `105000`; radius 1,200 cm; 250 cm step). The 12 scans tested 828
+footprints. All found landscape ground (`rejected ground=0`); 85 footprints
+were rejected for excessive slope, and the remaining 743 failed the strict
+spruce proximity/upper-crown filter. None qualified, and no capsule/nav
+placement was attempted for those samples. The map and resident data remained
+unchanged. Log: [`Run07`](../../Saved/CompileScratch/RatAnimationProbe_20261010/Saved/Logs/RatHollowSiteAudit_Run07.log).
+
+This only establishes that the prototype's strict canopy criterion found no
+site in these nav-bounds scans. It does not prove that no visually sheltered
+site exists: foliage is non-colliding, the filter counts mature spruce crowns
+rather than all vegetation, and most failures were grouped under the cover
+counter. A new `IslandNavProbe.cpp` diagnostic split was attempted but its
+scratch UBT process remained idle and was stopped; that unbuilt diagnostic
+change was discarded. Keep the map untouched until candidate visibility and
+rat-scale approach are verified.
+
 ## Next step
 
-Find a genuinely sheltered patch within a navigable region, then place the
-fallen-wood hollow there and verify its exact entrance orientation, landscape
-contact, capsule/nav clearance, and gameplay-scale concealment before recording
-the place or spawning Fenrus. Do not reuse the Raven's roost, the open fox
-clearing, or guess a point inside the broad PCG volume. If a world-local check
-is not available, add a scoped site-audit probe that reports trace hit
-actor/component and queries the navigation system; do not save a provisional
-placement. A small PVE/Megaplant preview is appropriate only after the editor
+Find a genuinely sheltered patch inside or near the current nav bounds using a
+visual ground-level review alongside a less brittle foliage-density measure.
+If the only convincing shelter is in the PCG forest outside current navigation,
+consider a small, local nav-bounds extension there rather than expanding the
+whole forest. Then place the fallen-wood hollow and verify its entrance
+orientation, landscape contact, capsule/nav clearance, and gameplay-scale
+concealment before recording the place or spawning Fenrus. Do not reuse the
+Raven's roost, the open fox clearing, or guess a point inside the broad PCG
+volume. A small PVE/Megaplant preview is appropriate only after the editor
 session has the PlantFactory mount and the selected pocket can be checked at
 gameplay scale.

@@ -2,14 +2,18 @@
 #include "AgentMemoryComponent.h"
 #include "AutonomousAgentAIController.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
 #include "IslandInteractionUtility.h"
+#include "IslandWeather.h"
+#include "LandscapeProxy.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
+#include "Engine/StaticMesh.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandNavProbe, Log, All);
@@ -332,4 +336,203 @@ static FAutoConsoleCommandWithWorldAndArgs GIslandNavBuildProbeCommand(
 			UE_LOG(LogIslandNavProbe, Warning, TEXT("NavBuildProbe could not find the ListeningStones landmark."));
 		}), static_cast<float>(DelaySeconds), false);
 	}));
+#endif
+
+#if !UE_BUILD_SHIPPING
+namespace
+{
+	struct FRatSiteSample
+	{
+		FVector Location = FVector::ZeroVector;
+		float SlopeRange = TNumericLimits<float>::Max();
+		float NearestMatureTreeDistance = TNumericLimits<float>::Max();
+		FVector NearestMatureTree = FVector::ZeroVector;
+		int32 CoveredFootprintSamples = 0;
+		int32 NavigableFootprintSamples = 0;
+		int32 NavigableApproachDirections = 0;
+		int32 ClearApproachDirections = 0;
+		float Score = -TNumericLimits<float>::Max();
+	};
+
+	static bool TraceRatSiteLandscape(UWorld* World, AIslandWeather* Weather, const FVector2D& XY, float& OutHeight)
+	{
+		if (!World) return false;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(RatHollowSiteAudit), false);
+		if (Weather) Params.AddIgnoredActor(Weather);
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+		TArray<FHitResult> Hits;
+		if (!World->LineTraceMultiByObjectType(Hits, FVector(XY.X, XY.Y, 20000.f), FVector(XY.X, XY.Y, -2000.f), ObjectParams, Params)) return false;
+
+		float BestDistance = TNumericLimits<float>::Max();
+		bool bFoundLandscape = false;
+		for (const FHitResult& Hit : Hits)
+		{
+			if (!Hit.GetActor() || !Hit.GetActor()->IsA<ALandscapeProxy>()) continue;
+			if (Hit.Distance >= BestDistance) continue;
+			BestDistance = Hit.Distance;
+			OutHeight = Hit.ImpactPoint.Z;
+			bFoundLandscape = true;
+		}
+		return bFoundLandscape;
+	}
+
+	static void AuditRatHollowSites(const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || !World->IsGameWorld() || Args.Num() != 4)
+		{
+			UE_LOG(LogIslandNavProbe, Warning, TEXT("Usage: Island.RatHollowSiteAudit CenterX CenterY RadiusCm StepCm (Game world; radius <= 1200, step 100..500)."));
+			return;
+		}
+		double CenterX = 0.0, CenterY = 0.0, Radius = 0.0, Step = 0.0;
+		if (!LexTryParseString(CenterX, *Args[0]) || !LexTryParseString(CenterY, *Args[1]) ||
+			!LexTryParseString(Radius, *Args[2]) || !LexTryParseString(Step, *Args[3]) ||
+			Radius < 0.0 || Radius > 1200.0 || Step < 100.0 || Step > 500.0)
+		{
+			UE_LOG(LogIslandNavProbe, Warning, TEXT("RatHollowSiteAudit needs numeric center XY, radius 0..1200 cm, and step 100..500 cm."));
+			return;
+		}
+
+		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+		if (!Navigation) { UE_LOG(LogIslandNavProbe, Warning, TEXT("RatHollowSiteAudit: no navigation system in this world.")); return; }
+		const ANavigationData* DefaultNavData = Navigation->GetDefaultNavDataInstance();
+		AIslandWeather* Weather = nullptr;
+		for (TActorIterator<AIslandWeather> It(World); It; ++It) { Weather = *It; break; }
+		if (!Weather) { UE_LOG(LogIslandNavProbe, Warning, TEXT("RatHollowSiteAudit: no IslandWeather actor for tree-canopy samples.")); return; }
+
+		TArray<FVector> MatureSpruceLocations;
+		TArray<UHierarchicalInstancedStaticMeshComponent*> Components;
+		Weather->GetComponents(Components);
+		for (UHierarchicalInstancedStaticMeshComponent* Component : Components)
+		{
+			if (!Component || Component->GetName() != TEXT("IslandSpruce")) continue;
+			const UStaticMesh* Mesh = Component->GetStaticMesh();
+			if (!Mesh) continue;
+			const float LocalHeight = Mesh->GetBoundingBox().GetSize().Z;
+			for (int32 Index = 0; Index < Component->GetInstanceCount(); ++Index)
+			{
+				FTransform InstanceTransform;
+				if (!Component->GetInstanceTransform(Index, InstanceTransform, true)) continue;
+				const float Height = LocalHeight * FMath::Abs(InstanceTransform.GetScale3D().Z);
+				if (Height >= 900.f) MatureSpruceLocations.Add(InstanceTransform.GetLocation());
+			}
+		}
+
+		UE_LOG(LogIslandNavProbe, Display,
+			TEXT("RatHollowSiteAudit scan center=(%.0f,%.0f) radius=%.0f step=%.0f; mature-spruce=%d; navdata=%s; map/world state unchanged."),
+			CenterX, CenterY, Radius, Step, MatureSpruceLocations.Num(), DefaultNavData ? *DefaultNavData->GetName() : TEXT("none"));
+
+		FCollisionQueryParams ClearanceParams(SCENE_QUERY_STAT(RatHollowCapsuleClearance), false);
+		ClearanceParams.AddIgnoredActor(Weather);
+		const FVector2D FootprintOffsets[] = {
+			FVector2D(0.f, 0.f), FVector2D(-128.f, -68.f), FVector2D(-128.f, 68.f),
+			FVector2D(128.f, -68.f), FVector2D(128.f, 68.f)
+		};
+		TArray<FRatSiteSample> Qualified;
+		const int32 GridRadius = FMath::CeilToInt(Radius / Step);
+		int32 Tested = 0;
+		int32 RejectedGround = 0, RejectedSlope = 0, RejectedCover = 0, RejectedObstruction = 0;
+		for (int32 GridX = -GridRadius; GridX <= GridRadius; ++GridX)
+		for (int32 GridY = -GridRadius; GridY <= GridRadius; ++GridY)
+		{
+			const FVector2D CandidateXY(CenterX + GridX * Step, CenterY + GridY * Step);
+			if (FVector2D::Distance(CandidateXY, FVector2D(CenterX, CenterY)) > Radius + KINDA_SMALL_NUMBER) continue;
+			++Tested;
+			FRatSiteSample Sample;
+			TArray<float> GroundHeights;
+			TArray<FVector> CoverStarts, CoverEnds;
+			bool bHasFootprintGround = true;
+			for (const FVector2D& Offset : FootprintOffsets)
+			{
+				float GroundZ = 0.f;
+				const FVector2D XY = CandidateXY + Offset;
+				if (!TraceRatSiteLandscape(World, Weather, XY, GroundZ)) { bHasFootprintGround = false; break; }
+				GroundHeights.Add(GroundZ);
+				// This helper measures upper spruce crowns (above 56% of tree height), not low branches.
+				CoverStarts.Add(FVector(XY.X, XY.Y, GroundZ + 20000.f));
+				CoverEnds.Add(FVector(XY.X, XY.Y, GroundZ + 4000.f));
+			}
+			if (!bHasFootprintGround || GroundHeights.Num() != UE_ARRAY_COUNT(FootprintOffsets)) { ++RejectedGround; continue; }
+			float MinGroundZ = TNumericLimits<float>::Max();
+			float MaxGroundZ = -TNumericLimits<float>::Max();
+			for (const float GroundHeight : GroundHeights)
+			{
+				MinGroundZ = FMath::Min(MinGroundZ, GroundHeight);
+				MaxGroundZ = FMath::Max(MaxGroundZ, GroundHeight);
+			}
+			Sample.SlopeRange = MaxGroundZ - MinGroundZ;
+			if (Sample.SlopeRange > 45.f) { ++RejectedSlope; continue; }
+
+			const float GroundZ = GroundHeights[0];
+			Sample.Location = FVector(CandidateXY.X, CandidateXY.Y, GroundZ);
+			for (int32 Index = 0; Index < MatureSpruceLocations.Num(); ++Index)
+			{
+				const float Distance = FVector::Dist2D(Sample.Location, MatureSpruceLocations[Index]);
+				if (Distance < Sample.NearestMatureTreeDistance)
+				{
+					Sample.NearestMatureTreeDistance = Distance;
+					Sample.NearestMatureTree = MatureSpruceLocations[Index];
+				}
+			}
+			if (Sample.NearestMatureTreeDistance < 250.f || Sample.NearestMatureTreeDistance > 1200.f) { ++RejectedCover; continue; }
+			Sample.CoveredFootprintSamples = Weather->CountSpruceCrownCoverProbes(CoverStarts, CoverEnds);
+			if (Sample.CoveredFootprintSamples < 3) { ++RejectedCover; continue; }
+
+			for (int32 FootprintIndex = 0; FootprintIndex < UE_ARRAY_COUNT(FootprintOffsets); ++FootprintIndex)
+			{
+				FNavLocation Projected;
+				const FVector2D XY = CandidateXY + FootprintOffsets[FootprintIndex];
+				if (Navigation->ProjectPointToNavigation(FVector(XY.X, XY.Y, GroundHeights[FootprintIndex]), Projected, FVector(80.f, 80.f, 120.f)))
+					++Sample.NavigableFootprintSamples;
+			}
+
+			const FVector CapsuleCenter(CandidateXY.X, CandidateXY.Y, GroundZ + 42.f);
+			if (World->OverlapBlockingTestByChannel(CapsuleCenter, FQuat::Identity, ECC_Pawn,
+				FCollisionShape::MakeCapsule(15.f, 36.f), ClearanceParams))
+			{
+				++RejectedObstruction;
+				continue;
+			}
+			for (const FVector2D& Direction : { FVector2D(1.f, 0.f), FVector2D(-1.f, 0.f), FVector2D(0.f, 1.f), FVector2D(0.f, -1.f) })
+			{
+				const FVector2D ApproachXY = CandidateXY + Direction * 220.f;
+				float ApproachGroundZ = 0.f;
+				if (!TraceRatSiteLandscape(World, Weather, ApproachXY, ApproachGroundZ)) continue;
+				FNavLocation ApproachNav;
+				const bool bApproachNavigable = Navigation->ProjectPointToNavigation(FVector(ApproachXY.X, ApproachXY.Y, ApproachGroundZ), ApproachNav,
+					FVector(80.f, 80.f, 120.f));
+				if (bApproachNavigable) ++Sample.NavigableApproachDirections;
+				const FVector ApproachCenter(ApproachXY.X, ApproachXY.Y, ApproachGroundZ + 42.f);
+				if (!World->OverlapBlockingTestByChannel(ApproachCenter, FQuat::Identity, ECC_Pawn,
+					FCollisionShape::MakeCapsule(15.f, 36.f), ClearanceParams)) ++Sample.ClearApproachDirections;
+			}
+			if (Sample.ClearApproachDirections == 0) { ++RejectedObstruction; continue; }
+
+			const float TreeDistancePreference = FMath::Abs(Sample.NearestMatureTreeDistance - 550.f);
+		Sample.Score = Sample.CoveredFootprintSamples * 100.f + Sample.NavigableFootprintSamples * 15.f +
+			Sample.NavigableApproachDirections * 5.f + Sample.ClearApproachDirections * 10.f - Sample.SlopeRange - TreeDistancePreference * 0.05f;
+			Qualified.Add(Sample);
+		}
+
+		Qualified.Sort([](const FRatSiteSample& A, const FRatSiteSample& B) { return A.Score > B.Score; });
+		UE_LOG(LogIslandNavProbe, Display,
+			TEXT("RatHollowSiteAudit complete: tested=%d qualified=%d rejected(ground=%d slope=%d cover=%d obstruction=%d)."),
+			Tested, Qualified.Num(), RejectedGround, RejectedSlope, RejectedCover, RejectedObstruction);
+		for (int32 Index = 0; Index < FMath::Min(10, Qualified.Num()); ++Index)
+		{
+			const FRatSiteSample& Sample = Qualified[Index];
+			UE_LOG(LogIslandNavProbe, Display,
+				TEXT("RatHollowSiteAudit candidate[%d] pos=%s slope=%.1fcm crownSamples=%d/5 navFootprint=%d/5 navApproaches=%d/4 clearApproaches=%d/4 nearestSpruce=%.0fcm at=%s score=%.1f."),
+				Index + 1, *Sample.Location.ToCompactString(), Sample.SlopeRange, Sample.CoveredFootprintSamples,
+				Sample.NavigableFootprintSamples, Sample.NavigableApproachDirections, Sample.ClearApproachDirections,
+				Sample.NearestMatureTreeDistance, *Sample.NearestMatureTree.ToCompactString(), Sample.Score);
+		}
+		UE_LOG(LogIslandNavProbe, Display, TEXT("RatHollowSiteAudit: results are suggestions only; visually inspect and test actual hollow placement before recording a home."));
+	}
+}
+
+static FAutoConsoleCommandWithWorldAndArgs GRatHollowSiteAuditCommand(
+	TEXT("Island.RatHollowSiteAudit"),
+	TEXT("Read-only 2D site scan around XY. Usage: Island.RatHollowSiteAudit CenterX CenterY RadiusCm StepCm (Game world)."),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&AuditRatHollowSites));
 #endif
