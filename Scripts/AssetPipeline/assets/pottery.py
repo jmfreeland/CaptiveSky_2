@@ -31,6 +31,10 @@ def build(A):
     # shard of rope-tied neck on the jar
     A.tube("rope", [Vector((0.108 * math.cos(a), 0.108 * math.sin(a), 0.32)) for a in [i * math.pi / 12 for i in range(26)]],
            0.008, segs=6, loc=(-0.52, 0.12, 0), name="tie")
+    # dark glaze bands on the amphora, and a shallow bowl
+    for z, R in ((0.45, 0.218), (0.52, 0.205)):
+        A.torus("char", R, 0.007, loc=(0, 0, z), segs=36, rsegs=5, name="band")
+    A.lathe("clay", [(0, 0.0), (0.06, 0.0), (0.12, 0.03), (0.17, 0.09), (0.175, 0.095), (0.15, 0.092), (0.1, 0.045), (0, 0.035)], loc=(0.15, -0.42, 0), segs=32, name="bowl")
     A.collide_cyl(0.23, 0.86, loc=(0, 0, 0.43))
     A.collide_cyl(0.22, 0.42, loc=(0.58, 0.18, 0.21))
     A.collide_cyl(0.16, 0.46, loc=(-0.52, 0.12, 0.23))

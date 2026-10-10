@@ -11,4 +11,9 @@ def build(A):
     A.rock("stone", (0.17, 0.13, 0.10), loc=(0.40, -0.22, 0.075), rot=(0, 0, 25), seed=3, tile=1.2, name="rock")
     A.rock("stone", (0.11, 0.10, 0.07), loc=(-0.33, 0.30, 0.05), rot=(0, 0, 70), seed=8, tile=1.2, name="rock")
     A.cyl("water", 0.33, 0.012, loc=(0, 0, 0.775), uv="box", segs=40, name="water")
+    # a little stone bird perched on the rim
+    A.rock("stone", (0.05, 0.075, 0.045), loc=(0.0, -0.395, 0.875), rot=(0, 0, 90), seed=5, sub=2, rough=0.04, flat_bottom=0.9, tile=1.2, name="bird")
+    A.rock("stone", (0.03, 0.03, 0.03), loc=(0.0, -0.46, 0.925), seed=7, sub=1, rough=0.02, flat_bottom=0.9, tile=1.2, name="birdHead")
+    A.cyl("stone", 0.01, 0.045, loc=(0.0, -0.5, 0.92), r2=0.003, rot=(90, 0, 0), segs=8, uv="box", tile=1.2, name="beak")
+    A.box("stone", (0.04, 0.09, 0.012), loc=(0.0, -0.31, 0.885), rot=(-12, 0, 0), tile=1.2, name="birdTail")
     A.collide_cyl(0.28, 0.83, loc=(0, 0, 0.415))

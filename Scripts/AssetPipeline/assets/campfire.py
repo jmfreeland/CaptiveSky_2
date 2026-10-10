@@ -3,6 +3,8 @@ import math
 
 from mathutils import Euler, Vector
 
+import lib
+
 NAME = "CampfireRing"
 BAKE_SIZE = 2048
 
@@ -36,4 +38,14 @@ def build(A):
     for i in range(5):
         a = i * 1.3
         A.rock("ember", (0.07, 0.06, 0.04), loc=(0.12 * math.cos(a), 0.12 * math.sin(a), 0.045), seed=20 + i, sub=1, name="ember")
+    # cooking tripod with a hanging iron pot
+    top = Vector((0, 0, 1.3))
+    for k in range(3):
+        a = math.radians(k * 120 + 15)
+        foot = Vector((0.95 * math.cos(a), 0.95 * math.sin(a), 0.0))
+        A.box("wood", (0.06, 0.06, (top - foot).length), loc=tuple((top + foot) / 2), rot=lib.align(top - foot), bevel=0.004, name="tripodLeg")
+    A.torus("rope", 0.05, 0.012, loc=(0, 0, 1.22), segs=14, rsegs=5, name="lashing")
+    A.tube("iron", [Vector((0, 0, 1.25)), Vector((0, 0, 1.0)), Vector((0, 0, 0.82))], 0.008, segs=5, name="chain")
+    A.lathe("iron", [(0, 0.55), (0.1, 0.55), (0.17, 0.6), (0.2, 0.7), (0.19, 0.78), (0.205, 0.795), (0.17, 0.795), (0.16, 0.77), (0.15, 0.62), (0, 0.6)], segs=24, name="pot")
+    A.torus("iron", 0.15, 0.008, loc=(0, 0, 0.84), rot=(90, 0, 0), segs=16, rsegs=5, name="potHandle")
     A.collide_cyl(0.75, 0.2, loc=(0, 0, 0.1), segs=16)

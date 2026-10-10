@@ -28,4 +28,12 @@ def build(A):
         A.box("parchment", (w, 0.006, h), loc=(x, -0.025 - i * 0.0008, z), rot=(0, rot, 0), grain="Z", tile=0.5, name="note")
         px = x + math.sin(math.radians(rot)) * (h / 2 - 0.03)
         A.cyl("iron", 0.011, 0.012, loc=(px, -0.034 - i * 0.0008, z + h / 2 - 0.03), rot=(90, 0, 0), segs=8, uv="box", name="pin")
+    # a bell on a bracket to call residents to read the board
+    A.box("wood", (0.4, 0.06, 0.06), loc=(0.9, -0.03, 1.72), bevel=0.004, name="bracket")
+    A.box("wood", (0.06, 0.06, 0.3), loc=(0.78, -0.03, 1.57), rot=(0, 40, 0), name="bracketBrace")
+    A.cyl("rope", 0.006, 0.08, loc=(1.02, -0.03, 1.64), segs=5, uv="box", name="bellRope")
+    A.lathe("brass", [(0, 0.0), (0.075, 0.0), (0.07, 0.025), (0.055, 0.075), (0.04, 0.11), (0.045, 0.125), (0, 0.13)], loc=(1.02, -0.03, 1.47), segs=20, name="bell")
+    A.rock("iron", (0.015, 0.015, 0.015), loc=(1.02, -0.03, 1.455), sub=1, rough=0.0, flat_bottom=0.9, name="clapper")
+    for (x, z, rot, w, h) in ((-0.64, 1.1, 6, 0.16, 0.22), (0.62, 1.52, -5, 0.15, 0.2)):
+        A.box("parchment", (w, 0.006, h), loc=(x, -0.032, z), rot=(0, rot, 0), name="note")
     A.collide_box((1.6, 0.25, 2.0), loc=(0, 0, 1.0))

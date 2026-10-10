@@ -26,8 +26,14 @@ def build(A):
     A.box("wood", (0.035, 0.52, 0.26), loc=(0.405, 0, 0.67 + t), rot=(0, 14, 0), grain="Y", bevel=0.004, name="front")
     A.box("wood", (0.035, 0.52, 0.22), loc=(-0.405, 0, 0.65 + t), rot=(0, -10, 0), grain="Y", bevel=0.004, name="back")
     # wheel: axis along Y, iron tyre + hub between the forks
-    A.cyl("wood", 0.185, 0.07, loc=(0.62, 0, 0.2), rot=(90, 0, 0), segs=28, uv="box", tile=0.5, name="wheel")
-    A.cyl("iron", 0.2, 0.05, loc=(0.62, 0, 0.2), rot=(90, 0, 0), segs=28, uv="box", name="tyre")
+    wc = (0.62, 0, 0.2)
+    A.torus("wood", 0.172, 0.022, loc=wc, rot=(90, 0, 0), segs=28, rsegs=6, name="wheelRim")
+    A.torus("iron", 0.196, 0.012, loc=wc, rot=(90, 0, 0), segs=28, rsegs=5, name="tyre")
+    A.cyl("wood", 0.045, 0.1, loc=wc, rot=(90, 0, 0), segs=12, uv="box", name="hub")
+    for k in range(8):  # spokes
+        ang = k * 45.0
+        d = (math.sin(math.radians(ang)), 0, math.cos(math.radians(ang)))
+        A.box("wood", (0.028, 0.028, 0.16), loc=(wc[0] + d[0] * 0.105, 0, wc[2] + d[2] * 0.105), rot=(0, ang, 0), name="spoke")
     A.cyl("wood", 0.035, 0.38, loc=(0.62, 0, 0.2), rot=(90, 0, 0), segs=12, uv="box", name="axle")
     A.box("wood", (0.04, 0.4, 0.04), loc=(-0.6, 0, 0.44), grain="Y", name="spreader")
     # a load of straw in the tub

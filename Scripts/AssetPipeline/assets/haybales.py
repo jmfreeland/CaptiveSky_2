@@ -21,6 +21,12 @@ def build(A):
             oy = off * math.cos(math.radians(rot))
             A.tube("rope", pts, 0.013, segs=6, loc=(x - ox, y + oy, 0.5), rot=(0, 0, rot), name="twine")
     A.rock("straw", (0.25, 0.18, 0.06), loc=(0.35, -0.7, 0.04), seed=9, tile=0.4, name="pile")
+    # a pitchfork stuck tines-down in the loose straw
+    px, py = 0.35, -0.7
+    A.cyl("wood", 0.017, 1.5, loc=(px, py, 1.1), rot=(5, 0, 0), segs=8, name="forkHandle")
+    A.box("iron", (0.2, 0.018, 0.018), loc=(px, py - 0.02, 0.37), bevel=0.002, name="forkBar")
+    for dx in (-0.08, 0.0, 0.08):
+        A.cyl("iron", 0.006, 0.34, loc=(px + dx, py - 0.02, 0.2), r2=0.002, segs=5, uv="box", name="tine")
     A.collide_box((0.95, 0.5, 0.48), loc=(0, 0, 0.24))
     A.collide_cyl(0.5, 0.9, loc=(0.95, 0.25, 0.5), rot=(90, 0, 8), segs=14)
     A.collide_cyl(0.5, 0.9, loc=(-0.85, -0.55, 0.5), rot=(90, 0, -20), segs=14)

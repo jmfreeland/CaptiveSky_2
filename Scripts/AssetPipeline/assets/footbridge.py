@@ -33,6 +33,13 @@ def build(A):
     for i in range(7):  # joists
         x = -1.2 + 0.4 * i
         A.box("wood", (0.06, 0.9, 0.06), loc=(x, 0, deck_z(x) - 0.1), grain="Y", name="joist")
+    # hanging lanterns on the four end posts
+    for x in (-1.5, 1.5):
+        for s in (-0.5, 0.5):
+            top = deck_z(x) + 0.9
+            A.box("iron", (0.1, 0.1, 0.012), loc=(x, s, top + 0.012), name="lampBase")
+            A.box("lanternglow", (0.07, 0.07, 0.1), loc=(x, s, top + 0.075), name="lampGlow")
+            A.lathe("iron", [(0, top + 0.13), (0.07, top + 0.125), (0.04, top + 0.17), (0, top + 0.185)], loc=(x, s, 0), segs=4, rot=(0, 0, 45), smooth=False, name="lampCap")
     for i in range(6):  # collision follows the arc in 6 slabs
         x0 = -HALF + (2 * HALF) * (i + 0.5) / 6
         slope = math.degrees(math.atan2(deck_z(x0 + 0.05) - deck_z(x0 - 0.05), 0.1))
