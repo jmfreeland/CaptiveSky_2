@@ -330,10 +330,13 @@ reached the world and captured the view. Details and evidence:
 A one-shot editor-world preview confirmed 7 Typha + 3 Phalaris at the Tideglass
 edge and three transient daylight dragonflies. The broad view's full-cover p95
 was 28.45 FPS, below the 30-FPS screen; meadow/ground plants alone reached
-55.50 FPS p95 and woodland/understory alone 58.11 FPS. This points to a
-combined-layer cost to isolate, but does not establish a Game/PIE regression or
-attribute it to the landscape material. The current view still has an exposed
-brown mid-distance, blockout pool/landmarks, and a placeholder-looking close
-dragonfly. Next: test meadow+trees and meadow+understory together, then check
-the target composition in standalone Game and PIE. See the [full capture and
-limits](findings/2026-10-10-tideglass-layer-performance.md).
+55.50 FPS p95 and woodland/understory alone 58.11 FPS. The combined
+meadow+trees and meadow+understory editor screens reached 56.05 and 44.54 FPS
+p95 respectively. All partial screens passed, unlike full cover, but the
+measurements were sequential editor SceneCaptures with Blender still open and
+do not establish a Game/PIE regression or identify a cause. The current view
+still has an exposed brown mid-distance, blockout pool/landmarks, and a
+placeholder-looking close dragonfly. Next: repeat full cover and
+meadow+understory as matched standalone Game and PIE profiles with other
+graphics workloads closed, then inspect a GPU trace before changing counts or
+materials. See the [full capture and limits](findings/2026-10-10-tideglass-layer-performance.md).
