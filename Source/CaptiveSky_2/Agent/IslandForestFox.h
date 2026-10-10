@@ -35,6 +35,7 @@ protected:
 private:
 	friend class FIslandForestFoxTest;
 	friend class FRavenPerchTest;
+	friend class FIslandFoxResidentGlanceCaptureTest;
 
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<USkeletalMeshComponent> FoxMesh;

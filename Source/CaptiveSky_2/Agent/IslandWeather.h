@@ -117,6 +117,7 @@ private:
 	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandGroundCoverTest;
+	friend class FIslandFoxResidentGlanceCaptureTest;
 	friend class FIslandMinnowTest;
 	friend class FIslandViewpointCaptureTest;
 	TArray<FIslandTransientGust> TransientGusts;

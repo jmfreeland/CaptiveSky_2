@@ -28,7 +28,29 @@ or retained memory, suppression while the same group remains nearby, leaving
 the wider range, cooldown, a later re-approach, and a sleeping fox staying
 undisturbed. This verifies deterministic encounter and perception state and
 the existing animation hookup, not perceived pacing or framing during rendered
-play; that needs a bounded Game/PIE observation.
+play; the encounter was invoked directly by the rendered fixture below, so this
+is not proof of its autonomous encounter frequency.
+
+### Rendered staging
+
+`CaptiveSky2.Visual.WoodlandFoxResidentGlance` passed in UE 5.8.3 on D3D12 with
+resident thinking and Python disabled, an isolated data root, a 120-second
+realtime ceiling, and zero model requests. The fixture stages transient Aster
+and fox actors at the logged runtime woodland site, orients Aster toward the
+fox, starts the fox's existing brief look, and checks the same immediate
+situation summary. It uses the project's bounded editor foliage preview
+(1,780,640 ground-cover instances, 14,727 trees, 15,063 shrubs, and 1,003
+meadow flowers) and clears that preview automatically afterward; no level or
+world-state file is saved.
+
+The real-RHI frame is
+[`01_Aster_Fox_WoodlandMeadow.png`](../../Saved/Viewpoints/WoodlandFoxResidentGlance_/20261010_041957/01_Aster_Fox_WoodlandMeadow.png);
+the run log is
+[`FoxResidentGlance.log`](../../Saved/Playtests/Codex_FoxGlance_FinalFraming_20261010/FoxResidentGlance.log).
+It shows the glance with both figures unobstructed in the populated meadow,
+but the Wind Arch's white/blue blockout pillars are still prominent. Treat this
+as interaction and foliage evidence, not a finished beauty shot or proof that
+the event naturally occurs at this camera position.
 
 ## AutoSDK note
 
