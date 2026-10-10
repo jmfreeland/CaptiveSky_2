@@ -187,9 +187,12 @@ play; see [the encounter finding](findings/2026-10-10-raven-fox-encounter.md).
 ## 2026-10-10 — The fox settles near woodland cover
 
 After the first real-RHI view placed the resting fox in an exposed clearing, its
-spawn now searches outward from the Wind Arch approach for a grounded site 3–9 m
-from mature spruce, preferring roughly 5 m of cover while keeping at least the
-existing 14.5 m landmark clearance. The live Island chose a site 5.8 m from
-mature spruce; this was a NullRHI placement check, not a rendered visual review.
-The next useful check is a real-RHI frame at ordinary gameplay scale, then a
-matched frame-time measurement. Details and logs: [woodland fox finding](findings/2026-10-10-woodland-fox.md).
+spawn searches outward from the Wind Arch approach for a grounded site 3–14 m
+from mature spruce, preferring a sparse grass pocket while keeping at least the
+existing 14.5 m landmark clearance. In the live Island it settled 8.15 m from
+mature spruce, with a natural opening in the understory; a 1600x900 real-D3D12
+frame shows the resting fox clearly. The captured session was bounded at 90
+real seconds and zero model requests. On this RTX 4080 Laptop GPU, a matched
+200-frame Game sample averaged 73 FPS (P95 15.09 ms), above the 30-FPS floor;
+PIE and target-hardware performance still need checking. Details and evidence:
+[woodland fox finding](findings/2026-10-10-woodland-fox.md).

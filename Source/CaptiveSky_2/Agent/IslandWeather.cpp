@@ -472,13 +472,14 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 }
 
 int32 AIslandWeather::SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& CandidateLocations,
-	const TArray<float>& NearestMatureSpruceDistances, int32 FallbackIndex)
+	const TArray<float>& NearestMatureSpruceDistances, const TArray<int32>& NearbyGrassCounts, int32 FallbackIndex)
 {
 	if (!CandidateLocations.IsValidIndex(FallbackIndex)) return INDEX_NONE;
 
 	constexpr float MinimumCoverDistance = 300.f;
-	constexpr float MaximumCoverDistance = 900.f;
-	constexpr float PreferredCoverDistance = 520.f;
+	constexpr float MaximumCoverDistance = 1400.f;
+	constexpr float PreferredCoverDistance = 850.f;
+	constexpr float GrassPenaltyPerInstance = 60.f;
 	int32 BestIndex = INDEX_NONE;
 	float BestScore = TNumericLimits<float>::Max();
 	for (int32 CandidateIndex = 0; CandidateIndex < CandidateLocations.Num(); ++CandidateIndex)
@@ -488,7 +489,10 @@ int32 AIslandWeather::SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& Can
 		if (!FMath::IsFinite(CoverDistance) || CoverDistance < MinimumCoverDistance || CoverDistance > MaximumCoverDistance)
 			continue;
 
-		const float Score = FMath::Abs(CoverDistance - PreferredCoverDistance);
+		const int32 NearbyGrassCount = NearbyGrassCounts.IsValidIndex(CandidateIndex)
+			? FMath::Max(0, NearbyGrassCounts[CandidateIndex]) : 0;
+		const float Score = FMath::Abs(CoverDistance - PreferredCoverDistance) +
+			NearbyGrassCount * GrassPenaltyPerInstance;
 		if (Score < BestScore)
 		{
 			BestScore = Score;
@@ -2377,6 +2381,7 @@ void AIslandWeather::RefreshNightEcology()
 			{
 				TArray<FVector> SpawnCandidates;
 				TArray<float> NearestMatureSpruceDistances;
+				TArray<int32> NearbyGrassCounts;
 				int32 FallbackCandidate = INDEX_NONE;
 				const bool bCanScoreSpruce = bGroundCoverInitialized && IslandSpruce && IslandSpruce->GetStaticMesh() &&
 					IslandSpruceBaseTransforms.Num() == IslandSpruce->GetInstanceCount();
@@ -2385,9 +2390,40 @@ void AIslandWeather::RefreshNightEcology()
 				const FTransform SpruceComponentTransform = bCanScoreSpruce
 					? IslandSpruce->GetComponentTransform() : FTransform::Identity;
 				const int32 SpruceCellRange = FMath::CeilToInt(900.f / GroundCoverSwayCellSize);
+				constexpr float FoxRestPocketRadius = 180.f;
+				const int32 GrassCellRange = FMath::CeilToInt(FoxRestPocketRadius / GroundCoverSwayCellSize);
+				UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC();
+				auto CountNearbyGrass = [&](const FVector& WorldLocation)
+				{
+					int32 Count = 0;
+					auto CountSpecies = [&](UHierarchicalInstancedStaticMeshComponent* Component,
+						const TArray<FTransform>& Baselines, const TMap<FIntPoint, TArray<int32>>& Cells, int32 BaselineOffset)
+					{
+						if (!Component || Cells.IsEmpty()) return;
+						const FTransform ComponentTransform = Component->GetComponentTransform();
+						const FVector LocalLocation = ComponentTransform.InverseTransformPosition(WorldLocation);
+						const FIntPoint CenterCell(
+							FMath::FloorToInt(LocalLocation.X / GroundCoverSwayCellSize),
+							FMath::FloorToInt(LocalLocation.Y / GroundCoverSwayCellSize));
+						for (int32 CellX = CenterCell.X - GrassCellRange; CellX <= CenterCell.X + GrassCellRange; ++CellX)
+							for (int32 CellY = CenterCell.Y - GrassCellRange; CellY <= CenterCell.Y + GrassCellRange; ++CellY)
+								if (const TArray<int32>* Indices = Cells.Find(FIntPoint(CellX, CellY)))
+									for (const int32 Index : *Indices)
+									{
+										const int32 BaselineIndex = BaselineOffset + Index;
+										if (!Baselines.IsValidIndex(BaselineIndex)) continue;
+										const FVector GrassLocation = ComponentTransform.TransformPosition(Baselines[BaselineIndex].GetLocation());
+										if (FVector::DistSquared2D(GrassLocation, WorldLocation) <= FMath::Square(FoxRestPocketRadius)) ++Count;
+									}
+					};
+					CountSpecies(ShoreGrassA, ShoreGrassABaseTransforms, ShoreGrassACells, 0);
+					CountSpecies(ShoreGrassB, ShoreGrassBBaseTransforms, ShoreGrassBCells, 0);
+					CountSpecies(GrassC, ShoreGrassBBaseTransforms, ShoreGrassCCells, ShoreGrassB ? ShoreGrassB->GetInstanceCount() : 0);
+					return Count;
+				};
 
-				// Search from the established landmark clearance outward so a dense grove just
-				// beyond the original ring can shelter the fox without placing it in the approach.
+				// Search from the established landmark clearance outward so a mature tree can
+				// shelter the fox while it rests in a naturally sparse ground-cover pocket.
 				static constexpr float FoxSpawnRadii[] = { 1450.f, 1900.f, 2350.f };
 				constexpr int32 FoxSpawnSamplesPerRing = 16;
 				for (const float SpawnRadius : FoxSpawnRadii)
@@ -2406,6 +2442,7 @@ void AIslandWeather::RefreshNightEcology()
 						const FVector SpawnLocation = GroundHit.ImpactPoint + FVector(0.f, 0.f, 3.f);
 						if (FallbackCandidate == INDEX_NONE) FallbackCandidate = SpawnCandidates.Num();
 						SpawnCandidates.Add(SpawnLocation);
+						NearbyGrassCounts.Add(CountNearbyGrass(SpawnLocation));
 
 						float NearestMatureSpruceDistance = -1.f;
 						if (bCanScoreSpruce && SpruceLocalBounds.IsValid)
@@ -2437,7 +2474,7 @@ void AIslandWeather::RefreshNightEcology()
 				}
 
 				const int32 SelectedCandidate = SelectWoodlandFoxSpawnCandidate(
-					SpawnCandidates, NearestMatureSpruceDistances, FallbackCandidate);
+					SpawnCandidates, NearestMatureSpruceDistances, NearbyGrassCounts, FallbackCandidate);
 				if (SpawnCandidates.IsValidIndex(SelectedCandidate))
 				{
 					FActorSpawnParameters SpawnParameters;
@@ -2449,8 +2486,10 @@ void AIslandWeather::RefreshNightEcology()
 					{
 						const float CoverDistance = NearestMatureSpruceDistances.IsValidIndex(SelectedCandidate)
 							? NearestMatureSpruceDistances[SelectedCandidate] : -1.f;
-						UE_LOG(LogIslandWeather, Log, TEXT("A transient fox emerged at the Wind Arch woodland edge at %s (%s; nearest mature spruce: %.0f cm)"),
-							*SpawnLocation.ToCompactString(), CoverDistance >= 300.f && CoverDistance <= 900.f ? TEXT("cover-preferred site") : TEXT("grounded fallback site"), CoverDistance);
+						const int32 NearbyGrassCount = NearbyGrassCounts.IsValidIndex(SelectedCandidate)
+							? NearbyGrassCounts[SelectedCandidate] : -1;
+						UE_LOG(LogIslandWeather, Log, TEXT("A transient fox emerged at the Wind Arch woodland edge at %s (%s; mature spruce %.0f cm away; %d grass instances within the rest pocket)"),
+							*SpawnLocation.ToCompactString(), CoverDistance >= 300.f && CoverDistance <= 1400.f ? TEXT("cover-preferred site") : TEXT("grounded fallback site"), CoverDistance, NearbyGrassCount);
 					}
 				}
 			}

@@ -42,32 +42,42 @@ Evidence:
 - [`real-D3D12 screenshot`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/Screenshots/004_Fox_At_Wind_Arch.png)
 - [`real-D3D12 run log`](../../Saved/Playtests/Codex_WoodlandFox_20261010/RealRHI_Close/WoodlandFoxRealRHI_Close.log)
 
-## Woodland-cover site selection (2026-10-10)
+## Woodland-cover site selection and visual check (2026-10-10)
 
 The first real-D3D12 frame showed the fox in an open clearing. The original
 eight-point 14.5 m spawn ring had no mature spruce within 9 m, so it could only
 select its first grounded fallback. The selector now samples three concentric
 rings (14.5, 19, and 23.5 m from the Wind Arch), with sixteen deterministic
-ground traces per ring. It prefers a grounded point 3–9 m from a mature spruce
-(at least 9 m tall), targeting 5.2 m; ties keep the nearer ring first. The
-14.5 m minimum remains, so the fox stays outside the immediate landmark
-approach. If no cover qualifies, the first valid grounded point remains the
-fallback.
+ground traces per ring. Eligible points are 3–14 m from a mature spruce (at
+least 9 m tall); the score prefers 8.5 m of tree cover and a naturally sparse
+grass pocket (fewest grass instances within 1.8 m, with each instance weighted
+against tree-distance error). Ties keep the nearer ring first. The 14.5 m
+minimum remains, so the fox stays outside the immediate landmark approach. If
+no cover qualifies, the first valid grounded point remains the fallback.
 
 The actual-project UE 5.8.3 build succeeded and `CaptiveSky2.Agent.GroundCover`
-passed. A bounded Island Game run selected `(-102709, 98102, 2638)` cm, 580 cm
-from mature spruce; this confirms the selector used live scatter data rather
-than its fallback. The run used NullRHI, isolated world data, disabled agent
-thinking, allowed zero model requests, and ended itself at 90.1 real seconds.
-This verifies placement and the real-time/request safeguards, not rendered
-composition or frame rate. The earlier real-D3D12 fox image depicts the old
-open-clearing site and must not be treated as a visual check of the new one.
+passed. A bounded NullRHI Island run selected `(-102709, 98102, 2638)` cm, 580
+cm from mature spruce. A follow-up real-D3D12 run with the sparse-pocket score
+selected `(-100915, 97968, 2869)` cm, 815 cm from mature spruce, with 43 grass
+instances inside the 1.8 m pocket. Four elevated noon views show the resting
+fox clearly in a natural ground-cover opening, with mature woodland nearby; the
+first two frames are clearest at 1600x900. The low 17:00 test angles failed to
+read the fox, so lighting and camera elevation matter as much as proximity to
+trees. The rendered run used isolated world data, disabled thinking, allowed
+zero model requests, and ended itself at 90.3 real seconds. This verifies
+rendered presence and the request/time safeguards.
 
-Evidence: [`GroundCover automation`](../../Saved/Playtests/Codex_FoxWoodlandCover_Verify_20261010/GroundCover.log), [`bounded Island Game run`](../../Saved/Playtests/Codex_FoxWoodlandCover_Verify_20261010/FoxGame.log).
+A separate 200-frame CSV profile at the same 1600x900 real-D3D12 Game settings
+averaged 13.63 ms (73.4 FPS); P95 was 15.09 ms (66.3 FPS equivalent), with one
+65.45 ms spike. It clears the 30-FPS floor on this RTX 4080 Laptop GPU for this
+short windowed spectator sample. It does not establish PIE performance, other
+hardware, or long-session stability. The profile used the same isolated data,
+thinking-disabled, zero-request, 90-second safeguards.
 
-Next, capture the updated site with real RHI and check the fox against the
-woodland edge, path readability, and Wind Arch approach at ordinary gameplay
-scale. Consider another species only after the visual and performance check;
-keep wildlife transient, bounded, and non-conscious unless the project
-deliberately gives an animal its own identity, memory, personality, and request
-budget.
+Evidence: [`GroundCover automation`](../../Saved/Playtests/Codex_FoxCover_SparseSelector_20261010/GroundCover.log), [`bounded placement run`](../../Saved/Playtests/Codex_FoxWoodlandCover_Verify_20261010/FoxGame.log), [`real-D3D12 screenshot`](../../Saved/Playtests/Codex_FoxCover_SparsePocket_Retry_20261010/Screenshots/001_Fox__Woodland_Edge.png), [`real-D3D12 run log`](../../Saved/Playtests/Codex_FoxCover_SparsePocket_Retry_20261010/FoxRealRHI.log). The initial lower-angle comparison set is under [`Codex_FoxCover_RealRHI_20261010`](../../Saved/Playtests/Codex_FoxCover_RealRHI_20261010/Screenshots/).
+
+CSV evidence: [`profile log`](../../Saved/Playtests/Codex_FoxCover_FrameTime_20261010/FoxFrameTime.log), [`200-frame CSV`](../../Saved/Profiling/CSV/Profile(20261010_032057).csv).
+
+Next, repeat the matched profile in PIE and on the user's target hardware before
+treating the 30-FPS floor as a platform-wide guarantee. Keep wildlife transient
+and bounded; consider another species only after performance is confirmed.

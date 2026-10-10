@@ -227,9 +227,9 @@ private:
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);
 	/** Select one stable Fab flower species for a world-space meadow patch. */
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed);
-	/** Prefer a grounded fox spawn candidate 3–9 m from mature spruce; preserve the valid fallback if none qualify. */
+	/** Prefer a grounded fox spawn candidate near mature spruce and a sparse grass pocket; preserve a valid fallback. */
 	static int32 SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& CandidateLocations,
-		const TArray<float>& NearestMatureSpruceDistances, int32 FallbackIndex);
+		const TArray<float>& NearestMatureSpruceDistances, const TArray<int32>& NearbyGrassCounts, int32 FallbackIndex);
 	/** Stable member offset for a small flower pocket; member indices start at zero. */
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */

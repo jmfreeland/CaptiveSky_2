@@ -405,13 +405,17 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	const TArray<FVector> FoxSpawnCandidates = {
 		FVector(0.f, 0.f, 0.f), FVector(1450.f, 0.f, 0.f), FVector(0.f, 1450.f, 0.f), FVector(-1450.f, 0.f, 0.f) };
 	const TArray<float> FoxCoverDistances = { 1000.f, 340.f, 680.f, 220.f };
+	const TArray<int32> FoxNearbyGrassCounts = { 15, 12, 1, 4 };
 	TestEqual(TEXT("The fox prefers a grounded candidate near mature spruce, not an exposed or trunk-overlapping spot"),
-		AIslandWeather::SelectWoodlandFoxSpawnCandidate(FoxSpawnCandidates, FoxCoverDistances, 0), 2);
-	const TArray<float> ExposedFoxCoverDistances = { -1.f, 1200.f, 1800.f, -1.f };
+		AIslandWeather::SelectWoodlandFoxSpawnCandidate(FoxSpawnCandidates, FoxCoverDistances, FoxNearbyGrassCounts, 0), 2);
+	TestEqual(TEXT("The fox prefers a naturally sparse pocket when mature-tree cover is equally good"),
+		AIslandWeather::SelectWoodlandFoxSpawnCandidate({ FoxSpawnCandidates[0], FoxSpawnCandidates[1] },
+			{ 520.f, 520.f }, { 8, 1 }, 0), 1);
+	const TArray<float> ExposedFoxCoverDistances = { -1.f, 1500.f, 1800.f, -1.f };
 	TestEqual(TEXT("If no candidate has mature cover within the preferred woodland band, the first grounded point remains the fallback"),
-		AIslandWeather::SelectWoodlandFoxSpawnCandidate(FoxSpawnCandidates, ExposedFoxCoverDistances, 0), 0);
+		AIslandWeather::SelectWoodlandFoxSpawnCandidate(FoxSpawnCandidates, ExposedFoxCoverDistances, FoxNearbyGrassCounts, 0), 0);
 	TestEqual(TEXT("Fox site selection refuses a fallback when no grounded candidate exists"),
-		AIslandWeather::SelectWoodlandFoxSpawnCandidate({}, {}, INDEX_NONE), INDEX_NONE);
+		AIslandWeather::SelectWoodlandFoxSpawnCandidate({}, {}, {}, INDEX_NONE), INDEX_NONE);
 	TestEqual(TEXT("Nearby meadow flowers share a botanical color patch"),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71));
