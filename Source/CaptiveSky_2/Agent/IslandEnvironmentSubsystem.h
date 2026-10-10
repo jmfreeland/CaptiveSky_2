@@ -75,6 +75,7 @@ public:
 	float GetCloudCover() const { return CloudCover; }
 	float GetSunHeight() const { return SunHeight; }
 	float GetWindSpeed() const { return Wind.Size(); }
+	FVector GetWind() const { return Wind; }
 	float GetIslandHour() const { return IslandHour; }
 
 	/** Wetness after Seconds with the given rain and drying conditions. */

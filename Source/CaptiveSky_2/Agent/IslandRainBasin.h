@@ -65,10 +65,14 @@ public:
 	static float WaterDepth(float Water);
 	/** Colour of a leaf of this age: green when fresh, browning over a few days. Pure. */
 	static FLinearColor LeafColor(int32 AgeDays);
+	/** Wind-driven presentation transform from an immutable base; always stays within a few cm. Pure. */
+	static FTransform FloatingLeafWindTransform(const FTransform& Base, const FVector& Wind, double Seconds, int32 Seed);
 
 	void Show(const FIslandBasinState& State, int32 Today);
+	void UpdateFloatingLeaves(const FVector& Wind, double Seconds);
 
 private:
+	friend class FIslandRainBasinWorldTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
 	TObjectPtr<UInstancedStaticMeshComponent> Rim;
 	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
@@ -78,6 +82,14 @@ private:
 	/** Fresh, aging and old leaves, each tinted for its age bucket. */
 	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> LeafLayers;
+	struct FFloatingLeafInstance
+	{
+		int32 LayerIndex = INDEX_NONE;
+		int32 InstanceIndex = INDEX_NONE;
+		FTransform BaseTransform;
+		int32 Seed = 0;
+	};
+	TArray<FFloatingLeafInstance> FloatingLeaves;
 	bool bBuilt = false;
 };
 
@@ -121,6 +133,7 @@ private:
 	bool bDirty = false;
 	float SinceSave = 0.f;
 	float SinceShow = 0.f;
+	float SinceLeafMotion = 0.f;
 	float ShownWater = -1.f;
 
 	FString GetStorageFilePath() const;

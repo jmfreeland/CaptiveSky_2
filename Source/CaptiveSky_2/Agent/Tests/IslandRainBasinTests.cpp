@@ -3,6 +3,7 @@
 #include "AgentBrainComponent.h"
 #include "IslandInteractionUtility.h"
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -71,6 +72,17 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("One leaf is singular"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 1).Contains(TEXT("1 leaf drifts")));
 	TestTrue(TEXT("Several leaves are plural"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 3).Contains(TEXT("3 leaves drift")));
 	TestTrue(TEXT("Leaves on a dry basin lie on the stone"), UIslandRainBasinSubsystem::DescribeWater(0.f, 2).Contains(TEXT("dried leaves lie")));
+	const FTransform LeafBase(FRotator(0.f, 20.f, 0.f), FVector(30.f, 0.f, 8.f), FVector(0.12f, 0.06f, 0.01f));
+	TestTrue(TEXT("A calm basin leaves a floating leaf still"),
+		AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector::ZeroVector, 12.0, 3).Equals(LeafBase));
+	const FTransform BreezyLeaf = AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector(600.f, 0.f, 0.f), 12.0, 3);
+	const FTransform SameBreezyLeaf = AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector(600.f, 0.f, 0.f), 12.0, 3);
+	TestTrue(TEXT("A breeze moves and turns a floating leaf"), !BreezyLeaf.Equals(LeafBase, 0.01f));
+	TestTrue(TEXT("Leaf drift is deterministic from time, wind and seed"), BreezyLeaf.Equals(SameBreezyLeaf));
+	TestTrue(TEXT("Basin leaf drift stays bounded inside the water surface"),
+		FVector::Dist2D(BreezyLeaf.GetLocation(), LeafBase.GetLocation()) <= 6.f && BreezyLeaf.GetLocation().Size2D() < 41.f);
+	TestTrue(TEXT("An invalid wind sample preserves the authored leaf pose"),
+		AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector(NAN, 1.f, 0.f), 12.0, 3).Equals(LeafBase));
 	return true;
 }
 
@@ -182,6 +194,19 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			FString Fact;
 			TestTrue(TEXT("Resident inspection uses the ordinary interaction path"), IslandInteractionUtility::Perform(Resident, BasinActor, Fact));
 			TestTrue(TEXT("The resident's first inspection sets a leaf afloat"), Fact.Contains(TEXT("set it on the water")) && Basin->GetState().Leaves.Num() == 1);
+			TestEqual(TEXT("One floating-leaf presentation slot is tracked"), BasinActor->FloatingLeaves.Num(), 1);
+			if (BasinActor->FloatingLeaves.Num() == 1)
+			{
+				const AIslandRainBasin::FFloatingLeafInstance& Floating = BasinActor->FloatingLeaves[0];
+				FTransform CalmTransform;
+				BasinActor->UpdateFloatingLeaves(FVector::ZeroVector, 12.0);
+				BasinActor->LeafLayers[Floating.LayerIndex]->GetInstanceTransform(Floating.InstanceIndex, CalmTransform, false);
+				TestTrue(TEXT("Calm in-world wind preserves the saved leaf presentation transform"), CalmTransform.Equals(Floating.BaseTransform));
+				BasinActor->UpdateFloatingLeaves(FVector(600.f, 0.f, 0.f), 12.0);
+				FTransform WindyTransform;
+				BasinActor->LeafLayers[Floating.LayerIndex]->GetInstanceTransform(Floating.InstanceIndex, WindyTransform, false);
+				TestTrue(TEXT("Wind updates the rendered instanced leaf transform"), !WindyTransform.Equals(Floating.BaseTransform, 0.01f));
+			}
 			const int32 LeafCount = Basin->GetState().Leaves.Num();
 			TestTrue(TEXT("A repeat inspection reports today's leaf without changing the basin"),
 				IslandInteractionUtility::Perform(Resident, BasinActor, Fact) && Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == LeafCount);

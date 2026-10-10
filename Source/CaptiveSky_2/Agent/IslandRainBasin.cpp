@@ -179,6 +179,35 @@ FLinearColor AIslandRainBasin::LeafColor(int32 AgeDays)
 	return FMath::Lerp(FLinearColor(0.10f, 0.30f, 0.06f), FLinearColor(0.30f, 0.17f, 0.06f), Age);
 }
 
+FTransform AIslandRainBasin::FloatingLeafWindTransform(const FTransform& Base, const FVector& Wind, double Seconds, int32 Seed)
+{
+	if (!FMath::IsFinite(Wind.X) || !FMath::IsFinite(Wind.Y) || !FMath::IsFinite(Seconds)) return Base;
+	const FVector PlanarWind(Wind.X, Wind.Y, 0.f);
+	const float Speed = PlanarWind.Size();
+	const float Activity = FMath::SmoothStep(18.f, 280.f, Speed);
+	if (Activity <= 0.f) return Base;
+
+	const FVector Direction = PlanarWind.GetSafeNormal();
+	const FVector Crosswind(-Direction.Y, Direction.X, 0.f);
+	const float Phase = static_cast<float>(Seconds) * 0.65f + static_cast<float>(Seed % 997) * 0.031f;
+	const FVector Drift = Direction * (2.4f + 2.4f * FMath::Sin(Phase)) * Activity
+		+ Crosswind * (1.4f * FMath::Sin(Phase * 0.73f + 1.1f)) * Activity;
+	FRotator Rotation = Base.GetRotation().Rotator();
+	Rotation.Yaw += 6.f * Activity * FMath::Sin(Phase * 0.47f + 0.6f);
+	return FTransform(Rotation, Base.GetLocation() + Drift, Base.GetScale3D());
+}
+
+void AIslandRainBasin::UpdateFloatingLeaves(const FVector& Wind, double Seconds)
+{
+	for (int32 Index = 0; Index < FloatingLeaves.Num(); ++Index)
+	{
+		const FFloatingLeafInstance& Leaf = FloatingLeaves[Index];
+		if (!LeafLayers.IsValidIndex(Leaf.LayerIndex) || !LeafLayers[Leaf.LayerIndex] || Leaf.InstanceIndex == INDEX_NONE) continue;
+		const FTransform Transform = FloatingLeafWindTransform(Leaf.BaseTransform, Wind, Seconds, Leaf.Seed);
+		LeafLayers[Leaf.LayerIndex]->UpdateInstanceTransform(Leaf.InstanceIndex, Transform, false, true, true);
+	}
+}
+
 void AIslandRainBasin::Show(const FIslandBasinState& State, int32 Today)
 {
 	auto Tint = [](UStaticMeshComponent* Part, const FLinearColor& Color)
@@ -219,6 +248,7 @@ void AIslandRainBasin::Show(const FIslandBasinState& State, int32 Today)
 		Surface->SetRelativeScale3D(FVector((RimRadius - 5.f) * 2.f / 100.f, (RimRadius - 5.f) * 2.f / 100.f, 0.01f));
 	}
 
+	FloatingLeaves.Reset();
 	for (UInstancedStaticMeshComponent* Layer : LeafLayers) Layer->ClearInstances();
 	for (const FIslandBasinLeaf& Leaf : State.Leaves)
 	{
@@ -230,7 +260,17 @@ void AIslandRainBasin::Show(const FIslandBasinState& State, int32 Today)
 		const float Z = (bWater ? SurfaceZ : Ground + FloorThickness) + 0.8f;
 		const FRotator Spin(Random.FRandRange(-4.f, 4.f), Random.FRandRange(0.f, 360.f), Random.FRandRange(-4.f, 4.f));
 		const FVector Scale(Random.FRandRange(0.10f, 0.14f), Random.FRandRange(0.055f, 0.08f), 0.012f);
-		LeafLayers[Age <= 1 ? 0 : Age <= 3 ? 1 : 2]->AddInstance(FTransform(Spin, FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Z), Scale), false);
+		const int32 LayerIndex = Age <= 1 ? 0 : Age <= 3 ? 1 : 2;
+		const FTransform BaseTransform(Spin, FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Z), Scale);
+		const int32 InstanceIndex = LeafLayers[LayerIndex]->AddInstance(BaseTransform, false);
+		if (bWater && InstanceIndex != INDEX_NONE)
+		{
+			FFloatingLeafInstance& Floating = FloatingLeaves.AddDefaulted_GetRef();
+			Floating.LayerIndex = LayerIndex;
+			Floating.InstanceIndex = InstanceIndex;
+			Floating.BaseTransform = BaseTransform;
+			Floating.Seed = Leaf.Seed;
+		}
 	}
 }
 
@@ -422,6 +462,13 @@ void UIslandRainBasinSubsystem::Tick(float DeltaTime)
 	if (!FMath::IsNearlyEqual(State.Water, Before)) bDirty = true;
 	SinceSave += DeltaTime;
 	SinceShow += DeltaTime;
+	SinceLeafMotion += DeltaTime;
+	if (SinceLeafMotion >= 0.25f)
+	{
+		SinceLeafMotion = FMath::Fmod(SinceLeafMotion, 0.25f);
+		if (State.Water >= 0.02f && State.Leaves.Num() > 0)
+			if (AIslandRainBasin* Basin = Actor.Get()) Basin->UpdateFloatingLeaves(Environment->GetWind(), World->GetTimeSeconds());
+	}
 	if (SinceShow >= 1.f)
 	{
 		SinceShow = 0.f;
