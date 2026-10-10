@@ -1263,7 +1263,7 @@ void AIslandWeather::InitializeGroundCover()
 				int32 MeadowFlowerPatchCount = 0;
 				int32 ListeningStonesMeadowFlowerCount = 0;
 				int32 MeadowFlowerSpeciesCounts[MeadowFlowerSpeciesCount] = {};
-				constexpr int32 MeadowFlowerCandidateSites = 512;
+				constexpr int32 MeadowFlowerCandidateSites = 256;
 				const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
 					? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
 				if (IslandRhododendrons && RhododendronBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
