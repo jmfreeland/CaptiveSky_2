@@ -80,12 +80,17 @@ void ARatAgentAIController::CacheAnimations(APawn* Rat)
 
 void ARatAgentAIController::UpdateAnimation(float DeltaSeconds)
 {
-	USkeletalMeshComponent* Body = RatBody.Get();
 	const APawn* Rat = GetPawn();
-	if (!Body || !Rat) return;
+	if (!RatBody.IsValid() || !Rat) return;
+	UpdateAnimationForMotion(DeltaSeconds, Rat->GetVelocity().Size2D(), IsResting());
+}
 
-	const bool bSleeping = IsResting();
-	const ERatLocomotionMode Mode = SelectLocomotionMode(Rat->GetVelocity().Size2D(), bSleeping);
+void ARatAgentAIController::UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping)
+{
+	USkeletalMeshComponent* Body = RatBody.Get();
+	if (!Body) return;
+
+	const ERatLocomotionMode Mode = SelectLocomotionMode(HorizontalSpeed, bSleeping);
 	UAnimSequence* Desired = IdleAnimation;
 	bool bLoop = true;
 	if (Mode != CurrentMode)

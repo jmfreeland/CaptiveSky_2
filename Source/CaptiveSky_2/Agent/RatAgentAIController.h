@@ -53,4 +53,5 @@ private:
 
 	void CacheAnimations(APawn* Rat);
 	void UpdateAnimation(float DeltaSeconds);
+	void UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping);
 };

@@ -75,6 +75,18 @@ bool FRatAnimationAssetsTest::RunTest(const FString& Parameters)
 		Rat->GetMesh()->GetAnimationMode() == EAnimationMode::AnimationSingleNode);
 	TestTrue(TEXT("Possession starts the breathing idle clip"), Controller->CurrentAnimation == Controller->IdleAnimation &&
 		Rat->GetMesh()->GetSingleNodeInstance() && Rat->GetMesh()->GetSingleNodeInstance()->GetCurrentAsset() == Controller->IdleAnimation);
+	Controller->UpdateAnimationForMotion(0.f, 60.f, false);
+	TestTrue(TEXT("Walking selects and plays the compatible walk clip"), Controller->CurrentAnimation == Controller->WalkAnimation &&
+		Rat->GetMesh()->GetSingleNodeInstance()->GetCurrentAsset() == Controller->WalkAnimation);
+	Controller->UpdateAnimationForMotion(0.f, 140.f, false);
+	TestTrue(TEXT("Running selects and plays the compatible run clip"), Controller->CurrentAnimation == Controller->RunAnimation &&
+		Rat->GetMesh()->GetSingleNodeInstance()->GetCurrentAsset() == Controller->RunAnimation);
+	Controller->UpdateAnimationForMotion(0.f, 0.f, true);
+	TestTrue(TEXT("Sleeping selects and plays the compatible sleep clip"), Controller->CurrentAnimation == Controller->SleepAnimation &&
+		Rat->GetMesh()->GetSingleNodeInstance()->GetCurrentAsset() == Controller->SleepAnimation);
+	Controller->UpdateAnimationForMotion(0.f, 0.f, false);
+	TestTrue(TEXT("Waking returns to the breathing idle clip"), Controller->CurrentAnimation == Controller->IdleAnimation &&
+		Rat->GetMesh()->GetSingleNodeInstance()->GetCurrentAsset() == Controller->IdleAnimation);
 	TestTrue(TEXT("The transient fixture never dispatches an LLM request"), !Rat->Brain || !Rat->Brain->bRequestInFlight);
 
 	World->DestroyWorld(false);
