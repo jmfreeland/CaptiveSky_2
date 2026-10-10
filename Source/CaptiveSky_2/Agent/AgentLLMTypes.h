@@ -72,8 +72,10 @@ enum class EAgentActionType : uint8
 	Build,
 	// A raven flies to a listed open-ground site and descends; it does not alter the world.
 	Land,
-	// Records a bounded proposal for a human to review and build through the local asset pipeline.
-	RequestObject
+	// Records a bounded proposal for a human to review and optionally build through the local asset pipeline.
+	RequestObject,
+	// Records a bounded human-reviewed proposal to improve an existing world object or feature.
+	RequestUpgrade
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */
@@ -118,7 +120,19 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachArrangement;
 
-	/** Optional object description, only used when ActionType == RequestObject. */
+	/** Optional new-object description, only used when ActionType == RequestObject. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString ObjectRequest;
+
+	/** Exact visible target identifier for RequestUpgrade, when the proposed change is object-specific. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString UpgradeTarget;
+
+	/** aesthetic, variation, or functionality; only used when ActionType == RequestUpgrade. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString UpgradeKind;
+
+	/** Concise proposal for improving an existing object or world feature. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString UpgradeRequest;
 };

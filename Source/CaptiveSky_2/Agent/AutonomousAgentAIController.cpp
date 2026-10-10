@@ -917,7 +917,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 	{
 		const FString Key = FString::FromInt(static_cast<int32>(Decision.ActionType)) + TEXT(":") + Decision.ActionTarget.ToLower();
 		// Different speech and random wandering are not identical failed actions.
-		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land || Decision.ActionType == EAgentActionType::RequestObject;
+		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land || Decision.ActionType == EAgentActionType::RequestObject || Decision.ActionType == EAgentActionType::RequestUpgrade;
 		RepeatedActions = bRepeatSensitive ? (Key == LastActionKey ? RepeatedActions + 1 : 1) : 0;
 		LastActionKey = Key;
 		NextThinkAt = FPlatformTime::Seconds() + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
@@ -1186,6 +1186,23 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.ObjectRequest, RequestId, Error))
 		{
 			ReportAction(FString::Printf(TEXT("Object request %s was added to the human-review queue; no asset has been made or placed."), *RequestId.Left(8)));
+		}
+		else
+		{
+			ReportAction(Error);
+		}
+		break;
+	}
+	case EAgentActionType::RequestUpgrade:
+	{
+		FString RequestId;
+		FString Error;
+		const FString Requester = ControlledPawn->GetName();
+		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.UpgradeRequest, RequestId, Error,
+			FString(), TEXT("upgrade"), Decision.UpgradeTarget, Decision.UpgradeKind))
+		{
+			const FString TargetPhrase = Decision.UpgradeTarget.IsEmpty() ? TEXT("the world") : Decision.UpgradeTarget;
+			ReportAction(FString::Printf(TEXT("Upgrade suggestion %s for %s was added for human review; nothing in the world changed."), *RequestId.Left(8), *TargetPhrase));
 		}
 		else
 		{

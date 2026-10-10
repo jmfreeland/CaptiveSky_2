@@ -257,6 +257,11 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		SystemPrompt.Contains(TEXT("request_object")) && SystemPrompt.Contains(TEXT("object_request")));
 	TestTrue(TEXT("Object requests are proposals and do not create assets automatically"),
 		SystemPrompt.Contains(TEXT("human caretaker")) && SystemPrompt.Contains(TEXT("does not create, import, or place anything")));
+	TestTrue(TEXT("Upgrade proposals cover any existing world element and the three requested improvement kinds"),
+		SystemPrompt.Contains(TEXT("any existing object or feature in the landscape or level")) &&
+		SystemPrompt.Contains(TEXT("aesthetic")) && SystemPrompt.Contains(TEXT("variation")) && SystemPrompt.Contains(TEXT("functionality")));
+	TestTrue(TEXT("Upgrade proposals remain human-reviewed suggestions that change nothing automatically"),
+		SystemPrompt.Contains(TEXT("request_upgrade")) && SystemPrompt.Contains(TEXT("not permission to change the world")));
 	const FAgentDecision LandDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
 		TEXT("{\"thought\":\"A quiet descent\",\"action\":{\"type\":\"land\",\"target\":\"ArrangingGround_1\"}}"), Writer);
 	TestTrue(TEXT("The land action parses with its exact site target"), LandDecision.bValid &&
@@ -266,6 +271,13 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The request_object action and description parse"), ObjectRequestDecision.bValid &&
 		ObjectRequestDecision.ActionType == EAgentActionType::RequestObject &&
 		ObjectRequestDecision.ObjectRequest == TEXT("A small weatherproof bird shelter"));
+	const FAgentDecision UpgradeDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
+		TEXT("{\"thought\":\"The sign could be clearer.\",\"action\":{\"type\":\"request_upgrade\",\"upgrade_target\":\"InnNoticeBoard\",\"upgrade_kind\":\"functionality\",\"upgrade_request\":\"Add a small weatherproof shelf for messages\"}}"), Writer);
+	TestTrue(TEXT("The request_upgrade action preserves its target, kind, and proposal"), UpgradeDecision.bValid &&
+		UpgradeDecision.ActionType == EAgentActionType::RequestUpgrade &&
+		UpgradeDecision.UpgradeTarget == TEXT("InnNoticeBoard") &&
+		UpgradeDecision.UpgradeKind == TEXT("functionality") &&
+		UpgradeDecision.UpgradeRequest == TEXT("Add a small weatherproof shelf for messages"));
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
 
 	return true;

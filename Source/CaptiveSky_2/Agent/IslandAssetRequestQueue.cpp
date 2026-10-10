@@ -16,8 +16,44 @@ namespace IslandAssetRequestQueue
 		constexpr int32 MaxDescriptionCharacters = 240;
 		constexpr int32 MaxPendingRequests = 64;
 
+		bool SplitJsonObjects(const FString& Text, TArray<FString>& OutObjects)
+		{
+			OutObjects.Reset();
+			FString Current;
+			int32 BraceDepth = 0;
+			bool bInString = false;
+			bool bEscaped = false;
+			for (const TCHAR Character : Text)
+			{
+				if (BraceDepth == 0)
+				{
+					if (FChar::IsWhitespace(Character)) continue;
+					if (Character != TEXT('{')) return false;
+					Current.Reset();
+					Current.AppendChar(Character);
+					BraceDepth = 1;
+					continue;
+				}
+
+				Current.AppendChar(Character);
+				if (bInString)
+				{
+					if (bEscaped) bEscaped = false;
+					else if (Character == TEXT('\\')) bEscaped = true;
+					else if (Character == TEXT('"')) bInString = false;
+					continue;
+				}
+
+				if (Character == TEXT('"')) bInString = true;
+				else if (Character == TEXT('{')) ++BraceDepth;
+				else if (Character == TEXT('}') && --BraceDepth == 0) OutObjects.Add(Current);
+			}
+			return BraceDepth == 0 && !bInString;
+		}
+
 		bool ReadPendingRequests(const FString& Path, int32& OutCount, FString& OutError,
-			const FString& Requester, const FString& Description)
+			const FString& Requester, const FString& Description, const FString& RequestType,
+			const FString& Target, const FString& UpgradeKind)
 		{
 			OutCount = 0;
 			FString Existing;
@@ -31,9 +67,13 @@ namespace IslandAssetRequestQueue
 				return false;
 			}
 
-			TArray<FString> Lines;
-			Existing.ParseIntoArrayLines(Lines, false);
-			for (const FString& Line : Lines)
+			TArray<FString> Records;
+			if (!SplitJsonObjects(Existing, Records))
+			{
+				OutError = TEXT("The asset request inbox contains an unreadable record; no request was added.");
+				return false;
+			}
+			for (const FString& Line : Records)
 			{
 				TSharedPtr<FJsonObject> Record;
 				const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Line);
@@ -53,11 +93,19 @@ namespace IslandAssetRequestQueue
 
 				FString ExistingRequester;
 				FString ExistingDescription;
+				FString ExistingType;
+				FString ExistingTarget;
+				FString ExistingKind;
 				Record->TryGetStringField(TEXT("requester"), ExistingRequester);
 				Record->TryGetStringField(TEXT("description"), ExistingDescription);
-				if (ExistingRequester == Requester && ExistingDescription.TrimStartAndEnd().Equals(Description, ESearchCase::IgnoreCase))
+				Record->TryGetStringField(TEXT("request_type"), ExistingType);
+				Record->TryGetStringField(TEXT("target"), ExistingTarget);
+				Record->TryGetStringField(TEXT("upgrade_kind"), ExistingKind);
+				if (ExistingType.IsEmpty()) ExistingType = TEXT("new_object");
+				if (ExistingRequester == Requester && ExistingDescription.TrimStartAndEnd().Equals(Description, ESearchCase::IgnoreCase) &&
+					ExistingType == RequestType && ExistingTarget == Target && ExistingKind == UpgradeKind)
 				{
-					OutError = TEXT("You already have this object request awaiting review; nothing was added.");
+					OutError = TEXT("You already have this proposal awaiting review; nothing was added.");
 					return false;
 				}
 			}
@@ -66,7 +114,8 @@ namespace IslandAssetRequestQueue
 	}
 
 	bool AppendRequest(const FString& Requester, const FString& Description,
-		FString& OutRequestId, FString& OutError, const FString& InboxPathOverride)
+		FString& OutRequestId, FString& OutError, const FString& InboxPathOverride,
+		const FString& RequestType, const FString& Target, const FString& UpgradeKind)
 	{
 		OutRequestId.Reset();
 		OutError.Reset();
@@ -74,16 +123,31 @@ namespace IslandAssetRequestQueue
 		const FString CleanDescription = Description.TrimStartAndEnd();
 		if (Requester.IsEmpty() || CleanDescription.IsEmpty() || CleanDescription.Len() > MaxDescriptionCharacters)
 		{
-			OutError = FString::Printf(TEXT("An object request needs a description of 1 to %d characters."), MaxDescriptionCharacters);
+			OutError = FString::Printf(TEXT("A world proposal needs a description of 1 to %d characters."), MaxDescriptionCharacters);
 			return false;
 		}
 		for (const TCHAR Character : CleanDescription)
 		{
 			if (FChar::IsControl(Character))
 			{
-				OutError = TEXT("Object requests must be a single line of plain text.");
+				OutError = TEXT("World proposals must be a single line of plain text.");
 				return false;
 			}
+		}
+		if (RequestType != TEXT("new_object") && RequestType != TEXT("upgrade"))
+		{
+			OutError = TEXT("The proposal type is not supported.");
+			return false;
+		}
+		if (Target.Len() > 96 || Target.Contains(TEXT("\n")) || Target.Contains(TEXT("\r")))
+		{
+			OutError = TEXT("The target must be a short, single-line identifier.");
+			return false;
+		}
+		if (RequestType == TEXT("upgrade") && UpgradeKind != TEXT("aesthetic") && UpgradeKind != TEXT("variation") && UpgradeKind != TEXT("functionality"))
+		{
+			OutError = TEXT("An upgrade proposal must be aesthetic, variation, or functionality.");
+			return false;
 		}
 
 		const FString Path = InboxPathOverride.IsEmpty()
@@ -97,7 +161,7 @@ namespace IslandAssetRequestQueue
 		}
 
 		int32 PendingCount = 0;
-		if (!ReadPendingRequests(Path, PendingCount, OutError, Requester, CleanDescription))
+		if (!ReadPendingRequests(Path, PendingCount, OutError, Requester, CleanDescription, RequestType, Target, UpgradeKind))
 		{
 			return false;
 		}
@@ -113,14 +177,18 @@ namespace IslandAssetRequestQueue
 		Record->SetStringField(TEXT("created_at_utc"), FDateTime::UtcNow().ToIso8601());
 		Record->SetStringField(TEXT("requester"), Requester);
 		Record->SetStringField(TEXT("description"), CleanDescription);
-		Record->SetStringField(TEXT("pipeline"), TEXT("ComfyBlender"));
+		Record->SetStringField(TEXT("request_type"), RequestType);
+		if (!Target.IsEmpty()) Record->SetStringField(TEXT("target"), Target);
+		if (!UpgradeKind.IsEmpty()) Record->SetStringField(TEXT("upgrade_kind"), UpgradeKind);
+		Record->SetStringField(TEXT("pipeline"), RequestType == TEXT("new_object") ? TEXT("ComfyBlender") : TEXT("human_review"));
 		Record->SetStringField(TEXT("status"), TEXT("pending_review"));
 
 		FString JsonLine;
-		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonLine);
+		const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+			TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&JsonLine);
 		if (!FJsonSerializer::Serialize(Record, Writer))
 		{
-			OutError = TEXT("The object request could not be serialized; no request was added.");
+			OutError = TEXT("The proposal could not be serialized; nothing was added.");
 			return false;
 		}
 		JsonLine.AppendChar(TEXT('\n'));
@@ -128,7 +196,7 @@ namespace IslandAssetRequestQueue
 			&IFileManager::Get(), EFileWrite::FILEWRITE_Append))
 		{
 			OutRequestId.Reset();
-			OutError = TEXT("The object request could not be written to the review inbox.");
+			OutError = TEXT("The proposal could not be written to the review inbox.");
 			return false;
 		}
 		return true;
