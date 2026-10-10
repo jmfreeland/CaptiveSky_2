@@ -2,6 +2,8 @@
 
 Residents can optionally choose `request_object` to propose a new physical object, or `request_upgrade` to propose a change to any existing object or landscape/level feature. Upgrade proposals can be `aesthetic` (appearance/material), `variation` (distinct forms, species, or details), or `functionality` (use, interaction, or behavior). Use the exact identifier shown in the resident's situation when one is available. For a visible object without a listed identifier, use a concise description of its visible kind and relative location (for example, `mossy stone tower beside the northern path`); the proposal queue preserves that description for human review. Omit the target only for genuinely broad world-level ideas.
 
+To make untagged props requestable without turning them into new interaction targets, each resident's situation may list at most three nearest, clearly visible static-mesh objects within 25 m. Use the displayed label or a short appearance/location description only in `upgrade_target`; these ordinary props do not thereby become valid `move_to` or `interact` targets. Instanced foliage is excluded from this prop list.
+
 These actions only record concise proposals for human review. They do not call ComfyUI or Blender, edit source assets, import an Unreal asset, or change the map. Requests are suggestions, not promises or character obligations. New-object proposals may proceed through ComfyBlender after review; upgrade proposals are labeled `human_review` because they may call for art, code, or level design rather than one particular asset pipeline.
 
 The default inbox is `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl`. Each line is a standalone JSON record:

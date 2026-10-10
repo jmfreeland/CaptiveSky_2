@@ -15,6 +15,9 @@
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/TargetPoint.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
@@ -159,6 +162,22 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(5100.f + 100.f * Index, 5000.f, 150.f), FRotator::ZeroRotator);
 		if (Firefly) Firefly->Tags.Append({TEXT("IslandLife"), TEXT("Firefly")});
 	}
+	UStaticMesh* TestPropMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	auto SpawnPerceptionProp = [World, TestPropMesh](const FVector& Position, const TCHAR* Label)
+	{
+		AStaticMeshActor* Prop = World->SpawnActor<AStaticMeshActor>(Position, FRotator::ZeroRotator);
+		if (!Prop) return;
+		Prop->SetActorLabel(Label);
+		if (UStaticMeshComponent* Mesh = Prop->GetStaticMeshComponent())
+		{
+			Mesh->SetStaticMesh(TestPropMesh);
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+	};
+	SpawnPerceptionProp(FVector(4900.f, 5000.f, 150.f), TEXT("Mossy Stone Tower"));
+	SpawnPerceptionProp(FVector(4900.f, 5300.f, 150.f), TEXT("Weathered Notice Board"));
+	SpawnPerceptionProp(FVector(4900.f, 5500.f, 150.f), TEXT("Old Windmill"));
+	SpawnPerceptionProp(FVector(5000.f, 7000.f, 150.f), TEXT("Distant Sundial"));
 	AIslandTidepoolCrab* WildlifeCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(5300.f, 5000.f, 150.f), FRotator::ZeroRotator);
 	AIslandTidepoolMinnows* WildlifeMinnows = World->SpawnActor<AIslandTidepoolMinnows>(FVector(5400.f, 5000.f, 150.f), FRotator::ZeroRotator);
 	if (TestNotNull(TEXT("Wildlife perception observer spawned"), WildlifeObserver) && TestNotNull(TEXT("Wildlife perception brain registered"), WildlifeBrain))
@@ -176,6 +195,13 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The nearest firefly, not an arbitrary member of the species, is described"), WildlifeView.Contains(TEXT("firefly glow is drifting independently nearby, about 1 metres away")));
 		TestTrue(TEXT("A larger firefly group does not crowd the shore crab out of perception"), WildlifeView.Contains(TEXT("A small shore crab is scuttling independently")));
 		TestTrue(TEXT("A larger firefly group does not crowd the minnows out of perception"), WildlifeView.Contains(TEXT("A small school of minnows is circling")));
+		TestTrue(TEXT("A nearby untagged prop is available as a descriptive upgrade target"),
+			WildlifeView.Contains(TEXT("Mossy Stone Tower")) && WildlifeView.Contains(TEXT("request_upgrade")));
+		TestTrue(TEXT("Nearby static-prop perception stays bounded and selects the three closest visible props"),
+			WildlifeView.Contains(TEXT("Weathered Notice Board")) && WildlifeView.Contains(TEXT("Old Windmill")) &&
+			!WildlifeView.Contains(TEXT("Distant Sundial")));
+		TestFalse(TEXT("An ordinary prop is not accidentally exposed as a movement or interaction target"),
+			WildlifeView.Contains(TEXT("move_to target: Mossy Stone Tower")) || WildlifeView.Contains(TEXT("interact target: Mossy Stone Tower")));
 	}
 
 	const TArray<FIslandArrangementSite>& Sites = State->GetArrangementSites();
