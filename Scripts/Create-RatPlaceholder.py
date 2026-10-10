@@ -1,9 +1,9 @@
 """Create /Game/Agents/BP_Rat_Placeholder: a resident body for the rat, cloned from BP_Agent_Placeholder.
 
-Swaps the mesh for SK_Rat_01 (Fox skeleton), scales it to a rat (~0.28), shrinks the capsule and slows the walk,
-(plays the Fox breathing idle in a loop; locomotion animation still needs an AnimBP or controller). The rat's seed
-profile is active, but its runtime spawn still waits on a real fallen-wood hollow anchor. Label its actor "Rat",
-never "Fenrus" (docs/residents/README.md).
+Swaps the mesh for SK_Rat_01 (Fox skeleton), scales it to a rat (~0.28), shrinks the capsule and slows the walk.
+ARatAgentAIController drives the compatible Fox idle/look-around/walk/run/sleep sequences. The rat's seed profile is
+active, but its runtime spawn still waits on a real fallen-wood hollow anchor. Label its actor "Rat", never "Fenrus"
+(docs/residents/README.md).
   UnrealEditor-Cmd <uproject> -ExecutePythonScript=Scripts/Create-RatPlaceholder.py -RenderOffscreen -NoZen
 """
 import traceback
@@ -27,6 +27,10 @@ try:
     if not bp:
         raise RuntimeError("could not create " + DST)
     cdo = unreal.get_default_object(bp.generated_class())
+    controller = unreal.load_class(None, "/Script/CaptiveSky_2.RatAgentAIController")
+    if not controller:
+        raise RuntimeError("ARatAgentAIController is missing; build the project module before creating the Rat body")
+    cdo.set_editor_property("ai_controller_class", controller)
     mesh = unreal.load_asset(MESH)
     b = mesh.get_bounds()
     cap = cdo.get_editor_property("capsule_component")
