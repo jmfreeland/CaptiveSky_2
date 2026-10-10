@@ -246,6 +246,19 @@ frequency or a polished highlight. The earlier Editor-context frame showed
 saved proxy geometry and is not representative of runtime stones.
 Details: [fox–stag awareness finding](findings/2026-10-10-fox-stag-awareness.md).
 
+## 2026-10-10 — The Raven notices a nearby dragonfly
+
+A settled Raven can briefly turn its attention toward a visible dragonfly
+within 10 m and a modest height band. It does not chase or move, and the
+dragonfly's flight is unchanged. The cue is one-shot while the insect remains
+in the nearby group and rearms after it leaves; closer existing wildlife cues
+and higher-priority attention still win. UE 5.8.3 editor build and the
+`CaptiveSky2.Agent.RavenPerch` regression passed with NullRHI, Python disabled,
+an isolated world-state root, and a zero model-request cap. AutoSDK validation
+returned 0 on this approved run. This verifies the bounded attention logic,
+not its natural frequency or readability in a rendered scene; check that in a
+future normal-distance gameplay capture. See [Raven–dragonfly attention](findings/2026-10-10-raven-dragonfly-attention.md).
+
 ## 2026-10-10 — Tideglass gameplay habitat baseline
 
 A bounded UE 5.8.3 real-D3D12 Game capture at 11:00 used an isolated data

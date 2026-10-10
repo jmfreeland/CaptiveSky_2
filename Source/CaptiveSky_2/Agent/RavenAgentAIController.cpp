@@ -20,6 +20,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandWeather.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWorldStateSubsystem.h"
@@ -1254,6 +1255,35 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 		ClosestDistanceSquared = DistanceSquared;
 		ClosestWildlifeAttentionLocation = FoxHead;
 		bClosestIsFox = true;
+	}
+
+	// Small, harmless insects can hold a settled bird's attention too, but they
+	// do not trigger a chase or change their own flight. Like the larger
+	// wildlife cues, this remains local, visible, and one-shot per nearby group.
+	for (TActorIterator<AIslandTideglassDragonfly> It(GetWorld()); It; ++It)
+	{
+		AIslandTideglassDragonfly* Dragonfly = *It;
+		if (!IsValid(Dragonfly)) continue;
+		const FVector Offset = Dragonfly->GetActorLocation() - Raven->GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const TWeakObjectPtr<AActor> DragonflyWeak(Dragonfly);
+		if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+		{
+			NoticedWildlifeInNearbyGroup.Remove(DragonflyWeak);
+			continue;
+		}
+		bWildlifeRemainsNearby = true;
+		if (DistanceSquared > FMath::Square(NoticeRadius) || NoticedWildlifeInNearbyGroup.Contains(DragonflyWeak) ||
+			(ClosestEligibleWildlife && DistanceSquared >= ClosestDistanceSquared))
+		{
+			continue;
+		}
+
+		const FVector DragonflyBody = Dragonfly->GetActorLocation() + FVector(0.f, 0.f, 12.f);
+		if (!IsVisibleFromRaven(Dragonfly, DragonflyBody)) continue;
+		ClosestEligibleWildlife = Dragonfly;
+		ClosestDistanceSquared = DistanceSquared;
+		ClosestWildlifeAttentionLocation = DragonflyBody;
 	}
 
 	if (!bWildlifeRemainsNearby) NoticedWildlifeInNearbyGroup.Reset();

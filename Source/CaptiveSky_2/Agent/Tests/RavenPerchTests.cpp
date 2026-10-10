@@ -15,6 +15,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
 #include "Components/BoxComponent.h"
@@ -992,6 +993,35 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				BeyondRangeFox->Destroy();
 			}
 			SleepingFox->Destroy();
+		}
+		AIslandTideglassDragonfly* NearbyDragonfly = World->SpawnActor<AIslandTideglassDragonfly>(
+			RavenLocationBeforeWildlifeGlance + FVector(350.f, 0.f, 120.f), FRotator::ZeroRotator);
+		TestNotNull(TEXT("A nearby dragonfly can be staged for the Raven's quiet attention cue"), NearbyDragonfly);
+		if (NearbyDragonfly)
+		{
+			NearbyDragonfly->SetActorTickEnabled(false);
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			const FVector RavenBeforeDragonflyGlance = BlueprintRaven->GetActorLocation();
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("A settled Raven notices a nearby visible dragonfly"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyDragonfly &&
+				BlueprintController->WildlifeAttentionRemaining > 1.5f);
+			TestTrue(TEXT("The quiet insect cue leaves Raven in place"),
+				BlueprintRaven->GetActorLocation().Equals(RavenBeforeDragonflyGlance, 0.1f));
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestFalse(TEXT("A dragonfly already noticed in this nearby group does not retrigger the cue"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyDragonfly);
+			NearbyDragonfly->SetActorLocation(RavenBeforeDragonflyGlance + FVector(1500.f, 0.f, 120.f));
+			BlueprintController->CheckForNearbyWildlifePresence();
+			NearbyDragonfly->SetActorLocation(RavenBeforeDragonflyGlance + FVector(350.f, 0.f, 120.f));
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("The insect cue rearms after the dragonfly leaves and later returns"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyDragonfly);
+			NearbyDragonfly->Destroy();
 		}
 		if (FoxGround) FoxGround->Destroy();
 		BlueprintController->UnPossess();
