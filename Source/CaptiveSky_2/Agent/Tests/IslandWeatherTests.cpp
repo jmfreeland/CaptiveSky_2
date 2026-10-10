@@ -297,6 +297,34 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	const FString GroundCoverSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("Numbered ground-cover asset IDs are described perceptually"),
 		GroundCoverSituation.Contains(TEXT("patch of low groundcover")) && !GroundCoverSituation.Contains(TEXT("ground 05 01")));
+
+	struct FInstalledPlantLabelCase
+	{
+		const TCHAR* AssetPath;
+		const TCHAR* ExpectedDescription;
+		const TCHAR* CaseName;
+	};
+	const FInstalledPlantLabelCase InstalledPlantLabels[] =
+	{
+		{ TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"), TEXT("patch of wildflowers"), TEXT("numbered Fab flower") },
+		{ TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_05_01.ground_05_01"), TEXT("patch of low groundcover"), TEXT("numbered Fab ground cover") },
+		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"), TEXT("patch of spruce trees"), TEXT("interactive spruce") },
+		{ TEXT("/Game/Plants/Meshes/Festuca_gautieri_LD.Festuca_gautieri_LD"), TEXT("patch of grasses"), TEXT("Festuca") },
+		{ TEXT("/Game/Plants/Meshes/Phalaris_arundinacea_LD.Phalaris_arundinacea_LD"), TEXT("patch of grasses"), TEXT("Phalaris") }
+	};
+	for (const FInstalledPlantLabelCase& LabelCase : InstalledPlantLabels)
+	{
+		UStaticMesh* InstalledPlant = LoadObject<UStaticMesh>(nullptr, LabelCase.AssetPath);
+		if (!InstalledPlant)
+		{
+			AddInfo(FString::Printf(TEXT("Optional %s asset is not installed; its resident-label check was skipped."), LabelCase.CaseName));
+			continue;
+		}
+		Foliage->SetStaticMesh(InstalledPlant);
+		const FString InstalledPlantSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+		TestTrue(FString::Printf(TEXT("Installed %s mesh gets a perceptual resident label"), LabelCase.CaseName),
+			InstalledPlantSituation.Contains(LabelCase.ExpectedDescription) && !InstalledPlantSituation.Contains(InstalledPlant->GetName()));
+	}
 	Foliage->SetStaticMesh(Cube);
 
 	AActor* Occluder = World->SpawnActor<AActor>(FVector(150.f, 0.f, 25.f), FRotator::ZeroRotator, Spawn);
