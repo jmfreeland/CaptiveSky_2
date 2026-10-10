@@ -22,6 +22,6 @@ Goal: bodies for the human residents (MetaHuman), the raven and the rat. Status:
 - Not wired in: the resident pawns still use their placeholder body.
 
 ## Reproduce
-1. `Scripts/Export-CreatureReferences` is not a separate script; export `SK_Crow` / `SK_Fox` to FBX with `unreal.Exporter.run_asset_export_task` under `-RenderOffscreen` (NullRHI asserts on skeletal-mesh export).
+1. `Scripts/Export-CreatureReferences.py` exports `SK_Crow` / `SK_Fox` to FBX (needs `-RenderOffscreen`; NullRHI asserts on skeletal-mesh export).
 2. `blender -b --factory-startup -P Scripts/AssetPipeline/creatures/raven.py -- SK_Crow.fbx <out>/Raven`, same for `rat.py`/`SK_Fox.fbx`, plus `rat_fur_texture.py`.
 3. `UnrealEditor-Cmd <uproject> -ExecutePythonScript=Scripts/Import-Creatures.py -RenderOffscreen` (set `CREATURE_SRC` when the project dir is not the repo).
