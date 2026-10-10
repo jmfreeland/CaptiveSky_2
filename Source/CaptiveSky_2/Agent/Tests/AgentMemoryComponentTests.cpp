@@ -253,11 +253,19 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		SystemPrompt.Contains(TEXT("return only if you are curious")));
 	TestTrue(TEXT("The prompt restricts land to Raven and listed open-ground sites"),
 		SystemPrompt.Contains(TEXT("The land action is for the raven only")) && SystemPrompt.Contains(TEXT("ArrangingGround target")));
-	TestTrue(TEXT("The response schema lists land as an action type"), SystemPrompt.Contains(TEXT("sleep|build|land")));
+	TestTrue(TEXT("The response schema lists the human-reviewed object request action"),
+		SystemPrompt.Contains(TEXT("request_object")) && SystemPrompt.Contains(TEXT("object_request")));
+	TestTrue(TEXT("Object requests are proposals and do not create assets automatically"),
+		SystemPrompt.Contains(TEXT("human caretaker")) && SystemPrompt.Contains(TEXT("does not create, import, or place anything")));
 	const FAgentDecision LandDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
 		TEXT("{\"thought\":\"A quiet descent\",\"action\":{\"type\":\"land\",\"target\":\"ArrangingGround_1\"}}"), Writer);
 	TestTrue(TEXT("The land action parses with its exact site target"), LandDecision.bValid &&
 		LandDecision.ActionType == EAgentActionType::Land && LandDecision.ActionTarget == TEXT("ArrangingGround_1"));
+	const FAgentDecision ObjectRequestDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(
+		TEXT("{\"thought\":\"A sheltered place might help.\",\"action\":{\"type\":\"request_object\",\"object_request\":\"A small weatherproof bird shelter\"}}"), Writer);
+	TestTrue(TEXT("The request_object action and description parse"), ObjectRequestDecision.bValid &&
+		ObjectRequestDecision.ActionType == EAgentActionType::RequestObject &&
+		ObjectRequestDecision.ObjectRequest == TEXT("A small weatherproof bird shelter"));
 	IFileManager::Get().DeleteDirectory(*TestDir, false, true);
 
 	return true;

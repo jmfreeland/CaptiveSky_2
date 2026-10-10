@@ -71,7 +71,9 @@ enum class EAgentActionType : uint8
 	// Makes a small lasting change to the world, only at targets the situation explicitly offers.
 	Build,
 	// A raven flies to a listed open-ground site and descends; it does not alter the world.
-	Land
+	Land,
+	// Records a bounded proposal for a human to review and build through the local asset pipeline.
+	RequestObject
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */
@@ -115,4 +117,8 @@ struct FAgentDecision
 	/** Optional exact public arrangement shared during nearby resident conversation. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachArrangement;
+
+	/** Optional object description, only used when ActionType == RequestObject. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString ObjectRequest;
 };

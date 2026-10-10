@@ -825,7 +825,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"object_request\": \"<short description, only for request_object>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"For move_to, interact, build, and land, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
 		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
@@ -834,6 +834,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
+		"You may optionally use request_object to ask the human caretaker for one useful physical object to consider making. Put a concise, concrete description (at most 240 characters) in object_request, grounded in a need or curiosity you actually have; do not claim it exists or that it will be made. This only places a proposal in a review queue; it does not create, import, or place anything. Requests are optional and should be occasional, not repeated. "
 		"When arranging stones, add \"form\", \"title\", and \"intent\" fields inside the action object; titles and intents are your own words and stay private unless you speak them. If an observed earlier stone work genuinely influenced a new arrangement, you may also add its exact visible site ID in \"influence\"; choose a different form so the new work transforms rather than copies it. Influence is optional and never a duty. "
 		"When you have actually inspected or learned the visible form of a completed stone arrangement, you may optionally keep one brief private new memory of your own impression if some quality of its pattern genuinely stays with you. This is personal aesthetic reflection, not a shared CultureScore or a duty; do not invent the maker's feelings, title, intent, or authorship beyond public lineage, and do not write a memory just because you saw the work. Such a memory is private to you unless you later choose to share something in an in-world conversation. "
 		"At the inn counter, build target GuestBook may use \"intent\" for one short line in the shared guest book; other residents can read it, so do not write private secrets there. Writing is optional and limited to one line per Island day. "
@@ -1138,6 +1139,7 @@ static EAgentActionType ActionTypeFromString(const FString& InString)
 	if (InString == TEXT("sleep")) return EAgentActionType::Sleep;
 	if (InString == TEXT("build")) return EAgentActionType::Build;
 	if (InString == TEXT("land")) return EAgentActionType::Land;
+	if (InString == TEXT("request_object")) return EAgentActionType::RequestObject;
 	return EAgentActionType::Idle;
 }
 
@@ -1169,6 +1171,7 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("intent"), Decision.Intent);
 		(*ActionObj)->TryGetStringField(TEXT("influence"), Decision.Influence);
 		(*ActionObj)->TryGetStringField(TEXT("teach_arrangement"), Decision.TeachArrangement);
+		(*ActionObj)->TryGetStringField(TEXT("object_request"), Decision.ObjectRequest);
 	}
 
 	Decision.bValid = true;

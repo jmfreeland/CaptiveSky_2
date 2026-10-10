@@ -19,6 +19,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandTrail.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandAssetRequestQueue.h"
 #include "LandscapeHeightfieldCollisionComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -916,7 +917,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 	{
 		const FString Key = FString::FromInt(static_cast<int32>(Decision.ActionType)) + TEXT(":") + Decision.ActionTarget.ToLower();
 		// Different speech and random wandering are not identical failed actions.
-		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land;
+		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land || Decision.ActionType == EAgentActionType::RequestObject;
 		RepeatedActions = bRepeatSensitive ? (Key == LastActionKey ? RepeatedActions + 1 : 1) : 0;
 		LastActionKey = Key;
 		NextThinkAt = FPlatformTime::Seconds() + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
@@ -1177,6 +1178,21 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		StopMovement();
 		ReportAction(TEXT("Landing at an open-ground site is available to the raven only; nothing changed."));
 		break;
+	case EAgentActionType::RequestObject:
+	{
+		FString RequestId;
+		FString Error;
+		const FString Requester = ControlledPawn->GetName();
+		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.ObjectRequest, RequestId, Error))
+		{
+			ReportAction(FString::Printf(TEXT("Object request %s was added to the human-review queue; no asset has been made or placed."), *RequestId.Left(8)));
+		}
+		else
+		{
+			ReportAction(Error);
+		}
+		break;
+	}
 	case EAgentActionType::Idle:
 	default:
 		StopMovement();
