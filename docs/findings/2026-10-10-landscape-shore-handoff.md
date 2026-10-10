@@ -1,6 +1,6 @@
 # Landscape shoreline layer: handoff for visual verification (2026-10-10)
 
-Built by Claude, **not yet verified visually**. The user asked for this to be handed to Codex to test, because a capture run loads
+Built by Claude; the non-authored variants are now **visually verified in isolated captures** (details below). The user asked for this to be handed to Codex to test, because a capture run loads
 the full Island map in a second editor and the machine was too tight on memory to do that beside the user's open editor
 (10 GB editor, commit at 83%, ~9 GB free).
 
@@ -62,14 +62,18 @@ Codex ran the captures on the main project (`Saved/Logs/Codex_Shore{Baseline,Leg
   Water plugin's turquoise shallows; the rowboat sits on it. No checkerboard, black, magenta or errors. The ground away from the beach is not changed by the material
   (the sand mask is zero there); the pixel differences elsewhere are the sky and the **cloud shadows on the ground**, because each capture is a separate process with a different
   dynamic cloud state. So the baseline-vs-shore frames are not a controlled pixel comparison, and there is no same-session baseline-vs-parent pair in the harness yet.
+- **The 30 FPS automation gate passed at hour 12.** `FWaitForInteractiveFrameRate` settled at 37.33 FPS on baseline, 38.26 on Legacy Shore, and 37.53 on Shore Substrate. These are short warm-up gates, not a controlled performance benchmark; they show no obvious regression at this view, not a general gameplay guarantee.
 - **The Substrate variant also renders.** The landscape pipeline accepts a Substrate Front Material: no fallback, no error. It differs from the legacy variant in the right place:
   a darker, glossier damp-sand band along the waterline instead of pale sand fading straight into the shallows (beach-region mean difference 9.4/255 vs 5.7 on plain ground).
   The film's rain/puddle part was **not** exercised (dry frame); pair it with `-CompareLandscapeWetness` / `-LandscapeWetness 1` to see it.
 - **The sand is bright.** In the legacy frame the beach reads about (218, 203, 177) mean RGB against about (98, 94, 87) for the surrounding ground, about 2.2 times brighter (not clipped:
   0% of sand pixels at 250 or more). The builder script now has a `SandAlbedoScale` parameter (default 0.8) for this; **the assets have not been rebuilt with it yet**, because a rebuild
   deletes and recreates the materials a capture may be using. Until then, tune `SandDampDarken` or rebuild. The sand grain is not visible at this camera distance.
-- **Not yet checked:** other viewpoints (`00_Survey`, `02a_TideglassGroundDetail`, `04_WindArchOverlook`), hour 17 / low sun, wet versus dry, frame time (the Substrate variant adds a closure per pixel on the
-  landscape), whether the sand band suits the rest of the shore (the band is derived from sea level Z=940, not measured), and in-game (PIE) behaviour. The authored `MI_Island_Landscape` is unchanged.
+- **Low sun:** Codex also captured the Substrate variant at hour 17 (`Saved/Logs/Codex_ShoreSubstrate_H17_20261010.log`, frame in
+  `Saved/Viewpoints/2026-10-10_140651_h17.0/01_ShoreApproach.png`). The test passed, settled at 39.02 FPS for five seconds after 16 seconds of warm-up, and the darker waterline band remains visible.
+  This is a single Substrate frame—not a matched baseline/legacy comparison—so it does not isolate the film effect from the lighting. It used the pre-`SandAlbedoScale` assets.
+- **Still unchecked:** other viewpoints (`00_Survey`, `02a_TideglassGroundDetail`, `04_WindArchOverlook`), wet versus dry (the rain/puddle film), controlled frame-time benchmarking, whether the sand band suits the full shore profile
+  (the band is derived from sea level Z=940, not measured), and in-game (PIE) behaviour. The authored `MI_Island_Landscape` is unchanged.
 
 ## Pitfalls hit while verifying
 
