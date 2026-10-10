@@ -5,10 +5,13 @@
 #include "IslandLightning.h"
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "Misc/ScopeExit.h"
 #include "Sound/SoundWaveProcedural.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
@@ -226,5 +229,75 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Residents are told a storm is overhead"), WorldWeather->DescribeAt(WorldWeather->GetActorLocation()).Contains(TEXT("a storm")));
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNearbyVegetationPerceptionTest,
+	"CaptiveSky2.Agent.NearbyVegetationPerception",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Transient plant-perception fixture world created"), World) ||
+		!TestNotNull(TEXT("Engine is available for plant-perception fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	ON_SCOPE_EXIT
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+	};
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
+	ACharacter* Observer = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Observer spawned"), Observer) ||
+		!TestNotNull(TEXT("Engine cube mesh loaded for one foliage instance"), Cube)) return false;
+
+	UHierarchicalInstancedStaticMeshComponent* Foliage = nullptr;
+	TArray<UHierarchicalInstancedStaticMeshComponent*> FoliageComponents;
+	Weather->GetComponents<UHierarchicalInstancedStaticMeshComponent>(FoliageComponents);
+	if (FoliageComponents.Num() > 0) Foliage = FoliageComponents[0];
+	if (!TestNotNull(TEXT("Weather actor exposes a HISM foliage component"), Foliage)) return false;
+	Foliage->SetStaticMesh(Cube);
+	Foliage->SetVisibility(true);
+	Foliage->SetHiddenInGame(false);
+	Foliage->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Foliage->AddInstance(FTransform(FRotator::ZeroRotator, FVector(300.f, 0.f, 0.f)));
+	UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Observer);
+	Observer->AddInstanceComponent(Brain);
+	Brain->RegisterComponent();
+
+	const FString VisibleSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby visible HISM plant is described for a possible upgrade request"),
+		VisibleSituation.Contains(TEXT("patch of Cube vegetation")) && VisibleSituation.Contains(TEXT("request_upgrade")));
+	TestTrue(TEXT("A plant description never creates a movement or interaction target"),
+		VisibleSituation.Contains(TEXT("no movement or interaction target")) && !VisibleSituation.Contains(TEXT("move_to target: Cube")));
+
+	AActor* Occluder = World->SpawnActor<AActor>(FVector(150.f, 0.f, 25.f), FRotator::ZeroRotator, Spawn);
+	UBoxComponent* OccluderBox = NewObject<UBoxComponent>(Occluder);
+	Occluder->SetRootComponent(OccluderBox);
+	OccluderBox->SetBoxExtent(FVector(35.f, 100.f, 100.f));
+	OccluderBox->SetCollisionProfileName(TEXT("BlockAll"));
+	OccluderBox->RegisterComponent();
+	const FString OccludedSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("A plant hidden behind solid geometry is not described as visible"),
+		OccludedSituation.Contains(TEXT("patch of Cube vegetation")));
+	Occluder->Destroy();
+
+	Observer->SetActorLocation(FVector(2000.f, 0.f, 0.f));
+	const FString DistantSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("HISM vegetation beyond the short perception radius is omitted"),
+		DistantSituation.Contains(TEXT("patch of Cube vegetation")));
 	return true;
 }

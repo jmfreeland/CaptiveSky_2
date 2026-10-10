@@ -17,6 +17,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "IslandInteractionUtility.h"
 #include "IslandWeather.h"
@@ -592,6 +593,107 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 			++VisibleLandmarks;
 		}
+		// HISM foliage belongs to the weather/scatter actor, so the ordinary prop scan
+		// below intentionally skips it. Give residents a small, genuinely nearby sample
+		// for descriptive upgrade requests without turning plants into travel targets.
+		struct FNearbyPlantPatch
+		{
+			FName MeshName;
+			FString DisplayName;
+			double DistanceSquared = TNumericLimits<double>::Max();
+			FVector Location = FVector::ZeroVector;
+		};
+		TArray<FNearbyPlantPatch> NearbyPlantPatches;
+		constexpr float PlantPerceptionRadius = 650.f;
+		constexpr int32 MaxPlantInstancesExaminedPerComponent = 48;
+		constexpr int32 MaxVisibilityChecksPerComponent = 3;
+		FVector PlantViewStart = Location + FVector(0.f, 0.f, 80.f);
+		FRotator PlantViewRotation = Owner->GetActorRotation();
+		Owner->GetActorEyesViewPoint(PlantViewStart, PlantViewRotation);
+		for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
+		{
+			TArray<UActorComponent*> FoliageComponents;
+			WeatherIt->GetComponents(UHierarchicalInstancedStaticMeshComponent::StaticClass(), FoliageComponents);
+			for (UActorComponent* FoliageComponent : FoliageComponents)
+			{
+				UHierarchicalInstancedStaticMeshComponent* Foliage = Cast<UHierarchicalInstancedStaticMeshComponent>(FoliageComponent);
+				const UStaticMesh* Mesh = Foliage ? Foliage->GetStaticMesh() : nullptr;
+				if (!Foliage || !Mesh || !Foliage->IsVisible() || Foliage->bHiddenInGame || Foliage->GetInstanceCount() == 0) continue;
+
+				const TArray<int32> CandidateIndices = Foliage->GetInstancesOverlappingSphere(Location, PlantPerceptionRadius, true);
+				if (CandidateIndices.IsEmpty()) continue;
+
+				struct FNearbyPlantInstance
+				{
+					double DistanceSquared = TNumericLimits<double>::Max();
+					FVector Location = FVector::ZeroVector;
+				};
+				TArray<FNearbyPlantInstance> Candidates;
+				const int32 CandidateLimit = FMath::Min(CandidateIndices.Num(), MaxPlantInstancesExaminedPerComponent);
+				for (int32 Candidate = 0; Candidate < CandidateLimit; ++Candidate)
+				{
+					FTransform InstanceTransform;
+					if (!Foliage->GetInstanceTransform(CandidateIndices[Candidate], InstanceTransform, true)) continue;
+					const FVector InstanceLocation = InstanceTransform.GetLocation();
+					Candidates.Add({ FVector::DistSquared(Location, InstanceLocation), InstanceLocation });
+				}
+				Candidates.Sort([](const FNearbyPlantInstance& A, const FNearbyPlantInstance& B)
+				{ return A.DistanceSquared < B.DistanceSquared; });
+
+				bool bFoundVisibleInstance = false;
+				FVector NearestVisibleLocation = FVector::ZeroVector;
+				double NearestVisibleDistanceSquared = TNumericLimits<double>::Max();
+				const int32 VisibilityLimit = FMath::Min(Candidates.Num(), MaxVisibilityChecksPerComponent);
+				for (int32 Candidate = 0; Candidate < VisibilityLimit; ++Candidate)
+				{
+					const FVector Target = Candidates[Candidate].Location + FVector(0.f, 0.f, FMath::Max(35.f, Mesh->GetBounds().BoxExtent.Z * 0.55f));
+					FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentNearbyVegetationVisibility), false, Owner);
+					Params.AddIgnoredActor(*WeatherIt);
+					FHitResult Hit;
+					if (GetWorld()->LineTraceSingleByChannel(Hit, PlantViewStart, Target, ECC_Visibility, Params)) continue;
+					bFoundVisibleInstance = true;
+					NearestVisibleLocation = Candidates[Candidate].Location;
+					NearestVisibleDistanceSquared = Candidates[Candidate].DistanceSquared;
+					break;
+				}
+				if (!bFoundVisibleInstance) continue;
+
+				FString DisplayName = Mesh->GetName();
+				DisplayName.RemoveFromStart(TEXT("SM_"));
+				DisplayName.RemoveFromStart(TEXT("SKM_"));
+				DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
+				const FName MeshName = Mesh->GetFName();
+				FNearbyPlantPatch* ExistingPatch = NearbyPlantPatches.FindByPredicate(
+					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });
+				if (!ExistingPatch || NearestVisibleDistanceSquared < ExistingPatch->DistanceSquared)
+				{
+					if (ExistingPatch)
+					{
+						ExistingPatch->DistanceSquared = NearestVisibleDistanceSquared;
+						ExistingPatch->Location = NearestVisibleLocation;
+					}
+					else
+					{
+						NearbyPlantPatches.Add({ MeshName, MoveTemp(DisplayName), NearestVisibleDistanceSquared, NearestVisibleLocation });
+					}
+				}
+			}
+		}
+		NearbyPlantPatches.Sort([](const FNearbyPlantPatch& A, const FNearbyPlantPatch& B)
+			{ return A.DistanceSquared < B.DistanceSquared; });
+		for (int32 Index = 0; Index < FMath::Min(3, NearbyPlantPatches.Num()); ++Index)
+		{
+			const FNearbyPlantPatch& Patch = NearbyPlantPatches[Index];
+			const FVector ToPatch = (Patch.Location - Location).GetSafeNormal2D();
+			const double ForwardDot = FVector::DotProduct(ToPatch, Owner->GetActorForwardVector());
+			const double RightDot = FVector::DotProduct(ToPatch, Owner->GetActorRightVector());
+			const TCHAR* RelativeDirection = FMath::Abs(RightDot) > FMath::Abs(ForwardDot)
+				? (RightDot >= 0.f ? TEXT("to your right") : TEXT("to your left"))
+				: (ForwardDot >= 0.f ? TEXT("ahead of you") : TEXT("behind you"));
+			NearbyBeings += FString::Printf(TEXT(" In clear view, a nearby patch of %s vegetation is about %.0f metres %s. If you choose request_upgrade, describe this patch and its relative location; it has no movement or interaction target."),
+				*Patch.DisplayName, FMath::Sqrt(Patch.DistanceSquared) / 100.f, RelativeDirection);
+		}
+
 		TArray<TPair<float, FString>> NearbyStaticProps;
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{

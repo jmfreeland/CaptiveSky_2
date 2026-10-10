@@ -97,6 +97,7 @@ private:
 	friend class FIslandArrangementTest;
 	friend class FIslandWeatherTracesTest;
 	friend class FIslandWeatherTest;
+	friend class FIslandNearbyVegetationPerceptionTest;
 	friend class FIslandEnvironmentTest;
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
