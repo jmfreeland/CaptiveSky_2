@@ -324,3 +324,16 @@ rendered the saved stone proxies and hit a separate existing foliage-count
 assertion; the first cold standalone Game launch timed out, but a warmed retry
 reached the world and captured the view. Details and evidence:
 [transient lichen finding](findings/2026-10-09-listening-stones-material-override.md#transient-lichen-weathering-2026-10-10).
+
+## 2026-10-10 — Tideglass wet-edge variety and layered-cover screen
+
+A one-shot editor-world preview confirmed 7 Typha + 3 Phalaris at the Tideglass
+edge and three transient daylight dragonflies. The broad view's full-cover p95
+was 28.45 FPS, below the 30-FPS screen; meadow/ground plants alone reached
+55.50 FPS p95 and woodland/understory alone 58.11 FPS. This points to a
+combined-layer cost to isolate, but does not establish a Game/PIE regression or
+attribute it to the landscape material. The current view still has an exposed
+brown mid-distance, blockout pool/landmarks, and a placeholder-looking close
+dragonfly. Next: test meadow+trees and meadow+understory together, then check
+the target composition in standalone Game and PIE. See the [full capture and
+limits](findings/2026-10-10-tideglass-layer-performance.md).
