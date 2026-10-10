@@ -347,7 +347,9 @@ namespace
 		float SlopeRange = TNumericLimits<float>::Max();
 		float NearestMatureTreeDistance = TNumericLimits<float>::Max();
 		FVector NearestMatureTree = FVector::ZeroVector;
+		bool bHasNearestMatureTree = false;
 		int32 CoveredFootprintSamples = 0;
+		int32 NearbyUnderstoryFootprintSamples = 0;
 		int32 NavigableFootprintSamples = 0;
 		int32 NavigableApproachDirections = 0;
 		int32 ClearApproachDirections = 0;
@@ -375,6 +377,34 @@ namespace
 			bFoundLandscape = true;
 		}
 		return bFoundLandscape;
+	}
+
+	static void GatherRatSiteUnderstoryLocations(AIslandWeather* Weather, const FVector2D& Center, float SearchRadius, TArray<FVector>& OutLocations)
+	{
+		// Nearby non-spruce HISM plants are a ranking cue only; they do not satisfy the strict crown-cover gate.
+		OutLocations.Reset();
+		if (!Weather) return;
+
+		TArray<UHierarchicalInstancedStaticMeshComponent*> Components;
+		Weather->GetComponents(Components);
+		const float SearchRadiusSquared = FMath::Square(SearchRadius);
+		for (UHierarchicalInstancedStaticMeshComponent* Component : Components)
+		{
+			if (!Component || Component->GetName() == TEXT("IslandSpruce") || !Component->IsVisible()) continue;
+			const UStaticMesh* Mesh = Component->GetStaticMesh();
+			if (!Mesh) continue;
+			const float MeshHeight = Mesh->GetBoundingBox().GetSize().Z;
+			if (MeshHeight < 35.f || MeshHeight > 650.f) continue;
+
+			for (int32 InstanceIndex = 0; InstanceIndex < Component->GetInstanceCount(); ++InstanceIndex)
+			{
+				FTransform InstanceTransform;
+				if (!Component->GetInstanceTransform(InstanceIndex, InstanceTransform, true)) continue;
+				const FVector Location = InstanceTransform.GetLocation();
+				if (FVector2D::DistSquared(FVector2D(Location.X, Location.Y), Center) > SearchRadiusSquared) continue;
+				OutLocations.Add(Location);
+			}
+		}
 	}
 
 	static void AuditRatHollowSites(const TArray<FString>& Args, UWorld* World)
@@ -417,10 +447,12 @@ namespace
 				if (Height >= 900.f) MatureSpruceLocations.Add(InstanceTransform.GetLocation());
 			}
 		}
+		TArray<FVector> UnderstoryLocations;
+		GatherRatSiteUnderstoryLocations(Weather, FVector2D(CenterX, CenterY), static_cast<float>(Radius + 600.0), UnderstoryLocations);
 
 		UE_LOG(LogIslandNavProbe, Display,
-			TEXT("RatHollowSiteAudit scan center=(%.0f,%.0f) radius=%.0f step=%.0f; mature-spruce=%d; navdata=%s; map/world state unchanged."),
-			CenterX, CenterY, Radius, Step, MatureSpruceLocations.Num(), DefaultNavData ? *DefaultNavData->GetName() : TEXT("none"));
+			TEXT("RatHollowSiteAudit scan center=(%.0f,%.0f) radius=%.0f step=%.0f; mature-spruce=%d; visible-understory-instances=%d; navdata=%s; map/world state unchanged."),
+			CenterX, CenterY, Radius, Step, MatureSpruceLocations.Num(), UnderstoryLocations.Num(), DefaultNavData ? *DefaultNavData->GetName() : TEXT("none"));
 
 		FCollisionQueryParams ClearanceParams(SCENE_QUERY_STAT(RatHollowCapsuleClearance), false);
 		ClearanceParams.AddIgnoredActor(Weather);
@@ -473,11 +505,24 @@ namespace
 				{
 					Sample.NearestMatureTreeDistance = Distance;
 					Sample.NearestMatureTree = MatureSpruceLocations[Index];
+					Sample.bHasNearestMatureTree = true;
 				}
 			}
-			if (Sample.NearestMatureTreeDistance < 250.f || Sample.NearestMatureTreeDistance > 1200.f) { ++RejectedCover; continue; }
+			if (Sample.NearestMatureTreeDistance < 250.f) { ++RejectedCover; continue; }
 			Sample.CoveredFootprintSamples = Weather->CountSpruceCrownCoverProbes(CoverStarts, CoverEnds);
 			const bool bHasCrownCover = Sample.CoveredFootprintSamples >= 3;
+			for (int32 FootprintIndex = 0; FootprintIndex < UE_ARRAY_COUNT(FootprintOffsets); ++FootprintIndex)
+			{
+				const FVector2D FootprintXY = CandidateXY + FootprintOffsets[FootprintIndex];
+				const float FootprintGroundZ = GroundHeights[FootprintIndex];
+				for (const FVector& PlantLocation : UnderstoryLocations)
+				{
+					if (FMath::Abs(PlantLocation.Z - FootprintGroundZ) > 200.f ||
+						FVector2D::DistSquared(FVector2D(PlantLocation.X, PlantLocation.Y), FootprintXY) > FMath::Square(250.f)) continue;
+					++Sample.NearbyUnderstoryFootprintSamples;
+					break;
+				}
+			}
 
 			for (int32 FootprintIndex = 0; FootprintIndex < UE_ARRAY_COUNT(FootprintOffsets); ++FootprintIndex)
 			{
@@ -509,8 +554,9 @@ namespace
 			}
 			if (Sample.ClearApproachDirections == 0) { ++RejectedObstruction; continue; }
 
-			const float TreeDistancePreference = FMath::Abs(Sample.NearestMatureTreeDistance - 550.f);
-			Sample.Score = Sample.CoveredFootprintSamples * 100.f + Sample.NavigableFootprintSamples * 15.f +
+			const float TreeDistancePreference = Sample.bHasNearestMatureTree
+				? FMath::Abs(Sample.NearestMatureTreeDistance - 550.f) : 1200.f;
+			Sample.Score = Sample.CoveredFootprintSamples * 100.f + Sample.NearbyUnderstoryFootprintSamples * 30.f + Sample.NavigableFootprintSamples * 15.f +
 				Sample.NavigableApproachDirections * 5.f + Sample.ClearApproachDirections * 10.f - Sample.SlopeRange - TreeDistancePreference * 0.05f;
 			if (bHasCrownCover) Qualified.Add(Sample);
 			else
@@ -528,20 +574,24 @@ namespace
 		for (int32 Index = 0; Index < FMath::Min(10, Qualified.Num()); ++Index)
 		{
 			const FRatSiteSample& Sample = Qualified[Index];
+			const FString NearestSpruce = Sample.bHasNearestMatureTree
+				? FString::Printf(TEXT("%.0fcm at=%s"), Sample.NearestMatureTreeDistance, *Sample.NearestMatureTree.ToCompactString()) : TEXT("none");
 			UE_LOG(LogIslandNavProbe, Display,
-				TEXT("RatHollowSiteAudit candidate[%d] pos=%s slope=%.1fcm crownSamples=%d/5 navFootprint=%d/5 navApproaches=%d/4 clearApproaches=%d/4 nearestSpruce=%.0fcm at=%s score=%.1f."),
-				Index + 1, *Sample.Location.ToCompactString(), Sample.SlopeRange, Sample.CoveredFootprintSamples,
+				TEXT("RatHollowSiteAudit candidate[%d] pos=%s slope=%.1fcm crownSamples=%d/5 nearbyUnderstory=%d/5 navFootprint=%d/5 navApproaches=%d/4 clearApproaches=%d/4 nearestSpruce=%s score=%.1f."),
+				Index + 1, *Sample.Location.ToCompactString(), Sample.SlopeRange, Sample.CoveredFootprintSamples, Sample.NearbyUnderstoryFootprintSamples,
 				Sample.NavigableFootprintSamples, Sample.NavigableApproachDirections, Sample.ClearApproachDirections,
-				Sample.NearestMatureTreeDistance, *Sample.NearestMatureTree.ToCompactString(), Sample.Score);
+				*NearestSpruce, Sample.Score);
 		}
 		for (int32 Index = 0; Index < FMath::Min(10, NearMisses.Num()); ++Index)
 		{
 			const FRatSiteSample& Sample = NearMisses[Index];
+			const FString NearestSpruce = Sample.bHasNearestMatureTree
+				? FString::Printf(TEXT("%.0fcm at=%s"), Sample.NearestMatureTreeDistance, *Sample.NearestMatureTree.ToCompactString()) : TEXT("none");
 			UE_LOG(LogIslandNavProbe, Display,
-				TEXT("RatHollowSiteAudit near-miss[%d] pos=%s slope=%.1fcm crownSamples=%d/5 navFootprint=%d/5 navApproaches=%d/4 clearApproaches=%d/4 nearestSpruce=%.0fcm at=%s score=%.1f; below the strict crown-cover threshold."),
-				Index + 1, *Sample.Location.ToCompactString(), Sample.SlopeRange, Sample.CoveredFootprintSamples,
+				TEXT("RatHollowSiteAudit near-miss[%d] pos=%s slope=%.1fcm crownSamples=%d/5 nearbyUnderstory=%d/5 navFootprint=%d/5 navApproaches=%d/4 clearApproaches=%d/4 nearestSpruce=%s score=%.1f; below the strict crown-cover threshold."),
+				Index + 1, *Sample.Location.ToCompactString(), Sample.SlopeRange, Sample.CoveredFootprintSamples, Sample.NearbyUnderstoryFootprintSamples,
 				Sample.NavigableFootprintSamples, Sample.NavigableApproachDirections, Sample.ClearApproachDirections,
-				Sample.NearestMatureTreeDistance, *Sample.NearestMatureTree.ToCompactString(), Sample.Score);
+				*NearestSpruce, Sample.Score);
 		}
 		UE_LOG(LogIslandNavProbe, Display, TEXT("RatHollowSiteAudit: results are suggestions only; visually inspect and test actual hollow placement before recording a home."));
 	}
