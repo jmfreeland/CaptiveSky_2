@@ -6,12 +6,13 @@
 - Source and import report: `Saved/CaptiveSky/ComfyBlender/RatHollow/`; `unreal_import.json` reports no validation errors.
 - Unreal registry: 1,602 vertices, 1,836 triangles, four material slots (wood, dark hollow, straw, moss), four simple box collision shapes, two UV channels, Nanite disabled; approximate bounds 256 × 136 × 134 cm.
 - Read-only Static Mesh Editor inspection shows a weathered fallen log and a clearly distinct circular hollow entrance; the source asset also includes moss patches and a small straw nest bed. The default side thumbnail hides the entrance; orient it toward the Rat's approach/habitat when placing it.
+- Live read-only mesh-bound check: `/Game/Characters/Creatures/Rat/SK_Rat_01` measures about 22 × 112 × 38 cm in local X/Y/Z, while the hollow runs along X and has a nominal 78 cm entrance. With the Rat's long local Y axis aligned to the tunnel (about 90° yaw), the body's 22 × 38 cm cross-section fits the opening with room for its tail to follow. This is only a geometric check: `SK_Rat_01` currently has no Physics Asset assigned, and the Rat's runtime collision/animation alignment has not been tested against the hollow.
 
 ## Relationship to Fenrus
 
 `Agents/Agent_Rat_01/identity.md` says the Rat's first home is a hidden fallen-wood hollow. `Agents/Agent_Rat_01/places.json` is still empty, so no in-world coordinates are claimed yet. The asset is imported and visually readable, but has not been placed or traversability-tested with a Rat body.
 
-The user has confirmed the home concept: a hidden fallen-wood hollow. This confirms the habitat/design, not a particular Island site; keep `places.json` empty until a sheltered, dry, accessible location is verified in-world.
+The user has confirmed the home concept: a hidden fallen-wood hollow. This confirms the habitat/design, not a particular Island site; keep `places.json` empty until a sheltered, dry, accessible location is verified in-world. The current editor viewport is a broad, exposed patch of bare ground, so it is not a home candidate.
 
 A read-only live viewport survey at `(-100500, 102000)` showed open grass beside the inn with little nearby cover; a higher survey near `(-100000, 101000)` showed only a sparse tree group. Reject this near-inn patch as a hidden home candidate. The island needs more understory/vegetation before a convincing sheltered rat home can be selected; no RatHollow placement was made.
 
