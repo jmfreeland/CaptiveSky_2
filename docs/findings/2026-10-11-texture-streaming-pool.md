@@ -8,8 +8,10 @@ The project sets `r.Streaming.PoolSize=4096` and
 `BaseScalability.ini` overrides that profile to a 1000 MiB pool and disables
 the VRAM clamp, which explains why the warning could recur in Game despite the
 project default. `Config/DefaultScalability.ini` now overrides just those two
-High-profile settings, preserving the selected texture quality and other
-scalability choices. The Game startup log
+pool settings at every texture-quality tier (0–3), preserving the selected
+texture quality and other scalability choices while retaining the per-device
+VRAM clamp. This also prevents a switch to Low, Medium, or Epic from restoring
+the engine's 1000 MiB/no-clamp pool defaults. The Game startup log
 (`Saved/Logs/Codex_TextureScalability_MemoryDDC_20261011.log`) sets both project
 values and applies `[TextureQuality@3]` without emitting the engine's 1000 MiB
 override. It then reports `UBT AutoSDK ReturnCode: -532462766` and never reaches
