@@ -2,12 +2,22 @@
 
 ## Finding
 
-The project enables texture streaming but does not set a project-specific pool
-size in `Config/DefaultEngine.ini`. The UE 5.8.3 process reports
-`r.Streaming.PoolSize = 1000`, set by Scalability (High texture quality).
-Previous real-RHI Game highlight captures showed the red streaming warning at
-about 4.4–5.7 MiB over that pool. This is a small recurring streaming-pool
-overage, distinct from the separate whole-GPU video-memory warning recorded in
+The project now explicitly sets `r.Streaming.PoolSize=4096` and
+`r.Streaming.LimitPoolSizeToVRAM=1` in `Config/DefaultEngine.ini` (commit
+`cacced2`). Real-RHI UE 5.8.3 capture logs confirm the active streaming pool
+changed from the previous scalability default of 1000 MiB to 4096 MiB:
+`Saved/Logs/Codex_TexturePool_Verify_20261011.log` and
+`Saved/Logs/Codex_TexturePool_Verify_1100_20261011.log`. The RHI reports a
+7074 MiB automatically estimated pool ceiling on this machine, but that is not
+evidence Island needs that much or that raising the project pool is safe.
+
+Earlier real-RHI Game highlight captures showed the red streaming warning
+about 4.4–5.7 MiB over the former 1000 MiB pool. That proves the old setting
+was occasionally exceeded; the newer captures confirm the 4096 MiB setting is
+active, but do **not** record the warning camera's Required Pool / Over Budget
+figures. The user's more recent observation that the warning still recurs is
+not yet quantified against the new limit. This streaming-pool warning is
+distinct from the separate whole-GPU video-memory warning recorded in
 `2026-10-08-editor-vram-pressure.md`.
 
 ## Read-only Island inventory
@@ -33,12 +43,13 @@ were changed.
 ## Next diagnostic
 
 On the exact Island view where the warning appears, capture
-`stat streaming sortby=name maxhistoryframes=1` after streaming settles, then
-run `ListTextures` in that same session. Verify the biggest candidates' asset
-referencers before changing their resolution, mip policy, or loading behavior.
-Keep the current High-quality pool unchanged until target hardware and the
-warning view have been measured; do not hide the warning for a performance
-claim. Epic documents [`STAT STREAMING`](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-metrics-in-unreal-engine)
+`stat streaming sortby=name maxhistoryframes=1` after streaming settles and
+record Required Pool and Over Budget at the current 4096 MiB setting. Then run
+`ListTextures` in that same session. If actual demand is well below 4096 MiB,
+investigate the warning's source/other memory category instead of increasing
+this pool; if it exceeds 4096 MiB, verify the top wanted-mip contributors and
+their referencers before changing resolution, mip policy, or loading behavior.
+Do not hide the warning or raise the pool blindly. Epic documents [`STAT STREAMING`](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-metrics-in-unreal-engine)
 and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentation/unreal-engine/texture-asset-editor-in-unreal-engine?lang=en-US).
 
 ## Follow-up status
@@ -46,10 +57,11 @@ and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentat
 The read-only inventory script now also asks the Asset Registry for direct
 hard/soft package referencers of the six largest candidates above. That query is
 based on UE's `AssetRegistry.get_referencers` API, but this addition has **not
-yet been executed in Unreal**: on 2026-10-11 the editor and Unreal MCP endpoint
-were unavailable, and a fresh `UnrealEditor-Cmd` attempt exited before creating
-its requested log. A separate `-version` startup probe entered UBT platform
-validation, made no CPU progress for over 20 seconds, and produced no new
-project log; only that probe and its stalled child processes were stopped. The
-candidate referencer list and exact-view `stat streaming` capture therefore
-remain pending. No texture settings or assets were changed.
+yet been executed in Unreal**. The last checked Unreal MCP endpoint was
+unavailable and no editor process was running. A fresh `UnrealEditor-Cmd`
+attempt had exited before creating its requested log; a separate `-version`
+startup probe entered UBT platform validation, made no CPU progress for over
+20 seconds, and produced no new project log, so only that probe and its stalled
+child processes were stopped. The candidate referencer list and exact-view
+`stat streaming` capture therefore remain pending. No texture assets or map
+content were changed; the 4096 MiB project pool setting is already committed.
