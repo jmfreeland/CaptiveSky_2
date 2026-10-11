@@ -31,8 +31,9 @@ map or assets. Latest output:
 also ran independently in `Codex_TextureInventory_Transitive_20261011.log`).
 
 The candidates below appeared in `ListTextures` in the map-loaded commandlet
-session. Registry paths prove package dependency, not that a texture is visible
-in the current camera or is a cause of the streaming warning:
+session. The table records the original settings before the local mip trial.
+Registry paths prove package dependency, not that a texture is visible in the
+current camera or is a cause of the streaming warning:
 
 | Candidate | Loaded size / format | Mip and streaming settings | Island dependency path |
 |---|---|---|---|
@@ -51,7 +52,38 @@ so the two must not be conflated. The 8K grass opacity map is an
 Island-reachable residency candidate: it has no mip chain and is referenced
 through landscape-grass assets. None of these facts alone
 quantifies the camera's Required Pool or proves which asset causes the warning.
-No texture settings or map content were changed.
+
+## Reversible grass-opacity mip trial
+
+The Island-referenced grass texture was backed up byte-for-byte at
+`Saved/Backups/springGrass_Opacity_8k_PreMips_20261011.uasset` (SHA-256
+`747E4D41D8E7A8104F65815A348FB65530918C6AEC9C49897FE42361F955BE6D`). The
+guarded one-shot writer is `Scripts/Configure-IslandGrassOpacityMips.py`.
+It changed only `springGrass_Opacity_8k` to `TMGS_FROM_TEXTURE_GROUP` with
+`MaxTextureSize=4096`; `NeverStream` remains false. The package remains local
+under Content (not tracked by Git).
+
+After saving and reloading, UE 5.8.3 reports the texture as 4096×4096 and
+10,944 KB, versus the original 8192×8192 and 32,768 KB. The platform texture
+footprint is therefore 21,824 KB (about 21.3 MiB) smaller at the listed
+resolution, and group-based mip generation now lets lower resolutions stream
+as demand falls. This is an asset footprint comparison, not a measurement of
+actual `Required Pool` or proof that the recurring warning is fixed.
+
+Matched ground-cover Tideglass captures passed before and after the change.
+Visual inspection of the dense close view found no obvious loss in grass
+silhouette or mask edges. Scene-capture p95 throughput was 55.43 / 57.73 /
+57.73 FPS before and 56.58 / 56.34 / 57.20 FPS after (overview / ground detail
+/ dragonfly close), too close to treat as a performance difference. These are
+editor capture results, not Game/PIE or target-hardware guarantees. The Island
+map was not saved.
+
+Baseline log/images:
+`Saved/Logs/Codex_GrassOpacity_Baseline_Viewpoints_Dragonflies_20261011.log`,
+`Saved/Viewpoints/2026-10-11_194428_h11.0/`.
+Mip-trial log/images:
+`Saved/Logs/Codex_GrassOpacity_MipTrial_Viewpoints_20261011.log`,
+`Saved/Viewpoints/2026-10-11_194755_h11.0/`.
 
 ## Next diagnostic
 
@@ -69,7 +101,9 @@ and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentat
 
 The direct and transitive Asset Registry queries now complete in UE 5.8.3; the
 dependency walk found Island paths for the grass opacity texture and all four
-spruce maps above, and none for the 8K combined-flower texture. The exact-view
-`stat streaming` capture remains pending because it needs the live warning
-view. No texture assets or map content were changed; the 4096 MiB project pool
-setting is already committed.
+spruce maps above, and none for the 8K combined-flower texture. The 8K grass
+opacity texture now has a verified 4K mipmapped local asset state and exact
+restore point. The exact-view `stat streaming` capture remains pending because
+it needs the live warning view; do not yet claim the recurring warning is
+resolved. No map content was changed; the separate 4096 MiB project pool
+setting remains as committed.
