@@ -124,6 +124,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
+	friend class FIslandProposalMemoryTest;
 	FTimerHandle ThinkTimerHandle;
 	FString LastActionOutcome = TEXT("No completed action yet.");
 	FString LastActionKey;
