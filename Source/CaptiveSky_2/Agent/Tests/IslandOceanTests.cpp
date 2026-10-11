@@ -5,6 +5,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/Material.h"
 #include "CaptiveSky_2Character.h"
 #include "IslandOceanTestCharacter.h"
@@ -55,11 +56,36 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 	{
 		UCharacterMovementComponent* Movement = Player->GetCharacterMovement();
 		const float OriginalFlySpeed = Movement->MaxFlySpeed;
+		APlayerController* SwimController = World->SpawnActor<APlayerController>();
+		if (TestNotNull(TEXT("The water-movement test controller spawns"), SwimController))
+		{
+			SwimController->Possess(Player);
+			TestTrue(TEXT("The test controller possesses the swimming character"), Player->GetController() == SwimController);
+		}
 
 		Player->EnterSurfaceSwimming(100.f);
 		TestTrue(TEXT("Entering surface water enables the player-only swim state"), Player->IsSurfaceSwimming());
 		TestEqual(TEXT("Surface swimming uses gravity-free movement"), Movement->MovementMode, MOVE_Flying);
 		TestEqual(TEXT("Surface swimming applies its tuned speed"), Movement->MaxFlySpeed, 260.f);
+		TestEqual(TEXT("The tuned speed is active in flying swim mode"), Movement->GetMaxSpeed(), 260.f);
+
+		if (SwimController)
+		{
+			SwimController->SetControlRotation(FRotator(0.f, 90.f, 0.f));
+			Player->DoMove(0.f, 1.f);
+			const FVector RightwardInput = Movement->GetPendingInputVector();
+			TestTrue(TEXT("Swimming accepts forward input as horizontal movement"), RightwardInput.Size2D() > 0.99f);
+			TestTrue(TEXT("Camera-relative swim input follows a rightward heading"),
+				FVector::DotProduct(RightwardInput.GetSafeNormal2D(), FVector::RightVector) > 0.99f);
+			TestTrue(TEXT("Horizontal swim input has no unintended vertical component"), FMath::Abs(RightwardInput.Z) < KINDA_SMALL_NUMBER);
+			Movement->ConsumeInputVector();
+
+			SwimController->SetControlRotation(FRotator::ZeroRotator);
+			Player->DoMove(0.f, 1.f);
+			const FVector ForwardInput = Movement->GetPendingInputVector();
+			TestTrue(TEXT("Swimming preserves forward movement on the world X axis"),
+				ForwardInput.X > 0.99f && FMath::Abs(ForwardInput.Y) < KINDA_SMALL_NUMBER && FMath::Abs(ForwardInput.Z) < KINDA_SMALL_NUMBER);
+		}
 
 		Player->LeaveSurfaceSwimming(MOVE_Falling);
 		TestFalse(TEXT("Leaving water clears the swim state"), Player->IsSurfaceSwimming());
