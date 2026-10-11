@@ -1,5 +1,7 @@
 #include "IslandInnHearthSubsystem.h"
 
+#include "AgentMemoryComponent.h"
+#include "AutonomousAgentCharacter.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
@@ -7,6 +9,8 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "IslandInteractionUtility.h"
+#include "IslandWorldStateSubsystem.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -64,6 +68,91 @@ bool UIslandInnHearthSubsystem::TendHearth(FString& OutFact)
 	OutFact = FlameMeshes.Num() == 3
 		? TEXT("You kindled three small, stylized flames and the hearth's warm light. They flicker for about five minutes of play (roughly three Island hours at the current clock rate), then bank themselves unless someone tends the hearth again. Nearby, the fire gives a small simulated warmth cue; it does not model body temperature, room temperature, shelter, or a lasting change.")
 		: TEXT("You kindled the hearth's warm light. It will flicker for about five minutes of play (roughly three Island hours at the current clock rate), then bank itself unless someone tends it again. The visible flame could not be created; no lasting hearth change was saved.");
+	return true;
+}
+
+bool UIslandInnHearthSubsystem::PracticeCraft(AAutonomousAgentCharacter* Practitioner, FName CraftId,
+	const FString& DisplayName, const FString& SourceDescription,
+	const TArray<FIslandCraftParameter>& Parameters, FString& OutFact)
+{
+	OutFact.Reset();
+	AActor* Anchor = HearthAnchor.Get();
+	if (!IsValid(Practitioner) || !IsValid(Anchor) || !Anchor->ActorHasTag(TEXT("IslandInn")) ||
+		!Anchor->ActorHasTag(TEXT("InnHearth")) ||
+		!IslandInteractionUtility::CanInteract(Practitioner, Anchor))
+	{
+		OutFact = TEXT("The inn hearth is not presently a visible, reachable practice site. Nothing was recorded.");
+		return false;
+	}
+	if (!bLit)
+	{
+		OutFact = TEXT("The inn hearth is banked. You could choose to kindle it first, or leave it for another time; nothing was recorded.");
+		return false;
+	}
+	if (Parameters.IsEmpty() || Parameters.Num() > UIslandWorldStateSubsystem::MaxCraftParameters)
+	{
+		OutFact = TEXT("The experiment needs one to four bounded notes. Nothing was recorded.");
+		return false;
+	}
+	static const TSet<FName> AllowedSettings =
+	{
+		FName(TEXT("hydration")), FName(TEXT("rise")), FName(TEXT("heat")), FName(TEXT("salt"))
+	};
+	for (const FIslandCraftParameter& Parameter : Parameters)
+	{
+		if (!AllowedSettings.Contains(Parameter.Id) || !FMath::IsFinite(Parameter.Value) ||
+			Parameter.Value < 0.f || Parameter.Value > 1.f)
+		{
+			OutFact = TEXT("The experiment included a setting outside the offered baking notes. Nothing was recorded.");
+			return false;
+		}
+	}
+
+	UAgentMemoryComponent* Memory = Practitioner->FindComponentByClass<UAgentMemoryComponent>();
+	UIslandWorldStateSubsystem* WorldState = GetWorld()
+		? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (!Memory || !WorldState)
+	{
+		OutFact = TEXT("The resident's memory or Island record is unavailable. Nothing was recorded.");
+		return false;
+	}
+	const FString AgentId = Memory->GetResolvedAgentId();
+	if (const FIslandCraftTraditionRecord* Existing = WorldState->FindCraftTradition(CraftId))
+	{
+		if (!WorldState->HasCraftKnowledge(CraftId, AgentId))
+		{
+			OutFact = TEXT("You do not yet know that tradition. It was not copied into your record.");
+			return false;
+		}
+		const int32 Day = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+		if (Existing->Attempts.ContainsByPredicate([&](const FIslandCraftAttemptRecord& Attempt)
+			{
+				return Attempt.PractitionerAgentId == AgentId && Attempt.Day == Day;
+			}))
+		{
+			OutFact = TEXT("You have already tried this tradition today. The existing notes remain; nothing new was recorded.");
+			return false;
+		}
+	}
+
+	const int32 Day = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+	if (!WorldState->RecordCraftAttempt(CraftId, DisplayName, AgentId, Day, SourceDescription,
+		Parameters, EIslandCraftOutcome::Unrated))
+	{
+		OutFact = TEXT("The experiment could not be safely saved (it may be a duplicate or outside the record bounds). Nothing changed.");
+		return false;
+	}
+
+	const FIslandCraftTraditionRecord* Saved = WorldState->FindCraftTradition(CraftId);
+	const FString Name = Saved ? Saved->DisplayName : TEXT("your idea");
+	FString SettingNotes;
+	for (const FIslandCraftParameter& Parameter : Parameters)
+	{
+		if (!SettingNotes.IsEmpty()) SettingNotes += TEXT(", ");
+		SettingNotes += FString::Printf(TEXT("%s %.2f"), *Parameter.Id.ToString(), Parameter.Value);
+	}
+	OutFact = FString::Printf(TEXT("You explored %s beside the lit inn hearth. Your chosen notes (%s) were saved as one unrated practice for Island day %d. These are intended settings, not measured ingredients or quality; no loaf, ingredients, or prop was created."),
+		*Name, *SettingNotes, Day);
 	return true;
 }
 

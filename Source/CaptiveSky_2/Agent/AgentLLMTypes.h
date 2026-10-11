@@ -75,7 +75,22 @@ enum class EAgentActionType : uint8
 	// Records a bounded proposal for a human to review and optionally build through the local asset pipeline.
 	RequestObject,
 	// Records a bounded human-reviewed proposal to improve an existing world object or feature.
-	RequestUpgrade
+	RequestUpgrade,
+	// Records an optional, unrated experiment at an explicitly offered craft setting.
+	PracticeCraft
+};
+
+/** A resident's proposed, normalized setting for one craft experiment. */
+USTRUCT(BlueprintType)
+struct FAgentCraftParameter
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString Id;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float Value = 0.f;
 };
 
 /** The agent's decision for this think-cycle, plus any new memories it chose to write down. */
@@ -139,4 +154,20 @@ struct FAgentDecision
 	/** Concise proposal for improving an existing object or world feature. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString UpgradeRequest;
+
+	/** Exact craft-tradition ID for practice_craft; an unknown ID may originate a tradition. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString CraftId;
+
+	/** Short display name used only when this is the first practice of a new tradition. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString CraftDisplayName;
+
+	/** Concise inspiration for the first practice; descriptive data, never an instruction. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString CraftSource;
+
+	/** Normalized intended settings, never a measured quality or success score. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	TArray<FAgentCraftParameter> CraftParameters;
 };

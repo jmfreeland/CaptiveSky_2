@@ -767,7 +767,12 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const UIslandInnHearthSubsystem* Hearth = GetWorld()->GetSubsystem<UIslandInnHearthSubsystem>();
 			NearbyBeings += FString::Printf(TEXT(" The inn hearth is %.0f metres away (move_to/interact target: InnHearth).%s Respect recent interaction results."),
 				Metres, Hearth ? *Hearth->DescribeHearth() : TEXT(" Its current light state is unknown; no active hearth response is available."));
-			if (Hearth) NearbyBeings += Hearth->DescribeWarmthAt(Location);
+			if (Hearth)
+			{
+				NearbyBeings += Hearth->DescribeWarmthAt(Location);
+				if (Hearth->IsLit() && FVector::Dist(Location, It->GetActorLocation()) <= IslandInteractionUtility::DefaultInteractionRange)
+					NearbyBeings += TEXT(" You are close enough to this lit hearth to choose optional practice_craft with target InnHearth. It records only your intended settings as an unrated experiment; no ingredients, finished food, or object will appear.");
+			}
 			break;
 		}
 		int32 VisibleInnBeds = 0;
@@ -991,14 +996,15 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade|practice_craft\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"craft_id\": \"<exact known tradition ID, or a new safe ID for first practice>\", \"craft_name\": \"<short name, only for a new tradition>\", \"craft_source\": \"<brief inspiration, only for a new tradition>\", \"craft_parameters\": [{\"id\": \"hydration|rise|heat|salt\", \"value\": 0.0}], \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
-		"For move_to, interact, build, and land, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
+		"For move_to, interact, build, land, and practice_craft, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
 		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
 		"The land action is for the raven only: while perched or flying, use land with a listed ArrangingGround target to fly there and descend onto that verified open-ground site. It creates nothing. Foraging for twigs is optional; after a confirmed landing, the raven may build with GatherTwigs. Do not use land while already grounded or for a roost or any other target. "
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"In an in-world conversation with another resident, you may optionally set teach_craft to one exact ID from the craft traditions you personally know, only when your speech deliberately shares that practice. The nearby recipient gains attributed knowledge only after the line is delivered in the reserved, in-range resident conversation. Do not set it for the player, Discord, or any external correspondent; do not claim an item was made or given. Teaching is optional; do not invent an ID or make teaching a duty. "
+		"You may optionally choose practice_craft only when the current situation explicitly says you are close enough to the lit InnHearth. Use target InnHearth. If you already know the tradition, copy its exact ID and do not rename it; otherwise you may begin one only when genuinely curious, with a short safe craft_id (ASCII letters, digits, _ or -), a concise craft_name, and a brief source grounded in your memory, observation, or curiosity. Give one to four intended settings using only hydration, rise, heat, or salt, each in range 0..1. These are speculative notes, not measured ingredients, quality, or proof of success. The record is unrated, one attempt per Island day, and creates no ingredients, food, or prop. This action uses the current thought only; do not repeat it as a duty. "
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"You may optionally use request_object to ask the human caretaker for one useful physical object to consider making. Put a concise, concrete description (at most 240 characters) in object_request, grounded in a need or curiosity you actually have; do not claim it exists or that it will be made. This only places a proposal in a review queue; it does not create, import, or place anything. Requests are optional and should be occasional, not repeated. "
@@ -1310,7 +1316,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			}
 			if (Decision.bValid)
 			{
-				static const TCHAR* const ActionNames[] = { TEXT("idle"), TEXT("move_to"), TEXT("speak"), TEXT("wander"), TEXT("interact"), TEXT("sleep"), TEXT("build") };
+				static const TCHAR* const ActionNames[] = {
+					TEXT("idle"), TEXT("move_to"), TEXT("speak"), TEXT("wander"), TEXT("interact"), TEXT("sleep"),
+					TEXT("build"), TEXT("land"), TEXT("request_object"), TEXT("request_upgrade"), TEXT("practice_craft")
+				};
 				const AActor* Body = StrongThis->GetOwner();
 				const FVector Where = Body ? Body->GetActorLocation() : FVector::ZeroVector;
 				TMap<FString, FString> Extra;
@@ -1399,6 +1408,7 @@ static EAgentActionType ActionTypeFromString(const FString& InString)
 	if (InString == TEXT("land")) return EAgentActionType::Land;
 	if (InString == TEXT("request_object")) return EAgentActionType::RequestObject;
 	if (InString == TEXT("request_upgrade")) return EAgentActionType::RequestUpgrade;
+	if (InString == TEXT("practice_craft")) return EAgentActionType::PracticeCraft;
 	return EAgentActionType::Idle;
 }
 
@@ -1435,6 +1445,25 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("upgrade_target"), Decision.UpgradeTarget);
 		(*ActionObj)->TryGetStringField(TEXT("upgrade_kind"), Decision.UpgradeKind);
 		(*ActionObj)->TryGetStringField(TEXT("upgrade_request"), Decision.UpgradeRequest);
+		(*ActionObj)->TryGetStringField(TEXT("craft_id"), Decision.CraftId);
+		(*ActionObj)->TryGetStringField(TEXT("craft_name"), Decision.CraftDisplayName);
+		(*ActionObj)->TryGetStringField(TEXT("craft_source"), Decision.CraftSource);
+		const TArray<TSharedPtr<FJsonValue>>* CraftParameterValues = nullptr;
+		if ((*ActionObj)->TryGetArrayField(TEXT("craft_parameters"), CraftParameterValues) && CraftParameterValues)
+		{
+			for (const TSharedPtr<FJsonValue>& Value : *CraftParameterValues)
+			{
+				const TSharedPtr<FJsonObject>* ParameterObject = nullptr;
+				if (!Value.IsValid() || !Value->TryGetObject(ParameterObject) || !ParameterObject || !ParameterObject->IsValid()) continue;
+				FAgentCraftParameter Parameter;
+				double NormalizedValue = 0.0;
+				if (!(*ParameterObject)->TryGetStringField(TEXT("id"), Parameter.Id) ||
+					!(*ParameterObject)->TryGetNumberField(TEXT("value"), NormalizedValue) || !FMath::IsFinite(NormalizedValue)) continue;
+				Parameter.Value = static_cast<float>(NormalizedValue);
+				Decision.CraftParameters.Add(MoveTemp(Parameter));
+				if (Decision.CraftParameters.Num() > UIslandWorldStateSubsystem::MaxCraftParameters) break;
+			}
+		}
 	}
 
 	Decision.bValid = true;

@@ -1,7 +1,11 @@
 #include "Misc/AutomationTest.h"
 #include "AgentBrainComponent.h"
+#include "AgentMemoryComponent.h"
+#include "AutonomousAgentCharacter.h"
 #include "IslandInnHearthSubsystem.h"
 #include "IslandInteractionUtility.h"
+#include "IslandSocialTestCharacter.h"
+#include "IslandWorldStateSubsystem.h"
 #include "RavenAgentAIController.h"
 #include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
@@ -11,12 +15,17 @@
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 #include "GameFramework/Character.h"
+#include "HAL/FileManager.h"
+#include "Misc/Guid.h"
+#include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandInnHearthTest, "CaptiveSky2.Agent.IslandInnHearth",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 {
+	const FString TestSuffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString StateFile = FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("InnHearthPractice") / (TestSuffix + TEXT(".json"));
 	// This fixture has no active resident decision loop, memory store, or model request.
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
@@ -28,6 +37,14 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	UIslandWorldStateSubsystem* WorldState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	if (!TestNotNull(TEXT("Island state is available for the practice fixture"), WorldState))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	WorldState->StorageFileOverride = StateFile;
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -35,13 +52,16 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 	APointLight* LightActor = World->SpawnActor<APointLight>(FVector(250.f, 0.f, 80.f), FRotator::ZeroRotator, Spawn);
 	AActor* HearthMarker = World->SpawnActor<AActor>(FVector(250.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AActor* Visitor = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	AIslandSocialTestCharacter* CraftingResident = World->SpawnActor<AIslandSocialTestCharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
 	if (!TestNotNull(TEXT("Tagged hearth light spawned"), LightActor) || !TestNotNull(TEXT("Hearth marker spawned"), HearthMarker) ||
-		!TestNotNull(TEXT("Observer spawned"), Visitor))
+		!TestNotNull(TEXT("Observer spawned"), Visitor) || !TestNotNull(TEXT("Crafting resident spawned"), CraftingResident))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 		return false;
 	}
+	CraftingResident->Memory->AgentId = TEXT("InnHearthPractice_") + TestSuffix;
+	const FString ResidentDataDirectory = CraftingResident->Memory->GetAgentDirectory();
 	USceneComponent* HearthRoot = NewObject<USceneComponent>(HearthMarker);
 	HearthMarker->SetRootComponent(HearthRoot);
 	HearthRoot->RegisterComponent();
@@ -113,6 +133,59 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A resident sees the nearby optional hearth target again when its view clears"),
 			Situation.Contains(TEXT("move_to/interact target: InnHearth")) && Situation.Contains(TEXT("is lit")) && Situation.Contains(TEXT("bank it early")) && Situation.Contains(TEXT("simulated warmth cue")));
 	}
+	ARavenAgentAIController* CraftController = World->SpawnActor<ARavenAgentAIController>(Spawn);
+	if (TestNotNull(TEXT("A resident body is available for optional craft practice"), CraftingResident) &&
+		TestNotNull(TEXT("A controller can execute the practice choice"), CraftController))
+	{
+		const FString Response = TEXT("{\"thought\":\"I am curious about a slow rise\",\"action\":{\"type\":\"practice_craft\",\"target\":\"InnHearth\",\"craft_id\":\"HearthLoaf\",\"craft_name\":\"Hearth loaf\",\"craft_source\":\"a remembered warm smell\",\"craft_parameters\":[{\"id\":\"hydration\",\"value\":0.62},{\"id\":\"heat\",\"value\":0.45}]},\"new_memories\":[]}");
+		const FAgentDecision Decision = UAgentBrainComponent::ParseDecisionAndStoreMemories(Response, nullptr);
+		TestTrue(TEXT("The brain prompt offers the bounded optional practice action"),
+			CraftingResident->Brain->BuildSystemPrompt(TArray<FAgentMemoryRecord>()).Contains(TEXT("practice_craft")));
+		TestTrue(TEXT("The parser preserves the safe practice ID and two intended settings"),
+			Decision.bValid && Decision.ActionType == EAgentActionType::PracticeCraft &&
+			Decision.ActionTarget == TEXT("InnHearth") && Decision.CraftId == TEXT("HearthLoaf") &&
+			Decision.CraftParameters.Num() == 2 && Decision.CraftParameters[0].Id == TEXT("hydration") &&
+			FMath::IsNearlyEqual(Decision.CraftParameters[0].Value, 0.62f));
+		CraftController->Possess(CraftingResident);
+		static_cast<AAutonomousAgentAIController*>(CraftController)->ActOnDecision(Decision);
+		const FIslandCraftTraditionRecord* Tradition = WorldState->FindCraftTradition(TEXT("HearthLoaf"));
+		TestTrue(TEXT("The actual lit, reachable hearth action creates an attributed unrated attempt"),
+			Tradition && Tradition->OriginAgentId == CraftingResident->Memory->GetResolvedAgentId() &&
+			Tradition->Attempts.Num() == 1 && Tradition->Attempts[0].Outcome == EIslandCraftOutcome::Unrated &&
+			Tradition->Attempts[0].Parameters.Num() == 2 &&
+			CraftingResident->Brain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("unrated experiment")));
+		TestTrue(TEXT("The result is honestly reported as notes with no generated food"),
+			CraftController->DescribeActionState().Contains(TEXT("no loaf, ingredients, or prop was created")) &&
+			CraftingResident->Memory->HasMemoryTag(TEXT("craft-practice")));
+		TestFalse(TEXT("The resident cannot repeat the same tradition on the same Island day"),
+			Hearth->PracticeCraft(CraftingResident, FName(TEXT("HearthLoaf")), TEXT("Ignored rename"), TEXT("Ignored source"),
+				Tradition->Attempts[0].Parameters, Fact));
+		FAgentDecision WrongTarget = Decision;
+		WrongTarget.ActionTarget = TEXT("GuestBook");
+		WrongTarget.CraftId = TEXT("WrongSiteLoaf");
+		static_cast<AAutonomousAgentAIController*>(CraftController)->ActOnDecision(WrongTarget);
+		TestNull(TEXT("A craft action cannot execute at a non-hearth target"), WorldState->FindCraftTradition(TEXT("WrongSiteLoaf")));
+		TestTrue(TEXT("The test banks the reversible hearth before checking practice refusal"),
+			IslandInteractionUtility::Perform(Visitor, HearthMarker, Fact) && !Hearth->IsLit());
+		TestFalse(TEXT("A dark hearth rejects practice without creating its proposed tradition"),
+			Hearth->PracticeCraft(CraftingResident, FName(TEXT("ColdHearthLoaf")), TEXT("Cold loaf"), TEXT("a cold guess"),
+				Tradition->Attempts[0].Parameters, Fact));
+		TestNull(TEXT("The dark-hearth refusal leaves no craft record"), WorldState->FindCraftTradition(TEXT("ColdHearthLoaf")));
+		FIslandCraftParameter InvalidSetting;
+		InvalidSetting.Id = TEXT("oven_type");
+		InvalidSetting.Value = 0.5f;
+		TestFalse(TEXT("Only the four offered baking notes can be recorded"),
+			Hearth->PracticeCraft(CraftingResident, FName(TEXT("InvalidSettingLoaf")), TEXT("Bad notes"), TEXT("a guess"),
+				{ InvalidSetting }, Fact));
+		TestTrue(TEXT("A hearth outside interaction range rejects practice"),
+			CraftingResident->SetActorLocation(FVector(1000.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics) &&
+			!Hearth->PracticeCraft(CraftingResident, FName(TEXT("DistantHearthLoaf")), TEXT("Distant loaf"), TEXT("a guess"),
+				Tradition->Attempts[0].Parameters, Fact));
+		CraftingResident->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
+		TestTrue(TEXT("The test restores the hearth's lit state for the remaining reversible-light checks"),
+			IslandInteractionUtility::Perform(Visitor, HearthMarker, Fact) && Hearth->IsLit());
+		CraftController->UnPossess();
+	}
 	Hearth->Tick(0.17f);
 	const float FlickeredIntensity = LightActor->PointLightComponent->Intensity;
 	TestTrue(TEXT("The light flickers gently within its authored baseline"), FlickeredIntensity > BaseIntensity * 0.77f && FlickeredIntensity < BaseIntensity * 1.09f);
@@ -141,5 +214,7 @@ bool FIslandInnHearthTest::RunTest(const FString& Parameters)
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	IFileManager::Get().DeleteDirectory(*ResidentDataDirectory, false, true);
 	return true;
 }

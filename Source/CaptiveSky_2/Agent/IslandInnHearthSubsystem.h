@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "IslandWorldStateSubsystem.h"
 #include "IslandInnHearthSubsystem.generated.h"
 
 class UPointLightComponent;
 class UStaticMeshComponent;
+class AAutonomousAgentCharacter;
 
 /** A small, session-only hearth response powered by the inn's tagged point light. */
 UCLASS()
@@ -19,6 +21,9 @@ public:
 
 	/** Toggle the hearth between banked and briefly lit; no saved world state is changed. */
 	bool TendHearth(FString& OutFact);
+	/** Records one unrated, resident-attributed practice only at the visible, lit, in-range inn hearth. */
+	bool PracticeCraft(AAutonomousAgentCharacter* Practitioner, FName CraftId, const FString& DisplayName,
+		const FString& SourceDescription, const TArray<FIslandCraftParameter>& Parameters, FString& OutFact);
 	FString DescribeHearth() const;
 	bool IsLit() const { return bLit; }
 	float GetSecondsRemaining() const { return SecondsRemaining; }

@@ -19,6 +19,7 @@
 #include "IslandTidepoolMinnows.h"
 #include "IslandTrail.h"
 #include "IslandWorldStateSubsystem.h"
+#include "IslandInnHearthSubsystem.h"
 #include "IslandAssetRequestQueue.h"
 #include "LandscapeHeightfieldCollisionComponent.h"
 #include "GameFramework/Character.h"
@@ -943,7 +944,7 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 	{
 		const FString Key = FString::FromInt(static_cast<int32>(Decision.ActionType)) + TEXT(":") + Decision.ActionTarget.ToLower();
 		// Different speech and random wandering are not identical failed actions.
-		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land || Decision.ActionType == EAgentActionType::RequestObject || Decision.ActionType == EAgentActionType::RequestUpgrade;
+		const bool bRepeatSensitive = Decision.ActionType == EAgentActionType::MoveTo || Decision.ActionType == EAgentActionType::Interact || Decision.ActionType == EAgentActionType::Idle || Decision.ActionType == EAgentActionType::Build || Decision.ActionType == EAgentActionType::Land || Decision.ActionType == EAgentActionType::RequestObject || Decision.ActionType == EAgentActionType::RequestUpgrade || Decision.ActionType == EAgentActionType::PracticeCraft;
 		RepeatedActions = bRepeatSensitive ? (Key == LastActionKey ? RepeatedActions + 1 : 1) : 0;
 		LastActionKey = Key;
 		NextThinkAt = FPlatformTime::Seconds() + BackgroundDelay(RepeatedActions, ThinkIntervalSeconds);
@@ -1237,6 +1238,40 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		{
 			ReportAction(Error);
 		}
+		break;
+	}
+	case EAgentActionType::PracticeCraft:
+	{
+		if (Decision.ActionTarget != TEXT("InnHearth"))
+		{
+			ReportAction(TEXT("Craft practice is available only at the exact InnHearth target; nothing changed."));
+			break;
+		}
+		AAutonomousAgentCharacter* Resident = Cast<AAutonomousAgentCharacter>(ControlledPawn);
+		UIslandInnHearthSubsystem* Hearth = GetWorld()
+			? GetWorld()->GetSubsystem<UIslandInnHearthSubsystem>() : nullptr;
+		if (!Resident || !Hearth)
+		{
+			ReportAction(TEXT("This body or world has no active resident hearth practice; nothing changed."));
+			break;
+		}
+		TArray<FIslandCraftParameter> Parameters;
+		Parameters.Reserve(Decision.CraftParameters.Num());
+		for (const FAgentCraftParameter& Setting : Decision.CraftParameters)
+		{
+			FIslandCraftParameter& Parameter = Parameters.AddDefaulted_GetRef();
+			Parameter.Id = FName(*Setting.Id);
+			Parameter.Value = Setting.Value;
+		}
+		FString Fact;
+		if (Hearth->PracticeCraft(Resident, FName(*Decision.CraftId), Decision.CraftDisplayName,
+			Decision.CraftSource, Parameters, Fact))
+		{
+			if (UAgentMemoryComponent* Memory = Resident->FindComponentByClass<UAgentMemoryComponent>())
+				Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Fact, 0.72f,
+					{ TEXT("craft"), TEXT("craft-practice"), TEXT("hearth") }));
+		}
+		ReportAction(Fact);
 		break;
 	}
 	case EAgentActionType::Idle:
