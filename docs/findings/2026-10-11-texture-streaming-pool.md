@@ -44,6 +44,24 @@ not yet quantified against the corrected High-profile override. This
 streaming-pool warning is distinct from the separate whole-GPU video-memory warning in
 `2026-10-08-editor-vram-pressure.md`.
 
+An additional capped, zero-request standalone Game capture on 2026-10-11 sampled
+two settled views with `stat streaming` enabled. The High texture profile logged
+`Texture pool size now 4096 MB`:
+
+| Settled view | Required Pool | Visible Mips | Hidden Mips | Over Budget |
+|---|---:|---:|---:|---:|
+| Tideglass ground detail | 993.00 MiB | 943.87 MiB | 42.38 MiB | 0 MiB |
+| Raven nest close-up | 1008.64 MiB | 960.14 MiB | 41.74 MiB | 0 MiB |
+
+Screenshots are in
+`Saved/Playtests/Codex_TexturePool_Multiview_20261011/Screenshots/` and the
+log is `Saved/Logs/Codex_TexturePool_Multiview_20261011.log`. These two views do
+not reproduce the user's frequently observed over-budget warning; they are not
+representative of every camera path or texture-quality/device configuration.
+Both were sampled at 11:14–11:43 game time with the High profile and the 4096
+MiB pool. The exact view and profile that show the warning remain the most
+useful next evidence.
+
 ## Read-only Island inventory
 
 `Scripts/Inspect-IslandTextureStreaming.py` loads `/Game/Maps/Island` in an
