@@ -443,9 +443,17 @@ that the two events share a cause. Later bounded main-tree commandlet
 automation completed successfully, which likewise does not identify the
 desktop prompt's owner.
 
-Conclusion: the recurring .NET dialog is still unattributed. Do not infer a
-project SDK, GPU, or plugin fix from its generic exception code. A future
-occurrence must be captured while the responsible process still exists (or
-with a fresh matching WER/.NET event); the current prompt alone lacks that
-correlation. Local crash evidence remains under
+There is an important earlier signature match: restricted-shell Unreal launches
+logged UBT AutoSDK's `-532462766`, the signed form of `0xe0434352`; a
+user-level build and automation run completed with `ReturnCode: 0`. This makes
+the restricted-shell AutoSDK/Turnkey path a plausible source for at least some
+occurrences. See the [detailed startup note](2026-10-09-raven-roost-shelter-audit.md#unrealnet-startup-exception-note)
+and the [texture-budget launch record](2026-10-11-texture-streaming-pool.md).
+
+The current desktop prompt remains unattributed specifically: its process had
+already exited, and no matching recent Windows event was present. Do not infer
+a project SDK, GPU, or plugin fix from this screenshot alone. To identify
+whether this occurrence used the known AutoSDK path, capture the process tree
+and UBT output during a future launch (or preserve a fresh matching WER/.NET
+event). Local Unreal crash evidence remains under
 `Saved/Crashes/UECC-Windows-0337C96240F43B33E8BA3E8573C123A8_0000/`.
