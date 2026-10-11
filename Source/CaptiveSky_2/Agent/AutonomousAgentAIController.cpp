@@ -31,6 +31,25 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAutonomousAgentAI, Log, All);
 
+namespace
+{
+	void RememberPendingWorldProposal(APawn* Resident, const FString& RequestId, const FString& RequestType,
+		const FString& Description, const FString& Target, const FString& UpgradeKind)
+	{
+		UAgentMemoryComponent* Memory = Resident ? Resident->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+		if (!Memory) return;
+
+		FString Proposal = RequestType == TEXT("upgrade")
+			? FString::Printf(TEXT("I proposed a %s upgrade for %s: %s"), *UpgradeKind,
+				Target.IsEmpty() ? TEXT("the world") : *Target, *Description)
+			: FString::Printf(TEXT("I proposed a new object: %s"), *Description);
+		Proposal += FString::Printf(TEXT(" It is pending human review (proposal %s); nothing has been made or placed."), *RequestId);
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Proposal, 0.7f,
+			{ TEXT("world-proposal"), TEXT("proposal-pending"), TEXT("proposal-id:") + RequestId,
+				TEXT("proposal-type:") + RequestType }));
+	}
+}
+
 AAutonomousAgentAIController::AAutonomousAgentAIController()
 {
 	// Necessary for EnvQueries to work correctly, matching ACombatAIController's setup.
@@ -1185,6 +1204,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		const FString Requester = ControlledPawn->GetName();
 		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.ObjectRequest, RequestId, Error))
 		{
+			RememberPendingWorldProposal(ControlledPawn, RequestId, TEXT("new_object"), Decision.ObjectRequest, FString(), FString());
 			ReportAction(FString::Printf(TEXT("Object request %s was added to the human-review queue; no asset has been made or placed."), *RequestId.Left(8)));
 		}
 		else
@@ -1201,6 +1221,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.UpgradeRequest, RequestId, Error,
 			FString(), TEXT("upgrade"), Decision.UpgradeTarget, Decision.UpgradeKind))
 		{
+			RememberPendingWorldProposal(ControlledPawn, RequestId, TEXT("upgrade"), Decision.UpgradeRequest,
+				Decision.UpgradeTarget, Decision.UpgradeKind);
 			const FString TargetPhrase = Decision.UpgradeTarget.IsEmpty() ? TEXT("the world") : Decision.UpgradeTarget;
 			ReportAction(FString::Printf(TEXT("Upgrade suggestion %s for %s was added for human review; nothing in the world changed."), *RequestId.Left(8), *TargetPhrase));
 		}
