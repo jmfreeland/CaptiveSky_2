@@ -26,6 +26,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -33,6 +34,11 @@ DEFINE_LOG_CATEGORY_STATIC(LogAutonomousAgentAI, Log, All);
 
 namespace
 {
+	TAutoConsoleVariable<int32> CVarDisableAgentThinking(
+		TEXT("CaptiveSky.Agent.DisableThinking"), 0,
+		TEXT("When non-zero, autonomous residents do not request LLM decisions. Useful for safe, zero-request PIE validation."),
+		ECVF_Cheat);
+
 	void RememberPendingWorldProposal(APawn* Resident, const FString& RequestId, const FString& RequestType,
 		const FString& Description, const FString& Target, const FString& UpgradeKind)
 	{
@@ -97,7 +103,8 @@ void AAutonomousAgentAIController::OnUnPossess()
 
 void AAutonomousAgentAIController::Think()
 {
-	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyDisableAgentThinking"))) return;
+	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyDisableAgentThinking")) ||
+		CVarDisableAgentThinking.GetValueOnGameThread() != 0) return;
 	AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(GetPawn());
 	if (!Agent || !Agent->Brain || Agent->Brain->bRequestInFlight || IsResting() || IsActionInProgress())
 	{

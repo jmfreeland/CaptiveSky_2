@@ -169,18 +169,42 @@ Island. The script parsed successfully; its custom-map runtime path remains
 unverified because UE startup stopped before map load. The trial clone is local
 and ignored by Git.
 
+## In-editor review and zero-request runtime gate (2026-10-11)
+
+When Unreal MCP became available again, the active editor was on the main
+Island and `/Game/Maps/Island` was clean. I opened the already-saved trial
+clone in that editor and captured both trial viewpoints without saving or
+changing the main map. In the editor viewport, the hollow reads as a pale,
+uniformly cut log sitting alone on exposed brown ground. This is not yet a fair
+habitat verdict: Island understory is scattered from `AIslandWeather::BeginPlay`
+and is absent from the non-playing editor viewport. It does show that the prop
+needs runtime context before we judge concealment, and its clean cylindrical
+silhouette may need a more naturally broken/mossy art pass if it remains so
+regular in gameplay.
+
+To make that runtime check safe inside the live editor, the existing
+process-start switch `-CaptiveSkyDisableAgentThinking` now has an equivalent
+temporary console variable, `CaptiveSky.Agent.DisableThinking`. The
+`AutonomousAgentAIController::Think` early-out uses either switch. Live Coding
+compiled successfully; Unreal's CVar search reports the new variable and its
+default value is `0`, so normal behavior is unchanged. I did not set it or
+start PIE during this pass because the editor had other unsaved asset work
+open. I restored `/Game/Maps/Island` and its original viewport camera; the main
+map still reports clean. Runtime behavior of the CVar and the clone's actual
+understory/concealment remain unverified.
+
 ## Next step
 
 The best provisional patch is near `(-104500, 105000, 2337.5)` cm, but its
 ground-level views show no fallen timber and still-visible bare soil. The
-hollow is now placed in the disposable map, but the real-RHI game could not
-start under the current sandbox permissions. Next, resolve the engine's
-user-level file access / AutoSDK startup failure, then capture the clone and
-check ground contact, sightlines into the entrance, and the current nav agent's
-route around it. If that view does not meet the hidden
-home brief, continue the understory/canopy search rather than forcing the
-location. Only after visual and movement/nav checks pass should the main Island
-map and `Agents/Agent_Rat_01/places.json` be updated or Fenrus spawned. Do not
-reuse the Raven's roost or open fox clearing. A PVE/Megaplant preview is useful
-only if it improves the tested habitat and stays within the project's frame
-budget.
+hollow is placed in the disposable map, but neither the standalone run nor an
+in-editor runtime view has yet shown it with the spawned undergrowth. When the
+active editor is free of unsaved work, set `CaptiveSky.Agent.DisableThinking`
+to `1`, run PIE on the trial clone for at most 30 real seconds, verify zero
+model requests, and inspect ground contact, entrance concealment, and the Rat
+agent's nav/movement route. If the log still reads as an exposed cylinder,
+improve the asset or keep searching rather than forcing this site. Only after
+those visual and movement checks pass should the main Island map and
+`Agents/Agent_Rat_01/places.json` be updated or Fenrus spawned. Do not reuse
+the Raven's roost or open fox clearing. A PVE/Megaplant preview is useful only
+if it improves the tested habitat and stays within the project's frame budget.
