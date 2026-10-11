@@ -5,12 +5,18 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 import sys
 import tempfile
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_INBOX = REPO_ROOT / "Saved" / "CaptiveSky" / "ComfyBlender" / "Requests" / "inbox.jsonl"
+PIPELINE_ROOT = REPO_ROOT / "Scripts" / "AssetPipeline"
+ASSET_SCRIPTS = PIPELINE_ROOT / "assets"
+MAKE_SCRIPT = PIPELINE_ROOT / "make.py"
+ASSET_SCRIPT_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 FINAL_STATUSES = ("accepted", "generated", "declined")
 ALL_STATUSES = ("pending_review",) + FINAL_STATUSES
 STATUS_TRANSITIONS = {
@@ -112,7 +118,59 @@ def build_parser() -> argparse.ArgumentParser:
     status_command.add_argument("request_id", help="exact request ID from the list")
     status_command.add_argument("status", choices=FINAL_STATUSES,
                                 help="accepted, generated, or declined; this does not run a pipeline")
+    build_command = commands.add_parser(
+        "build", help="run one named, human-authored asset script for an accepted new-object request"
+    )
+    build_command.add_argument("request_id", help="exact accepted request ID from the list")
+    build_command.add_argument("asset_script", help="script name under Scripts/AssetPipeline/assets, without .py")
     return parser
+
+
+def run_accepted_build(records: list[dict], request_id: str, asset_script: str) -> int:
+    matches = [record for record in records if record["id"] == request_id]
+    if not matches:
+        raise InboxError(f"Request ID {request_id!r} was not found; no pipeline was run.")
+    record = matches[0]
+    if record["status"] != "accepted":
+        raise InboxError(f"Request {request_id!r} is {record['status']}; only accepted requests may run a pipeline.")
+    if record.get("request_type", "new_object") != "new_object":
+        raise InboxError("Upgrade proposals stay on human review; no asset pipeline was run.")
+    if record.get("pipeline", "ComfyBlender") != "ComfyBlender":
+        raise InboxError("This request is not assigned to ComfyBlender; no pipeline was run.")
+    if not ASSET_SCRIPT_NAME.fullmatch(asset_script):
+        raise InboxError("Asset script must be a lowercase name under assets/; no pipeline was run.")
+
+    assets_root = ASSET_SCRIPTS.resolve()
+    try:
+        source = (ASSET_SCRIPTS / f"{asset_script}.py").resolve(strict=True)
+    except OSError as exc:
+        raise InboxError(f"Asset script {asset_script!r} was not found; no pipeline was run.") from exc
+    if not source.is_file() or assets_root not in source.parents:
+        raise InboxError("Asset script must be a file directly inside the pipeline assets folder; no pipeline was run.")
+    if not MAKE_SCRIPT.is_file():
+        raise InboxError("The ComfyBlender make.py entry point is missing; no pipeline was run.")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-I", str(MAKE_SCRIPT), asset_script],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise InboxError(f"The ComfyBlender pipeline could not be started: {exc}") from exc
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+    build_marker = f"[{asset_script}] build rc=0 exported=True"
+    if (result.returncode != 0 or build_marker not in result.stdout or
+            "PROBLEMS []" not in result.stdout or "VERIFY DONE" not in result.stdout):
+        print("Asset pipeline did not verify a clean export; request status remains accepted.", file=sys.stderr)
+        return result.returncode or 1
+    print("Pipeline export passed its verifier. Inspect the FBX and Preview.png before marking the request generated.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -129,6 +187,9 @@ def main(argv: list[str] | None = None) -> int:
                     print()
                 print_record(record)
             return 0
+
+        if args.command == "build":
+            return run_accepted_build(records, args.request_id, args.asset_script)
 
         matches = [record for record in records if record["id"] == args.request_id]
         if not matches:

@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
+import subprocess
+import sys
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "requests.py"
@@ -81,6 +84,81 @@ class RequestInboxTests(unittest.TestCase):
         self.inbox.write_text('{"description":"no id"}\n', encoding="utf-8")
         with self.assertRaises(asset_requests.InboxError):
             asset_requests.read_records(self.inbox)
+
+    def test_accepted_new_object_runs_only_the_named_authored_script(self):
+        original = {
+            "id": "req-build", "requester": "Raven", "description": "A weatherproof nest cover",
+            "request_type": "new_object", "pipeline": "ComfyBlender", "status": "accepted",
+        }
+        self.inbox.write_text(json.dumps(original) + "\n", encoding="utf-8")
+        success_output = "[rathollow] build rc=0 exported=True\nPROBLEMS []\nVERIFY DONE\n"
+        with patch.object(asset_requests.subprocess, "run", return_value=subprocess.CompletedProcess(
+            [], 0, stdout=success_output, stderr=""
+        )) as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "req-build", "rathollow"
+            ]), 0)
+        self.assertEqual(run.call_args.args[0], [
+            sys.executable, "-I", str(asset_requests.MAKE_SCRIPT), "rathollow"
+        ])
+        self.assertEqual(run.call_args.kwargs["cwd"], asset_requests.REPO_ROOT)
+        self.assertEqual(asset_requests.read_records(self.inbox)[0], original)
+
+    def test_pending_or_upgrade_request_never_launches_asset_pipeline(self):
+        records = [
+            {"id": "pending", "requester": "Aster", "description": "A sign",
+             "request_type": "new_object", "pipeline": "ComfyBlender", "status": "pending_review"},
+            {"id": "upgrade", "requester": "Raven", "description": "Add a perch",
+             "request_type": "upgrade", "pipeline": "human_review", "upgrade_kind": "functionality",
+             "status": "accepted"},
+        ]
+        self.inbox.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
+        with patch.object(asset_requests.subprocess, "run") as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "pending", "rathollow"
+            ]), 2)
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "upgrade", "rathollow"
+            ]), 2)
+        run.assert_not_called()
+        self.assertEqual(asset_requests.read_records(self.inbox), records)
+
+    def test_invalid_or_missing_asset_script_never_launches_pipeline(self):
+        accepted = {"id": "req-build", "requester": "Raven", "description": "A cover",
+                    "status": "accepted", "request_type": "new_object", "pipeline": "ComfyBlender"}
+        self.inbox.write_text(json.dumps(accepted) + "\n", encoding="utf-8")
+        with patch.object(asset_requests.subprocess, "run") as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "req-build", "../rathollow"
+            ]), 2)
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "req-build", "not_a_real_asset"
+            ]), 2)
+        run.assert_not_called()
+
+    def test_pipeline_failure_keeps_request_accepted(self):
+        accepted = {"id": "req-build", "requester": "Raven", "description": "A cover",
+                    "status": "accepted", "request_type": "new_object", "pipeline": "ComfyBlender"}
+        self.inbox.write_text(json.dumps(accepted) + "\n", encoding="utf-8")
+        with patch.object(asset_requests.subprocess, "run", return_value=subprocess.CompletedProcess(
+            [], 7, stdout="", stderr=""
+        )):
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "req-build", "rathollow"
+            ]), 7)
+        self.assertEqual(asset_requests.read_records(self.inbox)[0]["status"], "accepted")
+
+    def test_zero_exit_without_verifier_markers_is_not_reported_as_generated(self):
+        accepted = {"id": "req-build", "requester": "Raven", "description": "A cover",
+                    "status": "accepted", "request_type": "new_object", "pipeline": "ComfyBlender"}
+        self.inbox.write_text(json.dumps(accepted) + "\n", encoding="utf-8")
+        with patch.object(asset_requests.subprocess, "run", return_value=subprocess.CompletedProcess(
+            [], 0, stdout="[rathollow] build rc=0 exported=False\n", stderr=""
+        )):
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "req-build", "rathollow"
+            ]), 1)
+        self.assertEqual(asset_requests.read_records(self.inbox)[0]["status"], "accepted")
 
 
 if __name__ == "__main__":
