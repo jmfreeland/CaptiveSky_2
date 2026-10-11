@@ -14,7 +14,7 @@ Observe a longer, bounded live session to learn which resident requests accumula
 
 ## Reply pacing change
 
-Added a 15-second minimum real-time pause after receiving an automatic in-world line and before requesting the reply. The pause is configurable upward, but old Blueprint values cannot lower it. This spaces the rapid multi-line exchanges seen in the historical log while leaving autonomous thinking, conversation openings, the five-minute per-pair cooldown, the four-line exchange limit, and the session time/request caps unchanged. `AgentSocialPacing` now covers the minimum, longer overrides, invalid overrides, and pause expiry. Runtime confirmation remains pending.
+Added a 15-second minimum real-time pause after receiving an automatic in-world line and before requesting the reply. The pause is configurable upward, but old Blueprint values cannot lower it. This spaces the rapid multi-line exchanges seen in the historical log while leaving autonomous thinking, conversation openings, the five-minute per-pair cooldown, the four-line exchange limit, and the session time/request caps unchanged. Each queued reply now logs its participant, turn, conversation ID, and scheduled delay—but not the spoken text—so a bounded live sample can audit the pacing without putting private dialogue into this diagnostic. `AgentSocialPacing` covers the minimum, longer overrides, invalid overrides, and pause expiry. Runtime confirmation remains pending.
 
 ## 2026-10-11 launch attempts
 
@@ -35,7 +35,7 @@ Later that session the editor closed and available memory rose to about 18.6 GiB
 
 ## Next safe observation
 
-The editor and Unreal processes were closed for follow-up. The project Editor target build completed successfully (up to date), and `CaptiveSky2.Agent.SocialPacing` passed in `UnrealEditor-Cmd` with NullRHI, agent thinking disabled, and a zero-model-request cap. `FApp::CanEverRender()` already guards the first-person snapshot path so a later non-rendering run can use text-only context.
+The editor and Unreal processes were closed for follow-up. The project Editor target built successfully after the reply-scheduling log was added, and `CaptiveSky2.Agent.SocialPacing` passed in `UnrealEditor-Cmd` with NullRHI, agent thinking disabled, and a zero-model-request cap (`Saved/Logs/Codex_AgentSocialPacing_Log_20261011.log`). `FApp::CanEverRender()` already guards the first-person snapshot path so a later non-rendering run can use text-only context.
 
 A proposed five-minute live observation with a 12-request ceiling was not started: the configured agent backend would receive resident/world context, and that external data transfer was not authorized by the current request. No provider requests were made. If approved, the next sample can use the isolated `Saved/Playtests/Codex_SocialPacing_20261011/World` root, keep spontaneous thinking enabled, and cap at 300 real seconds and 12 model requests. Otherwise, continue with local-only automation and synthetic utterance tests.
 

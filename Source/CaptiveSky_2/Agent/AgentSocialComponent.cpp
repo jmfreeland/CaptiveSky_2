@@ -244,8 +244,12 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		}
 	}
 	PendingUtterances.Add(Utterance);
-	ConversationReplyNotBeforeSeconds = FPlatformTime::Seconds() +
-		EffectiveConversationReplyPauseSeconds(ConversationReplyPauseSeconds);
+	const float ReplyPauseSeconds = EffectiveConversationReplyPauseSeconds(ConversationReplyPauseSeconds);
+	ConversationReplyNotBeforeSeconds = FPlatformTime::Seconds() + ReplyPauseSeconds;
+	UE_LOG(LogAgentSocial, Log,
+		TEXT("[AgentSocial] %s queued reply turn %d to %s in conversation %s; waiting %.1f real seconds."),
+		*GetNameSafe(GetOwner()), Utterance.TurnIndex, *Utterance.SenderDisplayName,
+		*Utterance.ConversationId, ReplyPauseSeconds);
 }
 
 void UAgentSocialComponent::TryBeginPendingUtterance()
