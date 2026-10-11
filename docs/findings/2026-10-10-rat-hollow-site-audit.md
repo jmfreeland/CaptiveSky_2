@@ -193,18 +193,43 @@ open. I restored `/Game/Maps/Island` and its original viewport camera; the main
 map still reports clean. Runtime behavior of the CVar and the clone's actual
 understory/concealment remain unverified.
 
-## Next step
+## Then-upcoming step (superseded below)
 
-The best provisional patch is near `(-104500, 105000, 2337.5)` cm, but its
-ground-level views show no fallen timber and still-visible bare soil. The
-hollow is placed in the disposable map, but neither the standalone run nor an
-in-editor runtime view has yet shown it with the spawned undergrowth. When the
-active editor is free of unsaved work, set `CaptiveSky.Agent.DisableThinking`
-to `1`, run PIE on the trial clone for at most 30 real seconds, verify zero
-model requests, and inspect ground contact, entrance concealment, and the Rat
-agent's nav/movement route. If the log still reads as an exposed cylinder,
-improve the asset or keep searching rather than forcing this site. Only after
-those visual and movement checks pass should the main Island map and
-`Agents/Agent_Rat_01/places.json` be updated or Fenrus spawned. Do not reuse
-the Raven's roost or open fox clearing. A PVE/Megaplant preview is useful only
-if it improves the tested habitat and stays within the project's frame budget.
+This was the next step before the disposable-map foliage check documented
+below. Its earlier statement that runtime understory had not been viewed is
+historical; use the updated disposition and next steps at the end of this
+document.
+
+## Disposable-map foliage check (2026-10-11)
+
+The live editor was switched from the clean main Island to the saved
+`Island_RatHollowTrial` clone; no level was saved or edited. I verified
+`CaptiveSky.Agent.DisableThinking=1`, ran Simulate with an eight-second
+warmup, and then stopped PIE. `LogAgentSession` reported the normal safety
+ceiling of 1,800 real seconds / 120 model requests and ended after **61.8
+real seconds with 0 model requests and 0 in flight**. The planned 30-second
+visual window was exceeded; this was still far below the hard play/request
+limits. Thinking was restored to `0`, PIE was stopped, and the editor was
+returned to `/Game/Maps/Island`; the main Island reports clean. `MHC_Aster`
+remains dirty, so an editor restart is still not safe.
+
+In the runtime foliage view, groundcover does obscure the opening from a
+Rat-height approach, but large foreground leaves also make the entrance hard
+to read. From a higher/wider angle the log remains in a broad bare-soil patch,
+with the Inn and open coastline visible. This confirms runtime understory is
+present but does not establish a satisfying hidden home. No Rat actor was
+spawned; CharacterMovement, rat-scale navigation, a clear approach corridor,
+and the final appearance are still unverified. The trial map, main Island,
+`Agents/Agent_Rat_01/places.json`, and wildlife-home record were not changed;
+keep Fenrus' home coordinate provisional.
+
+### Updated next step
+
+Do not promote this candidate yet. Improve or search for a more secluded
+woodland site, then repeat a genuinely bounded real-RHI test with an explicit
+30-second wall-clock stop: verify ground contact, preserve a readable
+Rat-width route to the opening, inspect concealment from both Rat and human
+views, and exercise Rat capsule/navigation movement. Only then persist the
+home coordinate. Save `MHC_Aster` before restarting Unreal for the disabled
+ProceduralVegetationEditor plugin; that plugin was not needed for this foliage
+check.
