@@ -26,3 +26,9 @@ Goal: bodies for the human residents (MetaHuman), the raven and the rat. Status:
 1. `Scripts/Export-CreatureReferences.py` exports `SK_Crow` / `SK_Fox` to FBX (needs `-RenderOffscreen`; NullRHI asserts on skeletal-mesh export).
 2. `blender -b --factory-startup -P Scripts/AssetPipeline/creatures/raven.py -- SK_Crow.fbx <out>/Raven`, same for `rat.py`/`SK_Fox.fbx`, plus `rat_fur_texture.py`.
 3. `UnrealEditor-Cmd <uproject> -ExecutePythonScript=Scripts/Import-Creatures.py -RenderOffscreen` (set `CREATURE_SRC` when the project dir is not the repo).
+
+## Update 2026-10-11: verified state
+
+- MetaHuman optional content installed; `Scripts/Create-MetaHumans.py` (`-RenderOffscreen`) applied body, skin and eyes to `MHC_Aster` and `MHC_Innkeeper` and saved them. `can_build_meta_human` is still False for both: they need `request_auto_rigging` then `build_meta_human`, which calls Epic cloud services (login required). Not attempted yet, so no assembled MetaHuman exists and no resident pawn uses one.
+- Raven: scratch build succeeded; `CaptiveSky2.Agent.RavenPerch`, `RavenFlight`, `RavenShelterCandidateAudit` pass (NullRHI, so the mesh was not seen on screen).
+- Rat: `CaptiveSky2.Agent.RatAnimationAssets` and `RatLocomotionAnimation` pass (the Rat controller drives the Fox clips on `SK_Rat_01` via `BP_Rat_Placeholder`). A two-frame render of the placeholder showed only subtle idle motion. No rat is placed in the Island map; placement belongs with the Rat hollow work.
