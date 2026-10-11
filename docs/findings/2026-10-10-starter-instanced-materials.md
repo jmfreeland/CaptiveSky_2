@@ -27,16 +27,23 @@ local and are not part of the Git commit.
   packages: `Saved/Logs/Codex_StarterInstancedUsageProbe_20261010.log`.
 - The guarded save run reported `usage_after: True` for both, with the hashes
   above: `Saved/Logs/Codex_StarterInstancedUsage_20261010.log`.
-- No post-repair Game screenshot or runtime log has been captured yet, so the
-  disappearance of the two warnings and the visual effect are not yet verified.
-  A live UnrealEditor process was present after the save run; no second session
-  was started alongside it.
+- A post-repair, 60-second standalone Game recheck used the same 11:00 Tideglass
+  viewpoint, an isolated data root, disabled resident thinking, and a zero-model-
+  request cap: [`Codex_StarterInstanced_RecheckWarm_20261011.log`](../../Saved/Logs/Codex_StarterInstanced_RecheckWarm_20261011.log).
+  Its 13 `InstancedStaticMeshes` fallback warnings are all for the separate
+  Everest rhododendron family; neither repaired StarterContent material appears
+  in a missing-usage warning. The earlier cold-cache frame showed “Preparing
+  Shaders (64)” and is not valid visual evidence. The warm-cache frame
+  [`002_Tideglass.png`](../../Saved/Playtests/Codex_StarterInstanced_RecheckWarm_20261011/Screenshots/002_Tideglass.png)
+  has the authored stone and wood appearance visible in the view. This verifies
+  a bounded Game view, not PIE or all possible HISM placements.
 - The 13 Everestian rhododendron material fallbacks are a separate unresolved
   graph issue and were not changed; see
   [the Rhododendron finding](2026-10-08-rhododendron-material-fallback.md).
 
-Next: after the editor is closed, recapture the same bounded Tideglass Game
-view with agent thinking disabled and a zero-request cap. Confirm the two
-StarterContent warnings are gone, inspect whether the rock/wood HISM instances
-now use their authored materials, and keep the unresolved Rhododendron fallback
-separate from this result.
+Next: keep the broken Everestianum root isolated from the repaired StarterContent
+materials. The existing audit found four unbound material-function calls in
+that root and a failed compile when its instanced usage was enabled; restore it
+from a known-good source or rebuild/test it on a separate duplicate before any
+live replacement. The StarterContent warnings are absent in the bounded Game
+recheck; no additional material changes are justified by this result.
