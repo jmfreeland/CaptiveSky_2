@@ -2,10 +2,23 @@
 
 ## Finding
 
-The project now explicitly sets `r.Streaming.PoolSize=4096` and
+The project sets `r.Streaming.PoolSize=4096` and
 `r.Streaming.LimitPoolSizeToVRAM=1` in `Config/DefaultEngine.ini` (commit
-`cacced2`). Real-RHI UE 5.8.3 capture logs confirm the active streaming pool
-changed from the previous scalability default of 1000 MiB to 4096 MiB:
+`cacced2`). The saved game profile is Texture Quality 3. UE 5.8.3's engine
+`BaseScalability.ini` overrides that profile to a 1000 MiB pool and disables
+the VRAM clamp, which explains why the warning could recur in Game despite the
+project default. `Config/DefaultScalability.ini` now overrides just those two
+High-profile settings, preserving the selected texture quality and other
+scalability choices. The Game startup log
+(`Saved/Logs/Codex_TextureScalability_MemoryDDC_20261011.log`) sets both project
+values and applies `[TextureQuality@3]` without emitting the engine's 1000 MiB
+override. It then reports `UBT AutoSDK ReturnCode: -532462766` and never reaches
+the Island map; the isolated launch was stopped before gameplay. Thus startup
+confirms the override is loaded but the final in-session CVar and camera-specific
+pool counters remain unverified.
+
+Earlier isolated real-RHI UE 5.8.3 capture logs confirm the project-default
+pool was 4096 MiB:
 `Saved/Logs/Codex_TexturePool_Verify_20261011.log` and
 `Saved/Logs/Codex_TexturePool_Verify_1100_20261011.log`. The RHI reports a
 7074 MiB automatically estimated pool ceiling on this machine, but that is not
@@ -16,8 +29,8 @@ about 4.4–5.7 MiB over the former 1000 MiB pool. That proves the old setting
 was occasionally exceeded; the newer captures confirm the 4096 MiB setting is
 active, but do **not** record the warning camera's Required Pool / Over Budget
 figures. The user's more recent observation that the warning still recurs is
-not yet quantified against the new limit. This streaming-pool warning is
-distinct from the separate whole-GPU video-memory warning recorded in
+not yet quantified against the corrected High-profile override. This
+streaming-pool warning is distinct from the separate whole-GPU video-memory warning in
 `2026-10-08-editor-vram-pressure.md`.
 
 ## Read-only Island inventory
