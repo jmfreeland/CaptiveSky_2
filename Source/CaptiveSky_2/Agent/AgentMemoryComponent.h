@@ -75,6 +75,9 @@ public:
 	/** True when a memory of this kind since SinceUtc has at least the requested word-set Jaccard similarity. */
 	bool HasSimilarMemorySince(EAgentMemoryType Type, const FString& Text, const FDateTime& SinceUtc, float MinimumSimilarity = 0.6f) const;
 
+	/** True when any durable memory contains this exact tag. */
+	bool HasMemoryTag(const FString& Tag) const;
+
 protected:
 	virtual void BeginPlay() override;
 

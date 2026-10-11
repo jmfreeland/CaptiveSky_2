@@ -144,6 +144,9 @@ private:
 
 	FString BuildSituationSummary(const FAgentConversationContext& Context) const;
 	FString BuildSystemPrompt(const TArray<FAgentMemoryRecord>& RelevantMemories) const;
+	static FString CollectReviewedRequestUpdates(UAgentMemoryComponent* MemoryComp, const FString& InboxPathOverride = FString());
+	static FString AddReviewedRequestUpdatesToSituation(const FString& Situation, UAgentMemoryComponent* MemoryComp,
+		const FString& InboxPathOverride = FString());
 	void RequestDecisionWithContext(const FAgentConversationContext& Context);
 	static float GetConversationMemoryImportance(const FAgentConversationContext& Context);
 

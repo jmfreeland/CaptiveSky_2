@@ -201,4 +201,80 @@ namespace IslandAssetRequestQueue
 		}
 		return true;
 	}
+
+	bool ReadReviewedOutcomes(const FString& Requester, TArray<FReviewedOutcome>& OutOutcomes,
+		FString& OutError, const FString& InboxPathOverride)
+	{
+		OutOutcomes.Reset();
+		OutError.Reset();
+		if (Requester.IsEmpty())
+		{
+			OutError = TEXT("A resident identity is required to read proposal outcomes.");
+			return false;
+		}
+
+		const FString Path = InboxPathOverride.IsEmpty()
+			? CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl"))
+			: InboxPathOverride;
+		FString Existing;
+		if (!FFileHelper::LoadFileToString(Existing, *Path))
+		{
+			if (!IFileManager::Get().FileExists(*Path)) return true;
+			OutError = TEXT("The asset request inbox could not be read; no review updates were returned.");
+			return false;
+		}
+
+		TArray<FString> Records;
+		if (!SplitJsonObjects(Existing, Records))
+		{
+			OutError = TEXT("The asset request inbox contains an unreadable record; no review updates were returned.");
+			return false;
+		}
+		for (const FString& Line : Records)
+		{
+			TSharedPtr<FJsonObject> Record;
+			const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Line);
+			if (!FJsonSerializer::Deserialize(Reader, Record) || !Record.IsValid())
+			{
+				OutOutcomes.Reset();
+				OutError = TEXT("The asset request inbox contains an unreadable record; no review updates were returned.");
+				return false;
+			}
+
+			FReviewedOutcome Outcome;
+			FString RecordRequester;
+			Record->TryGetStringField(TEXT("id"), Outcome.Id);
+			Record->TryGetStringField(TEXT("requester"), RecordRequester);
+			Record->TryGetStringField(TEXT("description"), Outcome.Description);
+			Record->TryGetStringField(TEXT("target"), Outcome.Target);
+			Record->TryGetStringField(TEXT("upgrade_kind"), Outcome.UpgradeKind);
+			Record->TryGetStringField(TEXT("request_type"), Outcome.RequestType);
+			Record->TryGetStringField(TEXT("status"), Outcome.Status);
+			if (Outcome.RequestType.IsEmpty()) Outcome.RequestType = TEXT("new_object");
+			if (Outcome.Status.IsEmpty()) Outcome.Status = TEXT("pending_review");
+			bool bDescriptionHasControl = false;
+			for (const TCHAR Character : Outcome.Description) bDescriptionHasControl |= FChar::IsControl(Character);
+			bool bTargetHasControl = false;
+			for (const TCHAR Character : Outcome.Target) bTargetHasControl |= FChar::IsControl(Character);
+			const bool bValidType = Outcome.RequestType == TEXT("new_object") || Outcome.RequestType == TEXT("upgrade");
+			const bool bValidUpgradeKind = Outcome.RequestType != TEXT("upgrade") ||
+				Outcome.UpgradeKind == TEXT("aesthetic") || Outcome.UpgradeKind == TEXT("variation") || Outcome.UpgradeKind == TEXT("functionality");
+			if (Outcome.Id.IsEmpty() || RecordRequester.IsEmpty() || Outcome.Description.IsEmpty() ||
+				Outcome.Description.Len() > MaxDescriptionCharacters || bDescriptionHasControl ||
+				Outcome.Target.Len() > 96 || bTargetHasControl ||
+				!bValidType || !bValidUpgradeKind ||
+				(Outcome.Status != TEXT("pending_review") && Outcome.Status != TEXT("accepted") &&
+					Outcome.Status != TEXT("generated") && Outcome.Status != TEXT("declined")))
+			{
+				OutOutcomes.Reset();
+				OutError = TEXT("The asset request inbox contains an invalid record; no review updates were returned.");
+				return false;
+			}
+			if (RecordRequester == Requester && Outcome.Status != TEXT("pending_review"))
+			{
+				OutOutcomes.Add(MoveTemp(Outcome));
+			}
+		}
+		return true;
+	}
 }

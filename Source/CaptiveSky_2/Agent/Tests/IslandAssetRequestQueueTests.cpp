@@ -64,6 +64,28 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 		InboxContents.Contains(DescriptiveTarget) &&
 		InboxContents.Contains(TEXT("shore more sheltered from the prevailing wind")));
 
+	const FString ReviewInboxPath = FPaths::Combine(TestDirectory, TEXT("review-inbox.jsonl"));
+	const FString ReviewInbox =
+		TEXT("{\"id\":\"review-1\",\"requester\":\"Agent_Aster_01\",\"description\":\"Add a sheltered perch\",\"request_type\":\"upgrade\",\"target\":\"WindArch_UpperBeam\",\"upgrade_kind\":\"functionality\",\"status\":\"accepted\"}\n")
+		TEXT("{\"id\":\"review-2\",\"requester\":\"Agent_Raven_01\",\"description\":\"Add a nest shelf\",\"request_type\":\"upgrade\",\"target\":\"Roost_East\",\"upgrade_kind\":\"functionality\",\"status\":\"declined\"}\n")
+		TEXT("{\"id\":\"review-3\",\"requester\":\"Agent_Aster_01\",\"description\":\"A small wind bell\",\"request_type\":\"new_object\",\"status\":\"pending_review\"}\n");
+	TestTrue(TEXT("Review outcome fixture is written"), FFileHelper::SaveStringToFile(ReviewInbox, *ReviewInboxPath));
+	TArray<IslandAssetRequestQueue::FReviewedOutcome> ReviewedOutcomes;
+	TestTrue(TEXT("Reviewed outcomes can be read"), IslandAssetRequestQueue::ReadReviewedOutcomes(
+		TEXT("Agent_Aster_01"), ReviewedOutcomes, Error, ReviewInboxPath));
+	TestEqual(TEXT("Only completed outcomes for the requesting resident are returned"), ReviewedOutcomes.Num(), 1);
+	if (ReviewedOutcomes.Num() == 1)
+	{
+		TestEqual(TEXT("Requester outcome keeps its ID"), ReviewedOutcomes[0].Id, FString(TEXT("review-1")));
+		TestEqual(TEXT("Requester outcome keeps its decision"), ReviewedOutcomes[0].Status, FString(TEXT("accepted")));
+		TestEqual(TEXT("Requester outcome keeps the target"), ReviewedOutcomes[0].Target, FString(TEXT("WindArch_UpperBeam")));
+	}
+	TestTrue(TEXT("Pending proposals are not returned as review updates"), FFileHelper::SaveStringToFile(
+		TEXT("{\"id\":\"bad\",\"requester\":\"Agent_Aster_01\",\"description\":\"Malformed\",\"status\":\"unknown\"}\n"), *ReviewInboxPath));
+	TestFalse(TEXT("Unknown review states fail closed"), IslandAssetRequestQueue::ReadReviewedOutcomes(
+		TEXT("Agent_Aster_01"), ReviewedOutcomes, Error, ReviewInboxPath));
+	TestTrue(TEXT("No partial outcomes escape a malformed inbox"), ReviewedOutcomes.IsEmpty());
+
 	const FString LegacyInboxPath = FPaths::Combine(TestDirectory, TEXT("legacy-inbox.jsonl"));
 	const FString LegacyRecord = TEXT("{\n  \"id\": \"legacy\",\n  \"requester\": \"Agent_Aster_01\",\n  \"description\": \"A small weatherproof bird shelter\",\n  \"pipeline\": \"ComfyBlender\",\n  \"status\": \"pending_review\"\n}\n");
 	TestTrue(TEXT("A pre-upgrade inbox fixture is written"), FFileHelper::SaveStringToFile(LegacyRecord, *LegacyInboxPath));

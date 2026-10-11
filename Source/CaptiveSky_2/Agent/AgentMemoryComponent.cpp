@@ -202,6 +202,17 @@ bool UAgentMemoryComponent::HasSimilarMemorySince(EAgentMemoryType Type, const F
 	return false;
 }
 
+bool UAgentMemoryComponent::HasMemoryTag(const FString& Tag) const
+{
+	if (Tag.IsEmpty()) return false;
+	EnsureLoaded();
+	for (const FAgentMemoryRecord& Record : Cache)
+	{
+		if (Record.Tags.Contains(Tag)) return true;
+	}
+	return false;
+}
+
 static void TokenizeLower(const FString& In, TArray<FString>& OutWords)
 {
 	FString Cleaned = In.ToLower();

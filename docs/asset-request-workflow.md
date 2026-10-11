@@ -6,6 +6,8 @@ To make untagged props requestable without turning them into new interaction tar
 
 These actions only record concise proposals for human review. They do not call ComfyUI or Blender, edit source assets, import an Unreal asset, or change the map. Requests are suggestions, not promises or character obligations. New-object proposals may proceed through ComfyBlender after review; upgrade proposals are labeled `human_review` because they may call for art, code, or level design rather than one particular asset pipeline.
 
+After a human changes a proposal to `accepted`, `generated`, or `declined`, the requester receives that outcome in its next already-authorized thought and as a durable memory. Each request/status pair is delivered once, so a later transition (for example, `accepted` to `generated`) creates a new update. Acceptance means approved for consideration, not completed work; `generated` does not imply Unreal import or level placement. Only the requester sees the update, and the quoted proposal remains untrusted text. This adds no model request and makes no world change.
+
 The default inbox is `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl`. Each line is a standalone JSON record:
 
 ```json
