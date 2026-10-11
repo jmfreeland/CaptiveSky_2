@@ -201,7 +201,12 @@ void UIslandInnkeeperSubsystem::SpawnInnkeeper(UWorld& World)
 		return;
 	}
 
-	UClass* LoadedBodyClass = BodyClass.LoadSynchronous();
+	// Prefer the MetaHuman body (Scripts/Create-MetaHumanBodies.py) when it exists in this checkout; Content/ is local-only,
+	// so the configured placeholder remains the fallback.
+	UClass* LoadedBodyClass = LoadObject<UClass>(nullptr, TEXT("/Game/Agents/BP_Innkeeper_MetaHuman.BP_Innkeeper_MetaHuman_C"),
+		nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!LoadedBodyClass || !LoadedBodyClass->IsChildOf(AAutonomousAgentCharacter::StaticClass()))
+		LoadedBodyClass = BodyClass.LoadSynchronous();
 	if (!LoadedBodyClass || !LoadedBodyClass->IsChildOf(AAutonomousAgentCharacter::StaticClass()))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Island innkeeper was not spawned: configured body class is missing or is not an autonomous-agent character."));
