@@ -111,6 +111,8 @@ bool UAgentSocialComponent::TryReserveAutomaticConversation(UAgentSocialComponen
 	ActiveAutomaticConversationPartnerId = OtherAgentId;
 	OtherSocial->ActiveAutomaticConversationId = ConversationId;
 	OtherSocial->ActiveAutomaticConversationPartnerId = OwnAgentId;
+	UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] automatic conversation opened: %s -> %s (id=%s)."),
+		*OwnAgentId, *OtherAgentId, *ConversationId);
 	return true;
 }
 
@@ -159,6 +161,14 @@ void UAgentSocialComponent::FinishAutomaticConversation(AAutonomousAgentCharacte
 	{
 		ApplyMutualCooldown(Other);
 	}
+	const UAgentMemoryComponent* OtherMemory = Other
+		? Other->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	const UAgentMemoryComponent* OwnMemory = GetOwner()
+		? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] automatic conversation closed: %s <-> %s (id=%s; cooldown=%s)."),
+		OwnMemory ? *OwnMemory->GetResolvedAgentId() : TEXT("unknown"),
+		OtherMemory ? *OtherMemory->GetResolvedAgentId() : TEXT("unknown"), *ConversationId,
+		bApplyCooldown ? TEXT("yes") : TEXT("no"));
 
 	ReleaseAutomaticConversation(Other ? Other->FindComponentByClass<UAgentSocialComponent>() : nullptr,
 		ConversationId);
@@ -386,6 +396,8 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	{
 		return;
 	}
+	UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] automatic conversation line %d delivered: %s -> %s (id=%s)."),
+		TurnIndex, *SpeakerId, *RecipientId, *ConversationId);
 	const FString SpeakerName = Speaker->GetAgentDisplayName();
 	const FString RecipientName = Recipient->GetAgentDisplayName();
 	if (UAgentRelationshipComponent* Relationships = Speaker->FindComponentByClass<UAgentRelationshipComponent>())

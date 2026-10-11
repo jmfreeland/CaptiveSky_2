@@ -39,6 +39,12 @@ The editor and Unreal processes were closed for follow-up. The project Editor ta
 
 A proposed five-minute live observation with a 12-request ceiling was not started: the configured agent backend would receive resident/world context, and that external data transfer was not authorized by the current request. No provider requests were made. If approved, the next sample can use the isolated `Saved/Playtests/Codex_SocialPacing_20261011/World` root, keep spontaneous thinking enabled, and cap at 300 real seconds and 12 model requests. Otherwise, continue with local-only automation and synthetic utterance tests.
 
+## 2026-10-11 bounded live retry
+
+A fresh isolated `UnrealEditor-Cmd` run reached Island in 40 seconds with a 900-second / 30-request cap. The first decision cycle reserved three requests (Raven, Aster, Innkeeper), but all three failed to connect to the configured `https://api.openai.com/v1/chat/completions` endpoint in 0.02 seconds (`libcurl error 7`); no resident decisions or conversations followed. The test process was stopped rather than spending its cap on retries. A separate `Test-NetConnection api.openai.com -Port 443` check also failed from this managed execution environment. A requested network-enabled retry was declined because it would transmit resident prompts and potentially private memory/world context; explicit user approval for that data transfer is still required. No successful provider call was made.
+
+The social component now emits dialogue-free structured log markers for automatic conversation opens, delivered line numbers/participants, and closes. These enable a future authorized live run to distinguish decision-request volume from conversation-start rate without adding speech text to the new diagnostics. Existing conversational behavior and all time/request safeguards remain unchanged. The `CaptiveSky_2Editor` target built successfully. `CaptiveSky2.Agent.SocialPacing` and `CaptiveSky2.Agent.CraftTeaching` passed under NullRHI with thinking disabled and a zero-request cap; the latter exercised the delivered-line markers (`Saved/Logs/Codex_SocialDiagnosticsDelivery_20261011.log`).
+
 For any approved live observation, confirm the new reply pause in the live log and track:
 
 1. model requests by resident and elapsed minute;
