@@ -1,0 +1,38 @@
+# Hidden Ocean Plane Collision — 2026-10-11
+
+## Finding
+
+`Scripts/Create-IslandWaterBody.py` creates a Water plugin ocean with `NO_COLLISION`, then retains the legacy `OceanPlane` so existing world/environment tools can still find it. The script hid that static mesh visually, but never disabled its collision. A hidden plane at sea level can therefore remain a walkable surface even though the visible water body has no collision.
+
+This was the likely cause of the reported water-walking. The source script showed the mismatch, and the corrected builder was later run against the Island map and saved successfully.
+
+## Change and verification
+
+The builder now disables collision on the retained plane's static-mesh component as it hides it, while preserving the actor for environment lookup and revert workflows. This source change is idempotent. It also saves the map synchronously during startup-script execution, before any deferred post-tick water-info refresh; the delayed callback may not get a chance to run in unattended launches. Regression checks cover both the explicit `NO_COLLISION` setting and synchronous map/package saves.
+
+The `/Game/Maps/Island` map is updated. A pre-change backup is preserved at `Saved/Backups/IslandWaterBodyCollision_20261011/Island.umap`. The map SHA-256 changed from `61562FD34D31B200EE35FA07345B2628BF0365277FEF6BFAA88B3DFCF38B2471` to `CCCC9742D686C0A4BFDF38ACF1F8438C836F66E340A395EC984D714EC767996A`. This map has no `Content/__ExternalActors__/Maps/Island` folder (the external-actor tree contains only `Maps/PCG_World`).
+
+On 2026-10-11, the live editor MCP still reported the hidden `OceanPlane` (`StaticMeshActor_0`, mesh `/Water/Meshes/S_WaterPlane_256`) as `QueryAndPhysics`, even though the on-disk map still hashed to the corrected `CCCC9742...996A` value. This is a stale in-memory level state: the editor had loaded Island before the corrected map was saved. The editor window could not be brought into the Windows automation surface at that point; an unrelated `.NET` application-error dialog was exposed instead. Reload `/Game/Maps/Island` (after checking for unsaved editor work) or restart the editor to pick up the saved no-collision state, then re-query `bodyInstance.collisionEnabled` before retrying the water walk.
+
+
+The first runtime attempt, with the stock DDC graph, stopped at Unreal's `Installed` cache fatal error before loading a world. A retry with a project-local DDC and shader directory began compiling 16 shader workers, but had not reached the Island's world-ready marker after about five minutes. The desktop app inventory reported Unreal Editor as running, although the active-window list no longer exposed its windows; to avoid a possible collision, only the bounded game process started by that test was stopped (PID 15064), and no other Unreal process was touched.
+
+A later launch reused the isolated writable DDC and shader directory, with Python and agent thinking disabled, a 600-second startup ceiling, a 180-second realtime cap, and zero model requests. It loaded `/Game/Maps/Island` in Game mode and logged `Play safety active: 180 real seconds, at most 0 model requests.` The session ended normally at 180.2 seconds with zero requests and no fatal error. A cold startup incurred 500 PSO creation hitches before world-ready (131.1 seconds). The CUA window inventory did not expose the Game window, so no keyboard-controlled shore approach could be performed; this run verifies Island loading and the play/request safety caps, not walking or swimming. The Unreal MCP endpoint remains unavailable.
+
+## Player-water design evidence
+
+The player's native `ACaptiveSky_2Character` checks the Water subsystem's ocean component only while falling or already surface-swimming. When the capsule reaches the queried surface it switches the player to gravity-free horizontal movement, follows the live wave height without requesting depth data, and restores falling when the water query ends. Jumping exits back to falling with the normal jump impulse. This is deliberately player-only; resident movement is untouched. The movement is surface swimming rather than UE's built-in `MOVE_Swimming`, because that mode is defined for a fluid volume and this ocean is intentionally non-colliding. Transition logs use the `[PlayerWater]` prefix to support a later controlled run.
+
+## Verification and remaining work
+
+`CaptiveSky_2Editor Win64 Development` compiled successfully with Unreal Engine 5.8 after granting the build access to its normal per-user log directory. The first sandboxed attempt reproduced a .NET exception: UBT's bundled .NET 10 threw `UnauthorizedAccessException` while enumerating `C:\Users\freel\AppData\Local\UnrealBuildTool`. The subsequent approved build completed successfully, including `CaptiveSky_2Character.cpp`, the automation test, and the module link.
+
+`CaptiveSky2.Agent.IslandOcean` passes in Editor-Cmd. In its transient game world it spawns a native `AWaterBodyOcean` and `AWaterZone`, verifies that `GetWaterSurfaceInfoAtLocation` returns the surface, then ticks a falling player just across that queried surface and verifies entry into surface swimming. It also checks tuned speed, restoration to falling mode, and jump exit. This exercises the real Water plugin query and player transition code, but not the saved Island map, a full gameplay frame loop, animation, horizontal input, or shore exit. The two Python regression tests also pass for the builder's collision policy and synchronous map save. A player-controlled runtime check is still required for water entry, wave following, horizontal control, jump/shore exit, and behavior when the query is unavailable. The current-window inventory exposed only the .NET error dialog, not an Unreal editor/game window, so I could not perform that interaction check. The exact time of the user's water-walking observation relative to the map save is also unknown; if it was after the save, inspect for a duplicate/older colliding surface in the loaded level.
+
+On 2026-10-11, `CaptiveSky2.Agent.IslandOcean` was rerun after the current Editor build, with `-NullRHI`, agent thinking disabled, a 60-second ceiling, and a zero-model-request cap. It passed; the log shows surface-swim entry from the real ocean query plus the expected falling/jump exits (`Saved/Logs/Codex_IslandOceanCheck_20261011.log`). The standalone Python regression tests were not rerun this time: `D:\Python\3d\Scripts\python.exe` resolves to a venv whose configured Windows Store base interpreter is missing. The earlier reported Python pass remains separate evidence; restore a working Python 3.12 base interpreter to repeat it.
+
+## Bounded Island runtime check
+
+An opt-in, temporary development smoke-test hook placed the possessed player 50 m above open water at (500000, 500000) in the saved Island map. The actual `BP_ThirdPersonCharacter_C` logged `[PlayerWater] ... entered surface swimming at Z=940.0` roughly three seconds after placement. The Game session had a 30-second realtime cap, zero model requests, isolated agent data, disabled Python, and used the warmed project-local DDC. It exited normally at the configured cap. The temporary startup hook was removed after the run; the normal player-water path remains.
+
+This validates water entry on the saved Island level and confirms the hidden plane no longer blocks the player into a walk state at that offshore location. It does not yet validate user-controlled horizontal movement, wave-follow appearance, jumping, or walking back onto shore. The run also emitted two WaterBrushManager load warnings; they did not prevent the ocean query or swim transition, but should be reviewed separately if they recur in the editor.

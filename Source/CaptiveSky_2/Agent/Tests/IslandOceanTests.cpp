@@ -6,6 +6,13 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "Materials/Material.h"
+#include "CaptiveSky_2Character.h"
+#include "IslandOceanTestCharacter.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "WaterBodyComponent.h"
+#include "WaterBodyOceanActor.h"
+#include "WaterSubsystem.h"
+#include "WaterZoneActor.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcean",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -41,6 +48,63 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		Ocean->RestoreOceanMaterial();
 		TestTrue(TEXT("The authored material comes back"), Plane->GetStaticMeshComponent()->GetMaterial(0) == Flat);
 		TestFalse(TEXT("Nothing stays applied after a restore"), Ocean->IsApplied());
+	}
+
+	AIslandOceanTestCharacter* Player = World->SpawnActor<AIslandOceanTestCharacter>();
+	if (TestNotNull(TEXT("The player character spawns for water-movement checks"), Player))
+	{
+		UCharacterMovementComponent* Movement = Player->GetCharacterMovement();
+		const float OriginalFlySpeed = Movement->MaxFlySpeed;
+
+		Player->EnterSurfaceSwimming(100.f);
+		TestTrue(TEXT("Entering surface water enables the player-only swim state"), Player->IsSurfaceSwimming());
+		TestEqual(TEXT("Surface swimming uses gravity-free movement"), Movement->MovementMode, MOVE_Flying);
+		TestEqual(TEXT("Surface swimming applies its tuned speed"), Movement->MaxFlySpeed, 260.f);
+
+		Player->LeaveSurfaceSwimming(MOVE_Falling);
+		TestFalse(TEXT("Leaving water clears the swim state"), Player->IsSurfaceSwimming());
+		TestEqual(TEXT("Leaving water restores the prior flight speed"), Movement->MaxFlySpeed, OriginalFlySpeed);
+		TestEqual(TEXT("Leaving water resumes falling"), Movement->MovementMode, MOVE_Falling);
+
+		Player->EnterSurfaceSwimming(100.f);
+		Player->Jump();
+		TestFalse(TEXT("Jumping exits surface swimming"), Player->IsSurfaceSwimming());
+		TestEqual(TEXT("Jumping from the surface returns to falling movement"), Movement->MovementMode, MOVE_Falling);
+	}
+
+	AWaterZone* WaterZone = World->SpawnActor<AWaterZone>();
+	AWaterBodyOcean* OceanBody = World->SpawnActor<AWaterBodyOcean>(FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator);
+	UWaterSubsystem* WaterSubsystem = UWaterSubsystem::GetWaterSubsystem(World);
+	UWaterBodyComponent* OceanComponent = OceanBody ? OceanBody->GetWaterBodyComponent() : nullptr;
+	if (TestNotNull(TEXT("The transient game world has a Water subsystem"), WaterSubsystem) &&
+		TestNotNull(TEXT("The native ocean body has a water component"), OceanComponent) &&
+		TestNotNull(TEXT("The native ocean has a water zone"), WaterZone))
+	{
+		WaterZone->SetZoneExtent(FVector2D(50000.f, 50000.f));
+		WaterZone->SetRenderTargetResolution(FIntPoint(256, 256));
+		WaterZone->AddWaterBodyComponent(OceanComponent);
+		WaterZone->Update();
+		WaterSubsystem->SetOceanBodyComponent(OceanComponent);
+
+		FVector SurfaceLocation = FVector::ZeroVector;
+		FVector SurfaceNormal = FVector::UpVector;
+		FVector WaterVelocity = FVector::ZeroVector;
+		float WaterDepth = 0.f;
+		const bool bSurfaceQuerySucceeded = OceanComponent->GetWaterSurfaceInfoAtLocation(
+			FVector::ZeroVector, SurfaceLocation, SurfaceNormal, WaterVelocity, WaterDepth, false);
+		TestTrue(TEXT("The native ocean answers a surface query in its zone"), bSurfaceQuerySucceeded);
+
+		if (bSurfaceQuerySucceeded)
+		{
+			AIslandOceanTestCharacter* WaterPlayer = World->SpawnActor<AIslandOceanTestCharacter>(
+				FVector(0.f, 0.f, SurfaceLocation.Z + 90.f), FRotator::ZeroRotator);
+			if (TestNotNull(TEXT("The player for the real surface-query check spawns"), WaterPlayer))
+			{
+				WaterPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+				WaterPlayer->Tick(1.f / 60.f);
+				TestTrue(TEXT("A falling player enters surface swimming from the real ocean query"), WaterPlayer->IsSurfaceSwimming());
+			}
+		}
 	}
 
 	GEngine->DestroyWorldContext(World);

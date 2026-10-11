@@ -3,8 +3,8 @@
 Authors into /Game/Maps/Island:
   - one WaterZone centred on the island at sea level, covering the old ocean plane's footprint;
   - one WaterBodyOcean filling that zone (the landscape hides it wherever land is above sea level);
-  - the old `OceanPlane` actor is kept but made invisible, so it can be turned back on (revert) and the
-    IslandOceanSubsystem / viewpoint harness still find it.
+  - the old `OceanPlane` actor is kept but hidden with collision disabled, so it can be turned back on
+    (revert) and the IslandOceanSubsystem / viewpoint harness still find it.
 The ocean has no collision (like the plane before it, and so residents never switch to swimming) and does not
 carve the landscape. Rebuilds its own zone and ocean on every run (tagged IslandWaterBody) and nothing else.
 
@@ -64,14 +64,25 @@ def build():
 
     for actor in actors:
         if actor.get_actor_label() == PLANE_NAME and isinstance(actor, unreal.StaticMeshActor):
-            actor.static_mesh_component.set_visibility(False)
-            log("{} hidden".format(PLANE_NAME))
+            plane_mesh = actor.static_mesh_component
+            plane_mesh.set_visibility(False)
+            plane_mesh.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+            log("{} hidden with collision disabled".format(PLANE_NAME))
 
     state["zone"], state["ocean"] = zone, ocean
     log("zone extent {} resolution {} bounds {}".format(zone.get_editor_property("zone_extent"), zone.get_editor_property("render_target_resolution"), zone.get_actor_bounds(False)))
     log("ocean material {} extents {}".format(body.get_editor_property("water_material").get_path_name(), body.get_editor_property("ocean_extents")))
     waves = ocean.get_editor_property("water_waves")
     log("waves reference {} members {}".format(waves, [m for m in dir(waves) if not m.startswith("_") and m not in dir(unreal.Object)]))
+
+    # Persist the actor collision policy during the startup script itself. In
+    # unattended editor launches the process may close before post-tick work
+    # runs, so the delayed water-info refresh below must not be the only save.
+    if os.environ.get("WATER_BODY_DRYRUN") == "1":
+        log("dry run: not saving")
+    else:
+        log("saved level immediately: {}".format(unreal.EditorLevelLibrary.save_current_level()))
+        log("saved dirty packages immediately: {}".format(unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)))
 
 
 def on_tick(delta):

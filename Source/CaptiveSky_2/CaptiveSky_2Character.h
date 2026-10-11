@@ -49,10 +49,21 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
+	/** Top speed while floating at the ocean surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Water", meta=(ClampMin="0", ForceUnits="cm/s"))
+	float SurfaceSwimSpeed = 260.f;
+
+	/** Character capsule center offset from the queried water surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Water", meta=(ForceUnits="cm"))
+	float SurfaceSwimOffset = 12.f;
+
 public:
 
 	/** Constructor */
 	ACaptiveSky_2Character();	
+
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void Jump() override;
 
 protected:
 
@@ -84,6 +95,21 @@ public:
 	/** Handles jump pressed inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+public:
+
+	/** Returns whether the player is currently surface-swimming. */
+	UFUNCTION(BlueprintPure, Category="Movement|Water")
+	bool IsSurfaceSwimming() const { return bSurfaceSwimming; }
+
+private:
+	friend class FIslandOceanTest;
+
+	void EnterSurfaceSwimming(float WaterSurfaceZ);
+	void LeaveSurfaceSwimming(EMovementMode NextMovementMode);
+
+	bool bSurfaceSwimming = false;
+	float PreviousMaxFlySpeed = 0.f;
 
 public:
 

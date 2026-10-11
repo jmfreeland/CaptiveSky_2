@@ -7,6 +7,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
+#include "WaterBodyComponent.h"
+#include "WaterSubsystem.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -14,6 +16,8 @@
 
 ACaptiveSky_2Character::ACaptiveSky_2Character()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
@@ -48,6 +52,105 @@ ACaptiveSky_2Character::ACaptiveSky_2Character()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void ACaptiveSky_2Character::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!Movement) return;
+	if (!bSurfaceSwimming && !Movement->IsFalling()) return;
+
+	UWaterSubsystem* WaterSubsystem = UWaterSubsystem::GetWaterSubsystem(GetWorld());
+	UWaterBodyComponent* Ocean = WaterSubsystem ? WaterSubsystem->GetOceanBodyComponent().Get() : nullptr;
+	if (!Ocean)
+	{
+		if (bSurfaceSwimming) LeaveSurfaceSwimming(MOVE_Falling);
+		return;
+	}
+
+	FVector WaterSurfaceLocation = FVector::ZeroVector;
+	FVector WaterSurfaceNormal = FVector::UpVector;
+	FVector WaterVelocity = FVector::ZeroVector;
+	float WaterDepth = 0.f;
+	const bool bHasWaterSurface = Ocean->GetWaterSurfaceInfoAtLocation(
+		GetActorLocation(), WaterSurfaceLocation, WaterSurfaceNormal, WaterVelocity, WaterDepth, false);
+	if (!bHasWaterSurface)
+	{
+		if (bSurfaceSwimming) LeaveSurfaceSwimming(MOVE_Falling);
+		return;
+	}
+
+	if (!bSurfaceSwimming)
+	{
+		const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		const float CapsuleBottomZ = GetActorLocation().Z - CapsuleHalfHeight;
+		if (Movement->IsFalling() && CapsuleBottomZ <= WaterSurfaceLocation.Z)
+		{
+			EnterSurfaceSwimming(WaterSurfaceLocation.Z);
+		}
+		else
+		{
+			return;
+		}
+	}
+
+	// Flying movement keeps horizontal input responsive without requiring a
+	// PhysicsVolume. The water plugin supplies the moving surface height.
+	FVector TargetLocation = GetActorLocation();
+	TargetLocation.Z = FMath::FInterpTo(
+		TargetLocation.Z, WaterSurfaceLocation.Z + SurfaceSwimOffset, DeltaSeconds, 7.f);
+	FHitResult SurfaceFollowHit;
+	SetActorLocation(TargetLocation, true, &SurfaceFollowHit, ETeleportType::None);
+	Movement->Velocity.Z = 0.f;
+}
+
+void ACaptiveSky_2Character::EnterSurfaceSwimming(float WaterSurfaceZ)
+{
+	if (bSurfaceSwimming) return;
+
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		PreviousMaxFlySpeed = Movement->MaxFlySpeed;
+		Movement->MaxFlySpeed = SurfaceSwimSpeed;
+		Movement->Velocity.Z = 0.f;
+		Movement->SetMovementMode(MOVE_Flying);
+	}
+
+	bSurfaceSwimming = true;
+	UE_LOG(LogTemp, Log, TEXT("[PlayerWater] %s entered surface swimming at Z=%.1f"), *GetName(), WaterSurfaceZ);
+
+	// A short fall into the surface should not leave the capsule buried below it.
+	FVector SurfaceEntryLocation = GetActorLocation();
+	SurfaceEntryLocation.Z = FMath::Min(SurfaceEntryLocation.Z, WaterSurfaceZ + SurfaceSwimOffset);
+	SetActorLocation(SurfaceEntryLocation, true);
+}
+
+void ACaptiveSky_2Character::LeaveSurfaceSwimming(EMovementMode NextMovementMode)
+{
+	if (!bSurfaceSwimming) return;
+
+	bSurfaceSwimming = false;
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->MaxFlySpeed = PreviousMaxFlySpeed;
+		Movement->SetMovementMode(NextMovementMode);
+	}
+	UE_LOG(LogTemp, Log, TEXT("[PlayerWater] %s left surface swimming; next mode=%d"), *GetName(), static_cast<int32>(NextMovementMode));
+}
+
+void ACaptiveSky_2Character::Jump()
+{
+	if (bSurfaceSwimming)
+	{
+		const float JumpVelocity = GetCharacterMovement()->JumpZVelocity;
+		LeaveSurfaceSwimming(MOVE_Falling);
+		LaunchCharacter(FVector(0.f, 0.f, JumpVelocity), false, true);
+		return;
+	}
+
+	Super::Jump();
 }
 
 void ACaptiveSky_2Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
