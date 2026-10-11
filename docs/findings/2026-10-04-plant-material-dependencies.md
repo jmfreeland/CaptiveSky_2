@@ -10,6 +10,8 @@ Before restoration (`Saved/Logs/Codex_PlantMaterialAudit_20261004.log`), four Pl
 
 The original function assets were found locally in `C:/Program Files/e-on software/PlantFactory 2024/plugins/Unreal/Content`. Rather than replace them with guessed shader math, a content-only project plugin mounts those originals at their expected `/PlantFactoryPlugin` path. No vendor executable module is included, and existing mesh/material/map assets are not changed.
 
+**Terminology and removal safety (2026-10-11):** this project's `PlantFactoryPlugin` is not the PlantFactory authoring application or an Unreal authoring module; its descriptor only mounts imported `.uasset` material functions. The restored `StaticBillboard` and `BillboardMappedNormals` functions resolved previously missing calls in the Festuca, Phalaris, and Typha material graphs. Disabling this mount would make those package references unresolved again, so it should remain enabled until the affected materials are migrated to independently authored equivalents and that migration is validated in-engine. This does not require installing or launching the legacy authoring application.
+
 ## Local installation and source control
 
 Run `Scripts/Restore-PlantFactoryContent.ps1` with your own licensed installation. Its default source is the local PlantFactory 2024 installation; `-SourceContent` permits another installed original function-content directory. `-ProjectDir` supports an isolated CaptiveSky_2 scratch project.
