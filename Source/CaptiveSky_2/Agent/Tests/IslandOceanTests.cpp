@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "IslandOceanSubsystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -20,7 +22,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcea
 
 bool FIslandOceanTest::RunTest(const FString& Parameters)
 {
-	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UIslandOceanSubsystem* Ocean = World->GetSubsystem<UIslandOceanSubsystem>();
@@ -122,6 +124,36 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 		if (bSurfaceQuerySucceeded)
 		{
+			AActor* ShoreGround = World->SpawnActor<AActor>(FVector(2000.f, 0.f, SurfaceLocation.Z - 60.f), FRotator::ZeroRotator);
+			UBoxComponent* ShoreFloor = NewObject<UBoxComponent>(ShoreGround, TEXT("ShoreFloor"));
+			ShoreGround->SetRootComponent(ShoreFloor);
+			ShoreFloor->SetBoxExtent(FVector(250.f, 250.f, 10.f));
+			ShoreFloor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			ShoreFloor->SetCollisionObjectType(ECC_WorldStatic);
+			ShoreFloor->SetCollisionResponseToAllChannels(ECR_Block);
+			ShoreFloor->RegisterComponent();
+			ShoreFloor->SetWorldLocation(FVector(2000.f, 0.f, SurfaceLocation.Z - 60.f));
+			FHitResult ShoreFloorProbe;
+			TestTrue(TEXT("The transient shallow floor is queryable as world static"),
+				World->LineTraceSingleByChannel(ShoreFloorProbe,
+					FVector(2000.f, 0.f, SurfaceLocation.Z + 20.f),
+					FVector(2000.f, 0.f, SurfaceLocation.Z - 55.f), ECC_WorldStatic));
+
+			AIslandOceanTestCharacter* ShallowWaterPlayer = World->SpawnActor<AIslandOceanTestCharacter>(
+				FVector(2000.f, 0.f, SurfaceLocation.Z + 12.f), FRotator::ZeroRotator);
+			if (TestNotNull(TEXT("The player for the shallow shore exit check spawns"), ShallowWaterPlayer))
+			{
+				ShallowWaterPlayer->EnterSurfaceSwimming(SurfaceLocation.Z);
+				ShallowWaterPlayer->Tick(1.f / 60.f);
+				TestFalse(TEXT("A swimmer wades out when shallow walkable ground is beneath them"),
+					ShallowWaterPlayer->IsSurfaceSwimming());
+				TestEqual(TEXT("A shallow shore exit restores walking movement"),
+					ShallowWaterPlayer->GetCharacterMovement()->MovementMode, MOVE_Walking);
+				TestTrue(TEXT("The shallow shore exit places the capsule above the floor"),
+					ShallowWaterPlayer->GetActorLocation().Z - ShallowWaterPlayer->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() >=
+					ShoreFloor->GetComponentLocation().Z + ShoreFloor->GetScaledBoxExtent().Z);
+			}
+
 			AIslandOceanTestCharacter* WaterPlayer = World->SpawnActor<AIslandOceanTestCharacter>(
 				FVector(0.f, 0.f, SurfaceLocation.Z + 90.f), FRotator::ZeroRotator);
 			if (TestNotNull(TEXT("The player for the real surface-query check spawns"), WaterPlayer))
@@ -138,6 +170,9 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 				GroundedWaterPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 				GroundedWaterPlayer->Tick(1.f / 60.f);
 				TestTrue(TEXT("A grounded player at the ocean surface enters swimming instead of walking across water"),
+					GroundedWaterPlayer->IsSurfaceSwimming());
+				GroundedWaterPlayer->Tick(1.f / 60.f);
+				TestTrue(TEXT("A swimmer without shallow ground remains swimming in open water"),
 					GroundedWaterPlayer->IsSurfaceSwimming());
 			}
 		}

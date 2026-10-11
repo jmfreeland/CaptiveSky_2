@@ -4,11 +4,14 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Engine/StaticMeshActor.h"
+#include "CollisionShape.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
 #include "WaterBodyComponent.h"
 #include "WaterSubsystem.h"
+#include "IslandOceanSubsystem.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -81,6 +84,48 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 	{
 		if (bSurfaceSwimming) LeaveSurfaceSwimming(MOVE_Falling);
 		return;
+	}
+
+	if (bSurfaceSwimming)
+	{
+		// Allow a swimmer to wade out once shallow, walkable ground is directly
+		// beneath them. Keep the band narrow so submerged terrain in deep water
+		// cannot unexpectedly switch the player back to walking.
+		constexpr float MaxShoreStepUp = 20.f;
+		constexpr float MaxWadingDepth = 55.f;
+		const FVector TraceStart(GetActorLocation().X, GetActorLocation().Y,
+			WaterSurfaceLocation.Z + MaxShoreStepUp);
+		const FVector TraceEnd(TraceStart.X, TraceStart.Y, WaterSurfaceLocation.Z - MaxWadingDepth);
+		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(SurfaceSwimShoreExit), false, this);
+		if (AActor* WaterOwner = Ocean->GetOwner()) TraceParams.AddIgnoredActor(WaterOwner);
+		if (AStaticMeshActor* OceanPlane = UIslandOceanSubsystem::FindOceanPlane(GetWorld()))
+		{
+			TraceParams.AddIgnoredActor(OceanPlane);
+		}
+
+		FHitResult GroundHit;
+		if (GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams) &&
+			GroundHit.ImpactNormal.Z >= Movement->GetWalkableFloorZ())
+		{
+			const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			FVector ShoreLocation = GetActorLocation();
+			ShoreLocation.Z = GroundHit.ImpactPoint.Z + CapsuleHalfHeight + 2.f;
+			FCollisionQueryParams OverlapParams(SCENE_QUERY_STAT(SurfaceSwimShoreClearance), false, this);
+			if (AActor* WaterOwner = Ocean->GetOwner()) OverlapParams.AddIgnoredActor(WaterOwner);
+			if (AStaticMeshActor* OceanPlane = UIslandOceanSubsystem::FindOceanPlane(GetWorld()))
+			{
+				OverlapParams.AddIgnoredActor(OceanPlane);
+			}
+
+			const FCollisionShape Capsule = FCollisionShape::MakeCapsule(
+				GetCapsuleComponent()->GetScaledCapsuleRadius(), CapsuleHalfHeight);
+			if (!GetWorld()->OverlapBlockingTestByChannel(ShoreLocation, GetActorQuat(), ECC_Pawn, Capsule, OverlapParams))
+			{
+				SetActorLocation(ShoreLocation, false, nullptr, ETeleportType::TeleportPhysics);
+				LeaveSurfaceSwimming(MOVE_Walking);
+				return;
+			}
+		}
 	}
 
 	if (!bSurfaceSwimming)
