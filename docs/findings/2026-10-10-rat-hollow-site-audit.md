@@ -272,3 +272,16 @@ views, and exercise Rat capsule/navigation movement. Only then persist the
 home coordinate. Save `MHC_Aster` before restarting Unreal for the disabled
 ProceduralVegetationEditor plugin; that plugin was not needed for this foliage
 check.
+
+**Entrance-facing art review (2026-10-11):** the separate, unimported
+`RatHollow_ArtPass_20261011` FBX was re-imported and rendered with
+`ASSET_PREVIEW_DIRECTION=-1,0,0`. The specimen is 259 × 140 × 133 cm, about
+1,960 triangles, has five box-collision strips, four material slots, and the
+pipeline reported no material/manifest problems. The open cavity and straw bed
+are visible from the entrance, but the nearly circular, evenly framed opening
+still reads like a cleanly cut tunnel rather than broken fallen wood; the
+preview alone cannot judge site concealment or Unreal shading. The previous
+side preview is preserved as `Preview-Side.png`; the imported trial and Island
+were not changed. Before import, soften the cut-ring silhouette with an
+asymmetric break or bark tears and check the moss/ground transition in a
+woodland composition.
