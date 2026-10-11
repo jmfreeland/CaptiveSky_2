@@ -1,5 +1,51 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-11
+
+This week's repository state is unusually concrete: RatHollow has moved from an idea to a bounded asset/site experiment; a rat-scale PCG understory variant exists; the imported Raven and Rat pipelines are verified; Aster and the Innkeeper have MetaHuman source assets but are not yet assembled; the Island now has a runtime switch that can suppress agent thinking for zero-request PIE validation; and Tideglass Game captures show the visual bottleneck has shifted away from raw foliage count toward composition, materials, landmarks and middle-distance structure.
+
+### 1. Make RatHollow the first **canonical microhabitat**, not merely a rat prop
+
+**What the player sees/experiences:** Fenrus's home should read as a tiny ecological place: a broken, damp fallen-log cavity half-hidden by rat-scale understory, leaf litter, moss, disturbed soil and one or two habitual approach runs. At human height it is easy to miss. At rat height it becomes a coherent little landscape. Fenrus can leave, return, cache small objects/food, and gradually make the hollow visibly inhabited.
+
+**Why it matters:** this is a compact proof of the north-star architecture. A home is canonical world truth (occupant, entrance, shelter quality, caches, disturbance/history), while Unreal materializes that truth with a log mesh, PCG understory, decals/material variation and navigation. It also gives wildlife agency persistent spatial consequences without pretending every animal needs an LLM civilization.
+
+**Why it fits now:** the repo already has the disposable RatHollow trial map/site work, a clearance-tested hollow mesh, `PCG_RatHollowUnderstory_RatScale_Prototype` with 96 surveyed points in six clumps, Rat locomotion on `SK_Rat_01`, and a safe `CaptiveSky.Agent.DisableThinking` runtime gate. The current review explicitly says the pale regular cylinder on brown ground is not visually acceptable yet and needs runtime understory context.
+
+**Smallest practical implementation:** add a renderer-independent `WildlifeHomeRecord` (stable place ID, species/occupant, entrance anchor/orientation, shelter state, cache list, last-used/disturbance timestamps) and one RatHollow materializer. Do not authorize the main-Island placement until the existing bounded PIE/Game concealment + nav review passes. The first art pass should make the hollow irregular/broken and mossy rather than adding more simulation.
+
+**First visual milestone:** paired human-height and rat-height real-RHI frames of the same approved hollow: from human height it disappears into woodland-edge structure; from rat height the entrance, run, damp wood, litter and shelter geometry read immediately. A high-quality fallen-log/bark/moss asset set would have disproportionate impact.
+
+### 2. Replace the remaining blockout read with a **Tideglass material-and-landmark grammar**
+
+**What the player sees/experiences:** the existing Tideglass composition stops looking like a prototype even before any settlement is built. The pool, approach, Listening Stones/standing stones, inn edge, exposed ground and woodland transition share a believable material language: geological rock variation, weathering, lichen/moss, compacted foot traffic, wetness near water, proper wood/stone surfaces, and deliberate mid-distance masses. The eye reads a place rather than isolated systems.
+
+**Why it matters:** this is the highest-return visible work now. Recent standalone Game captures are already around the 30-FPS floor or better in the tested Tideglass compositions, while the repo repeatedly records the same visual failure: tangled foreground, broad brown mid-distance, thin tree silhouettes, blockout-looking stones/inn edges, and some imported foliage/material fallbacks. More global foliage density is no longer the answer.
+
+**Why it fits now:** the Island already has Tideglass water/life, wet-edge vegetation, `PN_interactiveSpruceForest`, transient lichen on Listening Stones, StarterContent instanced-material repairs, a repeatable 11:00/17:00 capture path and CSV performance harness. This is the natural next step after last week's ecological-composition recommendation: keep the semantic habitat bands, but now make the surfaces and landmark silhouettes carry their share of the image.
+
+**Smallest practical implementation:** choose the existing fixed Tideglass-overlook Game camera and make one bounded “beauty slice”: (1) replace/upgrade the three most conspicuous blockout stone/landmark surfaces; (2) add a deterministic compacted-path/ground-breakup layer through the approach; (3) fix the remaining relevant instanced-material fallbacks used in that view; (4) add two or three authored middle-distance shrub/rock/tree masses rather than increasing global density. Re-profile the identical camera.
+
+**First visual milestone:** the 11:00 fixed Game shot should be publishable without explaining away white/default surfaces, brown empty ground or proxy stones, while retaining a p95 above the project's 30-FPS floor. A small pack of excellent local rock faces, ground/soil blends, bark and mid-distance vegetation clumps would buy more than another million instances.
+
+### 3. Give Aster a **persistent craft lineage**: baking as the first non-monumental culture
+
+**What the player sees/experiences:** Aster makes a particular bread because she has learned and refined it, not because a “bakery” prop exists. Batches differ slightly; successful forms recur. The Innkeeper can taste or request one, another resident can learn it, and later the player can encounter a recognizably related loaf, preparation note, serving custom or ingredient choice elsewhere. Culture begins to propagate through ordinary excellence rather than only through stone art.
+
+**Why it matters:** last week's cultural recommendation focused on visual motifs in stone arrangements. This is deliberately different: transmit **practice**. A culture should contain recipes, techniques, standards and remembered exemplars as well as objects. It also gives relationships and NPC-to-NPC interaction concrete consequences: teaching changes what another person can make.
+
+**Why it fits now:** Aster and the Innkeeper are already persistent residents; the Inn/guest-book and resident memory/world-state machinery exist; Aster's MetaHuman source asset has now been prepared even though final assembly is pending. The canonical layer can hold the craft evidence without waiting for hand animation or a finished kitchen.
+
+**Smallest practical implementation:** add a tiny engine-agnostic `CraftTraditionRecord` plus `CraftAttemptRecord`: craft ID, practitioner, learned-from/source, a few meaningful parameters, outcome/evaluation, and lineage links. Implement exactly one bread with 2–3 adjustable traits and one teaching/observation path between Aster and the Innkeeper. Use existing scheduled thinking rather than adding background model calls.
+
+**First visual milestone:** a small inn table at warm evening light showing three related but non-identical loaves/batches, a practical preparation surface, and Aster/Innkeeper in a teaching or tasting moment; later a derivative loaf appearing elsewhere should be legible evidence that knowledge travelled. One excellent bread/crumb/flour/board prop set plus a restrained hand/serve animation would carry this much further than a large kitchen asset pack.
+
+## Concept art — Tideglass becomes materially believable before it becomes a city
+
+**Direction / reproducible prompt:** Wide cinematic 16:9 view from a shaded working terrace above Tideglass at late-afternoon golden hour. Keep the settlement modest: the existing inn and only a handful of useful structures, terraces and paths, not a finished metropolis. Foreground: Aster works at a practical table with bread, flour, a board and simple tools while another resident observes/tastes; nearby are sketchbook or crafted objects showing ordinary creative life. Middle ground: a compacted path descends through flowering meadow and woodland-edge masses toward clear Tideglass water; local stone retaining edges and steps use the same geology as nearby outcrops, with moss/lichen and damp darkening where appropriate. Include a subtle rat-scale hollow under roots/log at the woodland edge—nearly invisible at human scale—and a raven overhead. Listening Stones should look geological and weathered, not like pale proxies. Architecture is technology-agnostic and fit for purpose: precise contemporary glazing or metal connections may coexist with stone, timber and repaired older fabric where each makes functional sense. No medieval costume, fantasy ornament, cyberpunk, or imposed futurism. Show evidence of accumulated use: worn path centers, planted pockets, repaired surfaces, small personal objects, garden work, and one resident-made artwork. Water reflections, atmospheric mountain/coastal depth, layered vegetation with deliberate negative space, warm interior light beginning at the inn, long soft shadows, gentle wind. Materials are the star: wet stone, mineral soil, bark, lichen, glass, metal, timber, cloth, bread and foliage all distinct. Mood humane, calm, intelligent and alive. The scene should feel beautiful because ecology, craft and repeated human choices have cohered over time—not because a genre aesthetic was imposed.
+
+**Generated concept image:** generated in the weekly run and delivered in ChatGPT. Binary image persistence is not available through the connected GitHub text-file writer, so no repository image path is claimed.
+
 ## 2026-10-04
 
 ### 1. The first canonical resident project: a crossing that becomes a path
