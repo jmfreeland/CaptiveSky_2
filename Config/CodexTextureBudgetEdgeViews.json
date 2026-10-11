@@ -1,0 +1,31 @@
+{
+	"_comment": "Two diagnostic edge-case views: high-altitude survey (renamed so the runtime spectator will capture it) and live night firefly habitat at Tideglass.",
+	"hour": 20.0,
+	"width": 1600,
+	"height": 900,
+	"viewpoints": [
+		{
+			"name": "90_SurveyEdge",
+			"from": {
+				"at": [-99950, 100400, 42800]
+			},
+			"look": {
+				"at": [-99949, 100400, 2800]
+			},
+			"fov": 90
+		},
+		{
+			"name": "91_TideglassNightEcology",
+			"from": {
+				"tag": "TideglassPool",
+				"offset": [600, -500, 200]
+			},
+			"look": {
+				"tag": "TideglassPool",
+				"offset": [0, 0, 40]
+			},
+			"fov": 50,
+			"min_height": -1
+		}
+	]
+}

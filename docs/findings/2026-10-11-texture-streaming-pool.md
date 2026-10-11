@@ -223,3 +223,26 @@ streaming over-budget condition. The high aerial Survey and night-only
 Stones/Firefly viewpoints were not captured, and this route still does not
 reproduce the user's reported warning. Run log and images are under
 `Saved/Playtests/Codex_TexturePool_FullJourney_20261011/`.
+
+**Edge-view follow-up (2026-10-11):** captured the previously omitted 40 km
+survey and a live night Tideglass habitat view with `stat streaming` enabled,
+an isolated 20:00 clock, a 60-second real-time cap, and zero model requests.
+The replayable viewpoints are in
+[`CodexTextureBudgetEdgeViews.json`](../../Config/CodexTextureBudgetEdgeViews.json).
+The 40 km survey reported a Required Pool of 50.29 MiB; this is an intentionally
+transient aerial sample, not a settled scene. The initial night Tideglass view
+at 20:05 showed 1,004.68 MiB Required Pool, 128.05 MiB of in-flight requests,
+and 434.71 MiB Wanted Mips while textures were still loading. By 20:17 it had
+settled at the same 1,004.68 MiB Required Pool, 964.36 MiB Visible Mips,
+33.57 MiB Hidden Mips, 269.09 MiB Non-streaming Mips, and zero in-flight
+requests. The active pool was 4,096 MiB (about 25% required); no over-budget
+counter appeared. The earlier 20:14 Listening Stones sample was similarly
+about 1,003 MiB. These runtime captures still do not reproduce the recurring
+warning. Screenshots and log:
+[`Survey`](../../Saved/Playtests/Codex_TexturePool_EdgeViews_Final_20261011/Screenshots/001_Survey_Edge.png),
+[`night habitat, settling`](../../Saved/Playtests/Codex_TexturePool_EdgeViews_Final_20261011/Screenshots/002_Tideglass_Night_Ecology.png),
+[`night habitat, settled`](../../Saved/Playtests/Codex_TexturePool_EdgeViews_Final_20261011/Screenshots/004_Tideglass_Night_Ecology.png),
+[`run log`](../../Saved/Playtests/Codex_TexturePool_EdgeViews_Final_20261011/Logs/TexturePoolEdgeViews.log).
+If the user still sees it after this run, capture `stat streaming` in the exact
+warning view; don't increase the pool blindly. The separate full-GPU video
+memory warning remains a different metric.
