@@ -4,6 +4,7 @@
 
 #include "Agent/AgentMemoryComponent.h"
 #include "Agent/AutonomousAgentAIController.h"
+#include "Agent/AutonomousAgentCharacter.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -43,16 +44,17 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-	World->BeginPlay();
 
-	ACharacter* Resident = World->SpawnActor<ACharacter>();
+	UClass* ResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,
+		TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C"));
+	AAutonomousAgentCharacter* Resident = ResidentClass
+		? World->SpawnActor<AAutonomousAgentCharacter>(ResidentClass, FVector::ZeroVector, FRotator::ZeroRotator)
+		: nullptr;
 	AAutonomousAgentAIController* Controller = World->SpawnActor<AAutonomousAgentAIController>();
-	UAgentMemoryComponent* Memory = Resident ? NewObject<UAgentMemoryComponent>(Resident) : nullptr;
-	UAgentBrainComponent* Brain = Resident ? NewObject<UAgentBrainComponent>(Resident) : nullptr;
 	if (!TestNotNull(TEXT("Proposal resident spawned"), Resident) ||
 		!TestNotNull(TEXT("Proposal controller spawned"), Controller) ||
-		!TestNotNull(TEXT("Resident memory component created"), Memory) ||
-		!TestNotNull(TEXT("Resident decision brain created"), Brain))
+		!TestNotNull(TEXT("Resident has lived-memory component"), Resident ? Resident->Memory.Get() : nullptr) ||
+		!TestNotNull(TEXT("Resident has decision brain"), Resident ? Resident->Brain.Get() : nullptr))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -60,11 +62,9 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 		IFileManager::Get().DeleteDirectory(*TestRoot, false, true);
 		return false;
 	}
-	Resident->AddInstanceComponent(Memory);
+	UAgentMemoryComponent* Memory = Resident->Memory.Get();
+	UAgentBrainComponent* Brain = Resident->Brain.Get();
 	Memory->AgentId = TEXT("ProposalResident_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-	Memory->RegisterComponent();
-	Resident->AddInstanceComponent(Brain);
-	Brain->RegisterComponent();
 	Controller->Possess(Resident);
 
 	FAgentDecision ObjectRequest;
