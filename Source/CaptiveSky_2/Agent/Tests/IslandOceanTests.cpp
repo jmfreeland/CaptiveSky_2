@@ -104,6 +104,16 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 				WaterPlayer->Tick(1.f / 60.f);
 				TestTrue(TEXT("A falling player enters surface swimming from the real ocean query"), WaterPlayer->IsSurfaceSwimming());
 			}
+
+			AIslandOceanTestCharacter* GroundedWaterPlayer = World->SpawnActor<AIslandOceanTestCharacter>(
+				FVector(0.f, 0.f, SurfaceLocation.Z + 96.f), FRotator::ZeroRotator);
+			if (TestNotNull(TEXT("The player for the grounded water-contact check spawns"), GroundedWaterPlayer))
+			{
+				GroundedWaterPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+				GroundedWaterPlayer->Tick(1.f / 60.f);
+				TestTrue(TEXT("A grounded player at the ocean surface enters swimming instead of walking across water"),
+					GroundedWaterPlayer->IsSurfaceSwimming());
+			}
 		}
 	}
 

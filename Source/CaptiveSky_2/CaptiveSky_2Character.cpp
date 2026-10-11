@@ -60,7 +60,8 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	if (!Movement) return;
-	if (!bSurfaceSwimming && !Movement->IsFalling()) return;
+	const bool bWalkingAtGroundLevel = Movement->IsMovingOnGround();
+	if (!bSurfaceSwimming && !Movement->IsFalling() && !bWalkingAtGroundLevel) return;
 
 	UWaterSubsystem* WaterSubsystem = UWaterSubsystem::GetWaterSubsystem(GetWorld());
 	UWaterBodyComponent* Ocean = WaterSubsystem ? WaterSubsystem->GetOceanBodyComponent().Get() : nullptr;
@@ -86,7 +87,14 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 	{
 		const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 		const float CapsuleBottomZ = GetActorLocation().Z - CapsuleHalfHeight;
-		if (Movement->IsFalling() && CapsuleBottomZ <= WaterSurfaceLocation.Z)
+		// A leftover/duplicate ocean-plane collider can keep the player grounded
+		// exactly at sea level. Treat that contact as water entry too, instead of
+		// allowing the grounded walk mode to continue across the ocean.
+		constexpr float GroundedWaterEntryTolerance = 75.f;
+		const bool bFallingIntoWater = Movement->IsFalling() && CapsuleBottomZ <= WaterSurfaceLocation.Z;
+		const bool bGroundedOnWaterSurface = bWalkingAtGroundLevel &&
+			FMath::Abs(CapsuleBottomZ - WaterSurfaceLocation.Z) <= GroundedWaterEntryTolerance;
+		if (bFallingIntoWater || bGroundedOnWaterSurface)
 		{
 			EnterSurfaceSwimming(WaterSurfaceLocation.Z);
 		}
