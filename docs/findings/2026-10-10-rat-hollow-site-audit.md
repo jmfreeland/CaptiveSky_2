@@ -56,6 +56,25 @@ landscape, water, and vegetation collisions or prove ground slope. The live
 MCP toolsets also expose no navigation-clearance query. No coordinate was
 recorded and the Island map remains unchanged.
 
+**Floating-forest follow-up (2026-10-11):** a bounded, read-only UE 5.8
+commandlet reloaded `/Game/Maps/Island` and identified `PCG_ForestVolume_Island`
+as `/Game/PCG/PCG_World_Forest.PCG_World_Forest`, with its PCG component
+activated. The volume is centered at `(-80000, -80000, 500)` and spans
+X `-92366..-67373`, Y `-92369..-67439`, Z `-1000..2418` cm. It is about 1.8 km
+from the player start and outside saved Recast navigation coverage. The ocean
+plane spans X/Y `±307200` cm and Z `812..1068` cm, so it covers the whole PCG
+volume footprint and intersects its vertical bounds. Five diagnostic traces
+across the volume hit the ocean at Z=940; when ignoring the ocean and volume,
+the underlying landscape was only Z=68..677 at those samples. This validates
+that the old forest volume occupies an underwater/ocean region and that its
+active PCG bounds intersect the water surface. It does not prove the generated
+plant instances themselves are water-sampled; visual output or generated-point
+data still needs inspection. No map or actor was modified. The reusable audit
+is `Scripts/Inspect-IslandPCGForest.py`; log:
+`Saved/Logs/Codex_IslandPCGForestAudit_20261011.log`. The live Unreal MCP
+endpoint remains unavailable, so do not move or delete this actor until the
+user confirms whether they want the stray forest removed or repurposed.
+
 ## Saved-map survey and nav coverage
 
 The read-only `Scripts/Inspect-IslandRatHollowCandidates.py` scan then loaded

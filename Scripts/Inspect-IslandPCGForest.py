@@ -1,0 +1,125 @@
+"""Read-only audit of the legacy PCG forest volume in the saved Island.
+
+Run with UE 5.8's UnrealEditor-Cmd.exe while no interactive editor is open:
+  UnrealEditor-Cmd.exe CaptiveSky_2.uproject -ExecutePythonScript="<project-root>/Scripts/Inspect-IslandPCGForest.py" -unattended -NoZen -NullRHI
+
+This loads but never saves /Game/Maps/Island. It reports the forest PCG volume's
+world bounds, graph assignment, and the ocean plane's bounds for comparison.
+"""
+
+import traceback
+
+import unreal
+
+
+MAP_PATH = "/Game/Maps/Island"
+FOREST_LABEL = "PCG_ForestVolume_Island"
+OCEAN_LABEL = "OceanPlane"
+LANDSCAPE_LABEL = "Landscape"
+
+
+def describe_bounds(actor):
+    origin, extent = actor.get_actor_bounds(False)
+    minimum = unreal.Vector(origin.x - extent.x, origin.y - extent.y, origin.z - extent.z)
+    maximum = unreal.Vector(origin.x + extent.x, origin.y + extent.y, origin.z + extent.z)
+    return origin, extent, minimum, maximum
+
+
+def main():
+    unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH)
+    actors = unreal.EditorLevelLibrary.get_all_level_actors()
+    unreal.log("[PCGForestAudit] loaded map={} actors={}".format(MAP_PATH, len(actors)))
+
+    forest = next((actor for actor in actors if actor.get_actor_label() == FOREST_LABEL), None)
+    ocean = next((actor for actor in actors if actor.get_actor_label() == OCEAN_LABEL), None)
+    landscape = next((actor for actor in actors if actor.get_actor_label() == LANDSCAPE_LABEL), None)
+    if forest is None:
+        unreal.log_error("[PCGForestAudit] Forest actor '{}' not found; no changes made.".format(FOREST_LABEL))
+        return
+
+    origin, extent, minimum, maximum = describe_bounds(forest)
+    unreal.log("[PCGForestAudit] forest label={} class={} location={} bounds_origin={} extent={} min={} max={}".format(
+        forest.get_actor_label(), forest.get_class().get_name(), forest.get_actor_location(),
+        origin, extent, minimum, maximum))
+
+    for component in forest.get_components_by_class(unreal.ActorComponent):
+        class_name = component.get_class().get_name()
+        if "PCG" not in class_name:
+            continue
+        graph_path = "unavailable"
+        try:
+            graph = component.get_graph()
+            if graph:
+                graph_path = graph.get_path_name()
+        except Exception as error:
+            graph_path = "unavailable ({})".format(error)
+        try:
+            activated = component.get_editor_property("activated")
+        except Exception as error:
+            activated = "unavailable ({})".format(error)
+        unreal.log("[PCGForestAudit] component={} class={} graph={} activated={}".format(
+            component.get_name(), class_name, graph_path, activated))
+
+    if ocean is not None:
+        ocean_origin, ocean_extent, ocean_min, ocean_max = describe_bounds(ocean)
+        unreal.log("[PCGForestAudit] ocean label={} location={} bounds_origin={} extent={} min={} max={}".format(
+            ocean.get_actor_label(), ocean.get_actor_location(), ocean_origin, ocean_extent, ocean_min, ocean_max))
+        unreal.log("[PCGForestAudit] forest_bounds_cross_ocean_z={}".format(
+            minimum.z <= ocean_origin.z <= maximum.z))
+        unreal.log("[PCGForestAudit] forest_xy_inside_ocean_bounds={}".format(
+            ocean_min.x <= origin.x <= ocean_max.x and ocean_min.y <= origin.y <= ocean_max.y))
+    else:
+        unreal.log_warning("[PCGForestAudit] OceanPlane actor not found; waterline comparison unavailable.")
+
+    if landscape is not None:
+        land_origin, land_extent, land_min, land_max = describe_bounds(landscape)
+        overlaps_land_xy = (minimum.x <= land_max.x and maximum.x >= land_min.x
+                             and minimum.y <= land_max.y and maximum.y >= land_min.y)
+        unreal.log("[PCGForestAudit] landscape label={} bounds_origin={} extent={} min={} max={}".format(
+            landscape.get_actor_label(), land_origin, land_extent, land_min, land_max))
+        unreal.log("[PCGForestAudit] forest_overlaps_landscape_xy={}".format(overlaps_land_xy))
+    else:
+        unreal.log_warning("[PCGForestAudit] Landscape actor not found; land overlap unavailable.")
+
+    # Separate a real terrain hit from the huge ocean plane and report which
+    # actor supports the sampled PCG footprint. These are diagnostic traces only.
+    sample_points = [
+        (origin.x, origin.y, "center"),
+        (minimum.x + 1000.0, minimum.y + 1000.0, "southwest"),
+        (minimum.x + 1000.0, maximum.y - 1000.0, "northwest"),
+        (maximum.x - 1000.0, minimum.y + 1000.0, "southeast"),
+        (maximum.x - 1000.0, maximum.y - 1000.0, "northeast"),
+    ]
+    world = unreal.EditorLevelLibrary.get_editor_world()
+    ignored_forest = [forest]
+    ignored_forest_and_ocean = [forest] + ([ocean] if ocean is not None else [])
+    for x, y, sample_name in sample_points:
+        visible_hit = unreal.SystemLibrary.line_trace_single(
+            world, unreal.Vector(x, y, 60000.0), unreal.Vector(x, y, -20000.0),
+            unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored_forest, unreal.DrawDebugTrace.NONE, True)
+        ground_hit = unreal.SystemLibrary.line_trace_single(
+            world, unreal.Vector(x, y, 60000.0), unreal.Vector(x, y, -20000.0),
+            unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored_forest_and_ocean, unreal.DrawDebugTrace.NONE, True)
+
+        def hit_summary(hit):
+            if hit is None:
+                return "none"
+            hit_tuple = hit.to_tuple() if hasattr(hit, "to_tuple") else ()
+            hit_actor = next((value for value in hit_tuple if hasattr(value, "get_actor_label")), None)
+            hit_label = hit_actor.get_actor_label() if hit_actor else "unknown"
+            hit_class = hit_actor.get_class().get_name() if hit_actor else "unknown"
+            point = hit.impact_point if hasattr(hit, "impact_point") else (hit_tuple[5] if len(hit_tuple) > 5 else "unavailable")
+            return "{}:{}@{}".format(hit_label, hit_class, point)
+
+        unreal.log("[PCGForestAudit] sample={} xy=({:.0f},{:.0f}) first_surface={} ground_beneath_ocean={}".format(
+            sample_name, x, y, hit_summary(visible_hit), hit_summary(ground_hit)))
+
+    unreal.log("[PCGForestAudit] COMPLETE; read-only, map not saved.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        unreal.log_error("[PCGForestAudit] FAILED " + traceback.format_exc())
+        raise
