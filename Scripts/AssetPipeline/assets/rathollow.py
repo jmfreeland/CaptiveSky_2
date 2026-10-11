@@ -89,8 +89,11 @@ def _hollow_log(A):
         A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.18,
                flat_bottom=0.35, tile=0.4, name="moss{:02d}".format(i))
 
-    # Four simple collision strips follow the outside shell but leave the hollow passage open.
-    A.collide_box((2.38, 0.72, 0.18), loc=(0, 0, 0.15))
+    # Six simple collision strips follow the shell. Keep the two low runners at
+    # the sides: a full-width floor box here makes an impassable raised sill for
+    # the rat capsule when the log is snapped to ground.
+    A.collide_box((2.36, 0.12, 0.12), loc=(0, -0.30, 0.06))
+    A.collide_box((2.36, 0.12, 0.12), loc=(0, 0.30, 0.06))
     A.collide_box((2.36, 0.20, 0.70), loc=(0, 0.50, 0.66))
     A.collide_box((2.36, 0.20, 0.70), loc=(0, -0.50, 0.66))
     A.collide_box((2.34, 0.72, 0.18), loc=(0, 0, 1.17))
