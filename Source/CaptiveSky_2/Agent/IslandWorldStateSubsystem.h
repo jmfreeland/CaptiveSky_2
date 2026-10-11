@@ -7,6 +7,7 @@
 #include "IslandWorldStateSubsystem.generated.h"
 
 class AIslandNest;
+class AIslandWildlifeHome;
 class AIslandGuestBook;
 
 UENUM(BlueprintType)
@@ -258,10 +259,11 @@ public:
 	const TArray<FIslandNestRecord>& GetNests() const { return Nests; }
 	const TArray<FIslandWildlifeHomeRecord>& GetWildlifeHomes() const { return WildlifeHomes; }
 	const FIslandWildlifeHomeRecord* FindWildlifeHome(FName Id) const;
-	/** Stores validated canonical home facts only; it does not place an actor or authorize a location. */
+	/** Stores validated canonical facts and refreshes a visual-only materializer for supported species; it does not validate or authorize the chosen site. */
 	bool StoreWildlifeHome(const FIslandWildlifeHomeRecord& Record);
 	/** Developer reversal for a home record. */
 	bool RemoveWildlifeHome(FName Id);
+	AIslandWildlifeHome* FindWildlifeHomeActor(FName Id) const;
 
 	/**
 	 * Weaves one more layer into the nest at SiteTag (creating it at SupportLocation if absent),
@@ -374,7 +376,7 @@ public:
 	 */
 	bool ReadStateFile(const FString& Path);
 
-	/** Re-reads the storage file and respawns visible nests. Called automatically when play begins. */
+	/** Re-reads storage and respawns transient nest/home/curio/arrangement presentations. Called automatically when play begins. */
 	void LoadAndSpawn();
 
 protected:
@@ -400,12 +402,15 @@ private:
 	TWeakObjectPtr<AIslandGuestBook> GuestBookActor;
 	int32 ShownArrangementDay = 0;
 	TMap<FName, TWeakObjectPtr<AIslandNest>> NestActors;
+	TMap<FName, TWeakObjectPtr<AIslandWildlifeHome>> WildlifeHomeActors;
 	// Set when an existing file cannot be parsed, so a save never overwrites what it may still hold.
 	bool bStorageUnreadable = false;
 
 	bool Save() const;
 	void RefreshNestActor(const FIslandNestRecord& Record);
 	void DestroyNestActors();
+	void RefreshWildlifeHomeActor(const FIslandWildlifeHomeRecord& Record);
+	void DestroyWildlifeHomeActors();
 	/** First-time placement near the ListeningStones; all-or-nothing, then saved so it never moves. */
 	bool PlaceCurios();
 	void RefreshCurioActor(const FIslandCurioRecord& Record);

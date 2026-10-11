@@ -1,6 +1,7 @@
 #include "IslandWorldStateSubsystem.h"
 #include "AgentDataPaths.h"
 #include "IslandNest.h"
+#include "IslandWildlifeHome.h"
 #include "IslandGuestBook.h"
 #include "IslandDayNight.h"
 #include "IslandChronicle.h"
@@ -149,6 +150,12 @@ const FIslandWildlifeHomeRecord* UIslandWorldStateSubsystem::FindWildlifeHome(FN
 	return WildlifeHomes.FindByPredicate([Id](const FIslandWildlifeHomeRecord& Record) { return Record.Id == Id; });
 }
 
+AIslandWildlifeHome* UIslandWorldStateSubsystem::FindWildlifeHomeActor(FName Id) const
+{
+	const TWeakObjectPtr<AIslandWildlifeHome>* Actor = WildlifeHomeActors.Find(Id);
+	return Actor ? Actor->Get() : nullptr;
+}
+
 void UIslandWorldStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
@@ -159,6 +166,7 @@ void UIslandWorldStateSubsystem::Deinitialize()
 {
 	// These presentation actors are transient; only their factual records are saved.
 	NestActors.Reset();
+	DestroyWildlifeHomeActors();
 	CurioActors.Reset();
 	if (GuestBookActor.IsValid()) GuestBookActor->Destroy();
 	GuestBookActor.Reset();
@@ -170,6 +178,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	if (GuestBookActor.IsValid()) GuestBookActor->Destroy();
 	GuestBookActor.Reset();
 	DestroyNestActors();
+	DestroyWildlifeHomeActors();
 	for (const TPair<FName, TWeakObjectPtr<AIslandCurio>>& Pair : CurioActors)
 		if (Pair.Value.IsValid()) Pair.Value->Destroy();
 	CurioActors.Reset();
@@ -200,6 +209,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 		return;
 	}
 	for (const FIslandNestRecord& Record : Nests) RefreshNestActor(Record);
+	for (const FIslandWildlifeHomeRecord& Record : WildlifeHomes) RefreshWildlifeHomeActor(Record);
 	for (const FIslandCurioRecord& Record : Curios) RefreshCurioActor(Record);
 	for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 	if (Curios.Num() == 0) PlaceCurios();
@@ -537,7 +547,11 @@ bool UIslandWorldStateSubsystem::StoreWildlifeHome(const FIslandWildlifeHomeReco
 	const TArray<FIslandWildlifeHomeRecord> Previous = WildlifeHomes;
 	if (Existing) *Existing = Record;
 	else WildlifeHomes.Add(Record);
-	if (Save()) return true;
+	if (Save())
+	{
+		RefreshWildlifeHomeActor(Record);
+		return true;
+	}
 	WildlifeHomes = Previous;
 	return false;
 }
@@ -548,7 +562,12 @@ bool UIslandWorldStateSubsystem::RemoveWildlifeHome(FName Id)
 	if (Index == INDEX_NONE) return false;
 	const TArray<FIslandWildlifeHomeRecord> Previous = WildlifeHomes;
 	WildlifeHomes.RemoveAt(Index);
-	if (Save()) return true;
+	if (Save())
+	{
+		if (TWeakObjectPtr<AIslandWildlifeHome>* Actor = WildlifeHomeActors.Find(Id); Actor && Actor->IsValid()) Actor->Get()->Destroy();
+		WildlifeHomeActors.Remove(Id);
+		return true;
+	}
 	WildlifeHomes = Previous;
 	return false;
 }
@@ -914,6 +933,42 @@ void UIslandWorldStateSubsystem::RefreshNestActor(const FIslandNestRecord& Recor
 	const int32 Today = DisplayDay();
 	const bool bRecentStormDamage = Record.StormDamagedDay >= 0 && Today >= Record.StormDamagedDay && Today - Record.StormDamagedDay <= 2;
 	Actor->SetWoven(Record.SiteTag, Record.Layers, bRecentStormDamage);
+}
+
+void UIslandWorldStateSubsystem::RefreshWildlifeHomeActor(const FIslandWildlifeHomeRecord& Record)
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	TWeakObjectPtr<AIslandWildlifeHome>& Actor = WildlifeHomeActors.FindOrAdd(Record.Id);
+	if (!Actor.IsValid())
+	{
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Spawn.ObjectFlags |= RF_Transient;
+		Actor = World->SpawnActor<AIslandWildlifeHome>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+		if (!Actor.IsValid())
+		{
+			WildlifeHomeActors.Remove(Record.Id);
+			UE_LOG(LogIslandWorldState, Warning, TEXT("Could not materialize wildlife home %s (%s)."), *Record.Id.ToString(), *Record.Species.ToString());
+			return;
+		}
+	}
+
+	if (!Actor->ApplyHomeRecord(Record))
+	{
+		Actor->Destroy();
+		WildlifeHomeActors.Remove(Record.Id);
+		UE_LOG(LogIslandWorldState, Warning, TEXT("No visual materializer is available for wildlife home %s (%s); canonical record remains stored."),
+			*Record.Id.ToString(), *Record.Species.ToString());
+	}
+}
+
+void UIslandWorldStateSubsystem::DestroyWildlifeHomeActors()
+{
+	for (const TPair<FName, TWeakObjectPtr<AIslandWildlifeHome>>& Pair : WildlifeHomeActors)
+		if (Pair.Value.IsValid()) Pair.Value->Destroy();
+	WildlifeHomeActors.Reset();
 }
 
 void UIslandWorldStateSubsystem::DestroyNestActors()

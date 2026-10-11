@@ -5,9 +5,11 @@
 #include "AgentMemoryComponent.h"
 #include "IslandArrangement.h"
 #include "IslandNest.h"
+#include "IslandWildlifeHome.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -49,6 +51,14 @@ namespace
 		int32 Count = 0;
 		for (TActorIterator<AIslandNest> It(World); It; ++It)
 			if (It->ActorHasTag(FName(*(TEXT("Nest_") + SiteTag.ToString())))) ++Count;
+		return Count;
+	}
+
+	int32 CountWildlifeHomeActors(UWorld* World, FName HomeId)
+	{
+		int32 Count = 0;
+		for (TActorIterator<AIslandWildlifeHome> It(World); It; ++It)
+			if (It->GetHomeId() == HomeId) ++Count;
 		return Count;
 	}
 
@@ -530,6 +540,7 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Legacy JSON without wildlife_homes remains readable"), State->ReadStateFile(StateFile));
 	TestEqual(TEXT("Legacy nest records remain available"), State->GetNests().Num(), 1);
 	TestEqual(TEXT("Legacy state starts with no wildlife homes"), State->GetWildlifeHomes().Num(), 0);
+	TestEqual(TEXT("Legacy state does not invent or materialize a wildlife home"), CountWildlifeHomeActors(World, TEXT("Fenrus_FallenWood")), 0);
 
 	FIslandWildlifeHomeRecord Home;
 	Home.Id = TEXT("Fenrus_FallenWood");
@@ -553,6 +564,20 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A valid canonical wildlife home is saved"), State->StoreWildlifeHome(Home));
 	const FIslandWildlifeHomeRecord* Stored = State->FindWildlifeHome(Home.Id);
 	TestTrue(TEXT("The home can be found by stable place ID"), Stored && Stored->OccupantAgentId == TEXT("Agent_Rat_01"));
+	AIslandWildlifeHome* Materialized = State->FindWildlifeHomeActor(Home.Id);
+	TestNotNull(TEXT("A recorded supported Rat home gets a transient visual actor"), Materialized);
+	if (Materialized)
+	{
+		TestTrue(TEXT("Materialization preserves the entrance anchor"), Materialized->GetActorLocation().Equals(Home.EntranceLocation, 0.01f));
+		TestTrue(TEXT("The imported RatHollow mesh is assigned"), Materialized->GetShelterMesh() &&
+			Materialized->GetShelterMesh()->GetStaticMesh() &&
+			Materialized->GetShelterMesh()->GetStaticMesh()->GetPathName() == TEXT("/Game/Generated/ComfyBlender/RatHollow/SM_RatHollow_01.SM_RatHollow_01"));
+		TestEqual(TEXT("A wildlife shelter cannot block player or resident movement yet"),
+			Materialized->GetShelterMesh()->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("The visual shelter cannot alter navigation"), Materialized->GetShelterMesh()->CanEverAffectNavigation());
+		TestTrue(TEXT("The imported entrance is aligned to its saved anchor"),
+			Materialized->GetShelterMesh()->GetRelativeLocation().Equals(FVector(AIslandWildlifeHome::RatHollowEntranceOffsetCm, 0.f, 0.f), 0.01f));
+	}
 
 	TestTrue(TEXT("The updated file can be read again"), State->ReadStateFile(StateFile));
 	const FIslandWildlifeHomeRecord* Loaded = State->FindWildlifeHome(Home.Id);
@@ -567,9 +592,12 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Cache quantity survives persistence"), Loaded->CachedSupplies[0].Quantity, 3);
 	}
 	TestEqual(TEXT("Older nest data is preserved when the new field is written"), State->GetNests().Num(), 1);
+	State->LoadAndSpawn();
+	TestEqual(TEXT("Loading the saved record recreates exactly one transient RatHollow"), CountWildlifeHomeActors(World, Home.Id), 1);
 	TestTrue(TEXT("Developer removal reverses only the wildlife-home record"), State->RemoveWildlifeHome(Home.Id));
 	TestEqual(TEXT("The legacy nest record remains after home removal"), State->GetNests().Num(), 1);
 	TestFalse(TEXT("The removed home is no longer present"), State->FindWildlifeHome(Home.Id) != nullptr);
+	TestEqual(TEXT("Removing the record also removes its transient presentation actor"), CountWildlifeHomeActors(World, Home.Id), 0);
 
 	IFileManager::Get().Delete(*StateFile, false, true, true);
 	DestroyNestWorld(World);
