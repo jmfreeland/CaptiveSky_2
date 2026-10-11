@@ -577,22 +577,29 @@ class Asset:
 
         sc.render.engine = "CYCLES"
         sc.cycles.samples = 16
-        try:
-            prefs = bpy.context.preferences.addons["cycles"].preferences
-            for dev in ("OPTIX", "CUDA"):
-                try:
-                    prefs.compute_device_type = dev
-                    prefs.get_devices()
-                    gpus = [d for d in prefs.devices if d.type == dev]
-                    if gpus:
-                        for d in prefs.devices:
-                            d.use = d.type == dev
-                        sc.cycles.device = "GPU"
-                        break
-                except Exception:
-                    continue
-        except Exception as e:
-            print("gpu setup failed", e)
+        cycles_device = os.environ.get("ASSET_CYCLES_DEVICE", "AUTO").strip().upper()
+        if cycles_device == "CPU":
+            sc.cycles.device = "CPU"
+        elif cycles_device in ("AUTO", "GPU"):
+            try:
+                prefs = bpy.context.preferences.addons["cycles"].preferences
+                for dev in (("OPTIX", "CUDA") if cycles_device == "AUTO" else ("CUDA", "OPTIX")):
+                    try:
+                        prefs.compute_device_type = dev
+                        prefs.get_devices()
+                        gpus = [d for d in prefs.devices if d.type == dev]
+                        if gpus:
+                            for d in prefs.devices:
+                                d.use = d.type == dev
+                            sc.cycles.device = "GPU"
+                            break
+                    except Exception:
+                        continue
+            except Exception as e:
+                print("gpu setup failed", e)
+        else:
+            print("Unknown ASSET_CYCLES_DEVICE={!r}; using CPU".format(cycles_device))
+            sc.cycles.device = "CPU"
         if sc.world is None:
             sc.world = bpy.data.worlds.new("W")
         sc.world.light_settings.distance = 0.25
