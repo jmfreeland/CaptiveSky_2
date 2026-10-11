@@ -50,6 +50,8 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> WingMaterials;
 	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> WingVeinMaterials;
+	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> BodyMaterial;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> EyeMaterial;

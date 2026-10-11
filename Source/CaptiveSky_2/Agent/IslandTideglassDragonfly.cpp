@@ -89,6 +89,91 @@ namespace
 		}
 
 		Wing->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+
+		// The membrane alone reads like a blank leaf. Add a light, two-sided vein
+		// lattice as a second translucent section, keeping the silhouette and
+		// collision-free single-component setup unchanged.
+		TArray<FVector> VeinVertices;
+		TArray<int32> VeinTriangles;
+		TArray<FVector> VeinNormals;
+		TArray<FVector2D> VeinUVs;
+		TArray<FLinearColor> VeinColors;
+		TArray<FProcMeshTangent> VeinTangents;
+		const FLinearColor VeinColor(WingColor.R * 0.34f, WingColor.G * 0.34f, WingColor.B * 0.34f, 0.88f);
+		const auto WingPoint = [Side, Sweep, Length, MaximumHalfWidth](float Along, float Across)
+		{
+			const float Arch = FMath::Max(0.f, FMath::Sin(Along * PI));
+			const float CenterX = Sweep * Arch + 1.5f * Along;
+			const float HalfWidth = MaximumHalfWidth * FMath::Pow(Arch, 0.72f);
+			return FVector(CenterX + Across * HalfWidth, Side * Along * Length, 0.35f * Arch);
+		};
+		const auto AppendVeinSegment = [&VeinVertices, &VeinTriangles, &VeinNormals, &VeinUVs,
+			&VeinColors, &VeinTangents, &VeinColor](const FVector& Start, const FVector& End, float Width)
+		{
+			const FVector2D Direction(End.X - Start.X, End.Y - Start.Y);
+			const FVector2D SafeDirection = Direction.GetSafeNormal();
+			if (SafeDirection.IsNearlyZero()) return;
+			const FVector2D Perpendicular(-SafeDirection.Y, SafeDirection.X);
+			for (int32 Surface = 0; Surface < 2; ++Surface)
+			{
+				const float StartHeight = Surface == 0 ? Start.Z + 0.06f : -Start.Z - 0.06f;
+				const float EndHeight = Surface == 0 ? End.Z + 0.06f : -End.Z - 0.06f;
+				const int32 Base = VeinVertices.Num();
+				VeinVertices.Emplace(Start.X - Perpendicular.X * Width, Start.Y - Perpendicular.Y * Width, StartHeight);
+				VeinVertices.Emplace(Start.X + Perpendicular.X * Width, Start.Y + Perpendicular.Y * Width, StartHeight);
+				VeinVertices.Emplace(End.X + Perpendicular.X * Width, End.Y + Perpendicular.Y * Width, EndHeight);
+				VeinVertices.Emplace(End.X - Perpendicular.X * Width, End.Y - Perpendicular.Y * Width, EndHeight);
+				const bool bFaceUp = Surface == 0;
+				if (bFaceUp)
+				{
+					VeinTriangles.Add(Base);
+					VeinTriangles.Add(Base + 2);
+					VeinTriangles.Add(Base + 1);
+					VeinTriangles.Add(Base);
+					VeinTriangles.Add(Base + 3);
+					VeinTriangles.Add(Base + 2);
+				}
+				else
+				{
+					VeinTriangles.Add(Base);
+					VeinTriangles.Add(Base + 1);
+					VeinTriangles.Add(Base + 2);
+					VeinTriangles.Add(Base);
+					VeinTriangles.Add(Base + 2);
+					VeinTriangles.Add(Base + 3);
+				}
+				const FVector Normal(0.f, 0.f, bFaceUp ? 1.f : -1.f);
+				for (int32 Vertex = 0; Vertex < 4; ++Vertex)
+				{
+					VeinNormals.Add(Normal);
+					VeinUVs.Emplace(Vertex == 0 || Vertex == 3 ? 0.f : 1.f, Vertex < 2 ? 0.f : 1.f);
+					VeinColors.Add(VeinColor);
+					VeinTangents.Emplace(FVector(1.f, 0.f, 0.f), false);
+				}
+			}
+		};
+
+		constexpr float VeinHalfWidth = 0.095f;
+		constexpr int32 VeinLengthSegments = 14;
+		const float LongitudinalAcross[] = { 0.68f, 0.12f, -0.48f };
+		for (const float Across : LongitudinalAcross)
+		{
+			for (int32 Segment = 0; Segment < VeinLengthSegments; ++Segment)
+			{
+				const float StartAlong = 0.06f + 0.88f * Segment / VeinLengthSegments;
+				const float EndAlong = 0.06f + 0.88f * (Segment + 1) / VeinLengthSegments;
+				const float StartAcross = Across + 0.10f * StartAlong;
+				const float EndAcross = Across + 0.10f * EndAlong;
+				AppendVeinSegment(WingPoint(StartAlong, StartAcross), WingPoint(EndAlong, EndAcross), VeinHalfWidth);
+			}
+		}
+		for (int32 CrossVein = 0; CrossVein < 9; ++CrossVein)
+		{
+			const float Along = 0.16f + 0.075f * CrossVein;
+			AppendVeinSegment(WingPoint(Along, -0.68f), WingPoint(Along, 0.76f), VeinHalfWidth * 0.72f);
+		}
+		Wing->CreateMeshSection_LinearColor(1, VeinVertices, VeinTriangles, VeinNormals,
+			VeinUVs, VeinColors, VeinTangents, false);
 	}
 
 	const FLinearColor DragonflyBodyColors[] = {
@@ -198,6 +283,7 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 			if (Eye) Eye->SetMaterial(0, EyeMaterial);
 	}
 	WingMaterials.SetNum(Wings.Num());
+	WingVeinMaterials.SetNum(Wings.Num());
 	for (int32 Index = 0; Index < Wings.Num(); ++Index)
 	{
 		if (Wings[Index] && Wings[Index]->GetNumSections() == 0)
@@ -213,6 +299,14 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 		if (!WingMaterials[Index]) continue;
 		WingMaterials[Index]->SetVectorParameterValue(TEXT("Color"), DragonflyWingColors[ColorVariant]);
 		Wings[Index]->SetMaterial(0, WingMaterials[Index]);
+		if (!WingVeinMaterials[Index]) WingVeinMaterials[Index] = UMaterialInstanceDynamic::Create(WingBaseMaterial, this);
+		if (WingVeinMaterials[Index])
+		{
+			const FLinearColor MembraneColor = DragonflyWingColors[ColorVariant];
+			WingVeinMaterials[Index]->SetVectorParameterValue(TEXT("Color"), FLinearColor(
+				MembraneColor.R * 0.34f, MembraneColor.G * 0.34f, MembraneColor.B * 0.34f, 0.88f));
+			Wings[Index]->SetMaterial(1, WingVeinMaterials[Index]);
+		}
 	}
 }
 

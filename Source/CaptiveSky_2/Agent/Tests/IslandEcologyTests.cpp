@@ -1182,8 +1182,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		for (UProceduralMeshComponent* Wing : It->Wings)
 		{
 			const FProcMeshSection* Section = Wing ? Wing->GetProcMeshSection(0) : nullptr;
+			const FProcMeshSection* VeinSection = Wing ? Wing->GetProcMeshSection(1) : nullptr;
 			TestTrue(TEXT("Each dragonfly wing is a generated two-sided surface"),
-				Wing && Wing->GetNumSections() == 1 && Section &&
+				Wing && Wing->GetNumSections() == 2 && Section &&
 				Section->ProcVertexBuffer.Num() >= 100 && Section->ProcIndexBuffer.Num() >= 200);
 			const FColor WingTint = Section && Section->ProcVertexBuffer.Num() > 0
 				? Section->ProcVertexBuffer[0].Color : FColor::Black;
@@ -1194,9 +1195,20 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				? Cast<UMaterialInstanceDynamic>(Wing->GetMaterial(0)) : nullptr;
 			TestTrue(TEXT("Each translucent wing material receives the dragonfly's natural color morph"),
 				WingMaterial && WingMaterial->K2_GetVectorParameterValue(TEXT("Color")).Equals(ExpectedWingColor, 0.01f));
-			bool bFiniteWingGeometry = Section && !Section->SectionLocalBox.ContainsNaN();
+			const FColor VeinTint = VeinSection && VeinSection->ProcVertexBuffer.Num() > 0
+				? VeinSection->ProcVertexBuffer[0].Color : FColor::Black;
+			UMaterialInterface* VeinMaterial = Wing ? Wing->GetMaterial(1) : nullptr;
+			TestTrue(TEXT("Each wing carries a light, translucent two-sided venation lattice"),
+				VeinSection && VeinSection->ProcVertexBuffer.Num() >= 300 && VeinSection->ProcIndexBuffer.Num() >= 600 &&
+				VeinMaterial && VeinMaterial->GetBlendMode() == BLEND_Translucent &&
+				VeinTint.R + VeinTint.G + VeinTint.B < WingTint.R + WingTint.G + WingTint.B && VeinTint.A > WingTint.A);
+			bool bFiniteWingGeometry = Section && VeinSection &&
+				!Section->SectionLocalBox.ContainsNaN() && !VeinSection->SectionLocalBox.ContainsNaN();
 			if (Section)
 				for (const FProcMeshVertex& Vertex : Section->ProcVertexBuffer)
+					bFiniteWingGeometry &= FMath::IsFinite(Vertex.Position.X) && FMath::IsFinite(Vertex.Position.Y) && FMath::IsFinite(Vertex.Position.Z);
+			if (VeinSection)
+				for (const FProcMeshVertex& Vertex : VeinSection->ProcVertexBuffer)
 					bFiniteWingGeometry &= FMath::IsFinite(Vertex.Position.X) && FMath::IsFinite(Vertex.Position.Y) && FMath::IsFinite(Vertex.Position.Z);
 			TestTrue(TEXT("Generated wing bounds and vertices remain finite at the tapered tips"), bFiniteWingGeometry);
 			TestTrue(TEXT("Generated wings are collisionless, shadowless, and excluded from navigation"),
