@@ -418,3 +418,34 @@ Evidence: [`UnrealDotnetWatch_20261010_game_retry.jsonl`](../../Saved/Diagnostic
 [`UnrealDotnetWatch_20261010_build.jsonl`](../../Saved/Diagnostics/UnrealDotnetWatch_20261010_build.jsonl),
 [`Codex_TideglassNaturalGame_20261010_retry.log`](../../Saved/Logs/Codex_TideglassNaturalGame_20261010_retry.log),
 and [`Profile(20261010_105710).csv`](../../Saved/Profiling/CSV/Profile(20261010_105710).csv).
+
+### Desktop prompt and current process state (2026-10-11)
+
+The live desktop showed `dotnet.exe - Application Error` with exception
+`0xe0434352` at `0x00007FFD8E6B483A`. `Get-Process` showed no `dotnet.exe`, UBT,
+UnrealEditor, or UnrealEditor-Cmd process. The app inventory still listed old
+Unreal Editor windows, but the current targetable-window list did not contain
+them; among Unreal-related windows, only the .NET prompt was targetable. Thus
+the prompt is visible, but its crashed process and parent could not be recovered
+from the current process tree. A fresh Application-log query found no matching
+recent `.NET Runtime` 1026 or `Application Error` event; the latest `.NET
+Runtime` 1026 entry was an unrelated Gaea installer error from July. The prompt
+remained open after an attempt to dismiss it, so no application state was
+altered further.
+
+There is a **separate** local Unreal crash archive from the earlier
+`Codex_GrassOpacity_MipTrial_20261011` commandlet run (18:46 in its log).
+`CrashContext.runtime-xml` identifies `UnrealEditor-Cmd` and an access
+violation reading `0x64` during `EditorExit`; its symbolic stack starts in
+`UnrealEditor_SemanticSearch`, then Core/RenderCore/WindowsMoviePlayer. It is
+not the managed exception shown in the desktop prompt, and there is no evidence
+that the two events share a cause. Later bounded main-tree commandlet
+automation completed successfully, which likewise does not identify the
+desktop prompt's owner.
+
+Conclusion: the recurring .NET dialog is still unattributed. Do not infer a
+project SDK, GPU, or plugin fix from its generic exception code. A future
+occurrence must be captured while the responsible process still exists (or
+with a fresh matching WER/.NET event); the current prompt alone lacks that
+correlation. Local crash evidence remains under
+`Saved/Crashes/UECC-Windows-0337C96240F43B33E8BA3E8573C123A8_0000/`.
