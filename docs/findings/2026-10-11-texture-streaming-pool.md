@@ -123,12 +123,24 @@ and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentat
 
 ## Follow-up status
 
+**Warm-cache `stat streaming` capture (2026-10-11):** a standalone Game run
+reused the local shader/DDC cache, held the 11:00 Tideglass viewpoint, disabled
+resident thinking, and ended at its 60-second cap with zero model requests. The
+log is [`Codex_StarterInstanced_StatStreaming_20261011.log`](../../Saved/Logs/Codex_StarterInstanced_StatStreaming_20261011.log);
+the stat overlay is visible in
+[`002_Tideglass.png`](../../Saved/Playtests/Codex_StarterInstanced_StatStreaming_20261011/Screenshots/002_Tideglass.png).
+At this view the streaming pool is 4096 MiB, Required Pool is 990.71 MiB,
+Visible Mips 953.48 MiB, Non-streaming Mips 269.09 MiB, Hidden Mips 30.48 MiB,
+and Forced/UnknownRef Mips are 0 MiB. No streaming over-budget counter is
+shown; Required Pool is about 24% of capacity. The red “PROFILING WITH LOGGING
+ON!” banner is part of the diagnostic overlay, not a texture-budget alert.
+This establishes that the Tideglass view is comfortably within the corrected
+pool; it does not reproduce or disprove the user's reports at other views.
+
 The direct and transitive Asset Registry queries now complete in UE 5.8.3; the
 dependency walk found Island paths for the grass opacity texture and all four
 spruce maps above, and none for the 8K combined-flower texture. The 8K grass
 opacity texture now has a verified 4K mipmapped local asset state and exact
-restore point. The exact-view `stat streaming` capture remains pending because
-it needs the live warning view; do not yet claim the recurring warning is
-resolved. The bounded recheck confirms the 4096 MiB pool is applied in Game
-but does not capture per-view demand. No map content was changed; the separate
-4096 MiB project pool setting remains as committed.
+restore point. The user's warning view is still needed for the final diagnosis;
+do not yet claim the recurring warning is resolved everywhere. No map content
+was changed; the separate 4096 MiB project pool setting remains as committed.
