@@ -1162,6 +1162,33 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Dragonfly has a distinct four-wing silhouette"), It->Wings.Num(), 4);
 		TestTrue(TEXT("Dragonfly has head, thorax, elongated abdomen, and paired eyes"),
 			It->Head && It->Thorax && It->Abdomen && It->Eyes.Num() == 2);
+		TestTrue(TEXT("Dragonfly has a larger head and enlarged compound eyes"),
+			It->Head && It->Head->GetRelativeScale3D().X > 0.05f &&
+			It->Eyes.Num() == 2 && It->Eyes[0] && It->Eyes[0]->GetRelativeScale3D().X >= 0.032f);
+		TestEqual(TEXT("Dragonfly abdomen is divided into seven readable segments"), It->AbdomenSegments.Num(), 7);
+		TestEqual(TEXT("Each abdomen segment has its own color morph material"), It->AbdomenSegmentMaterials.Num(), It->AbdomenSegments.Num());
+		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
+		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
+		if (BodyMaterial)
+		{
+			const FLinearColor BodyColor = BodyMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			DragonflyColors.Add(BodyColor);
+			for (int32 SegmentIndex = 0; SegmentIndex < It->AbdomenSegments.Num(); ++SegmentIndex)
+			{
+				UStaticMeshComponent* Segment = It->AbdomenSegments[SegmentIndex];
+				UMaterialInstanceDynamic* SegmentMaterial = It->AbdomenSegmentMaterials.IsValidIndex(SegmentIndex)
+					? It->AbdomenSegmentMaterials[SegmentIndex].Get() : nullptr;
+				const float Tone = SegmentIndex == It->AbdomenSegments.Num() - 1
+					? 0.52f : (SegmentIndex % 2 == 0 ? 0.62f : 0.90f);
+				TestTrue(TEXT("Abdomen segment has finite bounds and remains cosmetic"),
+					Segment && !Segment->Bounds.GetBox().ContainsNaN() &&
+					Segment->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+					!Segment->CastShadow && !Segment->CanEverAffectNavigation());
+				TestTrue(TEXT("Adjacent abdomen segments alternate natural tones and taper at the tip"),
+					SegmentMaterial && SegmentMaterial->K2_GetVectorParameterValue(TEXT("Color")).Equals(BodyColor * Tone, 0.01f) &&
+					(SegmentIndex == 0 || It->AbdomenSegments[SegmentIndex - 1]->GetRelativeLocation().X > Segment->GetRelativeLocation().X));
+			}
+		}
 		UMaterialInstanceDynamic* EyeMaterial = It->EyeMaterial.Get();
 		TestNotNull(TEXT("Dragonfly compound eyes use a distinct dark material"), EyeMaterial);
 		if (EyeMaterial)
@@ -1174,9 +1201,6 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Each compound eye is cosmetic and cannot block movement or navigation"),
 				Eye && Eye->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 				!Eye->CastShadow && !Eye->CanEverAffectNavigation());
-		UMaterialInstanceDynamic* BodyMaterial = It->BodyMaterial.Get();
-		TestNotNull(TEXT("Dragonfly has a per-instance natural body color"), BodyMaterial);
-		if (BodyMaterial) DragonflyColors.Add(BodyMaterial->K2_GetVectorParameterValue(TEXT("Color")));
 		const FLinearColor ExpectedWingColor = ExpectedDragonflyWingColors[
 			FMath::Clamp(It->ColorVariant, 0, UE_ARRAY_COUNT(ExpectedDragonflyWingColors) - 1)];
 		for (UProceduralMeshComponent* Wing : It->Wings)

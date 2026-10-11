@@ -215,11 +215,24 @@ AIslandTideglassDragonfly::AIslandTideglassDragonfly()
 		Part->SetCastShadow(false);
 		return Part;
 	};
-	Head = MakeBodyPart(TEXT("Head"), FVector(8.f, 0.f, 0.f), FVector(0.045f, 0.045f, 0.045f));
+	Head = MakeBodyPart(TEXT("Head"), FVector(8.f, 0.f, 0.f), FVector(0.055f, 0.052f, 0.052f));
 	Thorax = MakeBodyPart(TEXT("Thorax"), FVector(0.f, 0.f, 0.f), FVector(0.07f, 0.055f, 0.055f));
-	Abdomen = MakeBodyPart(TEXT("Abdomen"), FVector(-11.f, 0.f, 0.f), FVector(0.19f, 0.025f, 0.027f));
-	Eyes.Add(MakeBodyPart(TEXT("Eye_Left"), FVector(9.2f, -3.0f, 1.7f), FVector(0.026f, 0.026f, 0.026f)));
-	Eyes.Add(MakeBodyPart(TEXT("Eye_Right"), FVector(9.2f, 3.0f, 1.7f), FVector(0.026f, 0.026f, 0.026f)));
+	Abdomen = MakeBodyPart(TEXT("Abdomen"), FVector(-16.f, 0.f, -0.2f), FVector(0.31f, 0.013f, 0.014f));
+	const FVector SegmentLocations[] = {
+		FVector(-3.0f, 0.0f, 0.0f), FVector(-7.3f, 0.2f, -0.1f), FVector(-11.6f, 0.35f, -0.2f),
+		FVector(-15.9f, 0.35f, -0.35f), FVector(-20.2f, 0.15f, -0.55f), FVector(-24.5f, -0.25f, -0.85f),
+		FVector(-28.7f, -0.7f, -1.15f)
+	};
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(SegmentLocations); ++Index)
+	{
+		const FVector SegmentScale = Index == UE_ARRAY_COUNT(SegmentLocations) - 1
+			? FVector(0.035f, 0.018f, 0.018f)
+			: FVector(0.050f, 0.023f - 0.0005f * Index, 0.024f - 0.00055f * Index);
+		const FString SegmentName = FString::Printf(TEXT("AbdomenSegment_%02d"), Index);
+		AbdomenSegments.Add(MakeBodyPart(*SegmentName, SegmentLocations[Index], SegmentScale));
+	}
+	Eyes.Add(MakeBodyPart(TEXT("Eye_Left"), FVector(9.3f, -3.0f, 1.4f), FVector(0.032f, 0.032f, 0.032f)));
+	Eyes.Add(MakeBodyPart(TEXT("Eye_Right"), FVector(9.3f, 3.0f, 1.4f), FVector(0.032f, 0.032f, 0.032f)));
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		const bool bLeft = Index % 2 == 0;
@@ -274,6 +287,18 @@ void AIslandTideglassDragonfly::ConfigureAppearance()
 		if (Head) Head->SetMaterial(0, BodyMaterial);
 		if (Thorax) Thorax->SetMaterial(0, BodyMaterial);
 		if (Abdomen) Abdomen->SetMaterial(0, BodyMaterial);
+	}
+	AbdomenSegmentMaterials.SetNum(AbdomenSegments.Num());
+	for (int32 Index = 0; Index < AbdomenSegments.Num(); ++Index)
+	{
+		if (!AbdomenSegmentMaterials[Index])
+			AbdomenSegmentMaterials[Index] = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+		UMaterialInstanceDynamic* SegmentMaterial = AbdomenSegmentMaterials[Index];
+		if (!SegmentMaterial || !AbdomenSegments[Index]) continue;
+		const float Tone = Index == AbdomenSegments.Num() - 1
+			? 0.52f : (Index % 2 == 0 ? 0.62f : 0.90f);
+		SegmentMaterial->SetVectorParameterValue(TEXT("Color"), DragonflyBodyColors[ColorVariant] * Tone);
+		AbdomenSegments[Index]->SetMaterial(0, SegmentMaterial);
 	}
 	if (!EyeMaterial) EyeMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, this);
 	if (EyeMaterial)
