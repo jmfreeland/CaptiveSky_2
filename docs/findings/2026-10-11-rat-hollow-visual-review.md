@@ -16,6 +16,12 @@ The corrected source was exported and re-imported by Blender's asset verifier in
 
 This updates the generator only. The already-imported, ignored Unreal asset and its collision have not been regenerated or reimported, and the Rat has not traversed it in UE; the runtime result remains unverified. The Unreal Editor is currently closed, so do not treat the source test as proof of walkability or update `places.json` from it.
 
+### Unreal import startup attempt (2026-10-11)
+
+An isolated reimport was attempted to `/Game/Generated/ComfyBlender/RatHollow_ClearanceTrial`, with the source pack set to the disposable Blender export. The first UE commandlet run failed while creating a shader transfer file in the default `C:/Users/freel/UnrealShaderWorkingDir`. A second run added `-shaderworkingdir` under `Saved/CompileScratch/`; it passed platform validation and began compiling SM6 engine materials, but the log then remained unchanged for over a minute while the process held about 4.6 GiB. I stopped only that commandlet at the bounded startup limit. Neither the isolated Content destination nor `unreal_import.json` was created; no level or existing asset was modified.
+
+Use the project-local shader working directory in future import attempts (see [`asset-import-pipeline.md`](../asset-import-pipeline.md#comfyblender-asset-import)). Do not repeat the same cold commandlet beside another Unreal process. The corrected FBX is structurally verified by Blender, but the UE importer, material appearance, and Rat CharacterMovement/NavMesh traversal remain unverified.
+
 ## Relationship to Fenrus
 
 `Agents/Agent_Rat_01/identity.md` says the Rat's first home is a hidden fallen-wood hollow. `Agents/Agent_Rat_01/places.json` is still empty, so no in-world coordinates are claimed yet. The asset is imported and visually readable, but has not been placed or traversability-tested with a Rat body.
