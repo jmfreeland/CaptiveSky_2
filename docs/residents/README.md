@@ -2,7 +2,7 @@
 
 Drafts of future residents are kept outside `Agents/` so the game and gateway never load them by accident. To bring one to life, copy its identity and personality into `Agents/`, give it a body, and let it start with an empty memory.
 
-Current status: `Agent_Rat_01` (the rat) has an active identity/personality profile and a user-chosen home concept, but is not yet spawned in the world; the unnamed `innkeeper` remains a draft.
+Current status: `Agent_Rat_01` (the rat) has an active identity/personality profile and spawns in Island Game/PIE when its local body asset is available. Until a canonical fallen-wood hollow is recorded and validated, runtime spawning falls back to a navigable point near the Inn; the unnamed `innkeeper` remains a draft.
 
 ## Agent_Rat_01: the rat (identity draft, 2026-09-27; active profile 2026-10-10)
 
@@ -22,4 +22,4 @@ What it would need before it could live in the game:
 
 Nothing here is final. Edit the voice freely; the drafts are intentionally short so lived experience can do most of the work.
 
-The user chose a **hidden hollow in fallen wood** as the rat's first home. The active profile under `Agents/Agent_Rat_01/` contains only identity and personality; its memory is intentionally absent/empty, and its place list remains empty until a real in-world hollow anchor is authored. No actor spawns yet. Do not invent a coordinate or reuse the Raven's nest as the rat's home merely because it is convenient; first find or build a distinct fallen-wood hollow and validate its ground/nav clearance.
+The user chose a **hidden hollow in fallen wood** as the rat's first home. The active profile under `Agents/Agent_Rat_01/` contains only identity and personality; its memory is intentionally absent/empty, and its place list remains empty until a real in-world hollow anchor is authored. The runtime spawner now prefers a matching Rat wildlife-home record (settled shelters first) and retains the established Inn-side fallback if no record exists or its entrance has no nearby navigation. Do not invent a coordinate or reuse the Raven's nest as the rat's home merely because it is convenient; first find or build a distinct fallen-wood hollow and validate its ground/nav clearance. See the [runtime spawn handoff](../findings/2026-10-11-rat-home-runtime-spawn.md).

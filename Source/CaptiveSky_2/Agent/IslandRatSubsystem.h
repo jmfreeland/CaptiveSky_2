@@ -5,8 +5,9 @@
 #include "IslandRatSubsystem.generated.h"
 
 class AAutonomousAgentCharacter;
+struct FIslandWildlifeHomeRecord;
 
-/** Spawns the rat resident near the Inn in the Island play world, until a real rat hollow anchor replaces this. */
+/** Spawns the rat resident near its registered wildlife home, falling back to the Inn until one exists. */
 UCLASS()
 class CAPTIVESKY_2_API UIslandRatSubsystem : public UWorldSubsystem
 {
@@ -15,6 +16,7 @@ class CAPTIVESKY_2_API UIslandRatSubsystem : public UWorldSubsystem
 public:
 	static const TCHAR* GetBodyClassPath() { return TEXT("/Game/Agents/BP_Rat_Placeholder.BP_Rat_Placeholder_C"); }
 	static const TCHAR* GetAgentId() { return TEXT("Agent_Rat_01"); }
+	static bool FindRatHomeLocation(const TArray<FIslandWildlifeHomeRecord>& Homes, FVector& OutLocation);
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;

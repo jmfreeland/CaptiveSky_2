@@ -5,6 +5,7 @@
 #include "AgentMemoryComponent.h"
 #include "IslandArrangement.h"
 #include "IslandNest.h"
+#include "IslandRatSubsystem.h"
 #include "IslandWildlifeHome.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
@@ -26,6 +27,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNestTest, "CaptiveSky2.Agent.IslandNest"
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWildlifeHomeRecordTest, "CaptiveSky2.Agent.WildlifeHomeRecord",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandRatHomeSelectionTest, "CaptiveSky2.Agent.RatHomeSelection",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 namespace
@@ -518,6 +522,61 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unreadable state file is left untouched"), AfterRefusal, Corrupt);
 	DestroyNestWorld(World);
 	IFileManager::Get().Delete(*StateFile, false, true, true);
+	return true;
+}
+
+bool FIslandRatHomeSelectionTest::RunTest(const FString& Parameters)
+{
+	TArray<FIslandWildlifeHomeRecord> Homes;
+	FVector OutLocation(1.f, 2.f, 3.f);
+	TestFalse(TEXT("An empty record set does not invent a Rat home"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation));
+	TestTrue(TEXT("A missing home leaves the caller's fallback location untouched"), OutLocation.Equals(FVector(1.f, 2.f, 3.f)));
+
+	FIslandWildlifeHomeRecord WrongSpecies;
+	WrongSpecies.Id = TEXT("FoxHome");
+	WrongSpecies.Species = TEXT("Fox");
+	WrongSpecies.OccupantAgentId = UIslandRatSubsystem::GetAgentId();
+	WrongSpecies.EntranceLocation = FVector(100.f, 0.f, 0.f);
+	WrongSpecies.ShelterState = EIslandWildlifeShelterState::Settled;
+	WrongSpecies.ShelterQuality = 5;
+	Homes.Add(WrongSpecies);
+
+	FIslandWildlifeHomeRecord WrongOccupant = WrongSpecies;
+	WrongOccupant.Id = TEXT("OtherRatHome");
+	WrongOccupant.Species = TEXT("Rat");
+	WrongOccupant.OccupantAgentId = TEXT("Agent_Other");
+	WrongOccupant.EntranceLocation = FVector(200.f, 0.f, 0.f);
+	Homes.Add(WrongOccupant);
+
+	FIslandWildlifeHomeRecord Disturbed = WrongOccupant;
+	Disturbed.Id = TEXT("DisturbedRatHome");
+	Disturbed.OccupantAgentId = UIslandRatSubsystem::GetAgentId();
+	Disturbed.EntranceLocation = FVector(300.f, 0.f, 0.f);
+	Disturbed.ShelterState = EIslandWildlifeShelterState::Disturbed;
+	Homes.Add(Disturbed);
+
+	FIslandWildlifeHomeRecord Temporary = Disturbed;
+	Temporary.Id = TEXT("TemporaryRatHome");
+	Temporary.ShelterState = EIslandWildlifeShelterState::Temporary;
+	Temporary.ShelterQuality = 5;
+	Temporary.EntranceLocation = FVector(400.f, 0.f, 0.f);
+	Homes.Add(Temporary);
+
+	FIslandWildlifeHomeRecord Settled = Temporary;
+	Settled.Id = TEXT("SettledRatHome");
+	Settled.ShelterState = EIslandWildlifeShelterState::Settled;
+	Settled.ShelterQuality = 2;
+	Settled.EntranceLocation = FVector(500.f, 0.f, 0.f);
+	Homes.Add(Settled);
+
+	FIslandWildlifeHomeRecord BestSettled = Settled;
+	BestSettled.Id = TEXT("BestSettledRatHome");
+	BestSettled.ShelterQuality = 4;
+	BestSettled.EntranceLocation = FVector(600.f, 0.f, 0.f);
+	Homes.Add(BestSettled);
+
+	TestTrue(TEXT("A supported canonical Rat home is found"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation));
+	TestTrue(TEXT("A settled home outranks a higher-quality temporary shelter"), OutLocation.Equals(BestSettled.EntranceLocation));
 	return true;
 }
 
