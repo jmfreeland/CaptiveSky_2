@@ -92,7 +92,11 @@ sc.collection.objects.link(cam)
 sc.camera = cam
 cam.data.lens = 50
 dist = size * 1.75 + 0.35
-cam.location = center + Vector((0.9, -1.1, 0.55)).normalized() * dist
+view_direction = Vector(tuple(float(part.strip()) for part in os.environ.get(
+    "ASSET_PREVIEW_DIRECTION", "0.9,-1.1,0.55").split(",")))
+if len(view_direction) != 3 or view_direction.length_squared < 1e-6:
+    raise ValueError("ASSET_PREVIEW_DIRECTION must be a non-zero x,y,z vector")
+cam.location = center + view_direction.normalized() * dist
 cam.rotation_euler = (center - cam.location).to_track_quat("-Z", "Y").to_euler()
 sc.render.filepath = f"{D}/Preview.png"
 bpy.ops.render.render(write_still=True)

@@ -33,6 +33,7 @@ Saved/CaptiveSky/ComfyBlender/            (gitignored, local)
 
 Every FBX: centimetres, Z up, origin at ground centre, one UV channel `UVMap`, normals exported, tangents on, `UCX_` (convex) / `UBX_`
 (box) collision embedded. `Preview.png` is rendered **from the exported FBX and PNGs only**, so it shows what the import will contain.
+For face-specific previews, set `ASSET_PREVIEW_DIRECTION` to a non-zero comma-separated `x,y,z` vector from the imported mesh's bounds centre toward the camera before running `verify_asset.py`; the default remains `0.9,-1.1,0.55`. The Rat Hollow entrance faces local `-X`, so `ASSET_PREVIEW_DIRECTION=-1,0,0` frames the open entrance without changing the asset.
 
 ## Setup (once)
 
