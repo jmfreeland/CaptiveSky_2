@@ -95,6 +95,16 @@ verified after a clean reload in
 The live Unreal MCP endpoint remains unavailable, and a rendered in-world view
 is still outstanding.
 
+**Live-session clarification (2026-10-11):** a later Unreal MCP query found the
+Island in PIE and listed a transient `PCGWorldActor_0` at the origin. That actor
+had no components and zero-size bounds; a scene search found neither
+`PCG_ForestVolume_Island` nor any `ISM_PCG` output actors. It is the PCG world
+manager, not the old forest. The saved-map disable above remains the stronger
+evidence for the serialized Island state. `/Game/Maps/PCG_World` and
+`/Game/PCG/PCG_World_Forest` are separate, preserved assets and were not
+modified. The MCP connection dropped before a viewport capture, so the current
+session's visual appearance was not verified.
+
 ## Saved-map survey and nav coverage
 
 The read-only `Scripts/Inspect-IslandRatHollowCandidates.py` scan then loaded
