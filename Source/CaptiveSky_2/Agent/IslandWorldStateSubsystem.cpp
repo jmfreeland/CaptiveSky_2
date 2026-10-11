@@ -23,6 +23,48 @@ DEFINE_LOG_CATEGORY_STATIC(LogIslandWorldState, Log, All);
 namespace
 {
 	FString CleanArrangementText(const FString& Text, int32 MaxLength);
+
+	FString WildlifeShelterStateName(EIslandWildlifeShelterState State)
+	{
+	switch (State)
+	{
+	case EIslandWildlifeShelterState::Exposed: return TEXT("Exposed");
+	case EIslandWildlifeShelterState::Temporary: return TEXT("Temporary");
+	case EIslandWildlifeShelterState::Settled: return TEXT("Settled");
+	case EIslandWildlifeShelterState::Disturbed: return TEXT("Disturbed");
+	default: return TEXT("Temporary");
+	}
+	}
+
+	bool ParseWildlifeShelterState(const FString& Text, EIslandWildlifeShelterState& OutState)
+	{
+	if (Text == TEXT("Exposed")) OutState = EIslandWildlifeShelterState::Exposed;
+	else if (Text == TEXT("Temporary")) OutState = EIslandWildlifeShelterState::Temporary;
+	else if (Text == TEXT("Settled")) OutState = EIslandWildlifeShelterState::Settled;
+	else if (Text == TEXT("Disturbed")) OutState = EIslandWildlifeShelterState::Disturbed;
+	else return false;
+	return true;
+	}
+
+	bool IsValidWildlifeHomeRecord(const FIslandWildlifeHomeRecord& Record)
+	{
+	if (Record.Id.IsNone() || Record.Species.IsNone() || Record.OccupantAgentId.TrimStartAndEnd().IsEmpty() ||
+		!FMath::IsFinite(Record.EntranceLocation.X) || !FMath::IsFinite(Record.EntranceLocation.Y) || !FMath::IsFinite(Record.EntranceLocation.Z) ||
+		!FMath::IsFinite(Record.EntranceRotation.Pitch) || !FMath::IsFinite(Record.EntranceRotation.Yaw) || !FMath::IsFinite(Record.EntranceRotation.Roll) ||
+		Record.ShelterQuality < 0 || Record.ShelterQuality > 5 ||
+		Record.CachedSupplies.Num() > UIslandWorldStateSubsystem::MaxWildlifeHomeCacheSlots)
+		return false;
+
+	TSet<FName> SeenItems;
+	for (const FIslandWildlifeHomeCache& Cache : Record.CachedSupplies)
+	{
+		if (Cache.ItemId.IsNone() || Cache.Quantity < 1 || Cache.Quantity > UIslandWorldStateSubsystem::MaxWildlifeHomeCacheQuantity ||
+			Cache.LastChangedDay < 0 || SeenItems.Contains(Cache.ItemId))
+			return false;
+		SeenItems.Add(Cache.ItemId);
+	}
+	return true;
+	}
 }
 
 bool UIslandWorldStateSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
@@ -43,6 +85,11 @@ FString UIslandWorldStateSubsystem::GetStorageFilePath() const
 const FIslandNestRecord* UIslandWorldStateSubsystem::FindNest(FName SiteTag) const
 {
 	return Nests.FindByPredicate([SiteTag](const FIslandNestRecord& Record) { return Record.SiteTag == SiteTag; });
+}
+
+const FIslandWildlifeHomeRecord* UIslandWorldStateSubsystem::FindWildlifeHome(FName Id) const
+{
+	return WildlifeHomes.FindByPredicate([Id](const FIslandWildlifeHomeRecord& Record) { return Record.Id == Id; });
 }
 
 void UIslandWorldStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
@@ -75,6 +122,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	ArrangementSites.Reset();
 	GuestBookEntries.Reset();
 	Nests.Reset();
+	WildlifeHomes.Reset();
 	Curios.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
@@ -108,6 +156,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	Curios.Reset();
 	ArrangementSites.Reset();
 	GuestBookEntries.Reset();
+	WildlifeHomes.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
 	SavedWeatherSeconds.Reset();
@@ -259,6 +308,54 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			ArrangementSites.Add(Site);
 		}
 	}
+	const TArray<TSharedPtr<FJsonValue>>* WildlifeHomeValues = nullptr;
+	if (Root->TryGetArrayField(TEXT("wildlife_homes"), WildlifeHomeValues))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *WildlifeHomeValues)
+		{
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			if (WildlifeHomes.Num() >= MaxWildlifeHomes || !Value.IsValid() || !Value->TryGetObject(Object)) continue;
+			FIslandWildlifeHomeRecord Record;
+			FString Id, Species, State, LastUsed, LastDisturbed;
+			const TArray<TSharedPtr<FJsonValue>>* Location = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* Rotation = nullptr;
+			if (!(*Object)->TryGetStringField(TEXT("id"), Id) || Id.IsEmpty() || FindWildlifeHome(FName(*Id)) ||
+				!(*Object)->TryGetStringField(TEXT("species"), Species) || Species.IsEmpty() ||
+				!(*Object)->TryGetStringField(TEXT("occupant"), Record.OccupantAgentId) || Record.OccupantAgentId.TrimStartAndEnd().IsEmpty() ||
+				!(*Object)->TryGetArrayField(TEXT("entrance_location"), Location) || Location->Num() != 3 ||
+				!(*Object)->TryGetArrayField(TEXT("entrance_rotation"), Rotation) || Rotation->Num() != 3)
+				continue;
+			Record.Id = FName(*Id);
+			Record.Species = FName(*Species);
+			Record.EntranceLocation = FVector((*Location)[0]->AsNumber(), (*Location)[1]->AsNumber(), (*Location)[2]->AsNumber());
+			Record.EntranceRotation = FRotator((*Rotation)[0]->AsNumber(), (*Rotation)[1]->AsNumber(), (*Rotation)[2]->AsNumber());
+			(*Object)->TryGetNumberField(TEXT("shelter_quality"), Record.ShelterQuality);
+			if (!(*Object)->TryGetStringField(TEXT("shelter_state"), State) || !ParseWildlifeShelterState(State, Record.ShelterState)) continue;
+			if ((*Object)->TryGetStringField(TEXT("last_used_utc"), LastUsed)) FDateTime::ParseIso8601(*LastUsed, Record.LastUsedUtc);
+			if ((*Object)->TryGetStringField(TEXT("last_disturbed_utc"), LastDisturbed)) FDateTime::ParseIso8601(*LastDisturbed, Record.LastDisturbedUtc);
+			const TArray<TSharedPtr<FJsonValue>>* CacheValues = nullptr;
+			if ((*Object)->TryGetArrayField(TEXT("cached_supplies"), CacheValues))
+			{
+				for (const TSharedPtr<FJsonValue>& CacheValue : *CacheValues)
+				{
+					if (Record.CachedSupplies.Num() >= MaxWildlifeHomeCacheSlots) break;
+					const TSharedPtr<FJsonObject>* CacheObject = nullptr;
+					if (!CacheValue.IsValid() || !CacheValue->TryGetObject(CacheObject)) continue;
+					FIslandWildlifeHomeCache& Cache = Record.CachedSupplies.AddDefaulted_GetRef();
+					FString Item;
+					if (!(*CacheObject)->TryGetStringField(TEXT("item"), Item) || Item.IsEmpty() ||
+						!(*CacheObject)->TryGetNumberField(TEXT("quantity"), Cache.Quantity) ||
+						!(*CacheObject)->TryGetNumberField(TEXT("last_changed_day"), Cache.LastChangedDay))
+					{
+						Record.CachedSupplies.Pop();
+						continue;
+					}
+					Cache.ItemId = FName(*Item);
+				}
+			}
+			if (IsValidWildlifeHomeRecord(Record)) WildlifeHomes.Add(MoveTemp(Record));
+		}
+	}
 	const TArray<TSharedPtr<FJsonValue>>* GuestBookValues = nullptr;
 	if (Root->TryGetArrayField(TEXT("guest_book"), GuestBookValues))
 	{
@@ -278,6 +375,31 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 		}
 	}
 	return true;
+}
+
+bool UIslandWorldStateSubsystem::StoreWildlifeHome(const FIslandWildlifeHomeRecord& Record)
+{
+	if (!IsValidWildlifeHomeRecord(Record)) return false;
+	FIslandWildlifeHomeRecord* Existing = WildlifeHomes.FindByPredicate(
+		[&Record](const FIslandWildlifeHomeRecord& Candidate) { return Candidate.Id == Record.Id; });
+	if (!Existing && WildlifeHomes.Num() >= MaxWildlifeHomes) return false;
+	const TArray<FIslandWildlifeHomeRecord> Previous = WildlifeHomes;
+	if (Existing) *Existing = Record;
+	else WildlifeHomes.Add(Record);
+	if (Save()) return true;
+	WildlifeHomes = Previous;
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::RemoveWildlifeHome(FName Id)
+{
+	const int32 Index = WildlifeHomes.IndexOfByPredicate([Id](const FIslandWildlifeHomeRecord& Record) { return Record.Id == Id; });
+	if (Index == INDEX_NONE) return false;
+	const TArray<FIslandWildlifeHomeRecord> Previous = WildlifeHomes;
+	WildlifeHomes.RemoveAt(Index);
+	if (Save()) return true;
+	WildlifeHomes = Previous;
+	return false;
 }
 
 bool UIslandWorldStateSubsystem::Save() const
@@ -302,6 +424,36 @@ bool UIslandWorldStateSubsystem::Save() const
 		NestValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("nests"), NestValues);
+	TArray<TSharedPtr<FJsonValue>> WildlifeHomeValues;
+	for (int32 Index = 0; Index < WildlifeHomes.Num() && Index < MaxWildlifeHomes; ++Index)
+	{
+		const FIslandWildlifeHomeRecord& Record = WildlifeHomes[Index];
+		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+		Object->SetStringField(TEXT("id"), Record.Id.ToString());
+		Object->SetStringField(TEXT("species"), Record.Species.ToString());
+		Object->SetStringField(TEXT("occupant"), Record.OccupantAgentId);
+		Object->SetArrayField(TEXT("entrance_location"), {
+			MakeShared<FJsonValueNumber>(Record.EntranceLocation.X), MakeShared<FJsonValueNumber>(Record.EntranceLocation.Y), MakeShared<FJsonValueNumber>(Record.EntranceLocation.Z) });
+		Object->SetArrayField(TEXT("entrance_rotation"), {
+			MakeShared<FJsonValueNumber>(Record.EntranceRotation.Pitch), MakeShared<FJsonValueNumber>(Record.EntranceRotation.Yaw), MakeShared<FJsonValueNumber>(Record.EntranceRotation.Roll) });
+		Object->SetNumberField(TEXT("shelter_quality"), Record.ShelterQuality);
+		Object->SetStringField(TEXT("shelter_state"), WildlifeShelterStateName(Record.ShelterState));
+		Object->SetStringField(TEXT("last_used_utc"), Record.LastUsedUtc.ToIso8601());
+		Object->SetStringField(TEXT("last_disturbed_utc"), Record.LastDisturbedUtc.ToIso8601());
+		TArray<TSharedPtr<FJsonValue>> CacheValues;
+		for (int32 CacheIndex = 0; CacheIndex < Record.CachedSupplies.Num() && CacheIndex < MaxWildlifeHomeCacheSlots; ++CacheIndex)
+		{
+			const FIslandWildlifeHomeCache& Cache = Record.CachedSupplies[CacheIndex];
+			const TSharedRef<FJsonObject> CacheObject = MakeShared<FJsonObject>();
+			CacheObject->SetStringField(TEXT("item"), Cache.ItemId.ToString());
+			CacheObject->SetNumberField(TEXT("quantity"), Cache.Quantity);
+			CacheObject->SetNumberField(TEXT("last_changed_day"), Cache.LastChangedDay);
+			CacheValues.Add(MakeShared<FJsonValueObject>(CacheObject));
+		}
+		Object->SetArrayField(TEXT("cached_supplies"), CacheValues);
+		WildlifeHomeValues.Add(MakeShared<FJsonValueObject>(Object));
+	}
+	Root->SetArrayField(TEXT("wildlife_homes"), WildlifeHomeValues);
 	TArray<TSharedPtr<FJsonValue>> CurioValues;
 	for (const FIslandCurioRecord& Record : Curios)
 	{

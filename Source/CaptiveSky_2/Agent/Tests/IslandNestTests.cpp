@@ -18,8 +18,12 @@
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNestTest, "CaptiveSky2.Agent.IslandNest",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWildlifeHomeRecordTest, "CaptiveSky2.Agent.WildlifeHomeRecord",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 namespace
@@ -504,5 +508,70 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unreadable state file is left untouched"), AfterRefusal, Corrupt);
 	DestroyNestWorld(World);
 	IFileManager::Get().Delete(*StateFile, false, true, true);
+	return true;
+}
+
+bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
+{
+	const FString StateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("WildlifeHomeRecord") / TEXT("WorldState.json"));
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(StateFile), true);
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	const FString LegacyState = TEXT("{\"version\":1,\"nests\":[{\"site\":\"Roost_Legacy\",\"layers\":2,\"location\":[10,20,30],\"builders\":[]}],\"curios\":[]}");
+	TestTrue(TEXT("A pre-wildlife-home world-state fixture is written to the scratch file"),
+		FFileHelper::SaveStringToFile(LegacyState, *StateFile));
+
+	UWorld* World = CreateNestWorld(StateFile);
+	UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	if (!TestNotNull(TEXT("Fixture world has a world-state subsystem"), State))
+	{
+		DestroyNestWorld(World);
+		return false;
+	}
+	TestTrue(TEXT("Legacy JSON without wildlife_homes remains readable"), State->ReadStateFile(StateFile));
+	TestEqual(TEXT("Legacy nest records remain available"), State->GetNests().Num(), 1);
+	TestEqual(TEXT("Legacy state starts with no wildlife homes"), State->GetWildlifeHomes().Num(), 0);
+
+	FIslandWildlifeHomeRecord Home;
+	Home.Id = TEXT("Fenrus_FallenWood");
+	Home.Species = TEXT("Rat");
+	Home.OccupantAgentId = TEXT("Agent_Rat_01");
+	Home.EntranceLocation = FVector(-104500.f, 105000.f, 2337.5f);
+	Home.EntranceRotation = FRotator(0.f, 180.f, 0.f);
+	Home.ShelterQuality = 4;
+	Home.ShelterState = EIslandWildlifeShelterState::Settled;
+	Home.LastUsedUtc = FDateTime::UtcNow();
+	FIslandWildlifeHomeCache Cache;
+	Cache.ItemId = TEXT("Hazelnut");
+	Cache.Quantity = 3;
+	Cache.LastChangedDay = 2;
+	Home.CachedSupplies.Add(Cache);
+
+	FIslandWildlifeHomeRecord Invalid = Home;
+	Invalid.EntranceLocation.X = std::numeric_limits<float>::quiet_NaN();
+	TestFalse(TEXT("Non-finite entrance transforms are rejected"), State->StoreWildlifeHome(Invalid));
+	TestEqual(TEXT("Rejected home records do not mutate the state"), State->GetWildlifeHomes().Num(), 0);
+	TestTrue(TEXT("A valid canonical wildlife home is saved"), State->StoreWildlifeHome(Home));
+	const FIslandWildlifeHomeRecord* Stored = State->FindWildlifeHome(Home.Id);
+	TestTrue(TEXT("The home can be found by stable place ID"), Stored && Stored->OccupantAgentId == TEXT("Agent_Rat_01"));
+
+	TestTrue(TEXT("The updated file can be read again"), State->ReadStateFile(StateFile));
+	const FIslandWildlifeHomeRecord* Loaded = State->FindWildlifeHome(Home.Id);
+	TestNotNull(TEXT("The wildlife home survives a JSON round trip"), Loaded);
+	if (Loaded)
+	{
+		TestTrue(TEXT("Species survives persistence"), Loaded->Species == FName(TEXT("Rat")));
+		TestTrue(TEXT("Entrance anchor survives persistence"), Loaded->EntranceLocation.Equals(Home.EntranceLocation, 0.01f));
+		TestTrue(TEXT("Shelter state survives persistence"), Loaded->ShelterState == EIslandWildlifeShelterState::Settled);
+		TestEqual(TEXT("Cached supplies survive persistence"), Loaded->CachedSupplies.Num(), 1);
+		if (Loaded->CachedSupplies.Num() == 1)
+			TestEqual(TEXT("Cache quantity survives persistence"), Loaded->CachedSupplies[0].Quantity, 3);
+	}
+	TestEqual(TEXT("Older nest data is preserved when the new field is written"), State->GetNests().Num(), 1);
+	TestTrue(TEXT("Developer removal reverses only the wildlife-home record"), State->RemoveWildlifeHome(Home.Id));
+	TestEqual(TEXT("The legacy nest record remains after home removal"), State->GetNests().Num(), 1);
+	TestFalse(TEXT("The removed home is no longer present"), State->FindWildlifeHome(Home.Id) != nullptr);
+
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	DestroyNestWorld(World);
 	return true;
 }

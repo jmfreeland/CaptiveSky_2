@@ -9,6 +9,71 @@
 class AIslandNest;
 class AIslandGuestBook;
 
+UENUM(BlueprintType)
+enum class EIslandWildlifeShelterState : uint8
+{
+	Exposed,
+	Temporary,
+	Settled,
+	Disturbed
+};
+
+/** A small, bounded cache entry stored as part of a wildlife home's canonical record. */
+USTRUCT(BlueprintType)
+struct FIslandWildlifeHomeCache
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FName ItemId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	int32 Quantity = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	int32 LastChangedDay = 0;
+};
+
+/** Renderer-independent facts about a settled or provisional wild-animal home. */
+USTRUCT(BlueprintType)
+struct FIslandWildlifeHomeRecord
+{
+	GENERATED_BODY()
+
+	/** Stable place identity; not an Unreal actor name. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FName Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FName Species;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FString OccupantAgentId;
+
+	/** A canonical approach point and facing direction for the shelter entrance. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FVector EntranceLocation = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FRotator EntranceRotation = FRotator::ZeroRotator;
+
+	/** Bounded factual shelter score, 0..5; presentation may derive from this later. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	int32 ShelterQuality = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	EIslandWildlifeShelterState ShelterState = EIslandWildlifeShelterState::Temporary;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	TArray<FIslandWildlifeHomeCache> CachedSupplies;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FDateTime LastUsedUtc;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	FDateTime LastDisturbedUtc;
+};
+
 /** One nest woven by residents at a tagged roost site. Stored outside Saved/ so it outlives play sessions. */
 USTRUCT(BlueprintType)
 struct FIslandNestRecord
@@ -69,7 +134,7 @@ struct FIslandGuestBookEntry
  * tracked in git. Every change is bounded (fixed layer cap per site) and reversible by a
  * developer through Island.RemoveNest or by editing/deleting the file with play stopped.
  *
- * Nests, curios (hidden stones, the seed pod, the cairn), resident stone arrangements, inn guest-book entries, and the Island clock are stored today; the file keeps a top-level version so other
+ * Nests, wildlife-home facts, curios (hidden stones, the seed pod, the cairn), resident stone arrangements, inn guest-book entries, and the Island clock are stored today; the file keeps a top-level version so other
  * kinds of lasting change can be added beside them later.
  */
 UCLASS()
@@ -83,6 +148,9 @@ public:
 	static constexpr int32 MaxGuestBookLineLength = 180;
 	static constexpr int32 MaxArrangementObservers = 32;
 	static constexpr int32 MaxArrangementLessons = 32;
+	static constexpr int32 MaxWildlifeHomes = 32;
+	static constexpr int32 MaxWildlifeHomeCacheSlots = 8;
+	static constexpr int32 MaxWildlifeHomeCacheQuantity = 20;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -92,6 +160,12 @@ public:
 
 	const FIslandNestRecord* FindNest(FName SiteTag) const;
 	const TArray<FIslandNestRecord>& GetNests() const { return Nests; }
+	const TArray<FIslandWildlifeHomeRecord>& GetWildlifeHomes() const { return WildlifeHomes; }
+	const FIslandWildlifeHomeRecord* FindWildlifeHome(FName Id) const;
+	/** Stores validated canonical home facts only; it does not place an actor or authorize a location. */
+	bool StoreWildlifeHome(const FIslandWildlifeHomeRecord& Record);
+	/** Developer reversal for a home record. */
+	bool RemoveWildlifeHome(FName Id);
 
 	/**
 	 * Weaves one more layer into the nest at SiteTag (creating it at SupportLocation if absent),
@@ -205,6 +279,7 @@ protected:
 private:
 	friend class FIslandNestTest;
 	TArray<FIslandNestRecord> Nests;
+	TArray<FIslandWildlifeHomeRecord> WildlifeHomes;
 	TOptional<float> SavedHour;
 	TOptional<int32> SavedDay;
 	TOptional<double> SavedWeatherSeconds;
