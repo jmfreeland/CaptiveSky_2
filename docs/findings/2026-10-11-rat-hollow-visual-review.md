@@ -12,6 +12,8 @@
 
 The source-level `RatHollow` generator previously put a full-width box across the tunnel floor, creating the raised sill described above. `Scripts/AssetPipeline/assets/rathollow.py` now uses two narrow ground runners at the sides instead, preserving a 48 cm central gap while the side and roof boxes still describe the shell. `Scripts/AssetPipeline/tests/test_rathollow.py` passes a source-level swept-AABB check for the Rat's nominal 16 × 24 cm capsule from the entrance into the tunnel (2 tests passed).
 
+The corrected source was exported and re-imported by Blender's asset verifier in a separate disposable folder, `Saved/CaptiveSky/ComfyBlender/RatHollow_ClearanceTrial_20261011_01/`. The verifier found unchanged 256 × 136 × 134 cm bounds, the expected four material slots and UV layer, five UCX boxes, and `PROBLEMS []`. The export/round-trip checks asset structure, not Unreal CharacterMovement, NavMesh, or the visual fit in the Island.
+
 This updates the generator only. The already-imported, ignored Unreal asset and its collision have not been regenerated or reimported, and the Rat has not traversed it in UE; the runtime result remains unverified. The Unreal Editor is currently closed, so do not treat the source test as proof of walkability or update `places.json` from it.
 
 ## Relationship to Fenrus
