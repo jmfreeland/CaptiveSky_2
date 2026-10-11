@@ -69,14 +69,24 @@ def main():
             mesh_path = mesh.get_path_name() if mesh else "none"
             mesh_bounds = mesh.get_bounds() if mesh else None
             mesh_height = mesh_bounds.box_extent.z * 2.0 if mesh_bounds else 0.0
+            visible = component.get_editor_property("visible")
+            collision_enabled = component.is_collision_enabled()
+            try:
+                body_instance = component.get_editor_property("body_instance")
+                body_collision_enabled = body_instance.get_editor_property("collision_enabled")
+                collision_profile = body_instance.get_editor_property("collision_profile_name")
+            except Exception as error:
+                body_collision_enabled = "unavailable ({})".format(error)
+                collision_profile = "unavailable"
             indices = sorted(set([0, count // 4, count // 2, (3 * count) // 4, count - 1])) if count else []
             sample_z = []
             for index in indices:
                 result = component.get_instance_transform(index, True)
                 transform = result[-1] if isinstance(result, tuple) else result
                 sample_z.append("{}:{:.1f}".format(index, transform.translation.z))
-            unreal.log("[PCGForestAudit] instances component={} mesh={} count={} mesh_height_cm={:.1f} sampled_world_root_z_cm=[{}]".format(
-                component.get_name(), mesh_path, count, mesh_height, ",".join(sample_z)))
+            unreal.log("[PCGForestAudit] instances component={} mesh={} count={} visible={} collision_enabled={} body_collision_enabled={} collision_profile={} mesh_height_cm={:.1f} sampled_world_root_z_cm=[{}]".format(
+                component.get_name(), mesh_path, count, visible, collision_enabled,
+                body_collision_enabled, collision_profile, mesh_height, ",".join(sample_z)))
             if mesh_bounds and "Tree" in component.get_name() and ocean is not None:
                 local_center = mesh_bounds.origin
                 local_extent = mesh_bounds.box_extent

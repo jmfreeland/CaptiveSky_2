@@ -76,11 +76,21 @@ trees, and 6 boulders. Transforming every tree mesh bound to world space shows
 3,114 tree instances intersect the ocean plane and 135 are fully submerged;
 none are entirely above it. This verifies the waterline intrusion, not just a
 broad volume overlap. A rendered in-world view is still needed to judge how it
-reads visually. No map or actor was modified. The reusable audit is
-`Scripts/Inspect-IslandPCGForest.py`; log:
-`Saved/Logs/Codex_IslandPCGForestAudit_20261011.log`. The live Unreal MCP
-endpoint remains unavailable; leave this instance untouched until the user
-chooses whether to disable it or repurpose it on land.
+reads visually. As a reversible cleanup, the Island PCG component is now
+`activated=false`, and all five generated ISM components have saved
+`visible=false`; the graph and all 58,173 generated instances are retained.
+A fresh commandlet reload verified the inactive component and hidden outputs.
+Their collision profiles were intentionally left unchanged (trees and boulders
+still report Query-and-Physics; seedlings report NoCollision), so this is a
+visual/generation disable, not a collision cleanup. Before reusing the graph,
+bound it to above-water land and explicitly reactivate/regenerate. The pre-change
+map backup is
+`Saved/Backups/Island_PrePCGForestDisable_20261011_161538.umap` (SHA-256
+`CCCC9742D686C0A4BFDF38ACF1F8438C836F66E340A395EC984D714EC767996A`). The
+reusable read-only audit is `Scripts/Inspect-IslandPCGForest.py`; the saved
+state verification is in `Saved/Logs/Codex_IslandPCGForestVerify_20261011.log`.
+The live Unreal MCP endpoint remains unavailable, and a rendered in-world view
+is still outstanding.
 
 ## Saved-map survey and nav coverage
 
