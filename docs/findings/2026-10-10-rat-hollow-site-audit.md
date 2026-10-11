@@ -70,9 +70,13 @@ found 16 nodes; `GetLandscapeData` connects to all three surface samplers
 (`Trees`, `Grass`, `Rocks`). So the graph samples landscape, not the water plane.
 At all five checked locations that landscape is submerged by 263–872 cm, which
 can let tree crowns emerge through the water while their roots are below it—the
-likely source of the reported floating appearance. Generated point/instance
-transforms and an in-world view are still needed to verify the exact visual
-result. No map or actor was modified. The reusable audit is
+likely source of the reported floating appearance. The loaded, generated PCG
+component owned 58,173 ISM instances at inspection: 54,918 seedlings, 3,249
+trees, and 6 boulders. Transforming every tree mesh bound to world space shows
+3,114 tree instances intersect the ocean plane and 135 are fully submerged;
+none are entirely above it. This verifies the waterline intrusion, not just a
+broad volume overlap. A rendered in-world view is still needed to judge how it
+reads visually. No map or actor was modified. The reusable audit is
 `Scripts/Inspect-IslandPCGForest.py`; log:
 `Saved/Logs/Codex_IslandPCGForestAudit_20261011.log`. The live Unreal MCP
 endpoint remains unavailable; leave this instance untouched until the user

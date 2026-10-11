@@ -25,6 +25,21 @@ def describe_bounds(actor):
     return origin, extent, minimum, maximum
 
 
+def transform_position(transform, point):
+    scale = transform.scale3d
+    scaled = unreal.Vector(point.x * scale.x, point.y * scale.y, point.z * scale.z)
+    rotation = transform.rotation
+    qv = unreal.Vector(rotation.x, rotation.y, rotation.z)
+    cross_a = unreal.Vector(qv.y * scaled.z - qv.z * scaled.y,
+                            qv.z * scaled.x - qv.x * scaled.z,
+                            qv.x * scaled.y - qv.y * scaled.x)
+    cross_b = unreal.Vector(qv.y * cross_a.z - qv.z * cross_a.y,
+                            qv.z * cross_a.x - qv.x * cross_a.z,
+                            qv.x * cross_a.y - qv.y * cross_a.x)
+    rotated = scaled + cross_a * (2.0 * rotation.w) + cross_b * 2.0
+    return transform.translation + rotated
+
+
 def main():
     unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH)
     actors = unreal.EditorLevelLibrary.get_all_level_actors()
@@ -43,8 +58,53 @@ def main():
         origin, extent, minimum, maximum))
 
     forest_graph = None
-    for component in forest.get_components_by_class(unreal.ActorComponent):
+    actor_components = forest.get_components_by_class(unreal.ActorComponent)
+    unreal.log("[PCGForestAudit] forest_component_count={}".format(len(actor_components)))
+    for component in actor_components:
         class_name = component.get_class().get_name()
+        unreal.log("[PCGForestAudit] forest_component={} class={}".format(component.get_name(), class_name))
+        if isinstance(component, unreal.InstancedStaticMeshComponent):
+            count = component.get_instance_count()
+            mesh = component.get_editor_property("static_mesh")
+            mesh_path = mesh.get_path_name() if mesh else "none"
+            mesh_bounds = mesh.get_bounds() if mesh else None
+            mesh_height = mesh_bounds.box_extent.z * 2.0 if mesh_bounds else 0.0
+            indices = sorted(set([0, count // 4, count // 2, (3 * count) // 4, count - 1])) if count else []
+            sample_z = []
+            for index in indices:
+                result = component.get_instance_transform(index, True)
+                transform = result[-1] if isinstance(result, tuple) else result
+                sample_z.append("{}:{:.1f}".format(index, transform.translation.z))
+            unreal.log("[PCGForestAudit] instances component={} mesh={} count={} mesh_height_cm={:.1f} sampled_world_root_z_cm=[{}]".format(
+                component.get_name(), mesh_path, count, mesh_height, ",".join(sample_z)))
+            if mesh_bounds and "Tree" in component.get_name() and ocean is not None:
+                local_center = mesh_bounds.origin
+                local_extent = mesh_bounds.box_extent
+                local_corners = [
+                    unreal.Vector(local_center.x + sx * local_extent.x,
+                                  local_center.y + sy * local_extent.y,
+                                  local_center.z + sz * local_extent.z)
+                    for sx in (-1.0, 1.0) for sy in (-1.0, 1.0) for sz in (-1.0, 1.0)
+                ]
+                water_z = ocean.get_actor_location().z
+                crossing = submerged = above = 0
+                root_min = float("inf")
+                root_max = float("-inf")
+                for index in range(count):
+                    result = component.get_instance_transform(index, True)
+                    transform = result[-1] if isinstance(result, tuple) else result
+                    root_z = transform.translation.z
+                    root_min = min(root_min, root_z)
+                    root_max = max(root_max, root_z)
+                    world_z = [transform_position(transform, corner).z for corner in local_corners]
+                    if min(world_z) < water_z < max(world_z):
+                        crossing += 1
+                    elif max(world_z) <= water_z:
+                        submerged += 1
+                    else:
+                        above += 1
+                unreal.log("[PCGForestAudit] tree_waterline component={} roots_z_cm={:.1f}..{:.1f} water_z_cm={:.1f} mesh_bounds crossing={} submerged={} above={}".format(
+                    component.get_name(), root_min, root_max, water_z, crossing, submerged, above))
         if "PCG" not in class_name:
             continue
         graph_path = "unavailable"
@@ -59,8 +119,12 @@ def main():
             activated = component.get_editor_property("activated")
         except Exception as error:
             activated = "unavailable ({})".format(error)
-        unreal.log("[PCGForestAudit] component={} class={} graph={} activated={}".format(
-            component.get_name(), class_name, graph_path, activated))
+        try:
+            generated = component.get_editor_property("generated")
+        except Exception as error:
+            generated = "unavailable ({})".format(error)
+        unreal.log("[PCGForestAudit] component={} class={} graph={} activated={} generated={}".format(
+            component.get_name(), class_name, graph_path, activated, generated))
 
     if forest_graph is not None:
         try:
