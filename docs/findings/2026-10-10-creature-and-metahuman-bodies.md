@@ -51,3 +51,9 @@ Goal: bodies for the human residents (MetaHuman), the raven and the rat. Status:
 ## Update: rat placed in Island.umap (2026-10-11)
 
 Per the user's go-ahead, `BP_Rat_Placeholder` is placed in `Content/Maps/Island.umap` (local-only, gitignored) as actor label `Rat` near the Inn at about (-99386, 103180, 2652), with `Memory.AgentId=Agent_Rat_01`, `DisplayName=Rat`, tag `Rat`, and the instance's `AIControllerClass` set to `RatAgentAIController` (the Blueprint default resolves to the generic controller). In a `-game -NullRHI` run the placed rat is possessed (`Rat locomotion on BP_Rat_Placeholder_C_0 ...`), decides and moves (`RatAgentAIController_0 decided: "Circle toward the innkeeper"`), and `UIslandRatSubsystem` does not spawn a duplicate. Fresh checkouts without the local map edit still get the subsystem's runtime rat.
+
+## In-game visual review follow-up (2026-10-11)
+
+- The first low-angle, bounded real-RHI capture placed the camera near the Rat but dense ground cover hid the body completely; the captured frame also showed `Preparing Shaders`, so it is not a settled visual check.
+- A second isolated capture was configured for a steep overhead view and capped at 120 seconds of play and one model request, but the game never reached its world-ready marker within the 600-second startup limit. The wrapper terminated only its launched Game process tree. No second screenshot or runtime agency observation was produced; the Island map was not saved.
+- The separate texture-pool audit, including the later settled runtime captures and remaining limits, is documented in `docs/findings/2026-10-11-texture-streaming-pool.md`.

@@ -164,3 +164,34 @@ opacity texture now has a verified 4K mipmapped local asset state and exact
 restore point. The user's warning view is still needed for the final diagnosis;
 do not yet claim the recurring warning is resolved everywhere. No map content
 was changed; the separate 4096 MiB project pool setting remains as committed.
+
+**Bounded real-RHI multi-view `stat streaming` capture (2026-10-11):** added an
+opt-in `-TextureStreamingStats` option to `Scripts/Start-Spectator.ps1`. It logs
+the effective `r.Streaming.PoolSize` CVar and enables the metrics overlay without
+changing project settings. A 90-second isolated Game run with agent thinking
+disabled and a zero-request cap reused the local DDC, reached world-ready after
+175.5 seconds of startup, and exited normally at its play-time cap. The project
+profile set the active streaming pool to 4096 MiB. Although the RHI separately
+reported a 7074 MiB hardware allowance, it did not expand the active pool.
+
+| Settled view | Required Pool | Visible Mips | Hidden Mips | Non-streaming Mips | Over Budget |
+|---|---:|---:|---:|---:|---:|
+| Tideglass ground detail | 993.00 MiB | 943.87 MiB | 42.38 MiB | 269.09 MiB | 0 MiB |
+| Raven nest close-up | 1008.65 MiB | 960.16 MiB | 41.74 MiB | 269.09 MiB | 0 MiB |
+
+The second capture of each view remained within 0.01 MiB of the prior sample.
+The initial Tideglass shot, taken before streaming settled, reported 70.47 MiB
+required and is excluded from the table. The views therefore used about 24–25%
+of the configured pool and do not reproduce an over-budget condition. In the
+overlay, the `Streaming Pool` row's 4096 MiB / 100% is the pool capacity, not
+the textures' current demand; use `Required Pool` and `Over Budget` to judge
+pressure. The red `PROFILING WITH AI LOGGING ON!` banner is likewise not a
+texture warning.
+
+Run log: `Saved/Playtests/Codex_TexturePool_StatStreaming_20261011/Logs/TexturePoolStats.log`.
+Settled overlay captures:
+`Saved/Playtests/Codex_TexturePool_StatStreaming_20261011/Screenshots/002_Tideglass_Ground_Detail.png`,
+`003_Raven_Nest_Closeup.png`, and `004_Raven_Nest_Closeup.png`. These duplicate
+the two earlier audit locations rather than covering the entire Island; the
+camera/profile where the user sees the warning is still needed before declaring
+it resolved or changing the cap.

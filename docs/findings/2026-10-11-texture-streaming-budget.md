@@ -20,12 +20,14 @@ the detected GPU budget on lower-memory cards. Texture streaming remains enabled
 
 ## Caveat / next check
 
-This verifies configuration and rendering, not that the user's original warning
-is gone: the capture did not collect `stat streaming`'s camera-specific
-`Required Pool` and `Streaming Pool` counters. In the editor/game view where the
-warning appears, run `stat streaming` and compare those counters. If required
-pool still exceeds the streaming pool, inspect which visible textures request
-excessive mips before raising the cap further. Unreal documents the pool as also
-covering non-streaming textures and other GPU resources, so avoid setting it to
-unlimited. See [Texture Streaming Configuration](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-configuration-in-unreal-engine)
+The original capture did not collect camera-specific stats. A later bounded
+real-RHI `stat streaming` run sampled settled Tideglass-ground and Raven-nest
+views at the 4096 MiB pool; Required Pool was 993.00 and 1008.65 MiB, with no
+over-budget condition in either view. See the [full texture-pool audit](2026-10-11-texture-streaming-pool.md)
+for the screenshots, exact metrics, and remaining caveat: the user's warning
+view has not been reproduced. If it recurs, compare Required Pool with the
+active Streaming Pool there and inspect wanted mip contributors before raising
+the cap. Unreal's pool also covers non-streaming textures and other GPU
+resources, so avoid setting it to unlimited. See [Texture Streaming
+Configuration](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-configuration-in-unreal-engine)
 and [Texture Streaming Metrics](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-metrics-in-unreal-engine).
