@@ -126,22 +126,30 @@ not a visually validated finished home. The first two candidates from the
 southern search circle were also reviewed; they had good groundcover but were
 weaker globally, so the northern pair replaced them for review.
 
-No map or resident place data was changed. The imported trial hollow's static
-mesh collision has been checked separately, but it has not yet been placed in
-this site or physically tested for Rat-scale entry/nav. Do not write a home
-coordinate or spawn Fenrus until that placement test and a gameplay-scale
-concealment review pass.
+The imported trial mesh was transiently spawned at the top candidate in an
+isolated UE 5.8.3 editor-commandlet session, then destroyed without saving the
+level. Its collision is enabled for Query-and-Physics, uses `BlockAll`, and
+blocks Pawn. An actual Unreal Pawn-profile simple-collision capsule sweep using
+the asset's nominal 16 x 24 cm Rat capsule passed from the west-facing entrance
+into the hollow and back out. The center point and five-footprint ground audit
+remain valid (9.2 cm height range). See the [`transient placement probe log`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Logs/PlacementProbe06.log).
+
+This proves the imported collision shell does not block that capsule sweep; it
+does not prove CharacterMovement, a Rat-specific NavAgent, rebuilt NavMesh, or
+visual concealment after placement. No Island map or resident place data was
+changed. Do not write a home coordinate or spawn Fenrus until a real-RHI view
+of the hollow in context and the remaining movement/nav checks pass.
 
 ## Next step
 
-Find a genuinely sheltered patch inside or near the current nav bounds using a
-visual ground-level review alongside a less brittle foliage-density measure.
-If the only convincing shelter is in the PCG forest outside current navigation,
-consider a small, local nav-bounds extension there rather than expanding the
-whole forest. Then place the fallen-wood hollow and verify its entrance
-orientation, landscape contact, capsule/nav clearance, and gameplay-scale
-concealment before recording the place or spawning Fenrus. Do not reuse the
-Raven's roost, the open fox clearing, or guess a point inside the broad PCG
-volume. A small PVE/Megaplant preview is appropriate only after the editor
-session has the PlantFactory mount and the selected pocket can be checked at
-gameplay scale.
+The best provisional patch is near `(-104500, 105000, 2337.5)` cm, but its
+ground-level views show no fallen timber and still-visible bare soil. Next,
+render the trial hollow in a disposable map/session at this point with its
+entrance facing west; check ground contact, sightlines into the entrance, and
+the current nav agent's route around it. If that view does not meet the hidden
+home brief, continue the understory/canopy search rather than forcing the
+location. Only after visual and movement/nav checks pass should the main Island
+map and `Agents/Agent_Rat_01/places.json` be updated or Fenrus spawned. Do not
+reuse the Raven's roost or open fox clearing. A PVE/Megaplant preview is useful
+only if it improves the tested habitat and stays within the project's frame
+budget.
