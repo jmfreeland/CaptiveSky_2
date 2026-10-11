@@ -17,6 +17,17 @@ the Island map; the isolated launch was stopped before gameplay. Thus startup
 confirms the override is loaded but the final in-session CVar and camera-specific
 pool counters remain unverified.
 
+Follow-up bounded Game run, `Saved/Logs/Codex_TextureScalability_Recheck_20261011.log`,
+reached Island after a 434-second first-time local shader/texture build, then
+exited at the 30-second cap with thinking disabled and zero model requests. The
+runtime applied `[TextureQuality@3]`, set both project CVars, and logged
+`Texture pool size now 4096 MB`. No `Required Pool` or `Over Budget` counters
+were captured in that run. It confirms the High-profile correction is active;
+it does not establish whether the user's recurring warning remains or which
+view/assets trigger it. The startup build also reached about 10 GiB of system
+working memory while building cached textures, which is separate from the
+runtime streaming-pool measurement.
+
 Earlier isolated real-RHI UE 5.8.3 capture logs confirm the project-default
 pool was 4096 MiB:
 `Saved/Logs/Codex_TexturePool_Verify_20261011.log` and
@@ -118,5 +129,6 @@ spruce maps above, and none for the 8K combined-flower texture. The 8K grass
 opacity texture now has a verified 4K mipmapped local asset state and exact
 restore point. The exact-view `stat streaming` capture remains pending because
 it needs the live warning view; do not yet claim the recurring warning is
-resolved. No map content was changed; the separate 4096 MiB project pool
-setting remains as committed.
+resolved. The bounded recheck confirms the 4096 MiB pool is applied in Game
+but does not capture per-view demand. No map content was changed; the separate
+4096 MiB project pool setting remains as committed.
