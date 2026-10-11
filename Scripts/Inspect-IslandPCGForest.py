@@ -42,6 +42,7 @@ def main():
         forest.get_actor_label(), forest.get_class().get_name(), forest.get_actor_location(),
         origin, extent, minimum, maximum))
 
+    forest_graph = None
     for component in forest.get_components_by_class(unreal.ActorComponent):
         class_name = component.get_class().get_name()
         if "PCG" not in class_name:
@@ -51,6 +52,7 @@ def main():
             graph = component.get_graph()
             if graph:
                 graph_path = graph.get_path_name()
+                forest_graph = graph
         except Exception as error:
             graph_path = "unavailable ({})".format(error)
         try:
@@ -59,6 +61,22 @@ def main():
             activated = "unavailable ({})".format(error)
         unreal.log("[PCGForestAudit] component={} class={} graph={} activated={}".format(
             component.get_name(), class_name, graph_path, activated))
+
+    if forest_graph is not None:
+        try:
+            nodes = forest_graph.get_editor_property("nodes")
+            unreal.log("[PCGForestAudit] graph_nodes={}".format(len(nodes)))
+            for node in nodes:
+                settings = node.get_settings()
+                settings_class = settings.get_class().get_name() if settings else "none"
+                unreal.log("[PCGForestAudit] graph_node={} settings={}".format(node.get_name(), settings_class))
+                for pin in node.get_editor_property("output_pins"):
+                    for edge in pin.get_editor_property("edges"):
+                        downstream = edge.get_output_node()
+                        unreal.log("[PCGForestAudit] graph_edge={} -> {}".format(
+                            node.get_name(), downstream.get_name() if downstream else "none"))
+        except Exception as error:
+            unreal.log_warning("[PCGForestAudit] graph node inspection unavailable: {}".format(error))
 
     if ocean is not None:
         ocean_origin, ocean_extent, ocean_min, ocean_max = describe_bounds(ocean)

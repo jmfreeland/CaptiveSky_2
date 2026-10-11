@@ -65,15 +65,18 @@ from the player start and outside saved Recast navigation coverage. The ocean
 plane spans X/Y `±307200` cm and Z `812..1068` cm, so it covers the whole PCG
 volume footprint and intersects its vertical bounds. Five diagnostic traces
 across the volume hit the ocean at Z=940; when ignoring the ocean and volume,
-the underlying landscape was only Z=68..677 at those samples. This validates
-that the old forest volume occupies an underwater/ocean region and that its
-active PCG bounds intersect the water surface. It does not prove the generated
-plant instances themselves are water-sampled; visual output or generated-point
-data still needs inspection. No map or actor was modified. The reusable audit
-is `Scripts/Inspect-IslandPCGForest.py`; log:
+the underlying landscape was only Z=68..677 at those samples. Graph inspection
+found 16 nodes; `GetLandscapeData` connects to all three surface samplers
+(`Trees`, `Grass`, `Rocks`). So the graph samples landscape, not the water plane.
+At all five checked locations that landscape is submerged by 263–872 cm, which
+can let tree crowns emerge through the water while their roots are below it—the
+likely source of the reported floating appearance. Generated point/instance
+transforms and an in-world view are still needed to verify the exact visual
+result. No map or actor was modified. The reusable audit is
+`Scripts/Inspect-IslandPCGForest.py`; log:
 `Saved/Logs/Codex_IslandPCGForestAudit_20261011.log`. The live Unreal MCP
-endpoint remains unavailable, so do not move or delete this actor until the
-user confirms whether they want the stray forest removed or repurposed.
+endpoint remains unavailable; leave this instance untouched until the user
+chooses whether to disable it or repurpose it on land.
 
 ## Saved-map survey and nav coverage
 
