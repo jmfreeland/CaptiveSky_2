@@ -24,6 +24,42 @@ TEXTURE_CANDIDATES = (
     "/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_O",
     "/Game/PN_interactiveSpruceForest/Textures/MasterTextures/ModelTextures/Leaf_O",
 )
+MAX_REFERENCER_DEPTH = 10
+MAX_REFERENCER_PACKAGES = 5000
+
+
+def find_island_reference_paths(registry, start_path, reference_options):
+    """Return bounded dependency chains from a texture's referencers to Island."""
+    queue = [(start_path, [start_path])]
+    visited = {start_path}
+    matches = []
+    cursor = 0
+    b_hit_limit = False
+
+    while cursor < len(queue):
+        package_name, path = queue[cursor]
+        cursor += 1
+        if len(path) - 1 >= MAX_REFERENCER_DEPTH:
+            continue
+
+        referencers = registry.get_referencers(package_name, reference_options) or []
+        for package in referencers:
+            parent = str(package)
+            if parent == MAP_PATH or parent.startswith(MAP_PATH + "/"):
+                matches.append(path + [parent])
+                continue
+            if parent in visited:
+                continue
+            if len(visited) >= MAX_REFERENCER_PACKAGES:
+                b_hit_limit = True
+                break
+            visited.add(parent)
+            queue.append((parent, path + [parent]))
+
+        if b_hit_limit:
+            break
+
+    return matches, len(visited), b_hit_limit
 
 
 def main():
@@ -53,6 +89,26 @@ def main():
         names = sorted(str(package_name) for package_name in referencers)
         unreal.log("[IslandTextureReferencers] texture={} count={} packages={}".format(
             texture_path, len(names), ",".join(names) if names else "<none>"))
+        texture = unreal.EditorAssetLibrary.load_asset(texture_path)
+        settings = []
+        if texture:
+            for property_name in (
+                "lod_group", "mip_gen_settings", "max_texture_size", "never_stream",
+                "srgb", "compression_settings", "virtual_texture_streaming",
+            ):
+                try:
+                    settings.append("{}={}".format(
+                        property_name, texture.get_editor_property(property_name)))
+                except Exception as error:
+                    settings.append("{}=<unavailable:{}>".format(property_name, error))
+        unreal.log("[IslandTextureSettings] texture={} settings={}".format(
+            texture_path, ",".join(settings) if settings else "<unavailable>"))
+        paths, visited_count, b_hit_limit = find_island_reference_paths(
+            registry, texture_path, reference_options)
+        examples = [" <- ".join(path) for path in paths[:3]]
+        unreal.log("[IslandTextureIslandPaths] texture={} paths={} visited={} capped={} examples={}".format(
+            texture_path, len(paths), visited_count, b_hit_limit,
+            " || ".join(examples) if examples else "<none>"))
     unreal.log("[IslandTextureInventory] COMPLETE; map and assets were not saved.")
 
 

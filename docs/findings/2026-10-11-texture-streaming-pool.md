@@ -22,23 +22,36 @@ distinct from the separate whole-GPU video-memory warning recorded in
 
 ## Read-only Island inventory
 
-`Scripts/Inspect-IslandTextureStreaming.py` loaded `/Game/Maps/Island` in an
-isolated UE 5.8.3 commandlet, printed `r.Streaming.PoolSize`, then ran the engine
-`ListTextures` command. The script did not save the map or assets. Output:
-`Saved/Logs/Codex_TextureInventory_20261011.log`.
+`Scripts/Inspect-IslandTextureStreaming.py` loads `/Game/Maps/Island` in an
+isolated UE 5.8.3 commandlet, prints `r.Streaming.PoolSize`, runs `ListTextures`,
+reads candidate texture settings, and walks a bounded Asset Registry
+referencer graph looking for package paths back to Island. It does not save the
+map or assets. Latest output:
+`Saved/Logs/Codex_TextureInventory_Settings_20261011.log` (the dependency walk
+also ran independently in `Codex_TextureInventory_Transitive_20261011.log`).
 
-The largest loaded entries in that inventory were:
+The candidates below appeared in `ListTextures` in the map-loaded commandlet
+session. Registry paths prove package dependency, not that a texture is visible
+in the current camera or is a cause of the streaming warning:
 
-- `/Game/PN_FoliageCollection/Textures/FlowerTextures/MasterTextures/Combined_Flowers_A` — 8192×8192, 32 MiB, one mip, `Streaming=NO`, inventory usage count 0.
-- `/Game/PN_FoliageCollection/Textures/grassTextures/MasterTextures/springGrass_Opacity_8k` — 8192×8192, 32 MiB, one mip, `Streaming=NO`, inventory usage count 0.
-- `/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_N` — 4064×4064, 16 MiB, one mip, `Streaming=NO`, inventory usage count 0.
-- `/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_A`, `.../half_01_imposter_O`, and `/Game/PN_interactiveSpruceForest/Textures/MasterTextures/ModelTextures/Leaf_O` — about 8 MiB each, one mip, `Streaming=NO`, inventory usage count 0.
+| Candidate | Loaded size / format | Mip and streaming settings | Island dependency path |
+|---|---|---|---|
+| `PN_FoliageCollection/.../springGrass_Opacity_8k` | 8192², 32 MiB, DXT1 | `TMGS_NO_MIPMAPS`, `NeverStream=false`, not virtual | 3 paths via grass meshes and `/Game/LandscapeGrassTypes/GT_MidLow` (also through the shore Substrate material) |
+| `PN_interactiveSpruceForest/.../half_01_imposter_N` | 4064², 16 MiB, BC5 | `TMGS_NO_MIPMAPS`, `NeverStream=true` | Material instance → `spruce_half_01` mesh → Island |
+| `PN_interactiveSpruceForest/.../half_01_imposter_A` | 4096², 8 MiB, DXT1 | `TMGS_NO_MIPMAPS`, `NeverStream=true` | Same mesh path |
+| `PN_interactiveSpruceForest/.../half_01_imposter_O` | 4064², 8 MiB, DXT1 | `TMGS_NO_MIPMAPS`, `NeverStream=true` | Same mesh path |
+| `PN_interactiveSpruceForest/.../ModelTextures/Leaf_O` | 4096², 8 MiB, DXT1 | `TMGS_NO_MIPMAPS`, `NeverStream=false`, not virtual | Leaf material → same mesh → Island |
+| `PN_FoliageCollection/.../Combined_Flowers_A` | 8192², 32 MiB, DXT1 | `TMGS_NO_MIPMAPS`, `NeverStream=false`, not virtual | **No path to Island found** (0 paths; 290 packages searched) |
 
-These are plausible memory candidates, not a proven cause of the small
-overage: this inventory was not captured from the warning camera, and
-`ListTextures`' usage count is not proof that a texture is safe to delete. No
-texture asset settings, source files, project pool settings, or map content
-were changed.
+The spruce maps total about 40 MiB loaded, including 32 MiB marked
+`NeverStream=true`. The Island package dependency does not identify the actor
+that references `spruce_half_01`; the PCG audit separately says the disabled
+forest outputs use `/PCG/SampleContent/SimpleForest/Meshes/PCG_Tree_01..03`,
+so the two must not be conflated. The 8K grass opacity map is an
+Island-reachable residency candidate: it has no mip chain and is referenced
+through landscape-grass assets. None of these facts alone
+quantifies the camera's Required Pool or proves which asset causes the warning.
+No texture settings or map content were changed.
 
 ## Next diagnostic
 
@@ -54,14 +67,9 @@ and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentat
 
 ## Follow-up status
 
-The read-only inventory script now also asks the Asset Registry for direct
-hard/soft package referencers of the six largest candidates above. That query is
-based on UE's `AssetRegistry.get_referencers` API, but this addition has **not
-yet been executed in Unreal**. The last checked Unreal MCP endpoint was
-unavailable and no editor process was running. A fresh `UnrealEditor-Cmd`
-attempt had exited before creating its requested log; a separate `-version`
-startup probe entered UBT platform validation, made no CPU progress for over
-20 seconds, and produced no new project log, so only that probe and its stalled
-child processes were stopped. The candidate referencer list and exact-view
-`stat streaming` capture therefore remain pending. No texture assets or map
-content were changed; the 4096 MiB project pool setting is already committed.
+The direct and transitive Asset Registry queries now complete in UE 5.8.3; the
+dependency walk found Island paths for the grass opacity texture and all four
+spruce maps above, and none for the 8K combined-flower texture. The exact-view
+`stat streaming` capture remains pending because it needs the live warning
+view. No texture assets or map content were changed; the 4096 MiB project pool
+setting is already committed.
