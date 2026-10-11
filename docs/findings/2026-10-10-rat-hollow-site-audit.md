@@ -97,6 +97,41 @@ scratch UBT process remained idle and was stopped; that unbuilt diagnostic
 change was discarded. Keep the map untouched until candidate visibility and
 rat-scale approach are verified.
 
+## Globally ranked candidates reviewed (2026-10-11)
+
+The read-only `Island.RatHollowSiteAudit` was repeated in a bounded NullRHI
+session against the same 12-circle nav survey. It tested 828 footprints and
+again found zero that met the strict mature-spruce crown rule. This pass also
+ranked near-misses using understory proximity, nav footprint, and clear
+approaches, so the cover rejection no longer hides useful alternatives.
+
+The highest-scoring candidate is `(-104500, 105000, 2337.50)` cm: slope
+9.2 cm, nearby understory 5/5, nav footprint 5/5, nav approaches 4/4, clear
+approaches 4/4, nearest mature spruce 563 cm, score 275.2. A nearby candidate
+at `(-104500, 105250, 2331.25)` scored 274.1 with the same understory/nav/
+approach results. These are near the north edge of current nav bounds, so keep
+the location in provisional status until a full hollow placement and route are
+tested.
+
+Two real-RHI Game screenshots were captured from ground level after shader
+preparation, with agent thinking and Python disabled, an isolated data root,
+zero model requests, and a 120-second realtime cap. See [`top candidate,
+view 1`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Screenshots03/001_1.png),
+[`top candidate, view 2`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Screenshots03/002_2.png),
+and [`bounded run log`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Logs/CandidateReview03.log).
+Both show substantial fern/leaf/grass understory and a denser stand than the
+earlier fox clearing, but also visible bare soil, widely spaced trunks, and no
+fallen timber. That makes this a promising place to test a fallen-log shelter,
+not a visually validated finished home. The first two candidates from the
+southern search circle were also reviewed; they had good groundcover but were
+weaker globally, so the northern pair replaced them for review.
+
+No map or resident place data was changed. The imported trial hollow's static
+mesh collision has been checked separately, but it has not yet been placed in
+this site or physically tested for Rat-scale entry/nav. Do not write a home
+coordinate or spawn Fenrus until that placement test and a gameplay-scale
+concealment review pass.
+
 ## Next step
 
 Find a genuinely sheltered patch inside or near the current nav bounds using a
