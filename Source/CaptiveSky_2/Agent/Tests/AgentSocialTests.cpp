@@ -13,6 +13,13 @@ bool FAgentSocialPacingTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Autonomous conversations remain bounded to four spoken lines"), Defaults->MaximumConversationTurns, 4);
 	TestEqual(TEXT("Pair cooldown gives residents five minutes between automatic exchanges"), Defaults->ConversationCooldownSeconds, 300.f);
+	TestEqual(TEXT("Automatic replies pause at least fifteen seconds between spoken lines"), Defaults->ConversationReplyPauseSeconds, 15.f);
+	TestEqual(TEXT("A short Blueprint reply pause cannot restore rapid-fire conversation"),
+		UAgentSocialComponent::EffectiveConversationReplyPauseSeconds(3.f), 15.f);
+	TestEqual(TEXT("Longer designer-authored reply pauses remain configurable"),
+		UAgentSocialComponent::EffectiveConversationReplyPauseSeconds(30.f), 30.f);
+	TestEqual(TEXT("Non-finite reply-pause overrides fall back to fifteen seconds"),
+		UAgentSocialComponent::EffectiveConversationReplyPauseSeconds(std::numeric_limits<float>::quiet_NaN()), 15.f);
 	TestEqual(TEXT("An old short Blueprint cooldown cannot restore rapid exchanges"),
 		UAgentSocialComponent::EffectiveConversationCooldownSeconds(45.f), 300.f);
 	TestEqual(TEXT("Zero cannot disable the autonomous social pause"),
@@ -32,6 +39,12 @@ bool FAgentSocialPacingTest::RunTest(const FString& Parameters)
 	Social->CooldownUntilByAgentId.Add(TEXT("aster"), FPlatformTime::Seconds() - 1.0);
 	TestEqual(TEXT("An elapsed pair cooldown is reported as zero"),
 		Social->GetConversationCooldownRemainingWith(TEXT("aster")), 0.f);
+	Social->ConversationReplyNotBeforeSeconds = FPlatformTime::Seconds() + 15.0;
+	TestTrue(TEXT("A pending conversational reply waits for its real-time pause"),
+		Social->IsConversationReplyPauseActive());
+	Social->ConversationReplyNotBeforeSeconds = FPlatformTime::Seconds() - 1.0;
+	TestFalse(TEXT("A conversational reply resumes when its pause elapses"),
+		Social->IsConversationReplyPauseActive());
 
 	UAgentSocialComponent* RavenSocial = NewObject<UAgentSocialComponent>();
 	UAgentSocialComponent* InnkeeperSocial = NewObject<UAgentSocialComponent>();

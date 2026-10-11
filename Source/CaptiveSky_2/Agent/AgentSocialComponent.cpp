@@ -180,6 +180,18 @@ float UAgentSocialComponent::EffectiveConversationCooldownSeconds(float Configur
 		: MinimumConversationCooldownSeconds;
 }
 
+float UAgentSocialComponent::EffectiveConversationReplyPauseSeconds(float ConfiguredSeconds)
+{
+	return FMath::IsFinite(ConfiguredSeconds)
+		? FMath::Max(MinimumConversationReplyPauseSeconds, ConfiguredSeconds)
+		: MinimumConversationReplyPauseSeconds;
+}
+
+bool UAgentSocialComponent::IsConversationReplyPauseActive() const
+{
+	return FPlatformTime::Seconds() < ConversationReplyNotBeforeSeconds;
+}
+
 void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other)
 {
 	if (!Other)
@@ -232,12 +244,15 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		}
 	}
 	PendingUtterances.Add(Utterance);
+	ConversationReplyNotBeforeSeconds = FPlatformTime::Seconds() +
+		EffectiveConversationReplyPauseSeconds(ConversationReplyPauseSeconds);
 }
 
 void UAgentSocialComponent::TryBeginPendingUtterance()
 {
 	UAgentBrainComponent* Brain = GetBrain();
-	if (bHandlingUtterance || PendingUtterances.IsEmpty() || !Brain || Brain->bRequestInFlight)
+	if (bHandlingUtterance || PendingUtterances.IsEmpty() || !Brain || Brain->bRequestInFlight ||
+		IsConversationReplyPauseActive())
 	{
 		return;
 	}

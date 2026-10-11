@@ -47,6 +47,9 @@ public:
 	/** Autonomous exchanges cool down for at least five real minutes, even if an older Blueprint overrides the property. */
 	static constexpr float MinimumConversationCooldownSeconds = 300.f;
 	static float EffectiveConversationCooldownSeconds(float ConfiguredSeconds);
+	/** Replies pause so an exchange does not become a burst of model calls and speech. */
+	static constexpr float MinimumConversationReplyPauseSeconds = 15.f;
+	static float EffectiveConversationReplyPauseSeconds(float ConfiguredSeconds);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "100.0"))
 	float SpeakingRadius = 2500.f;
@@ -57,6 +60,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "300.0"))
 	float ConversationCooldownSeconds = 300.f;
+
+	/** Minimum real-time pause before replying to another resident within an automatic exchange. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "15.0"))
+	float ConversationReplyPauseSeconds = 15.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "1", ClampMax = "16"))
 	int32 MaximumPendingUtterances = 4;
@@ -79,6 +86,7 @@ private:
 	FAgentSocialUtterance ActiveUtterance;
 	bool bHandlingUtterance = false;
 	TMap<FString, double> CooldownUntilByAgentId;
+	double ConversationReplyNotBeforeSeconds = 0.0;
 	FString ActiveAutomaticConversationId;
 	FString ActiveAutomaticConversationPartnerId;
 
@@ -87,6 +95,7 @@ private:
 	AAutonomousAgentCharacter* FindAgent(const FString& IdOrName) const;
 	bool IsWithinSpeakingRange(const AAutonomousAgentCharacter* Other) const;
 	bool IsCoolingDownWith(const FString& OtherAgentId) const;
+	bool IsConversationReplyPauseActive() const;
 	bool TryReserveAutomaticConversation(UAgentSocialComponent* OtherSocial, const FString& OwnAgentId,
 		const FString& OtherAgentId, const FString& ConversationId);
 	bool IsReservedFor(const FString& OtherAgentId, const FString& ConversationId) const;
