@@ -1153,6 +1153,12 @@ FString UAgentBrainComponent::AddReviewedRequestUpdatesToSituation(const FString
 		RequestReviewUpdates;
 }
 
+void UAgentBrainComponent::BroadcastDecisionReady(const FAgentDecision& Decision)
+{
+	OnDecisionReadyNative.Broadcast(Decision);
+	OnDecisionReady.Broadcast(Decision);
+}
+
 void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationContext& Context)
 {
 	if (bEndedPlay) return;
@@ -1176,7 +1182,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		FAgentDecision DeferredDecision;
 		LastDecision = DeferredDecision;
 		LastConversationContext = Context;
-		OnDecisionReady.Broadcast(DeferredDecision);
+		BroadcastDecisionReady(DeferredDecision);
 		OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
 		return;
 	}
@@ -1189,7 +1195,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			FAgentDecision DeferredDecision;
 			LastDecision = DeferredDecision;
 			LastConversationContext = Context;
-			OnDecisionReady.Broadcast(DeferredDecision);
+			BroadcastDecisionReady(DeferredDecision);
 			OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
 			return;
 		}
@@ -1206,7 +1212,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred by the play-session guard for %s."), *AgentId);
 		LastDecision = FAgentDecision();
 		LastConversationContext = Context;
-		OnDecisionReady.Broadcast(LastDecision);
+		BroadcastDecisionReady(LastDecision);
 		OnDecisionCompleteForStateTree.ExecuteIfBound(LastDecision);
 		return;
 	}
@@ -1370,7 +1376,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 
 		StrongThis->LastDecision = Decision;
 		StrongThis->LastConversationContext = Context;
-		StrongThis->OnDecisionReady.Broadcast(Decision);
+		StrongThis->BroadcastDecisionReady(Decision);
 		StrongThis->OnDecisionCompleteForStateTree.ExecuteIfBound(Decision);
 	}));
 }

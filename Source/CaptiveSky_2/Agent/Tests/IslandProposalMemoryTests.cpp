@@ -69,13 +69,15 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 	Memory->AgentId = TEXT("ProposalResident_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	Controller->Possess(Resident);
 	TestTrue(TEXT("The controller possesses the proposal resident"), Controller->GetPawn() == Resident);
+	TestTrue(TEXT("The controller is connected to native decision delivery"),
+		Brain->OnDecisionReadyNative.IsBoundToObject(Controller));
 	TestTrue(TEXT("The proposal resident is awake before acting"), Resident->Consolidation->IsAwake());
 
 	FAgentDecision ObjectRequest;
 	ObjectRequest.bValid = true;
 	ObjectRequest.ActionType = EAgentActionType::RequestObject;
 	ObjectRequest.ObjectRequest = TEXT("A small weatherproof shelter beside the garden wall");
-	Controller->HandleDecisionReady(ObjectRequest);
+	Brain->OnDecisionReadyNative.Broadcast(ObjectRequest);
 	const FString ObjectActionState = Controller->DescribeActionState();
 	TestTrue(FString::Printf(TEXT("The object proposal reaches action handling (%s)"), *ObjectActionState),
 		ObjectActionState.Contains(TEXT("human-review queue")));
@@ -91,7 +93,7 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 			Memories[0].Tags.ContainsByPredicate([](const FString& Tag) { return Tag.StartsWith(TEXT("proposal-id:")); }));
 	}
 
-	Controller->HandleDecisionReady(ObjectRequest);
+	Brain->OnDecisionReadyNative.Broadcast(ObjectRequest);
 	TestEqual(TEXT("A duplicate rejected by the queue does not create another memory"),
 		Memory->GetMemoriesSince(FDateTime::MinValue()).Num(), 1);
 
@@ -101,7 +103,7 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 	UpgradeRequest.UpgradeTarget = TEXT("WindArch_UpperBeam");
 	UpgradeRequest.UpgradeKind = TEXT("functionality");
 	UpgradeRequest.UpgradeRequest = TEXT("Add a sheltered perch near the upper beam");
-	Controller->HandleDecisionReady(UpgradeRequest);
+	Brain->OnDecisionReadyNative.Broadcast(UpgradeRequest);
 	Memories = Memory->GetMemoriesSince(FDateTime::MinValue());
 	TestEqual(TEXT("A successfully queued upgrade proposal is remembered"), Memories.Num(), 2);
 	if (Memories.Num() == 2)
@@ -116,7 +118,7 @@ bool FIslandProposalMemoryTest::RunTest(const FString& Parameters)
 	InvalidRequest.bValid = true;
 	InvalidRequest.ActionType = EAgentActionType::RequestObject;
 	InvalidRequest.ObjectRequest = TEXT(" ");
-	Controller->HandleDecisionReady(InvalidRequest);
+	Brain->OnDecisionReadyNative.Broadcast(InvalidRequest);
 	TestEqual(TEXT("A request rejected before queueing does not create memory"),
 		Memory->GetMemoriesSince(FDateTime::MinValue()).Num(), 2);
 

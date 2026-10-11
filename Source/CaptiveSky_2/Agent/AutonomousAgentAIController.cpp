@@ -71,7 +71,7 @@ void AAutonomousAgentAIController::OnPossess(APawn* InPawn)
 	{
 		if (Agent->Brain)
 		{
-			Agent->Brain->OnDecisionReady.AddDynamic(this, &AAutonomousAgentAIController::HandleDecisionReady);
+			Agent->Brain->OnDecisionReadyNative.AddUObject(this, &AAutonomousAgentAIController::HandleDecisionReady);
 		}
 	}
 
@@ -95,7 +95,7 @@ void AAutonomousAgentAIController::OnUnPossess()
 	{
 		if (Agent->Brain)
 		{
-			Agent->Brain->OnDecisionReady.RemoveDynamic(this, &AAutonomousAgentAIController::HandleDecisionReady);
+			Agent->Brain->OnDecisionReadyNative.RemoveAll(this);
 		}
 	}
 

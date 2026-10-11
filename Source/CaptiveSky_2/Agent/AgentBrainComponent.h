@@ -14,6 +14,7 @@
 class UAgentMemoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAgentDecisionReady, const FAgentDecision&, Decision);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAgentDecisionReadyNative, const FAgentDecision& /*Decision*/);
 
 // Plain (non-dynamic) single-cast delegate, bound/unbound by a StateTree task's EnterState/ExitState --
 // mirrors this project's existing convention (see ACombatEnemy::OnAttackCompleted) for hooking async
@@ -49,6 +50,9 @@ public:
 	// Broadcast on the game thread exactly once per RequestDecision call (Decision.bValid is false on failure).
 	UPROPERTY(BlueprintAssignable, Category = "Agent Brain")
 	FOnAgentDecisionReady OnDecisionReady;
+
+	/** Native counterpart for C++ gameplay listeners; dispatched before Blueprint listeners. */
+	FOnAgentDecisionReadyNative OnDecisionReadyNative;
 
 	// For the StateTree task hookup: bind in EnterState, unbind in ExitState (see FStateTreeAgentDecideTask).
 	FOnAgentDecisionCompleteDelegate OnDecisionCompleteForStateTree;
@@ -89,6 +93,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	void BroadcastDecisionReady(const FAgentDecision& Decision);
+
 	friend class FAgentMemoryComponentTest;
 	friend class FIslandListeningStonePresentationTest;
 	friend class FRavenPerchTest;
