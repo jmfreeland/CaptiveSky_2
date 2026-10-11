@@ -78,17 +78,20 @@ none are entirely above it. This verifies the waterline intrusion, not just a
 broad volume overlap. A rendered in-world view is still needed to judge how it
 reads visually. As a reversible cleanup, the Island PCG component is now
 `activated=false`, and all five generated ISM components have saved
-`visible=false`; the graph and all 58,173 generated instances are retained.
-A fresh commandlet reload verified the inactive component and hidden outputs.
-Their collision profiles were intentionally left unchanged (trees and boulders
-still report Query-and-Physics; seedlings report NoCollision), so this is a
-visual/generation disable, not a collision cleanup. Before reusing the graph,
-bound it to above-water land and explicitly reactivate/regenerate. The pre-change
-map backup is
+`visible=false` and `NoCollision`; the graph and all 58,173 generated instances
+are retained. A fresh commandlet reload verified those settings and unchanged
+instance counts. This prevents the submerged hidden outputs from interfering
+with player/resident movement or traces. Before reusing the graph, bind it to
+above-water land, restore any desired collision profiles, and explicitly
+reactivate/regenerate. The original pre-disable map backup is
 `Saved/Backups/Island_PrePCGForestDisable_20261011_161538.umap` (SHA-256
 `CCCC9742D686C0A4BFDF38ACF1F8438C836F66E340A395EC984D714EC767996A`). The
-reusable read-only audit is `Scripts/Inspect-IslandPCGForest.py`; the saved
-state verification is in `Saved/Logs/Codex_IslandPCGForestVerify_20261011.log`.
+collision-cleanup restore point is
+`Saved/Backups/Island_PrePCGForestCollisionProfileRetry_20261011.umap`; the
+reusable guarded writer is `Scripts/Disable-IslandPCGForest.py`, and the
+read-only audit is `Scripts/Inspect-IslandPCGForest.py`. The saved state was
+verified after a clean reload in
+`Saved/Logs/Codex_PCGForestCollisionVerifyFinal_20261011.log`.
 The live Unreal MCP endpoint remains unavailable, and a rendered in-world view
 is still outstanding.
 

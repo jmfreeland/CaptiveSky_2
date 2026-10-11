@@ -2,7 +2,8 @@
 
 Run only after backing up Content/Maps/Island.umap and while no interactive
 editor is open. This does not delete or edit /Game/PCG/PCG_World_Forest; it
-deactivates its one Island component and hides its generated ISM outputs.
+deactivates its one Island component, hides its generated ISM outputs, and
+disables collision on those now-invisible outputs.
 """
 
 import traceback
@@ -54,25 +55,39 @@ def main():
     pcg.set_editor_property("activated", False)
     for component in outputs:
         component.set_visibility(False, True)
+        component.set_collision_profile_name("NoCollision")
+        component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        # Serialize the BodyInstance values explicitly; the previous runtime-only
+        # collision setting reverted when the saved map was reloaded.
+        body_instance = component.get_editor_property("body_instance")
+        body_instance.set_editor_property("collision_profile_name", "NoCollision")
+        body_instance.set_editor_property("collision_enabled", unreal.CollisionEnabled.NO_COLLISION)
+        component.set_editor_property("body_instance", body_instance)
 
     activated_after = pcg.get_editor_property("activated")
     output_state = {
         component.get_name(): {
             "visible": component.get_editor_property("visible"),
             "collision_enabled": component.is_collision_enabled(),
+            "body_collision_enabled": str(component.get_editor_property("body_instance").get_editor_property("collision_enabled")),
             "collision_profile": str(component.get_editor_property("body_instance").get_editor_property("collision_profile_name")),
             "instances": component.get_instance_count(),
         }
         for component in outputs
     }
-    if activated_after or any(state["visible"] for state in output_state.values()):
+    if activated_after or any(
+        state["visible"] or state["collision_enabled"]
+        or "NO_COLLISION" not in state["body_collision_enabled"]
+        or state["collision_profile"] != "NoCollision"
+        for state in output_state.values()
+    ):
         raise RuntimeError("Disable verification failed before save: {}".format(output_state))
 
     if not unreal.EditorLevelLibrary.save_current_level():
         raise RuntimeError("Could not save {} after disabling the isolated PCG output.".format(MAP_PATH))
     unreal.log("[PCGForestDisable] saved={} activated_after={} outputs={}".format(
         MAP_PATH, activated_after, output_state))
-    unreal.log("[PCGForestDisable] COMPLETE; graph asset preserved; output instances retained but hidden; existing collision profiles unchanged.")
+    unreal.log("[PCGForestDisable] COMPLETE; graph and output instances preserved; generated outputs hidden with collision disabled.")
 
 
 try:
