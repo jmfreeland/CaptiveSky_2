@@ -74,9 +74,11 @@ def _hollow_log(A):
     A._finish(bm, "hollowBark", "wood", (0, 0, 0), (0, 0, 0), "box", "X", 1.0, True, 55)
 
     # A dark inner end and a little dry nest lining make the opening legible at game scale.
-    A.cyl("char", 0.29, 0.018, loc=(0.475, 0, center_z), rot=(0, 90, 0),
+    # Keep the recess dark, but let warm brown earth tone and ambient light
+    # reveal its depth instead of reading as a featureless black disc.
+    A.cyl("dirt", 0.29, 0.018, loc=(0.475, 0, center_z), rot=(0, 90, 0),
           segs=40, uv="box", name="hollowDepth")
-    A.rock("straw", (0.29, 0.23, 0.045), loc=(-0.27, 0, 0.285), seed=31,
+    A.rock("straw", (0.34, 0.27, 0.060), loc=(-0.32, 0, 0.325), seed=31,
            sub=2, rough=0.06, flat_bottom=0.6, tile=0.4, name="nestBed")
     for i, (x, y) in enumerate(((-0.55, -0.10), (-0.18, 0.16), (0.12, -0.14))):
         A.tube("straw", [Vector((x - 0.22, y - 0.05, 0.31)), Vector((x, y, 0.34)),

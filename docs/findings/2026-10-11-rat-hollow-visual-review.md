@@ -12,6 +12,23 @@
 
 The asset verifier accepts an optional `ASSET_PREVIEW_DIRECTION` vector from mesh centre toward the camera; its default composition is unchanged. For `RatHollow_TornEntranceV2`, the entrance is on local `-X`, so `-1,0,0` produces the saved [`Preview-Entrance.png`](../../Saved/CaptiveSky/ComfyBlender/RatHollow_TornEntranceV2/Preview-Entrance.png). The frontal render makes the irregular bark rim and small straw nest bed legible. The depth reads very dark in this simple Eevee preview; check the hollow under actual Island lighting before deciding whether it needs an interior bounce/light treatment. The companion `Preview-Side.png` confirms the weathered trunk profile but is not an in-world lighting or placement review. No source geometry, Unreal asset, or Island state changed for these preview renders.
 
+### Warm entrance readability pass (2026-10-11)
+
+The source generator now uses its dark-earth material instead of near-black
+charcoal for the cavity backing, and enlarges the straw bed modestly so the
+nest is more legible from the entrance. This leaves the trunk dimensions,
+entrance geometry, and all five collision boxes unchanged. The source-level
+RatHollow suite passes 5/5, including capsule clearance and the new material /
+bedding contract. The source was exported and re-imported in isolated review
+storage at
+`Saved/CaptiveSky/ComfyBlender/Codex_RatHollowCurrentReview_20261011/`:
+262 × 140 × 133 cm, 1,994 triangles, five box colliders, UVMap, four material
+slots, and `PROBLEMS []`. The new [entrance preview](../../Saved/CaptiveSky/ComfyBlender/Codex_RatHollowCurrentReview_20261011/RatHollow_TornEntranceV2/Preview.png)
+shows a warm brown recess and a more visible nest bed, rather than the prior
+black disc. This is still a simple Blender review render; Unreal lighting,
+material import, Rat traversal, and placement remain unverified. The existing
+Unreal trial asset and Island map were not modified.
+
 ### Ground-level collision revision (2026-10-11)
 
 The source-level `RatHollow` generator previously put a full-width box across the tunnel floor, creating the raised sill described above. `Scripts/AssetPipeline/assets/rathollow.py` now uses two narrow ground runners at the sides instead, preserving a 48 cm central gap while the side and roof boxes still describe the shell. `Scripts/AssetPipeline/tests/test_rathollow.py` passes a source-level swept-AABB check for the Rat's nominal 16 × 24 cm capsule from the entrance into the tunnel (2 tests passed).

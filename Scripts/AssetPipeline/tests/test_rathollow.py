@@ -56,6 +56,19 @@ def entrance_uses_broken_rim():
     )
 
 
+def material_calls(method, material):
+    tree = ast.parse(ASSET_SCRIPT.read_text(encoding="utf-8"), filename=str(ASSET_SCRIPT))
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == method
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == material
+    ]
+
+
 class RatHollowClearanceTests(unittest.TestCase):
     def test_entrance_rim_has_a_bounded_asymmetric_break(self):
         segments = entrance_break_segments()
@@ -108,6 +121,18 @@ class RatHollowClearanceTests(unittest.TestCase):
         runners = [(size, location) for size, location in boxes if size[2] <= 0.12]
         self.assertEqual(len(runners), 2, "the floor should have only two narrow side runners")
         self.assertTrue(all(abs(location[1]) >= 0.29 for _, location in runners))
+
+    def test_entrance_recess_is_warm_and_nest_bed_reads_at_the_opening(self):
+        recesses = material_calls("cyl", "dirt")
+        beds = [call for call in material_calls("rock", "straw")
+                if any(isinstance(keyword.value, ast.Constant)
+                       and keyword.arg == "name" and keyword.value.value == "nestBed"
+                       for keyword in call.keywords)]
+        self.assertEqual(len(recesses), 1, "the cavity depth should use warm earth, not charcoal black")
+        self.assertEqual(len(beds), 1, "the entrance needs one authored straw bed")
+        self.assertGreaterEqual(ast.literal_eval(beds[0].args[1])[0], 0.33)
+        location = next(keyword.value for keyword in beds[0].keywords if keyword.arg == "loc")
+        self.assertLessEqual(ast.literal_eval(location)[0], -0.30)
 
 
 if __name__ == "__main__":
