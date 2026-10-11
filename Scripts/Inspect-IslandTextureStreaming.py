@@ -16,6 +16,14 @@ import unreal
 
 
 MAP_PATH = "/Game/Maps/Island"
+TEXTURE_CANDIDATES = (
+    "/Game/PN_FoliageCollection/Textures/FlowerTextures/MasterTextures/Combined_Flowers_A",
+    "/Game/PN_FoliageCollection/Textures/grassTextures/MasterTextures/springGrass_Opacity_8k",
+    "/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_N",
+    "/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_A",
+    "/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_O",
+    "/Game/PN_interactiveSpruceForest/Textures/MasterTextures/ModelTextures/Leaf_O",
+)
 
 
 def main():
@@ -29,6 +37,22 @@ def main():
     unreal.log("[IslandTextureInventory] BEGIN map={} (read-only; no camera-specific wanted-mip claim)".format(MAP_PATH))
     unreal.SystemLibrary.execute_console_command(world, "r.Streaming.PoolSize")
     unreal.SystemLibrary.execute_console_command(world, "ListTextures")
+
+    registry = unreal.AssetRegistryHelpers.get_asset_registry()
+    reference_options = unreal.AssetRegistryDependencyOptions(
+        include_soft_package_references=True,
+        include_hard_package_references=True,
+        include_game_package_references=True,
+        include_editor_only_package_references=True,
+        include_searchable_names=False,
+        include_soft_management_references=False,
+        include_hard_management_references=False,
+    )
+    for texture_path in TEXTURE_CANDIDATES:
+        referencers = registry.get_referencers(texture_path, reference_options) or []
+        names = sorted(str(package_name) for package_name in referencers)
+        unreal.log("[IslandTextureReferencers] texture={} count={} packages={}".format(
+            texture_path, len(names), ",".join(names) if names else "<none>"))
     unreal.log("[IslandTextureInventory] COMPLETE; map and assets were not saved.")
 
 

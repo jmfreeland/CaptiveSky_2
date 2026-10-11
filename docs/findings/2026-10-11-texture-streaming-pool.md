@@ -40,3 +40,16 @@ Keep the current High-quality pool unchanged until target hardware and the
 warning view have been measured; do not hide the warning for a performance
 claim. Epic documents [`STAT STREAMING`](https://dev.epicgames.com/documentation/en-us/unreal-engine/texture-streaming-metrics-in-unreal-engine)
 and the [`ListTextures` runtime inspection](https://dev.epicgames.com/documentation/unreal-engine/texture-asset-editor-in-unreal-engine?lang=en-US).
+
+## Follow-up status
+
+The read-only inventory script now also asks the Asset Registry for direct
+hard/soft package referencers of the six largest candidates above. That query is
+based on UE's `AssetRegistry.get_referencers` API, but this addition has **not
+yet been executed in Unreal**: on 2026-10-11 the editor and Unreal MCP endpoint
+were unavailable, and a fresh `UnrealEditor-Cmd` attempt exited before creating
+its requested log. A separate `-version` startup probe entered UBT platform
+validation, made no CPU progress for over 20 seconds, and produced no new
+project log; only that probe and its stalled child processes were stopped. The
+candidate referencer list and exact-view `stat streaming` capture therefore
+remain pending. No texture settings or assets were changed.
