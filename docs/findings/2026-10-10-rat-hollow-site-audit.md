@@ -92,8 +92,8 @@ reusable guarded writer is `Scripts/Disable-IslandPCGForest.py`, and the
 read-only audit is `Scripts/Inspect-IslandPCGForest.py`. The saved state was
 verified after a clean reload in
 `Saved/Logs/Codex_PCGForestCollisionVerifyFinal_20261011.log`.
-The live Unreal MCP endpoint remains unavailable, and a rendered in-world view
-is still outstanding.
+No rendered in-world view was captured; see the live-session clarification
+below.
 
 **Live-session clarification (2026-10-11):** a later Unreal MCP query found the
 Island in PIE and listed a transient `PCGWorldActor_0` at the origin. That actor
