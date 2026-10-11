@@ -285,3 +285,17 @@ side preview is preserved as `Preview-Side.png`; the imported trial and Island
 were not changed. Before import, soften the cut-ring silhouette with an
 asymmetric break or bark tears and check the moss/ground transition in a
 woodland composition.
+
+**Narrow broken-rim art pass (2026-10-11):** the source now builds the separate
+`RatHollow_TornEntranceV2` export, leaving both earlier versions intact. It
+removes two top-rim sectors, makes the entrance ring slightly less regular, and
+adds one off-centre bark splinter; the rat passage and five collision boxes are
+unchanged. The four source/clearance tests pass. Blender 5.2 rebuilt and
+re-imported the FBX with no manifest/material problems: 262 × 140 × 133 cm,
+about 1,994 triangles, four material slots, and five box-collision meshes. The
+entrance render shows a small asymmetrical notch with moss visible behind it;
+the side render still reads as a fallen trunk. This is a stronger local art
+candidate, not Unreal/RHI or habitat-composition validation. It remains
+unimported and unplaced; next compare it in the disposable woodland trial while
+preserving the existing imported asset and do not assign Fenrus' home until the
+site, approach, and navigation gates pass.

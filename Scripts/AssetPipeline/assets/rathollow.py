@@ -5,26 +5,31 @@ import bmesh
 from mathutils import Vector
 
 
-NAME = "RatHollow"
+NAME = "RatHollow_TornEntranceV2"
+ENTRANCE_BARK_BREAK_SEGMENTS = (9, 10)
+ENTRANCE_RIM_IRREGULARITY = 1.35
 
 
-def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0):
+def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0, irregularity=1.0):
     verts = []
     for i in range(segments):
         angle = 2.0 * math.pi * i / segments
         # A few broad, offset deformations keep the trunk from reading as a
         # manufactured cylinder; the small high-frequency term breaks the rim.
-        variation = (1.0 + 0.060 * math.sin(3.0 * angle + phase)
-                     + 0.026 * math.sin(7.0 * angle - phase * 0.7)
-                     + 0.022 * math.sin(2.0 * angle + phase * 1.3))
+        variation = (1.0 + irregularity * (
+            0.060 * math.sin(3.0 * angle + phase)
+            + 0.026 * math.sin(7.0 * angle - phase * 0.7)
+            + 0.022 * math.sin(2.0 * angle + phase * 1.3)))
         x_jitter = 0.024 * math.sin(5.0 * angle + phase)
         r = radius * variation
         verts.append(bm.verts.new((x + x_jitter, center_y + r * math.cos(angle), center_z + r * math.sin(angle))))
     return verts
 
 
-def _bridge(bm, first, second):
+def _bridge(bm, first, second, skip_segments=()):
     for i in range(len(first)):
+        if i in skip_segments:
+            continue
         j = (i + 1) % len(first)
         bm.faces.new((first[i], first[j], second[j], second[i]))
 
@@ -56,9 +61,12 @@ def _hollow_log(A):
         (-1.17, 0.39, 0.66), (-0.92, 0.39, 0.66), (-0.54, 0.38, 0.66),
         (-0.12, 0.37, 0.66), (0.28, 0.34, 0.66), (0.45, 0.30, 0.66),
     ]
-    inner = [_ring(bm, x, radius, z, -k * 0.29, segments)
+    inner = [_ring(bm, x, radius, z, -k * 0.29, segments,
+                   irregularity=ENTRANCE_RIM_IRREGULARITY if k == 0 else 1.0)
              for k, (x, radius, z) in enumerate(inner_stations)]
-    _bridge(bm, outer[1], inner[0])
+    # A small, off-centre bite through the top of the annular rim breaks the
+    # manufactured ring without closing or narrowing the rat-sized passage.
+    _bridge(bm, outer[1], inner[0], ENTRANCE_BARK_BREAK_SEGMENTS)
     for first, second in zip(inner, inner[1:]):
         _bridge(bm, first, second)
     # Keep the tunnel open to the dark backing below; a wood cap here hides the cavity.
@@ -85,6 +93,10 @@ def _hollow_log(A):
     A.tube("wood", [Vector((0.92, 0.28, 0.92)), Vector((1.08, 0.39, 1.02)),
                      Vector((1.25, 0.43, 1.00))], 0.060, segs=8,
            taper=lambda t: 1.0 - 0.78 * t, tile=0.9, name="rearBrokenRoot")
+    # One off-centre splinter continues the torn edge into the bark.
+    A.tube("wood", [Vector((-1.26, 0.25, 1.25)), Vector((-1.32, 0.18, 1.18)),
+                     Vector((-1.35, 0.13, 1.12))], 0.038, segs=7,
+           taper=lambda t: 1.0 - 0.88 * t, tile=0.8, name="entranceSplinter")
 
     # Moss sits in separate soft clumps so it remains readable rather than painting the whole log green.
     for i, (x, y, z, radii) in enumerate((

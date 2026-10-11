@@ -33,7 +33,38 @@ def outer_profile():
     raise AssertionError("the trunk needs an explicit outer profile")
 
 
+def entrance_break_segments():
+    tree = ast.parse(ASSET_SCRIPT.read_text(encoding="utf-8"), filename=str(ASSET_SCRIPT))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == "ENTRANCE_BARK_BREAK_SEGMENTS" for target in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError("the entrance needs an explicit broken-bark sector")
+
+
+def entrance_uses_broken_rim():
+    tree = ast.parse(ASSET_SCRIPT.read_text(encoding="utf-8"), filename=str(ASSET_SCRIPT))
+    return any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_bridge"
+        and len(node.args) >= 4
+        and isinstance(node.args[3], ast.Name)
+        and node.args[3].id == "ENTRANCE_BARK_BREAK_SEGMENTS"
+        for node in ast.walk(tree)
+    )
+
+
 class RatHollowClearanceTests(unittest.TestCase):
+    def test_entrance_rim_has_a_bounded_asymmetric_break(self):
+        segments = entrance_break_segments()
+        self.assertTrue(entrance_uses_broken_rim())
+        self.assertGreaterEqual(len(segments), 2)
+        self.assertLessEqual(len(segments), 3)
+        self.assertEqual(sorted(segments), list(range(min(segments), max(segments) + 1)))
+        self.assertTrue(all(0 <= segment < 40 for segment in segments))
+
     def test_trunk_profile_varies_in_radius_and_height(self):
         """Keep the shell from collapsing back into a regular straight cylinder."""
         stations = outer_profile()
