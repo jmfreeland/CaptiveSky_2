@@ -123,6 +123,45 @@ class RequestInboxTests(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(asset_requests.read_records(self.inbox), records)
 
+    def test_accepted_visual_upgrade_needs_explicit_route_then_uses_authored_script(self):
+        request = {"id": "upgrade-1", "requester": "Raven", "description": "Give the Wind Arch mossy stones",
+                   "request_type": "upgrade", "target": "WindArch", "upgrade_kind": "aesthetic",
+                   "pipeline": "human_review", "status": "accepted"}
+        self.inbox.write_text(json.dumps(request) + "\n", encoding="utf-8")
+        success_output = "[rathollow] build rc=0 exported=True\nPROBLEMS []\nVERIFY DONE\n"
+        with patch.object(asset_requests.subprocess, "run", return_value=subprocess.CompletedProcess(
+            [], 0, stdout=success_output, stderr=""
+        )) as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "upgrade-1", "rathollow"
+            ]), 2)
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "route", "upgrade-1", "ComfyBlender"
+            ]), 0)
+            routed = asset_requests.read_records(self.inbox)[0]
+            self.assertEqual(routed["status"], "accepted")
+            self.assertEqual(routed["pipeline"], "ComfyBlender")
+            self.assertEqual(routed["target"], "WindArch")
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "upgrade-1", "rathollow"
+            ]), 0)
+        run.assert_called_once()
+
+    def test_functionality_upgrade_cannot_be_routed_to_comfyblender(self):
+        request = {"id": "upgrade-2", "requester": "Aster", "description": "Add a usable shelter",
+                   "request_type": "upgrade", "upgrade_kind": "functionality",
+                   "pipeline": "human_review", "status": "accepted"}
+        self.inbox.write_text(json.dumps(request) + "\n", encoding="utf-8")
+        with patch.object(asset_requests.subprocess, "run") as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "route", "upgrade-2", "ComfyBlender"
+            ]), 2)
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "upgrade-2", "rathollow"
+            ]), 2)
+        run.assert_not_called()
+        self.assertEqual(asset_requests.read_records(self.inbox)[0]["pipeline"], "human_review")
+
     def test_invalid_or_missing_asset_script_never_launches_pipeline(self):
         accepted = {"id": "req-build", "requester": "Raven", "description": "A cover",
                     "status": "accepted", "request_type": "new_object", "pipeline": "ComfyBlender"}

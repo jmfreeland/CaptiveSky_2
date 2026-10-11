@@ -118,8 +118,13 @@ def build_parser() -> argparse.ArgumentParser:
     status_command.add_argument("request_id", help="exact request ID from the list")
     status_command.add_argument("status", choices=FINAL_STATUSES,
                                 help="accepted, generated, or declined; this does not run a pipeline")
+    route_command = commands.add_parser(
+        "route", help="choose human review or ComfyBlender for an accepted visual upgrade"
+    )
+    route_command.add_argument("request_id", help="exact accepted upgrade request ID from the list")
+    route_command.add_argument("pipeline", choices=("ComfyBlender", "human_review"))
     build_command = commands.add_parser(
-        "build", help="run one named, human-authored asset script for an accepted new-object request"
+        "build", help="run one named, human-authored asset script for an accepted object or visual-upgrade request"
     )
     build_command.add_argument("request_id", help="exact accepted request ID from the list")
     build_command.add_argument("asset_script", help="script name under Scripts/AssetPipeline/assets, without .py")
@@ -133,10 +138,14 @@ def run_accepted_build(records: list[dict], request_id: str, asset_script: str) 
     record = matches[0]
     if record["status"] != "accepted":
         raise InboxError(f"Request {request_id!r} is {record['status']}; only accepted requests may run a pipeline.")
-    if record.get("request_type", "new_object") != "new_object":
-        raise InboxError("Upgrade proposals stay on human review; no asset pipeline was run.")
+    request_type = record.get("request_type", "new_object")
     if record.get("pipeline", "ComfyBlender") != "ComfyBlender":
         raise InboxError("This request is not assigned to ComfyBlender; no pipeline was run.")
+    if request_type == "upgrade":
+        if record.get("upgrade_kind") not in ("aesthetic", "variation"):
+            raise InboxError("Only aesthetic or variation upgrades may use ComfyBlender; no pipeline was run.")
+    elif request_type != "new_object":
+        raise InboxError("This proposal type is not supported by ComfyBlender; no pipeline was run.")
     if not ASSET_SCRIPT_NAME.fullmatch(asset_script):
         raise InboxError("Asset script must be a lowercase name under assets/; no pipeline was run.")
 
@@ -190,6 +199,22 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "build":
             return run_accepted_build(records, args.request_id, args.asset_script)
+
+        if args.command == "route":
+            matches = [record for record in records if record["id"] == args.request_id]
+            if not matches:
+                raise InboxError(f"Request ID {args.request_id!r} was not found; no changes made.")
+            record = matches[0]
+            if record["status"] != "accepted":
+                raise InboxError("Only accepted requests may be routed; no changes made.")
+            if record.get("request_type", "new_object") != "upgrade":
+                raise InboxError("Only upgrade requests can be routed; new objects already use ComfyBlender.")
+            if args.pipeline == "ComfyBlender" and record.get("upgrade_kind") not in ("aesthetic", "variation"):
+                raise InboxError("Functionality upgrades stay on human review; no changes made.")
+            record["pipeline"] = args.pipeline
+            write_records(args.inbox, records)
+            print(f"Routed {args.request_id} to {args.pipeline}. No generator or Unreal import was run.")
+            return 0
 
         matches = [record for record in records if record["id"] == args.request_id]
         if not matches:
