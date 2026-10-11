@@ -140,13 +140,44 @@ visual concealment after placement. No Island map or resident place data was
 changed. Do not write a home coordinate or spawn Fenrus until a real-RHI view
 of the hollow in context and the remaining movement/nav checks pass.
 
+## Disposable trial placement and runtime gate (2026-10-11)
+
+The imported clearance-trial mesh was placed and saved into a local-only clone
+of the Island at the top-ranked candidate, with its west entrance facing the
+approach. The editor commandlet started directly on the clone and loaded it
+once; it did not switch maps from Python. The placement log records bounds
+center `(-104503.0, 104998.9, 2401.8)` cm, Query-and-Physics collision,
+`BlockAll`, Pawn blocking, and `can_ever_affect_navigation=True`. The script
+saved only `/Game/Maps/Island_RatHollowTrial` and exited cleanly. The main Island
+and `Agents/Agent_Rat_01/places.json` remain untouched. See the
+[`trial placement log`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Logs/PlaceHollowInTrial.log).
+
+A standalone real-RHI run against that clone was attempted with an isolated
+data root, Python and agent thinking disabled, zero model requests, and a
+120-second runtime cap. It did not reach engine initialization or load the
+world within the 300-second startup guard, so the guard terminated only the
+launched game process. The log records an UnrealBuildTool AutoSDK validation
+exit code `-532462766` and an access-denied (`Error Code 5`) attempt to delete a
+user-level `EditorSettings.ini`; it then stops before the world-ready marker.
+There is no in-context screenshot and no evidence this is a content or
+RatHollow failure. The game process produced no crash report. See the
+[`bounded trial-game log`](../../Saved/CompileScratch/RatHollowSiteAudit_20261011_Run01/Logs/TrialGame.log).
+
+`Scripts/Start-Spectator.ps1` now accepts a validated `/Game/...` map path and
+uses that map's world-ready log marker, rather than hard-coding the main
+Island. The script parsed successfully; its custom-map runtime path remains
+unverified because UE startup stopped before map load. The trial clone is local
+and ignored by Git.
+
 ## Next step
 
 The best provisional patch is near `(-104500, 105000, 2337.5)` cm, but its
-ground-level views show no fallen timber and still-visible bare soil. Next,
-render the trial hollow in a disposable map/session at this point with its
-entrance facing west; check ground contact, sightlines into the entrance, and
-the current nav agent's route around it. If that view does not meet the hidden
+ground-level views show no fallen timber and still-visible bare soil. The
+hollow is now placed in the disposable map, but the real-RHI game could not
+start under the current sandbox permissions. Next, resolve the engine's
+user-level file access / AutoSDK startup failure, then capture the clone and
+check ground contact, sightlines into the entrance, and the current nav agent's
+route around it. If that view does not meet the hidden
 home brief, continue the understory/canopy search rather than forcing the
 location. Only after visual and movement/nav checks pass should the main Island
 map and `Agents/Agent_Rat_01/places.json` be updated or Fenrus spawned. Do not

@@ -68,6 +68,7 @@ param(
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
 	[switch]$Continuous,
+	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
 	[ValidateRange(0, 120)][Nullable[int]]$MaxModelRequests,
@@ -75,6 +76,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if ($MapPath -notmatch '^/Game/[A-Za-z0-9_./-]+$') {
+	throw "-MapPath must be a project content path beginning with /Game/."
+}
 if ($Continuous -and $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) {
 	throw "-StartupTimeoutSeconds is supported only for bounded non-continuous sessions."
 }
@@ -124,7 +128,7 @@ if (-not [string]::IsNullOrWhiteSpace($TraceProfileFile)) {
 	throw "-TraceProfileDelaySeconds and -TraceProfileDurationSeconds require -TraceProfileFile."
 }
 
-$arguments = @($project, "/Game/Maps/Island", "-game", "-Spectator")
+$arguments = @($project, $MapPath, "-game", "-Spectator")
 $execCommands = @()
 if ($Windowed) { $arguments += @("-windowed", "-ResX=$WindowWidth", "-ResY=$WindowHeight") } else { $arguments += "-fullscreen" }
 if ($Shots) { $arguments += "-SpectatorShots" } # one frame per shot; use -ScreenshotDirectory to isolate runs
@@ -194,7 +198,9 @@ if (-not $Continuous) {
 	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -PassThru
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
-	$worldReadyPattern = 'LogWorld: Bringing World /Game/Maps/Island\.Island up for play'
+	$mapObjectName = ($MapPath -split '/')[-1]
+	$worldAssetPath = [regex]::Escape("$MapPath.$mapObjectName")
+	$worldReadyPattern = "LogWorld: Bringing World $worldAssetPath up for play"
 	$bWorldReady = $false
 	while (-not $game.HasExited -and $startupTimer.Elapsed.TotalSeconds -lt $StartupTimeoutSeconds) {
 		if (Test-Path -LiteralPath $LogPath) {
