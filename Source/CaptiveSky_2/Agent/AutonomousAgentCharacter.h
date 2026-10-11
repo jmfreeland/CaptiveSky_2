@@ -84,4 +84,5 @@ protected:
 private:
 	friend class FIslandInnkeeperSpawnTest;
 	void RegisterApproachTargetTags();
+	void ApplyMetaHumanBodyIfBuilt();
 };

@@ -13,6 +13,8 @@
 #include "ImageUtils.h"
 #include "Serialization/MemoryWriter.h"
 #include "Misc/Base64.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAutonomousAgent, Log, All);
 
@@ -43,6 +45,7 @@ void AAutonomousAgentCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	RegisterApproachTargetTags();
+	ApplyMetaHumanBodyIfBuilt();
 
 	// Re-parent onto the actual assigned mesh's socket now that the Blueprint CDO's mesh is in effect.
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
@@ -68,6 +71,28 @@ void AAutonomousAgentCharacter::BeginPlay()
 	}
 }
 
+void AAutonomousAgentCharacter::ApplyMetaHumanBodyIfBuilt()
+{
+	// A map-placed resident (e.g. Aster) keeps its placeholder Blueprint; when the built MetaHuman for that resident exists in
+	// this checkout (Content/ is local-only, Scripts/Create-MetaHumans.py), show it instead. No-op otherwise.
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp || !Memory) return;
+	const FString AgentId = Memory->GetResolvedAgentId();
+	if (!AgentId.Equals(TEXT("Agent_Aster_01"), ESearchCase::IgnoreCase)) return;
+	const FString Who = AgentId.RightChop(6).LeftChop(3);   // "Aster"
+	const FString Base = FString::Printf(TEXT("/Game/Characters/MetaHumans/Built/%s/MHC_%s"), *Who, *Who);
+	USkeletalMesh* Body = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%s/Body/SKM_MHC_%s_BodyMesh.SKM_MHC_%s_BodyMesh"), *Base, *Who, *Who), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	USkeletalMesh* Face = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%s/Face/SKM_MHC_%s_FaceMesh.SKM_MHC_%s_FaceMesh"), *Base, *Who, *Who), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Body || !Face || MeshComp->GetSkeletalMeshAsset() == Body) return;
+	MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	MeshComp->SetSkeletalMesh(Body);
+	USkeletalMeshComponent* FaceComp = NewObject<USkeletalMeshComponent>(this, TEXT("MetaHumanFace"));
+	FaceComp->SetupAttachment(MeshComp);
+	FaceComp->RegisterComponent();
+	FaceComp->SetSkeletalMesh(Face);
+	UE_LOG(LogAutonomousAgent, Display, TEXT("%s is using its built MetaHuman body."), *AgentId);
+}
+
 void AAutonomousAgentCharacter::RegisterApproachTargetTags()
 {
 	// Give other residents a stable, body-independent movement target. Movement
@@ -89,6 +114,15 @@ void AAutonomousAgentCharacter::RegisterApproachTargetTags()
 
 FString AAutonomousAgentCharacter::CaptureFirstPersonSnapshot() const
 {
+	// Headless runs (including -NullRHI playtests) can still exercise agent
+	// decisions, but cannot render the scene capture into its texture target.
+	// Keep the provider request text-only instead of crashing in image export.
+	if (!FApp::CanEverRender())
+	{
+		UE_LOG(LogAutonomousAgent, Verbose, TEXT("Skipping first-person snapshot because this process cannot render."));
+		return FString();
+	}
+
 	if (!EyeCapture || !EyeRenderTarget)
 	{
 		UE_LOG(LogAutonomousAgent, Warning, TEXT("CaptureFirstPersonSnapshot called before eye capture was initialized."));
