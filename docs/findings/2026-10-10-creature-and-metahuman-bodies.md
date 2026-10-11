@@ -43,3 +43,7 @@ Goal: bodies for the human residents (MetaHuman), the raven and the rat. Status:
 - `LogRavenAgentAI: Raven appearance on BP_Raven_Placeholder_C_0: mesh=/Game/Characters/Creatures/Raven/SK_Raven_01 ... visible=yes` (the controller now selects the purpose-built raven).
 - The Innkeeper spawned with `SKM_MHC_Innkeeper_BodyMesh` loaded (`Spawned Island innkeeper ... Agent_Innkeeper_01`). NullRHI, so nothing was seen on screen.
 - Aster remains a map-placed actor on the placeholder body, and no rat actor is in the Island map.
+
+## Update: rat spawns in the Island (2026-10-11)
+
+`UIslandRatSubsystem` (Game/PIE worlds, Island map only) spawns `/Game/Agents/BP_Rat_Placeholder` as `Agent_Rat_01` at the nearest navigable point 700-1200 cm from the Inn landmark, forcing `ARatAgentAIController` (the Blueprint's controller class fell back to the generic one). Verified in a `-game -NullRHI` run: `Rat locomotion on BP_Rat_Placeholder_C_0: idle=ANIM_Fox_IdleBreathe ...` and `Spawned Island rat with stable identity Agent_Rat_01 ... (controller RatAgentAIController_0, mesh SK_Rat_01)`. The body is local Content, so without it the subsystem is a no-op. Idle animation is assigned by the controller but not yet seen in a rendered frame. Temporary stand-in until the rat hollow anchor lands.
