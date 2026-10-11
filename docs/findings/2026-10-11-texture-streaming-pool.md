@@ -195,3 +195,31 @@ Settled overlay captures:
 the two earlier audit locations rather than covering the entire Island; the
 camera/profile where the user sees the warning is still needed before declaring
 it resolved or changing the cap.
+
+**Expanded Island-route capture (2026-10-11):** the same bounded launcher option
+was run against the current `Config/IslandViewpoints.json`. The warm-cache Game
+reached world-ready in 48.5 seconds, sampled 11 of the 13 configured day views,
+and exited normally at its 180-second cap with thinking disabled and zero model
+requests. Every captured view was below the active 4096 MiB pool:
+
+| View | Required Pool |
+|---|---:|
+| Shore approach | 837.32 MiB |
+| Inn from path | 978.52 MiB |
+| Inn common room | 984.89 MiB |
+| Inn guest book | 995.10 MiB |
+| Tideglass | 990.70 MiB |
+| Tideglass ground detail | 992.98 MiB |
+| Tideglass dragonfly close | 979.14 MiB |
+| Listening Stones | 986.81 MiB |
+| WindArch overlook | 974.20 MiB |
+| Raven nest close-up | 1008.64 MiB |
+| Cairn resident scale | 984.59 MiB |
+
+The highest Required Pool was 24.6% of capacity. The largest reported
+NonStreaming Mips counter was 319.05 MiB; it is separate from Required Pool but
+also remains small relative to the 4096 MiB pool. No captured view showed a
+streaming over-budget condition. The high aerial Survey and night-only
+Stones/Firefly viewpoints were not captured, and this route still does not
+reproduce the user's reported warning. Run log and images are under
+`Saved/Playtests/Codex_TexturePool_FullJourney_20261011/`.
