@@ -13,13 +13,15 @@ The design uses irregular stone piers, shoulders, a broad lintel and a keystone,
 - `lib.py` honors `ASSET_CYCLES_DEVICE=CPU` to allow an explicit CPU-only stone bake; the default remains `AUTO` for existing assets.
 - Python AST parsing passes for the WindArch source and pipeline library.
 
-## Not yet verified
+## Local export and visual review (2026-10-11)
 
-The FBX, packed stone textures, Blender re-import render, and Unreal import have not been generated or reviewed. On 2026-10-11 the live Unreal editor was responsive at roughly 27 GB private memory; a Blender process (PID 18040) had also been running since 2026-10-10. Commit usage was about 60.7 of 65.8 GB. A second Blender process was not launched to avoid competing for memory/GPU while the user/editor work may be active.
+The asset pipeline was run with `ASSET_CYCLES_DEVICE=CPU`. The local FBX round-trip and texture pack passed: bounds are 7.059 × 1.972 × 5.217 m, with 2,080 triangles, two material slots, three box colliders, and a single `UVMap`; the verifier reported `PROBLEMS []` and `VERIFY DONE`. The authored collision leaves approximately 3.50 m clear width and 4.03 m clear height. The focused Wind Arch collision tests pass 2/2; the complete AssetPipeline suite passes 23/23.
+
+The local [preview render](../../Saved/CaptiveSky/ComfyBlender/WindArch/Preview.png) reads as a broad walk-through landmark with the passage visible. The stone is pale and fairly uniform under the verifier's simple lighting; compare it under Island lighting before deciding whether to warm or darken the material. The pack/verify logs are under `Saved/CaptiveSky/ComfyBlender/_work/logs/` (`windarch_build.txt` and `windarch_verify.txt`). Blender emitted a nonfatal extension-cache `WinError 183` and shutdown `Unable to delete file` messages while an older Blender process (PID 18040) remained open; despite these warnings, export, texture packing, re-import, and verifier all completed. Do not terminate that pre-existing process based on these logs.
 
 ## Next steps
 
-1. When the existing editor and Blender sessions are no longer needed, identify whether the existing Blender process has an active task before closing anything.
-2. Run the asset pipeline for `windarch` with `ASSET_CYCLES_DEVICE=CPU`; inspect the build log, packed textures, manifest bounds/triangle count, and re-import `Preview.png`.
-3. If the exported preview is sound, import only the asset into `/Game/Generated/ComfyBlender/WindArch/`, inspect scale/material/collision in Unreal, and request approval before replacing or moving the map's blockout.
+1. When Unreal is available, import only the asset into `/Game/Generated/ComfyBlender/WindArch/` and inspect material, scale, and collision under real Island lighting; do not place it yet.
+2. If the in-world material reads too pale, adjust only the Wind Arch asset/material and re-review; leave the shared source library untouched.
+3. Request approval before replacing or moving the map's existing blockout.
 4. Re-run `Scripts/AssetPipeline/tests/test_windarch.py` after any collision adjustment.
