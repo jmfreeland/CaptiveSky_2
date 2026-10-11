@@ -6,7 +6,7 @@ its script and rerun (10-60 s). Exports land in `Saved/CaptiveSky/ComfyBlender/<
 local; only these scripts are in git). Same review-then-import idea as `Saved/CaptiveSky/Tripo/`, but geometry and textures are
 authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
-The generated index currently covers 21 reviewed props: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory now has 22 prop scripts; `RatHollow` has a successful local FBX build, but remains unimported and visually unreviewed until the open Unreal editor can be closed safely.
+The generated index currently covers 21 reviewed props: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory now has 22 prop scripts. The original `RatHollow` export was imported into Unreal for an isolated Island trial; its editor view looked too regular and still needs a bounded gameplay/understory check. A more irregular source revision is exported locally at `Saved/CaptiveSky/ComfyBlender/RatHollow_ArtPass_20261011/RatHollow/`; it is not imported and has not had a preview render yet, so the trial asset remains unchanged.
 
 After importing a reviewed mesh, `Config/IslandProps.json` can reference it with an explicit Unreal object path, for example `"asset_path": "/Game/Generated/ComfyBlender/RatHollow/SM_RatHollow_01"`. The placement script still accepts legacy `"asset"` entries under `/Game/Generated/Tripo`. It preflights all meshes and ground samples before replacing generated-prop actors; `PLACE_PROPS_DRYRUN=1` reports the plan without destroying, spawning, or saving actors. Do not add the Rat's location until the hollow has been imported and checked in the world.
 

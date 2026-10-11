@@ -23,7 +23,26 @@ def collision_boxes():
     return boxes
 
 
+def outer_profile():
+    tree = ast.parse(ASSET_SCRIPT.read_text(encoding="utf-8"), filename=str(ASSET_SCRIPT))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == "outer_stations" for target in node.targets):
+            return ast.literal_eval(node.value)
+    raise AssertionError("the trunk needs an explicit outer profile")
+
+
 class RatHollowClearanceTests(unittest.TestCase):
+    def test_trunk_profile_varies_in_radius_and_height(self):
+        """Keep the shell from collapsing back into a regular straight cylinder."""
+        stations = outer_profile()
+        self.assertGreaterEqual(len(stations), 7)
+        radii = {round(station[1], 2) for station in stations}
+        heights = [station[2] for station in stations]
+        self.assertGreaterEqual(len(radii), 5)
+        self.assertGreaterEqual(max(heights) - min(heights), 0.015)
+
     def test_grounded_rat_capsule_has_clear_route_through_tunnel(self):
         """Approximate the authored 16 x 24 cm capsule swept along the X tunnel."""
         boxes = collision_boxes()

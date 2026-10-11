@@ -8,14 +8,18 @@ from mathutils import Vector
 NAME = "RatHollow"
 
 
-def _ring(bm, x, radius, center_z, phase, segments):
+def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0):
     verts = []
     for i in range(segments):
         angle = 2.0 * math.pi * i / segments
-        variation = 1.0 + 0.035 * math.sin(3.0 * angle + phase) + 0.018 * math.sin(7.0 * angle - phase * 0.7)
-        x_jitter = 0.012 * math.sin(5.0 * angle + phase)
+        # A few broad, offset deformations keep the trunk from reading as a
+        # manufactured cylinder; the small high-frequency term breaks the rim.
+        variation = (1.0 + 0.060 * math.sin(3.0 * angle + phase)
+                     + 0.026 * math.sin(7.0 * angle - phase * 0.7)
+                     + 0.022 * math.sin(2.0 * angle + phase * 1.3))
+        x_jitter = 0.024 * math.sin(5.0 * angle + phase)
         r = radius * variation
-        verts.append(bm.verts.new((x + x_jitter, r * math.cos(angle), center_z + r * math.sin(angle))))
+        verts.append(bm.verts.new((x + x_jitter, center_y + r * math.cos(angle), center_z + r * math.sin(angle))))
     return verts
 
 
@@ -41,7 +45,7 @@ def _hollow_log(A):
         (-0.48, 0.65, 0.66), (0.05, 0.63, 0.66), (0.55, 0.61, 0.65),
         (1.00, 0.58, 0.65), (1.24, 0.52, 0.65),
     ]
-    outer = [_ring(bm, x, radius, z, k * 0.37, segments)
+    outer = [_ring(bm, x, radius, z, k * 0.61, segments, 0.035 * math.sin(k * 0.83))
              for k, (x, radius, z) in enumerate(outer_stations)]
     for first, second in zip(outer, outer[1:]):
         _bridge(bm, first, second)
@@ -78,15 +82,19 @@ def _hollow_log(A):
     A.tube("wood", [Vector((0.34, -0.27, 0.94)), Vector((0.48, -0.34, 1.10)),
                      Vector((0.62, -0.40, 1.22))], 0.085, segs=9,
            taper=lambda t: 1.0 - 0.83 * t, tile=0.9, name="brokenBranch")
+    A.tube("wood", [Vector((0.92, 0.28, 0.92)), Vector((1.08, 0.39, 1.02)),
+                     Vector((1.25, 0.43, 1.00))], 0.060, segs=8,
+           taper=lambda t: 1.0 - 0.78 * t, tile=0.9, name="rearBrokenRoot")
 
     # Moss sits in separate soft clumps so it remains readable rather than painting the whole log green.
     for i, (x, y, z, radii) in enumerate((
         (-0.78, -0.10, 1.19, (0.26, 0.17, 0.055)),
         (-0.30, 0.13, 1.23, (0.32, 0.14, 0.05)),
-        (0.24, 0.08, 1.20, (0.25, 0.16, 0.055)),
+        (0.22, 0.08, 1.20, (0.29, 0.18, 0.060)),
         (0.78, -0.07, 1.15, (0.22, 0.13, 0.045)),
+        (-0.54, 0.42, 0.97, (0.18, 0.13, 0.045)),
     )):
-        A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.18,
+        A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.22,
                flat_bottom=0.35, tile=0.4, name="moss{:02d}".format(i))
 
     # Five simple collision shapes follow the shell. Keep the two low runners at
