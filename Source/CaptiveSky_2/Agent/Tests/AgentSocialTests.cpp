@@ -1,5 +1,17 @@
 #include "Misc/AutomationTest.h"
+#include "AgentBrainComponent.h"
+#include "AgentDataPaths.h"
+#include "AgentMemoryComponent.h"
+#include "AgentMemoryTypes.h"
 #include "AgentSocialComponent.h"
+#include "AutonomousAgentCharacter.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "HAL/FileManager.h"
+#include "IslandSocialTestCharacter.h"
+#include "IslandWorldStateSubsystem.h"
+#include "Misc/Guid.h"
+#include "Misc/Paths.h"
 #include "HAL/PlatformTime.h"
 #include <limits>
 
@@ -84,5 +96,110 @@ bool FAgentSocialPacingTest::RunTest(const FString& Parameters)
 	Social->MaximumConversationTurns = 1;
 	TestTrue(TEXT("A one-line configured exchange does not queue a reply to its opener"),
 		Social->IsConversationAtTurnLimit(1));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentCraftTeachingTest, "CaptiveSky2.Agent.CraftTeaching",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
+{
+	const FString Suffix = FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString TeacherId = TEXT("CraftTeacher_") + Suffix;
+	const FString LearnerId = TEXT("CraftLearner_") + Suffix;
+	const FString UnknownLearnerId = TEXT("CraftUnknownLearner_") + Suffix;
+	const FString DistantLearnerId = TEXT("CraftDistantLearner_") + Suffix;
+	const FString StateFile = FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("CraftTeaching") / (Suffix + TEXT(".json"));
+	const FString ConversationId = TEXT("craft-teaching-") + Suffix;
+	const FString UnknownConversationId = TEXT("craft-unknown-") + Suffix;
+	const FString DistantConversationId = TEXT("craft-distant-") + Suffix;
+
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Craft teaching fixture world is created"), World)) return false;
+	if (!TestNotNull(TEXT("Engine exists for the social fixture"), GEngine))
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+
+	UIslandWorldStateSubsystem* WorldState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	if (!TestNotNull(TEXT("Persistent world state is available in the fixture"), WorldState))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	WorldState->StorageFileOverride = StateFile;
+
+	AIslandSocialTestCharacter* Teacher = World->SpawnActor<AIslandSocialTestCharacter>(FVector::ZeroVector, FRotator::ZeroRotator);
+	AIslandSocialTestCharacter* Learner = World->SpawnActor<AIslandSocialTestCharacter>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator);
+	AIslandSocialTestCharacter* UnknownLearner = World->SpawnActor<AIslandSocialTestCharacter>(FVector(120.f, 0.f, 0.f), FRotator::ZeroRotator);
+	AIslandSocialTestCharacter* DistantLearner = World->SpawnActor<AIslandSocialTestCharacter>(FVector(5000.f, 0.f, 0.f), FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("The teacher body is spawned"), Teacher) || !TestNotNull(TEXT("The nearby learner body is spawned"), Learner) ||
+		!TestNotNull(TEXT("The second learner body is spawned"), UnknownLearner) || !TestNotNull(TEXT("The distant learner body is spawned"), DistantLearner))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		IFileManager::Get().Delete(*StateFile, false, true, true);
+		return false;
+	}
+	Teacher->Memory->AgentId = TeacherId;
+	Learner->Memory->AgentId = LearnerId;
+	UnknownLearner->Memory->AgentId = UnknownLearnerId;
+	DistantLearner->Memory->AgentId = DistantLearnerId;
+
+	FIslandCraftParameter Moisture;
+	Moisture.Id = TEXT("moisture");
+	Moisture.Value = 0.64f;
+	TestTrue(TEXT("A real first practice establishes a tradition before anyone can teach it"),
+		WorldState->RecordCraftAttempt(TEXT("HearthLoaf"), TEXT("A hearth loaf"), TeacherId, 1,
+			TEXT("A remembered family recipe"), { Moisture }, EIslandCraftOutcome::Promising));
+	TestFalse(TEXT("The learner begins without preordained craft knowledge"), WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), LearnerId));
+	const FString TeacherSituation = Teacher->Brain->BuildSituationSummary(FAgentConversationContext());
+	const FString LearnerSituation = Learner->Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Only a resident who knows the tradition sees its exact optional teaching ID"),
+		TeacherSituation.Contains(TEXT("teach_craft ID: HearthLoaf")) && !LearnerSituation.Contains(TEXT("teach_craft ID: HearthLoaf")));
+	TArray<FAgentMemoryRecord> NoMemories;
+	TestTrue(TEXT("The one scheduled decision prompt describes optional resident-to-resident craft teaching"),
+		Teacher->Brain->BuildSystemPrompt(NoMemories).Contains(TEXT("teach_craft")));
+	const FString Response = TEXT("{\"thought\":\"share a remembered method\",\"action\":{\"type\":\"speak\",\"target\":\"CraftLearner\",\"speech\":\"I remember a slow rise for this loaf.\",\"teach_craft\":\"HearthLoaf\"},\"new_memories\":[]}");
+	const FAgentDecision Decision = UAgentBrainComponent::ParseDecisionAndStoreMemories(Response, nullptr);
+	TestTrue(TEXT("The decision parser preserves the optional craft lineage ID"),
+		Decision.bValid && Decision.ActionType == EAgentActionType::Speak && Decision.TeachCraft == TEXT("HearthLoaf"));
+
+	const bool bReserved = Teacher->Social->TryReserveAutomaticConversation(Learner->Social, TeacherId, LearnerId, ConversationId);
+	TestTrue(TEXT("The teacher and learner enter the existing bounded conversation path"), bReserved);
+	if (bReserved)
+		Teacher->Social->DeliverSpeech(Learner, Decision.Speech, ConversationId, 1, FString(), Decision.TeachCraft);
+	const FIslandCraftTraditionRecord* Tradition = WorldState->FindCraftTradition(TEXT("HearthLoaf"));
+	TestTrue(TEXT("A delivered nearby resident line grants exactly attributed craft knowledge"),
+		WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), LearnerId) && Tradition && Tradition->Lessons.Num() == 1 &&
+		Tradition->Lessons[0].TeacherAgentId == TeacherId && Tradition->Lessons[0].LearnerAgentId == LearnerId);
+	TestEqual(TEXT("Teaching queues the ordinary reply but starts no additional model request"),
+		Learner->Brain->bRequestInFlight, false);
+
+	Teacher->Social->ReleaseAutomaticConversation(Learner->Social, ConversationId);
+	TestTrue(TEXT("An unrelated nearby conversation can be reserved afterward"),
+		Teacher->Social->TryReserveAutomaticConversation(UnknownLearner->Social, TeacherId, UnknownLearnerId, UnknownConversationId));
+	Teacher->Social->DeliverSpeech(UnknownLearner, TEXT("I describe a practice I do not know."), UnknownConversationId, 1,
+		FString(), TEXT("InventedTradition"));
+	TestFalse(TEXT("An invented tradition ID cannot grant craft knowledge"),
+		WorldState->HasCraftKnowledge(TEXT("InventedTradition"), UnknownLearnerId));
+	Teacher->Social->ReleaseAutomaticConversation(UnknownLearner->Social, UnknownConversationId);
+
+	TestTrue(TEXT("The distant pair can reserve independently"),
+		Teacher->Social->TryReserveAutomaticConversation(DistantLearner->Social, TeacherId, DistantLearnerId, DistantConversationId));
+	Teacher->Social->DeliverSpeech(DistantLearner, TEXT("This line is out of range."), DistantConversationId, 1,
+		FString(), TEXT("HearthLoaf"));
+	TestFalse(TEXT("A line outside speaking range teaches nothing"), WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), DistantLearnerId));
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	IFileManager::Get().Delete(*StateFile, false, true, true);
+	for (const FString& AgentId : { TeacherId, LearnerId, UnknownLearnerId, DistantLearnerId })
+		IFileManager::Get().DeleteDirectory(*CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / AgentId), false, true);
 	return true;
 }

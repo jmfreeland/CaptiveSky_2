@@ -65,6 +65,63 @@ namespace
 	}
 	return true;
 	}
+
+	FString CraftOutcomeName(EIslandCraftOutcome Outcome)
+	{
+	switch (Outcome)
+	{
+	case EIslandCraftOutcome::Unrated: return TEXT("Unrated");
+	case EIslandCraftOutcome::Promising: return TEXT("Promising");
+	case EIslandCraftOutcome::Successful: return TEXT("Successful");
+	case EIslandCraftOutcome::NeedsRevision: return TEXT("NeedsRevision");
+	default: return TEXT("Unrated");
+	}
+	}
+
+	bool ParseCraftOutcome(const FString& Text, EIslandCraftOutcome& OutOutcome)
+	{
+	if (Text == TEXT("Unrated")) OutOutcome = EIslandCraftOutcome::Unrated;
+	else if (Text == TEXT("Promising")) OutOutcome = EIslandCraftOutcome::Promising;
+	else if (Text == TEXT("Successful")) OutOutcome = EIslandCraftOutcome::Successful;
+	else if (Text == TEXT("NeedsRevision")) OutOutcome = EIslandCraftOutcome::NeedsRevision;
+	else return false;
+	return true;
+	}
+
+	bool HasCraftKnowledgeByDay(const FIslandCraftTraditionRecord& Record, const FString& AgentId, int32 Day)
+	{
+	const FString NormalizedAgentId = AgentId.TrimStartAndEnd();
+	if (NormalizedAgentId.IsEmpty()) return false;
+	TSet<FString> KnownAgents;
+	if (!Record.OriginAgentId.IsEmpty()) KnownAgents.Add(Record.OriginAgentId);
+	for (const FIslandCraftLesson& Lesson : Record.Lessons)
+	{
+	if (Lesson.Day > Day) break;
+	if (KnownAgents.Contains(Lesson.TeacherAgentId)) KnownAgents.Add(Lesson.LearnerAgentId);
+	}
+	return KnownAgents.Contains(NormalizedAgentId);
+	}
+
+	bool IsValidCraftParameters(const TArray<FIslandCraftParameter>& Parameters)
+	{
+	if (Parameters.IsEmpty() || Parameters.Num() > UIslandWorldStateSubsystem::MaxCraftParameters) return false;
+	TSet<FName> SeenIds;
+	for (const FIslandCraftParameter& Parameter : Parameters)
+	{
+	if (Parameter.Id.IsNone() || !FMath::IsFinite(Parameter.Value) || Parameter.Value < 0.f || Parameter.Value > 1.f || SeenIds.Contains(Parameter.Id))
+		return false;
+	SeenIds.Add(Parameter.Id);
+	}
+	return true;
+	}
+
+	bool IsValidCraftTraditionId(const FString& Id)
+	{
+	if (Id.IsEmpty() || Id.Len() > UIslandWorldStateSubsystem::MaxCraftIdLength) return false;
+	for (const TCHAR Character : Id)
+		if (!FChar::IsAlnum(Character) && Character != TEXT('_') && Character != TEXT('-')) return false;
+	return true;
+	}
 }
 
 bool UIslandWorldStateSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
@@ -121,6 +178,7 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	ArrangementActors.Reset();
 	ArrangementSites.Reset();
 	GuestBookEntries.Reset();
+	CraftTraditions.Reset();
 	Nests.Reset();
 	WildlifeHomes.Reset();
 	Curios.Reset();
@@ -156,6 +214,7 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 	Curios.Reset();
 	ArrangementSites.Reset();
 	GuestBookEntries.Reset();
+	CraftTraditions.Reset();
 	WildlifeHomes.Reset();
 	SavedHour.Reset();
 	SavedDay.Reset();
@@ -353,7 +412,99 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 					Cache.ItemId = FName(*Item);
 				}
 			}
-			if (IsValidWildlifeHomeRecord(Record)) WildlifeHomes.Add(MoveTemp(Record));
+		if (IsValidWildlifeHomeRecord(Record)) WildlifeHomes.Add(MoveTemp(Record));
+		}
+	}
+	const TArray<TSharedPtr<FJsonValue>>* CraftValues = nullptr;
+	if (Root->TryGetArrayField(TEXT("craft_traditions"), CraftValues))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *CraftValues)
+		{
+			if (CraftTraditions.Num() >= MaxCraftTraditions || !Value.IsValid()) continue;
+			const TSharedPtr<FJsonObject>* Object = nullptr;
+			if (!Value->TryGetObject(Object)) continue;
+			FIslandCraftTraditionRecord Record;
+			FString Id, Created;
+			if (!(*Object)->TryGetStringField(TEXT("id"), Id) || !IsValidCraftTraditionId(Id) || FindCraftTradition(FName(*Id)) ||
+				!(*Object)->TryGetStringField(TEXT("display_name"), Record.DisplayName) ||
+				!(*Object)->TryGetStringField(TEXT("origin"), Record.OriginAgentId) || Record.OriginAgentId.TrimStartAndEnd().IsEmpty()) continue;
+			Record.Id = FName(*Id);
+			Record.DisplayName = CleanArrangementText(Record.DisplayName, MaxCraftNameLength);
+			Record.OriginAgentId = Record.OriginAgentId.TrimStartAndEnd();
+			(*Object)->TryGetStringField(TEXT("source"), Record.SourceDescription);
+			Record.SourceDescription = CleanArrangementText(Record.SourceDescription, MaxCraftSourceLength);
+			if ((*Object)->TryGetStringField(TEXT("created_utc"), Created)) FDateTime::ParseIso8601(*Created, Record.CreatedUtc);
+
+			const TArray<TSharedPtr<FJsonValue>>* LessonValues = nullptr;
+			if ((*Object)->TryGetArrayField(TEXT("lessons"), LessonValues))
+			{
+				TSet<FString> KnownAgents;
+				KnownAgents.Add(Record.OriginAgentId);
+				int32 PreviousLessonDay = 0;
+				for (const TSharedPtr<FJsonValue>& LessonValue : *LessonValues)
+				{
+					if (Record.Lessons.Num() >= MaxCraftLessons || !LessonValue.IsValid()) break;
+					const TSharedPtr<FJsonObject>* LessonObject = nullptr;
+					if (!LessonValue->TryGetObject(LessonObject)) continue;
+					FIslandCraftLesson Lesson;
+					if (!(*LessonObject)->TryGetStringField(TEXT("teacher"), Lesson.TeacherAgentId) ||
+						!(*LessonObject)->TryGetStringField(TEXT("learner"), Lesson.LearnerAgentId) ||
+						!(*LessonObject)->TryGetNumberField(TEXT("day"), Lesson.Day) || Lesson.Day < 1 || Lesson.Day < PreviousLessonDay ||
+						Lesson.TeacherAgentId.IsEmpty() || Lesson.LearnerAgentId.IsEmpty() || Lesson.TeacherAgentId == Lesson.LearnerAgentId ||
+						!KnownAgents.Contains(Lesson.TeacherAgentId) || KnownAgents.Contains(Lesson.LearnerAgentId)) continue;
+					Lesson.TeacherAgentId = Lesson.TeacherAgentId.TrimStartAndEnd();
+					Lesson.LearnerAgentId = Lesson.LearnerAgentId.TrimStartAndEnd();
+					KnownAgents.Add(Lesson.LearnerAgentId);
+					PreviousLessonDay = Lesson.Day;
+					Record.Lessons.Add(MoveTemp(Lesson));
+				}
+			}
+
+			const TArray<TSharedPtr<FJsonValue>>* AttemptValues = nullptr;
+			if ((*Object)->TryGetArrayField(TEXT("attempts"), AttemptValues))
+			{
+				for (const TSharedPtr<FJsonValue>& AttemptValue : *AttemptValues)
+				{
+					if (Record.Attempts.Num() >= MaxCraftAttemptsPerTradition || !AttemptValue.IsValid()) break;
+					const TSharedPtr<FJsonObject>* AttemptObject = nullptr;
+					if (!AttemptValue->TryGetObject(AttemptObject)) continue;
+					FIslandCraftAttemptRecord Attempt;
+					FString Outcome, AttemptCreated;
+					if (!(*AttemptObject)->TryGetStringField(TEXT("practitioner"), Attempt.PractitionerAgentId) ||
+						Attempt.PractitionerAgentId.IsEmpty() || !(*AttemptObject)->TryGetNumberField(TEXT("day"), Attempt.Day) || Attempt.Day < 1 ||
+						!(*AttemptObject)->TryGetStringField(TEXT("outcome"), Outcome) || !ParseCraftOutcome(Outcome, Attempt.Outcome) ||
+						!HasCraftKnowledgeByDay(Record, Attempt.PractitionerAgentId, Attempt.Day) ||
+						Record.Attempts.ContainsByPredicate([&Attempt](const FIslandCraftAttemptRecord& Existing)
+						{
+							return Existing.PractitionerAgentId == Attempt.PractitionerAgentId && Existing.Day == Attempt.Day;
+						})) continue;
+					Attempt.PractitionerAgentId = Attempt.PractitionerAgentId.TrimStartAndEnd();
+					(*AttemptObject)->TryGetStringField(TEXT("created_utc"), AttemptCreated);
+					if (!AttemptCreated.IsEmpty()) FDateTime::ParseIso8601(*AttemptCreated, Attempt.CreatedUtc);
+					const TArray<TSharedPtr<FJsonValue>>* ParameterValues = nullptr;
+					if ((*AttemptObject)->TryGetArrayField(TEXT("parameters"), ParameterValues))
+					{
+						for (const TSharedPtr<FJsonValue>& ParameterValue : *ParameterValues)
+						{
+							if (Attempt.Parameters.Num() >= MaxCraftParameters) break;
+							if (!ParameterValue.IsValid()) continue;
+							const TSharedPtr<FJsonObject>* ParameterObject = nullptr;
+							if (!ParameterValue->TryGetObject(ParameterObject)) continue;
+							FIslandCraftParameter& Parameter = Attempt.Parameters.AddDefaulted_GetRef();
+							FString ParameterId;
+							if (!(*ParameterObject)->TryGetStringField(TEXT("id"), ParameterId) || ParameterId.IsEmpty() ||
+								!(*ParameterObject)->TryGetNumberField(TEXT("value"), Parameter.Value))
+							{
+								Attempt.Parameters.Pop();
+								continue;
+							}
+							Parameter.Id = FName(*ParameterId);
+						}
+					}
+					if (IsValidCraftParameters(Attempt.Parameters)) Record.Attempts.Add(MoveTemp(Attempt));
+				}
+			}
+			if (!Record.Id.IsNone() && !Record.DisplayName.IsEmpty() && !Record.OriginAgentId.IsEmpty()) CraftTraditions.Add(MoveTemp(Record));
 		}
 	}
 	const TArray<TSharedPtr<FJsonValue>>* GuestBookValues = nullptr;
@@ -406,7 +557,7 @@ bool UIslandWorldStateSubsystem::Save() const
 {
 	if (bStorageUnreadable || GetStorageFilePath().IsEmpty()) return false;
 	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetNumberField(TEXT("version"), 2);
 	TArray<TSharedPtr<FJsonValue>> NestValues;
 	for (const FIslandNestRecord& Record : Nests)
 	{
@@ -521,6 +672,52 @@ bool UIslandWorldStateSubsystem::Save() const
 		SiteValues.Add(MakeShared<FJsonValueObject>(Object));
 	}
 	Root->SetArrayField(TEXT("arrangement_sites"), SiteValues);
+	TArray<TSharedPtr<FJsonValue>> CraftValues;
+	for (int32 Index = 0; Index < CraftTraditions.Num() && Index < MaxCraftTraditions; ++Index)
+	{
+		const FIslandCraftTraditionRecord& Record = CraftTraditions[Index];
+		const TSharedRef<FJsonObject> Object = MakeShared<FJsonObject>();
+		Object->SetStringField(TEXT("id"), Record.Id.ToString());
+		Object->SetStringField(TEXT("display_name"), Record.DisplayName);
+		Object->SetStringField(TEXT("origin"), Record.OriginAgentId);
+		Object->SetStringField(TEXT("source"), Record.SourceDescription);
+		Object->SetStringField(TEXT("created_utc"), Record.CreatedUtc.ToIso8601());
+		TArray<TSharedPtr<FJsonValue>> Lessons;
+		for (int32 LessonIndex = 0; LessonIndex < Record.Lessons.Num() && LessonIndex < MaxCraftLessons; ++LessonIndex)
+		{
+			const FIslandCraftLesson& Lesson = Record.Lessons[LessonIndex];
+			const TSharedRef<FJsonObject> LessonObject = MakeShared<FJsonObject>();
+			LessonObject->SetStringField(TEXT("teacher"), Lesson.TeacherAgentId);
+			LessonObject->SetStringField(TEXT("learner"), Lesson.LearnerAgentId);
+			LessonObject->SetNumberField(TEXT("day"), Lesson.Day);
+			Lessons.Add(MakeShared<FJsonValueObject>(LessonObject));
+		}
+		Object->SetArrayField(TEXT("lessons"), Lessons);
+		TArray<TSharedPtr<FJsonValue>> Attempts;
+		for (int32 AttemptIndex = 0; AttemptIndex < Record.Attempts.Num() && AttemptIndex < MaxCraftAttemptsPerTradition; ++AttemptIndex)
+		{
+			const FIslandCraftAttemptRecord& Attempt = Record.Attempts[AttemptIndex];
+			const TSharedRef<FJsonObject> AttemptObject = MakeShared<FJsonObject>();
+			AttemptObject->SetStringField(TEXT("practitioner"), Attempt.PractitionerAgentId);
+			AttemptObject->SetNumberField(TEXT("day"), Attempt.Day);
+			AttemptObject->SetStringField(TEXT("outcome"), CraftOutcomeName(Attempt.Outcome));
+			AttemptObject->SetStringField(TEXT("created_utc"), Attempt.CreatedUtc.ToIso8601());
+			TArray<TSharedPtr<FJsonValue>> Parameters;
+			for (int32 ParameterIndex = 0; ParameterIndex < Attempt.Parameters.Num() && ParameterIndex < MaxCraftParameters; ++ParameterIndex)
+			{
+				const FIslandCraftParameter& Parameter = Attempt.Parameters[ParameterIndex];
+				const TSharedRef<FJsonObject> ParameterObject = MakeShared<FJsonObject>();
+				ParameterObject->SetStringField(TEXT("id"), Parameter.Id.ToString());
+				ParameterObject->SetNumberField(TEXT("value"), Parameter.Value);
+				Parameters.Add(MakeShared<FJsonValueObject>(ParameterObject));
+			}
+			AttemptObject->SetArrayField(TEXT("parameters"), Parameters);
+			Attempts.Add(MakeShared<FJsonValueObject>(AttemptObject));
+		}
+		Object->SetArrayField(TEXT("attempts"), Attempts);
+		CraftValues.Add(MakeShared<FJsonValueObject>(Object));
+	}
+	Root->SetArrayField(TEXT("craft_traditions"), CraftValues);
 	TArray<TSharedPtr<FJsonValue>> GuestBookValues;
 	for (const FIslandGuestBookEntry& Entry : GuestBookEntries)
 	{
@@ -1268,6 +1465,87 @@ bool UIslandWorldStateSubsystem::ForgetGuestBook()
 	return true;
 }
 
+const FIslandCraftTraditionRecord* UIslandWorldStateSubsystem::FindCraftTradition(FName Id) const
+{
+	return CraftTraditions.FindByPredicate([Id](const FIslandCraftTraditionRecord& Record) { return Record.Id == Id; });
+}
+
+bool UIslandWorldStateSubsystem::HasCraftKnowledge(FName Id, const FString& AgentId) const
+{
+	const FIslandCraftTraditionRecord* Record = FindCraftTradition(Id);
+	return Record && HasCraftKnowledgeByDay(*Record, AgentId, TNumericLimits<int32>::Max());
+}
+
+bool UIslandWorldStateSubsystem::RecordCraftAttempt(FName Id, const FString& DisplayName, const FString& PractitionerAgentId,
+	int32 Day, const FString& SourceDescription, const TArray<FIslandCraftParameter>& Parameters, EIslandCraftOutcome Outcome)
+{
+	const FString Practitioner = PractitionerAgentId.TrimStartAndEnd();
+	if (Id.IsNone() || !IsValidCraftTraditionId(Id.ToString()) || Practitioner.IsEmpty() || Day < 1 ||
+		!IsValidCraftParameters(Parameters) || (Outcome != EIslandCraftOutcome::Unrated && Outcome != EIslandCraftOutcome::Promising &&
+		Outcome != EIslandCraftOutcome::Successful && Outcome != EIslandCraftOutcome::NeedsRevision)) return false;
+
+	const int32 ExistingIndex = CraftTraditions.IndexOfByPredicate([Id](const FIslandCraftTraditionRecord& Record) { return Record.Id == Id; });
+	if (ExistingIndex == INDEX_NONE && (CraftTraditions.Num() >= MaxCraftTraditions ||
+		CleanArrangementText(DisplayName, MaxCraftNameLength).IsEmpty())) return false;
+	if (ExistingIndex != INDEX_NONE)
+	{
+		const FIslandCraftTraditionRecord& Existing = CraftTraditions[ExistingIndex];
+		int32 LastEventDay = Existing.Lessons.IsEmpty() ? 0 : Existing.Lessons.Last().Day;
+		for (const FIslandCraftAttemptRecord& PreviousAttempt : Existing.Attempts) LastEventDay = FMath::Max(LastEventDay, PreviousAttempt.Day);
+		if (Day < LastEventDay || !HasCraftKnowledgeByDay(Existing, Practitioner, Day) ||
+			Existing.Attempts.ContainsByPredicate([&](const FIslandCraftAttemptRecord& Attempt)
+			{
+				return Attempt.PractitionerAgentId == Practitioner && Attempt.Day == Day;
+			})) return false;
+	}
+
+	const TArray<FIslandCraftTraditionRecord> Previous = CraftTraditions;
+	FIslandCraftTraditionRecord* Record = nullptr;
+	if (ExistingIndex == INDEX_NONE)
+	{
+		Record = &CraftTraditions.AddDefaulted_GetRef();
+		Record->Id = Id;
+		Record->DisplayName = CleanArrangementText(DisplayName, MaxCraftNameLength);
+		Record->OriginAgentId = Practitioner;
+		Record->SourceDescription = CleanArrangementText(SourceDescription, MaxCraftSourceLength);
+		Record->CreatedUtc = FDateTime::UtcNow();
+	}
+	else Record = &CraftTraditions[ExistingIndex];
+
+	FIslandCraftAttemptRecord& Attempt = Record->Attempts.AddDefaulted_GetRef();
+	Attempt.PractitionerAgentId = Practitioner;
+	Attempt.Day = Day;
+	Attempt.Parameters = Parameters;
+	Attempt.Outcome = Outcome;
+	Attempt.CreatedUtc = FDateTime::UtcNow();
+	if (Record->Attempts.Num() > MaxCraftAttemptsPerTradition) Record->Attempts.RemoveAt(0);
+	if (Save()) return true;
+	CraftTraditions = Previous;
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::RecordCraftTeaching(FName Id, const FString& TeacherAgentId, const FString& LearnerAgentId, int32 Day)
+{
+	const FString Teacher = TeacherAgentId.TrimStartAndEnd();
+	const FString Learner = LearnerAgentId.TrimStartAndEnd();
+	const int32 RecordIndex = CraftTraditions.IndexOfByPredicate([Id](const FIslandCraftTraditionRecord& Record) { return Record.Id == Id; });
+	if (RecordIndex == INDEX_NONE || !IsValidCraftTraditionId(Id.ToString()) || Teacher.IsEmpty() || Learner.IsEmpty() || Teacher == Learner || Day < 1) return false;
+	FIslandCraftTraditionRecord& Record = CraftTraditions[RecordIndex];
+	if (Record.Lessons.Num() >= MaxCraftLessons || !HasCraftKnowledgeByDay(Record, Teacher, Day) ||
+		HasCraftKnowledgeByDay(Record, Learner, Day)) return false;
+	int32 LastEventDay = Record.Lessons.IsEmpty() ? 0 : Record.Lessons.Last().Day;
+	for (const FIslandCraftAttemptRecord& Attempt : Record.Attempts) LastEventDay = FMath::Max(LastEventDay, Attempt.Day);
+	if (Day < LastEventDay) return false;
+
+	const TArray<FIslandCraftTraditionRecord> Previous = CraftTraditions;
+	FIslandCraftLesson& Lesson = Record.Lessons.AddDefaulted_GetRef();
+	Lesson.TeacherAgentId = Teacher;
+	Lesson.LearnerAgentId = Learner;
+	Lesson.Day = Day;
+	if (Save()) return true;
+	CraftTraditions = Previous;
+	return false;
+}
 int32 UIslandWorldStateSubsystem::DisplayDay() const
 {
 	if (const UWorld* World = GetWorld())

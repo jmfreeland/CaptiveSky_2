@@ -120,6 +120,10 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachArrangement;
 
+	/** Optional exact craft tradition shared through a nearby resident conversation. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString TeachCraft;
+
 	/** Optional new-object description, only used when ActionType == RequestObject. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString ObjectRequest;

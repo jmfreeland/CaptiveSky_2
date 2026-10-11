@@ -126,6 +126,95 @@ struct FIslandGuestBookEntry
 	FDateTime CreatedUtc;
 };
 
+UENUM(BlueprintType)
+enum class EIslandCraftOutcome : uint8
+{
+	Unrated,
+	Promising,
+	Successful,
+	NeedsRevision
+};
+
+/** A normalized, bounded property of one crafted attempt (for example hydration or crust). */
+USTRUCT(BlueprintType)
+struct FIslandCraftParameter
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FName Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float Value = 0.f;
+};
+
+/** A later resident's explicitly attributed acquisition of a craft tradition. */
+USTRUCT(BlueprintType)
+struct FIslandCraftLesson
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString TeacherAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString LearnerAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	int32 Day = 1;
+};
+
+/** One resident's attempt to practice a known tradition. */
+USTRUCT(BlueprintType)
+struct FIslandCraftAttemptRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString PractitionerAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	int32 Day = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	TArray<FIslandCraftParameter> Parameters;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	EIslandCraftOutcome Outcome = EIslandCraftOutcome::Unrated;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FDateTime CreatedUtc;
+};
+
+/** Persistent, renderer-independent recipe lineage and its bounded practice history. */
+USTRUCT(BlueprintType)
+struct FIslandCraftTraditionRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FName Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString DisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString OriginAgentId;
+
+	/** A concise account of the first source (memory, observation, or discovery). */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FString SourceDescription;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	FDateTime CreatedUtc;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	TArray<FIslandCraftLesson> Lessons;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Craft Tradition")
+	TArray<FIslandCraftAttemptRecord> Attempts;
+};
+
 /**
  * Persistent, per-level record of lasting changes residents have made to the world.
  *
@@ -134,7 +223,7 @@ struct FIslandGuestBookEntry
  * tracked in git. Every change is bounded (fixed layer cap per site) and reversible by a
  * developer through Island.RemoveNest or by editing/deleting the file with play stopped.
  *
- * Nests, wildlife-home facts, curios (hidden stones, the seed pod, the cairn), resident stone arrangements, inn guest-book entries, and the Island clock are stored today; the file keeps a top-level version so other
+ * Nests, wildlife-home facts, curios (hidden stones, the seed pod, the cairn), resident stone arrangements, inn guest-book entries, craft traditions, and the Island clock are stored today; the file keeps a top-level version so other
  * kinds of lasting change can be added beside them later.
  */
 UCLASS()
@@ -151,6 +240,13 @@ public:
 	static constexpr int32 MaxWildlifeHomes = 32;
 	static constexpr int32 MaxWildlifeHomeCacheSlots = 8;
 	static constexpr int32 MaxWildlifeHomeCacheQuantity = 20;
+	static constexpr int32 MaxCraftTraditions = 16;
+	static constexpr int32 MaxCraftIdLength = 48;
+	static constexpr int32 MaxCraftLessons = 32;
+	static constexpr int32 MaxCraftAttemptsPerTradition = 24;
+	static constexpr int32 MaxCraftParameters = 4;
+	static constexpr int32 MaxCraftNameLength = 80;
+	static constexpr int32 MaxCraftSourceLength = 160;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -261,6 +357,16 @@ public:
 	/** Developer reversal for all guest-book lines. */
 	bool ForgetGuestBook();
 
+	const TArray<FIslandCraftTraditionRecord>& GetCraftTraditions() const { return CraftTraditions; }
+	const FIslandCraftTraditionRecord* FindCraftTradition(FName Id) const;
+	/** Knowledge is acquired only by originating a tradition or through its explicit lesson lineage. */
+	bool HasCraftKnowledge(FName Id, const FString& AgentId) const;
+	/** Records a first practice or a known resident's bounded daily attempt; never creates a prop. */
+	bool RecordCraftAttempt(FName Id, const FString& DisplayName, const FString& PractitionerAgentId, int32 Day,
+		const FString& SourceDescription, const TArray<FIslandCraftParameter>& Parameters, EIslandCraftOutcome Outcome);
+	/** Adds one attributed lesson only when the teacher knows the tradition and the learner does not. */
+	bool RecordCraftTeaching(FName Id, const FString& TeacherAgentId, const FString& LearnerAgentId, int32 Day);
+
 	/**
 	 * Parses a world-state file into this object's records without spawning, saving, or placing
 	 * anything; usable on a bare instance (e.g. to preview lasting changes in the editor world).
@@ -289,6 +395,7 @@ private:
 	TMap<FName, TWeakObjectPtr<AIslandCurio>> CurioActors;
 	TArray<FIslandArrangementSite> ArrangementSites;
 	TArray<FIslandGuestBookEntry> GuestBookEntries;
+	TArray<FIslandCraftTraditionRecord> CraftTraditions;
 	TMap<FName, TWeakObjectPtr<AIslandArrangement>> ArrangementActors;
 	TWeakObjectPtr<AIslandGuestBook> GuestBookActor;
 	int32 ShownArrangementDay = 0;

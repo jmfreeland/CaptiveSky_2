@@ -31,6 +31,10 @@ struct FAgentSocialUtterance
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	FString TeachArrangementSiteId;
 
+	/** Optional craft tradition intentionally shared in this line. */
+	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
+	FString TeachCraftTraditionId;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	int32 TurnIndex = 1;
 };
@@ -81,6 +85,7 @@ protected:
 
 private:
 	friend class FAgentSocialPacingTest;
+	friend class FAgentCraftTeachingTest;
 
 	TArray<FAgentSocialUtterance> PendingUtterances;
 	FAgentSocialUtterance ActiveUtterance;
@@ -107,7 +112,8 @@ private:
 	void TryBeginPendingUtterance();
 	void TryBeginSpontaneousConversation(const FAgentDecision& Decision);
 	void DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
-		const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId = FString());
+		const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId = FString(),
+		const FString& TeachCraftTraditionId = FString());
 
 	UFUNCTION()
 	void HandleDecisionReady(const FAgentDecision& Decision);
