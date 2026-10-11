@@ -29,3 +29,33 @@ The first PVE probe lacked the project-local `Plugins/PlantFactoryPlugin` direct
 **Post-restart follow-up (2026-10-11):** the tracked main project descriptor still enables both `ProceduralVegetationEditor` and `PlantFactoryPlugin`. The latter's local descriptor identifies it as a content-only mount for restored material functions, with no vendor executable modules. The plugin name being present therefore does not mean the retired PlantFactory application or a UE 5.8 engine integration is installed. Existing Festuca, Phalaris, and Typha material graphs resolve functions from this mount; removing it now would reintroduce missing material-function references. Keep it mounted until those materials are replaced or removed, while continuing to use UE 5.8 PVE as the separate vegetation-authoring tool. This follows the local material audit and [Epic's UE 5.8 PVE guide](https://dev.epicgames.com/documentation/unreal-engine/procedural-vegetation-editor-pve-in-unreal-engine), which documents both a standard Static Mesh export and Nanite Foliage export.
 
 During a later read-only UI inventory, the initial app list still advertised the PVE graph window, but rehydrating that window failed because it had disappeared. The current window inventory at that point showed `dotnet.exe - Application Error` and no Unreal Editor window; the process query likewise returned no `UnrealEditor` process. This is consistent with the known intermittent editor/.NET failure but does not establish its cause or prove PVE triggered it. No window actions, exports, saves, or content changes occurred. Treat the prior dirty-editor warning as superseded only for current process status, not as evidence that the unsaved graph/shrub was saved. The static-mesh export remains unverified and should wait for the editor to be stable; do not relaunch or save over the user's project state as part of this note.
+
+**Main-project Megaplant inventory refresh (2026-10-11):** a read-only
+`UnrealEditor-Cmd` Python audit scanned 296 assets under
+`/Game/Megaplant_Library` without asset-load errors. All 16 A/B/C/D tree
+variants are `SkeletalMesh`; none is directly ready for the Island's HISM
+scatter. Each tree uses two material slots. Bounds identify
+`Tree_Common_Hazel_01_D` as the smallest output at about 89 cm tall (half-height
+from `SkeletalMesh.GetBounds()`), followed by `Tree_Norway_Maple_Forest_01_D`
+at 221 cm; the previous Hazel A candidate was about 480 cm tall. A–D are not
+consistently ordered by height across species. The measured heights are:
+
+| Species | A | B | C | D |
+|---|---:|---:|---:|---:|
+| Common Hazel | 480 cm | 292 cm | 174 cm | 89 cm |
+| European Aspen | 1,413 cm | 1,023 cm | 717 cm | 451 cm |
+| European Beech | 2,383 cm | 1,848 cm | 706 cm | 504 cm |
+| Norway Maple | 1,223 cm | 1,379 cm | 565 cm | 221 cm |
+
+The tested UE 5.8 Python wrapper does not expose SkeletalMesh LOD or bone
+counts, so this inventory cannot prove that Hazel D is low-complexity. Its
+bounds make it the better next export-dialog specimen, not an approved asset or
+placement. The existing Hazel test copy was made from A and has no exported
+mesh. During this refresh no PVE graph, Content asset, plugin setting, or Island
+map was changed; the editor and Unreal MCP were not available, so do not launch
+the unstable UI just to repeat the dialog. Logs:
+[`initial inventory`](../../Saved/Playtests/Codex_MegaplantInventory_Followup_20261011/Logs/MegaplantInventory.log),
+[`corrected bounds inventory`](../../Saved/Playtests/Codex_MegaplantInventory_Verify_20261011/Logs/MegaplantInventory.log).
+The read-only inspector's vector and SkeletalMesh handling were corrected and
+this final commandlet run completed successfully with the same 16/16 skeletal,
+0 static-mesh result and no asset-load errors.

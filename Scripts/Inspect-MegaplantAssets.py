@@ -2,10 +2,12 @@
 
 Run in UE 5.8.3 with -ExecutePythonScript=<absolute path> -unattended
 -NoZen -NullRHI -abslog=<absolute log path>. It loads tree A-D variants and
-PVE data/presets for class, bounds, LOD, and material-slot inspection. It does
-not save assets, change project settings, or load/edit a level. A StaticMesh
-class is only a prerequisite for HISM use; this audit does not prove visual,
-wind, shading, or runtime-performance compatibility.
+PVE data/presets for class, bounds, and material-slot inspection, plus LOD
+counts for StaticMesh variants. The tested UE 5.8 SkeletalMesh Python wrapper
+does not expose LOD or bone counts. It does not save assets, change project
+settings, or load/edit a level. A StaticMesh class is only a prerequisite for
+HISM use; this audit does not prove visual, wind, shading, or runtime-performance
+compatibility.
 """
 
 import json
@@ -24,16 +26,25 @@ SPECIES = (
 
 def mesh_details(asset):
     details = {}
+
+    def vector_components(value):
+        return [round(float(getattr(value, axis)), 2) for axis in ("x", "y", "z")]
+
     try:
         bounds = asset.get_bounds()
-        details["bounds_origin_cm"] = [round(float(v), 2) for v in bounds.origin]
-        details["bounds_extent_cm"] = [round(float(v), 2) for v in bounds.box_extent]
+        details["bounds_origin_cm"] = vector_components(bounds.origin)
+        details["bounds_extent_cm"] = vector_components(bounds.box_extent)
     except Exception as error:
         details["bounds_error"] = str(error)
-    try:
-        details["lod_count"] = int(asset.get_num_lods())
-    except Exception as error:
-        details["lod_error"] = str(error)
+
+    if isinstance(asset, unreal.StaticMesh):
+        try:
+            details["lod_count"] = int(asset.get_num_lods())
+        except Exception as error:
+            details["lod_error"] = str(error)
+    elif isinstance(asset, unreal.SkeletalMesh):
+        details["skeletal_lod_and_bone_counts"] = "not exposed by the tested Python wrapper"
+
     try:
         property_name = "static_materials" if isinstance(asset, unreal.StaticMesh) else "materials"
         slots = asset.get_editor_property(property_name)
