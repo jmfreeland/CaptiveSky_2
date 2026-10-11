@@ -11,6 +11,8 @@
 
 `Agents/Agent_Rat_01/identity.md` says the Rat's first home is a hidden fallen-wood hollow. `Agents/Agent_Rat_01/places.json` is still empty, so no in-world coordinates are claimed yet. The asset is imported and visually readable, but has not been placed or traversability-tested with a Rat body.
 
+A read-only live viewport survey at `(-100500, 102000)` showed open grass beside the inn with little nearby cover; a higher survey near `(-100000, 101000)` showed only a sparse tree group. Reject this near-inn patch as a hidden home candidate. The island needs more understory/vegetation before a convincing sheltered rat home can be selected; no RatHollow placement was made.
+
 ## Placement safety
 
 The live `/Game/Maps/Island` and `/Game/Generated/ProceduralVegetation/PVE_Deciduous_Shrub_01` currently report dirty/unsaved in Unreal. This inspection did not edit or save either. Do not run `Scripts/Place-IslandProps.py` against the current session: a normal run replaces every actor tagged `GeneratedProp`/`TripoProp` and saves the level. First preserve the current authoring session, then choose a hidden, dry, Rat-accessible ground point, validate the approach/orientation and collision, and only then create the home placement and update Rat place-memory.
