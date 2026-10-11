@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Force -Path $shaderWorkingDir | Out-Null
 & 'D:\Games\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' `
   (Resolve-Path '.\CaptiveSky_2.uproject') `
   '-ExecutePythonScript=D:/Projects - Athena/Unreal/CaptiveSky_2/Scripts/Import-ComfyBlenderAsset.py' `
-  -unattended -NoSplash -NoSound -NoZen -DDC-ForceMemoryCache `
+  -unattended -NoSplash -NoSound -NoZen -DDC-ForceMemoryCache -NullRHI `
   "-shaderworkingdir=$shaderWorkingDir"
 Remove-Item Env:\COMFYBLENDER_ASSET
 ```
@@ -24,9 +24,9 @@ After import, inspect the `unreal_import.json` report in the selected source pac
 
 The report is local and ignored with the generated pack. Keep the source script and manifest as the editable/golden source; do not hand-edit imported meshes as a substitute. Only place the asset after its appearance, scale, and collision have been reviewed.
 
-**Shader startup note (2026-10-11):** in the current sandbox, omitting `-shaderworkingdir` caused UE to fail while creating a shader transfer file under `C:\Users\freel\UnrealShaderWorkingDir`. A retry with the working directory under `Saved/CompileScratch/` passed platform validation and began compiling editor shaders, but did not reach the import script within a roughly 90-second bounded run; the commandlet was stopped at about 4.6 GiB and had not created its destination or import report. Keep the path above for future attempts, avoid overlapping Unreal commandlets, and do not treat that retry as an import result. The local asset source/Blender verifier passes; Unreal import and in-level traversal remain unverified.
+**Shader/import startup note (2026-10-11):** in the current sandbox, omitting `-shaderworkingdir` caused UE to fail while creating a shader transfer file under `C:\Users\freel\UnrealShaderWorkingDir`. A retry with a project-local working directory but the normal RHI began compiling engine shaders and did not reach the script in a roughly 90-second bounded run. The successful content-only invocation used both `-NullRHI` and the absolute Python script path shown above; it imported the corrected RatHollow source into a separate trial folder, verified five collision boxes, all four material slots, expected dimensions, and `validation_errors: []`. The original RatHollow asset and Island level were untouched. NullRHI confirms import structure, not visual quality or Rat traversal; inspect in the live editor and test CharacterMovement/NavMesh before placement. Avoid overlapping Unreal commandlets.
 
-As of 2026-10-10, the NoticeBoard, StoneLantern, and RatHollow are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; NoticeBoard and RatHollow use embedded boxes, while StoneLantern uses one convex hull. The RatHollow's entrance view exposed a source-model cap occluding the cavity; the source fix is committed separately and the local Unreal copy awaits regeneration/reimport before placement. Its scene scale/concealment and nav/clearance also remain untested. The StoneLantern emissive slot is assigned, but its in-world lighting/material review is still outstanding.
+As of 2026-10-10, the NoticeBoard, StoneLantern, and original RatHollow are imported under `/Game/Generated/ComfyBlender/`. Their reports match expected scale and material slots; NoticeBoard and RatHollow use embedded boxes, while StoneLantern uses one convex hull. On 2026-10-11 the corrected RatHollow source was additionally imported as `/Game/Generated/ComfyBlender/RatHollow_ClearanceTrial`; the original asset remains untouched. The new trial's material appearance, scene scale/concealment, and NavMesh/physical traversal remain untested. The StoneLantern emissive slot is assigned, but its in-world lighting/material review is still outstanding.
 
 ## Fab cache check — Megaplants
 
