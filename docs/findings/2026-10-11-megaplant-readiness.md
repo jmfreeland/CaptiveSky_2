@@ -17,3 +17,31 @@
 Do not begin with a broad PCG scatter. First inspect the Hazel PVE graph and confirm its export produces the leaf-bearing result. Epic's [UE 5.8 PVE guide](https://dev.epicgames.com/documentation/unreal-engine/procedural-vegetation-editor-pve-in-unreal-engine) says the Export node bakes graph output into renderable assets and that only exported assets should be placed in the world. Then compare a single exported plant with Nanite Foliage off/on in a reversible test area and measure frame time and memory in a short, bounded play session. Compare with the existing landscape/foliage baseline before choosing a PVE export, static/non-Nanite representation, or instancing strategy. Do not alter the authored Island landscape material or save a large scatter without a measured result.
 
 The latest editor inspection opened the existing Hazel graph and captured read-only thumbnails; it made no asset edits and saved nothing. Unreal reports `/Game/Maps/Island` and `/Game/Generated/ProceduralVegetation/PVE_Deciduous_Shrub_01` as dirty. Both were left untouched; do not save or close them until the current author confirms their in-flight work is safe. No plants were placed. The Hazel graph loads and evaluates in UE 5.8; its Nanite foliage export and runtime rendering remain unverified.
+
+## Instancing paths worth a controlled benchmark (2026-10-12)
+
+The UE 5.8 API exposes `UInstancedSkinnedMeshComponent::AddInstances` with an
+animation index per transform and a per-instance animation screen-size cutoff
+([API](https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/Engine/UInstancedSkinnedMeshComponent),
+[Add Instances](https://dev.epicgames.com/documentation/unreal-engine/BlueprintAPI/Components/InstancedSkinnedMesh/AddInstances?lang=en-US)).
+This could support a small number of animated Megaplant tree instances without
+one actor/component per tree, but it is not yet tested with these assets and is
+not evidence of a performance win. The representative Beech A output's
+1,113-bone skeleton and registry-reported 22,157,107 Nanite triangles make it
+an unsuitable first scatter candidate; measure a single instance first.
+
+The installed UE 5.8 AnimToTexture plugin also exposes a SkeletalMesh-to-
+StaticMesh conversion helper. Epic's [conversion guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-to-static-mesh-conversion-in-unreal-engine)
+describes converting a posed mesh to a still static asset to reduce render
+cost. For a woodland tree, this may allow HISM instancing, but it sacrifices
+skeleton-driven motion; whether the existing Megaplant materials retain useful
+wind movement on a static mesh has not been checked. Treat this as a distinct
+prototype from skinned instancing.
+
+**Next test:** use a disposable level/package and one leaf-bearing, lower-cost
+variant. Verify bounds, material slots, foliage appearance, collision, and
+whether wind still animates after conversion; then compare one and a small
+group against the same camera in Game. Do not change the authored Island,
+enable Nanite Foliage globally, or scatter a full PCG population based on API
+availability alone. At this check the UnrealEditor processes were absent and
+the Unreal MCP endpoint did not respond, so no test or Content change was made.

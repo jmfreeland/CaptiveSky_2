@@ -62,3 +62,16 @@ review separate from approving a canonical recipe or saving an Island
 placement. A later milestone can let Aster voluntarily create a visible batch
 from an unrated attempt, but only after the world has explicit rules for the
 resulting object and its persistence.
+
+**Import safety check (2026-10-12):** the trial manifest references shared
+`T_Lib_Wood_*` and `T_Lib_Canvas_*` maps. The project's existing
+`Content/Generated/ComfyBlender/Library` already contains the wood maps, but no
+canvas maps. The current importer sends all shared maps to that fixed `/Library`
+destination and uses replace-existing imports; `COMFYBLENDER_DESTINATION`
+isolates only the per-asset folder, not shared textures. The importer also has
+uncommitted local edits, so it was not run. At this check the UnrealEditor
+processes were absent and Unreal MCP could not connect at `127.0.0.1:8000`.
+No Content assets or Island data were changed. Before importing, provide a
+separate trial Library destination or otherwise verify the shared wood maps
+will not be altered; then inspect the imported mesh under the Inn lighting
+before considering placement.
