@@ -16,9 +16,17 @@ shows a stylized, open fan silhouette that should add a distinct leaf shape
 among low vegetation. It is a mesh/material candidate, not finished natural
 art.
 
-No Unreal asset was imported and no PCG graph or Island placement was changed.
-Wind response, Unreal material appearance, LODs, instanced draw cost, and
-composition among existing foliage are all unverified. Next gate: import this
-single FBX into a temporary generated-content folder when the editor is stable,
-review it at ground and normal play distances, then test a tiny HISM/PCG patch
-in an isolated preview before considering Island integration.
+**Unreal import validation (2026-10-12):** the UE 5.8.3 commandlet importer
+placed the FBX and its two parameter-only materials in the new local folder
+`/Game/Generated/ComfyBlender/WoodlandFern_Review_20261012`. The measured bounds
+were 110.1 × 108.2 × 59.7 cm, both material slots resolved, no collision was
+created, and `validation_errors` is empty. The unique destination avoided any
+reimport or replacement; no map was loaded or saved. Evidence:
+[`unreal_import.json`](../../Saved/CaptiveSky/ComfyBlender/WoodlandFernClump/unreal_import.json)
+and [`import log`](../../Saved/Logs/Codex_WoodlandFernImport_20261012.log).
+
+This was a `NullRHI` import check, not a visual Unreal review. Wind response,
+real-RHI material appearance, LODs, instanced draw cost, and composition among
+existing foliage remain unverified. Next gate: render the single imported mesh
+in an isolated real-RHI preview at ground and normal play distances, then test a
+tiny HISM/PCG patch before considering Island integration.
