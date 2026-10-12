@@ -52,6 +52,6 @@ public sealed class AgentMessageRouter(
             await memories.AppendReflectionAsync(memory.Text, memory.Importance, memory.Tags, cancellationToken);
         await memories.AppendConversationAsync(message, response.Speech, spokenByAgent: true, cancellationToken);
         await deduplicator.MarkProcessedAsync(message.Source, message.MessageId, cancellationToken);
-        return new AgentReply(response.Speech);
+        return new AgentReply(response.Speech, response.Proposal);
     }
 }

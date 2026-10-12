@@ -12,4 +12,4 @@ public sealed record ExternalMessage(
     DateTimeOffset Timestamp,
     IReadOnlyDictionary<string, string>? Metadata = null);
 
-public sealed record AgentReply(string Speech);
+public sealed record AgentReply(string Speech, AgentProposal? Proposal = null);

@@ -7,6 +7,9 @@ public interface IAgentResponder
     Task<AgentResponse> RespondAsync(ExternalMessage message, CancellationToken cancellationToken);
 }
 
-public sealed record AgentResponse(string Speech, IReadOnlyList<NewMemory> NewMemories);
+public sealed record AgentResponse(
+    string Speech,
+    IReadOnlyList<NewMemory> NewMemories,
+    AgentProposal? Proposal = null);
 
 public sealed record NewMemory(string Text, double Importance, IReadOnlyList<string> Tags);

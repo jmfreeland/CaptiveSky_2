@@ -83,6 +83,7 @@ public sealed class AgentConfiguration
 public sealed class DiscordConfiguration
 {
     public bool Enabled { get; set; }
+    public bool AllowAgentProposals { get; set; }
     public string TokenEnvironmentVariable { get; set; } = string.Empty;
     public bool AllowDirectMessages { get; set; } = true;
     public bool RespondToMentions { get; set; } = true;

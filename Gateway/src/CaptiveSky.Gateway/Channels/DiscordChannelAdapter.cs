@@ -135,7 +135,23 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             if (reply is null)
                 return;
 
-            foreach (var part in SplitMessage(reply.Speech, 1900))
+            var speech = reply.Speech;
+            if (reply.Proposal is not null)
+            {
+                var proposalResult = await AgentProposalSubmission.SubmitAsync(
+                    _proposalQueue,
+                    _agent.AgentId,
+                    _agent.Discord,
+                    reply.Proposal,
+                    message.Author.Id,
+                    message.Author.GlobalName ?? message.Author.Username,
+                    message.Channel.Id.ToString(),
+                    message.Id.ToString(),
+                    _shutdownToken);
+                speech += "\n\n" + proposalResult;
+            }
+
+            foreach (var part in SplitMessage(speech, 1900))
                 await message.Channel.SendMessageAsync(part, messageReference: new MessageReference(message.Id));
         }
         catch (OperationCanceledException) when (_shutdownToken.IsCancellationRequested)

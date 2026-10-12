@@ -20,6 +20,7 @@
       "enabled": true,
       "discord": {
         "enabled": true,
+        "allowAgentProposals": true,
         "tokenEnvironmentVariable": "CAPTIVESKY_RAVEN_DISCORD_TOKEN",
         "allowDirectMessages": true,
         "respondToMentions": true,

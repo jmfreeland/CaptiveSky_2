@@ -97,6 +97,20 @@ try
     Assert(records[2].Text.Contains("I replied", StringComparison.Ordinal), "agent speech is remembered");
     Assert(responder.SawHeadlessMarker, "headless turns are visible to an Unreal embodiment");
 
+    var proposedAction = new AgentProposal("upgrade", "Add a sheltered landing rail", "RavenNest", "functionality");
+    var proposalResponder = new FakeResponder(home, proposedAction);
+    var proposalRouter = new AgentMessageRouter(
+        memories,
+        proposalResponder,
+        new AgentRuntimeLease(home),
+        new MessageDeduplicator(home),
+        new FileEmbodimentBridge(home, bridgeConfiguration),
+        new HeadlessTurnMarker(home));
+    var proposalReply = await proposalRouter.RouteAsync(
+        message with { MessageId = "discord-message-agent-proposal" }, CancellationToken.None);
+    Assert(proposalReply?.Proposal == proposedAction,
+        "headless agent proposal is carried back to the Discord adapter");
+
     var embodiedHome = new AgentHome(root, "Agent_Embodied_01");
     Directory.CreateDirectory(embodiedHome.DirectoryPath);
     await File.WriteAllTextAsync(Path.Combine(embodiedHome.DirectoryPath, "identity.md"), "An embodied test being.");
@@ -154,6 +168,42 @@ try
         && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
     Assert(!DiscordProposalCommand.TryParse("!request help", out _, out var proposalHelp) && proposalHelp.Contains("human review", StringComparison.Ordinal), "help returns safe usage");
     Assert(!DiscordProposalCommand.TryParse("!request upgrade magical Inn :: Make magic", out _, out _), "unsupported upgrade kind rejected");
+    var parsedAgentProposal = OpenAICompatibleAgentResponder.ParseAgentResponse("""
+        {"speech":"I can ask for that to be reviewed.","new_memories":[],"proposal":{"request_type":"upgrade","description":"Add a sheltered landing rail","target":"RavenNest","upgrade_kind":"functionality"}}
+        """);
+    Assert(parsedAgentProposal.Proposal is { RequestType: "upgrade", Target: "RavenNest", UpgradeKind: "functionality" },
+        "headless response parser accepts a structured resident proposal");
+    var parsedWorldProposal = OpenAICompatibleAgentResponder.ParseAgentResponse("""
+        {"speech":"I can propose this for the Island.","new_memories":[],"proposal":{"request_type":"upgrade","description":"Add a mossy stone edge","target":"world","upgrade_kind":"variation"}}
+        """);
+    Assert(parsedWorldProposal.Proposal is { Target: "", UpgradeKind: "variation" },
+        "world-wide agent upgrades normalize to an untargeted request");
+    Assert(OpenAICompatibleAgentResponder.ParseAgentResponse("""{"speech":"A thought.","new_memories":[],"proposal":null}""").Proposal is null,
+        "no-request response produces no proposal action");
+    Assert(OpenAICompatibleAgentResponder.ParseAgentResponse("""{"speech":"Legacy reply.","new_memories":[]}""").Proposal is null,
+        "older response schema remains compatible without a proposal field");
+    AssertThrows<InvalidOperationException>(() => OpenAICompatibleAgentResponder.ParseAgentResponse(
+        """{"speech":"Oops.","proposal":"create a nest"}"""), "non-object proposal payload is rejected");
+    Assert(!new DiscordConfiguration().AllowAgentProposals,
+        "agent-authored proposals are opt-in for each Discord route");
+
+    var agentProposalRoot = Path.Combine(root, "agent-proposals");
+    var agentProposalQueue = new AssetProposalQueue(agentProposalRoot);
+    var ravenDiscord = new DiscordConfiguration
+    {
+        AllowAgentProposals = true,
+        AllowedUserIds = [42]
+    };
+    var blockedAgentProposal = await AgentProposalSubmission.SubmitAsync(
+        agentProposalQueue, home.AgentId, ravenDiscord, proposedAction, 43, "Other Visitor", "10", "109", CancellationToken.None);
+    Assert(blockedAgentProposal.Contains("allowedUserIds", StringComparison.Ordinal),
+        "agent proposal is not submitted for a visitor outside the explicit allow-list");
+    Assert(!File.Exists(Path.Combine(agentProposalRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl")),
+        "unauthorized agent proposal leaves the review inbox untouched");
+    var allowedAgentProposal = await AgentProposalSubmission.SubmitAsync(
+        agentProposalQueue, home.AgentId, ravenDiscord, proposedAction, 42, "Visitor", "10", "110", CancellationToken.None);
+    Assert(allowedAgentProposal.Contains("queued for human review", StringComparison.Ordinal),
+        "allow-listed visitor can explicitly request an agent-authored proposal");
 
     var proposals = new AssetProposalQueue(root);
     var queuedObject = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "100", CancellationToken.None);
@@ -244,7 +294,7 @@ static void AssertThrows<TException>(Action action, string description) where TE
     throw new InvalidOperationException($"Check failed: {description}");
 }
 
-file sealed class FakeResponder(AgentHome home) : IAgentResponder
+file sealed class FakeResponder(AgentHome home, AgentProposal? proposal = null) : IAgentResponder
 {
     public int CallCount { get; private set; }
     public bool SawHeadlessMarker { get; private set; }
@@ -255,6 +305,7 @@ file sealed class FakeResponder(AgentHome home) : IAgentResponder
         SawHeadlessMarker = File.Exists(Path.Combine(home.GatewayStatePath, "headless-turn.json"));
         return Task.FromResult(new AgentResponse(
             "Hello from the test agent.",
-            [new NewMemory("A visitor greeted me through an outside channel.", 0.4, ["greeting"])]));
+            [new NewMemory("A visitor greeted me through an outside channel.", 0.4, ["greeting"])],
+            proposal));
     }
 }

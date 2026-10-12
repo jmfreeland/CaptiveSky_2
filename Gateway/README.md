@@ -43,6 +43,8 @@ Unreal play now ends automatically after at most 30 real minutes or 120 shared e
 
 The raven responds to DMs and direct mentions. It ignores bots and unaddressed guild conversation. If a client pastes `@Raven` as plain text instead of creating a Discord mention entity, configure `textualMentionAliases` (for example `["Raven"]`) in the agent's Discord block; the alias is accepted only at the start of a message and the existing user, guild, and channel allow-lists still apply.
 
+Headless residents can submit one structured proposal during a reply when `discord.allowAgentProposals` is enabled for that route. Raven has this opt-in enabled. The requesting Discord user must still be on the route's explicit `allowedUserIds` list; with an empty list, agent-authored proposals are rejected. The model is instructed to submit only when the correspondent clearly asks, not during casual brainstorming.
+
 ### Submit a world proposal
 
 After adding your Discord user ID to `allowedUserIds`, DM the raven or mention it in a permitted server channel with one of these text commands:
@@ -53,6 +55,15 @@ After adding your Discord user ID to `allowedUserIds`, DM the raven or mention i
 !request upgrade variation world :: Scatter a few mossy stones along the stream
 !request help
 ```
+
+Alternatively, ask Raven conversationally to submit a specific idea for review, for example:
+
+```text
+Could you submit a human-review request for a small copper bell beside the east trail?
+Could you submit a functionality-upgrade proposal for RavenNest to add a sheltered landing rail?
+```
+
+Raven's reply includes the gateway's queue result and, if accepted, its short ID. If Raven is only discussing an idea, no proposal is submitted. The direct `!request` commands remain available when agent-authored proposals are disabled.
 
 `world` means the proposal is not tied to a named object. Descriptions are limited to 240 characters; upgrade targets to 96. Each request is deduplicated while pending, and the shared review inbox is capped at 64 pending proposals. A successful command appends a record to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` with `requester` set to the agent's stable ID, so Unreal can associate a later review with the right resident. `object` proposals are marked for the ComfyBlender pipeline; upgrades are human-review only. This is a proposal queue, not an asset-generation trigger: nothing is generated or placed automatically.
 

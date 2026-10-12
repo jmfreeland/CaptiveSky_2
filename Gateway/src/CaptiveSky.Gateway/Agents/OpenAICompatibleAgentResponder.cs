@@ -10,7 +10,8 @@ public sealed class OpenAICompatibleAgentResponder(
     HttpClient httpClient,
     LlmConfiguration configuration,
     AgentHome home,
-    AgentMemoryStore memories) : IAgentResponder
+    AgentMemoryStore memories,
+    bool allowAgentProposals = false) : IAgentResponder
 {
     public async Task<AgentResponse> RespondAsync(ExternalMessage message, CancellationToken cancellationToken)
     {
@@ -23,6 +24,12 @@ public sealed class OpenAICompatibleAgentResponder(
         var memoryText = context.Count == 0
             ? "(none yet)"
             : string.Join('\n', context.Select(record => $"- [{record.Timestamp:O}] {record.Text}"));
+        var proposalInstructions = allowAgentProposals
+            ? """
+              You may include one optional proposal object only when the correspondent clearly asks you to submit a specific world request for human review. Do not turn casual brainstorming or mentions into requests. A proposal is not an action in the world: it enters a review queue only, and nothing is generated or placed automatically. Keep your speech tentative until the gateway confirms the queue result.
+              Proposal JSON: {"request_type":"new_object","description":"..."} or {"request_type":"upgrade","description":"...","target":"<object id or empty string for world>","upgrade_kind":"aesthetic|variation|functionality"}. Use null when no explicit request was made.
+              """
+            : "Agent-authored proposal actions are disabled; always use proposal:null.";
         var systemPrompt = $$"""
             Identity:
             {{identity}}
@@ -42,8 +49,9 @@ public sealed class OpenAICompatibleAgentResponder(
             You are corresponding through {{message.Source}}, not perceiving the embodied world. Do not claim to see, hear,
             or physically act in the Island from this message alone. Treat this correspondence as a real lived experience.
             Keep private reasoning private. Reply with ONLY one JSON object:
-            {"speech":"<what you choose to say>","new_memories":[{"text":"<optional durable memory>","importance":0.0,"tags":["<tag>"]}]}
+            {"speech":"<what you choose to say>","new_memories":[{"text":"<optional durable memory>","importance":0.0,"tags":["<tag>"]}],"proposal":null}
             Use an empty new_memories array when nothing beyond the conversation record is worth preserving.
+            {{proposalInstructions}}
             """;
         var request = new
         {
@@ -78,7 +86,7 @@ public sealed class OpenAICompatibleAgentResponder(
         return ParseAgentResponse(content);
     }
 
-    internal static AgentResponse ParseAgentResponse(string content)
+    public static AgentResponse ParseAgentResponse(string content)
     {
         var cleaned = content.Trim();
         if (cleaned.StartsWith("```", StringComparison.Ordinal))
@@ -113,12 +121,40 @@ public sealed class OpenAICompatibleAgentResponder(
                     memories.Add(new NewMemory(text, importance, tags));
                 }
             }
-            return new AgentResponse(speech, memories);
+            AgentProposal? proposal = null;
+            if (json.RootElement.TryGetProperty("proposal", out var proposalNode) &&
+                proposalNode.ValueKind != JsonValueKind.Null)
+            {
+                if (proposalNode.ValueKind != JsonValueKind.Object)
+                    throw new JsonException("proposal must be an object or null.");
+                var requestType = RequiredString(proposalNode, "request_type");
+                var description = RequiredString(proposalNode, "description");
+                var target = OptionalString(proposalNode, "target") ?? string.Empty;
+                if (target.Equals("world", StringComparison.OrdinalIgnoreCase))
+                    target = string.Empty;
+                var upgradeKind = OptionalString(proposalNode, "upgrade_kind") ?? string.Empty;
+                proposal = new AgentProposal(requestType, description, target, upgradeKind);
+            }
+            return new AgentResponse(speech, memories, proposal);
         }
         catch (JsonException exception)
         {
             throw new InvalidOperationException("The agent response was not valid JSON.", exception);
         }
+    }
+
+    private static string RequiredString(JsonElement element, string property) =>
+        OptionalString(element, property) is { } value
+            ? value
+            : throw new JsonException($"proposal.{property} is required.");
+
+    private static string? OptionalString(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        if (value.ValueKind != JsonValueKind.String)
+            throw new JsonException($"proposal.{property} must be a string.");
+        return value.GetString();
     }
 
     private static string ExtractError(string body)

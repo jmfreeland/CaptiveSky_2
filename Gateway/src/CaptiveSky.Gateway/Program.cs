@@ -72,7 +72,8 @@ try
         {
             var home = new AgentHome(configuration.ResolvedProjectRoot, agent.AgentId);
             var memories = new AgentMemoryStore(home);
-            var responder = new OpenAICompatibleAgentResponder(httpClient, configuration.Llm, home, memories);
+            var responder = new OpenAICompatibleAgentResponder(
+                httpClient, configuration.Llm, home, memories, agent.Discord.AllowAgentProposals);
             var router = new AgentMessageRouter(
                 memories,
                 responder,

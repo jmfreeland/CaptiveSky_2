@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CaptiveSky.Gateway.Domain;
 
 namespace CaptiveSky.Gateway.Proposals;
 
@@ -10,7 +11,7 @@ public sealed class AssetProposalQueue(string projectRoot)
     private readonly string _path = Path.Combine(Path.GetFullPath(projectRoot), "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
 
     public async Task<(bool Success, string RequestId, string Message)> AppendAsync(
-        string requester, DiscordProposal proposal, string participantId, string participantName,
+        string requester, AgentProposal proposal, string participantId, string participantName,
         string channelId, string messageId, CancellationToken cancellationToken)
     {
         var description = proposal.Description.Trim();

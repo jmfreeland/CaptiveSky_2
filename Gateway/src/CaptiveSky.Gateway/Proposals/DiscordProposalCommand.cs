@@ -1,6 +1,6 @@
-namespace CaptiveSky.Gateway.Proposals;
+using CaptiveSky.Gateway.Domain;
 
-public sealed record DiscordProposal(string RequestType, string Description, string Target = "", string UpgradeKind = "");
+namespace CaptiveSky.Gateway.Proposals;
 
 public static class DiscordProposalCommand
 {
@@ -10,7 +10,7 @@ public static class DiscordProposalCommand
         text.StartsWith("!request", StringComparison.OrdinalIgnoreCase) &&
         (text.Length == 8 || char.IsWhiteSpace(text[8]));
 
-    public static bool TryParse(string text, out DiscordProposal? proposal, out string error)
+    public static bool TryParse(string text, out AgentProposal? proposal, out string error)
     {
         proposal = null;
         error = Usage;
@@ -20,7 +20,7 @@ public static class DiscordProposalCommand
 
         if (args.StartsWith("object ", StringComparison.OrdinalIgnoreCase))
         {
-            proposal = new DiscordProposal("new_object", args[7..].Trim());
+            proposal = new AgentProposal("new_object", args[7..].Trim());
             error = string.Empty;
             return true;
         }
@@ -33,7 +33,7 @@ public static class DiscordProposalCommand
         var kind = header[0].ToLowerInvariant();
         if (kind is not ("aesthetic" or "variation" or "functionality")) return false;
         var target = header[1].Equals("world", StringComparison.OrdinalIgnoreCase) ? "" : header[1];
-        proposal = new DiscordProposal("upgrade", fields[1], target, kind);
+        proposal = new AgentProposal("upgrade", fields[1], target, kind);
         error = string.Empty;
         return true;
     }
