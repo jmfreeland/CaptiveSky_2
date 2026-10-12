@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
+#include "IslandFirefly.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIslandForestFox::AIslandForestFox()
@@ -128,6 +129,7 @@ void AIslandForestFox::BeginForaging()
 {
 	bMoving = false;
 	bNoticing = false;
+	bNoticingFirefly = false;
 	bStartled = false;
 	bWaking = false;
 	MoveSpeed = 0.f;
@@ -135,6 +137,44 @@ void AIslandForestFox::BeginForaging()
 	MoveRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(4.f, 9.f);
 	PlayLoop(IdleAnimation);
+}
+
+void AIslandForestFox::CheckForNearbyFirefly()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	constexpr float NoticeRadius = 450.f;
+	constexpr float RearmRadius = 700.f;
+	AIslandFirefly* NearbyFirefly = nullptr;
+	bool bFireflyWithinRearmRange = false;
+	for (TActorIterator<AIslandFirefly> It(World); It; ++It)
+	{
+		AIslandFirefly* Candidate = *It;
+		if (!IsValid(Candidate) || Candidate->IsActorBeingDestroyed() || Candidate->IsHidden()) continue;
+		const float DistanceSquared = FVector::DistSquared(GetActorLocation(), Candidate->GetActorLocation());
+		if (DistanceSquared > FMath::Square(RearmRadius)) continue;
+		bFireflyWithinRearmRange = true;
+		if (DistanceSquared <= FMath::Square(NoticeRadius))
+		{
+			NearbyFirefly = Candidate;
+			break;
+		}
+	}
+
+	if (!bFireflyWithinRearmRange) bFireflyPresenceNearby = false;
+	if (!NearbyFirefly || bFireflyPresenceNearby || bResting || bWaking || bMoving ||
+		bNoticing || bNoticingFirefly || FireflyPresenceCooldownRemaining > 0.f || !LookAroundAnimation)
+		return;
+
+	// One quiet, transient look per nearby firefly encounter. The fox does not
+	// chase the light, and a resident arriving mid-glance may still take priority.
+	bFireflyPresenceNearby = true;
+	FireflyPresenceCooldownRemaining = 8.f;
+	bNoticingFirefly = true;
+	NoticeRemaining = FMath::Clamp(LookAroundAnimation->GetPlayLength(), 0.5f, 2.0f);
+	FoxMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	FoxMesh->PlayAnimation(LookAroundAnimation, false);
 }
 
 bool AIslandForestFox::FindGround(const FVector& NearPoint, FVector& OutGround) const
@@ -171,6 +211,7 @@ void AIslandForestFox::StartMove(const FVector& Target, bool bRun)
 	if (bResting) return;
 	bWaking = false;
 	bNoticing = false;
+	bNoticingFirefly = false;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -200,6 +241,7 @@ bool AIslandForestFox::RespondToQuietObservation(const FVector& ObserverLocation
 	}
 	bMoving = false;
 	bStartled = false;
+	bNoticingFirefly = false;
 	MoveSpeed = 0.f;
 	TargetLocation = Desired;
 	if (LookAroundAnimation)
@@ -219,6 +261,7 @@ void AIslandForestFox::SetResting(bool bShouldRest)
 	bResting = bShouldRest;
 	bMoving = false;
 	bNoticing = false;
+	bNoticingFirefly = false;
 	bStartled = false;
 	bWaking = false;
 	MoveSpeed = 0.f;
@@ -245,11 +288,13 @@ void AIslandForestFox::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
 	ResidentPresenceCooldownRemaining = FMath::Max(0.f, ResidentPresenceCooldownRemaining - Delta);
+	FireflyPresenceCooldownRemaining = FMath::Max(0.f, FireflyPresenceCooldownRemaining - Delta);
 	ResidentPresenceCheckRemaining -= Delta;
 	if (ResidentPresenceCheckRemaining <= 0.f)
 	{
 		ResidentPresenceCheckRemaining = 0.35f;
 		CheckForNearbyResident();
+		CheckForNearbyFirefly();
 	}
 	if (bResting) return;
 	if (bWaking)
@@ -262,6 +307,12 @@ void AIslandForestFox::Tick(float DeltaSeconds)
 	{
 		NoticeRemaining -= Delta;
 		if (NoticeRemaining <= 0.f) StartMove(TargetLocation, true);
+		return;
+	}
+	if (bNoticingFirefly)
+	{
+		NoticeRemaining -= Delta;
+		if (NoticeRemaining <= 0.f) BeginForaging();
 		return;
 	}
 	if (!bMoving)

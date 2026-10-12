@@ -6,6 +6,7 @@
 
 class UAnimSequence;
 class USkeletalMeshComponent;
+class AIslandFirefly;
 
 /** One transient, independent fox that rests by day and forages within a small woodland-edge patch at night. */
 UCLASS()
@@ -59,10 +60,13 @@ private:
 	float MoveRemaining = 0.f;
 	float ResidentPresenceCheckRemaining = 0.f;
 	float ResidentPresenceCooldownRemaining = 0.f;
+	float FireflyPresenceCooldownRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bNoticing = false;
+	bool bNoticingFirefly = false;
 	bool bResidentPresenceNearby = false;
+	bool bFireflyPresenceNearby = false;
 	bool bStartled = false;
 	bool bResting = false;
 	bool bWaking = false;
@@ -70,6 +74,7 @@ private:
 	void PlayLoop(UAnimSequence* Animation);
 	void BeginForaging();
 	void CheckForNearbyResident();
+	void CheckForNearbyFirefly();
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseForageTarget(FVector& OutTarget) const;
 	void StartMove(const FVector& Target, bool bRun);

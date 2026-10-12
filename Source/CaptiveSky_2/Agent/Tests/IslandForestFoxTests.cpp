@@ -9,6 +9,7 @@
 #include "GameFramework/Actor.h"
 #include "Components/SceneComponent.h"
 #include "IslandForestFox.h"
+#include "IslandFirefly.h"
 #include "IslandInteractionUtility.h"
 #include "Components/SkeletalMeshComponent.h"
 
@@ -188,6 +189,37 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	Fox->TargetLocation = Fox->GetActorLocation() + FVector(50.f, 0.f, 0.f);
 	TestTrue(TEXT("A quiet resident can redirect a fox already on a short forage step"),
 		Fox->RespondToQuietObservation(Observer->GetActorLocation()) && Fox->bNoticing && !Fox->bMoving);
+
+	Observer->SetActorLocation(FVector(1400.f, 0.f, 0.f));
+	Fox->bNoticing = false;
+	Fox->bNoticingFirefly = false;
+	Fox->bMoving = false;
+	Fox->bResting = false;
+	Fox->bWaking = false;
+	Fox->bFireflyPresenceNearby = false;
+	Fox->FireflyPresenceCooldownRemaining = 0.f;
+	AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(300.f, 0.f, 100.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A nearby firefly can be staged for a woodland encounter"), Firefly);
+	if (Firefly)
+	{
+		Fox->CheckForNearbyFirefly();
+		TestTrue(TEXT("An awake, foraging fox briefly notices a nearby firefly without pursuing it"),
+			Fox->bNoticingFirefly && !Fox->bMoving && !Fox->bStartled && Fox->NoticeRemaining > 0.f);
+		const float FirstFireflyNoticeRemaining = Fox->NoticeRemaining;
+		Fox->CheckForNearbyFirefly();
+		TestTrue(TEXT("One firefly encounter cannot restart the same look"),
+			Fox->bNoticingFirefly && Fox->NoticeRemaining == FirstFireflyNoticeRemaining);
+		Fox->bNoticingFirefly = false;
+		Fox->bResting = true;
+		Firefly->SetActorLocation(FVector(800.f, 0.f, 100.f));
+		Fox->CheckForNearbyFirefly();
+		TestFalse(TEXT("A resting fox remains undisturbed by fireflies"), Fox->bNoticingFirefly);
+		Fox->bResting = false;
+		Firefly->SetActorLocation(FVector(300.f, 0.f, 100.f));
+		Fox->FireflyPresenceCooldownRemaining = 0.f;
+		Fox->CheckForNearbyFirefly();
+		TestTrue(TEXT("A new firefly visit can earn one later curious glance"), Fox->bNoticingFirefly);
+	}
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
