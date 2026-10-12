@@ -40,3 +40,17 @@ keeping functionality upgrades on human review, and verifying the named
 authored script before a pipeline run. These are pipeline-boundary tests; they
 do not prove a generated asset renders well in Unreal or has been placed in the
 world.
+
+**End-to-end accepted-request smoke test (2026-10-12):** the locally bundled
+Python 3.12.14 runtime has NumPy 2.3.5 and Pillow 12.3.0, and successfully ran
+`requests.py build` against a synthetic accepted `new_object` record in a
+temporary inbox. It invoked only the named, already-authored `woodland_fern`
+script through `make.py`; Blender 5.2.2 exported and re-imported the FBX, and
+the verifier reported `PROBLEMS []` / `VERIFY DONE`. The request correctly
+remained `accepted` for visual inspection; no real inbox record, ComfyUI, Unreal
+asset, or map was changed. The isolated export is under
+`Saved/CaptiveSky/PipelineRequestSmoke_20261012/` (gitignored). On this machine,
+the documented `D:\python\3d` venv still points to a missing base Python, but
+the request runner inherits the interpreter used to launch `requests.py`, so a
+working Python with NumPy/Pillow can run the same guarded handoff without
+repairing that external venv.
