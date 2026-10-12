@@ -314,6 +314,24 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(160.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::SeedPod));
 	TestFalse(TEXT("Small trail stones clear only their immediate footprint"),
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(70.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::PaleStone));
+	const FVector RatEntrance(1000.f, 2000.f, 300.f);
+	const FVector RatOutward(-1.f, 0.f, 0.f);
+	TestTrue(TEXT("The hollow mouth itself stays open at Rat scale"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance, RatEntrance, RatOutward));
+	TestTrue(TEXT("The narrow approach run clears ground cover in front of the entrance"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(-100.f, 45.f, 0.f), RatEntrance, RatOutward));
+	TestFalse(TEXT("The approach lane does not become a broad human footpath"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(-100.f, 51.f, 0.f), RatEntrance, RatOutward));
+	TestFalse(TEXT("The short approach lane leaves nearby surrounding cover intact"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(-151.f, 0.f, 0.f), RatEntrance, RatOutward));
+	TestTrue(TEXT("Broad leaves clear the entrance when their footprint reaches the mouth"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(-120.f, 0.f, 0.f), RatEntrance, RatOutward, 60.f));
+	TestFalse(TEXT("Footprint expansion stays local instead of clearing an entire grove"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(-211.f, 0.f, 0.f), RatEntrance, RatOutward, 60.f));
+	TestFalse(TEXT("Ground cover behind the hollow is preserved"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance + FVector(100.f, 0.f, 0.f), RatEntrance, RatOutward));
+	TestFalse(TEXT("Invalid direction cannot create a world-sized clearing"),
+		AIslandWeather::IsWithinRatHollowApproachClearance(RatEntrance, RatEntrance, FVector::ZeroVector));
 	FIslandTrailLedger WornTrail;
 	const FVector TrailCellPoint(75.f, 75.f, 0.f);
 	for (int32 Step = 0; Step < UIslandTrailSubsystem::WearStartSteps; ++Step)

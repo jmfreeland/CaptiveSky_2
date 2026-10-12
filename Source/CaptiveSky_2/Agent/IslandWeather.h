@@ -222,6 +222,9 @@ private:
 		const TArray<FVector>& OtherAnchors);
 	/** Keep a resident-scale open patch around lasting curios so meadow cover cannot bury them. */
 	static bool IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind);
+	/** Keep the Rat-hollow mouth and its short, narrow approach lane open while preserving nearby cover. */
+	static bool IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
+		const FVector& OutwardDirection, float VisualFootprintRadius = 0.f);
 	/** Thin transient vegetation around sufficiently worn persistent footpaths, with clearance scaled to wear. */
 	static bool IsGroundCoverWithinWornTrailClearance(const FIslandTrailLedger& TrailLedger, const FVector& Position);
 	/** Fade a Tideglass wet-edge habitat into the meadow unless another landmark owns the patch. */

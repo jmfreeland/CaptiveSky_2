@@ -420,6 +420,28 @@ bool AIslandWeather::IsWithinCurioGroundCoverClearance(const FVector& Position, 
 	return FVector::DistSquared2D(Position, CurioPosition) < FMath::Square(ClearanceRadius);
 }
 
+bool AIslandWeather::IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
+	const FVector& OutwardDirection, float VisualFootprintRadius)
+{
+	if (Position.ContainsNaN() || EntrancePosition.ContainsNaN() || OutwardDirection.ContainsNaN()) return false;
+	FVector2D FlatOutward(OutwardDirection.X, OutwardDirection.Y);
+	if (!FlatOutward.Normalize()) return false;
+
+	const FVector2D FromEntrance(Position.X - EntrancePosition.X, Position.Y - EntrancePosition.Y);
+	const float FootprintRadius = FMath::Max(0.f, FMath::IsFinite(VisualFootprintRadius) ? VisualFootprintRadius : 0.f);
+	const float MouthRadius = 72.f + FootprintRadius;
+	if (FromEntrance.SizeSquared() <= FMath::Square(MouthRadius)) return true;
+
+	// Expand only by each mesh's actual horizontal footprint. Broad leaves can
+	// overhang the entrance even when their instance origins sit outside the Rat-scale lane.
+	constexpr float ApproachLength = 150.f;
+	constexpr float ApproachHalfWidth = 50.f;
+	const float Along = FVector2D::DotProduct(FromEntrance, FlatOutward);
+	const float Across = FMath::Abs(FlatOutward.X * FromEntrance.Y - FlatOutward.Y * FromEntrance.X);
+	return Along >= -FootprintRadius && Along <= ApproachLength + FootprintRadius &&
+		Across <= ApproachHalfWidth + FootprintRadius;
+}
+
 bool AIslandWeather::IsGroundCoverWithinWornTrailClearance(const FIslandTrailLedger& TrailLedger, const FVector& Position)
 {
 	if (TrailLedger.Cells.IsEmpty() || Position.ContainsNaN()) return false;
@@ -614,9 +636,22 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverFlowerCount = 0;
 	GroundCoverWetlandCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
+	TArray<TPair<FVector, FVector>> RatHollowApproaches;
 	for (TActorIterator<AActor> IgnoreIt(GetWorld()); IgnoreIt; ++IgnoreIt)
 	{
-		bool bIgnoreActor = (*IgnoreIt)->ActorHasTag(TEXT("IslandLandmark")) || (*IgnoreIt)->GetName().Contains(TEXT("Ocean"));
+		const bool bRatHollowClearance = (*IgnoreIt)->ActorHasTag(TEXT("RatHollowClearance"));
+		bool bIgnoreActor = (*IgnoreIt)->ActorHasTag(TEXT("IslandLandmark")) || bRatHollowClearance || (*IgnoreIt)->GetName().Contains(TEXT("Ocean"));
+		if (bRatHollowClearance)
+		{
+			FVector OutwardDirection = -(*IgnoreIt)->GetActorForwardVector();
+			OutwardDirection.Z = 0.f;
+			if (!OutwardDirection.IsNearlyZero())
+			{
+				OutwardDirection.Normalize();
+				const FVector EntrancePosition = (*IgnoreIt)->GetActorLocation() + OutwardDirection * 84.f;
+				RatHollowApproaches.Emplace(EntrancePosition, OutwardDirection);
+			}
+		}
 		TArray<UStaticMeshComponent*> Components;
 		(*IgnoreIt)->GetComponents<UStaticMeshComponent>(Components);
 		for (const UStaticMeshComponent* Component : Components)
@@ -631,7 +666,7 @@ void AIslandWeather::InitializeGroundCover()
 	{
 		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("WindArch")))
 			ExposedHabitatAnchors.Add(It->GetActorLocation());
-		else if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")))
+		else if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")) || It->ActorHasTag(TEXT("RatHollowClearance")))
 			OtherHabitatAnchors.Add(It->GetActorLocation());
 	}
 	TArray<FIslandCurioRecord> ScatterCurios;
@@ -653,7 +688,22 @@ void AIslandWeather::InitializeGroundCover()
 		TrailLedgerForScatter.WeatherTo(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
 		TrailLedger = &TrailLedgerForScatter;
 	}
-	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios](const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
+	int32 RatHollowClearedInstanceCount = 0;
+	TMap<const UStaticMesh*, float> GroundCoverMeshFootprintRadii;
+	const UHierarchicalInstancedStaticMeshComponent* GroundCoverComponents[] = {
+		ShoreGrassA.Get(), ShoreGrassB.Get(), GrassC, ShoreGroundPlants.Get(),
+		ShoreGroundPlantLowA.Get(), ShoreGroundPlantLowB.Get(), ShoreGroundPlantLowC.Get(), ShoreGroundPlantLowD.Get(),
+		IslandFestuca.Get(), IslandPhalaris.Get() };
+	for (const UHierarchicalInstancedStaticMeshComponent* Component : GroundCoverComponents)
+	{
+		if (!Component || !Component->GetStaticMesh()) continue;
+		const FBoxSphereBounds MeshBounds = Component->GetStaticMesh()->GetBounds();
+		GroundCoverMeshFootprintRadii.Add(Component->GetStaticMesh(),
+			FMath::Max(MeshBounds.BoxExtent.X, MeshBounds.BoxExtent.Y));
+	}
+	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios,
+		&RatHollowApproaches, &RatHollowClearedInstanceCount, &GroundCoverMeshFootprintRadii](
+		const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
 		if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, GroundHit.ImpactPoint))
 		{
@@ -702,6 +752,21 @@ void AIslandWeather::InitializeGroundCover()
 		{
 			const int32 GrassVariant = (SpeciesVariant - 5) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
+		}
+		if (!RatHollowApproaches.IsEmpty())
+		{
+			if (const float* MeshFootprintRadius = GroundCoverMeshFootprintRadii.Find(Species->GetStaticMesh()))
+			{
+				const float InstanceScaleXY = FMath::Max(FMath::Abs(Scale.X), FMath::Abs(Scale.Y));
+				const float VisualFootprintRadius = *MeshFootprintRadius * InstanceScaleXY;
+				for (const TPair<FVector, FVector>& Approach : RatHollowApproaches)
+					if (IsWithinRatHollowApproachClearance(GroundHit.ImpactPoint, Approach.Key, Approach.Value,
+						VisualFootprintRadius))
+					{
+						++RatHollowClearedInstanceCount;
+						return;
+					}
+			}
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
 		++GroundCoverInstanceCount;
@@ -1519,6 +1584,9 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandCattails) IslandCattails->SetVisibility(GroundCoverWetlandCount > 0, true);
 	if (IslandFestuca) IslandFestuca->SetVisibility(IslandFestuca->GetInstanceCount() > 0, true);
 	if (IslandPhalaris) IslandPhalaris->SetVisibility(IslandPhalaris->GetInstanceCount() > 0, true);
+	if (!RatHollowApproaches.IsEmpty())
+		UE_LOG(LogIslandWeather, Log, TEXT("Rat-hollow habitat clearance preserved surrounding cover and skipped %d candidate ground-cover instances."),
+			RatHollowClearedInstanceCount);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
