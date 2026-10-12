@@ -5,7 +5,8 @@
 The worldbuilding milestone calls for a simple practice bread set that can
 eventually give Aster's craft tradition a visible, ordinary-life expression.
 This asset is deliberately only a serving vignette: one oval hearth loaf with
-three flour scores, a turned cut slice, a worn board, folded linen, and crumbs.
+three fine baked scores, a turned cut slice with visible crumb pores, a worn
+board, folded linen, and crumbs.
 It does not define or seed a recipe, alter either resident's memory, or place
 anything in the Island.
 
@@ -37,9 +38,27 @@ embedded box collider, and `validation_errors: []` in
 imported materials nor collision has yet been visually inspected in the live
 editor; no Island map state was touched.
 
+## Visual refinement trial (2026-10-12)
+
+The first preview exposed three source-level problems: the small board sampled
+too many dark planks from the shared wood atlas, raised pale score tubes looked
+like wires, and the cut face was a blank disk. The source now samples a broader
+wood region, uses fine dark baked scores, adds fourteen low-profile toasted
+crumb pores, warms the cut crumb, and gives the linen a shallow drape. The shared
+wood/canvas maps and generic `lib.py` were not changed.
+
+The revised FBX was built and re-imported by Blender 5.2.2 in an isolated output
+root, with **1,460 triangles**, bounds 54 × 36 × 17.8 cm, one UV channel, seven
+resolved material slots, one board collider, `ZMIN 0.0`, and `PROBLEMS []`.
+The verified trial preview is
+`Saved/CaptiveSky/ComfyBlender/BreadPracticeTrial_20261012/BreadPracticeSet/Preview.png`.
+This is still only an offline FBX preview: the already-imported Unreal asset,
+Inn placement, and Island map were not changed, and the revised material has
+not been checked under Island lighting.
+
 ## Remaining
 
-Before using it in the world, inspect the imported static mesh in the editor and
-check the warm crust/crumb contrast, woven linen, tangents, and scale under Island
-lighting. Decide separately whether it belongs on an inn table. No recipe, Aster
+Before using it in the world, inspect the revised FBX in the editor and check
+the warm crust/crumb contrast, board grain, linen folds, tangents, and scale under
+Island lighting. Decide separately whether it belongs on an inn table. No recipe, Aster
 memory, request approval, or Island map state is seeded by this asset.

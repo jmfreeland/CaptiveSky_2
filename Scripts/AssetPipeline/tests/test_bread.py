@@ -73,7 +73,7 @@ class BreadPracticeAssetTests(unittest.TestCase):
         self.assertEqual(ast.literal_eval(collisions[0].args[0]), (0.54, 0.36, 0.025))
         self.assertEqual(keyword(collisions[0], "loc"), (0, 0, 0.0125))
 
-    def test_prop_has_scored_loaf_visible_slice_linen_and_crumbs(self):
+    def test_prop_has_fine_scores_crumb_pores_folded_linen_and_crumbs(self):
         source = ASSET.read_text(encoding="utf-8")
         calls = calls_in_build()
         attrs = [call.func.attr for call in calls]
@@ -81,16 +81,20 @@ class BreadPracticeAssetTests(unittest.TestCase):
         self.assertIn("cyl", attrs)
         self.assertIn("torus", attrs)
         self.assertIn("cloth", attrs)
-        self.assertEqual(source.count('A.tube("bread_flour"'), 1)
+        self.assertEqual(source.count('A.tube("bread_score"'), 1)
         self.assertIn('for index, lateral in enumerate((-0.026, 0.0, 0.026))', source)
+        self.assertIn('tile=6.0', source)
+        self.assertEqual(source.count('A.cyl("bread_pore"'), 1)
+        self.assertIn('range(5)', source)
+        self.assertIn('tile=1.4', source)
         self.assertTrue(any(
             call.func.attr == "cyl" and call.args
             and isinstance(call.args[0], ast.Constant)
             and call.args[0].value == "bread_crumb"
             for call in calls
         ), "the cut face uses warm crumb rather than the pale mushroom placeholder")
-        self.assertIn('y = -0.16 + row * 0.042', source)
-        self.assertIn('Vector((x, y, 0.030 + fold))', source)
+        self.assertIn('y = -0.17 + v * 0.11', source)
+        self.assertIn('Vector((x, y, 0.030 + ridge + ripple))', source)
         self.assertGreaterEqual(source.count('A.rock("mushstem"'), 1)
 
     def test_script_is_python_syntax_valid(self):

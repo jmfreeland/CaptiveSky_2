@@ -1,4 +1,4 @@
-"""A small hearth loaf, cut slice, flour marks, linen and a well-used board."""
+"""A small hearth loaf, fine baked scores, linen and a well-used board."""
 import math
 
 from mathutils import Vector
@@ -9,13 +9,16 @@ BAKE_SIZE = 1024
 
 # Isolated to this asset-builder process; the shared toolkit stays generic.
 lib.TILED["bread"] = ("T_Lib_Bread", 0.30)
-lib.PLAIN["bread_crumb"] = dict(BaseColor=[0.58, 0.38, 0.22], Roughness=0.94)
-lib.PLAIN["bread_flour"] = dict(BaseColor=[0.78, 0.68, 0.52], Roughness=0.97)
+lib.PLAIN["bread_crumb"] = dict(BaseColor=[0.68, 0.49, 0.30], Roughness=0.94)
+lib.PLAIN["bread_pore"] = dict(BaseColor=[0.43, 0.25, 0.13], Roughness=0.98)
+lib.PLAIN["bread_score"] = dict(BaseColor=[0.23, 0.11, 0.045], Roughness=0.96)
 
 
 def build(A):
     # A compact board with a warm, lightly worn working surface.
-    A.box("wood", (0.54, 0.36, 0.025), loc=(0, 0, 0.0125), grain="X",
+    # The library wood atlas contains many narrow planks; a large UV tile keeps
+    # this small board to one quiet plank instead of a screen-filling stripe pattern.
+    A.box("wood", (0.54, 0.36, 0.025), loc=(0, 0, 0.0125), grain="X", tile=6.0,
           bevel=0.016, name="bread_board")
 
     # An oval sourdough boule with its own small, tileable baked-crust material.
@@ -24,7 +27,7 @@ def build(A):
     A.rock("bread", loaf_radii, loc=loaf_center, rot=(2, -1, 7), seed=37,
            sub=2, rough=0.08, flat_bottom=0.96, tile=0.30, name="hearth_loaf")
 
-    # Three shallow, arcing flour-scored seams following the loaf's upper dome.
+    # Three fine, darker baked slashes follow the loaf's upper dome.
     for index, lateral in enumerate((-0.026, 0.0, 0.026)):
         path = []
         for step in range(9):
@@ -36,7 +39,7 @@ def build(A):
             dome = math.sqrt(max(0.025, 1.0 - nx * nx - ny * ny))
             z = loaf_center[2] + loaf_radii[2] * dome + 0.0015
             path.append(Vector((x, y, z)))
-        A.tube("bread_flour", path, 0.0012, segs=5, name="flour_score_{}".format(index))
+        A.tube("bread_score", path, 0.00045, segs=4, name="loaf_score_{}".format(index))
 
     # A cut face turned toward the viewer, with a thin darker crust around it.
     slice_center = (0.172, -0.071, 0.078)
@@ -46,17 +49,33 @@ def build(A):
                                         slice_center[2]), rot=(90, 0, 0),
             segs=32, rsegs=6, name="slice_crust")
 
-    # A folded linen corner and a few crumbs make the set feel recently used.
+    # Small toasted pores keep the cut crumb from reading as a blank, plastic disk.
+    pore_points = (
+        (-0.025, -0.022, 0.0020), (-0.008, -0.034, 0.0018), (0.018, -0.026, 0.0022),
+        (0.032, -0.008, 0.0018), (-0.033, 0.000, 0.0020), (-0.018, 0.014, 0.0017),
+        (0.005, 0.009, 0.0021), (0.026, 0.018, 0.0019), (-0.003, 0.031, 0.0018),
+        (0.013, 0.040, 0.0017), (-0.042, 0.024, 0.0016), (0.042, 0.027, 0.0015),
+        (-0.018, -0.042, 0.0015), (-0.040, -0.015, 0.0016),
+    )
+    for index, (dx, dz, radius) in enumerate(pore_points):
+        A.cyl("bread_pore", radius, 0.0005,
+              loc=(slice_center[0] + dx, slice_center[1] - 0.0133, slice_center[2] + dz),
+              rot=(90, 0, 0), segs=8, name="crumb_pore_{}".format(index))
+
+    # A softly ridged linen corner and a few crumbs make the set feel recently used.
     cloth_rows = []
-    for row in range(3):
-        y = -0.16 + row * 0.042
+    for row in range(5):
+        v = row / 4.0
+        y = -0.17 + v * 0.11
         cloth_row = []
-        for col in range(4):
-            x = -0.245 + col * 0.035
-            fold = 0.008 if col == 2 and row == 1 else 0.002 * ((row + col) % 2)
-            cloth_row.append(Vector((x, y, 0.030 + fold)))
+        for col in range(5):
+            u = col / 4.0
+            x = -0.26 + u * 0.15
+            ridge = 0.009 * math.exp(-((u - 0.58) / 0.18) ** 2)
+            ripple = 0.0015 * math.sin(u * 3.0 * math.pi + v * math.pi)
+            cloth_row.append(Vector((x, y, 0.030 + ridge + ripple)))
         cloth_rows.append(cloth_row)
-    A.cloth("canvas", cloth_rows, thick=0.003, name="folded_linen")
+    A.cloth("canvas", cloth_rows, thick=0.003, tile=1.4, name="folded_linen")
 
     for index, (x, y, z, radius) in enumerate((
         (0.236, -0.033, 0.029, 0.006),
