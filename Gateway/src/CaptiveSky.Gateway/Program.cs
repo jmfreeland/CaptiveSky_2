@@ -80,7 +80,7 @@ try
                 new MessageDeduplicator(home),
                 new FileEmbodimentBridge(home, configuration.Embodiment),
                 new HeadlessTurnMarker(home));
-            var adapter = new DiscordChannelAdapter(agent);
+            var adapter = new DiscordChannelAdapter(agent, configuration.ResolvedProjectRoot);
             await adapter.StartAsync(router.RouteAsync, shutdown.Token);
             adapters.Add(adapter);
         }

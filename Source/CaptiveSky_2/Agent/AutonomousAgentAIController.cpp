@@ -1209,7 +1209,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	{
 		FString RequestId;
 		FString Error;
-		const FString Requester = ControlledPawn->GetName();
+		const UAgentMemoryComponent* Memory = ControlledPawn->FindComponentByClass<UAgentMemoryComponent>();
+		const FString Requester = Memory ? Memory->GetResolvedAgentId() : ControlledPawn->GetName();
 		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.ObjectRequest, RequestId, Error))
 		{
 			RememberPendingWorldProposal(ControlledPawn, RequestId, TEXT("new_object"), Decision.ObjectRequest, FString(), FString());
@@ -1225,7 +1226,8 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	{
 		FString RequestId;
 		FString Error;
-		const FString Requester = ControlledPawn->GetName();
+		const UAgentMemoryComponent* Memory = ControlledPawn->FindComponentByClass<UAgentMemoryComponent>();
+		const FString Requester = Memory ? Memory->GetResolvedAgentId() : ControlledPawn->GetName();
 		if (IslandAssetRequestQueue::AppendRequest(Requester, Decision.UpgradeRequest, RequestId, Error,
 			FString(), TEXT("upgrade"), Decision.UpgradeTarget, Decision.UpgradeKind))
 		{

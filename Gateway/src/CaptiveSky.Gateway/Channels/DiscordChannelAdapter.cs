@@ -1,5 +1,6 @@
 using CaptiveSky.Gateway.Configuration;
 using CaptiveSky.Gateway.Domain;
+using CaptiveSky.Gateway.Proposals;
 using Discord;
 using Discord.WebSocket;
 
@@ -9,12 +10,14 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
 {
     private readonly AgentConfiguration _agent;
     private readonly DiscordSocketClient _client;
+    private readonly AssetProposalQueue _proposalQueue;
     private ExternalMessageHandler? _handler;
     private CancellationToken _shutdownToken;
 
-    public DiscordChannelAdapter(AgentConfiguration agent)
+    public DiscordChannelAdapter(AgentConfiguration agent, string projectRoot)
     {
         _agent = agent;
+        _proposalQueue = new AssetProposalQueue(projectRoot);
         _client = new DiscordSocketClient(new DiscordSocketConfig
         {
             GatewayIntents = GatewayIntents.Guilds |
@@ -87,6 +90,29 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             var text = RemoveBotMention(message.Content).Trim();
             if (string.IsNullOrWhiteSpace(text))
                 return;
+
+            if (DiscordProposalCommand.IsCommand(text))
+            {
+                string response;
+                if (_agent.Discord.AllowedUserIds.Count == 0 || !_agent.Discord.AllowedUserIds.Contains(message.Author.Id))
+                {
+                    response = "Proposal requests are disabled until this bot has an explicit allowedUserIds list and your Discord user ID is on it.";
+                }
+                else if (!DiscordProposalCommand.TryParse(text, out var proposal, out var error))
+                {
+                    response = error;
+                }
+                else
+                {
+                    var queued = await _proposalQueue.AppendAsync(_agent.AgentId, proposal!,
+                        message.Author.Id.ToString(), message.Author.GlobalName ?? message.Author.Username,
+                        message.Channel.Id.ToString(), message.Id.ToString(), _shutdownToken);
+                    response = queued.Message;
+                }
+
+                await message.Channel.SendMessageAsync(response, messageReference: new MessageReference(message.Id));
+                return;
+            }
 
             using var typing = message.Channel.EnterTypingState();
             var guildChannel = message.Channel as SocketGuildChannel;

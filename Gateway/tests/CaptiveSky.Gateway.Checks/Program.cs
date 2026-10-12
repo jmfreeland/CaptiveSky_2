@@ -5,6 +5,7 @@ using CaptiveSky.Gateway.Domain;
 using CaptiveSky.Gateway.Infrastructure;
 using CaptiveSky.Gateway.Routing;
 using CaptiveSky.Gateway.Channels;
+using CaptiveSky.Gateway.Proposals;
 
 var root = Path.Combine(Path.GetTempPath(), $"CaptiveSkyGatewayChecks-{Guid.NewGuid():N}");
 try
@@ -142,6 +143,54 @@ try
         "gateway does not duplicate memory owned by the embodiment");
     Assert(DiscordChannelAdapter.HasTextualMention("@Raven hello", "Raven"), "pasted bot mentions are accepted");
     Assert(!DiscordChannelAdapter.HasTextualMention("@Ravenous hello", "Raven"), "partial aliases are rejected");
+
+    Assert(DiscordProposalCommand.IsCommand("!request object a bell"), "explicit proposal command is recognized");
+    Assert(!DiscordProposalCommand.IsCommand("!requestion object a bell"), "proposal command prefix is exact");
+    Assert(DiscordProposalCommand.TryParse("!request object A copper bell", out var objectProposal, out _)
+        && objectProposal is { RequestType: "new_object", Description: "A copper bell" }, "new-object proposal parses");
+    Assert(DiscordProposalCommand.TryParse("!request upgrade aesthetic InnDoorLantern :: Add brass trim", out var upgradeProposal, out _)
+        && upgradeProposal is { RequestType: "upgrade", UpgradeKind: "aesthetic", Target: "InnDoorLantern", Description: "Add brass trim" }, "upgrade proposal parses");
+    Assert(DiscordProposalCommand.TryParse("!request upgrade variation world :: Add stream stones", out var worldUpgrade, out _)
+        && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
+    Assert(!DiscordProposalCommand.TryParse("!request help", out _, out var proposalHelp) && proposalHelp.Contains("human review", StringComparison.Ordinal), "help returns safe usage");
+    Assert(!DiscordProposalCommand.TryParse("!request upgrade magical Inn :: Make magic", out _, out _), "unsupported upgrade kind rejected");
+
+    var proposals = new AssetProposalQueue(root);
+    var queuedObject = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "100", CancellationToken.None);
+    Assert(queuedObject.Success, "Discord object proposal is appended");
+    var inbox = Path.Combine(root, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    using (var queuedRecord = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(inbox)))
+    {
+        var record = queuedRecord.RootElement;
+        Assert(record.GetProperty("requester").GetString() == home.AgentId, "proposal is attributed to stable agent ID");
+        Assert(record.GetProperty("pipeline").GetString() == "ComfyBlender" && record.GetProperty("status").GetString() == "pending_review", "object proposal uses compatible review schema");
+        Assert(record.GetProperty("source").GetString() == "discord" && record.GetProperty("message_id").GetString() == "100", "Discord provenance is retained");
+    }
+    var duplicateProposal = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "101", CancellationToken.None);
+    Assert(!duplicateProposal.Success && duplicateProposal.Message.Contains("already", StringComparison.Ordinal), "pending duplicate is rejected");
+    var rejectedLong = await proposals.AppendAsync(home.AgentId, objectProposal! with { Description = new string('x', 241) }, "42", "Visitor", "10", "102", CancellationToken.None);
+    Assert(!rejectedLong.Success, "oversized description rejected");
+    var queuedUpgrade = await proposals.AppendAsync(home.AgentId, upgradeProposal!, "42", "Visitor", "10", "103", CancellationToken.None);
+    Assert(queuedUpgrade.Success, "upgrade proposal is appended");
+    using (var proposalRecords = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', await File.ReadAllLinesAsync(inbox)) + "]"))
+        Assert(proposalRecords.RootElement[1].GetProperty("pipeline").GetString() == "human_review", "upgrade proposal remains human-review only");
+
+    var brokenRoot = Path.Combine(root, "broken-queue");
+    var brokenInbox = Path.Combine(brokenRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    Directory.CreateDirectory(Path.GetDirectoryName(brokenInbox)!);
+    await File.WriteAllTextAsync(brokenInbox, "{ not json }\n");
+    var brokenQueue = new AssetProposalQueue(brokenRoot);
+    var brokenAppend = await brokenQueue.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "104", CancellationToken.None);
+    Assert(!brokenAppend.Success && brokenAppend.Message.Contains("unreadable", StringComparison.Ordinal), "unreadable inbox fails closed");
+
+    var fullRoot = Path.Combine(root, "full-queue");
+    var fullInbox = Path.Combine(fullRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    Directory.CreateDirectory(Path.GetDirectoryName(fullInbox)!);
+    var pendingRows = Enumerable.Range(0, 64).Select(index => System.Text.Json.JsonSerializer.Serialize(new { id = $"pending-{index}", requester = $"other-{index}", description = "different request", request_type = "new_object", status = "pending_review" }));
+    await File.WriteAllLinesAsync(fullInbox, pendingRows);
+    var fullQueue = new AssetProposalQueue(fullRoot);
+    var fullAppend = await fullQueue.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "105", CancellationToken.None);
+    Assert(!fullAppend.Success && fullAppend.Message.Contains("full", StringComparison.Ordinal), "pending queue cap is enforced");
 
     var vanishedHome = new AgentHome(root, "Agent_Vanished_01");
     Directory.CreateDirectory(vanishedHome.DirectoryPath);

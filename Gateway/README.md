@@ -39,9 +39,22 @@ Unreal play now ends automatically after at most 30 real minutes or 120 shared e
    setx CAPTIVESKY_RAVEN_DISCORD_TOKEN "paste-the-bot-token-here"
    ```
 
-5. Open a new terminal after `setx`. Put your Discord user ID in `allowedUserIds` in `gateway.json` before inviting the bot to a shared server. An empty list permits any user who can reach the bot.
+5. Open a new terminal after `setx`. Put your Discord user ID in `allowedUserIds` in `gateway.json` before inviting the bot to a shared server. An empty list permits any user who can reach the bot for ordinary conversation, but disables proposal submission.
 
 The raven responds to DMs and direct mentions. It ignores bots and unaddressed guild conversation. If a client pastes `@Raven` as plain text instead of creating a Discord mention entity, configure `textualMentionAliases` (for example `["Raven"]`) in the agent's Discord block; the alias is accepted only at the start of a message and the existing user, guild, and channel allow-lists still apply.
+
+### Submit a world proposal
+
+After adding your Discord user ID to `allowedUserIds`, DM the raven or mention it in a permitted server channel with one of these text commands:
+
+```text
+!request object A small copper bell beside the east trail
+!request upgrade aesthetic InnDoorLantern :: Add a warmer, hand-forged brass finish
+!request upgrade variation world :: Scatter a few mossy stones along the stream
+!request help
+```
+
+`world` means the proposal is not tied to a named object. Descriptions are limited to 240 characters; upgrade targets to 96. Each request is deduplicated while pending, and the shared review inbox is capped at 64 pending proposals. A successful command appends a record to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` with `requester` set to the agent's stable ID, so Unreal can associate a later review with the right resident. `object` proposals are marked for the ComfyBlender pipeline; upgrades are human-review only. This is a proposal queue, not an asset-generation trigger: nothing is generated or placed automatically.
 
 ## Run locally
 
