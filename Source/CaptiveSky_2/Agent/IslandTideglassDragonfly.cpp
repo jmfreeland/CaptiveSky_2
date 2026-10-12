@@ -261,6 +261,7 @@ void AIslandTideglassDragonfly::BeginPlay()
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.8f, 1.2f);
 	WingPhase = FMath::FRandRange(0.f, 2.f * PI);
+	FlowerCheckRemaining = FMath::FRandRange(0.8f, 2.2f);
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
 		Weather = *It;
@@ -351,6 +352,7 @@ void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& Observe
 	ScatterDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScatterDirection.IsNearlyZero()) ScatterDirection = GetActorRightVector();
 	ScatterRemaining = 1.6f;
+	FlowerInterestRemaining = 0.f;
 }
 
 void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
@@ -396,7 +398,47 @@ bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLoca
 		110.f);
 	RippleInterestRemaining = 1.8f;
 	RippleInterestCooldownRemaining = 7.f;
+	FlowerInterestRemaining = 0.f;
 	return true;
+}
+
+void AIslandTideglassDragonfly::CheckForNearbyMeadowFlower()
+{
+	if (!Weather.IsValid() || FlowerInterestRemaining > 0.f || FlowerInterestCooldownRemaining > 0.f ||
+		ScatterRemaining > 0.f || RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f)
+		return;
+	if (Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) > 0.45f) return;
+
+	FVector FlowerLocation;
+	if (Weather->FindNearestMeadowFlower(GetActorLocation(), 900.f, FlowerLocation))
+		RespondToMeadowFlower(FlowerLocation);
+}
+
+bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocation)
+{
+	if (FlowerLocation.ContainsNaN() || FlowerInterestRemaining > 0.f || FlowerInterestCooldownRemaining > 0.f ||
+		ScatterRemaining > 0.f || RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f ||
+		FVector::DistSquared(GetActorLocation(), FlowerLocation) > FMath::Square(900.f))
+		return false;
+
+	// This is a brief hover above an existing bloom, not a landing or plant interaction.
+	// Color morphs take slightly different stations so the group does not stack.
+	constexpr float HoverRadius = 32.f;
+	const float HoverAngle = 2.f * PI * static_cast<float>(ColorVariant) / 3.f;
+	FlowerInterestLocation = FlowerLocation + FVector(
+		FMath::Cos(HoverAngle) * HoverRadius,
+		FMath::Sin(HoverAngle) * HoverRadius,
+		100.f);
+	FlowerInterestRemaining = 2.6f;
+	FlowerInterestCooldownRemaining = 16.f;
+	return true;
+}
+
+float AIslandTideglassDragonfly::GetFlowerInterestAlpha() const
+{
+	if (FlowerInterestRemaining <= 0.f) return 0.f;
+	const float Elapsed = 2.6f - FlowerInterestRemaining;
+	return FMath::SmoothStep(0.f, 0.65f, Elapsed) * (1.f - FMath::SmoothStep(1.9f, 2.6f, Elapsed));
 }
 
 void AIslandTideglassDragonfly::CheckForNearbyNaturalSurfaceRipple()
@@ -447,6 +489,8 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	RippleInterestRemaining = FMath::Max(0.f, RippleInterestRemaining - SafeDelta);
 	RippleInterestCooldownRemaining = FMath::Max(0.f, RippleInterestCooldownRemaining - SafeDelta);
+	FlowerInterestRemaining = FMath::Max(0.f, FlowerInterestRemaining - SafeDelta);
+	FlowerInterestCooldownRemaining = FMath::Max(0.f, FlowerInterestCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
@@ -459,6 +503,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 		RippleCheckRemaining = 0.35f;
 		CheckForNearbyNaturalSurfaceRipple();
 	}
+	FlowerCheckRemaining -= SafeDelta;
+	if (FlowerCheckRemaining <= 0.f)
+	{
+		FlowerCheckRemaining = 1.2f;
+		CheckForNearbyMeadowFlower();
+	}
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float MoveScale = RainMovementScale(Rain);
 	const float MotionTime = Time * MotionRate;
@@ -470,7 +520,11 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	const FVector PatrolLocation = HomeLocation + Offset + WindDisplacement(LocalWind);
 	const FVector RippleInterestLocationWithOrbit = RippleInterestLocation + FVector(0.f, 0.f, 12.f) + Offset * 0.12f;
-	const FVector Desired = FMath::Lerp(PatrolLocation, RippleInterestLocationWithOrbit, GetRippleInterestAlpha());
+	const FVector FlowerInterestLocationWithOrbit = FlowerInterestLocation + Offset * 0.08f;
+	const float FlowerInterestAlpha = ScatterRemaining > 0.f ? 0.f : GetFlowerInterestAlpha();
+	const FVector Desired = FMath::Lerp(
+		FMath::Lerp(PatrolLocation, FlowerInterestLocationWithOrbit, FlowerInterestAlpha),
+		RippleInterestLocationWithOrbit, GetRippleInterestAlpha());
 	const FVector Previous = GetActorLocation();
 	const FVector Safe = ResolveFlightPath(Previous, Desired);
 	SetActorLocation(Safe, false);

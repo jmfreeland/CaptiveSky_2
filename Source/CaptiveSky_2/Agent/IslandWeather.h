@@ -99,6 +99,8 @@ public:
 	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Count vertical samples intersecting mature spruce crown envelopes without enabling foliage collision. */
 	int32 CountSpruceCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const;
+	/** Read-only closest-bloom query for small wildlife; rejects invalid radii and never edits instances. */
+	bool FindNearestMeadowFlower(const FVector& Position, float MaxDistance, FVector& OutFlowerLocation) const;
 	/** Conservative upper-crown envelope test for a vertical cover probe; not a waterproofness test. */
 	static bool DoesSpruceCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
 		const FVector& ProbeStart, const FVector& ProbeEnd);

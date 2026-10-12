@@ -1,5 +1,9 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-12 — A small everyday ecology cue
+
+Daytime Tideglass dragonflies now occasionally pause above the nearest existing meadow bloom, then fade back to their pool-side patrol. Flower lookup is read-only; no bloom is landed on, modified, or persisted. Visits are infrequent, suppressed in heavier rain and during raven/ripple responses, and use staggered checks plus a cooldown so the three dragonflies do not become a constant synchronized spectacle. The UE 5.8.3 editor target built and `CaptiveSky2.Agent.NightEcology` passed under NullRHI with thinking disabled; the regression checks nearest-bloom selection, hover geometry, movement toward the bloom, natural return, cooldown, storm suppression, visitor interruption and unchanged HISM instance count (`Saved/Logs/Codex_DragonflyFlowerVisit_NightEcology_Verified_20261012.log`). This is source-and-automation evidence, not yet an in-game visual review; judge how often the visits read at normal play distance during a bounded daylight run.
+
 ## 2026-10-11
 
 This week's repository state is unusually concrete: RatHollow has moved from an idea to a bounded asset/site experiment; a rat-scale PCG understory variant exists; the imported Raven and Rat pipelines are verified; Aster and the Innkeeper have MetaHuman source assets but are not yet assembled; the Island now has a runtime switch that can suppress agent thinking for zero-request PIE validation; and Tideglass Game captures show the visual bottleneck has shifted away from raw foliage count toward composition, materials, landmarks and middle-distance structure.

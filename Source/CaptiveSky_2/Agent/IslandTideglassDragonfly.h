@@ -72,11 +72,18 @@ private:
 	float RippleInterestCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
 	FVector RippleInterestLocation = FVector::ZeroVector;
+	float FlowerInterestRemaining = 0.f;
+	float FlowerInterestCooldownRemaining = 0.f;
+	float FlowerCheckRemaining = 0.f;
+	FVector FlowerInterestLocation = FVector::ZeroVector;
 	int32 ColorVariant = 0;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
 	void CheckForNearbyNaturalSurfaceRipple();
+	void CheckForNearbyMeadowFlower();
 	bool RespondToSurfaceRipple(const FVector& RippleLocation);
 	float GetRippleInterestAlpha() const;
+	bool RespondToMeadowFlower(const FVector& FlowerLocation);
+	float GetFlowerInterestAlpha() const;
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 };

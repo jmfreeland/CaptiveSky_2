@@ -1841,6 +1841,63 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
 
+		if (Weather->IslandMeadowFlowers.IsValidIndex(0) && Weather->IslandMeadowFlowers[0])
+		{
+			UHierarchicalInstancedStaticMeshComponent* FlowerComponent = Weather->IslandMeadowFlowers[0];
+			const bool bFlowerWasVisible = FlowerComponent->GetVisibleFlag();
+			FlowerComponent->SetVisibility(true, true);
+			const FVector BloomLocation = WatchableDragonfly->GetActorLocation() + FVector(300.f, 0.f, -100.f);
+			const int32 FlowerIndex = FlowerComponent->AddInstance(FTransform(FQuat::Identity, BloomLocation), true);
+			const int32 FlowerCountWithFixture = FlowerComponent->GetInstanceCount();
+			FVector NearestBloom;
+			TestTrue(TEXT("The read-only flower query finds a nearby live meadow instance"),
+				Weather->FindNearestMeadowFlower(BloomLocation + FVector(100.f, 0.f, 0.f), 150.f, NearestBloom));
+			TestTrue(TEXT("The query returns the existing bloom location, not a newly authored target"),
+				NearestBloom.Equals(BloomLocation, 0.1f));
+			TestFalse(TEXT("The flower query rejects nonpositive radius"),
+				Weather->FindNearestMeadowFlower(BloomLocation, 0.f, NearestBloom));
+			Weather->WeatherSeed = StormSeed;
+			TestTrue(TEXT("The selected storm seed is still active at the fixture time"),
+				Weather->SampleRainIntensity(World->GetTimeSeconds()) > 0.55f);
+			WatchableDragonfly->Weather = Weather;
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("A heavier passing shower suppresses a new bloom visit"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining));
+			Weather->WeatherSeed = DryWeatherSeed;
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("A calm dragonfly briefly visits a nearby meadow bloom"),
+				WatchableDragonfly->FlowerInterestRemaining > 0.f && WatchableDragonfly->FlowerInterestRemaining <= 2.6f);
+			TestTrue(TEXT("The hover station is just above and beside the existing bloom"),
+				FMath::IsNearlyEqual(WatchableDragonfly->FlowerInterestLocation.Z, BloomLocation.Z + 100.f) &&
+				FMath::IsNearlyEqual(FVector::Dist2D(WatchableDragonfly->FlowerInterestLocation, BloomLocation), 32.f, 0.1f));
+			TestFalse(TEXT("One dragonfly cannot immediately repeat the same flower visit"),
+				WatchableDragonfly->RespondToMeadowFlower(BloomLocation));
+			const FVector BeforeFlowerApproach = WatchableDragonfly->GetActorLocation();
+			WatchableDragonfly->Tick(0.35f);
+			TestTrue(TEXT("The dragonfly begins curving toward its temporary flower hover"),
+				FVector::DistSquared(WatchableDragonfly->GetActorLocation(), WatchableDragonfly->FlowerInterestLocation) <
+				FVector::DistSquared(BeforeFlowerApproach, WatchableDragonfly->FlowerInterestLocation));
+			WatchableDragonfly->Tick(3.f);
+			TestTrue(TEXT("The brief bloom visit fades and the dragonfly returns to its patrol"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining) &&
+				FMath::IsNearlyZero(WatchableDragonfly->GetFlowerInterestAlpha()));
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("The visit cooldown prevents immediate re-entry while the bloom remains nearby"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining) &&
+				WatchableDragonfly->FlowerInterestCooldownRemaining > 0.f);
+			WatchableDragonfly->FlowerInterestCooldownRemaining = 0.f;
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			WatchableDragonfly->RespondToQuietObservation(WatchableDragonfly->GetActorLocation() - FVector(100.f, 0.f, 0.f));
+			TestTrue(TEXT("A nearby visitor startle interrupts rather than competes with a bloom visit"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining) && WatchableDragonfly->ScatterRemaining > 0.f);
+			WatchableDragonfly->ScatterRemaining = 0.f;
+			TestEqual(TEXT("Wildlife observation never adds, removes, or edits meadow flowers"),
+				FlowerComponent->GetInstanceCount(), FlowerCountWithFixture);
+			if (FlowerIndex != INDEX_NONE) FlowerComponent->RemoveInstance(FlowerIndex);
+			FlowerComponent->SetVisibility(bFlowerWasVisible, true);
+			Weather->WeatherSeed = OriginalWeatherSeed;
+		}
+
 		const FVector DragonflyRippleTestHome = TestPoolLocation + FVector(12000.f, 0.f, 800.f);
 		WatchableDragonfly->SetActorLocation(DragonflyRippleTestHome);
 		WatchableDragonfly->HomeLocation = DragonflyRippleTestHome;

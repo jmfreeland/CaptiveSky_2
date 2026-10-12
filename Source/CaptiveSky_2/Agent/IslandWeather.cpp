@@ -493,6 +493,31 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	return static_cast<int32>(Hash % MeadowFlowerSpeciesCount);
 }
 
+bool AIslandWeather::FindNearestMeadowFlower(const FVector& Position, float MaxDistance, FVector& OutFlowerLocation) const
+{
+	if (Position.ContainsNaN() || !FMath::IsFinite(MaxDistance) || MaxDistance <= 0.f) return false;
+	const float MaxDistanceSquared = FMath::Square(MaxDistance);
+	float NearestDistanceSquared = MaxDistanceSquared;
+	bool bFoundFlower = false;
+	for (const UHierarchicalInstancedStaticMeshComponent* FlowerSpecies : IslandMeadowFlowers)
+	{
+		if (!FlowerSpecies || !FlowerSpecies->IsVisible() || FlowerSpecies->GetInstanceCount() <= 0) continue;
+		for (int32 InstanceIndex = 0; InstanceIndex < FlowerSpecies->GetInstanceCount(); ++InstanceIndex)
+		{
+			FTransform InstanceTransform;
+			if (!FlowerSpecies->GetInstanceTransform(InstanceIndex, InstanceTransform, true)) continue;
+			const FVector FlowerLocation = InstanceTransform.GetLocation();
+			if (FlowerLocation.ContainsNaN()) continue;
+			const float DistanceSquared = FVector::DistSquared(Position, FlowerLocation);
+			if (DistanceSquared >= NearestDistanceSquared) continue;
+			NearestDistanceSquared = DistanceSquared;
+			OutFlowerLocation = FlowerLocation;
+			bFoundFlower = true;
+		}
+	}
+	return bFoundFlower;
+}
+
 int32 AIslandWeather::SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& CandidateLocations,
 	const TArray<float>& NearestMatureSpruceDistances, const TArray<int32>& NearbyGrassCounts, int32 FallbackIndex)
 {
