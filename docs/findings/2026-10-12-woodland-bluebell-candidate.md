@@ -25,12 +25,29 @@ landscape carpet.
   `unreal_import.json`, and
   `Saved/Logs/Codex_WoodlandBluebellsImport_20261012.log`.
 
+### UE real-RHI visual gate
+
+An isolated UE 5.8.3 render was captured beside `Roost_West` using transient
+actors; the Island map was not saved. The ordinary final-color capture at
+`Saved/Playtests/Codex_WoodlandBluebellRealRHI_20261012/StaticMesh_RealRHI.png`
+shows the mesh, but its foliage and flowers are nearly monochrome with severe
+dark fragments and hard shadows. A second `SCS_BASE_COLOR` capture at
+`StaticMesh_BaseColor.png` is also neutral gray. The source manifest specifies
+green leaf/stem and blue-violet bloom colors, so this does not pass visual
+review and cannot be explained away as only the scene's lighting. The exact
+cause (material compilation/binding versus capture behavior) remains
+unresolved; inspect the imported mesh's material slots and material outputs
+before changing geometry or placing it in PCG. Capture log:
+`Saved/Logs/Codex_WoodlandBluebellBaseColor_20261012.log` (the earlier
+final-color run is in `Codex_WoodlandBluebellRealRHI_ObjectSpawn_20261012.log`).
+
 ## Remaining review
 
 The FBX preview is a deliberately stylized low-poly interpretation, not a
 photoreal botanical asset. Its 5.1k triangles per clump are high for dense
 ground cover; if approved for placement, test a lower-poly variant or keep
-patch density sparse. Real-RHI appearance, translucency/two-sided foliage
-settings, wind response, LODs, PCG distribution, and gameplay frame-time are
-not validated. Review it beside the existing fern in a shaded Island
-viewpoint before deciding whether it belongs in the landscape.
+patch density sparse. Material/color appearance is currently a failed visual
+gate; translucency/two-sided foliage settings, wind response, LODs, PCG
+distribution, and gameplay frame-time are also unvalidated. Do not place it in
+the Island until the neutral-gray capture is diagnosed and a naturally lit
+viewpoint passes review.
