@@ -198,12 +198,25 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 	Fox->bWaking = false;
 	Fox->bFireflyPresenceNearby = false;
 	Fox->FireflyPresenceCooldownRemaining = 0.f;
-	AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(300.f, 0.f, 100.f), FRotator::ZeroRotator, Spawn);
+	AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(1800.f, 0.f, 100.f), FRotator::ZeroRotator, Spawn);
 	TestNotNull(TEXT("A nearby firefly can be staged for a woodland encounter"), Firefly);
 	if (Firefly)
 	{
+		AStaticMeshActor* FireflySightBlocker = World->SpawnActor<AStaticMeshActor>(
+			FVector(900.f, 0.f, 65.f), FRotator::ZeroRotator, Spawn);
+		if (FireflySightBlocker && Cube)
+		{
+			FireflySightBlocker->GetStaticMeshComponent()->SetStaticMesh(Cube);
+			FireflySightBlocker->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			FireflySightBlocker->GetStaticMeshComponent()->SetCollisionResponseToAllChannels(ECR_Ignore);
+			FireflySightBlocker->GetStaticMeshComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+			FireflySightBlocker->SetActorScale3D(FVector(0.2f, 0.8f, 0.8f));
+		}
 		Fox->CheckForNearbyFirefly();
-		TestTrue(TEXT("An awake, foraging fox briefly notices a nearby firefly without pursuing it"),
+		TestFalse(TEXT("A nearby firefly behind a visibility blocker does not draw a glance"), Fox->bNoticingFirefly);
+		if (FireflySightBlocker) FireflySightBlocker->Destroy();
+		Fox->CheckForNearbyFirefly();
+		TestTrue(TEXT("An awake fox notices a firefly at natural woodland scale without pursuing it"),
 			Fox->bNoticingFirefly && !Fox->bMoving && !Fox->bStartled && Fox->NoticeRemaining > 0.f);
 		const float FirstFireflyNoticeRemaining = Fox->NoticeRemaining;
 		Fox->CheckForNearbyFirefly();
@@ -211,11 +224,11 @@ bool FIslandForestFoxTest::RunTest(const FString& Parameters)
 			Fox->bNoticingFirefly && Fox->NoticeRemaining == FirstFireflyNoticeRemaining);
 		Fox->bNoticingFirefly = false;
 		Fox->bResting = true;
-		Firefly->SetActorLocation(FVector(800.f, 0.f, 100.f));
+		Firefly->SetActorLocation(FVector(3400.f, 0.f, 100.f));
 		Fox->CheckForNearbyFirefly();
 		TestFalse(TEXT("A resting fox remains undisturbed by fireflies"), Fox->bNoticingFirefly);
 		Fox->bResting = false;
-		Firefly->SetActorLocation(FVector(300.f, 0.f, 100.f));
+		Firefly->SetActorLocation(FVector(1800.f, 0.f, 100.f));
 		Fox->FireflyPresenceCooldownRemaining = 0.f;
 		Fox->CheckForNearbyFirefly();
 		TestTrue(TEXT("A new firefly visit can earn one later curious glance"), Fox->bNoticingFirefly);

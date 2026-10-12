@@ -144,8 +144,11 @@ void AIslandForestFox::CheckForNearbyFirefly()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	constexpr float NoticeRadius = 450.f;
-	constexpr float RearmRadius = 700.f;
+	// The local night-firefly habitat is about 28 m from the fox's Wind Arch
+	// woodland edge. A brief light notice can therefore happen as both species
+	// wander toward one another, without making the fox pursue them.
+	constexpr float NoticeRadius = 2200.f;
+	constexpr float RearmRadius = 3200.f;
 	AIslandFirefly* NearbyFirefly = nullptr;
 	bool bFireflyWithinRearmRange = false;
 	for (TActorIterator<AIslandFirefly> It(World); It; ++It)
@@ -157,6 +160,13 @@ void AIslandForestFox::CheckForNearbyFirefly()
 		bFireflyWithinRearmRange = true;
 		if (DistanceSquared <= FMath::Square(NoticeRadius))
 		{
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandForestFoxFireflyNotice), false, this);
+			FHitResult Hit;
+			const FVector FoxEye = GetActorLocation() + FVector(0.f, 0.f, 70.f);
+			const FVector FireflyGlow = Candidate->GetActorLocation() + FVector(0.f, 0.f, 10.f);
+			if (World->LineTraceSingleByChannel(Hit, FoxEye, FireflyGlow, ECC_Visibility, Query) &&
+				Hit.GetActor() != Candidate)
+				continue;
 			NearbyFirefly = Candidate;
 			break;
 		}
