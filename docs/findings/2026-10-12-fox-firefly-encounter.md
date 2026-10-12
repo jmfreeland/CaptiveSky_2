@@ -27,11 +27,23 @@ keeps occlusion from producing through-obstacle glances.
   limit was zero, and test world data used an isolated root.
 - The adjacent `CaptiveSky2.Agent.RavenPerch` regression also passed under
   NullRHI with thinking disabled and zero model requests.
-- This validates state and line-of-sight gating, not the frequency of natural
-  encounters or how the cue reads in rendered play. The prior rendered view hid
-  the fox in tall grass; no map or Content asset was modified.
+- The separate real-RHI `CaptiveSky2.Visual.WoodlandFoxResidentGlance` scene
+  capture passed in the same scratch project. It transiently initialized
+  1,780,637 ground-cover instances, 14,727 trees, and 15,063 shrubs; the fox was
+  visible, with no subject-ray blockers. This is a resident-observation image,
+  not a firefly shot or a live-play encounter. The central landmark pillars
+  still dominate the composition. A tighter/diagonal camera trial enlarged the
+  pillars without clearing the frame, so it was discarded; the next visual pass
+  should stage the wildlife pair in a cleaner woodland-edge patch.
+- The earlier live-view capture hid the fox in tall grass and overlaid texture
+  statistics. No map or Content asset was modified during these captures.
+- Natural firefly encounter frequency and the in-world firefly-glance animation
+  remain unverified; the regression only validates state transitions and
+  line-of-sight gating.
 
 Build log: `C:/Users/freel/AppData/Local/UnrealBuildTool/Log.txt`.
 Automation log: `Saved/Logs/Codex_FoxFirefly_Automation_20261012.log`.
 Raven compatibility log:
 `Saved/Logs/Codex_FoxFirefly_RavenPerch_20261012.log`.
+Rendered resident/fox capture log:
+`Saved/Logs/Codex_FoxResidentGlance_20261012.log`.
