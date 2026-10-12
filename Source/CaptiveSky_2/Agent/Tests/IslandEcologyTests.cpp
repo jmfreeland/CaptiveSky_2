@@ -1325,8 +1325,14 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (StonesDistance <= AIslandListeningStonesChime::AudibleRadius) ++StoneSideFireflies;
 		UPointLightComponent* FireflyGlow = It->FindComponentByClass<UPointLightComponent>();
 		TestNotNull(TEXT("Firefly has a fluctuating glow component"), FireflyGlow);
-		TestTrue(TEXT("The visible body is large enough to read at the ListeningStones viewpoint"),
-			It->GlowingBody && It->GlowingBody->GetRelativeScale3D().X >= 0.07f);
+		TestTrue(TEXT("The emissive core stays smaller than its dark abdomen shell"),
+			It->GlowingBody && It->AbdomenShell &&
+			It->GlowingBody->GetRelativeScale3D().X < It->AbdomenShell->GetRelativeScale3D().X &&
+			It->GlowingBody->GetRelativeScale3D().Y < It->AbdomenShell->GetRelativeScale3D().Y);
+		TestTrue(TEXT("The luminous abdomen is offset far enough to remain visible beyond its shell"),
+			It->GlowingBody && It->AbdomenShell &&
+			FVector::Dist(It->GlowingBody->GetRelativeLocation(), It->AbdomenShell->GetRelativeLocation()) >
+				50.f * (It->AbdomenShell->GetRelativeScale3D().X - It->GlowingBody->GetRelativeScale3D().X));
 		TestNotNull(TEXT("Firefly has a per-instance emissive material"), It->GlowMaterial.Get());
 		if (It->GlowMaterial)
 		{
@@ -1348,6 +1354,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			bHasRightWing |= Part->GetFName() == FName(TEXT("RightWing"));
 		}
 		TestTrue(TEXT("Firefly has separate left and right wing meshes"), bHasLeftWing && bHasRightWing);
+		TestTrue(TEXT("Firefly's dark abdomen shell, thorax and head make a distinct silhouette"),
+			It->AbdomenShell && It->Thorax && It->Head &&
+			It->Thorax->GetRelativeScale3D().X > It->Head->GetRelativeScale3D().X);
 	}
 	TestEqual(TEXT("Night population is bounded at three"), Population, 3);
 	DragonflyPopulation = 0;
@@ -1411,6 +1420,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			const float ClearGlowAtFixedPhase = RainSensitiveFirefly->Glow->Intensity;
 			RainSensitiveFirefly->UpdateGlow(1.37, 1.f);
 			TestTrue(TEXT("The same natural pulse is visibly dimmer in heavy rain"), RainSensitiveFirefly->Glow->Intensity < ClearGlowAtFixedPhase);
+			RainSensitiveFirefly->Phase = -1.37f * 4.2f;
+			RainSensitiveFirefly->UpdateGlow(1.37, 0.f);
+			TestTrue(TEXT("A firefly retains a visible ember at the natural pulse trough"), RainSensitiveFirefly->Glow->Intensity >= 9.f);
 			RainSensitiveFirefly->UpdateGlow(World->GetTimeSeconds(), Weather->SampleRainIntensity(World->GetTimeSeconds()));
 			Weather->MaximumWindSpeed = OriginalWindSpeed;
 			Weather->WeatherSeed = RainTestWeatherSeed;

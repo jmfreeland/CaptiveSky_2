@@ -57,6 +57,15 @@ private:
 	TObjectPtr<UStaticMeshComponent> GlowingBody;
 
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> AbdomenShell;
+
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> Thorax;
+
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> Head;
+
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> LeftWing;
 
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -79,8 +88,10 @@ private:
 	TWeakObjectPtr<AIslandDayNight> DayNight;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
+	bool bBodyAppearanceConfigured = false;
 	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
+	void ConfigureBodyAppearance();
 	void EnsureGlowMaterial();
 	void CheckForNearbyStoneChime();
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
