@@ -67,6 +67,18 @@ def build(A):
         A.tube("hazel_bark", path, 0.044 - 0.019 * (stem / stem_count), segs=7,
                taper=lambda t: 1.0 - 0.64 * t, name="hazelStem_{}".format(stem))
 
+        # Alternate leaves along the primary stems as well as on side shoots;
+        # this closes the bare central and upper gaps without using leaf blobs.
+        stem_leaf_dirs = (radial + Vector((0, 0, 0.24)),
+                          tangent * 0.72 + radial * 0.28 + Vector((0, 0, 0.30)),
+                          -tangent * 0.72 + radial * 0.28 + Vector((0, 0, 0.30)))
+        for node, point in enumerate(path[2:]):
+            for leaf_index, raw_direction in enumerate(stem_leaf_dirs):
+                direction = (raw_direction + tangent * (0.08 * ((node + leaf_index) % 2))).normalized()
+                _leaf(A, point - direction * 0.075, direction, 0.126, 0.215,
+                      ("hazel_leaf_deep", "hazel_leaf_mid", "hazel_leaf_light")[(stem + node + leaf_index) % 3],
+                      "hazelMainLeaf_{}_{}_{}".format(stem, node, leaf_index))
+
         # Short side shoots break the silhouette and carry smaller leaf sprays.
         for shoot in range(5):
             t = 0.34 + shoot * 0.12
