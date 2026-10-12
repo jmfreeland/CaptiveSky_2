@@ -96,3 +96,23 @@ export, or asset save was performed. Resume only after the editor is stably
 targetable, then use the smaller shrub or measured Hazel D in its disposable
 copy, select `Static Mesh` explicitly, and verify the output before any Island
 integration.
+
+**UE 5.8 instanced-skeletal route audit (2026-10-12):** the installed engine
+does include `UInstancedSkinnedMeshComponent`, with per-instance transforms
+and animation indices, but it requires a `UTransformProviderData`. The engine
+exposes animation-bank, animation-sequence, and runtime transform-provider
+variants; it does not make a SkeletalMesh automatically behave like a static
+foliage instance. A fresh Content inventory found the 16 A-D tree outputs are
+SkeletalMeshes and found no standalone tree animation assets. A custom runtime
+wind provider remains a possible future route, but would need its own bone
+transform generation, valid bounds, material `InstancedSkinnedMesh` usage, and
+real-RHI cost/appearance checks. There is no evidence yet that the current
+Megaplant materials or skeletal outputs are ready for that path. For adding
+middle-distance tree variety, continue with the isolated PVE **Static Mesh**
+export candidate first; do not scatter the skeletal outputs or infer that
+enabling Nanite foliage alone resolves their runtime cost. Evidence: engine
+headers `Components/InstancedSkinnedMeshComponent.h`,
+`Animation/TransformProviderData.h`, `Animation/AnimBank.h`, and
+`Animation/AnimSequenceTransformProviderData.h`; local inventory logs linked
+above. This was a read-only audit: no plugin, source graph, material, or Island
+state changed.
