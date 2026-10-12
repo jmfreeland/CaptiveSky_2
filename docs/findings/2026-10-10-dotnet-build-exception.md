@@ -44,3 +44,31 @@ user's approval. The repository's `Scripts/Watch-UnrealDotnet.ps1` can record
 process paths, command lines (with common secret fields redacted), and matching
 Application events during an observed build/run window, but it cannot recover a
 managed exception stack by itself.
+
+## UE 5.8 AutoSDK correlation (2026-10-12)
+
+The bounded real-RHI Bracket Fungus Game launch logged
+`UBT AutoSDK ReturnCode: -532462766` immediately after
+`Build.bat -Mode=ValidatePlatforms`. Interpreted as a signed 32-bit value, this
+is `0xE0434352`, the same exception code shown in the reported
+`dotnet.exe - Application Error` dialog. That launch nevertheless continued to
+load the preview world, ran for its 60-second cap with zero model requests, and
+exited normally. This is direct evidence that UE's AutoSDK validation path can
+emit the matching managed-exception code, but it does not prove that every
+dialog—or the intermittent startup stalls—has the same cause.
+
+Two later bounded real-RHI launches logged the same
+`Build.bat -Mode=ValidatePlatforms` invocation and `TurnkeySupport` load, then
+made no further startup progress until their 300-second and 180-second guards
+terminated only the launched Game process trees. Neither reached world-ready,
+so neither produced a texture-pool measurement. A read-only Windows Application
+log query covering the three hours around the latter launch found no matching
+`.NET Runtime` or `Application Error` event. After that attempt, no Unreal or
+dotnet process remained. The log pair is
+[`successful launch`](../../Saved/Logs/Codex_BracketFungusArtPassRealRHI_20261012.log)
+and
+[`startup timeout`](../../Saved/Logs/Codex_TextureBudgetPostCapCoverage_20261012.log).
+Do not enable a process dump without approval: it can contain secrets and
+other in-memory data. If the dialog recurs, the safe next diagnostic remains a
+narrowly scoped WER dump for the bundled UE `dotnet.exe` or a matching managed
+exception event.
