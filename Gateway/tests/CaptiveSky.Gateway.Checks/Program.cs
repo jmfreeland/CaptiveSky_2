@@ -157,6 +157,22 @@ try
         "gateway does not duplicate memory owned by the embodiment");
     Assert(DiscordChannelAdapter.HasTextualMention("@Raven hello", "Raven"), "pasted bot mentions are accepted");
     Assert(!DiscordChannelAdapter.HasTextualMention("@Ravenous hello", "Raven"), "partial aliases are rejected");
+    var discordAuthors = new DiscordConfiguration
+    {
+        AllowedUserIds = [42],
+        AllowedBotUserIds = [9001],
+        AllowedChannelIds = [88]
+    };
+    Assert(DiscordChannelAdapter.IsAllowedAuthor(42, false, discordAuthors), "explicitly allowed human remains accepted");
+    Assert(!DiscordChannelAdapter.IsAllowedAuthor(43, false, discordAuthors), "unlisted human remains rejected");
+    Assert(DiscordChannelAdapter.IsAllowedAuthor(9001, true, discordAuthors), "explicitly trusted Architect bot can address Raven");
+    Assert(!DiscordChannelAdapter.IsAllowedAuthor(9002, true, discordAuthors), "unlisted bots remain rejected");
+    Assert(!DiscordChannelAdapter.IsAllowedAuthor(42, true, discordAuthors), "human allow-list never implicitly trusts a bot");
+    Assert(DiscordChannelAdapter.IsAllowedAuthor(43, false, new DiscordConfiguration()), "empty human allow-list preserves ordinary conversation behavior");
+    Assert(!DiscordChannelAdapter.IsAllowedAuthor(9001, true, new DiscordConfiguration()), "empty bot allow-list trusts no bots");
+    Assert(DiscordChannelAdapter.IsAllowedBotChannel(88, discordAuthors), "trusted bot requires the explicitly allowed shared channel");
+    Assert(!DiscordChannelAdapter.IsAllowedBotChannel(89, discordAuthors), "trusted bot cannot use a different channel");
+    Assert(!DiscordChannelAdapter.IsAllowedBotChannel(88, new DiscordConfiguration()), "empty channel allow-list rejects bot conversation");
 
     Assert(DiscordProposalCommand.IsCommand("!request object a bell"), "explicit proposal command is recognized");
     Assert(!DiscordProposalCommand.IsCommand("!requestion object a bell"), "proposal command prefix is exact");
@@ -200,6 +216,10 @@ try
         "agent proposal is not submitted for a visitor outside the explicit allow-list");
     Assert(!File.Exists(Path.Combine(agentProposalRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl")),
         "unauthorized agent proposal leaves the review inbox untouched");
+    var blockedBotProposal = await AgentProposalSubmission.SubmitAsync(
+        agentProposalQueue, home.AgentId, ravenDiscord, proposedAction, 9001, "Architect", "10", "109", CancellationToken.None);
+    Assert(blockedBotProposal.Contains("allowedUserIds", StringComparison.Ordinal),
+        "trusted conversation bot cannot submit resident proposals as a human");
     var allowedAgentProposal = await AgentProposalSubmission.SubmitAsync(
         agentProposalQueue, home.AgentId, ravenDiscord, proposedAction, 42, "Visitor", "10", "110", CancellationToken.None);
     Assert(allowedAgentProposal.Contains("queued for human review", StringComparison.Ordinal),

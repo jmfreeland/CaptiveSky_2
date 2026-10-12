@@ -82,9 +82,12 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
     {
         try
         {
-            if (_handler is null || socketMessage is not SocketUserMessage message || message.Author.IsBot)
+            if (_handler is null || socketMessage is not SocketUserMessage message)
                 return;
-            if (!IsAllowedUser(message.Author.Id) || !IsAddressedToAgent(message))
+            if (!IsAllowedAuthor(message.Author.Id, message.Author.IsBot, _agent.Discord) || !IsAddressedToAgent(message))
+                return;
+            if (message.Author.IsBot &&
+                (message.Channel is not SocketGuildChannel || !IsAllowedBotChannel(message.Channel.Id, _agent.Discord)))
                 return;
 
             var text = RemoveBotMention(message.Content).Trim();
@@ -163,8 +166,13 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
         }
     }
 
-    private bool IsAllowedUser(ulong userId) =>
-        _agent.Discord.AllowedUserIds.Count == 0 || _agent.Discord.AllowedUserIds.Contains(userId);
+    public static bool IsAllowedAuthor(ulong userId, bool isBot, DiscordConfiguration configuration) =>
+        isBot
+            ? configuration.AllowedBotUserIds.Contains(userId)
+            : configuration.AllowedUserIds.Count == 0 || configuration.AllowedUserIds.Contains(userId);
+
+    public static bool IsAllowedBotChannel(ulong channelId, DiscordConfiguration configuration) =>
+        configuration.AllowedChannelIds.Count > 0 && configuration.AllowedChannelIds.Contains(channelId);
 
     private bool IsAddressedToAgent(SocketUserMessage message)
     {

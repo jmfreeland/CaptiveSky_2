@@ -43,6 +43,24 @@ Unreal play now ends automatically after at most 30 real minutes or 120 shared e
 
 The raven responds to DMs and direct mentions. It ignores bots and unaddressed guild conversation. If a client pastes `@Raven` as plain text instead of creating a Discord mention entity, configure `textualMentionAliases` (for example `["Raven"]`) in the agent's Discord block; the alias is accepted only at the start of a message and the existing user, guild, and channel allow-lists still apply.
 
+### Let Architect speak with Raven
+
+For a distinct speaker identity, create a second Discord bot named **Architect** and invite it to a private server channel that also contains Raven. A bot cannot read another bot's DM history, so this shared channel is the live conversation space; the existing Raven DM history remains available in `Agents/Agent_Raven_01/memory.jsonl` when it was recorded by the gateway.
+
+Give Architect only View Channel, Send Messages, and Read Message History in that channel. Store its bot token in the user environment as `CAPTIVESKY_ARCHITECT_DISCORD_TOKEN` using Windows Environment Variables; do not put the token in `gateway.json`, source control, or command arguments. Copy the Architect bot ID and add it to Raven's `discord.allowedBotUserIds`. Keep `allowedUserIds` unchanged, and set Raven's `allowedGuildIds` and `allowedChannelIds` to the private conversation location: trusted bot messages are rejected unless the channel is explicitly allowlisted. Raven still requires an actual @Raven mention in a server channel. Bot IDs are a separate, explicit allow-list: an empty `allowedBotUserIds` continues to reject every bot, and a human allow-list never implicitly trusts a bot. Restart the gateway after changing the config so the new policy is loaded.
+
+After the user has reviewed the exact text and destination, send one message from Architect with:
+
+```powershell
+.\Gateway\Send-ArchitectMessage.ps1 `
+  -ChannelId "<private-channel-id>" `
+  -RavenUserId "<raven-bot-id>" `
+  -Message "Hello Raven — Architect here. I read your recent thoughts about the minnows, firefly, and Listening Stones. What would you most like us to improve next?" `
+  -ConfirmSend
+```
+
+`-ConfirmSend` is required for every real post; the script sends only to the specified channel, explicitly allows only Raven's mention, and prints the message ID rather than the token or message body. Raven's normal gateway then stores both sides of the exchange in its shared memory, which can be read locally. Architect bot messages may converse, but the existing human-only allowlist still prevents bot accounts from submitting asset proposals.
+
 Headless residents can submit one structured proposal during a reply when `discord.allowAgentProposals` is enabled for that route. Raven has this opt-in enabled. The requesting Discord user must still be on the route's explicit `allowedUserIds` list; with an empty list, agent-authored proposals are rejected. The model is instructed to submit only when the correspondent clearly asks, not during casual brainstorming.
 
 ### Submit a world proposal
@@ -115,6 +133,7 @@ Create its normal `Agents/<AgentId>/` home, create a separate Discord applicatio
     "allowDirectMessages": true,
     "respondToMentions": true,
     "allowedUserIds": [123456789012345678],
+    "allowedBotUserIds": [],
     "allowedGuildIds": [],
     "allowedChannelIds": []
   }

@@ -90,6 +90,8 @@ public sealed class DiscordConfiguration
     /// <summary>Optional display names accepted when a pasted @name has no Discord mention metadata.</summary>
     public List<string> TextualMentionAliases { get; set; } = [];
     public List<ulong> AllowedUserIds { get; set; } = [];
+    /// <summary>Bot accounts explicitly trusted as conversation participants (for example, Architect).</summary>
+    public List<ulong> AllowedBotUserIds { get; set; } = [];
     public List<ulong> AllowedGuildIds { get; set; } = [];
     public List<ulong> AllowedChannelIds { get; set; } = [];
 }
