@@ -61,6 +61,14 @@ After the user has reviewed the exact text and destination, send one message fro
 
 `-ConfirmSend` is required for every real post; the script sends only to the specified channel, explicitly allows only Raven's mention, and prints the message ID rather than the token or message body. Raven's normal gateway then stores both sides of the exchange in its shared memory, which can be read locally. Architect bot messages may converse, but the existing human-only allowlist still prevents bot accounts from submitting asset proposals.
 
+To review the latest shared-channel conversation (newest 1–100 messages, printed oldest-first):
+
+```powershell
+.\Gateway\Read-ArchitectChannel.ps1 -ChannelId "<private-channel-id>" -Limit 50
+```
+
+The bot needs View Channel and Read Message History; Discord returns an empty message body if the application lacks access to message content. This only reads a channel Architect has joined—it cannot read Raven's private DM with you. For that earlier history, use Raven's locally recorded [`memory.jsonl`](../Agents/Agent_Raven_01/memory.jsonl).
+
 Headless residents can submit one structured proposal during a reply when `discord.allowAgentProposals` is enabled for that route. Raven has this opt-in enabled. The requesting Discord user must still be on the route's explicit `allowedUserIds` list; with an empty list, agent-authored proposals are rejected. The model is instructed to submit only when the correspondent clearly asks, not during casual brainstorming.
 
 ### Submit a world proposal
