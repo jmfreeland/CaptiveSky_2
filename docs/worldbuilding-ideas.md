@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-12 — Woodland structure: keep the mid-distance art-directed
+
+The second collisionless hazel-coppice mesh passed structural Blender/FBX
+checks at 12,310 triangles but still read as disconnected angular leaf sprays
+in its re-imported preview, so it is not an Island candidate. Together with
+the earlier Game-rejected skeletal hazel thicket and the fern's unresolved
+shadow review, this is evidence against generating more isolated procedural
+plant meshes without a proven foliage material/silhouette. Next try a sparse,
+art-directed grouping of assets already proven in Game, or the isolated PVE
+Static Mesh export once the UE editor is stable; judge it in the fixed
+Tideglass-to-Woodland Game view before any map placement. See the
+[coppice candidate review](findings/2026-10-12-woodland-hazel-coppice.md).
+
 ## 2026-10-12 — A small everyday ecology cue
 
 Daytime Tideglass dragonflies now occasionally pause above the nearest existing meadow bloom, then fade back to their pool-side patrol. Flower lookup is read-only; no bloom is landed on, modified, or persisted. Visits are infrequent, suppressed in heavier rain and during raven/ripple responses, and use staggered checks plus a cooldown so the three dragonflies do not become a constant synchronized spectacle. The UE 5.8.3 editor target built and `CaptiveSky2.Agent.NightEcology` passed under NullRHI with thinking disabled; the regression checks nearest-bloom selection, hover geometry, movement toward the bloom, natural return, cooldown, storm suppression, visitor interruption and unchanged HISM instance count (`Saved/Logs/Codex_DragonflyFlowerVisit_NightEcology_Verified_20261012.log`). This is source-and-automation evidence, not yet an in-game visual review; judge how often the visits read at normal play distance during a bounded daylight run.
