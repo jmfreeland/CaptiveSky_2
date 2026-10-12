@@ -37,9 +37,19 @@ keeps occlusion from producing through-obstacle glances.
   should stage the wildlife pair in a cleaner woodland-edge patch.
 - The earlier live-view capture hid the fox in tall grass and overlaid texture
   statistics. No map or Content asset was modified during these captures.
-- Natural firefly encounter frequency and the in-world firefly-glance animation
-  remain unverified; the regression only validates state transitions and
-  line-of-sight gating.
+- `LogIslandForestFox` now emits only an opt-in `Verbose` line when a glance
+  actually begins. In an isolated 5-minute D3D12 `-game -Spectator` run at
+  20:00, the naturally spawned fox noticed a naturally spawned/wandering
+  firefly once, at 20.6 m, about 110 seconds after the safety window began.
+  The session ended normally after 300.1 real seconds with zero model requests;
+  resident thinking and Python were disabled, and world-state used a separate
+  data root. This proves the encounter can happen in the real Island setup, but
+  one run is not enough to estimate its typical frequency, and the animation's
+  visual readability during that live event remains unverified.
+- A fresh `CaptiveSky_2` Game-target build could not complete because other
+  shared, dirty source/test files call editor-only `GetActorLabel`. The fox
+  source compiled in the Editor target, which then ran the map with `-game` for
+  this probe; those unrelated files were left untouched.
 
 Build log: `C:/Users/freel/AppData/Local/UnrealBuildTool/Log.txt`.
 Automation log: `Saved/Logs/Codex_FoxFirefly_Automation_20261012.log`.
@@ -47,3 +57,7 @@ Raven compatibility log:
 `Saved/Logs/Codex_FoxFirefly_RavenPerch_20261012.log`.
 Rendered resident/fox capture log:
 `Saved/Logs/Codex_FoxResidentGlance_20261012.log`.
+Natural nighttime probe log:
+`Saved/Logs/Codex_FoxFireflyNightProbe_Run2_20261012.log`.
+Telemetry regression log:
+`Saved/Logs/Codex_FoxFireflyTelemetry_Automation_20261012.log`.

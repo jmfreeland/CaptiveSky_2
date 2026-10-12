@@ -8,7 +8,10 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "IslandFirefly.h"
+#include "Logging/LogMacros.h"
 #include "UObject/ConstructorHelpers.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogIslandForestFox, Log, All);
 
 AIslandForestFox::AIslandForestFox()
 {
@@ -182,6 +185,10 @@ void AIslandForestFox::CheckForNearbyFirefly()
 	bFireflyPresenceNearby = true;
 	FireflyPresenceCooldownRemaining = 8.f;
 	bNoticingFirefly = true;
+	UE_LOG(LogIslandForestFox, Verbose,
+		TEXT("Woodland fox noticed firefly at %.1f m (fox=%s, firefly=%s)"),
+		FMath::Sqrt(FVector::DistSquared(GetActorLocation(), NearbyFirefly->GetActorLocation())) / 100.f,
+		*GetActorLocation().ToCompactString(), *NearbyFirefly->GetActorLocation().ToCompactString());
 	NoticeRemaining = FMath::Clamp(LookAroundAnimation->GetPlayLength(), 0.5f, 2.0f);
 	FoxMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	FoxMesh->PlayAnimation(LookAroundAnimation, false);
