@@ -36,3 +36,12 @@ remain modest. The Unreal import is structurally validated but has not yet had
 a real-RHI in-game preview or Rat-capsule traversal test. Keep it as an
 unplaced art candidate until those checks establish a convincing woodland
 composition and safe collision.
+
+**Isolated Unreal preview attempt (2026-10-12):** duplicating the existing
+preview map and loading that duplicate from the same Editor-Cmd Python session
+hit UE 5.8's fatal `World Memory Leaks` check while replacing the world; no
+gameplay screenshot was produced. The disposable preview map was not saved and
+the Island was not modified. The one-off helper was removed rather than
+re-running the same world-switch sequence. A later visual check needs either a
+separate process for map duplication and map loading, or the live editor.
+Log: `Saved/Logs/Codex_BracketFungusArtPassPreviewMap_20261012.log`.
