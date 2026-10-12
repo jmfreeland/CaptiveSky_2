@@ -5,7 +5,8 @@ and -ExecutePythonScript=Scripts/Preview-GeneratedStaticMesh.py. Optional
 environment variables: CAPTIVESKY_PREVIEW_ASSET, CAPTIVESKY_PREVIEW_TARGET_LABEL,
 CAPTIVESKY_PREVIEW_OUTPUT (a project-relative path),
 CAPTIVESKY_PREVIEW_CAPTURE_SOURCE (an Unreal SceneCaptureSource enum name), and
-CAPTIVESKY_PREVIEW_FILENAME.
+CAPTIVESKY_PREVIEW_FILENAME. Set CAPTIVESKY_PREVIEW_SCENE_MODE to "full" to
+render the Island around the transient preview actor instead of an isolated actor.
 """
 import os
 
@@ -24,6 +25,7 @@ OUTPUT_RELATIVE = os.environ.get(
 )
 CAPTURE_SOURCE = os.environ.get("CAPTIVESKY_PREVIEW_CAPTURE_SOURCE", "SCS_FINAL_COLOR_LDR")
 OUTPUT_FILENAME = os.environ.get("CAPTIVESKY_PREVIEW_FILENAME", "StaticMesh_RealRHI.png")
+CAPTURE_SCENE_MODE = os.environ.get("CAPTIVESKY_PREVIEW_SCENE_MODE", "isolated").lower()
 
 
 def log(message):
@@ -44,6 +46,34 @@ world = require(
 actor_tools = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 require(actor_tools, "Editor Actor Subsystem is unavailable")
 mesh = require(unreal.load_asset(ASSET), "Could not load preview Static Mesh: " + ASSET)
+section_count = mesh.get_num_sections(0)
+log("lod0_section_count={}".format(section_count))
+
+for index, slot in enumerate(mesh.get_editor_property("static_materials")):
+    slot_name = slot.get_editor_property("material_slot_name")
+    material = slot.get_editor_property("material_interface")
+    material_path = material.get_path_name() if material else "<none>"
+    log("asset_slot[{}] name={} material={}".format(index, slot_name, material_path))
+    if material:
+        try:
+            input_node = unreal.MaterialEditingLibrary.get_material_property_input_node(
+                material, unreal.MaterialProperty.MP_BASE_COLOR
+            )
+            if input_node:
+                class_name = input_node.get_class().get_name()
+                output_name = unreal.MaterialEditingLibrary.get_material_property_input_node_output_name(
+                    material, unreal.MaterialProperty.MP_BASE_COLOR
+                )
+                detail = ""
+                if class_name == "MaterialExpressionConstant3Vector":
+                    detail = " value={}".format(input_node.get_editor_property("constant"))
+                log("base_color_input path={} class={} output={}{}".format(
+                    material_path, class_name, output_name, detail
+                ))
+            else:
+                log("base_color_input path={} <none>".format(material_path))
+        except Exception as exc:
+            log("material_graph_inspection_unavailable path={} reason={}".format(material_path, exc))
 
 target_actor = next(
     (actor for actor in actor_tools.get_all_level_actors()
@@ -86,26 +116,11 @@ mesh_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
 mesh_component.set_visibility(True, True)
 mesh_component.set_hidden_in_game(False)
 mesh_actor.set_actor_hidden_in_game(False)
-
-# A temporary ground plane gives the foliage a readable scale cue. The capture
-# is restricted to these two transient actors so nearby Island art cannot occlude it.
-floor_actor = require(
-    actor_tools.spawn_actor_from_class(
-        unreal.StaticMeshActor, mesh_location + unreal.Vector(0.0, 0.0, -2.0),
-        unreal.Rotator(0.0, 0.0, 0.0), True),
-    "Could not spawn transient preview ground",
-)
-floor_component = floor_actor.get_component_by_class(unreal.StaticMeshComponent)
-floor_mesh = require(unreal.load_asset("/Engine/BasicShapes/Plane.Plane"),
-                     "Could not load Unreal's basic preview plane")
-floor_material = require(unreal.load_asset(
-    "/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/Materials/M_Lib_Bluebell_leaf.M_Lib_Bluebell_leaf"),
-    "Could not load the preview foliage material",
-)
-floor_component.set_static_mesh(floor_mesh)
-floor_component.set_material(0, floor_material)
-floor_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
-floor_actor.set_actor_scale3d(unreal.Vector(4.0, 4.0, 1.0))
+for index in range(mesh_component.get_num_materials()):
+    material = mesh_component.get_material(index)
+    log("component_slot[{}] material={}".format(
+        index, material.get_path_name() if material else "<none>"
+    ))
 
 look_at = mesh_location + unreal.Vector(0.0, 0.0, 17.0)
 camera_location = look_at + unreal.Vector(72.0, -92.0, 58.0)
@@ -121,11 +136,17 @@ capture.set_editor_property("capture_every_frame", False)
 capture.set_editor_property("capture_on_movement", False)
 capture.set_editor_property("fov_angle", 48.0)
 capture.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, CAPTURE_SOURCE))
-capture.set_editor_property(
-    "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
-)
-capture.show_only_component(mesh_component)
-capture.show_only_component(floor_component)
+if CAPTURE_SCENE_MODE == "isolated":
+    capture.set_editor_property(
+        "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
+    )
+    capture.show_only_component(mesh_component)
+elif CAPTURE_SCENE_MODE == "full":
+    capture.set_editor_property(
+        "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_RENDER_SCENE_PRIMITIVES
+    )
+else:
+    raise RuntimeError("CAPTIVESKY_PREVIEW_SCENE_MODE must be 'isolated' or 'full'")
 
 render_target = unreal.RenderingLibrary.create_render_target2d(
     world,
@@ -144,6 +165,7 @@ os.makedirs(output_directory, exist_ok=True)
 unreal.RenderingLibrary.export_render_target(
     world, render_target, output_directory, OUTPUT_FILENAME
 )
-log("map={} target={} asset={} source={} location={} output={}/{}".format(
-    MAP, TARGET_LABEL, ASSET, CAPTURE_SOURCE, mesh_location, output_directory, OUTPUT_FILENAME
+log("map={} target={} asset={} source={} scene_mode={} location={} output={}/{}".format(
+    MAP, TARGET_LABEL, ASSET, CAPTURE_SOURCE, CAPTURE_SCENE_MODE, mesh_location,
+    output_directory, OUTPUT_FILENAME
 ))

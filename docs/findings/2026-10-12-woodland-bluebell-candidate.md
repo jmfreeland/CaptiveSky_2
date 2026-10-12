@@ -32,22 +32,31 @@ actors; the Island map was not saved. The ordinary final-color capture at
 `Saved/Playtests/Codex_WoodlandBluebellRealRHI_20261012/StaticMesh_RealRHI.png`
 shows the mesh, but its foliage and flowers are nearly monochrome with severe
 dark fragments and hard shadows. A second `SCS_BASE_COLOR` capture at
-`StaticMesh_BaseColor.png` is also neutral gray. The source manifest specifies
-green leaf/stem and blue-violet bloom colors, so this does not pass visual
-review and cannot be explained away as only the scene's lighting. The exact
-cause (material compilation/binding versus capture behavior) remains
-unresolved; inspect the imported mesh's material slots and material outputs
-before changing geometry or placing it in PCG. Capture log:
-`Saved/Logs/Codex_WoodlandBluebellBaseColor_20261012.log` (the earlier
-final-color run is in `Codex_WoodlandBluebellRealRHI_ObjectSpawn_20261012.log`).
+`StaticMesh_BaseColor.png` also appears neutral gray. A UE-side audit then
+confirmed all three asset slots and the spawned component slots reference the
+expected materials; each material's connected base-color node contains the
+manifest value (stem `(0.20, 0.31, 0.11)`, leaf `(0.11, 0.23, 0.075)`, bloom
+`(0.24, 0.20, 0.52)`). LOD0 has three render sections. This rules out missing
+material assets and missing component assignments, but does not yet prove the
+section-to-slot mapping. A full-scene SceneCapture attempt also produced a
+heavily occluded, partly black frame
+(`StaticMesh_FullSceneAudit.png`), so this preview method is not reliable
+enough to judge the in-game colors. Do not retune source colors based on these
+captures. The exact issue—section mapping or a SceneCapture/render-path
+difference—remains unresolved; verify in a normal editor/game viewport before
+placing the candidate in PCG. Audit log:
+`Saved/Logs/Codex_WoodlandBluebellSectionAudit_20261012.log`; the base-color
+material values are in `Codex_WoodlandBluebellMaterialInputAudit_20261012.log`.
+The earlier captures are in `Codex_WoodlandBluebellBaseColor_20261012.log` and
+`Codex_WoodlandBluebellRealRHI_ObjectSpawn_20261012.log`.
 
 ## Remaining review
 
 The FBX preview is a deliberately stylized low-poly interpretation, not a
 photoreal botanical asset. Its 5.1k triangles per clump are high for dense
 ground cover; if approved for placement, test a lower-poly variant or keep
-patch density sparse. Material/color appearance is currently a failed visual
-gate; translucency/two-sided foliage settings, wind response, LODs, PCG
-distribution, and gameplay frame-time are also unvalidated. Do not place it in
-the Island until the neutral-gray capture is diagnosed and a naturally lit
-viewpoint passes review.
+patch density sparse. In-game material/color appearance is unverified because
+the transient SceneCapture diagnostics are unreliable; translucency/two-sided
+foliage settings, wind response, LODs, PCG distribution, and gameplay
+frame-time are also unvalidated. Do not place it in the Island until a normal
+viewport or gameplay viewpoint passes review.
