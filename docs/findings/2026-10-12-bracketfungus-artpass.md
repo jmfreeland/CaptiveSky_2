@@ -61,3 +61,16 @@ texture-pool sample:
 `Saved/Logs/Codex_BracketFungusHazelBarkSettledRealRHI_20261012.log`. Thus the
 Hazel override remains visually unverified, and the art candidate stays
 unplaced. The Island remains untouched throughout.
+
+**Scratch-project RHI retry (2026-10-12):** with no Unreal process reported,
+the same disposable preview map was launched through the isolated
+`Claude_Props` project, with a unique local DDC, shader-working directory and
+world-data root. Agent thinking and Python were disabled, model requests were
+capped at zero, gameplay at 60 seconds, and startup at 120 seconds. The process
+did not reach the map's world-ready marker; its log stops during early Slate and
+DDC startup, before map load. No screenshots or runtime texture-pool counters
+were produced, so this says nothing about the prop's appearance or Island
+texture budget. The guarded launch ended without a world-ready marker, and a
+follow-up process check found no Unreal Editor/Game process. Do not repeat the
+same launch route; resume visual review when the editor/startup path is stable.
+Log: [`Codex_BracketFungusScratchRHI_20261012.log`](../../Saved/Logs/Codex_BracketFungusScratchRHI_20261012.log).
