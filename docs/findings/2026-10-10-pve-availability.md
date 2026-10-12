@@ -59,3 +59,28 @@ the unstable UI just to repeat the dialog. Logs:
 The read-only inspector's vector and SkeletalMesh handling were corrected and
 this final commandlet run completed successfully with the same 16/16 skeletal,
 0 static-mesh result and no asset-load errors.
+
+**PlantFactory content-mount update (2026-10-12):** the project-local
+content-only `PlantFactoryPlugin` is now explicitly disabled in
+`CaptiveSky_2.uproject`. Its two billboard functions were migrated to project
+content, the three meadow master materials and generated Rhododendron repair
+copy were rewired and recompiled, and a fresh UE 5.8.3 commandlet loaded Island
+with zero PlantFactory assets mounted. The original plugin directory remains
+for rollback; no PVE graph or Island placement was changed. This supersedes
+earlier notes in this document saying to keep the PlantFactory mount enabled;
+see [the migration finding](2026-10-12-plantfactory-migration.md). PVE remains
+independently enabled and the static-mesh export task is still unverified.
+
+**Installed PVE export API check (2026-10-12):** UE 5.8 exposes the export
+settings on `UPVExportSettings`/`FPVExportParams`, including a standard
+`StaticMesh` output mode, but the asset-baking implementation
+(`FPVExporter` / `PV::Export::ExportCollectionAsMesh`) lives in the editor
+module's `Private` source. I found no project-callable Python or Blueprint
+export function in the installed plugin sources. That means setting the graph
+node's export type alone is not an export; a commandlet route would have to
+evaluate the copied graph through PCG and prove the export node performs the
+bake. This route remains untested. No editor process was running during this
+inspection, and no graph, asset, or map was changed. Prefer the existing
+disposable graph's editor export dialog when the editor is stable; if pursuing
+automation, first validate PCG graph execution and asset creation in a scratch
+project, never on the source graph or Island.
