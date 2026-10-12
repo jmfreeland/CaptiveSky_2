@@ -29,3 +29,14 @@ The path uses the project's `CaptiveSkyDataRoot` override, so isolated playtests
 7. Import and place only after review. `Content/` and the Island map are local-only/ignored; preserve backups and verify placements in-game.
 
 The asset pipeline reference is `Saved/CaptiveSky/ComfyBlender/ASSET_CREATION.md`; its current index is `Saved/CaptiveSky/ComfyBlender/ASSETS.md`.
+
+## Regression check
+
+On 2026-10-12, the bundled Python runtime ran
+`-m unittest discover -s Scripts/AssetPipeline/tests -v` and all 24 tests
+passed. Coverage includes isolated inbox storage, duplicate and malformed-record
+rejection, human-only status transitions, explicit routing of visual upgrades,
+keeping functionality upgrades on human review, and verifying the named
+authored script before a pipeline run. These are pipeline-boundary tests; they
+do not prove a generated asset renders well in Unreal or has been placed in the
+world.
