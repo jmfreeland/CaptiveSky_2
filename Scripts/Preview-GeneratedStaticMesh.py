@@ -9,6 +9,7 @@ CAPTIVESKY_PREVIEW_FILENAME. Set CAPTIVESKY_PREVIEW_SCENE_MODE to "full" to
 render the Island around the transient preview actor instead of an isolated actor.
 """
 import os
+import math
 
 import unreal
 
@@ -26,6 +27,7 @@ OUTPUT_RELATIVE = os.environ.get(
 CAPTURE_SOURCE = os.environ.get("CAPTIVESKY_PREVIEW_CAPTURE_SOURCE", "SCS_FINAL_COLOR_LDR")
 OUTPUT_FILENAME = os.environ.get("CAPTIVESKY_PREVIEW_FILENAME", "StaticMesh_RealRHI.png")
 CAPTURE_SCENE_MODE = os.environ.get("CAPTIVESKY_PREVIEW_SCENE_MODE", "isolated").lower()
+FOV_ANGLE = 48.0
 
 
 def log(message):
@@ -122,8 +124,18 @@ for index in range(mesh_component.get_num_materials()):
         index, material.get_path_name() if material else "<none>"
     ))
 
-look_at = mesh_location + unreal.Vector(0.0, 0.0, 17.0)
-camera_location = look_at + unreal.Vector(72.0, -92.0, 58.0)
+mesh_bounds = mesh.get_bounds()
+bounds_origin = mesh_bounds.origin
+bounds_extent = mesh_bounds.box_extent
+look_at = mesh_location + bounds_origin
+largest_half_extent = max(bounds_extent.x, bounds_extent.y, bounds_extent.z)
+camera_distance = max(150.0, largest_half_extent / math.tan(math.radians(FOV_ANGLE * 0.5)) * 1.4)
+camera_location = look_at + unreal.Vector(camera_distance * 0.65,
+                                           -camera_distance,
+                                           camera_distance * 0.45)
+log("bounds_origin={} bounds_extent={} camera_distance_cm={:.1f}".format(
+    bounds_origin, bounds_extent, camera_distance
+))
 camera_rotation = unreal.MathLibrary.find_look_at_rotation(camera_location, look_at)
 camera_actor = require(
     actor_tools.spawn_actor_from_class(unreal.SceneCapture2D, camera_location,
@@ -134,7 +146,7 @@ capture = camera_actor.get_component_by_class(unreal.SceneCaptureComponent2D)
 require(capture, "Scene-capture actor has no capture component")
 capture.set_editor_property("capture_every_frame", False)
 capture.set_editor_property("capture_on_movement", False)
-capture.set_editor_property("fov_angle", 48.0)
+capture.set_editor_property("fov_angle", FOV_ANGLE)
 capture.set_editor_property("capture_source", getattr(unreal.SceneCaptureSource, CAPTURE_SOURCE))
 if CAPTURE_SCENE_MODE == "isolated":
     capture.set_editor_property(
