@@ -212,3 +212,23 @@ Natural nighttime probe log:
 `Saved/Logs/Codex_FoxFireflyNightProbe_Run2_20261012.log`.
 Telemetry regression log:
 `Saved/Logs/Codex_FoxFireflyTelemetry_Automation_20261012.log`.
+
+**Pipeline-authored body candidate (2026-10-12):** added
+`Scripts/AssetPipeline/assets/firefly.py`, a no-credit, low-poly body candidate
+using the existing procedural Blender helpers: segmented abdomen/thorax/head,
+paired matte wing covers, six tapered legs, antennae and eyes. The script
+triangulates its final components before export so tangent generation does not
+depend on FBX n-gon handling. Blender 5.2 built and re-imported the FBX
+successfully: 13 x 7 x 4 cm, 684 triangles, one `UVMap`, four library material
+slots, no collision (appropriate for a non-interactive ambient insect), and
+`PROBLEMS []`. The re-imported mesh preview is at
+`Saved/CaptiveSky/ComfyBlender/Firefly/Preview.png`; it is a static mesh-only
+preview and does not include the runtime emissive abdomen, point light, Island
+foliage, or Unreal material response. Unreal Editor and the Unreal MCP endpoint
+were unavailable during this pass, so the FBX remains unimported and is not
+connected to `AIslandFirefly`; no gameplay or in-world visual claim is made.
+Next: import to the fresh `/Game/Generated/ComfyBlender/Firefly` destination
+with `Scripts/Import-ComfyBlenderAsset.py`, inspect the result in the Island
+night habitat, then replace the placeholder body components while retaining
+the independently animated glow and the safe fallback for projects without
+the generated mesh.
