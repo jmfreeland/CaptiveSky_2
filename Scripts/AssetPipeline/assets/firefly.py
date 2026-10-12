@@ -1,4 +1,4 @@
-"""A small, stylized firefly with a readable carapace, paired wing covers, legs and antennae."""
+"""A small, stylized firefly body with a readable carapace, legs and antennae."""
 import bmesh
 from mathutils import Vector
 
@@ -15,15 +15,6 @@ def build(A):
            seed=23, sub=2, rough=0.025, flat_bottom=0.0, name="thorax")
     A.rock("char", (0.012, 0.010, 0.009), loc=(0.041, 0.0, 0.027),
            seed=29, sub=2, rough=0.02, flat_bottom=0.0, name="head")
-
-    # Long, low-profile wing covers fan gently outward. A matte brown material
-    # keeps their silhouette legible without the metallic white highlights of
-    # the previous engine-sphere placeholders.
-    for side, angle in ((-1, 18.0), (1, -18.0)):
-        A.rock("felt", (0.031, 0.015, 0.0022),
-               loc=(-0.003, side * 0.018, 0.039), rot=(0.0, 0.0, angle),
-               seed=31 + side, sub=2, rough=0.018, flat_bottom=0.0,
-               name="wingCover")
 
     # Six fine, jointed legs: three pairs taper toward their small feet.
     for pair, x in enumerate((-0.012, 0.002, 0.015)):

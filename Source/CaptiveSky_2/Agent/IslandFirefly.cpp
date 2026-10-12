@@ -28,7 +28,23 @@ AIslandFirefly::AIslandFirefly()
 	GlowingBody->SetRelativeScale3D(FVector(0.045f, 0.027f, 0.027f));
 	GlowingBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	GlowingBody->SetCastShadow(false);
+	AuthoredBodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AuthoredBodyMesh"));
+	AuthoredBodyMesh->SetupAttachment(RootComponent);
+	AuthoredBodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	AuthoredBodyMesh->SetCastShadow(false);
+	AuthoredBodyMesh->SetVisibility(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FireflySphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> AuthoredFireflyBody(
+		TEXT("/Game/Generated/ComfyBlender/Firefly_AnimatedWings/SM_Firefly_01.SM_Firefly_01"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FireflyWingSurface(
+		TEXT("/Game/Generated/ComfyBlender/Firefly_AnimatedWings/Materials/M_Lib_Dirt.M_Lib_Dirt"));
+	if (AuthoredFireflyBody.Succeeded())
+	{
+		AuthoredBodyMesh->SetStaticMesh(AuthoredFireflyBody.Object);
+		AuthoredBodyMesh->SetRelativeScale3D(FVector::OneVector);
+		AuthoredBodyMesh->SetVisibility(true);
+		bUsingAuthoredBodyMesh = true;
+	}
 	if (FireflySphere.Succeeded())
 	{
 		GlowingBody->SetStaticMesh(FireflySphere.Object);
@@ -56,7 +72,8 @@ AIslandFirefly::AIslandFirefly()
 		AbdomenShell = MakeBodyPart(TEXT("AbdomenShell"), FVector(-3.8f, 0.f, 0.f), FVector(0.068f, 0.039f, 0.039f));
 		Thorax = MakeBodyPart(TEXT("Thorax"), FVector(1.6f, 0.f, 0.3f), FVector(0.044f, 0.032f, 0.031f));
 		Head = MakeBodyPart(TEXT("Head"), FVector(4.8f, 0.f, 0.7f), FVector(0.03f, 0.027f, 0.025f));
-		// Thin ellipsoids are a placeholder for wings until a proper insect mesh is chosen.
+		// Keep wings as separate components so their flutter remains animated even
+		// when the detailed, body-only mesh is installed.
 		LeftWing = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("LeftWing"));
 		LeftWing->SetupAttachment(RootComponent);
 		LeftWing->SetStaticMesh(FireflySphere.Object);
@@ -72,10 +89,28 @@ AIslandFirefly::AIslandFirefly()
 		RightWing->SetRelativeScale3D(FVector(0.018f, 0.05f, 0.003f));
 		RightWing->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		RightWing->SetCastShadow(false);
+		if (bUsingAuthoredBodyMesh)
+		{
+			// Keep a single animated wing pair: the imported mesh supplies the
+			// detailed body while these rough, separate wings retain their flutter.
+			AbdomenShell->SetVisibility(false);
+			Thorax->SetVisibility(false);
+			Head->SetVisibility(false);
+			LeftWing->SetRelativeLocation(FVector(0.f, -3.1f, 3.2f));
+			RightWing->SetRelativeLocation(FVector(0.f, 3.1f, 3.2f));
+			LeftWing->SetRelativeScale3D(FVector(0.017f, 0.05f, 0.0025f));
+			RightWing->SetRelativeScale3D(FVector(0.017f, 0.05f, 0.0025f));
+			GlowingBody->SetRelativeLocation(FVector(0.8f, 0.f, 0.7f));
+		}
 		if (FireflyBodySurface)
 		{
 			LeftWing->SetMaterial(0, FireflyBodySurface);
 			RightWing->SetMaterial(0, FireflyBodySurface);
+		}
+		if (bUsingAuthoredBodyMesh && FireflyWingSurface.Succeeded())
+		{
+			LeftWing->SetMaterial(0, FireflyWingSurface.Object);
+			RightWing->SetMaterial(0, FireflyWingSurface.Object);
 		}
 	}
 
@@ -86,7 +121,7 @@ AIslandFirefly::AIslandFirefly()
 	Glow->SetAttenuationRadius(420.f);
 	Glow->SetCastShadows(false);
 	Glow->SetIntensity(0.f);
-	Glow->SetRelativeLocation(FVector(-1.8f, 0.f, 0.f));
+	Glow->SetRelativeLocation(bUsingAuthoredBodyMesh ? FVector(0.8f, 0.f, 0.7f) : FVector(-1.8f, 0.f, 0.f));
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.05f;
 	Tags.AddUnique(TEXT("IslandLife"));

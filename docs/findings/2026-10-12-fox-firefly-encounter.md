@@ -216,19 +216,33 @@ Telemetry regression log:
 **Pipeline-authored body candidate (2026-10-12):** added
 `Scripts/AssetPipeline/assets/firefly.py`, a no-credit, low-poly body candidate
 using the existing procedural Blender helpers: segmented abdomen/thorax/head,
-paired matte wing covers, six tapered legs, antennae and eyes. The script
-triangulates its final components before export so tangent generation does not
-depend on FBX n-gon handling. Blender 5.2 built and re-imported the FBX
-successfully: 13 x 7 x 4 cm, 684 triangles, one `UVMap`, four library material
-slots, no collision (appropriate for a non-interactive ambient insect), and
-`PROBLEMS []`. The re-imported mesh preview is at
-`Saved/CaptiveSky/ComfyBlender/Firefly/Preview.png`; it is a static mesh-only
-preview and does not include the runtime emissive abdomen, point light, Island
-foliage, or Unreal material response. Unreal Editor and the Unreal MCP endpoint
-were unavailable during this pass, so the FBX remains unimported and is not
-connected to `AIslandFirefly`; no gameplay or in-world visual claim is made.
-Next: import to the fresh `/Game/Generated/ComfyBlender/Firefly` destination
-with `Scripts/Import-ComfyBlenderAsset.py`, inspect the result in the Island
-night habitat, then replace the placeholder body components while retaining
-the independently animated glow and the safe fallback for projects without
-the generated mesh.
+six tapered legs, antennae and eyes. The script triangulates its final
+components before FBX export so tangent generation is deterministic. Blender
+5.2 built and re-imported the revised body-only FBX successfully: 13 x 6 x 4 cm,
+524 triangles, one `UVMap`, three library material slots, no collision, and
+`PROBLEMS []`. The initial four-slot version did import, but a real-RHI Island
+capture showed its pale static wing covers doubled with the actor's animated
+wings. The golden source now leaves the wings to two separate animated Unreal
+components, and the revised FBX was imported to a fresh
+`/Game/Generated/ComfyBlender/Firefly_AnimatedWings` destination. Its Unreal
+report measures 12.9 x 6.1 x 3.7 cm, assigns all three material slots, reports
+zero collision shapes, and has `validation_errors: []`. The actor hides its old
+body primitives only when this optional asset is available; the independent
+glowing abdomen and fallback body remain, and the moving wings use the imported
+rough Dirt material.
+
+The UE 5.8.3 Editor target built successfully. `CaptiveSky2.Agent.NightEcology`
+passed with the imported body and tests for optional-asset fallback, separate
+animated wings and material parent. The same real-RHI viewpoint automation
+passed with three transient preview fireflies, ground cover, day 8 at 20:00,
+and `-ViewpointNoWorldState`; no gameplay session, model request, or map save
+occurred. The [Island frame](../../Saved/Viewpoints/2026-10-12_135718_h20.0/05_StonesFirefly.png)
+shows the body against the actual undergrowth, though the close stylized insect
+still reads a little like a tiny moth and its legs are obscured by grass; treat
+it as a visual integration check, not finished art or live-play evidence. The
+dense-cover SceneCapture measured 53.61 FPS wall-clock and 34.35 FPS p95 over
+50 valid intervals after warmup—a conservative offscreen performance screen,
+not a gameplay or target-hardware guarantee. Logs:
+`Saved/Logs/Codex_FireflyBuild_20261012_4.log`,
+`Saved/Logs/Codex_FireflyAnimatedBody_NightEcology_20261012_Retry.log`, and
+`Saved/Logs/Codex_FireflyAnimatedBody_Visual_20261012.log`.

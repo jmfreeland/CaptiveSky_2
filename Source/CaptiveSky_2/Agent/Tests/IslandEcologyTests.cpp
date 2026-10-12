@@ -30,6 +30,8 @@
 #include "Misc/Parse.h"
 #include "Misc/ScopeExit.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/InputComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "EngineUtils.h"
@@ -1334,6 +1336,24 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			FVector::Dist(It->GlowingBody->GetRelativeLocation(), It->AbdomenShell->GetRelativeLocation()) >
 				50.f * (It->AbdomenShell->GetRelativeScale3D().X - It->GlowingBody->GetRelativeScale3D().X));
 		TestNotNull(TEXT("Firefly has a per-instance emissive material"), It->GlowMaterial.Get());
+		const bool bImportedFireflyBodyAvailable = It->AuthoredBodyMesh && It->AuthoredBodyMesh->GetStaticMesh() &&
+			It->AuthoredBodyMesh->GetStaticMesh()->GetPathName() ==
+			TEXT("/Game/Generated/ComfyBlender/Firefly_AnimatedWings/SM_Firefly_01.SM_Firefly_01");
+		TestTrue(TEXT("Firefly uses the imported detailed silhouette or retains its visible primitive fallback"),
+			It->AuthoredBodyMesh && (bImportedFireflyBodyAvailable
+				? It->bUsingAuthoredBodyMesh && It->AuthoredBodyMesh->GetVisibleFlag() &&
+					!It->AbdomenShell->GetVisibleFlag() && !It->Thorax->GetVisibleFlag() && !It->Head->GetVisibleFlag()
+				: !It->AuthoredBodyMesh->GetVisibleFlag() && It->AbdomenShell->GetVisibleFlag() &&
+					It->Thorax->GetVisibleFlag() && It->Head->GetVisibleFlag()));
+		if (bImportedFireflyBodyAvailable)
+		{
+			UMaterialInterface* WingMaterial = It->LeftWing ? It->LeftWing->GetMaterial(0) : nullptr;
+			UMaterial* WingBaseMaterial = WingMaterial ? WingMaterial->GetBaseMaterial() : nullptr;
+			TestTrue(TEXT("The imported body keeps one distinct animated wing pair beside the thorax"),
+				It->LeftWing && It->RightWing && It->LeftWing->GetRelativeLocation().Z < 3.5f &&
+					It->RightWing->GetRelativeLocation().Z < 3.5f && WingBaseMaterial &&
+					WingBaseMaterial->GetPathName().Contains(TEXT("M_Lib_Dirt")));
+		}
 		if (It->GlowMaterial)
 		{
 			const FLinearColor Emission = It->GlowMaterial->K2_GetVectorParameterValue(TEXT("Color"));

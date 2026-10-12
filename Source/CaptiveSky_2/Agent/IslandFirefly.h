@@ -56,6 +56,10 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> GlowingBody;
 
+	/** Locally generated detailed silhouette; engine primitives remain the safe fallback. */
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> AuthoredBodyMesh;
+
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> AbdomenShell;
 
@@ -89,6 +93,7 @@ private:
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
 	bool bBodyAppearanceConfigured = false;
+	bool bUsingAuthoredBodyMesh = false;
 	/** Swept flight target with a single tangent-slide attempt; fireflies never teleport through WorldStatic geometry. */
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 	void ConfigureBodyAppearance();
