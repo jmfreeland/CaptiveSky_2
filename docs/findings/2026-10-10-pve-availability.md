@@ -84,3 +84,15 @@ inspection, and no graph, asset, or map was changed. Prefer the existing
 disposable graph's editor export dialog when the editor is stable; if pursuing
 automation, first validate PCG graph execution and asset creation in a scratch
 project, never on the source graph or Island.
+
+**Unstable-window recheck (2026-10-12):** the desktop inventory briefly
+advertised the main `CaptiveSky_2 - Unreal Editor` window and the
+`PVE_Deciduous_Shrub_01` graph, but both returned window handles disappeared
+before a screenshot could be captured. A fresh window inventory contained a
+`dotnet.exe - Application Error` dialog and no Unreal window; the Unreal MCP
+transport at `127.0.0.1:8000` also failed. Treat the earlier app inventory as
+stale, not evidence that the graph is currently open or saved. No UI action,
+export, or asset save was performed. Resume only after the editor is stably
+targetable, then use the smaller shrub or measured Hazel D in its disposable
+copy, select `Static Mesh` explicitly, and verify the output before any Island
+integration.
