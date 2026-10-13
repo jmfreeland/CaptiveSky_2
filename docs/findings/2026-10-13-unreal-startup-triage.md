@@ -56,6 +56,13 @@ not explained solely by the spectator script's argument-array quoting. The
 zero exit code is not a pass: the crash context is authoritative. No Unreal
 process remained afterward.
 
+The 22:17 launch used the corrected engine `Binaries/Win64` working directory.
+Its crash-side transcript no longer contains the earlier UnrealTraceServer
+launch-failure line, though it still reports in-memory tracing and creates no
+project log. This is consistent with the working-directory correction fixing
+the helper lookup; it does not explain or resolve the same startup
+access-violation stack.
+
 ## Next useful step
 
 Do not repeat an unchanged launch: the two bounded Game attempts now reproduce
