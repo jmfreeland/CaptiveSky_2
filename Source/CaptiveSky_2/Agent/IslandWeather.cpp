@@ -377,9 +377,9 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float
 
 int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure, float WetEdgeMoisture)
 {
-	// Coarse, stable species patches make mixed cover read as small plant communities rather than
-	// alternating individual tufts. A 2D world grid keeps the selection independent of trace order.
-	constexpr float SpeciesPatchSize = 700.f;
+	// Stable, 14 m species patches make mixed cover read as plant communities at overlook distance
+	// rather than fine-grained noise. A 2D world grid keeps selection independent of trace order.
+	constexpr float SpeciesPatchSize = 1400.f;
 	const uint32 CellX = static_cast<uint32>(FMath::FloorToInt(Position.X / SpeciesPatchSize));
 	const uint32 CellY = static_cast<uint32>(FMath::FloorToInt(Position.Y / SpeciesPatchSize));
 	uint32 Hash = CellX * 0x8da6b343u ^ CellY * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
@@ -764,7 +764,7 @@ void AIslandWeather::InitializeGroundCover()
 		FVector Scale = FVector(JitterScale * 1.8f);
 		FVector Location = GroundHit.ImpactPoint + GroundHit.ImpactNormal * 1.2f;
 		UHierarchicalInstancedStaticMeshComponent* Species = nullptr;
-		// Each 7 m world patch selects one existing mesh, preventing per-instance alternation.
+		// Each 14 m world patch selects one existing mesh, preventing per-instance alternation.
 		// A 50 m exposed core feathers into the shared meadow over another 15 m.
 		// Nearby wet/social landmarks keep their own habitat: the closest anchor owns the patch.
 		const float Exposure = CalculateGroundCoverExposure(GroundHit.ImpactPoint, ExposedHabitatAnchors, OtherHabitatAnchors);

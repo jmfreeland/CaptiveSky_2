@@ -385,7 +385,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Wetness never selects a species slot outside the existing foliage set"), WetEdgeSpecies >= 0 && WetEdgeSpecies <= 10, true);
 			if (DryEdgeSpecies < 5) ++DryEdgeBroadleafPatches;
 			if (WetEdgeSpecies < 5) ++WetEdgeBroadleafPatches;
-			TestEqual(TEXT("Wet-edge species remain coherent within a 7 m botanical patch"), WetEdgeSpecies,
+			TestEqual(TEXT("Wet-edge species remain coherent within a 14 m botanical patch"), WetEdgeSpecies,
 				AIslandWeather::SelectGroundCoverVariant(Position + FVector(200.f, 200.f, 0.f), 71, 0.f, 1.f));
 			TestEqual(TEXT("Wet-edge influence clamps above one"), WetEdgeSpecies,
 				AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 2.f));
@@ -410,7 +410,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		ExposedGrassCounts[0] > 0 && ExposedGrassCounts[1] > 0 && ExposedGrassCounts[2] > 0);
 	for (int32 X = 0; X < 8; ++X)
 		for (int32 Y = 0; Y < 8; ++Y)
-			++SpeciesCounts[AIslandWeather::SelectGroundCoverVariant(FVector(X * 2500.f + 900.f, Y * 2500.f + 900.f, 0.f), 71)];
+			++SpeciesCounts[AIslandWeather::SelectGroundCoverVariant(FVector(X * 20000.f + 2600.f, Y * 20000.f + 2600.f, 0.f), 71)];
 	int32 MinimumSpeciesCells = MAX_int32;
 	int32 MaximumSpeciesCells = 0;
 	for (int32 Count : SpeciesCounts)
