@@ -42,14 +42,28 @@ source of the separate .NET dialog. Do not repeat the same launch; symbolize
 the dump or compare it with the next controlled launch only after the startup
 conditions materially change.
 
+## Structured-argument repeat — 22:17 local
+
+A second, isolated Game attempt used a dedicated moonlit MinnowSchool view and
+passed arguments through `.NET ProcessStartInfo.ArgumentList` rather than the
+spectator script's `Start-Process` argument wrapper. The launched Game PID was
+36388. The process exited after about five seconds with exit code 0 before the
+Island world-ready marker; it created no requested project log or screenshots.
+Crash Reporter did create a fresh startup transcript and minidump. The context
+again reports a null-address access violation at `SecondsSinceStart=0` and the
+exact same `PCallStackHash` as the 21:56 attempt. This shows the early crash is
+not explained solely by the spectator script's argument-array quoting. The
+zero exit code is not a pass: the crash context is authoritative. No Unreal
+process remained afterward.
+
 ## Next useful step
 
-Do not repeat the same launch. The project-opening `-NullRHI` attempt and the
-bounded Game launch now have inconclusive early-startup outcomes, one of which
-has a concrete null-dereference crash context. A future attempt should first
-capture the Unreal PID and exit code independently of the wrapper and preserve
-the full command line. Require a project log/world-ready marker or a fresh
-crash context as the outcome; do not interpret an exit code without a matching
-startup artifact as a pass. Keep agent thinking disabled and the model-request
-ceiling at zero. The new crash still needs symbols or a materially changed
-startup condition before another live launch is useful.
+Do not repeat an unchanged launch: the two bounded Game attempts now reproduce
+the same zero-second null-dereference stack despite a different launch path and
+viewpoint. The installed engine has no `UnrealEditor-Core.pdb`, and no local
+WinDbg/CDB or LLVM symbolizer was found, so this machine cannot resolve the
+stack with its current tools. Next, obtain matching UE 5.8.3 symbols or inspect
+the dump in a symbol-capable debugger; only then choose another controlled
+startup experiment. Keep agent thinking disabled and the model-request ceiling
+at zero. The repeated startup fault remains separate from the recurring .NET
+dialog unless new evidence links them.

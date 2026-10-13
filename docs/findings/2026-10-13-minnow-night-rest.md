@@ -57,8 +57,17 @@ captures prove continued presence, not polished close-up readability or a
 
 ## Next step
 
-Make a closer, deliberately composed Tideglass view so the small school reads
-clearly against moonlit water, then review the nighttime water/terrain contrast.
-Keep that art/readability pass separate from a 30-FPS traversal profile and
-retain the existing play/request safeguards. The four wide captures confirm
-presence and lighting states, not target-hardware performance.
+The close moonlit MinnowSchool view was attempted on 2026-10-13 with an
+isolated 03:00 start, zero model requests, and a dedicated actor-anchored camera.
+Unreal crashed at zero seconds before world-ready and produced no project log or
+screenshots; the crash has the same null-address stack hash as the crab-view
+attempt. See [`2026-10-13-unreal-startup-triage.md`](2026-10-13-unreal-startup-triage.md).
+Do not repeat the same startup experiment until matching symbols or materially
+changed startup conditions are available.
+
+When a real-RHI run is possible again, use the saved close-view config to judge
+whether the small school reads clearly against moonlit water, then review the
+nighttime water/terrain contrast. Keep that art/readability pass separate from
+a 30-FPS traversal profile and retain the existing play/request safeguards. The
+four earlier wide captures confirm presence and lighting states, not close-up
+readability or target-hardware performance.
