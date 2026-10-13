@@ -309,6 +309,38 @@ FString UIslandEnvironmentSubsystem::DescribeGround(float InWetness, float Rain)
 		: TEXT(" The ground is damp from earlier rain and slowly drying.");
 }
 
+FString UIslandEnvironmentSubsystem::DescribeWeather(float Rain, float InWetness, const FVector& InWind, float InMist)
+{
+	TArray<FString> Observations;
+	if (Rain > 0.05f)
+	{
+		Observations.Add(Rain >= 0.55f
+			? TEXT("Steady rain is falling across the Island.")
+			: TEXT("A light rain is falling across the Island."));
+	}
+	else
+	{
+		FString Ground = DescribeGround(InWetness, Rain);
+		Ground.TrimStartAndEndInline();
+		if (!Ground.IsEmpty()) Observations.Add(Ground);
+	}
+
+	const float WindSpeed = InWind.Size();
+	if (WindSpeed >= 100.f)
+	{
+		Observations.Add(WindSpeed >= 600.f
+			? TEXT("A strong wind sweeps across the open ground.")
+			: WindSpeed >= 320.f
+				? TEXT("A steady wind moves across the open ground.")
+				: TEXT("A light breeze crosses the open ground."));
+	}
+
+	FString Air = DescribeAir(InMist);
+	Air.TrimStartAndEndInline();
+	if (!Air.IsEmpty()) Observations.Add(Air);
+	return FString::Join(Observations, TEXT(" "));
+}
+
 void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 {
 	UWorld* World = GetWorld();

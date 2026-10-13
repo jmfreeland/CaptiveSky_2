@@ -178,6 +178,15 @@ FString ACaptiveSky_2PlayerController::DescribeTrailUnderfoot() const
 	return Trail->DescribeUnderfoot(PlayerPawn->GetActorLocation(), Wetness);
 }
 
+FString ACaptiveSky_2PlayerController::DescribeLocalWeather() const
+{
+	const UWorld* World = GetWorld();
+	const UIslandEnvironmentSubsystem* Environment = World ? World->GetSubsystem<UIslandEnvironmentSubsystem>() : nullptr;
+	if (!Environment || Environment->GetIndoors() >= 0.5f) return FString();
+	return UIslandEnvironmentSubsystem::DescribeWeather(Environment->GetRainIntensity(), Environment->GetWetness(),
+		Environment->GetWind(), Environment->GetMist());
+}
+
 FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Target) const
 {
 	if (!Target) return FString();
@@ -233,6 +242,11 @@ void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
 		Hint = FString::Printf(TEXT("%s: read the nearby tracks"), *Input);
 	}
+	if (Hint.IsEmpty() && !DescribeLocalWeather().IsEmpty())
+	{
+		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
+		Hint = FString::Printf(TEXT("%s: feel the weather"), *Input);
+	}
 	if (Hint.IsEmpty()) AmbientSpeechWidget->HideInteractionHint();
 	else AmbientSpeechWidget->ShowInteractionHint(Hint);
 }
@@ -257,6 +271,12 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		if (!TrailFact.IsEmpty())
 		{
 			ShowWorldInteractionCaption(FString::Printf(TEXT("You pause to read the ground. %s"), *TrailFact));
+			return;
+		}
+		const FString WeatherFact = DescribeLocalWeather();
+		if (!WeatherFact.IsEmpty())
+		{
+			ShowWorldInteractionCaption(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
 			return;
 		}
 		ShowWorldInteractionCaption(TEXT("Nothing nearby catches your eye. Move closer to a landmark or wild creature and try E again."));

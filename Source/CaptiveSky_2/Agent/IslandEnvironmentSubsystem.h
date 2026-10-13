@@ -87,6 +87,8 @@ public:
 	static float GoldenHourFor(float SunHeight);
 	/** What a resident notices underfoot: lingering wetness after rain has stopped. Empty when dry or still raining. */
 	static FString DescribeGround(float Wetness, float Rain);
+	/** Factual local-weather observation for a visitor; empty in calm, dry, clear conditions. */
+	static FString DescribeWeather(float Rain, float Wetness, const FVector& Wind, float Mist);
 	/**
 	 * How misty the air is, 0..1: low fog on calm dawns after wet nights, a lighter haze in rain and storms,
 	 * nothing in dry wind. Wind speed is cm/s; hour is Island time.
@@ -115,6 +117,7 @@ protected:
 
 private:
 	friend class FIslandEnvironmentTest;
+	friend class FIslandWeatherObservationTest;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> Collection;
 	UPROPERTY(Transient)
