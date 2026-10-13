@@ -1053,7 +1053,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	Clock->CurrentHour = 12.f;
-	Minnows->BeginPlay();
+	// This isolated fixture does not begin the whole world (Weather would scatter
+	// the full Island cover); dispatch the minnow actor's lifecycle correctly.
+	Minnows->DispatchBeginPlay();
 	const FVector DaySchoolStart = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
 		? Minnows->Fish[0]->GetRelativeLocation() : FVector::ZeroVector;
 	Minnows->Tick(1.f);

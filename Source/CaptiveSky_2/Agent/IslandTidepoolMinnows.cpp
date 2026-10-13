@@ -608,9 +608,12 @@ float AIslandTidepoolMinnows::NightRestAmount(float CurrentHour)
 	if (!FMath::IsFinite(CurrentHour)) return 0.f;
 	const float WrappedHour = FMath::Fmod(CurrentHour, 24.f);
 	const float Hour = WrappedHour < 0.f ? WrappedHour + 24.f : WrappedHour;
-	const float Dusk = Hour >= 19.f ? FMath::SmoothStep(19.f, 22.f, Hour) : 1.f;
-	const float Dawn = Hour <= 5.f ? 1.f : 1.f - FMath::SmoothStep(5.f, 8.f, Hour);
-	return FMath::Clamp(Dusk * Dawn, 0.f, 1.f);
+	// The sleep interval crosses midnight, so dusk and dawn are separate
+	// transitions rather than a product of two curves evaluated all night.
+	if (Hour < 5.f || Hour >= 22.f) return 1.f;
+	if (Hour < 8.f) return 1.f - FMath::SmoothStep(5.f, 8.f, Hour);
+	if (Hour < 19.f) return 0.f;
+	return FMath::SmoothStep(19.f, 22.f, Hour);
 }
 
 float AIslandTidepoolMinnows::NightActivityScale(float RestAmount)
