@@ -97,6 +97,8 @@ Raven's reply includes the gateway's queue result and, if accepted, its short ID
 
 After Raven returns a proposal's short ID, the same explicitly allow-listed human correspondent can check it with `!request status <8-character-id>`. The read-only lookup is scoped to Raven and that Discord correspondent; it does not reveal other correspondents' requests or change their status. A `generated` result means an asset candidate passed its export verifier, not that it was imported or placed in Unreal.
 
+Headless replies also receive up to five of Raven's recent proposals for that same correspondent. This lets him follow up without repeating an idea, while keeping other correspondents' requests private. It is read-only context in the existing reply; it adds no model call and makes no world changes.
+
 ## Run locally
 
 ```powershell

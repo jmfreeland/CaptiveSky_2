@@ -7,6 +7,7 @@ public sealed class AssetProposalQueue(string projectRoot)
 {
     private const int MaxDescriptionCharacters = 240;
     private const int MaxPending = 64;
+    private const int MaxRecentHistory = 5;
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private readonly string _path = Path.Combine(Path.GetFullPath(projectRoot), "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
 
@@ -128,6 +129,72 @@ public sealed class AssetProposalQueue(string projectRoot)
         finally { Gate.Release(); }
     }
 
+    public async Task<string> GetRecentSummaryAsync(
+        string requester, string participantId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(requester) || string.IsNullOrWhiteSpace(participantId))
+            return "(unavailable: correspondent identity is missing)";
+
+        await Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(_path)) return "(none recorded)";
+
+            var entries = new List<string>();
+            foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                using var document = JsonDocument.Parse(line);
+                var record = document.RootElement;
+                if (record.ValueKind != JsonValueKind.Object)
+                    throw new JsonException("The proposal record must be an object.");
+                if (Get(record, "requester") != requester || Get(record, "participant_id") != participantId)
+                    continue;
+
+                var id = Get(record, "id");
+                if (id.Length < 8) continue;
+                var requestType = Get(record, "request_type");
+                var upgradeKind = Get(record, "upgrade_kind");
+                var kind = requestType switch
+                {
+                    "upgrade" when upgradeKind is "aesthetic" or "variation" or "functionality" => $"{upgradeKind} upgrade",
+                    "upgrade" => "upgrade",
+                    "new_object" or "" => "new object",
+                    _ => "proposal"
+                };
+                var status = Get(record, "status") switch
+                {
+                    "pending_review" => "pending human review",
+                    "accepted" => "accepted for human follow-up",
+                    "generated" => "candidate generated",
+                    "declined" => "declined",
+                    _ => "status unknown"
+                };
+                var target = CleanText(Get(record, "target"), 96);
+                var description = CleanText(Get(record, "description"), MaxDescriptionCharacters);
+                if (description.Length == 0) description = "(description unavailable)";
+                entries.Add($"- {id[..8]} [{status}] {kind}{(target.Length == 0 ? "" : $" for {target}")}: {description}");
+            }
+
+            return entries.Count == 0 ? "(none recorded)" : string.Join('\n', entries.TakeLast(MaxRecentHistory));
+        }
+        catch (JsonException)
+        {
+            return "(unavailable: proposal inbox is unreadable)";
+        }
+        catch (IOException)
+        {
+            return "(unavailable: proposal inbox could not be read)";
+        }
+        finally { Gate.Release(); }
+    }
+
     private static string Get(JsonElement record, string property) =>
         record.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+
+    private static string CleanText(string value, int maximumCharacters)
+    {
+        var clean = string.Concat(value.Select(character => char.IsControl(character) ? ' ' : character)).Trim();
+        return clean.Length <= maximumCharacters ? clean : clean[..maximumCharacters];
+    }
 }

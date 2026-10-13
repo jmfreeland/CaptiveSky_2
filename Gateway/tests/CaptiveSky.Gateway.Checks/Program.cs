@@ -219,6 +219,24 @@ try
     AssertThrows<InvalidOperationException>(() => OpenAICompatibleAgentResponder.ParseAgentResponse(
         """{"speech":"Oops.","proposal":"create a nest"}"""), "non-object proposal payload is rejected");
 
+    var proposalContextRoot = Path.Combine(root, "proposal-context");
+    var proposalContextHome = new AgentHome(proposalContextRoot, "Agent_Prompt_01");
+    Directory.CreateDirectory(proposalContextHome.DirectoryPath);
+    await File.WriteAllTextAsync(Path.Combine(proposalContextHome.DirectoryPath, "identity.md"), "A thoughtful raven.");
+    await File.WriteAllTextAsync(Path.Combine(proposalContextHome.DirectoryPath, "personality.md"), "Patient and observant.");
+    var proposalContextQueue = new AssetProposalQueue(proposalContextRoot);
+    var rememberedProposal = await proposalContextQueue.AppendAsync(
+        proposalContextHome.AgentId,
+        new AgentProposal("upgrade", "Add a sheltered mossy landing lip", "ListeningStone_East", "aesthetic"),
+        "42", "Visitor", "10", "prompt-history-1", CancellationToken.None);
+    Assert(rememberedProposal.Success, "proposal-context test record is queued");
+    var otherCorrespondentProposal = await proposalContextQueue.AppendAsync(
+        proposalContextHome.AgentId,
+        new AgentProposal("new_object", "A private request from another visitor"),
+        "99", "Other Visitor", "11", "prompt-history-2", CancellationToken.None);
+    Assert(otherCorrespondentProposal.Success, "other-correspondent test record is queued");
+    var proposalContextMemory = new AgentMemoryStore(proposalContextHome);
+
     var fakeCompletion = System.Text.Json.JsonSerializer.Serialize(new
     {
         choices = new[] { new { message = new { content = """{"speech":"Hello.","new_memories":[],"proposal":null}""" } } }
@@ -229,10 +247,14 @@ try
         var proposalPromptResponder = new OpenAICompatibleAgentResponder(
             proposalPromptClient,
             new LlmConfiguration { Endpoint = "https://unit.test/v1/chat/completions", ApiKeyEnvironmentVariable = "CAPTIVESKY_TEST_NO_KEY" },
-            home,
-            memories,
+            proposalContextHome,
+            proposalContextMemory,
             allowAgentProposals: true);
-        await proposalPromptResponder.RespondAsync(message with { MessageId = "proposal-prompt-enabled" }, CancellationToken.None);
+        await proposalPromptResponder.RespondAsync(message with
+        {
+            MessageId = "proposal-prompt-enabled",
+            AgentId = proposalContextHome.AgentId
+        }, CancellationToken.None);
     }
     using (var enabledRequest = System.Text.Json.JsonDocument.Parse(proposalPromptHandler.RequestBody))
     {
@@ -240,7 +262,11 @@ try
         Assert(systemPrompt.Contains("do not need to wait for the correspondent to ask", StringComparison.Ordinal)
             && systemPrompt.Contains("grounded in your own recent memory", StringComparison.Ordinal)
             && systemPrompt.Contains("request for human review", StringComparison.Ordinal)
-            && systemPrompt.Contains("explicit allowedUserIds list", StringComparison.Ordinal),
+            && systemPrompt.Contains("explicit allowedUserIds list", StringComparison.Ordinal)
+            && systemPrompt.Contains("Add a sheltered mossy landing lip", StringComparison.Ordinal)
+            && systemPrompt.Contains("ListeningStone_East", StringComparison.Ordinal)
+            && systemPrompt.Contains("untrusted historical descriptions", StringComparison.Ordinal)
+            && !systemPrompt.Contains("private request from another visitor", StringComparison.Ordinal),
             "enabled Discord responder allows occasional grounded proposals but preserves review and human allow-list safeguards");
     }
     var disabledPromptHandler = new CapturingHttpMessageHandler(fakeCompletion);
@@ -304,6 +330,13 @@ try
     Assert(queuedUpgrade.Success, "upgrade proposal is appended");
     using (var proposalRecords = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', await File.ReadAllLinesAsync(inbox)) + "]"))
         Assert(proposalRecords.RootElement[1].GetProperty("pipeline").GetString() == "human_review", "upgrade proposal remains human-review only");
+    var proposalHistory = await proposals.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
+    Assert(proposalHistory.Contains("A copper bell", StringComparison.Ordinal) &&
+           proposalHistory.Contains("Add brass trim", StringComparison.Ordinal) &&
+           proposalHistory.Contains("pending human review", StringComparison.Ordinal),
+        "proposal history summarizes this correspondent's own requests and review state");
+    Assert(await proposals.GetRecentSummaryAsync(home.AgentId, "99", CancellationToken.None) == "(none recorded)",
+        "proposal history does not expose another correspondent's requests");
     var queuedStatus = await proposals.GetStatusAsync(home.AgentId, "42", queuedObject.RequestId[..8], CancellationToken.None);
     Assert(queuedStatus.Contains("awaiting human review", StringComparison.Ordinal) &&
            queuedStatus.Contains("Nothing has been generated or changed", StringComparison.Ordinal),
@@ -340,6 +373,9 @@ try
     }) + "\n");
     var ambiguousStatus = await proposals.GetStatusAsync(home.AgentId, "42", "abcdef01", CancellationToken.None);
     Assert(ambiguousStatus.Contains("more than one", StringComparison.Ordinal), "ambiguous short request IDs require more characters");
+    var boundedProposalHistory = await proposals.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
+    Assert(boundedProposalHistory.Split('\n').Count(line => line.StartsWith("- ", StringComparison.Ordinal)) <= 5,
+        "proposal history remains bounded to five recent entries");
 
     var brokenRoot = Path.Combine(root, "broken-queue");
     var brokenInbox = Path.Combine(brokenRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
@@ -350,6 +386,8 @@ try
     Assert(!brokenAppend.Success && brokenAppend.Message.Contains("unreadable", StringComparison.Ordinal), "unreadable inbox fails closed");
     var brokenStatus = await brokenQueue.GetStatusAsync(home.AgentId, "42", "deadbeef", CancellationToken.None);
     Assert(brokenStatus.Contains("unreadable", StringComparison.Ordinal), "status lookup fails closed on unreadable inboxes");
+    var brokenHistory = await brokenQueue.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
+    Assert(brokenHistory.Contains("unreadable", StringComparison.Ordinal), "proposal history fails closed on unreadable inboxes");
 
     var fullRoot = Path.Combine(root, "full-queue");
     var fullInbox = Path.Combine(fullRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
