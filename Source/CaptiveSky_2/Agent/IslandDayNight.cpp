@@ -59,7 +59,14 @@ float AIslandDayNight::NightAmount(float Hour)
 
 float AIslandDayNight::TwilightFillAmount(float Hour)
 {
-	return 1.f - FMath::SmoothStep(-0.02f, 0.34f, SunHeight(Hour));
+	// Begin lifting long shadows while the sun is still above the horizon, rather than only at sunset.
+	return 1.f - FMath::SmoothStep(-0.04f, 0.72f, SunHeight(Hour));
+}
+
+float AIslandDayNight::GoldenHourSkylightScale(float Hour)
+{
+	const float Twilight = TwilightFillAmount(Hour) * (1.f - NightAmount(Hour));
+	return 1.f + GoldenHourSkylightBoost * FMath::Clamp(Twilight, 0.f, 1.f);
 }
 
 float AIslandDayNight::LunarPhaseProgress(int32 IslandDay, float IslandHour)
@@ -250,7 +257,9 @@ void AIslandDayNight::UpdateLighting()
 		NightAmount(CurrentHour));
 	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
 	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
-	if (Sky) Sky->GetLightComponent()->SetIntensity(FMath::Lerp(NightSkylightFloor, 1.f, Daylight) * CloudSkylightTransmission(CloudCover));
+	if (Sky) Sky->GetLightComponent()->SetIntensity(
+		FMath::Lerp(NightSkylightFloor, 1.f, Daylight) *
+		GoldenHourSkylightScale(CurrentHour) * CloudSkylightTransmission(CloudCover));
 
 	// Translucent water and volumetric fog can use only one directional light. Give
 	// the brightest current source a unique top priority; keep the inactive/secondary

@@ -66,6 +66,9 @@ public:
 	/** Gentle shadowless cool fill during low-angle sunrise/sunset, fading to zero under a high sun. */
 	static constexpr float TwilightFillStrength = 0.6f;
 	static float TwilightFillAmount(float Hour);
+	/** Extra ambient skylight during golden hour; returns exactly to baseline at full night. */
+	static constexpr float GoldenHourSkylightBoost = 0.7f;
+	static float GoldenHourSkylightScale(float Hour);
 	static float LunarPhaseProgress(int32 IslandDay, float IslandHour);
 	static float LunarIllumination(int32 IslandDay, float IslandHour);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */

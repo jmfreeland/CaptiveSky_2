@@ -24,10 +24,17 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Sun below horizon at midnight"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(0), -1.f));
 	TestEqual(TEXT("A high daytime sun receives no artificial twilight fill"), AIslandDayNight::TwilightFillAmount(12.f), 0.f);
 	TestTrue(TEXT("Low golden-hour sun receives a partial, bounded cool fill"),
-		AIslandDayNight::TwilightFillAmount(17.5f) > 0.f && AIslandDayNight::TwilightFillAmount(17.5f) < 1.f &&
+		AIslandDayNight::TwilightFillAmount(17.f) > 0.5f && AIslandDayNight::TwilightFillAmount(17.f) < 1.f &&
 		AIslandDayNight::TwilightFillStrength <= 0.6f);
 	TestTrue(TEXT("The twilight fill reaches full strength only near the horizon"),
 		AIslandDayNight::TwilightFillAmount(18.f) > AIslandDayNight::TwilightFillAmount(17.5f));
+	TestTrue(TEXT("Golden-hour ambient light lifts shadows at 17:00"),
+		AIslandDayNight::GoldenHourSkylightScale(17.f) > 1.f &&
+		AIslandDayNight::GoldenHourSkylightScale(17.f) < 1.f + AIslandDayNight::GoldenHourSkylightBoost);
+	TestTrue(TEXT("The golden-hour fill grows smoothly toward sunset"),
+		AIslandDayNight::GoldenHourSkylightScale(17.5f) > AIslandDayNight::GoldenHourSkylightScale(17.f));
+	TestEqual(TEXT("Night ambient brightness is unchanged by the golden-hour lift"),
+		AIslandDayNight::GoldenHourSkylightScale(20.f), 1.f);
 	const float QuarterMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.25 - 7.0) * 24.0);
 	const float FullMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays * 0.5 - 14.0) * 24.0);
 	const float NextNewMoonHour = static_cast<float>((AIslandDayNight::LunarCycleDays - 29.0) * 24.0);
@@ -122,6 +129,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->DaySunIntensity = 10.f;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("Noon"));
+	const float NoonSkyIntensity = Sky->GetLightComponent()->Intensity;
 	bool bNoStarGroupsAtNoon = true;
 	if (Clock->Starfield)
 		for (int32 SectionIndex = 0; SectionIndex < AIslandDayNight::NightStarSectionCount; ++SectionIndex)
@@ -132,6 +140,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Daylight keeps all star groups hidden"), bNoStarGroupsAtNoon);
 	TestEqual(TEXT("Default moon illumination is tuned for a visible but dark night"), Clock->MoonIntensity, 1.5f);
 	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
+	Clock->CurrentHour = 17.f;
+	Clock->UpdateLighting();
+	TestTrue(TEXT("Golden hour adds ambient skylight above the ordinary daytime level"),
+		Sky->GetLightComponent()->Intensity > NoonSkyIntensity);
+	TestTrue(TEXT("Golden-hour skylight follows its bounded scale"),
+		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,
+			NoonSkyIntensity * AIslandDayNight::GoldenHourSkylightScale(17.f), 0.001f));
 	Clock->CurrentHour = 18.5f;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("Dusk"));
