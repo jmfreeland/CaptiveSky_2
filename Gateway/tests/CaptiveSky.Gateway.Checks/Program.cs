@@ -186,6 +186,9 @@ try
         && objectProposal is { RequestType: "new_object", Description: "A copper bell" }, "new-object proposal parses");
     Assert(DiscordProposalCommand.TryParse("!request upgrade aesthetic InnDoorLantern :: Add brass trim", out var upgradeProposal, out _)
         && upgradeProposal is { RequestType: "upgrade", UpgradeKind: "aesthetic", Target: "InnDoorLantern", Description: "Add brass trim" }, "upgrade proposal parses");
+    Assert(DiscordProposalCommand.TryParse("!request upgrade aesthetic western stone tower :: Add weathered lichen", out var descriptiveUpgrade, out _)
+        && descriptiveUpgrade is { RequestType: "upgrade", UpgradeKind: "aesthetic", Target: "western stone tower", Description: "Add weathered lichen" },
+        "upgrade command accepts a grounded multi-word landscape landmark target");
     Assert(DiscordProposalCommand.TryParse("!request upgrade variation world :: Add stream stones", out var worldUpgrade, out _)
         && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
     Assert(DiscordProposalCommand.IsStatusCommand("!request status deadbeef"), "proposal status command is recognized");
@@ -209,6 +212,11 @@ try
         """);
     Assert(parsedAgentProposal.Proposal is { RequestType: "upgrade", Target: "RavenNest", UpgradeKind: "functionality" },
         "headless response parser accepts a structured resident proposal");
+    var parsedDescriptiveUpgrade = OpenAICompatibleAgentResponder.ParseAgentResponse("""
+        {"speech":"I could ask for the western stone tower to be softened by time.","new_memories":[],"proposal":{"request_type":"upgrade","description":"Add weathered lichen","target":"western stone tower","upgrade_kind":"aesthetic"}}
+        """);
+    Assert(parsedDescriptiveUpgrade.Proposal is { Target: "western stone tower", UpgradeKind: "aesthetic" },
+        "resident response accepts a descriptive target for a known landscape feature");
     var parsedWorldProposal = OpenAICompatibleAgentResponder.ParseAgentResponse("""
         {"speech":"I can propose this for the Island.","new_memories":[],"proposal":{"request_type":"upgrade","description":"Add a mossy stone edge","target":"world","upgrade_kind":"variation"}}
         """);
@@ -332,6 +340,16 @@ try
     Assert(queuedUpgrade.Success, "upgrade proposal is appended");
     using (var proposalRecords = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', await File.ReadAllLinesAsync(inbox)) + "]"))
         Assert(proposalRecords.RootElement[1].GetProperty("pipeline").GetString() == "human_review", "upgrade proposal remains human-review only");
+    var queuedDescriptiveUpgrade = await proposals.AppendAsync(home.AgentId, descriptiveUpgrade!, "42", "Visitor", "10", "106", CancellationToken.None);
+    Assert(queuedDescriptiveUpgrade.Success, "upgrade request for a descriptive landscape target is queued");
+    using (var descriptiveRecords = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', await File.ReadAllLinesAsync(inbox)) + "]"))
+    {
+        var descriptiveRecord = descriptiveRecords.RootElement.EnumerateArray()
+            .Single(record => record.GetProperty("message_id").GetString() == "106");
+        Assert(descriptiveRecord.GetProperty("target").GetString() == "western stone tower" &&
+               descriptiveRecord.GetProperty("pipeline").GetString() == "human_review",
+            "multi-word target is preserved for human review without automatic world changes");
+    }
     var proposalHistory = await proposals.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
     Assert(proposalHistory.Contains("A copper bell", StringComparison.Ordinal) &&
            proposalHistory.Contains("Add brass trim", StringComparison.Ordinal) &&
