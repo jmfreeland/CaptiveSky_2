@@ -565,17 +565,18 @@ void AIslandTidepoolMinnows::CheckForNaturalSurfaceRipple()
 
 void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 {
+	const float NightRest = GetNightRestAmount();
 	if (!GetWorld() || Fish.IsEmpty() || ScatterRemaining > 0.f ||
 		SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f || RainIntensity >= 0.35f)
 	{
-		SurfaceBreakRemaining = 4.f;
+		SurfaceBreakRemaining = FMath::Lerp(4.f, 16.f, NightRest);
 		return;
 	}
 
 	UProceduralMeshComponent* FishThatBrokeSurface = Fish[SurfaceBreakFishIndex % Fish.Num()];
 	if (!FishThatBrokeSurface)
 	{
-		SurfaceBreakRemaining = 4.f;
+		SurfaceBreakRemaining = FMath::Lerp(4.f, 16.f, NightRest);
 		return;
 	}
 
@@ -591,13 +592,38 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 	{
 		Ripple->ConfigureAsMinnowImpact();
 		SurfaceBreakFishIndex = (SurfaceBreakFishIndex + 1) % Fish.Num();
-		SurfaceBreakRemaining = 19.f;
+		SurfaceBreakRemaining = SurfaceBreakInterval(NightRest);
 		SurfaceBreakContextRemaining = SurfaceBreakContextLifetime;
 		SurfacePulseCooldownRemaining = FMath::Max(SurfacePulseCooldownRemaining, 3.f);
 		return;
 	}
 
-	SurfaceBreakRemaining = 4.f;
+	SurfaceBreakRemaining = FMath::Lerp(4.f, 16.f, NightRest);
+}
+
+float AIslandTidepoolMinnows::NightRestAmount(float CurrentHour)
+{
+	if (!FMath::IsFinite(CurrentHour)) return 0.f;
+	const float WrappedHour = FMath::Fmod(CurrentHour, 24.f);
+	const float Hour = WrappedHour < 0.f ? WrappedHour + 24.f : WrappedHour;
+	const float Dusk = Hour >= 19.f ? FMath::SmoothStep(19.f, 22.f, Hour) : 1.f;
+	const float Dawn = Hour <= 5.f ? 1.f : 1.f - FMath::SmoothStep(5.f, 8.f, Hour);
+	return FMath::Clamp(Dusk * Dawn, 0.f, 1.f);
+}
+
+float AIslandTidepoolMinnows::NightActivityScale(float RestAmount)
+{
+	return FMath::Lerp(1.f, 0.24f, FMath::Clamp(RestAmount, 0.f, 1.f));
+}
+
+float AIslandTidepoolMinnows::SwimRateForRest(float RestAmount)
+{
+	return FMath::Lerp(0.62f, 0.18f, FMath::Clamp(RestAmount, 0.f, 1.f));
+}
+
+float AIslandTidepoolMinnows::SurfaceBreakInterval(float RestAmount)
+{
+	return FMath::Lerp(19.f, 60.f, FMath::Clamp(RestAmount, 0.f, 1.f));
 }
 
 float AIslandTidepoolMinnows::RainMovementScale(float RainIntensity)
@@ -611,6 +637,11 @@ float AIslandTidepoolMinnows::GetTideOffsetCm() const
 	return IslandClock.IsValid()
 		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
 		: 0.f;
+}
+
+float AIslandTidepoolMinnows::GetNightRestAmount() const
+{
+	return IslandClock.IsValid() ? NightRestAmount(IslandClock->CurrentHour) : 0.f;
 }
 
 float AIslandTidepoolMinnows::GetScatterAlpha() const
@@ -674,7 +705,9 @@ void AIslandTidepoolMinnows::CheckForNearbyRavenDisturbance()
 
 void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 {
-	const float TuckScale = RainMovementScale(RainIntensity);
+	const float NightRest = GetNightRestAmount();
+	const float NightScale = NightActivityScale(NightRest);
+	const float TuckScale = RainMovementScale(RainIntensity) * NightScale;
 	const float TideOffset = GetTideOffsetCm();
 	const float ScatterAlpha = GetScatterAlpha();
 	const float CircleScale = 1.f + 0.65f * GetSurfacePulseAlpha();
@@ -683,11 +716,11 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 	{
 		UProceduralMeshComponent* Minnow = Fish[Index];
 		if (!Minnow) continue;
-		const float Angle = Phase + ElapsedSeconds * 0.62f + Index * 2.f * PI / FishCount;
+		const float Angle = Phase + SwimPhaseRadians + Index * 2.f * PI / FishCount;
 		const FVector IdleOffset(
 			FMath::Cos(Angle) * 135.f * TuckScale * CircleScale,
 			FMath::Sin(Angle) * 82.f * TuckScale * CircleScale,
-			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f);
+			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f * NightScale);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
 		Minnow->SetRelativeLocation(ClampToPoolSwimmingBounds(IdleOffset + ScatterOffset * ScatterAlpha));
@@ -710,6 +743,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ElapsedSeconds += SafeDelta;
+	SwimPhaseRadians += SafeDelta * SwimRateForRest(GetNightRestAmount());
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	SurfacePulseRemaining = FMath::Max(0.f, SurfacePulseRemaining - SafeDelta);
 	SurfacePulseCooldownRemaining = FMath::Max(0.f, SurfacePulseCooldownRemaining - SafeDelta);

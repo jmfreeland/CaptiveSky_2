@@ -10,7 +10,7 @@ class ARavenAgentAIController;
 class UMaterialInterface;
 class UProceduralMeshComponent;
 
-/** A small daytime school that stays in the Tideglass shallows and briefly scatters from quiet attention. */
+/** A small Tideglass school that settles into a slower, tighter orbit at night. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandTidepoolMinnows : public AActor
 {
@@ -40,6 +40,10 @@ private:
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
+	static float NightRestAmount(float CurrentHour);
+	static float NightActivityScale(float RestAmount);
+	static float SwimRateForRest(float RestAmount);
+	static float SurfaceBreakInterval(float RestAmount);
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Fish;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -63,6 +67,7 @@ private:
 	float SurfaceBreakRemaining = 13.f;
 	float SurfaceBreakContextRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
+	float SwimPhaseRadians = 0.f;
 	int32 SurfaceBreakFishIndex = 0;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	float RavenCheckRemaining = 0.f;
@@ -73,6 +78,7 @@ private:
 	float GetScatterAlpha() const;
 	float GetSurfacePulseAlpha() const;
 	float GetTideOffsetCm() const;
+	float GetNightRestAmount() const;
 	void CachePoolSwimmingBounds();
 	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation, float EdgeClearanceCm = 0.f) const;
 	void ConfigureAppearance();

@@ -8,6 +8,7 @@
 #include "IslandTidepoolCrab.h"
 #include "IslandTideglassSubsystem.h"
 #include "IslandTideglassDragonfly.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
@@ -928,6 +929,26 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Dry conditions leave crab roaming unchanged"), FMath::IsNearlyEqual(AIslandTidepoolCrab::RainMovementScale(0.f), 1.f));
 	TestTrue(TEXT("Heavy rain reduces but does not stop crab roaming"), AIslandTidepoolCrab::RainMovementScale(1.f) > 0.f && AIslandTidepoolCrab::RainMovementScale(1.f) < 1.f);
 	TestTrue(TEXT("Crab rain response changes smoothly and monotonically"), AIslandTidepoolCrab::RainMovementScale(0.75f) < AIslandTidepoolCrab::RainMovementScale(0.45f));
+	TestTrue(TEXT("Minnows remain fully active at midday"), FMath::IsNearlyZero(AIslandTidepoolMinnows::NightRestAmount(12.f)));
+	TestTrue(TEXT("Minnow rest eases in after dusk"), AIslandTidepoolMinnows::NightRestAmount(19.f) == 0.f &&
+		AIslandTidepoolMinnows::NightRestAmount(20.5f) > 0.f && AIslandTidepoolMinnows::NightRestAmount(20.5f) < 1.f);
+	TestTrue(TEXT("Minnow rest spans midnight"), FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(23.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(0.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(4.f), 1.f));
+	TestTrue(TEXT("Minnow rest eases out at dawn"), AIslandTidepoolMinnows::NightRestAmount(6.5f) > 0.f &&
+		AIslandTidepoolMinnows::NightRestAmount(6.5f) < 1.f && FMath::IsNearlyZero(AIslandTidepoolMinnows::NightRestAmount(8.f)));
+	TestTrue(TEXT("Minnow rest wraps valid clock hours and rejects non-finite time"),
+		FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(-1.f), 1.f) &&
+		FMath::IsNearlyZero(AIslandTidepoolMinnows::NightRestAmount(std::numeric_limits<float>::quiet_NaN())));
+	TestTrue(TEXT("Night rest slows but does not stop the school"),
+		AIslandTidepoolMinnows::NightActivityScale(1.f) > 0.f && AIslandTidepoolMinnows::NightActivityScale(1.f) < 0.25f &&
+		AIslandTidepoolMinnows::NightActivityScale(0.f) == 1.f);
+	TestTrue(TEXT("Night swim phase integrates at a slower but nonzero rate"),
+		AIslandTidepoolMinnows::SwimRateForRest(1.f) > 0.f &&
+		AIslandTidepoolMinnows::SwimRateForRest(1.f) < AIslandTidepoolMinnows::SwimRateForRest(0.f));
+	TestTrue(TEXT("Surface breaks become less frequent during night rest"),
+		AIslandTidepoolMinnows::SurfaceBreakInterval(0.f) == 19.f &&
+		AIslandTidepoolMinnows::SurfaceBreakInterval(1.f) == 60.f);
 	const float LowTideActivity = AIslandTidepoolCrab::TideMovementScale(-UIslandTideglassSubsystem::MaximumTideOffsetCm);
 	const float HighTideActivity = AIslandTidepoolCrab::TideMovementScale(UIslandTideglassSubsystem::MaximumTideOffsetCm);
 	TestTrue(TEXT("No tidal displacement leaves crab activity at its ordinary baseline"),
@@ -1001,16 +1022,37 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
 	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>(Spawn);
+	AIslandTidepoolMinnows* Minnows = World->SpawnActor<AIslandTidepoolMinnows>(Spawn);
 	ATargetPoint* Habitat = World->SpawnActor<ATargetPoint>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
 	ATargetPoint* NightStonesHabitat = World->SpawnActor<ATargetPoint>(FVector(3500.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
 	AActor* Ground = World->SpawnActor<AActor>(Spawn);
 	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Clock actor spawned"), Clock) ||
+		!TestNotNull(TEXT("Minnow school spawned for day/night rhythm checks"), Minnows) ||
 		!TestNotNull(TEXT("Habitat marker spawned"), Habitat) || !TestNotNull(TEXT("Nearby ListeningStones habitat marker spawned"), NightStonesHabitat))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 		return false;
 	}
+	Clock->CurrentHour = 12.f;
+	Minnows->BeginPlay();
+	const FVector DaySchoolStart = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? Minnows->Fish[0]->GetRelativeLocation() : FVector::ZeroVector;
+	Minnows->Tick(1.f);
+	const float DaySwimStep = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? FVector::Dist2D(DaySchoolStart, Minnows->Fish[0]->GetRelativeLocation()) : 0.f;
+	Clock->CurrentHour = 0.f;
+	Minnows->SwimPhaseRadians = 0.f;
+	Minnows->UpdateSchool(0.f);
+	const float NightSchoolRadius = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? Minnows->Fish[0]->GetRelativeLocation().Size2D() : 0.f;
+	const FVector NightSchoolStart = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? Minnows->Fish[0]->GetRelativeLocation() : FVector::ZeroVector;
+	Minnows->Tick(1.f);
+	const float NightSwimStep = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? FVector::Dist2D(NightSchoolStart, Minnows->Fish[0]->GetRelativeLocation()) : 0.f;
+	TestTrue(TEXT("The real minnow school contracts its orbit at night without freezing"),
+		NightSchoolRadius > 0.f && DaySwimStep > 0.f && NightSwimStep > 0.f && NightSwimStep < DaySwimStep * 0.35f);
 	if (!TestNotNull(TEXT("Ground fixture actor spawned"), Ground))
 	{
 		GEngine->DestroyWorldContext(World);
