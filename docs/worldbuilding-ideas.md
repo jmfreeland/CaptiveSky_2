@@ -28,7 +28,16 @@ null-pointer access violation at process startup, but has no symbolized stack
 and the requested game log was never created
 (`Saved/Crashes/_0000/Codex_DragonflyBloomPause_CadenceRetry_20261013.log`,
 `Saved/Crashes/_0000/CrashContext.runtime-xml`). Stop repeating the same launch;
-diagnose that startup crash before resuming the visual test.
+diagnose that startup crash before resuming the visual test. After retiring the
+disabled PlantFactory mount, one 30-second, zero-request retry with the former
+five-second cadence and warmed project-local DDC failed the same way. Its crash
+context again reports a null-address access violation at `SecondsSinceStart=0`
+and the same `PCallStackHash` (`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`);
+the requested project log and world-ready marker were never produced. The fault
+predates PlantFactory's removal and persists with the mount absent, so that
+deprecated plugin is not a sufficient explanation. Preserve this as a separate
+startup diagnosis and do not repeat the launch until it can be symbolized or
+its environment meaningfully changes.
 
 ## 2026-10-13 — Installed Beech is not yet a canopy solution
 
