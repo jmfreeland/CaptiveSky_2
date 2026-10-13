@@ -116,3 +116,13 @@ headers `Components/InstancedSkinnedMeshComponent.h`,
 `Animation/AnimSequenceTransformProviderData.h`; local inventory logs linked
 above. This was a read-only audit: no plugin, source graph, material, or Island
 state changed.
+
+**UE 5.8 project-loader check (2026-10-13):** the `CaptiveSky_2.uproject`
+entry in the Unreal launcher points at this checkout, but opening it stopped at
+a `Missing Plugin` dialog for `Aura`. I chose **No** and closed the launch;
+I did not disable or remove any plugin. The current `.uproject`, project
+`Config/` and `Source/`, project `Plugins/` directory, and installed UE 5.8
+plugin descriptors contain no `Aura` reference, so this checkout's source does
+not explain the prompt. No level or PVE graph was loaded. Resolve the project
+plugin prompt before the editor-only Static Mesh export step; do not accept the
+dialog's disable-and-continue option until the owning reference is identified.
