@@ -25,23 +25,38 @@ disabled.
   no validation errors or collision geometry.
 - `CaptiveSky_2Editor Win64 Development` built successfully with UE 5.8.3.
 - `CaptiveSky2.Agent.NightEcology` passed under NullRHI with agent thinking
-  disabled and a zero model-request limit. The test confirms the detailed mesh
-  is loaded and visible at the intended scale when present, has no collision,
-  and leaves the primitive fallback visible when the mesh is absent. See the
-  [automation log](../../Saved/Logs/Codex_TidepoolCrabNightEcology_20261013.log).
+  disabled and a zero model-request limit. The test checks the local Content
+  file: if the `.uasset` is installed, the detailed mesh must actually load and
+  be visible at the intended scale, have no collision, and hide the primitive
+  shell; if it is absent, the primitive fallback must stay visible. The
+  strengthened test passed with the local asset installed
+  ([log](../../Saved/Logs/Codex_TidepoolCrabAssetLoaded_20261013.log)).
+
+A bounded 60.2-second real-RHI Game session then loaded the saved Island at
+12:00 with an isolated data root, Python and agent thinking disabled, and a
+zero-request cap. It exited normally with zero model requests. Three spectator
+frames are saved under
+[`Codex_TidepoolCrabRuntime_20261013`](../../Playtests/Codex_TidepoolCrabRuntime_20261013/Screenshots/003_Tideglass.png);
+the last frame shows the real runtime water and active meadow/woodland fauna.
+That wide establishing view does **not** make the small crab individually
+legible, so it validates loading and overall composition, not the crab's final
+in-world art read. The log also reports many installed rhododendron material
+instances missing the `InstancedStaticMeshes` usage flag and falling back to
+the default material; that is a separate foliage-material issue, not changed
+here.
 
 The local round-trip preview is
 `Saved/CaptiveSky/ComfyBlender/TidepoolCrab/Preview.png`. It is a source-art
-review, not a real-RHI in-world capture. The asset remains static and has not
-been reviewed in the Tideglass shoreline composition or under gameplay camera
-distance/lighting; do not treat the silhouette, scale, or color as final art
-approval yet. Content and FBX outputs are gitignored, so other clones retain
-the primitive fallback until the candidate is imported there too.
+review, not a close real-RHI in-world capture. The asset remains static and has
+not been reviewed at crab-level camera distance or for motion readability; do
+not treat the silhouette, scale, or color as final art approval yet. Content
+and FBX outputs are gitignored, so other clones retain the primitive fallback
+until the candidate is imported there too.
 
 ## Next step
 
-Review a close real-RHI Tideglass capture with the mesh enabled, then a normal
-gameplay-distance view. If its scale and russet palette read naturally against
-the wet sand and rocks, keep it; otherwise revise the Blender source and import
-to a fresh candidate destination. Keep movement/animation and placement as
-separate follow-ups so this art comparison remains reversible.
+Add a dedicated, close real-RHI crab view that keeps the subject on dry shore;
+review its material and scale against the wet sand/rocks, then decide whether
+its idle/scurry movement reads naturally. If not, revise the Blender source and
+import to a fresh candidate destination. Keep map placement separate so this
+art comparison remains reversible.

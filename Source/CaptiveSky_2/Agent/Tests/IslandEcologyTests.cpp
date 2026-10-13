@@ -27,8 +27,10 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/FileManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/Paths.h"
 #include "Misc/ScopeExit.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
@@ -1199,6 +1201,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Tidepool crab has two claws and two eye stalks"), It->Claws.Num(), 2);
 		TestTrue(TEXT("Tidepool crab carapace remains visibly flatter than it is wide"), It->Shell && It->Shell->GetRelativeScale3D().Z < It->Shell->GetRelativeScale3D().X * 0.5f);
 		TestNotNull(TEXT("Tidepool crab has an optional detailed-body component"), It->DetailedBody.Get());
+		const FString DetailedCrabAssetFile = FPaths::Combine(FPaths::ProjectContentDir(),
+			TEXT("Generated/ComfyBlender/IslandTidepoolCrab/SM_TidepoolCrab_01.uasset"));
+		const bool bDetailedCrabAssetInstalled = IFileManager::Get().FileExists(*DetailedCrabAssetFile);
+		if (bDetailedCrabAssetInstalled && It->DetailedBody)
+			TestNotNull(TEXT("Installed Tidepool Crab candidate loads instead of silently using the primitive fallback"), It->DetailedBody->GetStaticMesh().Get());
 		if (It->DetailedBody && It->DetailedBody->GetStaticMesh())
 		{
 			const FVector DetailedMeshExtent = It->DetailedBody->GetStaticMesh()->GetBounds().BoxExtent * It->DetailedBody->GetRelativeScale3D();
@@ -1212,7 +1219,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		}
 		else
 		{
-			TestTrue(TEXT("Primitive crab remains visible when the optional mesh is absent"), It->Shell->IsVisible());
+			TestTrue(TEXT("Primitive crab remains visible only when the optional mesh file is absent"),
+				!bDetailedCrabAssetInstalled && It->Shell->IsVisible());
 		}
 		UMaterialInstanceDynamic* CrabShellTint = It->Shell ? Cast<UMaterialInstanceDynamic>(It->Shell->GetMaterial(0)) : nullptr;
 		TestNotNull(TEXT("Tidepool crab shell uses its per-instance natural tint"), CrabShellTint);
