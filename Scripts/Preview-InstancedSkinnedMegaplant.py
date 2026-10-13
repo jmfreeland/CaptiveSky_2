@@ -1,0 +1,270 @@
+"""Compare one transient Beech through instanced and ordinary skeletal paths.
+
+This is a disposable visual/API probe. It loads the Island as a lighting and
+scale reference, adds exactly one transient instance, captures one frame, and
+never saves the map or any asset. Run with UnrealEditor-Cmd.exe, the project
+uproject, -RenderOffscreen, and -ExecutePythonScript=<absolute script path>.
+CAPTIVESKY_SKINNED_PREVIEW_ASSET and CAPTIVESKY_SKINNED_PREVIEW_OUTPUT may
+override the default Beech A asset and project-relative output directory.
+"""
+import json
+import os
+import traceback
+
+import unreal
+
+
+PREFIX = "[InstancedSkinnedMegaplant] "
+MAP = "/Game/Maps/Island"
+ASSET = os.environ.get(
+    "CAPTIVESKY_SKINNED_PREVIEW_ASSET",
+    "/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A",
+)
+TARGET_LABEL = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_TARGET", "Roost_West")
+OUTPUT_RELATIVE = os.environ.get(
+    "CAPTIVESKY_SKINNED_PREVIEW_OUTPUT",
+    "Saved/Playtests/Codex_InstancedSkinnedBeech_20261013",
+)
+OUTPUT_FILENAME = "InstancedSkinned_BeechA.png"
+STANDARD_OUTPUT_FILENAME = "SkeletalMesh_BeechA.png"
+FOV_ANGLE = 48.0
+PREVIEW_STATE = {}
+
+
+def log(message):
+    unreal.log(PREFIX + str(message))
+
+
+def require(value, message):
+    if not value:
+        raise RuntimeError(message)
+    return value
+
+
+def components(vector):
+    return [round(float(getattr(vector, axis)), 2) for axis in ("x", "y", "z")]
+
+
+def on_preview_tick(delta_seconds):
+    state = PREVIEW_STATE
+    state["ticks"] += 1
+    try:
+        if state["ticks"] == 3:
+            for capture in state["captures"]:
+                capture.capture_scene()
+            log("instanced and ordinary skeletal captures requested at frame {}".format(
+                unreal.SystemLibrary.get_frame_count()
+            ))
+        elif state["ticks"] >= 5:
+            for filename, render_target in state["outputs"]:
+                unreal.RenderingLibrary.export_render_target(
+                    state["world"], render_target, state["output_directory"], filename
+                )
+            log("REPORT " + json.dumps(state["report"], sort_keys=True))
+            log("COMPLETE")
+            unreal.unregister_slate_post_tick_callback(state["handle"])
+            unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+            unreal.SystemLibrary.quit_editor()
+    except Exception:
+        unreal.log_error(PREFIX + "FAILED " + traceback.format_exc())
+        if state.get("handle") is not None:
+            unreal.unregister_slate_post_tick_callback(state["handle"])
+        unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+        unreal.SystemLibrary.quit_editor()
+
+
+def main():
+    require(unreal.EditorLoadingAndSavingUtils.load_map(MAP), "Could not load Island review map")
+    world = require(
+        unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world(),
+        "Editor world is unavailable",
+    )
+    actor_tools = require(unreal.get_editor_subsystem(unreal.EditorActorSubsystem),
+                          "Editor Actor Subsystem is unavailable")
+    mesh = require(unreal.load_asset(ASSET), "Could not load Skeletal Mesh: " + ASSET)
+    if not isinstance(mesh, unreal.SkeletalMesh):
+        raise TypeError("Expected a SkeletalMesh, got " + mesh.get_class().get_name())
+
+    skeletal_component_class = getattr(unreal, "InstancedSkinnedMeshComponent", None)
+    if skeletal_component_class is None:
+        raise RuntimeError("InstancedSkinnedMeshComponent is not exposed to the UE Python API")
+    actor_class = unreal.load_class(None, "/Script/CaptiveSky_2.IslandInstancedSkinnedFoliage")
+    require(actor_class, "Native IslandInstancedSkinnedFoliage class is unavailable; build the Editor target first")
+
+    target_actor = next(
+        (actor for actor in actor_tools.get_all_level_actors()
+         if actor.get_actor_label() == TARGET_LABEL),
+        None,
+    )
+    require(target_actor, "Could not find target landmark: " + TARGET_LABEL)
+    anchor = target_actor.get_actor_location()
+    trace_x, trace_y = anchor.x + 220.0, anchor.y + 100.0
+    trace_start = unreal.Vector(trace_x, trace_y, anchor.z + 2500.0)
+    trace_end = unreal.Vector(trace_x, trace_y, anchor.z - 6000.0)
+    hit = unreal.SystemLibrary.line_trace_single(
+        world,
+        trace_start,
+        trace_end,
+        unreal.TraceTypeQuery.ECC_VISIBILITY,
+        False,
+        [target_actor],
+        unreal.DrawDebugTrace.NONE,
+        True,
+    )
+    require(hit, "Ground trace near {} found no surface".format(TARGET_LABEL))
+    ground = hit.to_tuple()[5]
+    location = unreal.Vector(ground.x, ground.y, ground.z + 1.0)
+
+    preview_actor = require(
+        actor_tools.spawn_actor_from_class(actor_class, location, unreal.Rotator(0, 0, 0), True),
+        "Could not spawn transient native foliage actor",
+    )
+    preview_actor.set_editor_property("source_mesh", mesh)
+    identity = unreal.Transform(
+        unreal.Vector(0.0, 0.0, 0.0),
+        unreal.Rotator(0.0, 0.0, 0.0),
+        unreal.Vector(1.0, 1.0, 1.0),
+    )
+    preview_actor.set_editor_property("instance_transforms", [identity])
+    preview_actor.rebuild_instances()
+    component = require(
+        preview_actor.get_component_by_class(skeletal_component_class),
+        "Native preview actor has no InstancedSkinnedMeshComponent",
+    )
+    instance_count = int(component.get_instance_count())
+    require(instance_count == 1, "Instanced skinned component did not retain exactly one instance")
+
+    standard_actor = require(
+        actor_tools.spawn_actor_from_class(unreal.SkeletalMeshActor, location, unreal.Rotator(0, 0, 0), True),
+        "Could not spawn a transient ordinary SkeletalMeshActor for comparison",
+    )
+    standard_component = require(
+        standard_actor.get_component_by_class(unreal.SkeletalMeshComponent),
+        "Ordinary SkeletalMeshActor has no SkeletalMeshComponent",
+    )
+    standard_component.set_editor_property("skeletal_mesh_asset", mesh)
+    standard_component.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+    standard_component.set_visibility(True, True)
+    standard_actor.set_actor_hidden_in_game(False)
+
+    materials = []
+    material_count = int(component.get_num_materials())
+    for index in range(material_count):
+        material = component.get_material(index)
+        material_path = material.get_path_name() if material else None
+        materials.append(material_path)
+        log("material[{}]={}".format(index, material_path or "<none>"))
+
+    mesh_bounds = mesh.get_bounds()
+    bounds_origin = mesh_bounds.origin
+    bounds_extent = mesh_bounds.box_extent
+    center = location + bounds_origin
+    height = float(bounds_extent.z) * 2.0
+    camera_distance = max(600.0, height / 0.43)
+    camera_location = center + unreal.Vector(camera_distance * 0.55,
+                                              -camera_distance,
+                                              camera_distance * 0.30)
+    camera_rotation = unreal.MathLibrary.find_look_at_rotation(camera_location, center)
+    camera_actor = require(
+        actor_tools.spawn_actor_from_class(
+            unreal.SceneCapture2D, camera_location, camera_rotation, True
+        ),
+        "Could not spawn transient scene-capture actor",
+    )
+    capture = require(camera_actor.get_component_by_class(unreal.SceneCaptureComponent2D),
+                       "Scene-capture actor has no capture component")
+    capture.set_editor_property("capture_every_frame", False)
+    capture.set_editor_property("capture_on_movement", False)
+    capture.set_editor_property("fov_angle", FOV_ANGLE)
+    capture.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    capture.set_editor_property(
+        "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
+    )
+    capture.show_only_component(component)
+    render_target = require(
+        unreal.RenderingLibrary.create_render_target2d(
+            world, 1440, 960, unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB,
+            unreal.LinearColor(0.12, 0.16, 0.12, 1.0), False,
+        ),
+        "Could not create render target",
+    )
+    capture.set_editor_property("texture_target", render_target)
+
+    standard_camera = require(
+        actor_tools.spawn_actor_from_class(
+            unreal.SceneCapture2D, camera_location, camera_rotation, True
+        ),
+        "Could not spawn ordinary skeletal comparison scene-capture actor",
+    )
+    standard_capture = require(
+        standard_camera.get_component_by_class(unreal.SceneCaptureComponent2D),
+        "Ordinary skeletal comparison capture has no scene-capture component",
+    )
+    standard_capture.set_editor_property("capture_every_frame", False)
+    standard_capture.set_editor_property("capture_on_movement", False)
+    standard_capture.set_editor_property("fov_angle", FOV_ANGLE)
+    standard_capture.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    standard_capture.set_editor_property(
+        "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
+    )
+    standard_capture.show_only_component(standard_component)
+    standard_render_target = require(
+        unreal.RenderingLibrary.create_render_target2d(
+            world, 1440, 960, unreal.TextureRenderTargetFormat.RTF_RGBA8_SRGB,
+            unreal.LinearColor(0.12, 0.16, 0.12, 1.0), False,
+        ),
+        "Could not create ordinary skeletal comparison render target",
+    )
+    standard_capture.set_editor_property("texture_target", standard_render_target)
+
+    output_directory = os.path.join(unreal.Paths.project_dir(), OUTPUT_RELATIVE)
+    os.makedirs(output_directory, exist_ok=True)
+    try:
+        transform_provider = component.get_transform_provider()
+        transform_provider_path = transform_provider.get_path_name() if transform_provider else None
+    except Exception as error:
+        transform_provider_path = "Python API unavailable: " + str(error)
+    report = {
+        "asset": ASSET,
+        "mesh_class": mesh.get_class().get_name(),
+        "component_class": component.get_class().get_name(),
+        "instance_count": instance_count,
+        "material_slot_count": material_count,
+        "transform_provider": transform_provider_path,
+        "materials": materials,
+        "bounds_origin_cm": components(bounds_origin),
+        "bounds_extent_cm": components(bounds_extent),
+        "height_cm": round(height, 2),
+        "target": TARGET_LABEL,
+        "map_saved": False,
+        "outputs": [
+            os.path.join(output_directory, OUTPUT_FILENAME),
+            os.path.join(output_directory, STANDARD_OUTPUT_FILENAME),
+        ],
+        "limitations": [
+            "One reference-pose instance only; no transform provider or wind animation was authored.",
+            "A scene-capture image is not a runtime draw-cost or LOD measurement.",
+        ],
+    }
+    PREVIEW_STATE.update({
+        "ticks": 0,
+        "handle": None,
+        "captures": [capture, standard_capture],
+        "outputs": [
+            (OUTPUT_FILENAME, render_target),
+            (STANDARD_OUTPUT_FILENAME, standard_render_target),
+        ],
+        "output_directory": output_directory,
+        "report": report,
+        "world": world,
+    })
+    unreal.EditorPythonScripting.set_keep_python_script_alive(True)
+    PREVIEW_STATE["handle"] = unreal.register_slate_post_tick_callback(on_preview_tick)
+    log("waiting for renderer to settle before the transient capture")
+
+
+try:
+    main()
+except Exception:
+    unreal.log_error(PREFIX + "FAILED " + traceback.format_exc())
+    raise

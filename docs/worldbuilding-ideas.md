@@ -1,5 +1,20 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-13 — Installed Beech is not yet a canopy solution
+
+UE 5.8.3 can render the installed European Beech skeletal output through
+`UInstancedSkinnedMeshComponent`. With the project's Nanite foliage feature
+off, Beech A/B show bare branches; startup-only overrides for Nanite foliage,
+voxels, and assemblies reveal the leaves, but they render as coarse, very dark
+clusters in the isolated preview. The ordinary skeletal component looks
+similar, so this is not yet an instancing win or an Island-ready tree. No
+transform provider is assigned, and wind or batch performance remains
+untested. Do not scatter the current outputs to fill the woodland midground.
+Inspect the PVE graph/preset and foliage materials, then judge a lit candidate
+in the fixed Tideglass-to-Woodland Game view and benchmark a small batch before
+Island placement. Full evidence:
+[instanced-skinned Megaplant probe](findings/2026-10-13-instanced-skinned-megaplant.md).
+
 ## 2026-10-12 — Woodland structure: keep the mid-distance art-directed
 
 The second collisionless hazel-coppice mesh passed structural Blender/FBX
