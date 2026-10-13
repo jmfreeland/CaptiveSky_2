@@ -243,9 +243,22 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 	if (!bPopulated)
 	{
 		bPopulated = true;
-		for (int32 Slot = 0; Slot < MaxMotes && Active < Desired; ++Slot)
+		TArray<int32, TInlineAllocator<MaxMotes>> EligibleSlots;
+		for (int32 Slot = 0; Slot < MaxMotes; ++Slot)
 		{
-			if (Motes[Slot].bActive || ViewerWindSpeed < LiftWindSpeed(KindForSlot(Slot))) continue;
+			if (!Motes[Slot].bActive && ViewerWindSpeed >= LiftWindSpeed(KindForSlot(Slot)))
+				EligibleSlots.Add(Slot);
+		}
+
+		// Slot ranges are grouped by kind, with always-eligible seeds first. Shuffle the initial
+		// candidates so a modest breeze starts with a representative mix instead of seeds only.
+		for (int32 Index = EligibleSlots.Num() - 1; Index > 0; --Index)
+		{
+			EligibleSlots.Swap(Index, Random.RandRange(0, Index));
+		}
+		for (const int32 Slot : EligibleSlots)
+		{
+			if (Active >= Desired) break;
 			Place(Motes[Slot], Slot, Viewer, ViewerWind, true);
 			++Active;
 		}

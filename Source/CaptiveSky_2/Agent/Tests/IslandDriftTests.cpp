@@ -54,9 +54,14 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	if (Drift* Actor = World->SpawnActor<Drift>(Spawn))
 	{
 		const FVector Viewer(1000.f, -500.f, 300.f);
-		const TFunctionRef<FVector(const FVector&)> Breeze = [](const FVector&) { return FVector(180.f, 0.f, 0.f); };
+		const TFunctionRef<FVector(const FVector&)> Breeze = [](const FVector&) { return FVector(100.f, 0.f, 0.f); };
 		Actor->Advance(0.016f, Viewer, Breeze, 0.f, 1.f);
 		TestTrue(TEXT("A breeze lifts motes on the first frame"), Actor->GetActiveCount() > 6);
+		int32 InitialKinds[static_cast<int32>(EIslandDriftKind::Count)] = {};
+		for (int32 Slot = 0; Slot < Actor->GetMotes().Num(); ++Slot)
+			if (Actor->GetMotes()[Slot].bActive) ++InitialKinds[static_cast<int32>(Drift::KindForSlot(Slot))];
+		for (int32 Kind = 0; Kind < static_cast<int32>(EIslandDriftKind::Count); ++Kind)
+			TestTrue(TEXT("The first breeze population includes every lift-eligible mote kind"), InitialKinds[Kind] > 0);
 
 		for (int32 Step = 0; Step < 120; ++Step) Actor->Advance(0.016f, Viewer, Breeze, 0.f, 1.f);
 		bool bInside = true;
