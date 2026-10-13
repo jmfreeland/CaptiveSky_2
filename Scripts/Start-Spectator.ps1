@@ -98,6 +98,8 @@ $project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
 $projectRoot = Split-Path $project
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor.exe"
 if (-not (Test-Path $editor)) { throw "UnrealEditor.exe not found under $EngineDir; pass -EngineDir." }
+$editor = (Resolve-Path -LiteralPath $editor).Path
+$engineWorkingDirectory = Split-Path -Parent $editor
 
 function Resolve-ProjectPath([string]$Path) {
 	if ([string]::IsNullOrWhiteSpace($Path)) { return $Path }
@@ -197,12 +199,16 @@ if (-not [string]::IsNullOrWhiteSpace($LogPath)) {
 if ($PSBoundParameters.ContainsKey("MaxRealtimeSeconds")) { $arguments += "-CaptiveSkyMaxRealtimeSeconds=$MaxRealtimeSeconds" }
 if ($PSBoundParameters.ContainsKey("MaxModelRequests")) { $arguments += "-CaptiveSkyMaxModelRequests=$MaxModelRequests" }
 if (-not $Continuous) {
-	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) { & $editor @arguments; return }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds")) {
+		Push-Location -LiteralPath $engineWorkingDirectory
+		try { & $editor @arguments } finally { Pop-Location }
+		return
+	}
 
 	$quotedArguments = $arguments | ForEach-Object {
 		if ("$_" -match '\s') { "`"$_`"" } else { "$_" }
 	}
-	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -PassThru
+	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -WorkingDirectory $engineWorkingDirectory -PassThru
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
 	$mapObjectName = ($MapPath -split '/')[-1]
@@ -263,7 +269,7 @@ $arguments += "-unattended" # a crash must end the process rather than wait on a
 $restartLog = Join-Path $PSScriptRoot "..\Saved\Logs\SpectatorRestarts.log"
 $recentCrashes = @()
 while ($true) {
-	$game = Start-Process -FilePath $editor -ArgumentList ($arguments | ForEach-Object { if ("$_" -match '\s') { "`"$_`"" } else { "$_" } }) -PassThru -Wait
+	$game = Start-Process -FilePath $editor -ArgumentList ($arguments | ForEach-Object { if ("$_" -match '\s') { "`"$_`"" } else { "$_" } }) -WorkingDirectory $engineWorkingDirectory -PassThru -Wait
 	if ($game.ExitCode -eq 0) { break }
 	$now = Get-Date
 	$recentCrashes = @($recentCrashes | Where-Object { ($now - $_).TotalMinutes -lt 60 }) + $now
