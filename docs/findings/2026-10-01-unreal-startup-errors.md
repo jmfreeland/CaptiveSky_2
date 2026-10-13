@@ -114,3 +114,15 @@ ground-cover-density comparison was not run.
 **Decision:** keep the no-retry gate. Symbolize both existing dumps with
 matching UE 5.8.3 symbols (or obtain equivalent diagnostics) before another
 project-open attempt; do not infer a shared root cause from these two hashes.
+
+### Static plugin inventory and build check — 2026-10-13
+
+A read-only descriptor inventory found 39 enabled plugin names in
+`CaptiveSky_2.uproject`; every name resolved to a `.uplugin` descriptor under
+the installed UE 5.8 `Engine/Plugins`, and no project-local `Plugins/*.uplugin`
+was present. This rules out a missing plugin descriptor, not a binary,
+dependency, or plugin startup fault. A build-only `CaptiveSky_2Editor` compile
+also succeeded (five actions), with warnings that `MetaHumanGenerator` and the
+project depend on `StructUtils`, deprecated since UE 5.5. The warning is not
+evidence that it caused the null access violation. No plugin was disabled and
+no project-open attempt was made; the matching-symbols gate remains.
