@@ -68,6 +68,15 @@ startup experiment. Keep agent thinking disabled and the model-request ceiling
 at zero. The repeated startup fault remains separate from the recurring .NET
 dialog unless new evidence links them.
 
+**Bounded-launcher exit guard (2026-10-13):** `Start-Spectator.ps1` now fails
+explicitly if its launched Game process exits before the world-ready marker,
+including the misleading exit-code-0 case. It reports a fresh crash `.xml` or
+`.log` when one was written after launch. A mocked process regression returned
+exit code 0 without creating a log; the script correctly raised a startup
+failure, and PowerShell's parser reported no syntax errors. No Unreal process
+was started for this test, and the actual project startup crash remains
+unresolved.
+
 Epic's documented symbol component is available from Epic Games Launcher under
 Unreal Engine > Library > the UE 5.8.3 tile's Options > **Editor symbols for
 debugging**. Epic says this component adds source used to provide more detailed

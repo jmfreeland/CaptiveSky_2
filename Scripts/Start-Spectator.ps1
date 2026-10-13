@@ -208,6 +208,7 @@ if (-not $Continuous) {
 	$quotedArguments = $arguments | ForEach-Object {
 		if ("$_" -match '\s') { "`"$_`"" } else { "$_" }
 	}
+	$gameLaunchTime = Get-Date
 	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -WorkingDirectory $engineWorkingDirectory -PassThru
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
@@ -257,6 +258,16 @@ if (-not $Continuous) {
 		$game.WaitForExit()
 	}
 	$game.Refresh()
+	if (-not $bWorldReady -and $game.HasExited) {
+		$earlyExitMessage = "Island Game exited before the world-ready marker (exit code $($game.ExitCode)). A zero exit code is not proof of successful startup. Log: $LogPath"
+		$crashRoot = Join-Path $projectRoot "Saved\Crashes"
+		$recentCrashArtifact = Get-ChildItem -LiteralPath $crashRoot -Recurse -File -ErrorAction SilentlyContinue |
+			Where-Object { $_.LastWriteTime -ge $gameLaunchTime -and $_.Extension -in @('.xml', '.log') } |
+			Sort-Object LastWriteTime -Descending |
+			Select-Object -First 1
+		if ($recentCrashArtifact) { $earlyExitMessage += " Recent crash artifact: $($recentCrashArtifact.FullName)." }
+		throw $earlyExitMessage
+	}
 	if ($game.HasExited -and $game.ExitCode -ne 0) {
 		Write-Warning "Island Game exited with code $($game.ExitCode). Log: $LogPath"
 	}
