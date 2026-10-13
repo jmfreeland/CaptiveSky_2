@@ -59,3 +59,36 @@ crashed.
 The one crowd-following warning is worth revisiting only if a play session
 shows actual navigation failure. It is currently an isolated warning, not
 evidence of a failed gameplay behavior.
+
+## 2026-10-13 — Project-open access violation remains unsymbolized
+
+Several later project launches failed before the Island or requested automation
+test began. The latest bounded `-NullRHI` attempt targeted
+`CaptiveSky2.Agent.NightEcology`; its crash-side log records the command line,
+but no normal project log or test result was produced. `CrashContext.runtime-xml`
+reports `EXCEPTION_ACCESS_VIOLATION` reading `0x0000000000000000` on the game
+thread, with `PCallStackHash`
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`. The included
+`UEMinidump.dmp` is 321,103 bytes. Its recorded stack names only
+`UnrealEditor-Core` and `UnrealEditor-Cmd` offsets; there are no function
+symbols, so the faulting initializer/module is not identified. This is distinct
+from the earlier optional Toolsets Python tracebacks above. Evidence is in
+[`Codex_MinnowNightRest_20261013.log`](../../Saved/Crashes/_0000/Codex_MinnowNightRest_20261013.log),
+[`CrashContext.runtime-xml`](../../Saved/Crashes/_0000/CrashContext.runtime-xml),
+and [`UEMinidump.dmp`](../../Saved/Crashes/_0000/UEMinidump.dmp).
+
+The installed engine location is `D:/Games/Epic/UE_5.8`. The matching
+`UnrealEditor-Core.pdb` and `UnrealEditor-Cmd.pdb` are absent from its Win64
+binary directory, and the standard Windows Kits x64 `cdb.exe`/`windbg.exe`
+paths are absent as well. Engine-only `UnrealEditor-Cmd.exe -version` has
+previously exited successfully; that does not isolate the project-opening
+failure further.
+
+**Decision:** do not repeat the same project-open launch yet. No evidence here
+identifies a plugin, project module, or asset as the cause, so do not disable
+plugins or edit project startup configuration speculatively. The next
+diagnostic step is to make a matching UE 5.8.3 debugger and symbols available,
+then symbolize this existing dump before another project launch. Once the
+faulting frame is known, make one targeted environment/configuration change and
+retry the zero-request automation. Until then, in-engine visual and behavioral
+validation remains unavailable; this finding does not validate Island content.
