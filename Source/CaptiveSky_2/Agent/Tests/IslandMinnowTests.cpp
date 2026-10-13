@@ -667,3 +667,79 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	World->DestroyWorld(false);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMinnowSwimmingVisitorTest, "CaptiveSky2.Agent.TidepoolMinnows.PlayerWaterPresence",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandMinnowSwimmingVisitorTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Swimming visitor fixture world created"), World) || !TestNotNull(TEXT("Engine is available for swimming visitor fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandTidepoolMinnows* School = World->SpawnActor<AIslandTidepoolMinnows>(FVector(1000.f, 2000.f, 300.f), FRotator::ZeroRotator, Spawn);
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(School ? School->GetActorLocation() : FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Minnow school spawns for the swimming visitor test"), School) ||
+		!TestNotNull(TEXT("Swimming visitor pawn spawns"), Visitor))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	School->ConfigureAppearance();
+	School->UpdateSchool(0.f);
+	School->bHasPoolSwimmingBounds = true;
+	School->PoolSurfaceBoundsOrigin = School->GetActorLocation();
+	School->PoolSwimmingRadii = FVector2D(200.f, 200.f);
+	School->ScatterSurfaceCueCooldownRemaining = 0.f;
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 0.f));
+	School->UpdatePlayerWaterPresence(Visitor, false);
+	TestTrue(TEXT("A nearby player on the bank does not disturb the minnows"), FMath::IsNearlyZero(School->ScatterRemaining));
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 300.f));
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	TestTrue(TEXT("A swimmer well above the shallow school is outside its disturbance band"), FMath::IsNearlyZero(School->ScatterRemaining));
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-1200.f, 0.f, 0.f));
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	TestTrue(TEXT("A distant swimmer does not disturb the pool school"), FMath::IsNearlyZero(School->ScatterRemaining));
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 0.f));
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	TestTrue(TEXT("A nearby surface-swimming player briefly startles the school"),
+		FMath::IsNearlyEqual(School->ScatterRemaining, 2.4f) && School->ScatterDirection.X > 0.95f);
+	int32 PlayerStartleRippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) ++PlayerStartleRippleCount;
+	TestEqual(TEXT("The swimmer creates one short visible cue at the fish"), PlayerStartleRippleCount, 1);
+	School->ScatterRemaining = 0.f;
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	TestTrue(TEXT("Lingering beside the school does not repeatedly startle it"), FMath::IsNearlyZero(School->ScatterRemaining));
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-900.f, 0.f, 0.f));
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	School->PlayerWaterStartleCooldownRemaining = 0.f;
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-300.f, 0.f, 0.f));
+	School->ScatterSurfaceCueCooldownRemaining = 0.f;
+	School->UpdatePlayerWaterPresence(Visitor, true);
+	TestTrue(TEXT("Leaving the outer radius and returning rearms one fresh response"), School->ScatterRemaining > 2.3f);
+	School->ScatterRemaining = 0.f;
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-900.f, 0.f, 0.f));
+	School->UpdatePlayerWaterPresence(Visitor, false);
+	School->PlayerWaterStartleCooldownRemaining = 0.f;
+	Visitor->SetActorLocation(School->GetActorLocation() + FVector(-100.f, 0.f, 0.f));
+	School->ScatterSurfaceCueCooldownRemaining = 0.f;
+	School->UpdatePlayerWaterPresence(Visitor, false);
+	TestTrue(TEXT("A player crossing the shallow Tideglass footprint disturbs the school even without ocean-swim mode"),
+		School->ScatterRemaining > 2.3f);
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (It->ActorHasTag(TEXT("MinnowStartleImpact"))) It->Destroy();
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}

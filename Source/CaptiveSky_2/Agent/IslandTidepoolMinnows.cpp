@@ -6,6 +6,8 @@
 #include "IslandWeather.h"
 #include "IslandTideglassSubsystem.h"
 #include "RavenAgentAIController.h"
+#include "CaptiveSky_2Character.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
@@ -703,6 +705,67 @@ void AIslandTidepoolMinnows::CheckForNearbyRavenDisturbance()
 	}
 }
 
+void AIslandTidepoolMinnows::CheckForPlayerWaterDisturbance()
+{
+	if (!GetWorld()) return;
+
+	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+	ACaptiveSky_2Character* Player = PlayerController
+		? Cast<ACaptiveSky_2Character>(PlayerController->GetPawn())
+		: nullptr;
+	UpdatePlayerWaterPresence(Player, Player && Player->IsSurfaceSwimming());
+}
+
+void AIslandTidepoolMinnows::UpdatePlayerWaterPresence(APawn* PlayerPawn, bool bIsSurfaceSwimming)
+{
+	if (!IsValid(PlayerPawn))
+	{
+		PlayerWaterPresenceLatch.Reset();
+		return;
+	}
+
+	const FVector Offset = PlayerPawn->GetActorLocation() - GetActorLocation();
+	const float DistanceSquared = Offset.SizeSquared2D();
+	if (PlayerWaterPresenceLatch.Get() == PlayerPawn &&
+		DistanceSquared > FMath::Square(PlayerWaterRearmRadiusCm))
+	{
+		PlayerWaterPresenceLatch.Reset();
+	}
+
+	bool bWithinPoolFootprint = false;
+	if (bHasPoolSwimmingBounds && PoolSwimmingRadii.X > KINDA_SMALL_NUMBER && PoolSwimmingRadii.Y > KINDA_SMALL_NUMBER)
+	{
+		const FVector PoolOffset = PlayerPawn->GetActorLocation() - PoolSurfaceBoundsOrigin;
+		const FVector2D NormalizedPoolOffset(PoolOffset.X / PoolSwimmingRadii.X, PoolOffset.Y / PoolSwimmingRadii.Y);
+		bWithinPoolFootprint = NormalizedPoolOffset.SizeSquared() <= 1.f &&
+			FMath::Abs(PoolOffset.Z - GetTideOffsetCm()) <= PlayerWaterHeightToleranceCm;
+	}
+	const bool bInNearbyWater = bIsSurfaceSwimming || bWithinPoolFootprint;
+	if (!bInNearbyWater)
+	{
+		PlayerWaterPresenceLatch.Reset();
+		return;
+	}
+
+	if (DistanceSquared > FMath::Square(PlayerWaterStartleRadiusCm) ||
+		FMath::Abs(Offset.Z) > PlayerWaterHeightToleranceCm)
+	{
+		return;
+	}
+
+	const bool bAlreadyNoticedThisApproach = PlayerWaterPresenceLatch.Get() == PlayerPawn;
+	if (!bAlreadyNoticedThisApproach) PlayerWaterPresenceLatch = PlayerPawn;
+	if (bAlreadyNoticedThisApproach || PlayerWaterStartleCooldownRemaining > 0.f || ScatterRemaining > 0.f)
+	{
+		return;
+	}
+
+	// A nearby swimmer briefly breaks the school's pattern; the fish remain wild,
+	// stay within their shallow-water footprint, and naturally regroup.
+	RespondToQuietObservation(PlayerPawn->GetActorLocation());
+	PlayerWaterStartleCooldownRemaining = PlayerWaterStartleCooldownSeconds;
+}
+
 void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 {
 	const float NightRest = GetNightRestAmount();
@@ -748,6 +811,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	SurfacePulseRemaining = FMath::Max(0.f, SurfacePulseRemaining - SafeDelta);
 	SurfacePulseCooldownRemaining = FMath::Max(0.f, SurfacePulseCooldownRemaining - SafeDelta);
 	ScatterSurfaceCueCooldownRemaining = FMath::Max(0.f, ScatterSurfaceCueCooldownRemaining - SafeDelta);
+	PlayerWaterStartleCooldownRemaining = FMath::Max(0.f, PlayerWaterStartleCooldownRemaining - SafeDelta);
 	RippleCheckRemaining -= SafeDelta;
 	if (RippleCheckRemaining <= 0.f)
 	{
@@ -760,6 +824,12 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = RavenCheckIntervalSeconds;
 		CheckForNearbyRavenDisturbance();
+	}
+	PlayerWaterCheckRemaining -= SafeDelta;
+	if (PlayerWaterCheckRemaining <= 0.f)
+	{
+		PlayerWaterCheckRemaining = PlayerWaterCheckIntervalSeconds;
+		CheckForPlayerWaterDisturbance();
 	}
 	const float Rain = Weather.IsValid() && GetWorld()
 		? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds())

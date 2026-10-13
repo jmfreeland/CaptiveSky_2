@@ -7,6 +7,7 @@
 class AIslandWeather;
 class AIslandDayNight;
 class ARavenAgentAIController;
+class APawn;
 class UMaterialInterface;
 class UProceduralMeshComponent;
 
@@ -33,6 +34,7 @@ protected:
 
 private:
 	friend class FIslandMinnowTest;
+	friend class FIslandMinnowSwimmingVisitorTest;
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
 	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
@@ -40,6 +42,11 @@ private:
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
+	static constexpr float PlayerWaterCheckIntervalSeconds = 0.2f;
+	static constexpr float PlayerWaterStartleRadiusCm = 500.f;
+	static constexpr float PlayerWaterRearmRadiusCm = 850.f;
+	static constexpr float PlayerWaterHeightToleranceCm = 250.f;
+	static constexpr float PlayerWaterStartleCooldownSeconds = 8.f;
 	static float NightRestAmount(float CurrentHour);
 	static float NightActivityScale(float RestAmount);
 	static float SwimRateForRest(float RestAmount);
@@ -70,8 +77,11 @@ private:
 	float SwimPhaseRadians = 0.f;
 	int32 SurfaceBreakFishIndex = 0;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
+	TWeakObjectPtr<APawn> PlayerWaterPresenceLatch;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
+	float PlayerWaterCheckRemaining = 0.f;
+	float PlayerWaterStartleCooldownRemaining = 0.f;
 	float Phase = 0.73f;
 	bool bHasPoolSwimmingBounds = false;
 
@@ -83,6 +93,8 @@ private:
 	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation, float EdgeClearanceCm = 0.f) const;
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
+	void CheckForPlayerWaterDisturbance();
+	void UpdatePlayerWaterPresence(APawn* PlayerPawn, bool bIsSurfaceSwimming);
 	void CheckForNaturalSurfaceRipple();
 	void TryCreateSurfaceBreak(float RainIntensity);
 	void CreateScatterSurfaceCue(const FVector& ObserverLocation);
