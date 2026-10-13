@@ -4,11 +4,35 @@ namespace CaptiveSky.Gateway.Proposals;
 
 public static class DiscordProposalCommand
 {
-    public const string Usage = "Examples: `!request object A small copper bell beside the east trail`; `!request upgrade aesthetic InnDoorLantern :: Add brass trim`; `!request upgrade variation world :: Add mossy stream stones`; `!request upgrade functionality RavenNest :: Add a sheltered landing rail`. You can also ask Raven to submit one specific idea for human review. These are proposals only; nothing is created automatically.";
+    public const string Usage = "Examples: `!request object A small copper bell beside the east trail`; `!request upgrade aesthetic InnDoorLantern :: Add brass trim`; `!request upgrade variation world :: Add mossy stream stones`; `!request upgrade functionality RavenNest :: Add a sheltered landing rail`; `!request status <8-character-id>`. You can also ask Raven to submit one specific idea for human review. These are proposals only; nothing is created automatically.";
 
     public static bool IsCommand(string text) =>
         text.StartsWith("!request", StringComparison.OrdinalIgnoreCase) &&
         (text.Length == 8 || char.IsWhiteSpace(text[8]));
+
+    public static bool IsStatusCommand(string text)
+    {
+        if (!IsCommand(text)) return false;
+        var args = text[8..].TrimStart();
+        return args.StartsWith("status", StringComparison.OrdinalIgnoreCase) &&
+               (args.Length == 6 || char.IsWhiteSpace(args[6]));
+    }
+
+    public static bool TryParseStatusRequest(string text, out string requestIdPrefix, out string error)
+    {
+        requestIdPrefix = string.Empty;
+        error = "Use `!request status <8-character-id>` to check one of your proposals.";
+        if (!IsStatusCommand(text)) return false;
+
+        var args = text[8..].Trim();
+        var id = args[6..].Trim();
+        if (id.Length is < 8 or > 36 || id.Any(character => !char.IsAsciiHexDigit(character) && character != '-'))
+            return true;
+
+        requestIdPrefix = id;
+        error = string.Empty;
+        return true;
+    }
 
     public static bool TryParse(string text, out AgentProposal? proposal, out string error)
     {

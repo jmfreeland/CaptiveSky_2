@@ -94,6 +94,31 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             if (string.IsNullOrWhiteSpace(text))
                 return;
 
+            if (DiscordProposalCommand.IsStatusCommand(text))
+            {
+                string response;
+                if (!CanLookupProposalStatus(message.Author.Id, message.Author.IsBot, _agent.Discord))
+                {
+                    response = "Status lookup is only available to an explicitly allow-listed human correspondent.";
+                }
+                else if (!DiscordProposalCommand.TryParseStatusRequest(text, out var requestIdPrefix, out var error))
+                {
+                    response = error;
+                }
+                else if (requestIdPrefix.Length == 0)
+                {
+                    response = error;
+                }
+                else
+                {
+                    response = await _proposalQueue.GetStatusAsync(
+                        _agent.AgentId, message.Author.Id.ToString(), requestIdPrefix, _shutdownToken);
+                }
+
+                await message.Channel.SendMessageAsync(response, messageReference: new MessageReference(message.Id));
+                return;
+            }
+
             if (DiscordProposalCommand.IsCommand(text))
             {
                 string response;
@@ -170,6 +195,9 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
         isBot
             ? configuration.AllowedBotUserIds.Contains(userId)
             : configuration.AllowedUserIds.Count == 0 || configuration.AllowedUserIds.Contains(userId);
+
+    public static bool CanLookupProposalStatus(ulong userId, bool isBot, DiscordConfiguration configuration) =>
+        !isBot && configuration.AllowedUserIds.Contains(userId);
 
     public static bool IsAllowedBotChannel(ulong channelId, DiscordConfiguration configuration) =>
         configuration.AllowedChannelIds.Count > 0 && configuration.AllowedChannelIds.Contains(channelId);

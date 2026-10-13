@@ -72,6 +72,62 @@ public sealed class AssetProposalQueue(string projectRoot)
         finally { Gate.Release(); }
     }
 
+    public async Task<string> GetStatusAsync(
+        string requester, string participantId, string requestIdPrefix, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(requester) || string.IsNullOrWhiteSpace(participantId) ||
+            requestIdPrefix.Length is < 8 or > 36 ||
+            requestIdPrefix.Any(character => !char.IsAsciiHexDigit(character) && character != '-'))
+            return "Use `!request status <8-character-id>` to check one of your proposals.";
+
+        await Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(_path))
+                return "No proposal with that ID was found for this correspondent.";
+
+            var matches = new List<(string Id, string Status)>();
+            foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                using var document = JsonDocument.Parse(line);
+                var record = document.RootElement;
+                if (record.ValueKind != JsonValueKind.Object)
+                    throw new JsonException("The proposal record must be an object.");
+                var id = Get(record, "id");
+                if (Get(record, "requester") != requester || Get(record, "participant_id") != participantId ||
+                    !id.StartsWith(requestIdPrefix, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                matches.Add((id, Get(record, "status")));
+            }
+
+            if (matches.Count == 0)
+                return "No proposal with that ID was found for this correspondent.";
+            if (matches.Count > 1)
+                return "That short ID matches more than one proposal; include more characters.";
+
+            var match = matches[0];
+            var explanation = match.Status switch
+            {
+                "pending_review" => "is awaiting human review. Nothing has been generated or changed in the world.",
+                "accepted" => "was accepted for human follow-up. No world change is confirmed yet.",
+                "generated" => "has a generated asset candidate. This does not confirm Unreal import or placement.",
+                "declined" => "was declined. Nothing was generated or changed in the world.",
+                _ => "has an unrecognized status. Please ask the human reviewer for details."
+            };
+            return $"Proposal `{match.Id[..8]}` {explanation}";
+        }
+        catch (JsonException)
+        {
+            return "The proposal inbox contains an unreadable record; its status is unavailable.";
+        }
+        catch (IOException)
+        {
+            return "The proposal inbox could not be read; its status is unavailable.";
+        }
+        finally { Gate.Release(); }
+    }
+
     private static string Get(JsonElement record, string property) =>
         record.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 }

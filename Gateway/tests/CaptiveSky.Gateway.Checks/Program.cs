@@ -167,6 +167,10 @@ try
     Assert(!DiscordChannelAdapter.IsAllowedAuthor(43, false, discordAuthors), "unlisted human remains rejected");
     Assert(DiscordChannelAdapter.IsAllowedAuthor(9001, true, discordAuthors), "explicitly trusted Architect bot can address Raven");
     Assert(!DiscordChannelAdapter.IsAllowedAuthor(9002, true, discordAuthors), "unlisted bots remain rejected");
+    Assert(DiscordChannelAdapter.CanLookupProposalStatus(42, false, discordAuthors), "explicitly allow-listed human can check proposal status");
+    Assert(!DiscordChannelAdapter.CanLookupProposalStatus(43, false, discordAuthors), "unlisted human cannot check proposal status");
+    Assert(!DiscordChannelAdapter.CanLookupProposalStatus(9001, true, discordAuthors), "trusted conversation bot cannot inspect human proposal status");
+    Assert(!DiscordChannelAdapter.CanLookupProposalStatus(42, false, new DiscordConfiguration()), "empty human allow-list does not expose proposal status");
     Assert(!DiscordChannelAdapter.IsAllowedAuthor(42, true, discordAuthors), "human allow-list never implicitly trusts a bot");
     Assert(DiscordChannelAdapter.IsAllowedAuthor(43, false, new DiscordConfiguration()), "empty human allow-list preserves ordinary conversation behavior");
     Assert(!DiscordChannelAdapter.IsAllowedAuthor(9001, true, new DiscordConfiguration()), "empty bot allow-list trusts no bots");
@@ -182,11 +186,18 @@ try
         && upgradeProposal is { RequestType: "upgrade", UpgradeKind: "aesthetic", Target: "InnDoorLantern", Description: "Add brass trim" }, "upgrade proposal parses");
     Assert(DiscordProposalCommand.TryParse("!request upgrade variation world :: Add stream stones", out var worldUpgrade, out _)
         && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
+    Assert(DiscordProposalCommand.IsStatusCommand("!request status deadbeef"), "proposal status command is recognized");
+    Assert(!DiscordProposalCommand.IsStatusCommand("!request statuslight deadbeef"), "status command prefix is exact");
+    Assert(DiscordProposalCommand.TryParseStatusRequest("!request status deadbeef", out var statusPrefix, out var statusError)
+        && statusPrefix == "deadbeef" && statusError.Length == 0, "short proposal ID parses for status lookup");
+    Assert(DiscordProposalCommand.TryParseStatusRequest("!request status too-short", out var invalidStatusPrefix, out var invalidStatusError)
+        && invalidStatusPrefix.Length == 0 && invalidStatusError.Contains("8-character-id", StringComparison.Ordinal), "malformed status ID receives usage guidance");
     Assert(!DiscordProposalCommand.TryParse("!request help", out _, out var proposalHelp)
         && proposalHelp.Contains("!request object", StringComparison.Ordinal)
         && proposalHelp.Contains("upgrade aesthetic", StringComparison.Ordinal)
         && proposalHelp.Contains("upgrade variation", StringComparison.Ordinal)
         && proposalHelp.Contains("upgrade functionality", StringComparison.Ordinal)
+        && proposalHelp.Contains("!request status", StringComparison.Ordinal)
         && proposalHelp.Contains("ask Raven", StringComparison.Ordinal)
         && proposalHelp.Contains("human review", StringComparison.Ordinal)
         && proposalHelp.Contains("nothing is created automatically", StringComparison.Ordinal), "help gives examples and explains review-only resident proposals");
@@ -293,6 +304,42 @@ try
     Assert(queuedUpgrade.Success, "upgrade proposal is appended");
     using (var proposalRecords = System.Text.Json.JsonDocument.Parse("[" + string.Join(',', await File.ReadAllLinesAsync(inbox)) + "]"))
         Assert(proposalRecords.RootElement[1].GetProperty("pipeline").GetString() == "human_review", "upgrade proposal remains human-review only");
+    var queuedStatus = await proposals.GetStatusAsync(home.AgentId, "42", queuedObject.RequestId[..8], CancellationToken.None);
+    Assert(queuedStatus.Contains("awaiting human review", StringComparison.Ordinal) &&
+           queuedStatus.Contains("Nothing has been generated or changed", StringComparison.Ordinal),
+        "status lookup reports pending review without changing the world");
+    var otherCorrespondentStatus = await proposals.GetStatusAsync(home.AgentId, "99", queuedObject.RequestId[..8], CancellationToken.None);
+    Assert(otherCorrespondentStatus.Contains("No proposal", StringComparison.Ordinal),
+        "status lookup hides another correspondent's proposal");
+
+    var statusFixtures = new[]
+    {
+        (Id: "fedcba98-0000-0000-0000-000000000001", Status: "accepted", Expected: "No world change is confirmed"),
+        (Id: "badc0ffe-0000-0000-0000-000000000002", Status: "generated", Expected: "does not confirm Unreal import or placement"),
+        (Id: "deadbeef-0000-0000-0000-000000000003", Status: "declined", Expected: "Nothing was generated or changed"),
+    };
+    foreach (var fixture in statusFixtures)
+        await File.AppendAllTextAsync(inbox, System.Text.Json.JsonSerializer.Serialize(new
+        {
+            id = fixture.Id, requester = home.AgentId, participant_id = "42", status = fixture.Status
+        }) + "\n");
+    foreach (var fixture in statusFixtures)
+    {
+        var status = await proposals.GetStatusAsync(home.AgentId, "42", fixture.Id[..8], CancellationToken.None);
+        Assert(status.Contains(fixture.Expected, StringComparison.Ordinal),
+            $"status lookup accurately describes {fixture.Status} without implying world completion");
+    }
+
+    await File.AppendAllTextAsync(inbox, System.Text.Json.JsonSerializer.Serialize(new
+    {
+        id = "abcdef01-0000-0000-0000-000000000004", requester = home.AgentId, participant_id = "42", status = "pending_review"
+    }) + "\n");
+    await File.AppendAllTextAsync(inbox, System.Text.Json.JsonSerializer.Serialize(new
+    {
+        id = "abcdef01-1111-0000-0000-000000000005", requester = home.AgentId, participant_id = "42", status = "pending_review"
+    }) + "\n");
+    var ambiguousStatus = await proposals.GetStatusAsync(home.AgentId, "42", "abcdef01", CancellationToken.None);
+    Assert(ambiguousStatus.Contains("more than one", StringComparison.Ordinal), "ambiguous short request IDs require more characters");
 
     var brokenRoot = Path.Combine(root, "broken-queue");
     var brokenInbox = Path.Combine(brokenRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
@@ -301,6 +348,8 @@ try
     var brokenQueue = new AssetProposalQueue(brokenRoot);
     var brokenAppend = await brokenQueue.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "104", CancellationToken.None);
     Assert(!brokenAppend.Success && brokenAppend.Message.Contains("unreadable", StringComparison.Ordinal), "unreadable inbox fails closed");
+    var brokenStatus = await brokenQueue.GetStatusAsync(home.AgentId, "42", "deadbeef", CancellationToken.None);
+    Assert(brokenStatus.Contains("unreadable", StringComparison.Ordinal), "status lookup fails closed on unreadable inboxes");
 
     var fullRoot = Path.Combine(root, "full-queue");
     var fullInbox = Path.Combine(fullRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");

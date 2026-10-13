@@ -80,6 +80,7 @@ After adding your Discord user ID to `allowedUserIds`, DM the raven or mention i
 !request upgrade aesthetic InnDoorLantern :: Add a warmer, hand-forged brass finish
 !request upgrade variation world :: Scatter a few mossy stones along the stream
 !request upgrade functionality RavenNest :: Add a sheltered landing rail
+!request status <8-character-id>
 !request help
 ```
 
@@ -93,6 +94,8 @@ Could you submit a functionality-upgrade proposal for RavenNest to add a shelter
 Raven's reply includes the gateway's queue result and, if accepted, its short ID. If Raven is only discussing an idea, no proposal is submitted. The direct `!request` commands remain available when agent-authored proposals are disabled.
 
 `world` means the proposal is not tied to a named object. Descriptions are limited to 240 characters; upgrade targets to 96. Each request is deduplicated while pending, and the shared review inbox is capped at 64 pending proposals. A successful command appends a record to `Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` with `requester` set to the agent's stable ID, so Unreal can associate a later review with the right resident. `object` proposals are marked for the ComfyBlender pipeline; upgrades are human-review only. This is a proposal queue, not an asset-generation trigger: nothing is generated or placed automatically.
+
+After Raven returns a proposal's short ID, the same explicitly allow-listed human correspondent can check it with `!request status <8-character-id>`. The read-only lookup is scoped to Raven and that Discord correspondent; it does not reveal other correspondents' requests or change their status. A `generated` result means an asset candidate passed its export verifier, not that it was imported or placed in Unreal.
 
 ## Run locally
 
