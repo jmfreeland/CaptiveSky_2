@@ -133,6 +133,8 @@ Run the integration checks with:
 dotnet run --project Gateway/tests/CaptiveSky.Gateway.Checks/CaptiveSky.Gateway.Checks.csproj
 ```
 
+The checks create and remove a unique fixture directory under the system temp path. If that path is restricted, set `CAPTIVESKY_GATEWAY_CHECKS_ROOT` to a writable scratch directory before running them; each run still uses its own GUID-named child folder.
+
 ## Add another agent
 
 Create its normal `Agents/<AgentId>/` home, create a separate Discord application when it should have its own visible identity, and add another entry to `gateway.json`:

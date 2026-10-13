@@ -7,7 +7,9 @@ using CaptiveSky.Gateway.Routing;
 using CaptiveSky.Gateway.Channels;
 using CaptiveSky.Gateway.Proposals;
 
-var root = Path.Combine(Path.GetTempPath(), $"CaptiveSkyGatewayChecks-{Guid.NewGuid():N}");
+var configuredRoot = Environment.GetEnvironmentVariable("CAPTIVESKY_GATEWAY_CHECKS_ROOT");
+var rootBase = string.IsNullOrWhiteSpace(configuredRoot) ? Path.GetTempPath() : configuredRoot;
+var root = Path.Combine(Path.GetFullPath(rootBase), $"CaptiveSkyGatewayChecks-{Guid.NewGuid():N}");
 try
 {
     var home = new AgentHome(root, "Agent_Test_01");
