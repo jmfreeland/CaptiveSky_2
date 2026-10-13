@@ -207,6 +207,48 @@ try
         "older response schema remains compatible without a proposal field");
     AssertThrows<InvalidOperationException>(() => OpenAICompatibleAgentResponder.ParseAgentResponse(
         """{"speech":"Oops.","proposal":"create a nest"}"""), "non-object proposal payload is rejected");
+
+    var fakeCompletion = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        choices = new[] { new { message = new { content = """{"speech":"Hello.","new_memories":[],"proposal":null}""" } } }
+    });
+    var proposalPromptHandler = new CapturingHttpMessageHandler(fakeCompletion);
+    using (var proposalPromptClient = new HttpClient(proposalPromptHandler))
+    {
+        var proposalPromptResponder = new OpenAICompatibleAgentResponder(
+            proposalPromptClient,
+            new LlmConfiguration { Endpoint = "https://unit.test/v1/chat/completions", ApiKeyEnvironmentVariable = "CAPTIVESKY_TEST_NO_KEY" },
+            home,
+            memories,
+            allowAgentProposals: true);
+        await proposalPromptResponder.RespondAsync(message with { MessageId = "proposal-prompt-enabled" }, CancellationToken.None);
+    }
+    using (var enabledRequest = System.Text.Json.JsonDocument.Parse(proposalPromptHandler.RequestBody))
+    {
+        var systemPrompt = enabledRequest.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert(systemPrompt.Contains("do not need to wait for the correspondent to ask", StringComparison.Ordinal)
+            && systemPrompt.Contains("grounded in your own recent memory", StringComparison.Ordinal)
+            && systemPrompt.Contains("request for human review", StringComparison.Ordinal)
+            && systemPrompt.Contains("explicit allowedUserIds list", StringComparison.Ordinal),
+            "enabled Discord responder allows occasional grounded proposals but preserves review and human allow-list safeguards");
+    }
+    var disabledPromptHandler = new CapturingHttpMessageHandler(fakeCompletion);
+    using (var disabledPromptClient = new HttpClient(disabledPromptHandler))
+    {
+        var disabledPromptResponder = new OpenAICompatibleAgentResponder(
+            disabledPromptClient,
+            new LlmConfiguration { Endpoint = "https://unit.test/v1/chat/completions", ApiKeyEnvironmentVariable = "CAPTIVESKY_TEST_NO_KEY" },
+            home,
+            memories,
+            allowAgentProposals: false);
+        await disabledPromptResponder.RespondAsync(message with { MessageId = "proposal-prompt-disabled" }, CancellationToken.None);
+    }
+    using (var disabledRequest = System.Text.Json.JsonDocument.Parse(disabledPromptHandler.RequestBody))
+    {
+        var systemPrompt = disabledRequest.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert(systemPrompt.Contains("Agent-authored proposal actions are disabled; always use proposal:null.", StringComparison.Ordinal),
+            "Discord routes without proposal opt-in continue to reject resident proposals");
+    }
     Assert(!new DiscordConfiguration().AllowAgentProposals,
         "agent-authored proposals are opt-in for each Discord route");
 
@@ -334,5 +376,19 @@ file sealed class FakeResponder(AgentHome home, AgentProposal? proposal = null) 
             "Hello from the test agent.",
             [new NewMemory("A visitor greeted me through an outside channel.", 0.4, ["greeting"])],
             proposal));
+    }
+}
+
+file sealed class CapturingHttpMessageHandler(string responseBody) : HttpMessageHandler
+{
+    public string RequestBody { get; private set; } = string.Empty;
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+        return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent(responseBody, System.Text.Encoding.UTF8, "application/json")
+        };
     }
 }

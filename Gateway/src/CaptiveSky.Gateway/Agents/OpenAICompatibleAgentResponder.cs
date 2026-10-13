@@ -26,8 +26,9 @@ public sealed class OpenAICompatibleAgentResponder(
             : string.Join('\n', context.Select(record => $"- [{record.Timestamp:O}] {record.Text}"));
         var proposalInstructions = allowAgentProposals
             ? """
-              You may include one optional proposal object only when the correspondent clearly asks you to submit a specific world request for human review. Do not turn casual brainstorming or mentions into requests. A proposal is not an action in the world: it enters a review queue only, and nothing is generated or placed automatically. Keep your speech tentative until the gateway confirms the queue result.
-              Proposal JSON: {"request_type":"new_object","description":"..."} or {"request_type":"upgrade","description":"...","target":"<object id or empty string for world>","upgrade_kind":"aesthetic|variation|functionality"}. Use null when no explicit request was made.
+              You may include one optional proposal in a natural reply when you have a concrete, useful reason grounded in your own recent memory, something you made, or specific details the correspondent gave you. You do not need to wait for the correspondent to ask. Be sparing: do not turn general brainstorming or every mention of the Island into a request, and use proposal:null when no specific need or curiosity has emerged. You are corresponding remotely; do not claim to see or experience anything that is not in your memories or the correspondent's message.
+              A proposal is only a request for human review. It does not change the Island: nothing is generated, imported, or placed automatically. Keep your speech tentative and never imply approval or completion. The gateway only submits proposals from a human correspondent who is on the route's explicit allowedUserIds list.
+              Proposal JSON: {"request_type":"new_object","description":"..."} or {"request_type":"upgrade","description":"...","target":"<known object id or concise grounded description; empty only for a broad world-level request>","upgrade_kind":"aesthetic|variation|functionality"}. Include at most one proposal in this reply.
               """
             : "Agent-authored proposal actions are disabled; always use proposal:null.";
         var systemPrompt = $$"""

@@ -69,7 +69,7 @@ To review the latest shared-channel conversation (newest 1–100 messages, print
 
 The bot needs View Channel and Read Message History; Discord returns an empty message body if the application lacks access to message content. This only reads a channel Architect has joined—it cannot read Raven's private DM with you. For that earlier history, use Raven's locally recorded [`memory.jsonl`](../Agents/Agent_Raven_01/memory.jsonl).
 
-Headless residents can submit one structured proposal during a reply when `discord.allowAgentProposals` is enabled for that route. Raven has this opt-in enabled. The requesting Discord user must still be on the route's explicit `allowedUserIds` list; with an empty list, agent-authored proposals are rejected. The model is instructed to submit only when the correspondent clearly asks, not during casual brainstorming.
+Headless residents can submit one structured proposal during a reply when `discord.allowAgentProposals` is enabled for that route. Raven has this opt-in enabled. A resident may occasionally raise a concrete proposal grounded in its own memories, something it made, or details the correspondent supplied; it need not wait for the correspondent to explicitly ask. This remains one optional proposal in an already-requested reply—there are no autonomous Discord messages or extra model calls. The requesting Discord user must still be on the route's explicit `allowedUserIds` list; with an empty list, agent-authored proposals are rejected. Trusted bot accounts may converse, but cannot submit proposals as if they were an allow-listed human.
 
 ### Submit a world proposal
 
