@@ -20,7 +20,15 @@ That is not proof the behavior failed: the 4.8-second cue can begin and end
 between five-second samples. The timing and interruption contract is verified,
 but player legibility remains unproven. Next, use a close, bloom-level view and
 one-second sampling (or temporary event telemetry) under the same zero-request
-cap; only then decide whether to tune the cue or its opportunities.
+cap; only then decide whether to tune the cue or its opportunities. Two attempts
+to tighten the sampling to one second instead crashed during Unreal startup,
+before the Island became ready; one retry omitted the explicit DDC overrides,
+so those switches alone do not explain it. The latest crash context reports a
+null-pointer access violation at process startup, but has no symbolized stack
+and the requested game log was never created
+(`Saved/Crashes/_0000/Codex_DragonflyBloomPause_CadenceRetry_20261013.log`,
+`Saved/Crashes/_0000/CrashContext.runtime-xml`). Stop repeating the same launch;
+diagnose that startup crash before resuming the visual test.
 
 ## 2026-10-13 — Installed Beech is not yet a canopy solution
 
