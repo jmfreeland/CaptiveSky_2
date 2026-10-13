@@ -15,6 +15,9 @@
 
 namespace
 {
+	constexpr float FlowerInterestDurationSeconds = 4.8f;
+	constexpr float FlowerInterestFadeStartSeconds = 3.8f;
+
 	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep, float Length, float MaximumHalfWidth,
 		const FLinearColor& WingColor)
 	{
@@ -429,7 +432,7 @@ bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocat
 		FMath::Cos(HoverAngle) * HoverRadius,
 		FMath::Sin(HoverAngle) * HoverRadius,
 		100.f);
-	FlowerInterestRemaining = 2.6f;
+	FlowerInterestRemaining = FlowerInterestDurationSeconds;
 	FlowerInterestCooldownRemaining = 16.f;
 	return true;
 }
@@ -437,8 +440,9 @@ bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocat
 float AIslandTideglassDragonfly::GetFlowerInterestAlpha() const
 {
 	if (FlowerInterestRemaining <= 0.f) return 0.f;
-	const float Elapsed = 2.6f - FlowerInterestRemaining;
-	return FMath::SmoothStep(0.f, 0.65f, Elapsed) * (1.f - FMath::SmoothStep(1.9f, 2.6f, Elapsed));
+	const float Elapsed = FlowerInterestDurationSeconds - FlowerInterestRemaining;
+	return FMath::SmoothStep(0.f, 0.65f, Elapsed) *
+		(1.f - FMath::SmoothStep(FlowerInterestFadeStartSeconds, FlowerInterestDurationSeconds, Elapsed));
 }
 
 void AIslandTideglassDragonfly::CheckForNearbyNaturalSurfaceRipple()

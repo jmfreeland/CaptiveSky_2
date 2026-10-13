@@ -1,5 +1,20 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-13 — Give the dragonfly's flower pause time to read
+
+The existing flower-interest cue was only 2.6 seconds end-to-end, leaving about
+1.25 seconds at its strongest approach/hover alpha. It now lasts 4.8 seconds:
+the dragonfly eases in, holds its flowerward attention for roughly 3.1 seconds,
+then fades back to its ordinary patrol. The 9 m search radius and 16-second
+per-insect cooldown are unchanged; rain, ripple, and nearby-observer
+interruptions still take priority, and flower instances remain read-only.
+UE 5.8.3 built successfully and `CaptiveSky2.Agent.NightEcology` passed under
+NullRHI with agent thinking and world-state persistence disabled
+(`Saved/Logs/Codex_DragonflyBloomPause_20261013_Retry.log`). This proves the
+timing and interruption contract, not that a player will notice the cue in a
+normal view. Next capture a bounded daylight Tideglass session and judge its
+visibility and frequency before considering further tuning.
+
 ## 2026-10-13 — Installed Beech is not yet a canopy solution
 
 UE 5.8.3 can render the installed European Beech skeletal output through
