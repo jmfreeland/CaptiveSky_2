@@ -55,8 +55,15 @@ until the candidate is imported there too.
 
 ## Next step
 
-Add a dedicated, close real-RHI crab view that keeps the subject on dry shore;
-review its material and scale against the wet sand/rocks, then decide whether
-its idle/scurry movement reads naturally. If not, revise the Blender source and
-import to a fresh candidate destination. Keep map placement separate so this
-art comparison remains reversible.
+The dedicated close real-RHI view was attempted on 2026-10-13 with an
+actor-anchored viewpoint on dry shore, but Unreal crashed at zero seconds before
+the world became ready and produced no close-view screenshot. See
+[`2026-10-13-unreal-startup-triage.md`](2026-10-13-unreal-startup-triage.md)
+for the crash evidence. Do not repeat the same launch until startup conditions
+have materially changed.
+
+Once a real-RHI session starts reliably, review the crab's material and scale
+against the wet sand/rocks, then decide whether its idle/scurry movement reads
+naturally. If not, revise the Blender source and import to a fresh candidate
+destination. Keep map placement separate so this art comparison remains
+reversible.
