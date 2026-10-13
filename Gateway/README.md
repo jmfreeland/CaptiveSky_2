@@ -79,6 +79,7 @@ After adding your Discord user ID to `allowedUserIds`, DM the raven or mention i
 !request object A small copper bell beside the east trail
 !request upgrade aesthetic InnDoorLantern :: Add a warmer, hand-forged brass finish
 !request upgrade variation world :: Scatter a few mossy stones along the stream
+!request upgrade functionality RavenNest :: Add a sheltered landing rail
 !request help
 ```
 
