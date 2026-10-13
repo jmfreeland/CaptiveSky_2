@@ -92,3 +92,25 @@ then symbolize this existing dump before another project launch. Once the
 faulting frame is known, make one targeted environment/configuration change and
 retry the zero-request automation. Until then, in-engine visual and behavioral
 validation remains unavailable; this finding does not validate Island content.
+
+### Follow-up bounded Game startup — 2026-10-13 12:12 UTC
+
+A later 90-second spectator launch of `/Game/Maps/Island` also exited before
+the world became ready. It was configured for zero model requests and would
+have written screenshots and a 300-frame profile, but neither was produced.
+Its crash log contains engine startup metadata and the command line only; no
+normal project log or world-ready marker appears. The crash context again says
+`EXCEPTION_ACCESS_VIOLATION` reading the null address, but its
+`PCallStackHash` is `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`, not the earlier
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`. Its unsymbolized stack is mostly
+`UnrealEditor-Core` offsets, so the shared exception type alone does not prove
+the same fault. The dump is 316,090 bytes.
+
+Evidence: [`SpectatorStartup_20261013_131240_538.log`](../../Saved/Crashes/_0000/SpectatorStartup_20261013_131240_538.log)
+and the same crash-context/minidump files linked above. The baseline output
+directory exists, but no capture or profile is available; the proposed
+ground-cover-density comparison was not run.
+
+**Decision:** keep the no-retry gate. Symbolize both existing dumps with
+matching UE 5.8.3 symbols (or obtain equivalent diagnostics) before another
+project-open attempt; do not infer a shared root cause from these two hashes.
