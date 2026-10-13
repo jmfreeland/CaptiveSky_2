@@ -563,6 +563,16 @@ FVector AIslandWeather::SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberI
 	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 }
 
+FVector AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex)
+{
+	if (SiteIndex < 0 || SiteIndex >= TideglassPollinatorFlowerSiteCount) return FVector::ZeroVector;
+	FRandomStream Random(Seed ^ ((SiteIndex + 1) * 0x45d9f3b));
+	const float Sector = 2.f * PI / TideglassPollinatorFlowerSiteCount;
+	const float Angle = (SiteIndex + 0.5f + Random.FRandRange(-0.045f, 0.045f)) * Sector;
+	const float Radius = Random.FRandRange(TideglassPollinatorFlowerInnerRadius, TideglassPollinatorFlowerOuterRadius);
+	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+}
+
 FTransform AIslandWeather::CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 	double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed)
 {
@@ -687,12 +697,19 @@ void AIslandWeather::InitializeGroundCover()
 
 	TArray<FVector> ExposedHabitatAnchors;
 	TArray<FVector> OtherHabitatAnchors;
+	FVector TideglassFlowerAnchor = FVector::ZeroVector;
+	bool bHasTideglassFlowerAnchor = false;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("WindArch")))
 			ExposedHabitatAnchors.Add(It->GetActorLocation());
 		else if (It->ActorHasTag(TEXT("IslandLandmark")) || It->ActorHasTag(TEXT("InnDoorLantern")) || It->ActorHasTag(TEXT("RatHollowClearance")))
 			OtherHabitatAnchors.Add(It->GetActorLocation());
+		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("TideglassPool")))
+		{
+			TideglassFlowerAnchor = It->GetActorLocation();
+			bHasTideglassFlowerAnchor = true;
+		}
 	}
 	TArray<FIslandCurioRecord> ScatterCurios;
 	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
@@ -798,6 +815,7 @@ void AIslandWeather::InitializeGroundCover()
 	};
 
 	TArray<FVector> CattailLocations;
+	float TideglassPoolClearanceRadius = 0.f;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		const AActor* Landmark = *It;
@@ -830,7 +848,10 @@ void AIslandWeather::InitializeGroundCover()
 				if (TideglassClearRadius > 0.f) break;
 			}
 			if (TideglassClearRadius > 0.f)
+			{
+				TideglassPoolClearanceRadius = TideglassClearRadius;
 				UE_LOG(LogIslandWeather, Log, TEXT("Tideglass ground cover leaves a %.0f cm pool-edge clearance."), TideglassClearRadius);
+			}
 		}
 		TArray<FVector> TideglassGroundCoverLocations;
 
@@ -1366,11 +1387,23 @@ void AIslandWeather::InitializeGroundCover()
 					constexpr float FlowerMinSpacing = 475.f;
 					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
 					auto TryPlaceMeadowFlower = [&](const FVector& Candidate, bool bListeningStonesMeadowSite,
-						int32 ForcedSpeciesIndex) -> bool
+						bool bTideglassPollinatorSite, int32 ForcedSpeciesIndex) -> bool
 					{
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)
-							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
+						{
+							float RequiredClearance = SpruceLandmarkClearance;
+							if (bTideglassPollinatorSite && bHasTideglassFlowerAnchor &&
+								FVector::DistSquared2D(Exclusion, TideglassFlowerAnchor) <= 1.f)
+								RequiredClearance = FMath::Max(TideglassPoolClearanceRadius + 175.f,
+									AIslandWeather::TideglassPollinatorFlowerInnerRadius - 50.f);
+							if (FVector::Dist2D(Candidate, Exclusion) < RequiredClearance) { bTooClose = true; break; }
+						}
+						if (bTideglassPollinatorSite)
+						{
+							for (const FVector& ExistingCattail : CattailLocations)
+								if (FVector::Dist2D(Candidate, ExistingCattail) < 375.f) { bTooClose = true; break; }
+						}
 						if (!bTooClose)
 							for (const FVector& ExistingFlower : RhododendronLocations)
 								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerMinSpacing) { bTooClose = true; break; }
@@ -1381,6 +1414,9 @@ void AIslandWeather::InitializeGroundCover()
 							for (const FVector& ExistingShrub : ShrubLocations)
 								if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
 						if (bTooClose) return false;
+						if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, Candidate)) return false;
+						for (const FIslandCurioRecord& Curio : ScatterCurios)
+							if (IsWithinCurioGroundCoverClearance(Candidate, Curio.Location, Curio.Kind)) return false;
 
 						FHitResult FlowerHit;
 						++MeadowFlowerTraceCount;
@@ -1434,7 +1470,7 @@ void AIslandWeather::InitializeGroundCover()
 									Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
 							}
 							const int32 SiteSpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
-							if (!TryPlaceMeadowFlower(Candidate, bListeningStonesMeadowSite, SiteSpeciesIndex)) continue;
+							if (!TryPlaceMeadowFlower(Candidate, bListeningStonesMeadowSite, false, SiteSpeciesIndex)) continue;
 							bPlacedMeadowFlower = true;
 							for (int32 MemberIndex = 0; MemberIndex < MeadowFlowersPerPocket - 1; ++MemberIndex)
 							{
@@ -1445,18 +1481,45 @@ void AIslandWeather::InitializeGroundCover()
 										(static_cast<uint32>(MemberIndex) + 1u) * 0x85ebca6bu ^
 										static_cast<uint32>(MemberAttempt) * 0xc2b2ae35u);
 									const FVector MemberCandidate = Candidate + SelectMeadowFlowerPocketOffset(MemberSeed, MemberIndex);
-									if (TryPlaceMeadowFlower(MemberCandidate, bListeningStonesMeadowSite, SiteSpeciesIndex)) break;
+									if (TryPlaceMeadowFlower(MemberCandidate, bListeningStonesMeadowSite, false, SiteSpeciesIndex)) break;
 								}
 							}
 						}
 					}
-				}
-				UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d in the ListeningStones meadow; %d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig) across %d sampled sites after %d bounded traces."),
-					MeadowFlowerPatchCount, ListeningStonesMeadowFlowerCount, MeadowFlowerSpeciesCount,
+					int32 TideglassPollinatorSitesPlaced = 0;
+					if (bHasTideglassFlowerAnchor)
+					{
+						// The broad flower field intentionally stays well outside landmark clearings.
+						// This tiny, collisionless edge is the one exception: it puts existing blooms
+						// within the Tideglass dragonflies' 9 m sensory radius without raising density.
+						for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+						{
+							const FVector Candidate = TideglassFlowerAnchor +
+								SelectTideglassPollinatorFlowerSiteOffset(WeatherSeed, SiteIndex);
+							const int32 SiteSpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
+							if (!TryPlaceMeadowFlower(Candidate, false, true, SiteSpeciesIndex)) continue;
+							++TideglassPollinatorSitesPlaced;
+							for (int32 MemberIndex = 0; MemberIndex < MeadowFlowersPerPocket - 1; ++MemberIndex)
+							{
+								for (int32 MemberAttempt = 0; MemberAttempt < MaxPocketMemberAttempts; ++MemberAttempt)
+								{
+									const int32 MemberSeed = static_cast<int32>(static_cast<uint32>(WeatherSeed) ^
+										(static_cast<uint32>(SiteIndex) + 1u) * 0x9e3779b9u ^
+										(static_cast<uint32>(MemberIndex) + 1u) * 0x85ebca6bu ^
+										static_cast<uint32>(MemberAttempt) * 0xc2b2ae35u);
+									const FVector MemberCandidate = Candidate + SelectMeadowFlowerPocketOffset(MemberSeed, MemberIndex);
+									if (TryPlaceMeadowFlower(MemberCandidate, false, true, SiteSpeciesIndex)) break;
+								}
+							}
+						}
+					}
+					UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d Tideglass pollinator sites, %d in the ListeningStones meadow; %d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig) across %d general candidate sites plus up to %d Tideglass slots after %d bounded traces."),
+					MeadowFlowerPatchCount, TideglassPollinatorSitesPlaced, ListeningStonesMeadowFlowerCount, MeadowFlowerSpeciesCount,
 					MeadowFlowerSpeciesCounts[0], MeadowFlowerSpeciesCounts[1], MeadowFlowerSpeciesCounts[2],
 					MeadowFlowerSpeciesCounts[3], MeadowFlowerSpeciesCounts[4], MeadowFlowerSpeciesCounts[5],
 					MeadowFlowerSpeciesCounts[6], MeadowFlowerSpeciesCounts[7],
-					MeadowFlowerCandidateSites, MeadowFlowerTraceCount);
+					MeadowFlowerCandidateSites, AIslandWeather::TideglassPollinatorFlowerSiteCount, MeadowFlowerTraceCount);
+				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}

@@ -72,6 +72,10 @@ public:
 	static constexpr int32 MeadowFlowerSpeciesCount = 8;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
 	static constexpr int32 MeadowFlowersPerPocket = 3;
+	/** Small, deterministic pollinator edge just beyond the Tideglass water clearance. */
+	static constexpr int32 TideglassPollinatorFlowerSiteCount = 8;
+	static constexpr float TideglassPollinatorFlowerInnerRadius = 700.f;
+	static constexpr float TideglassPollinatorFlowerOuterRadius = 850.f;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
@@ -239,6 +243,7 @@ private:
 		const TArray<float>& NearestMatureSpruceDistances, const TArray<int32>& NearbyGrassCounts, int32 FallbackIndex);
 	/** Stable member offset for a small flower pocket; member indices start at zero. */
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
+	static FVector SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);

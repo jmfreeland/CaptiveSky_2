@@ -468,6 +468,24 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::ListeningStonesFlowerOuterRadius < 4500.f);
 	TestTrue(TEXT("The ListeningStones habitat receives a fixed, bounded share of the existing flower-site budget"),
 		AIslandWeather::ListeningStonesFlowerSiteCount > 0 && AIslandWeather::ListeningStonesFlowerSiteCount < 512);
+	TArray<FVector> TideglassPollinatorOffsets;
+	for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+	{
+		const FVector Offset = AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(71, SiteIndex);
+		TestTrue(TEXT("Tideglass pollinator flowers stay beyond the pool edge and inside the dragonfly's 9 m query"),
+			Offset.Size2D() >= AIslandWeather::TideglassPollinatorFlowerInnerRadius &&
+			Offset.Size2D() <= AIslandWeather::TideglassPollinatorFlowerOuterRadius && Offset.Size2D() < 900.f);
+		TestTrue(TEXT("Tideglass pollinator-site offsets are deterministic"),
+			Offset.Equals(AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(71, SiteIndex)));
+		TideglassPollinatorOffsets.Add(Offset);
+	}
+	float MinimumTideglassPollinatorSpacing = MAX_flt;
+	for (int32 Index = 0; Index < TideglassPollinatorOffsets.Num(); ++Index)
+		for (int32 PriorIndex = 0; PriorIndex < Index; ++PriorIndex)
+			MinimumTideglassPollinatorSpacing = FMath::Min(MinimumTideglassPollinatorSpacing,
+				FVector::Dist2D(TideglassPollinatorOffsets[Index], TideglassPollinatorOffsets[PriorIndex]));
+	TestTrue(TEXT("A small ring of eight Tideglass pollinator pockets stays spatially separated"),
+		AIslandWeather::TideglassPollinatorFlowerSiteCount == 8 && MinimumTideglassPollinatorSpacing > 475.f);
 	TestTrue(TEXT("Pool clearance, the inn roof filter, and hillside patches preserve varied cover within the 17,068-instance budget"),
 		Weather->GroundCoverInstanceCount > 96 && Weather->GroundCoverInstanceCount <= 17068);
 	const int32 FixturePlantCount = Weather->ShoreGroundPlants->GetInstanceCount() + Weather->ShoreGroundPlantLowA->GetInstanceCount() +
