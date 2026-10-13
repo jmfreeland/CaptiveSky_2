@@ -7,6 +7,8 @@
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
+#include "Logging/LogMacros.h"
 #include "ProceduralMeshComponent.h"
 #include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -15,6 +17,13 @@
 
 namespace
 {
+	DEFINE_LOG_CATEGORY_STATIC(LogIslandTideglassDragonfly, Log, All);
+
+	TAutoConsoleVariable<int32> CVarDragonflyFlowerTelemetry(
+		TEXT("CaptiveSky.Island.DragonflyFlowerTelemetry"),
+		0,
+		TEXT("When non-zero, logs the start, completion, and interruption of dragonfly flower visits."));
+
 	constexpr float FlowerInterestDurationSeconds = 4.8f;
 	constexpr float FlowerInterestFadeStartSeconds = 3.8f;
 
@@ -352,6 +361,8 @@ float AIslandTideglassDragonfly::RainMovementScale(float RainIntensity)
 
 void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& ObserverLocation)
 {
+	if (FlowerInterestRemaining > 0.f)
+		LogFlowerInterestTelemetry(TEXT("interrupted: quiet observation"));
 	ScatterDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScatterDirection.IsNearlyZero()) ScatterDirection = GetActorRightVector();
 	ScatterRemaining = 1.6f;
@@ -401,6 +412,8 @@ bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLoca
 		110.f);
 	RippleInterestRemaining = 1.8f;
 	RippleInterestCooldownRemaining = 7.f;
+	if (FlowerInterestRemaining > 0.f)
+		LogFlowerInterestTelemetry(TEXT("interrupted: water ripple"));
 	FlowerInterestRemaining = 0.f;
 	return true;
 }
@@ -434,7 +447,18 @@ bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocat
 		100.f);
 	FlowerInterestRemaining = FlowerInterestDurationSeconds;
 	FlowerInterestCooldownRemaining = 16.f;
+	LogFlowerInterestTelemetry(TEXT("started"));
 	return true;
+}
+
+void AIslandTideglassDragonfly::LogFlowerInterestTelemetry(const TCHAR* Event) const
+{
+	if (CVarDragonflyFlowerTelemetry.GetValueOnGameThread() == 0 || !GetWorld()) return;
+	const float Elapsed = FlowerInterestDurationSeconds - FlowerInterestRemaining;
+	UE_LOG(LogIslandTideglassDragonfly, Display,
+		TEXT("FlowerVisit %s dragonfly=%s variant=%d gameTime=%.2f elapsed=%.2f flower=%s actor=%s"),
+		Event, *GetName(), ColorVariant, GetWorld()->GetTimeSeconds(), Elapsed,
+		*FlowerInterestLocation.ToCompactString(), *GetActorLocation().ToCompactString());
 }
 
 float AIslandTideglassDragonfly::GetFlowerInterestAlpha() const
@@ -493,7 +517,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	RippleInterestRemaining = FMath::Max(0.f, RippleInterestRemaining - SafeDelta);
 	RippleInterestCooldownRemaining = FMath::Max(0.f, RippleInterestCooldownRemaining - SafeDelta);
-	FlowerInterestRemaining = FMath::Max(0.f, FlowerInterestRemaining - SafeDelta);
+	if (FlowerInterestRemaining > 0.f)
+	{
+		FlowerInterestRemaining = FMath::Max(0.f, FlowerInterestRemaining - SafeDelta);
+		if (FlowerInterestRemaining <= 0.f)
+			LogFlowerInterestTelemetry(TEXT("completed"));
+	}
 	FlowerInterestCooldownRemaining = FMath::Max(0.f, FlowerInterestCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)

@@ -77,6 +77,7 @@ private:
 	float FlowerCheckRemaining = 0.f;
 	FVector FlowerInterestLocation = FVector::ZeroVector;
 	int32 ColorVariant = 0;
+	void LogFlowerInterestTelemetry(const TCHAR* Event) const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
 	void CheckForNearbyNaturalSurfaceRipple();
