@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using CaptiveSky.Gateway.Configuration;
 using CaptiveSky.Gateway.Domain;
 using CaptiveSky.Gateway.Proposals;
@@ -28,7 +29,9 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
         });
         _client.Log += message =>
         {
-            Console.WriteLine($"[{DateTimeOffset.Now:T}] Discord/{_agent.AgentId} {message.Severity}: {message.Message}");
+            var source = string.IsNullOrWhiteSpace(message.Source) ? string.Empty : $" [{message.Source}]";
+            var exceptionTypes = GetExceptionTypeChain(message.Exception);
+            Console.WriteLine($"[{DateTimeOffset.Now:T}] Discord/{_agent.AgentId} {message.Severity}{source}: {message.Message}{exceptionTypes}");
             return Task.CompletedTask;
         };
         _client.MessageReceived += message =>
@@ -76,6 +79,26 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
     public async ValueTask DisposeAsync()
     {
         await _client.DisposeAsync();
+    }
+
+    private static string GetExceptionTypeChain(Exception? exception)
+    {
+        if (exception is null)
+            return string.Empty;
+
+        var types = new List<string>();
+        var socketErrors = new List<string>();
+        for (var current = exception; current is not null && types.Count < 4; current = current.InnerException)
+        {
+            types.Add(current.GetType().Name);
+            if (current is SocketException socketException)
+                socketErrors.Add($"{socketException.SocketErrorCode}/{socketException.NativeErrorCode}");
+        }
+
+        var details = $" (exception types: {string.Join(" -> ", types)}";
+        if (socketErrors.Count > 0)
+            details += $"; socket errors: {string.Join(", ", socketErrors)}";
+        return details + ")";
     }
 
     private async Task HandleMessageAsync(SocketMessage socketMessage)
