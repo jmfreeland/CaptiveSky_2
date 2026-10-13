@@ -133,6 +133,7 @@ protected:
 
 	void HideAmbientSpeech();
 	FString DescribeWorldInteractionHint(AActor* Target) const;
+	FString DescribeTrailUnderfoot() const;
 	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;
 
 };

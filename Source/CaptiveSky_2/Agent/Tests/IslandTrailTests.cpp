@@ -1,5 +1,10 @@
 #include "Misc/AutomationTest.h"
+#include "CaptiveSkyAmbientSpeechWidget.h"
 #include "IslandTrail.h"
+#include "IslandInteractionTestPlayerController.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "GameFramework/Character.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTrailTest, "CaptiveSky2.Agent.IslandTrail",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -91,5 +96,56 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	for (int32 I = 0; I < FIslandTrailLedger::MaxCells; ++I) Full.AddStep(FVector(I * FIslandTrailLedger::CellSize, 0.f, 0.f), FVector::UpVector);
 	TestFalse(TEXT("A full ledger refuses new ground"), Full.AddStep(FVector(0.f, 99999.f, 0.f), FVector::UpVector));
 	TestTrue(TEXT("But still counts old paths"), Full.AddStep(FVector(0.f, 0.f, 0.f), FVector::UpVector));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTrailVisitorTest, "CaptiveSky2.Agent.IslandTrailVisitor",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandTrailVisitorTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Synthetic visitor trail world created"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	UIslandTrailSubsystem* Trail = World->GetSubsystem<UIslandTrailSubsystem>();
+	TestNotNull(TEXT("Synthetic world owns the persistent trail subsystem"), Trail);
+	if (!Trail)
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Trail->bAllowStorage = false;
+	World->BeginPlay();
+
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 90.f), FRotator::ZeroRotator);
+	UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+	AIslandInteractionTestPlayerController* Controller = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	TestNotNull(TEXT("Visitor pawn created over the trail"), Visitor);
+	TestNotNull(TEXT("Caption widget created for trail reading"), Caption);
+	TestNotNull(TEXT("Local visitor controller created for trail reading"), Controller);
+	if (Visitor && Caption && Controller)
+	{
+		FIslandTrailCell& Cell = Trail->GetLedgerMutable().Cells.Add(FIslandTrailLedger::CellFor(Visitor->GetActorLocation()));
+		Cell.Steps = UIslandTrailSubsystem::WearFullSteps;
+		Cell.Position = Visitor->GetActorLocation();
+		Cell.NormalX = 0.f;
+		Cell.NormalY = 0.f;
+		Controller->SetFixturePawn(Visitor);
+		Controller->SetCaptionWidget(Caption);
+		Controller->BindFixtureInput();
+		Controller->RefreshInteractionHintForTest();
+		TestEqual(TEXT("A visitor over persistent worn tracks gets a read-only prompt when no landmark is nearer"),
+			Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: read the nearby tracks")));
+		TestTrue(TEXT("E is bound to the visitor's interaction handler"), Controller->PressBoundE());
+		TestTrue(TEXT("The visitor learns that repeated feet wore this track"),
+			Caption->GetDisplayedCaption().ToString().Contains(TEXT("trodden bare along a track")));
+		TestEqual(TEXT("Reading the trail does not add footfalls"), Trail->GetLedger().StepsAt(Visitor->GetActorLocation()), UIslandTrailSubsystem::WearFullSteps);
+	}
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }

@@ -20,8 +20,10 @@
 #include "Agent/IslandArrangement.h"
 #include "Agent/IslandRainBasin.h"
 #include "Agent/IslandInteractionUtility.h"
+#include "Agent/IslandTrail.h"
 #include "Agent/IslandWorldStateSubsystem.h"
 #include "Agent/IslandSpectator.h"
+#include "Agent/IslandEnvironmentSubsystem.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -163,6 +165,19 @@ AActor* ACaptiveSky_2PlayerController::FindNearestWorldInteraction() const
 	return IslandInteractionUtility::FindNearestVisibleTarget(PlayerPawn, GetWorld(), IslandInteractionRadius);
 }
 
+FString ACaptiveSky_2PlayerController::DescribeTrailUnderfoot() const
+{
+	const APawn* PlayerPawn = GetPawn();
+	UWorld* World = GetWorld();
+	const UIslandTrailSubsystem* Trail = World ? World->GetSubsystem<UIslandTrailSubsystem>() : nullptr;
+	if (!PlayerPawn || !Trail) return FString();
+
+	float Wetness = 0.f;
+	if (const UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>())
+		Wetness = Environment->GetWetness();
+	return Trail->DescribeUnderfoot(PlayerPawn->GetActorLocation(), Wetness);
+}
+
 FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Target) const
 {
 	if (!Target) return FString();
@@ -212,7 +227,12 @@ void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 		AmbientSpeechWidget->HideInteractionHint();
 		return;
 	}
-	const FString Hint = DescribeWorldInteractionHint(FindNearestWorldInteraction());
+	FString Hint = DescribeWorldInteractionHint(FindNearestWorldInteraction());
+	if (Hint.IsEmpty() && !DescribeTrailUnderfoot().IsEmpty())
+	{
+		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
+		Hint = FString::Printf(TEXT("%s: read the nearby tracks"), *Input);
+	}
 	if (Hint.IsEmpty()) AmbientSpeechWidget->HideInteractionHint();
 	else AmbientSpeechWidget->ShowInteractionHint(Hint);
 }
@@ -232,6 +252,13 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	AActor* Target = FindNearestWorldInteraction();
 	if (!Target)
 	{
+		FString TrailFact = DescribeTrailUnderfoot();
+		TrailFact.TrimStartAndEndInline();
+		if (!TrailFact.IsEmpty())
+		{
+			ShowWorldInteractionCaption(FString::Printf(TEXT("You pause to read the ground. %s"), *TrailFact));
+			return;
+		}
 		ShowWorldInteractionCaption(TEXT("Nothing nearby catches your eye. Move closer to a landmark or wild creature and try E again."));
 		return;
 	}
