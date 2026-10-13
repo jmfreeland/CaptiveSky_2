@@ -10,10 +10,17 @@ per-insect cooldown are unchanged; rain, ripple, and nearby-observer
 interruptions still take priority, and flower instances remain read-only.
 UE 5.8.3 built successfully and `CaptiveSky2.Agent.NightEcology` passed under
 NullRHI with agent thinking and world-state persistence disabled
-(`Saved/Logs/Codex_DragonflyBloomPause_20261013_Retry.log`). This proves the
-timing and interruption contract, not that a player will notice the cue in a
-normal view. Next capture a bounded daylight Tideglass session and judge its
-visibility and frequency before considering further tuning.
+(`Saved/Logs/Codex_DragonflyBloomPause_20261013_Retry.log`). A bounded 90-second
+daylight Game pass then loaded Tideglass, made zero model requests, and ended
+normally. Fifteen fixed-view frames at five-second intervals show dragonflies
+crossing the open view, but none clearly shows the flowerward hover
+(`Saved/Logs/Codex_DragonflyBloomPause_Tideglass_20261013.log`; local captures
+in `Saved/Playtests/Codex_DragonflyBloomPause_20261013/Screenshots_Tideglass/`).
+That is not proof the behavior failed: the 4.8-second cue can begin and end
+between five-second samples. The timing and interruption contract is verified,
+but player legibility remains unproven. Next, use a close, bloom-level view and
+one-second sampling (or temporary event telemetry) under the same zero-request
+cap; only then decide whether to tune the cue or its opportunities.
 
 ## 2026-10-13 — Installed Beech is not yet a canopy solution
 
