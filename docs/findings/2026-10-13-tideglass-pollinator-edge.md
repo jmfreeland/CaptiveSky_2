@@ -37,6 +37,12 @@ spacing between the eight candidate sites.
   `Saved/Crashes/_0000/` (gitignored). Do not repeat the project launch until
   this startup failure is diagnosed or the launch environment meaningfully
   changes.
+- The project editor DLL and project PDB were both timestamped 11:59 local;
+  `IslandWeather.cpp` was saved at 11:58, before the failed launch. This rules
+  out the Tideglass edit being omitted solely because the project module was
+  stale. The installed `UnrealEditor-Core.pdb` is absent, and the crash stack
+  contains only engine Core and editor frames, so the current dump cannot yet
+  name the failing engine call site.
 - Runtime scatter and dragonfly visit in the saved Island: **not visually
   verified**. The screenshots from the successful pre-commit run show flying
   dragonflies, but not the newly added pool-edge pockets or a confirmed flower
