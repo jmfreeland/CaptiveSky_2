@@ -242,7 +242,9 @@ AIslandWeather::AIslandWeather()
 		ShoreGroundPlantLowC, ShoreGroundPlantLowD})
 		SetFoliageCullRange(GroundDetail, 6000, 9000);
 	SetFoliageCullRange(ShoreGrassC, 6000, 9000);
-	SetFoliageCullRange(IslandShrubs, 8000, 14000);
+	// Let existing broadleaf grove clusters carry farther into the mid-distance.
+	// This changes visibility only: it adds no instances, collision, or navigation cost.
+	SetFoliageCullRange(IslandShrubs, 11000, 32000);
 	SetFoliageCullRange(IslandRhododendrons, 8000, 14000);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		SetFoliageCullRange(MeadowFlower, 6000, 9000);

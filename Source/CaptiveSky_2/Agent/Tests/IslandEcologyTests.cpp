@@ -166,7 +166,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	CheckCullRange(TEXT("ShoreGrassA"), 6000, 9000);
 	CheckCullRange(TEXT("ShoreGroundPlantLowD"), 6000, 9000);
 	CheckCullRange(TEXT("IslandMeadowFlowerA"), 6000, 9000);
-	CheckCullRange(TEXT("IslandShrubs"), 8000, 14000);
+	CheckCullRange(TEXT("IslandShrubs"), 11000, 32000);
 	CheckCullRange(TEXT("IslandSpruce"), 35000, 55000);
 	CheckCullRange(TEXT("IslandFestuca"), 6000, 9000);
 	CheckCullRange(TEXT("IslandPhalaris"), 6000, 9000);
