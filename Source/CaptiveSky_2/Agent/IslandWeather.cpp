@@ -1133,8 +1133,8 @@ void AIslandWeather::InitializeGroundCover()
 		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter sampled %d valid terrain cells and placed %d ground-cover instances after %d bounded traces (budget %d, density %.2f)."),
 			ValidMeadowTerrainCells.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount, ScaledMeadowCandidateBudget, LandscapeDensity);
 
-		// Add a few distant spruce groves to break up the low meadow skyline. These are decorative
-		// HISM instances well outside landmark clearances; they never collide or affect navigation.
+		// Group distant spruce groves into a continuous but irregular woodland edge. Their
+		// HISM instances remain outside landmark clearances and never collide or affect navigation.
 		GroundCoverTreeCount = 0;
 		if (IslandSpruce && IslandSpruce->GetStaticMesh())
 		{
@@ -1143,7 +1143,7 @@ void AIslandWeather::InitializeGroundCover()
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
 			constexpr float SpruceGroveInnerRadius = 500.f;
 			constexpr float SpruceGroveOuterRadius = 1600.f;
-			constexpr float SpruceGroveMinSpacing = 3400.f;
+			constexpr float SpruceGroveMinSpacing = 2400.f;
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
 			constexpr float ShrubTreeClearance = 225.f;
