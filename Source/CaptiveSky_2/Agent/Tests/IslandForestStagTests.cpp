@@ -172,6 +172,49 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	}
 	if (Resident) Resident->Destroy();
 
+	// A careful player visitor earns the same brief, non-startled wildlife
+	// acknowledgment as a resident, without becoming an interaction target.
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(900.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A visitor pawn is available for the awareness fixture"), Visitor);
+	if (Visitor)
+	{
+		Deer->BeginGrazing();
+		const FVector BeforeVisitorNotice = Deer->GetActorLocation();
+		Visitor->SetActorLocation(BeforeVisitorNotice + FVector(-300.f, 0.f, 0.f));
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestTrue(TEXT("A slow, visible visitor draws one brief look from the stag"), Deer->bNoticingVisitor);
+		TestTrue(TEXT("The visitor cue uses the imported look-around animation"), Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+			Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+		TestTrue(TEXT("Noticing a visitor neither moves nor startles the stag"),
+			Deer->GetActorLocation().Equals(BeforeVisitorNotice) && !Deer->bMoving && !Deer->bStartled);
+		TestTrue(TEXT("The visitor cue is temporary and rate-limited"),
+			Deer->VisitorNoticeRemaining > 0.f && Deer->VisitorPresenceCooldownRemaining == 8.f);
+		const float VisitorNoticeRemaining = Deer->VisitorNoticeRemaining;
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestEqual(TEXT("The same visitor cannot restart the active look"), Deer->VisitorNoticeRemaining, VisitorNoticeRemaining);
+		Deer->Tick(VisitorNoticeRemaining + 0.1f);
+		TestFalse(TEXT("The stag returns to grazing after its visitor acknowledgment"), Deer->bNoticingVisitor || Deer->bMoving);
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestFalse(TEXT("A lingering visitor does not cause repeated looks"), Deer->bNoticingVisitor);
+		Visitor->SetActorLocation(BeforeVisitorNotice + FVector(-1000.f, 0.f, 0.f));
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestFalse(TEXT("The visitor latch rearms only after leaving the wider local area"), Deer->bVisitorPresenceNearby);
+		Visitor->SetActorLocation(BeforeVisitorNotice + FVector(-300.f, 0.f, 0.f));
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestFalse(TEXT("The visitor cooldown prevents an immediate return look"), Deer->bNoticingVisitor);
+		Deer->VisitorPresenceCooldownRemaining = 0.f;
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestTrue(TEXT("A returning visitor can earn a later look after leaving"), Deer->bNoticingVisitor);
+		Deer->SetResting(true);
+		Deer->bVisitorPresenceNearby = false;
+		Deer->VisitorPresenceCooldownRemaining = 0.f;
+		Deer->CheckForNearbyVisitor(Visitor);
+		TestTrue(TEXT("A sleeping stag is not woken by a nearby visitor"), Deer->IsResting() && !Deer->bNoticingVisitor);
+		Deer->SetResting(false);
+	}
+	if (Visitor) Visitor->Destroy();
+	Deer->BeginGrazing();
+
 	FString Fact;
 	TestTrue(TEXT("Quiet observation is an implemented reversible interaction"),
 		IslandInteractionUtility::Perform(Observer, Deer, Fact));

@@ -7,6 +7,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "IslandForestFox.h"
 #include "IslandLightning.h"
 #include "IslandListeningStonesChime.h"
@@ -74,12 +75,14 @@ void AIslandForestStag::BeginGrazing()
 	bListeningToChime = false;
 	bNoticingResident = false;
 	bNoticingFox = false;
+	bNoticingVisitor = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
+	VisitorNoticeRemaining = 0.f;
 	ActivityRemaining = FMath::FRandRange(7.f, 15.f);
 	PlayLoop(GrazeAnimation);
 }
@@ -134,6 +137,49 @@ void AIslandForestStag::CheckForNearbyResident()
 	bNoticingResident = true;
 	ResidentNoticeRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
 	ResidentPresenceCooldownRemaining = 8.f;
+	ActivityRemaining = 0.f;
+	if (DeerMesh)
+	{
+		DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		DeerMesh->PlayAnimation(LookAroundAnimation, false);
+	}
+}
+
+void AIslandForestStag::CheckForNearbyVisitor(const APawn* Visitor)
+{
+	UWorld* World = GetWorld();
+	if (!World || !IsValid(Visitor))
+	{
+		bVisitorPresenceNearby = false;
+		return;
+	}
+
+	constexpr float NoticeRadius = 600.f;
+	constexpr float RearmRadius = 850.f;
+	constexpr float QuietMovementSpeed = 180.f;
+	const float DistanceSquared = FVector::DistSquared2D(Visitor->GetActorLocation(), GetActorLocation());
+	if (DistanceSquared > FMath::Square(RearmRadius)) bVisitorPresenceNearby = false;
+	if (DistanceSquared > FMath::Square(NoticeRadius) ||
+		Visitor->GetVelocity().SizeSquared2D() > FMath::Square(QuietMovementSpeed) ||
+		bVisitorPresenceNearby || bResting || bWakingUp || bMoving || bStartled || bListeningToChime ||
+		bNoticingResident || bNoticingFox || bNoticingVisitor || VisitorPresenceCooldownRemaining > 0.f ||
+		!LookAroundAnimation)
+		return;
+
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandForestStagVisitorNotice), false, this);
+	FHitResult Hit;
+	const FVector StagEye = GetActorLocation() + FVector(0.f, 0.f, 85.f);
+	const FVector VisitorHead = Visitor->GetActorLocation() + FVector(0.f, 0.f, 65.f);
+	if (World->LineTraceSingleByChannel(Hit, StagEye, VisitorHead, ECC_Visibility, Query) &&
+		Hit.GetActor() != Visitor)
+		return;
+
+	// A slow, visible visitor earns the same brief look as a calm resident. The stag
+	// does not approach, flee, remember, or request anything because of this cue.
+	bVisitorPresenceNearby = true;
+	bNoticingVisitor = true;
+	VisitorNoticeRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
+	VisitorPresenceCooldownRemaining = 8.f;
 	ActivityRemaining = 0.f;
 	if (DeerMesh)
 	{
@@ -305,10 +351,12 @@ void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 	bListeningToChime = false;
 	bNoticingResident = false;
 	bNoticingFox = false;
+	bNoticingVisitor = false;
 	WakeRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
+	VisitorNoticeRemaining = 0.f;
 	TargetLocation = Target;
 	bMoving = true;
 	bStartled = bRun;
@@ -345,6 +393,7 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	bListeningToChime = false;
 	bNoticingResident = false;
 	bNoticingFox = false;
+	bNoticingVisitor = false;
 	bStartled = false;
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
@@ -352,6 +401,7 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
+	VisitorNoticeRemaining = 0.f;
 	if (bResting)
 	{
 		PlayLoop(SleepAnimation);
@@ -375,12 +425,14 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 void AIslandForestStag::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!GetWorld()) return;
+	UWorld* World = GetWorld();
+	if (!World) return;
 	const float Delta = FMath::Max(0.f, DeltaSeconds);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - Delta);
 	ListeningStonesCooldownRemaining = FMath::Max(0.f, ListeningStonesCooldownRemaining - Delta);
 	ResidentPresenceCooldownRemaining = FMath::Max(0.f, ResidentPresenceCooldownRemaining - Delta);
 	FoxPresenceCooldownRemaining = FMath::Max(0.f, FoxPresenceCooldownRemaining - Delta);
+	VisitorPresenceCooldownRemaining = FMath::Max(0.f, VisitorPresenceCooldownRemaining - Delta);
 	ThunderCheckRemaining -= Delta;
 	if (ThunderCheckRemaining <= 0.f)
 	{
@@ -411,6 +463,13 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		FoxPresenceCheckRemaining = 0.5f;
 		CheckForNearbyFox();
 	}
+	VisitorCheckRemaining -= Delta;
+	if (VisitorCheckRemaining <= 0.f)
+	{
+		VisitorCheckRemaining = 0.35f;
+		const APlayerController* Player = World->GetFirstPlayerController();
+		CheckForNearbyVisitor(Player ? Player->GetPawn() : nullptr);
+	}
 	if (bResting) return;
 	if (bWakingUp)
 	{
@@ -434,6 +493,12 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 	{
 		FoxNoticeRemaining -= Delta;
 		if (FoxNoticeRemaining <= 0.f) BeginGrazing();
+		return;
+	}
+	if (bNoticingVisitor)
+	{
+		VisitorNoticeRemaining -= Delta;
+		if (VisitorNoticeRemaining <= 0.f) BeginGrazing();
 		return;
 	}
 	if (!bMoving)

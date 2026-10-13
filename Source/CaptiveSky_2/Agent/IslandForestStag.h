@@ -5,6 +5,7 @@
 #include "IslandForestStag.generated.h"
 
 class UAnimSequence;
+class APawn;
 class USkeletalMeshComponent;
 class AIslandLightning;
 class AIslandListeningStonesChime;
@@ -71,6 +72,9 @@ private:
 	float ListeningRemaining = 0.f;
 	float ResidentNoticeRemaining = 0.f;
 	float FoxNoticeRemaining = 0.f;
+	float VisitorCheckRemaining = 0.f;
+	float VisitorPresenceCooldownRemaining = 0.f;
+	float VisitorNoticeRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
 	bool bWakingUp = false;
@@ -79,6 +83,8 @@ private:
 	bool bResidentPresenceNearby = false;
 	bool bNoticingFox = false;
 	bool bFoxPresenceNearby = false;
+	bool bNoticingVisitor = false;
+	bool bVisitorPresenceNearby = false;
 	bool bStartled = false;
 	bool bResting = false;
 	TWeakObjectPtr<AIslandLightning> LastHeardThunder;
@@ -87,6 +93,7 @@ private:
 	bool FindGround(const FVector& NearPoint, FVector& OutGround) const;
 	bool ChooseWanderTarget(FVector& OutTarget) const;
 	void CheckForNearbyResident();
+	void CheckForNearbyVisitor(const APawn* Visitor);
 	void CheckForNearbyFox();
 	void CheckForNearbyRavenFlyby();
 	void CheckForNearbyListeningStonesChime();
