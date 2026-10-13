@@ -27,11 +27,20 @@ spacing between the eight candidate sites.
 - UE 5.8 editor target build: **passed**.
 - Test source: compiled as part of an earlier build action; automation test itself
   has **not** run in this turn.
+- A 90-second, zero-model-request Game-mode run completed before this commit
+  (07:12–07:14 local); its screenshots are baseline only and cannot verify these
+  new pockets.
+- A post-commit 90-second, zero-model-request spectator launch at 12:11 local
+  failed before world-ready. Its log records an access violation reading null at
+  process age 0 seconds, in unsymbolized `UnrealEditor-Core` startup frames; no
+  map or scatter initialization occurred. The minidump and launch log are in
+  `Saved/Crashes/_0000/` (gitignored). Do not repeat the project launch until
+  this startup failure is diagnosed or the launch environment meaningfully
+  changes.
 - Runtime scatter and dragonfly visit in the saved Island: **not visually
-  verified**. The desktop inventory showed no Unreal Editor, and project startup
-  is currently failing before world-ready with an unsymbolized null-address
-  access violation. Do not repeat the same project launch until that blocker is
-  diagnosed or the launch environment meaningfully changes.
+  verified**. The screenshots from the successful pre-commit run show flying
+  dragonflies, but not the newly added pool-edge pockets or a confirmed flower
+  hover.
 - Next: once a safe editor/Game run is possible, inspect the Tideglass edge at
   player height, confirm at least one candidate pocket survives landscape and
   pool clearance, and capture a dragonfly's approach/hover at one-second cadence
