@@ -17,10 +17,6 @@
 	],
 	"Plugins": [
 		{
-			"Name": "PlantFactoryPlugin",
-			"Enabled": false
-		},
-		{
 			"Name": "ProceduralVegetationEditor",
 			"Enabled": true
 		},
