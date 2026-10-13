@@ -18,6 +18,7 @@
 #include "Agent/AgentSocialSubsystem.h"
 #include "Agent/IslandGuestBook.h"
 #include "Agent/IslandArrangement.h"
+#include "Agent/IslandRainBasin.h"
 #include "Agent/IslandInteractionUtility.h"
 #include "Agent/IslandWorldStateSubsystem.h"
 #include "Agent/IslandSpectator.h"
@@ -178,6 +179,12 @@ FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Targ
 	else if (Tag == FName(TEXT("Firefly"))) Action = TEXT("quietly watch a wild firefly");
 	else if (Tag == FName(TEXT("TidepoolCrab"))) Action = TEXT("quietly watch a wild shore crab");
 	else if (Tag == FName(TEXT("MinnowSchool"))) Action = TEXT("quietly watch the wild minnows");
+	else if (Tag == FName(TEXT("RainBasin")))
+	{
+		const UIslandRainBasinSubsystem* Basin = GetWorld() ? GetWorld()->GetSubsystem<UIslandRainBasinSubsystem>() : nullptr;
+		Action = Basin && Basin->GetState().Water >= FIslandBasinState::FloatLevel
+			? TEXT("float a leaf on the rainwater") : TEXT("inspect the rain basin");
+	}
 	else if (Tag == FName(TEXT("InnHearth"))) Action = TEXT("tend the inn hearth");
 	else if (Tag == FName(TEXT("ListeningStones"))) Action = TEXT("listen to the ListeningStones");
 	else if (Tag == FName(TEXT("TideglassPool"))) Action = TEXT("send a brief ripple across the pool");

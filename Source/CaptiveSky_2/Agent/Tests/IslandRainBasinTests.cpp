@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
+#include "CaptiveSkyAmbientSpeechWidget.h"
 #include "IslandRainBasin.h"
 #include "AgentBrainComponent.h"
+#include "IslandInteractionTestPlayerController.h"
 #include "IslandInteractionUtility.h"
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -8,6 +10,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Character.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -167,6 +170,27 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 	if (BasinActor)
 	{
 		Basin->ForceWater(0.7f);
+		ACharacter* Visitor = World->SpawnActor<ACharacter>(BasinActor->GetActorLocation() + FVector(50.f, 0.f, 40.f), FRotator::ZeroRotator);
+		UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+		AIslandInteractionTestPlayerController* VisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>();
+		TestNotNull(TEXT("Synthetic visitor pawn created for basin affordance"), Visitor);
+		TestNotNull(TEXT("Synthetic visitor caption created for basin affordance"), Caption);
+		TestNotNull(TEXT("Synthetic local controller created for basin affordance"), VisitorController);
+		if (Visitor && Caption && VisitorController)
+		{
+			VisitorController->SetFixturePawn(Visitor);
+			VisitorController->SetCaptionWidget(Caption);
+			VisitorController->RefreshInteractionHintForTest();
+			TestEqual(TEXT("A visitor is told they can float a leaf when rainwater is deep enough"),
+				Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: float a leaf on the rainwater")));
+			Basin->ForceWater(FIslandBasinState::FloatLevel - 0.01f);
+			VisitorController->RefreshInteractionHintForTest();
+			TestEqual(TEXT("A visitor is told to inspect rather than float a leaf when the basin is too shallow"),
+				Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: inspect the rain basin")));
+			Basin->ForceWater(0.7f);
+			VisitorController->Destroy();
+			Visitor->Destroy();
+		}
 		AActor* Resident = World->SpawnActor<AActor>();
 		if (Resident)
 		{
