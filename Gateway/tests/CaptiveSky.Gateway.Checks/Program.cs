@@ -182,7 +182,14 @@ try
         && upgradeProposal is { RequestType: "upgrade", UpgradeKind: "aesthetic", Target: "InnDoorLantern", Description: "Add brass trim" }, "upgrade proposal parses");
     Assert(DiscordProposalCommand.TryParse("!request upgrade variation world :: Add stream stones", out var worldUpgrade, out _)
         && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
-    Assert(!DiscordProposalCommand.TryParse("!request help", out _, out var proposalHelp) && proposalHelp.Contains("human review", StringComparison.Ordinal), "help returns safe usage");
+    Assert(!DiscordProposalCommand.TryParse("!request help", out _, out var proposalHelp)
+        && proposalHelp.Contains("!request object", StringComparison.Ordinal)
+        && proposalHelp.Contains("upgrade aesthetic", StringComparison.Ordinal)
+        && proposalHelp.Contains("upgrade variation", StringComparison.Ordinal)
+        && proposalHelp.Contains("upgrade functionality", StringComparison.Ordinal)
+        && proposalHelp.Contains("ask Raven", StringComparison.Ordinal)
+        && proposalHelp.Contains("human review", StringComparison.Ordinal)
+        && proposalHelp.Contains("nothing is created automatically", StringComparison.Ordinal), "help gives examples and explains review-only resident proposals");
     Assert(!DiscordProposalCommand.TryParse("!request upgrade magical Inn :: Make magic", out _, out _), "unsupported upgrade kind rejected");
     var parsedAgentProposal = OpenAICompatibleAgentResponder.ParseAgentResponse("""
         {"speech":"I can ask for that to be reviewed.","new_memories":[],"proposal":{"request_type":"upgrade","description":"Add a sheltered landing rail","target":"RavenNest","upgrade_kind":"functionality"}}

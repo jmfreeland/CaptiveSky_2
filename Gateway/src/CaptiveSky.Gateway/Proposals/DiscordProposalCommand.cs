@@ -4,7 +4,7 @@ namespace CaptiveSky.Gateway.Proposals;
 
 public static class DiscordProposalCommand
 {
-    public const string Usage = "Use `!request object <description>` or `!request upgrade <aesthetic|variation|functionality> <target|world> :: <description>`. Requests go to human review; nothing is created automatically.";
+    public const string Usage = "Examples: `!request object A small copper bell beside the east trail`; `!request upgrade aesthetic InnDoorLantern :: Add brass trim`; `!request upgrade variation world :: Add mossy stream stones`; `!request upgrade functionality RavenNest :: Add a sheltered landing rail`. You can also ask Raven to submit one specific idea for human review. These are proposals only; nothing is created automatically.";
 
     public static bool IsCommand(string text) =>
         text.StartsWith("!request", StringComparison.OrdinalIgnoreCase) &&
