@@ -1195,9 +1195,25 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		DayCrabResidents.Add(*It);
 		TestTrue(TEXT("Tidepool crab advertises as untargeted ambient life"), It->ActorHasTag(TEXT("IslandLife")) && It->ActorHasTag(TEXT("TidepoolCrab")) && !It->ActorHasTag(TEXT("IslandLandmark")));
 		TestTrue(TEXT("Tidepool crab remains at the shoreline of its habitat"), FVector::Dist2D(It->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
-		TestEqual(TEXT("Tidepool crab has six visible leg placeholders"), It->Legs.Num(), 6);
+		TestEqual(TEXT("Tidepool crab keeps six primitive legs as a portable fallback"), It->Legs.Num(), 6);
 		TestEqual(TEXT("Tidepool crab has two claws and two eye stalks"), It->Claws.Num(), 2);
 		TestTrue(TEXT("Tidepool crab carapace remains visibly flatter than it is wide"), It->Shell && It->Shell->GetRelativeScale3D().Z < It->Shell->GetRelativeScale3D().X * 0.5f);
+		TestNotNull(TEXT("Tidepool crab has an optional detailed-body component"), It->DetailedBody.Get());
+		if (It->DetailedBody && It->DetailedBody->GetStaticMesh())
+		{
+			const FVector DetailedMeshExtent = It->DetailedBody->GetStaticMesh()->GetBounds().BoxExtent * It->DetailedBody->GetRelativeScale3D();
+			TestTrue(TEXT("Imported crab candidate is visible at a resident scale"),
+				It->DetailedBody->IsVisible() &&
+				DetailedMeshExtent.Size2D() > 25.f &&
+				DetailedMeshExtent.Z < 30.f);
+			TestEqual(TEXT("Imported crab candidate cannot block shoreline movement"),
+				It->DetailedBody->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+			TestFalse(TEXT("Primitive shell is hidden when the detailed candidate is available"), It->Shell->IsVisible());
+		}
+		else
+		{
+			TestTrue(TEXT("Primitive crab remains visible when the optional mesh is absent"), It->Shell->IsVisible());
+		}
 		UMaterialInstanceDynamic* CrabShellTint = It->Shell ? Cast<UMaterialInstanceDynamic>(It->Shell->GetMaterial(0)) : nullptr;
 		TestNotNull(TEXT("Tidepool crab shell uses its per-instance natural tint"), CrabShellTint);
 		if (CrabShellTint)

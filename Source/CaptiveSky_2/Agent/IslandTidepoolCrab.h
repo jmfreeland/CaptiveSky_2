@@ -40,6 +40,8 @@ private:
 	friend class FIslandNightEcologyTest;
 	friend class FRavenPerchTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
+	TObjectPtr<UStaticMeshComponent> DetailedBody;
+	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Shell;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TArray<TObjectPtr<UStaticMeshComponent>> Legs;

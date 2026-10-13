@@ -72,6 +72,48 @@ AIslandTidepoolCrab::AIslandTidepoolCrab()
 		Eye->SetCastShadow(false);
 		Eyes.Add(Eye);
 	}
+
+	// The locally generated Tideglass candidate is deliberately optional: clean
+	// checkouts without the gitignored Content asset retain the old primitive form.
+	DetailedBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DetailedBody"));
+	DetailedBody->SetupAttachment(RootComponent);
+	DetailedBody->SetRelativeScale3D(FVector(0.75f));
+	DetailedBody->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DetailedBody->SetCanEverAffectNavigation(false);
+	DetailedBody->SetCastShadow(true);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TidepoolCrabMesh(
+		TEXT("/Game/Generated/ComfyBlender/IslandTidepoolCrab/SM_TidepoolCrab_01.SM_TidepoolCrab_01"));
+	const bool bHasDetailedMesh = TidepoolCrabMesh.Succeeded();
+	if (bHasDetailedMesh)
+		DetailedBody->SetStaticMesh(TidepoolCrabMesh.Object);
+	DetailedBody->SetVisibility(bHasDetailedMesh, true);
+	DetailedBody->SetHiddenInGame(!bHasDetailedMesh, true);
+	Shell->SetVisibility(!bHasDetailedMesh, true);
+	Shell->SetHiddenInGame(bHasDetailedMesh, true);
+	for (UStaticMeshComponent* Part : Legs)
+	{
+		if (Part)
+		{
+			Part->SetVisibility(!bHasDetailedMesh, true);
+			Part->SetHiddenInGame(bHasDetailedMesh, true);
+		}
+	}
+	for (UStaticMeshComponent* Part : Claws)
+	{
+		if (Part)
+		{
+			Part->SetVisibility(!bHasDetailedMesh, true);
+			Part->SetHiddenInGame(bHasDetailedMesh, true);
+		}
+	}
+	for (UStaticMeshComponent* Part : Eyes)
+	{
+		if (Part)
+		{
+			Part->SetVisibility(!bHasDetailedMesh, true);
+			Part->SetHiddenInGame(bHasDetailedMesh, true);
+		}
+	}
 }
 
 void AIslandTidepoolCrab::BeginPlay()
