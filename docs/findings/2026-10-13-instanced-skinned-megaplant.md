@@ -44,20 +44,39 @@ provider is assigned.
   read-only after startup. The successful `-ini` overrides were process-only;
   `Config/DefaultEngine.ini` remained unchanged. Do not enable this experimental
   renderer setting project-wide based on this isolated result.
+- The foliage material audit found that `MI_European_Beech_Foliage_01` uses the
+  plugin's `MA_Foliage_Trees` parent and has a blue-gray `BaseColor Tint`
+  (`[0.3214, 0.3684, 0.5, 1]`), plus the expected foliage color/normal textures
+  and translucency/season controls. A second process-only capture applied a
+  green `Base Color Tint` (`[0.48, 0.65, 0.35, 1]`) to transient dynamic
+  material instances on both render paths. This makes the cards greener, but
+  the tree remains visibly sparse and blocky; color alone is not the fix. The
+  material instances, map, and project settings were not saved. Captures:
+  [green-tinted instanced](../../Saved/Playtests/Codex_InstancedSkinnedBeech_20261013_GreenTint/InstancedSkinned_BeechA.png),
+  [green-tinted ordinary skeletal mesh](../../Saved/Playtests/Codex_InstancedSkinnedBeech_20261013_GreenTint/SkeletalMesh_BeechA.png).
 - The component reports no transform provider. Wind and animated per-instance
   bone transforms therefore remain untested. These one-tree scene captures do
   not measure runtime cost, LOD behavior, or a multi-instance batch.
+- The UE 5.8.3 PVE exporter has no exposed Python/UFUNCTION entry point in the
+  installed plugin headers: `FPVExporter` and `PV::Export::ExportCollectionAsMesh`
+  are editor-private C++ APIs, and the exporter implementation is in the
+  precompiled plugin binary. A reliable repeatable script cannot invoke the
+  PVE export from Unreal Python alone. Use the PVE editor export UI for the
+  full Beech graph/preset, keeping the export in a disposable test folder; do
+  not alter the source graph or Island. The separate Hazel StaticMesh test is
+  still independently owned and should not be repurposed for this Beech probe.
 - The UE commandlet reached the script's `COMPLETE` marker and exited; the map
   and imported assets were not saved.
 
 ## Decision and next step
 
 Do not place these Beech outputs as canopy or scatter them on the Island yet.
-Startup Nanite overrides recover leaf geometry, but its isolated material and
-silhouette still look wrong; there is also no wind/provider or runtime-cost
-evidence. Next inspect the Beech PVE graph/preset and material parameters, then
-capture one candidate in the lit Island composition. The installed folder
-contains separate branch, twig, bud, and leaf instances, so a complete exported
-asset may be required. Keep that export isolated, judge it in the fixed
-Tideglass-to-Woodland Game view, and measure a bounded small batch before any
-Island placement. Do not raise global foliage density as a substitute.
+Startup Nanite overrides recover leaf geometry, but a greener transient tint
+does not fix the sparse silhouette; wind/provider and runtime-cost evidence are
+also missing. Next use the PVE editor export UI to create a complete Beech
+candidate in an isolated test folder, then capture it in the lit Island
+composition. The installed folder contains separate branch, twig, bud, and leaf
+instances, so confirm the chosen graph output includes the intended foliage.
+Judge it in the fixed Tideglass-to-Woodland Game view and measure a bounded
+small batch before any Island placement. Do not raise global foliage density
+as a substitute.

@@ -27,6 +27,11 @@ OUTPUT_RELATIVE = os.environ.get(
 )
 OUTPUT_FILENAME = "InstancedSkinned_BeechA.png"
 STANDARD_OUTPUT_FILENAME = "SkeletalMesh_BeechA.png"
+FOLIAGE_TINT = tuple(float(value) for value in os.environ.get(
+    "CAPTIVESKY_SKINNED_PREVIEW_FOLIAGE_TINT", "0.48,0.65,0.35,1.0"
+).split(","))
+if len(FOLIAGE_TINT) != 4:
+    raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_FOLIAGE_TINT must contain RGBA values")
 FOV_ANGLE = 48.0
 PREVIEW_STATE = {}
 
@@ -43,6 +48,46 @@ def require(value, message):
 
 def components(vector):
     return [round(float(getattr(vector, axis)), 2) for axis in ("x", "y", "z")]
+
+
+def material_parameters(material):
+    result = {"path": material.get_path_name(), "class": material.get_class().get_name()}
+    try:
+        parent = material.get_editor_property("parent")
+        result["parent"] = parent.get_path_name() if parent else None
+    except Exception as error:
+        result["parent_error"] = str(error)
+
+    for property_name, value_property in (
+        ("texture_parameter_values", "parameter_value"),
+        ("scalar_parameter_values", "parameter_value"),
+        ("vector_parameter_values", "parameter_value"),
+    ):
+        entries = []
+        try:
+            values = material.get_editor_property(property_name)
+        except Exception as error:
+            result[property_name + "_error"] = str(error)
+            continue
+        for entry in values:
+            try:
+                parameter_info = entry.get_editor_property("parameter_info")
+                parameter_name = str(parameter_info.get_editor_property("name"))
+                value = entry.get_editor_property(value_property)
+                if hasattr(value, "get_path_name"):
+                    value = value.get_path_name() if value else None
+                elif all(hasattr(value, axis) for axis in ("r", "g", "b", "a")):
+                    value = [round(float(getattr(value, axis)), 4) for axis in ("r", "g", "b", "a")]
+                elif isinstance(value, (int, float, bool, str)) or value is None:
+                    value = value
+                else:
+                    value = str(value)
+                entries.append({"name": parameter_name, "value": value})
+            except Exception as error:
+                entries.append({"error": str(error)})
+        result[property_name] = entries
+
+    return result
 
 
 def on_preview_tick(delta_seconds):
@@ -152,8 +197,22 @@ def main():
     for index in range(material_count):
         material = component.get_material(index)
         material_path = material.get_path_name() if material else None
-        materials.append(material_path)
+        details = material_parameters(material) if material else None
+        materials.append(details)
         log("material[{}]={}".format(index, material_path or "<none>"))
+        if details:
+            log("material_details[{}]={}".format(index, json.dumps(details, sort_keys=True)))
+
+    base_foliage_material = component.get_material(1)
+    preview_color = unreal.LinearColor(*FOLIAGE_TINT)
+    for label, foliage_component in (("instanced", component), ("ordinary", standard_component)):
+        preview_material = foliage_component.create_dynamic_material_instance(1)
+        require(preview_material, "Could not create transient {} foliage MID".format(label))
+        preview_material.set_vector_parameter_value("Base Color Tint", preview_color)
+        log("{} foliage tint {} applied to transient MID from {}".format(
+            label, list(FOLIAGE_TINT),
+            base_foliage_material.get_path_name() if base_foliage_material else "<none>",
+        ))
 
     mesh_bounds = mesh.get_bounds()
     bounds_origin = mesh_bounds.origin
@@ -232,6 +291,7 @@ def main():
         "material_slot_count": material_count,
         "transform_provider": transform_provider_path,
         "materials": materials,
+        "transient_foliage_tint": list(FOLIAGE_TINT),
         "bounds_origin_cm": components(bounds_origin),
         "bounds_extent_cm": components(bounds_extent),
         "height_cm": round(height, 2),
