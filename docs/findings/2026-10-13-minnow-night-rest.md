@@ -10,6 +10,11 @@ nearby observers, Raven flybys, and natural surface cues. Minnow surface breaks
 become less frequent during the resting period (60 seconds at full rest versus
 19 seconds by day).
 
+The weather manager preserves the same school actor across dusk, the full night,
+and dawn rather than destroying it at 19:00. Its owner is named for the Tideglass
+habitat, not the daytime schedule. This keeps the shallow pool inhabited while
+the minnows visibly quiet their swimming rhythm.
+
 This is a lightweight behavioral use of the existing Island clock: no new
 assets, timers, model requests, or persistent state were added. Movement and
 surface-break scheduling remain within the current actor tick and existing
@@ -30,10 +35,30 @@ passed under NullRHI with thinking disabled and zero model requests
 deterministic behavior evidence, not visual confirmation; the resting school
 still needs review under night lighting to ensure it remains subtly alive.
 
+The separate `CaptiveSky2.Agent.TidepoolMinnows` and
+`CaptiveSky2.Agent.TidepoolMinnowWaterPresence` tests now cover the manager's
+same-actor continuity through dusk, 23:00, midnight, and dawn, alongside the
+school's nonzero-but-slower swim step and existing swimmer response. Both passed
+after a successful UE 5.8.3 editor-target rebuild; the run used NullRHI,
+disabled thinking, and a zero-request ceiling
+([log](../../Saved/Logs/Codex_MinnowOvernightPersistence_20261013.log)).
+
+Four bounded real-RHI Game captures sampled the requested Island hours with the
+minnow school visibly present in each; each run ended normally with zero model
+requests at the configured 60-second cap. The pool and school are visible in the
+[`17:00`](../../Playtests/Codex_MinnowOvernight_20261013/Hour17/Screenshots/001_Tideglass.png),
+[`23:00`](../../Playtests/Codex_MinnowOvernight_20261013/Hour23/Screenshots/001_Tideglass.png),
+[`03:00`](../../Playtests/Codex_MinnowOvernight_20261013/Hour03/Screenshots/001_Tideglass.png),
+and [`07:00`](../../Playtests/Codex_MinnowOvernight_20261013/Hour07/Screenshots/001_Tideglass.png)
+frames. The school reads as small fish in the broad Tideglass composition; the
+captures prove continued presence, not polished close-up readability or a
+30-FPS traversal profile. Per-hour logs are under `Saved/Logs/` as
+`Codex_MinnowOvernight_Hour{17,23,03,07}_20261013.log`.
+
 ## Next step
 
-Run a short, zero-model-request Tideglass Game capture at 17:00, 23:00, 03:00,
-and 07:00 when the UE 5.8.3 session is stable. Confirm that
-daytime minnow activity is unchanged, night movement remains visible, and the
-existing surface-cue and Raven-disturbance behaviors still work before treating
-this as visually verified.
+Make a closer, deliberately composed Tideglass view so the small school reads
+clearly against moonlit water, then review the nighttime water/terrain contrast.
+Keep that art/readability pass separate from a 30-FPS traversal profile and
+retain the existing play/request safeguards. The four wide captures confirm
+presence and lighting states, not target-hardware performance.

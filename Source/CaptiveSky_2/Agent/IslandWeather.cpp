@@ -2057,8 +2057,8 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
 		if (Dragonfly.IsValid()) Dragonfly->Destroy();
 	DayDragonflies.Reset();
-	if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
-	DayMinnowSchool.Reset();
+	if (TidepoolMinnowSchool.IsValid()) TidepoolMinnowSchool->Destroy();
+	TidepoolMinnowSchool.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -2465,7 +2465,7 @@ void AIslandWeather::RefreshNightEcology()
 	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
 	DayCrabs.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolCrab>& Crab) { return !Crab.IsValid(); });
 	DayDragonflies.RemoveAll([](const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly) { return !Dragonfly.IsValid(); });
-	if (!DayMinnowSchool.IsValid()) DayMinnowSchool.Reset();
+	if (!TidepoolMinnowSchool.IsValid()) TidepoolMinnowSchool.Reset();
 	if (!GetWorld()) return;
 
 	float CurrentHour = -1.f;
@@ -2677,8 +2677,8 @@ void AIslandWeather::RefreshNightEcology()
 		for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
 			if (Dragonfly.IsValid()) Dragonfly->Destroy();
 		DayDragonflies.Reset();
-		if (DayMinnowSchool.IsValid()) DayMinnowSchool->Destroy();
-		DayMinnowSchool.Reset();
+		if (TidepoolMinnowSchool.IsValid()) TidepoolMinnowSchool->Destroy();
+		TidepoolMinnowSchool.Reset();
 		return;
 	}
 
@@ -2734,19 +2734,13 @@ void AIslandWeather::RefreshNightEcology()
 		DayDragonflies.Reset();
 	}
 
-	if (bDay)
+	// Keep the same pool school through dusk and night; its own clock response
+	// tucks the orbit and reduces activity instead of making Tideglass empty.
+	if (!TidepoolMinnowSchool.IsValid())
 	{
-		if (!DayMinnowSchool.IsValid())
-		{
-			FActorSpawnParameters SpawnParameters;
-			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			DayMinnowSchool = GetWorld()->SpawnActor<AIslandTidepoolMinnows>(Habitat->GetActorLocation() + FVector(0.f, 0.f, 24.f), FRotator::ZeroRotator, SpawnParameters);
-		}
-	}
-	else if (DayMinnowSchool.IsValid())
-	{
-		DayMinnowSchool->Destroy();
-		DayMinnowSchool.Reset();
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		TidepoolMinnowSchool = GetWorld()->SpawnActor<AIslandTidepoolMinnows>(Habitat->GetActorLocation() + FVector(0.f, 0.f, 24.f), FRotator::ZeroRotator, SpawnParameters);
 	}
 
 	if (!bDay)

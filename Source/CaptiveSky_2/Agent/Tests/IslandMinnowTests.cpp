@@ -66,18 +66,14 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	PoolSurfaceActor->SetActorScale3D(FVector(4.f, 4.f, 0.1f));
 	PoolSurfaceActor->GetStaticMeshComponent()->UpdateBounds();
 	Weather->RefreshNightEcology();
-	AIslandTidepoolMinnows* School = Weather->DayMinnowSchool.Get();
-	if (!TestNotNull(TEXT("One daytime school appears at Tideglass"), School))
+	AIslandTidepoolMinnows* School = Weather->TidepoolMinnowSchool.Get();
+	if (!TestNotNull(TEXT("One minnow school appears at Tideglass"), School))
 	{
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
 		return false;
 	}
-	School->Weather = Weather;
-	School->IslandClock = Clock;
-	School->CachePoolSwimmingBounds();
-	School->ConfigureAppearance();
-	School->UpdateSchool(0.f);
+	School->DispatchBeginPlay();
 	TestTrue(TEXT("The school derives a swim boundary from the tagged pool's flattened sphere"), School->bHasPoolSwimmingBounds);
 	auto AreFishInsidePoolFootprint = [&School]()
 	{
@@ -105,7 +101,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	};
 	TestTrue(TEXT("Every fish begins within the measured shallow-water footprint"), AreFishInsidePoolFootprint());
 	Weather->RefreshNightEcology();
-	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->DayMinnowSchool.Get() == School);
+	TestTrue(TEXT("Repeated ecology refresh reuses rather than duplicates the school"), Weather->TidepoolMinnowSchool.Get() == School);
 	TestTrue(TEXT("The school is wild life, not a landmark, pet, or nest site"),
 		School->ActorHasTag(TEXT("IslandLife")) && School->ActorHasTag(TEXT("MinnowSchool")) &&
 		!School->ActorHasTag(TEXT("IslandLandmark")) && !School->ActorHasTag(TEXT("RavenNestSite")));
@@ -656,15 +652,31 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		ResidentController->UnPossess();
 	}
 
-	Clock->CurrentHour = 19.f;
+	Clock->CurrentHour = 20.f;
 	Weather->RefreshNightEcology();
-	TestTrue(TEXT("The daytime school leaves the habitat after dusk"), School->IsActorBeingDestroyed() && !Weather->DayMinnowSchool.IsValid());
+	TestTrue(TEXT("The same school remains at Tideglass as its dusk rest begins"),
+		!School->IsActorBeingDestroyed() && Weather->TidepoolMinnowSchool.Get() == School && School->GetNightRestAmount() > 0.f);
+	Clock->CurrentHour = 23.f;
+	Weather->RefreshNightEcology();
+	TestTrue(TEXT("The same school persists through late night at full rest"),
+		!School->IsActorBeingDestroyed() && Weather->TidepoolMinnowSchool.Get() == School &&
+		FMath::IsNearlyEqual(School->GetNightRestAmount(), 1.f) && AIslandTidepoolMinnows::NightActivityScale(School->GetNightRestAmount()) > 0.f);
+	const FVector RestingFishStart = School->Fish.IsValidIndex(0) && School->Fish[0]
+		? School->Fish[0]->GetRelativeLocation() : FVector::ZeroVector;
+	School->Tick(1.f);
+	const float RestingSwimStep = School->Fish.IsValidIndex(0) && School->Fish[0]
+		? FVector::Dist2D(RestingFishStart, School->Fish[0]->GetRelativeLocation()) : 0.f;
+	TestTrue(TEXT("Resting minnows continue a smaller, nonzero swimming step"), RestingSwimStep > 0.f && RestingSwimStep < 100.f);
+	Clock->CurrentHour = 0.f;
+	Weather->RefreshNightEcology();
+	TestTrue(TEXT("The same school remains in the pool at midnight"),
+		!School->IsActorBeingDestroyed() && Weather->TidepoolMinnowSchool.Get() == School);
 	Clock->CurrentHour = 6.f;
 	Weather->RefreshNightEcology();
-	TestTrue(TEXT("One school returns at dawn without duplicating"), Weather->DayMinnowSchool.IsValid());
-	AIslandTidepoolMinnows* DawnSchool = Weather->DayMinnowSchool.Get();
+	TestTrue(TEXT("The overnight school remains through dawn without duplicating"), Weather->TidepoolMinnowSchool.Get() == School);
+	AIslandTidepoolMinnows* DawnSchool = Weather->TidepoolMinnowSchool.Get();
 	Weather->RefreshNightEcology();
-	TestTrue(TEXT("Dawn refresh preserves the same single school"), Weather->DayMinnowSchool.Get() == DawnSchool);
+	TestTrue(TEXT("Dawn refresh preserves the same single school"), Weather->TidepoolMinnowSchool.Get() == DawnSchool);
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

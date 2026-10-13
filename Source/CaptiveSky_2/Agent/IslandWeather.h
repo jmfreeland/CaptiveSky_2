@@ -131,7 +131,7 @@ private:
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
 	TArray<TWeakObjectPtr<AIslandTideglassDragonfly>> DayDragonflies;
-	TWeakObjectPtr<AIslandTidepoolMinnows> DayMinnowSchool;
+	TWeakObjectPtr<AIslandTidepoolMinnows> TidepoolMinnowSchool;
 	TWeakObjectPtr<AIslandForestStag> WoodlandDeer;
 	TWeakObjectPtr<AIslandForestFox> WoodlandFox;
 	TArray<FTransform> ShoreGrassABaseTransforms;
