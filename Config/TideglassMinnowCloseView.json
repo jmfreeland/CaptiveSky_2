@@ -1,0 +1,11 @@
+{
+	"viewpoints": [
+		{
+			"name": "01_TideglassMinnowSchoolMoonlit",
+			"from": { "tag": "MinnowSchool", "offset": [260, -260, 95] },
+			"look": { "tag": "MinnowSchool", "offset": [0, 0, 15] },
+			"fov": 48,
+			"min_height": 20
+		}
+	]
+}

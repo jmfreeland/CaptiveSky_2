@@ -65,9 +65,11 @@ attempt. See [`2026-10-13-unreal-startup-triage.md`](2026-10-13-unreal-startup-t
 Do not repeat the same startup experiment until matching symbols or materially
 changed startup conditions are available.
 
-When a real-RHI run is possible again, use the saved close-view config to judge
-whether the small school reads clearly against moonlit water, then review the
-nighttime water/terrain contrast. Keep that art/readability pass separate from
-a 30-FPS traversal profile and retain the existing play/request safeguards. The
-four earlier wide captures confirm presence and lighting states, not close-up
-readability or target-hardware performance.
+When a real-RHI run is possible again, use the tracked
+[`TideglassMinnowCloseView.json`](../../Config/TideglassMinnowCloseView.json)
+with a 03:00 isolated start to judge whether the small school reads clearly
+against moonlit water, then review the nighttime water/terrain contrast. Keep
+that art/readability pass separate from a 30-FPS traversal profile and retain
+the existing play/request safeguards. The four earlier wide captures confirm
+presence and lighting states, not close-up readability or target-hardware
+performance.

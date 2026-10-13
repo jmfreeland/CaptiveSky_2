@@ -67,3 +67,12 @@ the dump in a symbol-capable debugger; only then choose another controlled
 startup experiment. Keep agent thinking disabled and the model-request ceiling
 at zero. The repeated startup fault remains separate from the recurring .NET
 dialog unless new evidence links them.
+
+Epic's documented symbol component is available from Epic Games Launcher under
+Unreal Engine > Library > the UE 5.8.3 tile's Options > **Editor symbols for
+debugging**. Epic says this component adds source used to provide more detailed
+crash information ([installation guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/install-unreal-engine)).
+It is not installed in the current engine directory. After the component is
+added, verify that its symbols match the installed 5.8.3 binaries before
+opening the minidump; do not assume an engine update or a mismatched symbol set
+will resolve this stack.
