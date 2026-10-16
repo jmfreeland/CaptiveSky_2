@@ -1,13 +1,14 @@
 using System.Text;
 using System.Text.Json;
+using System.Globalization;
 
 namespace CaptiveSky.Gateway.Agents;
 
 /// <summary>
-/// Summarizes the lasting world changes an agent itself made, from Unreal's per-level
-/// <c>WorldState/&lt;Map&gt;.json</c> files, so headless correspondence can remember them.
-/// Only the agent's own contributions are included, mirroring what its body would know:
-/// who made other things, and other residents' private titles or intents, are never revealed.
+/// Summarizes the latest saved environment and lasting world changes from Unreal's per-level
+/// <c>WorldState/&lt;Map&gt;.json</c> files, so headless correspondence can answer from grounded context.
+/// Environment observations are public and timestamped; only the agent's own lasting contributions
+/// are described, so other residents' private titles or intents are never revealed.
 /// A missing or unreadable file simply contributes nothing.
 /// </summary>
 public static class WorldStateSummary
@@ -47,6 +48,32 @@ public static class WorldStateSummary
         var day = root.TryGetProperty("clock", out var clock) && clock.TryGetProperty("day", out var dayNode) && dayNode.TryGetInt32(out var savedDay)
             ? savedDay
             : (int?)null;
+
+        if (root.TryGetProperty("environment", out var environment) && environment.ValueKind == JsonValueKind.Object &&
+            environment.TryGetProperty("observed_utc", out var observedNode) && observedNode.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParse(observedNode.GetString(), CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var observedUtc))
+        {
+            var conditions = new List<string>();
+            if (Number(environment, "rain_intensity", out var rain))
+                conditions.Add(rain >= 0.55 ? "steady rain" : rain > 0.02 ? "light rain" : "no rain recorded");
+            if (Number(environment, "wetness", out var wetness))
+                conditions.Add($"ground wetness {Percent(wetness)}");
+            if (Number(environment, "cloud_cover", out var clouds))
+                conditions.Add($"cloud cover {Percent(clouds)}");
+            if (Number(environment, "mist", out var mist) && mist >= 0.05)
+                conditions.Add($"mist {Percent(mist)}");
+            if (Number(environment, "wind_speed_cm_s", out var windSpeed) &&
+                Number(environment, "wind_x_cm_s", out var windX) && Number(environment, "wind_y_cm_s", out var windY))
+            {
+                var direction = windSpeed < 1
+                    ? "calm"
+                    : FormattableString.Invariant($"moving toward map X {windX / windSpeed:+0.00;-0.00;0.00}, Y {windY / windSpeed:+0.00;-0.00;0.00} (not a compass bearing)");
+                conditions.Add(FormattableString.Invariant($"wind {windSpeed:0} cm/s, {direction}"));
+            }
+            if (conditions.Count > 0)
+                facts.Insert(0, $"On {level}, the last saved local weather snapshot (sampled near the active viewpoint when present, otherwise near the weather actor) was observed at {observedUtc.ToUniversalTime():O}: {string.Join(", ", conditions)}. This is historical, not live weather.");
+        }
 
         foreach (var nest in Items(root, "nests"))
         {
@@ -97,6 +124,17 @@ public static class WorldStateSummary
 
     private static int Int(JsonElement element, string name) =>
         element.TryGetProperty(name, out var node) && node.TryGetInt32(out var value) ? value : 0;
+
+    private static bool Number(JsonElement element, string name, out double value)
+    {
+        value = 0;
+        if (!element.TryGetProperty(name, out var node) || !node.TryGetDouble(out var parsed) || !double.IsFinite(parsed))
+            return false;
+        value = parsed;
+        return true;
+    }
+
+    private static string Percent(double value) => FormattableString.Invariant($"{Math.Round(Math.Clamp(value, 0, 1) * 100):0}%");
 
     private static bool Contains(JsonElement element, string name, string value) =>
         element.TryGetProperty(name, out var array) && array.ValueKind == JsonValueKind.Array &&

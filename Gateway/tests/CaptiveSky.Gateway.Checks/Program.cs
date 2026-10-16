@@ -38,6 +38,7 @@ try
     await File.WriteAllTextAsync(Path.Combine(root, "WorldState", "Broken.json"), "{ not json");
     await File.WriteAllTextAsync(Path.Combine(root, "WorldState", "Island.json"), """
         {"version":1,"clock":{"hour":10.5,"day":6},
+         "environment":{"observed_utc":"2026-10-16T09:30:00Z","rain_intensity":0.6,"wetness":0.8,"cloud_cover":0.9,"mist":0.2,"wind_speed_cm_s":200,"wind_x_cm_s":120,"wind_y_cm_s":160},
          "nests":[{"site":"Roost_West","layers":2,"builders":["Agent_Test_01"]},{"site":"Roost_East","layers":4,"builders":["Someone_Else"]}],
          "curios":[{"id":"Cairn","kind":"Cairn","state":5,"contributors":["Agent_Test_01"]}],
          "arrangement_sites":[
@@ -47,13 +48,18 @@ try
            {"id":"ArrangingGround_3"}]}
         """);
     var worldFacts = WorldStateSummary.Describe(root, home.AgentId);
+    Assert(worldFacts.Contains("steady rain", StringComparison.Ordinal) && worldFacts.Contains("ground wetness 80%", StringComparison.Ordinal), "headless correspondence receives grounded saved weather");
+    Assert(worldFacts.Contains("wind 200 cm/s, moving toward map X +0.60, Y +0.80 (not a compass bearing)", StringComparison.Ordinal), "wind direction is described in explicit map-relative coordinates");
+    Assert(worldFacts.Contains("2026-10-16T09:30:00.0000000+00:00", StringComparison.Ordinal) && worldFacts.Contains("historical, not live weather", StringComparison.Ordinal), "weather context is timestamped and cannot be mistaken for current conditions");
     Assert(worldFacts.Contains("2 of 5 layers of a nest at Roost_West", StringComparison.Ordinal), "own nest is recalled headlessly");
     Assert(!worldFacts.Contains("Roost_East", StringComparison.Ordinal), "others' nests are not attributed to the agent");
     Assert(worldFacts.Contains("cairn; it stood 5 stones", StringComparison.Ordinal), "own cairn stones are recalled");
     Assert(worldFacts.Contains("\"Tide Watch\", made 4 Island day(s)", StringComparison.Ordinal) && worldFacts.Contains("to mark the chime", StringComparison.Ordinal), "own arrangement, age, and intent are recalled");
     Assert(worldFacts.Contains("answered someone else's stone spiral", StringComparison.Ordinal) && worldFacts.Contains("an answer", StringComparison.Ordinal), "own response is recalled");
     Assert(!worldFacts.Contains("Secret", StringComparison.Ordinal) && !worldFacts.Contains("secret", StringComparison.Ordinal) && !worldFacts.Contains("Someone_Else", StringComparison.Ordinal), "others' makers, titles, and intents stay private");
-    Assert(WorldStateSummary.Describe(root, "Agent_Nobody").Length == 0, "agents who made nothing get no facts");
+    var nobodyFacts = WorldStateSummary.Describe(root, "Agent_Nobody");
+    Assert(nobodyFacts.Contains("steady rain", StringComparison.Ordinal), "island weather is public context for every resident");
+    Assert(!nobodyFacts.Contains("Roost_West", StringComparison.Ordinal) && !nobodyFacts.Contains("Tide Watch", StringComparison.Ordinal), "public weather does not expose another resident's private changes");
 
     static MemoryRecord Memory(int minute, string type, string text, params string[] tags) => new()
     {

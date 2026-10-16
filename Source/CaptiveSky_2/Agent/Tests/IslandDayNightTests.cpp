@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "IslandWorldStateSubsystem.h"
 #include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandClockTest, "CaptiveSky2.Agent.DayNight",
@@ -259,6 +260,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 		if (State) State->StorageFileOverride = File;
 		FActorSpawnParameters Spawn;
 		Spawn.ObjectFlags |= RF_Transient;
+		OutWorld->SpawnActor<AIslandWeather>(Spawn);
 		AIslandDayNight* Clock = OutWorld->SpawnActor<AIslandDayNight>(Spawn);
 		Clock->StartHour = 9.f;
 		Clock->bResumeSavedTime = bResume;
@@ -294,6 +296,13 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock->DayNumber = 4;
 	EndSession(World, Clock);
 	TestTrue(TEXT("Ending play saves the Island hour"), FPaths::FileExists(StateFile));
+	FString SavedState;
+	TestTrue(TEXT("Saved Island state can be inspected by the headless gateway"), FFileHelper::LoadFileToString(SavedState, *StateFile));
+	TestTrue(TEXT("The environment snapshot is timestamped"), SavedState.Contains(TEXT("\"observed_utc\"")));
+	TestTrue(TEXT("Saved weather includes rain, clouds, mist, and wind components"),
+		SavedState.Contains(TEXT("\"rain_intensity\"")) && SavedState.Contains(TEXT("\"cloud_cover\"")) &&
+		SavedState.Contains(TEXT("\"mist\"")) && SavedState.Contains(TEXT("\"wind_speed_cm_s\"")) &&
+		SavedState.Contains(TEXT("\"wind_x_cm_s\"")) && SavedState.Contains(TEXT("\"wind_y_cm_s\"")));
 
 	Clock = StartSession(World, StateFile, true);
 	TestTrue(TEXT("Next session resumes where the last one ended"), FMath::IsNearlyEqual(Clock->CurrentHour, 21.5f, 0.01f));

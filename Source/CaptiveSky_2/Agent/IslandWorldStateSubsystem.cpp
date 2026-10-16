@@ -4,6 +4,7 @@
 #include "IslandWildlifeHome.h"
 #include "IslandGuestBook.h"
 #include "IslandDayNight.h"
+#include "IslandEnvironmentSubsystem.h"
 #include "IslandChronicle.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
@@ -763,10 +764,25 @@ bool UIslandWorldStateSubsystem::Save() const
 		Weather->SetNumberField(TEXT("last_storm_mark"), LastStormMarkSeconds);
 		Root->SetObjectField(TEXT("weather"), Weather);
 	}
-	if (SavedWetness.IsSet())
+	const UIslandEnvironmentSubsystem* LiveEnvironment = GetWorld()
+		? GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>()
+		: nullptr;
+	const bool bHasLiveWeatherSample = LiveEnvironment && LiveEnvironment->HasLiveWeatherSample();
+	if (SavedWetness.IsSet() || bHasLiveWeatherSample)
 	{
 		const TSharedRef<FJsonObject> Environment = MakeShared<FJsonObject>();
-		Environment->SetNumberField(TEXT("wetness"), SavedWetness.GetValue());
+		Environment->SetNumberField(TEXT("wetness"), bHasLiveWeatherSample ? LiveEnvironment->GetWetness() : SavedWetness.GetValue());
+		if (bHasLiveWeatherSample)
+		{
+			const FVector Wind = LiveEnvironment->GetWind();
+			Environment->SetStringField(TEXT("observed_utc"), FDateTime::UtcNow().ToIso8601());
+			Environment->SetNumberField(TEXT("rain_intensity"), LiveEnvironment->GetRainIntensity());
+			Environment->SetNumberField(TEXT("cloud_cover"), LiveEnvironment->GetCloudCover());
+			Environment->SetNumberField(TEXT("mist"), LiveEnvironment->GetMist());
+			Environment->SetNumberField(TEXT("wind_x_cm_s"), Wind.X);
+			Environment->SetNumberField(TEXT("wind_y_cm_s"), Wind.Y);
+			Environment->SetNumberField(TEXT("wind_speed_cm_s"), Wind.Size2D());
+		}
 		Root->SetObjectField(TEXT("environment"), Environment);
 	}
 

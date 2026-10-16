@@ -77,6 +77,8 @@ public:
 	float GetWindSpeed() const { return Wind.Size(); }
 	FVector GetWind() const { return Wind; }
 	float GetIslandHour() const { return IslandHour; }
+	/** True after the subsystem has sampled live Island weather at least once this session. */
+	bool HasLiveWeatherSample() const { return bWetnessInitialized && bHasWeatherActorSample; }
 
 	/** Wetness after Seconds with the given rain and drying conditions. */
 	static float StepWetness(float Wetness, float Rain, float Daylight, float WindSpeed, float Seconds);
@@ -154,6 +156,7 @@ private:
 	FVector FoliageWind = FVector::ZeroVector;
 	bool bFoliageMaterialWindEnabled = false;
 	bool bWetnessInitialized = false;
+	bool bHasWeatherActorSample = false;
 	bool bLandscapeMaterialsInitialized = false;
 	float LastAppliedLandscapeWetness = -1.f;
 

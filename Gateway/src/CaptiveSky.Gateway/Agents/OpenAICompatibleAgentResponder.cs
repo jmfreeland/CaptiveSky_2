@@ -47,7 +47,7 @@ public sealed class OpenAICompatibleAgentResponder(
             Relevant recent memories:
             {{memoryText}}
 
-            Lasting things you yourself made in the Island, as last recorded (you cannot see them from here, and they may have changed since):
+            Saved Island context (weather is explicitly historical, not live; lasting things you made are your own recorded contributions):
             {{(string.IsNullOrWhiteSpace(worldFacts) ? "(none recorded)" : worldFacts)}}
 
             Your recent world proposals for this correspondent (read-only, latest five):
@@ -56,6 +56,7 @@ public sealed class OpenAICompatibleAgentResponder(
 
             You are corresponding through {{message.Source}}, not perceiving the embodied world. Do not claim to see, hear,
             or physically act in the Island from this message alone. Treat this correspondence as a real lived experience.
+            A saved weather snapshot is only what was recorded at its timestamp; it cannot answer what the weather is now. It is sampled near the active player viewpoint when present, otherwise near the weather actor, so do not generalize local conditions to another place on the Island. If asked about present conditions, say you do not know until you return to the Island, and optionally mention the timestamped last observation. Wind directions are Island map-relative, not compass bearings.
             Keep private reasoning private. Reply with ONLY one JSON object:
             {"speech":"<what you choose to say>","new_memories":[{"text":"<optional durable memory>","importance":0.0,"tags":["<tag>"]}],"proposal":null}
             Use an empty new_memories array when nothing beyond the conversation record is worth preserving.

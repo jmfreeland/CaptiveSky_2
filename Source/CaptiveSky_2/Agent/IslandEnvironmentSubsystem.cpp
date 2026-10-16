@@ -366,6 +366,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	RainIntensity = CloudCover = Storm = LightningFlash = 0.f;
 	Wind = FVector::ZeroVector;
 	FoliageWind = FVector::ZeroVector;
+	bHasWeatherActorSample = false;
 	float FoliageWindReferenceSpeed = 180.f;
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
@@ -378,6 +379,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 		RainIntensity = FMath::Clamp(It->SampleRainIntensity(Now), 0.f, 1.f);
 		CloudCover = FMath::Clamp(It->SampleCloudCover(Now), 0.f, 1.f);
 		Wind = It->GetLocalWind(Viewpoint);
+		bHasWeatherActorSample = true;
 		FoliageWind = It->SampleWind(Viewpoint, Now);
 		FoliageWindReferenceSpeed = FMath::Max(1.f, It->MaximumWindSpeed);
 		Storm = FMath::Clamp(It->SampleStormIntensity(Now), 0.f, 1.f);
