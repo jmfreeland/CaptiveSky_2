@@ -32,12 +32,19 @@ dialogs seen during Unreal build/run.
 
 ## Diagnostic limit and next step
 
-The matching `UnrealEditor-Core.pdb` was previously confirmed absent from the
-installed UE 5.8 tree, and this crash bundle has no resolved function names.
+The matching `UnrealEditor-Core.pdb` is absent from the installed UE 5.8 tree,
+and this crash bundle has no resolved function names. Epic documents
+`Editor symbols for debugging` as an optional engine-install component and says
+components can be added later from the Epic Games Launcher without redownloading
+the engine ([UE 5.8 install documentation](https://dev.epicgames.com/documentation/unreal-engine/install-unreal-engine)).
+When authorized and convenient, open Unreal Engine > Library, choose Options on
+the installed UE 5.8.3 tile, select `Editor symbols for debugging`, and Apply.
+This component has not been installed from this session.
+
 Do not repeat the same project-opening launch based on this evidence alone.
-Install/download the exact matching UE 5.8.3 editor symbols, then resolve the
-existing dump with a debugger. Once the Core offsets are symbolized, inspect
-the first project-opening caller before choosing any plugin/configuration
-change or attempting another bounded test. The saved dump is the authoritative
-artifact for that follow-up; the context reports the process started at zero
-seconds, and the requested project log was not created.
+After the matching symbols are available, resolve the existing dump with a
+debugger. Once the Core offsets are symbolized, inspect the first
+project-opening caller before choosing any plugin/configuration change or
+attempting another bounded test. The saved dump is the authoritative artifact
+for that follow-up; the context reports the process started at zero seconds,
+and the requested project log was not created.
