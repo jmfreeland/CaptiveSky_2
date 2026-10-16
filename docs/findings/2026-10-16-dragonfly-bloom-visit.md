@@ -11,13 +11,27 @@ stations; rainfall suppression, visitor startle, pool-ripple priority, and the
 not yet an in-world result: no flower instances are added or altered.
 
 The UE 5.8.3 `CaptiveSky_2Editor` target compiled and linked successfully after
-the change. `IslandEcologyTests.cpp` also compiled, but its automation test was
-not executed: the known early Unreal commandlet startup access violation has no
-new symbols or other environmental change that would make another identical
-launch informative. See the [startup minidump finding](2026-10-16-project-startup-minidump.md).
+the change. The updated `IslandEcologyTests.cpp` compiled, and
+`CaptiveSky2.Agent.NightEcology` passed on 2026-10-16 in the existing isolated
+scratch project. The run used `-NullRHI`, disabled agent
+thinking and Python, capped model requests at zero and realtime at 60 seconds,
+and used a separate data root. Log:
+[`Codex_DragonflyBloom_20261016.log`](../../Saved/Logs/Codex_DragonflyBloom_20261016.log).
+This verifies the behavior contract but not the rendered result.
+
+A separate real-RHI attempt used that scratch project, the fixed Tideglass
+spectator camera, a 60-second cap, zero model requests, and flower-visit
+telemetry. It exited during engine startup, before the Island or spectator
+initialized; the log has no `LogIslandSpectator` or `FlowerVisit` events and no
+screenshots were produced:
+[`Codex_DragonflyBloomGameplay_20261016.log`](../../Saved/Logs/Codex_DragonflyBloomGameplay_20261016.log).
+No new crash-context dump was written, so this attempt does not diagnose the
+startup failure. I did not retry it. The earlier main-project startup finding
+also remains unresolved; see the [startup minidump finding](2026-10-16-project-startup-minidump.md).
 
 The next validation is a bounded, zero-model-request Tideglass Game capture at
-midday with `CaptiveSky.Island.DragonflyFlowerTelemetry=1`. Confirm a
+midday with `CaptiveSky.Island.DragonflyFlowerTelemetry=1`, after Unreal can
+start the real-RHI Island session. Confirm a
 `FlowerVisit started`/`completed` pair and capture the dragonfly beside an
 actual meadow flower throughout the pause. Check that its body clears the
 flower mesh and that the six-second visit reads at human scale. If it clips or
