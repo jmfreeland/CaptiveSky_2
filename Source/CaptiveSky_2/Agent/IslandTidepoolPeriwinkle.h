@@ -9,6 +9,7 @@ class UMaterialInstanceDynamic;
 class UProceduralMeshComponent;
 class UStaticMeshComponent;
 class AIslandDayNight;
+class AIslandWeather;
 
 /** A tiny, slow-moving periwinkle that adds close-range life to Tideglass's rocky edge. */
 UCLASS()
@@ -23,6 +24,8 @@ public:
 	bool RespondToQuietObservation();
 	/** Smoothly tucks an intertidal snail in during the most exposed part of the ebb. */
 	static float ExposureRestAmount(float TideOffsetCm);
+	/** Heavy rain causes a smaller, temporary tuck; dry weather leaves the snail unchanged. */
+	static float RainRestAmount(float RainIntensity);
 
 protected:
 	virtual void BeginPlay() override;
@@ -59,6 +62,7 @@ private:
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
+	TWeakObjectPtr<AIslandWeather> IslandWeather;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void BuildShellSpiral();

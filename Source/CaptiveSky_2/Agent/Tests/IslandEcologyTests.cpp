@@ -989,6 +989,16 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		AIslandTidepoolPeriwinkle::ExposureRestAmount(-1000.f) == PeriwinkleEbbRest &&
 		AIslandTidepoolPeriwinkle::ExposureRestAmount(1000.f) == PeriwinkleFloodRest &&
 		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::ExposureRestAmount(std::numeric_limits<float>::quiet_NaN())));
+	TestTrue(TEXT("Dry weather leaves periwinkles fully extended"),
+		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::RainRestAmount(0.f)));
+	TestTrue(TEXT("Heavy rain causes only a gentle, bounded periwinkle tuck"),
+		AIslandTidepoolPeriwinkle::RainRestAmount(1.f) > 0.f &&
+		AIslandTidepoolPeriwinkle::RainRestAmount(1.f) <= 0.42f);
+	TestTrue(TEXT("Periwinkle rain response is smooth, monotonic, and finite"),
+		AIslandTidepoolPeriwinkle::RainRestAmount(0.75f) > AIslandTidepoolPeriwinkle::RainRestAmount(0.45f) &&
+		AIslandTidepoolPeriwinkle::RainRestAmount(-1.f) == 0.f &&
+		AIslandTidepoolPeriwinkle::RainRestAmount(2.f) == AIslandTidepoolPeriwinkle::RainRestAmount(1.f) &&
+		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::RainRestAmount(std::numeric_limits<float>::quiet_NaN())));
 	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
 		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
 		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
@@ -1323,6 +1333,28 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	{
 		TestFalse(TEXT("First and second periwinkles have different shells"), PeriwinkleShellColors[0].Equals(PeriwinkleShellColors[1], 0.01f));
 		TestFalse(TEXT("Second and third periwinkles have different shells"), PeriwinkleShellColors[1].Equals(PeriwinkleShellColors[2], 0.01f));
+	}
+	if (DayPeriwinkles.Num() > 0 && DayPeriwinkles[0].IsValid())
+	{
+		AIslandTidepoolPeriwinkle* RainResponsiveSnail = DayPeriwinkles[0].Get();
+		const float OriginalHour = Clock->CurrentHour;
+		Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+		Weather->WeatherSeed = StormSeed;
+		const float StormRainIntensity = Weather->SampleRainIntensity(World->GetTimeSeconds());
+		RainResponsiveSnail->Tick(0.f);
+		const float StormStalkScale = RainResponsiveSnail->EyeStalks[0]->GetRelativeScale3D().Z;
+		Weather->WeatherSeed = DryWeatherSeed;
+		const float DryRainIntensity = Weather->SampleRainIntensity(World->GetTimeSeconds());
+		RainResponsiveSnail->Tick(0.f);
+		const float DryStalkScale = RainResponsiveSnail->EyeStalks[0]->GetRelativeScale3D().Z;
+		TestTrue(TEXT("Heavy rain draws a Tideglass periwinkle's eyestalks in slightly"),
+			AIslandTidepoolPeriwinkle::RainRestAmount(StormRainIntensity) > 0.f &&
+			StormStalkScale < DryStalkScale - 0.001f);
+		TestTrue(TEXT("The periwinkle fully re-extends when the deterministic weather returns dry"),
+			DryRainIntensity < 0.01f && FMath::IsNearlyEqual(DryStalkScale, 0.10f, 0.001f));
+		Weather->WeatherSeed = OriginalWeatherSeed;
+		Clock->CurrentHour = OriginalHour;
+		RainResponsiveSnail->Tick(0.f);
 	}
 	Weather->RefreshNightEcology();
 	PeriwinkleCount = 0;

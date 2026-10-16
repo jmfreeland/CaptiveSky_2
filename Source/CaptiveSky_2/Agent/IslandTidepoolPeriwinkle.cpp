@@ -2,6 +2,7 @@
 
 #include "IslandDayNight.h"
 #include "IslandTideglassSubsystem.h"
+#include "IslandWeather.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
@@ -108,6 +109,11 @@ void AIslandTidepoolPeriwinkle::BeginPlay()
 		IslandClock = *It;
 		break;
 	}
+	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+	{
+		IslandWeather = *It;
+		break;
+	}
 	if (!BaseShapeMaterial)
 	{
 		BaseShapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
@@ -134,6 +140,12 @@ float AIslandTidepoolPeriwinkle::ExposureRestAmount(float TideOffsetCm)
 		TideOffsetCm / UIslandTideglassSubsystem::MaximumTideOffsetCm, -1.f, 1.f);
 	// Stay open while water is returning; tuck in only through the exposed ebb.
 	return 1.f - FMath::SmoothStep(-0.72f, -0.12f, NormalizedTide);
+}
+
+float AIslandTidepoolPeriwinkle::RainRestAmount(float RainIntensity)
+{
+	if (!FMath::IsFinite(RainIntensity)) return 0.f;
+	return 0.42f * FMath::SmoothStep(0.45f, 0.9f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 }
 
 bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
@@ -242,7 +254,11 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	ObservationCooldownRemaining = FMath::Max(0.f, ObservationCooldownRemaining - SafeDelta);
 	const float TideRest = ExposureRestAmount(TideOffset);
 	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);
-	const float ExposureRest = FMath::Max(TideRest, ObservationRest);
+	const float RainIntensity = IslandWeather.IsValid() && GetWorld()
+		? IslandWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
+		: 0.f;
+	const float WeatherRest = RainRestAmount(RainIntensity);
+	const float ExposureRest = FMath::Max(TideRest, FMath::Max(ObservationRest, WeatherRest));
 	const float StalkExtension = FMath::Lerp(1.f, 0.46f, ExposureRest);
 	const float ApertureExtension = FMath::Lerp(1.f, 0.5f, ExposureRest);
 	const float AttentionScale = FMath::Lerp(1.f, 0.35f, ExposureRest);
