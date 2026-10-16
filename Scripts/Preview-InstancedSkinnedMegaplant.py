@@ -6,9 +6,12 @@ never saves the map or any asset. Run with UnrealEditor-Cmd.exe, the project
 uproject, -RenderOffscreen, and -ExecutePythonScript=<absolute script path>.
 CAPTIVESKY_SKINNED_PREVIEW_ASSET and CAPTIVESKY_SKINNED_PREVIEW_OUTPUT may
 override the default Beech A asset and project-relative output directory.
+The default output folder and comparison filenames are derived from the asset
+name so alternate species and variants cannot overwrite or masquerade as Beech.
 """
 import json
 import os
+import re
 import traceback
 
 import unreal
@@ -20,13 +23,15 @@ ASSET = os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_ASSET",
     "/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A",
 )
+ASSET_PACKAGE_NAME = os.path.basename(ASSET.rsplit(".", 1)[0])
+ASSET_LABEL = re.sub(r"[^A-Za-z0-9_-]+", "_", ASSET_PACKAGE_NAME).strip("_") or "Candidate"
 TARGET_LABEL = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_TARGET", "Roost_West")
 OUTPUT_RELATIVE = os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_OUTPUT",
-    "Saved/Playtests/Codex_InstancedSkinnedBeech_20261013",
+    "Saved/Playtests/Codex_InstancedSkinned_" + ASSET_LABEL,
 )
-OUTPUT_FILENAME = "InstancedSkinned_BeechA.png"
-STANDARD_OUTPUT_FILENAME = "SkeletalMesh_BeechA.png"
+OUTPUT_FILENAME = "InstancedSkinned_{}.png".format(ASSET_LABEL)
+STANDARD_OUTPUT_FILENAME = "SkeletalMesh_{}.png".format(ASSET_LABEL)
 FOLIAGE_TINT = tuple(float(value) for value in os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_FOLIAGE_TINT", "0.48,0.65,0.35,1.0"
 ).split(","))

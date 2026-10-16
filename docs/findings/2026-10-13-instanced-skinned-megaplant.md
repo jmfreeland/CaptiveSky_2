@@ -80,3 +80,15 @@ instances, so confirm the chosen graph output includes the intended foliage.
 Judge it in the fixed Tideglass-to-Woodland Game view and measure a bounded
 small batch before any Island placement. Do not raise global foliage density
 as a substitute.
+
+## Reusable candidate naming (2026-10-16)
+
+`Preview-InstancedSkinnedMegaplant.py` now derives its output folder and both
+capture filenames from the selected asset name. When
+`CAPTIVESKY_SKINNED_PREVIEW_ASSET` selects another species or variant, its
+instanced and ordinary skeletal comparisons no longer appear as `BeechA` or
+overwrite the old Beech evidence. The installed library includes Norway Maple
+variants A-D; variant D is a reasonable low-cost candidate for the next
+isolated review, not yet a proven Island asset. Keep the review transient and
+compare its silhouette, foliage materials, bounds, and bounded-batch cost in
+the same lit woodland-transition composition before placing anything.
