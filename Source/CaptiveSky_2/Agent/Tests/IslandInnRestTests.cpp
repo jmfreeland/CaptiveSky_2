@@ -149,6 +149,11 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 		Home.ShelterQuality = 4;
 		Home.ShelterState = EIslandWildlifeShelterState::Settled;
 		Home.LastUsedUtc = FDateTime(2000, 1, 1);
+		FIslandWildlifeHomeCache HazelnutCache;
+		HazelnutCache.ItemId = TEXT("Hazelnut");
+		HazelnutCache.Quantity = 3;
+		HazelnutCache.LastChangedDay = 1;
+		Home.CachedSupplies.Add(HazelnutCache);
 		TestTrue(TEXT("A bounded assigned Rat home is stored outside the real world-state file"), WorldState->StoreWildlifeHome(Home));
 		AActor* HomeActor = WorldState->FindWildlifeHomeActor(Home.Id);
 		if (!HomeActor)
@@ -169,6 +174,14 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 				HomeSituation.Contains(TEXT("optional move_to target: WildlifeHome_Fenrus_FallenWood")) && HomeSituation.Contains(TEXT("Sleep is optional")));
 			TestTrue(TEXT("Home perception does not promise shelter, safety, comfort, or recovery"),
 				HomeSituation.Contains(TEXT("does not establish shelter, safety, comfort, or recovery")));
+			TestTrue(TEXT("The assigned Rat receives its recorded cache quantity without freshness or edibility claims"),
+				HomeSituation.Contains(TEXT("cache lists 3 hazelnuts")) &&
+				HomeSituation.Contains(TEXT("not evidence of freshness or edibility")));
+
+			Resident->SetActorLocation(Home.EntranceLocation + FVector(2600.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+			const FString DistantHomeSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+			TestFalse(TEXT("The home cache is not disclosed outside the nearby-home perception range"),
+				DistantHomeSituation.Contains(TEXT("cache lists 3 hazelnuts")));
 
 			Resident->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
 			TestFalse(TEXT("A requested home cannot teleport a resident into sleep"), Controller->TryRest(TEXT("WildlifeHome_Fenrus_FallenWood")));
@@ -180,6 +193,8 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 			const FString OtherResidentSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 			TestFalse(TEXT("Another resident does not receive this home's optional target"),
 				OtherResidentSituation.Contains(TEXT("optional move_to target: WildlifeHome_Fenrus_FallenWood")));
+			TestFalse(TEXT("Another resident never receives the Rat's private recorded cache contents"),
+				OtherResidentSituation.Contains(TEXT("cache lists 3 hazelnuts")));
 			TestFalse(TEXT("A resident cannot sleep at another agent's assigned home"), Controller->TryRest(TEXT("WildlifeHome_Fenrus_FallenWood")));
 			TestTrue(TEXT("Rejecting another resident's home leaves consciousness unchanged"), Rest->IsAwake());
 

@@ -380,6 +380,17 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					if (GetWorld()->LineTraceSingleByChannel(Hit, Location, HomeActor->GetActorLocation(), ECC_Visibility, Params)) continue;
 					NearbyBeings += FString::Printf(TEXT(" Your recorded wildlife home %s is %.0f metres away (optional move_to target: WildlifeHome_%s). If you choose sleep after arriving, the system can remember that you rested there; the place record does not establish shelter, safety, comfort, or recovery. Sleep is optional."),
 						*Home.Id.ToString(), FVector::Dist(Location, HomeActor->GetActorLocation()) / 100.f, *Home.Id.ToString());
+					if (Home.Species == FName(TEXT("Rat")))
+					{
+						int32 RecordedHazelnuts = 0;
+						for (const FIslandWildlifeHomeCache& Cache : Home.CachedSupplies)
+							if (Cache.ItemId == FName(TEXT("Hazelnut"))) RecordedHazelnuts = Cache.Quantity;
+						if (RecordedHazelnuts > 0)
+							NearbyBeings += FString::Printf(TEXT(" Your recorded home cache lists %d hazelnut%s; this is only a stored-quantity record, not evidence of freshness or edibility."),
+								RecordedHazelnuts, RecordedHazelnuts == 1 ? TEXT("") : TEXT("s"));
+						else
+							NearbyBeings += TEXT(" No hazelnuts are recorded in your home cache.");
+					}
 					break;
 				}
 				for (const FIslandCraftTraditionRecord& Tradition : WorldState->GetCraftTraditions())
