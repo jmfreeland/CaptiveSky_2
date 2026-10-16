@@ -30,6 +30,24 @@ root cause or rule out project configuration/data that the engine reads before
 loading project modules. It also does not explain the separate `dotnet.exe`
 dialogs seen during Unreal build/run.
 
+## Later successful editor session evidence
+
+The separate `Saved/Logs/CaptiveSky_2.log` for 2026-10-16 records a successful
+UE 5.8.3 editor session: AutoSDK returned `0` at 09:05, the editor automation
+controller discovered project tests, and `CaptiveSky2.Agent.NightEcology`
+completed with `Result={Success}` at 10:07. This proves the project can complete
+at least one editor automation test in a same-day session. It does not resolve
+the zero-address commandlet minidump, prove the editor is currently responsive,
+or identify the cause of the separate `dotnet.exe` dialogs. Treat the minidump
+and the successful editor session as distinct launches; the observed AutoSDK
+exception is not universal.
+
+For the next .NET failure, capture its exact timestamp and correlate that with
+Windows Application events and the matching Unreal/BuildTool log before making
+an engine, SDK, cache, or project-configuration change. Do not terminate the
+current editor solely to repeat a same-day launch that has already succeeded
+once.
+
 ## Diagnostic limit and next step
 
 The matching `UnrealEditor-Core.pdb` is absent from the installed UE 5.8 tree,
