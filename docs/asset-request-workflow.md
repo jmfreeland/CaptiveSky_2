@@ -64,3 +64,21 @@ authored plant source contracts, and request inbox/routing guard tests. The
 suite verifies deterministic source and pipeline boundaries; it does not show
 that a generated prop is attractive in Unreal, imported, or placed in the
 world.
+
+**Engine-side behavior check (2026-10-16):** four focused UE 5.8 scratch
+automation tests passed under NullRHI with exit code 0:
+`CaptiveSky2.Agent.SessionSafety`,
+`CaptiveSky2.Agent.AssetRequestQueue`,
+`CaptiveSky2.Agent.MemoryComponent`, and
+`CaptiveSky2.Agent.NearbyVegetationPerception`. Together they cover the
+fail-closed request budget, proposal append/validation, preservation of an
+upgrade action's target and kind, and descriptive visibility of nearby plant
+patches without granting them movement or interaction semantics. No model
+provider was called; all fixture writes stayed in the ignored
+`Saved/CompileScratch/Claude_Props/` project.
+
+The scratch project's separate editor binary was reported up to date; this is
+behavior evidence for that isolated build, not proof that the unresponsive main
+editor finished its Live Coding compile. These checks also do not show an
+actual character choosing a proposal or prove any proposed upgrade was
+implemented in the world.
