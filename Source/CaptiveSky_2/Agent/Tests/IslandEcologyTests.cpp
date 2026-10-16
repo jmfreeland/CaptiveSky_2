@@ -979,6 +979,16 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Tidal crab activity is monotonic and bounded outside the tide range"),
 		AIslandTidepoolCrab::TideMovementScale(-1000.f) == LowTideActivity &&
 		AIslandTidepoolCrab::TideMovementScale(1000.f) == HighTideActivity);
+	const float PeriwinkleEbbRest = AIslandTidepoolPeriwinkle::ExposureRestAmount(-UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	const float PeriwinkleFloodRest = AIslandTidepoolPeriwinkle::ExposureRestAmount(UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	TestTrue(TEXT("The lowest ebb fully tucks the periwinkle into its shell"), FMath::IsNearlyEqual(PeriwinkleEbbRest, 1.f));
+	TestTrue(TEXT("Returning high water lets the periwinkle extend and resume activity"), FMath::IsNearlyZero(PeriwinkleFloodRest));
+	TestTrue(TEXT("Periwinkle exposure response is finite, smooth, and bounded"),
+		FMath::IsFinite(AIslandTidepoolPeriwinkle::ExposureRestAmount(0.f)) &&
+		AIslandTidepoolPeriwinkle::ExposureRestAmount(-6.f) > AIslandTidepoolPeriwinkle::ExposureRestAmount(-2.f) &&
+		AIslandTidepoolPeriwinkle::ExposureRestAmount(-1000.f) == PeriwinkleEbbRest &&
+		AIslandTidepoolPeriwinkle::ExposureRestAmount(1000.f) == PeriwinkleFloodRest &&
+		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::ExposureRestAmount(std::numeric_limits<float>::quiet_NaN())));
 	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
 		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
 		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
@@ -1273,6 +1283,24 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			Snail->ShellSpiral->GetProcMeshSection(0)->ProcVertexBuffer.Num() >= 300);
 		TestTrue(TEXT("A close visitor ahead draws a forward glance"),
 			FMath::IsNearlyZero(Snail->CalculateAttentionYaw(Snail->GetActorLocation() + Snail->GetActorForwardVector() * 120.f), 0.1f));
+		if (DayPeriwinkles.Num() == 1 && Clock)
+		{
+			const FVector PeriwinkleHome = Snail->HomeLocation;
+			Clock->DayNumber = 1;
+			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.75f;
+			Snail->Tick(0.f);
+			const float EbbStalkLength = Snail->EyeStalks[0]->GetRelativeScale3D().Z;
+			const float EbbApertureHeight = Snail->Aperture->GetRelativeScale3D().Z;
+			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			Snail->Tick(0.f);
+			TestTrue(TEXT("The first periwinkle retracts its eye stalks and narrows the shell opening at low tide"),
+				EbbStalkLength < Snail->EyeStalks[0]->GetRelativeScale3D().Z &&
+				EbbApertureHeight < Snail->Aperture->GetRelativeScale3D().Z);
+			TestTrue(TEXT("Tidal posture changes leave the periwinkle's home location fixed"),
+				PeriwinkleHome.Equals(Snail->HomeLocation));
+			Clock->CurrentHour = 12.f;
+			Snail->Tick(0.f);
+		}
 		const FVector CloseSideVisitor = Snail->GetActorLocation() + Snail->GetActorForwardVector() * 60.f + Snail->GetActorRightVector() * 104.f;
 		const float SideAttentionYaw = FMath::Abs(Snail->CalculateAttentionYaw(CloseSideVisitor));
 		TestTrue(TEXT("A close visitor to the side draws a bounded glance"), SideAttentionYaw > 30.f && SideAttentionYaw <= 35.01f);

@@ -1,10 +1,13 @@
 #include "IslandTidepoolPeriwinkle.h"
 
+#include "IslandDayNight.h"
+#include "IslandTideglassSubsystem.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -100,6 +103,11 @@ void AIslandTidepoolPeriwinkle::BeginPlay()
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
 	Phase = FMath::Fmod(FMath::Abs(HomeLocation.X * 0.001f + HomeLocation.Y * 0.0017f), 2.f * PI);
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		IslandClock = *It;
+		break;
+	}
 	if (!BaseShapeMaterial)
 	{
 		BaseShapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
@@ -117,6 +125,15 @@ void AIslandTidepoolPeriwinkle::BeginPlay()
 		if (Aperture && SpiralMaterial) Aperture->SetMaterial(0, SpiralMaterial);
 	}
 	ApplyPalette();
+}
+
+float AIslandTidepoolPeriwinkle::ExposureRestAmount(float TideOffsetCm)
+{
+	if (!FMath::IsFinite(TideOffsetCm)) return 0.f;
+	const float NormalizedTide = FMath::Clamp(
+		TideOffsetCm / UIslandTideglassSubsystem::MaximumTideOffsetCm, -1.f, 1.f);
+	// Stay open while water is returning; tuck in only through the exposed ebb.
+	return 1.f - FMath::SmoothStep(-0.72f, -0.12f, NormalizedTide);
 }
 
 void AIslandTidepoolPeriwinkle::SetColorVariant(int32 Variant)
@@ -209,22 +226,34 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	ElapsedSeconds += FMath::Max(0.f, DeltaSeconds);
+	const float TideOffset = IslandClock.IsValid()
+		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
+		: UIslandTideglassSubsystem::MaximumTideOffsetCm;
+	const float ExposureRest = ExposureRestAmount(TideOffset);
+	const float StalkExtension = FMath::Lerp(1.f, 0.46f, ExposureRest);
+	const float ApertureExtension = FMath::Lerp(1.f, 0.5f, ExposureRest);
+	const float AttentionScale = FMath::Lerp(1.f, 0.35f, ExposureRest);
 	// Close visitors draw a quiet glance; the animal stays planted on its rock.
 	float TargetAttentionYaw = 0.f;
 	if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
 		TargetAttentionYaw = CalculateAttentionYaw(PlayerPawn->GetActorLocation());
 	UpdateAttentionYaw(TargetAttentionYaw, DeltaSeconds);
+	for (UStaticMeshComponent* EyeStalk : EyeStalks)
+		if (EyeStalk) EyeStalk->SetRelativeScale3D(FVector(0.018f, 0.018f, 0.10f * StalkExtension));
+	if (Aperture) Aperture->SetRelativeScale3D(FVector(0.035f, 0.105f, 0.10f * ApertureExtension));
 
 	// Barely perceptible antenna and body motion rewards a close look without
 	// turning naturally slow intertidal life into a conspicuous moving prop.
-	const float Sway = FMath::Sin(ElapsedSeconds * 0.8f + Phase) * 2.4f;
+	const float ActivityScale = FMath::Lerp(1.f, 0.3f, ExposureRest);
+	const float Sway = FMath::Sin(ElapsedSeconds * 0.8f + Phase) * 2.4f * ActivityScale;
 	for (int32 Index = 0; Index < EyeStalks.Num(); ++Index)
 	{
 		if (EyeStalks[Index])
-			EyeStalks[Index]->SetRelativeRotation(FRotator(0.f, (Index == 0 ? 1.f : -1.f) * (12.f + Sway) + AttentionYaw, (Index == 0 ? -1.f : 1.f) * 12.f));
+			EyeStalks[Index]->SetRelativeRotation(FRotator(0.f, (Index == 0 ? 1.f : -1.f) * (12.f + Sway) + AttentionYaw * AttentionScale, (Index == 0 ? -1.f : 1.f) * 12.f));
 	}
 	SetActorRotation(FRotator(0.f, Sway * 0.45f, 0.f));
-	SetActorLocation(HomeLocation + FVector(0.f, 0.f, FMath::Sin(ElapsedSeconds * 0.55f + Phase) * 0.8f));
+	const float BodyBob = FMath::Sin(ElapsedSeconds * 0.55f + Phase) * FMath::Lerp(0.8f, 0.2f, ExposureRest);
+	SetActorLocation(HomeLocation + FVector(0.f, 0.f, BodyBob));
 }
 
 void AIslandTidepoolPeriwinkle::UpdateAttentionYaw(float TargetYaw, float DeltaSeconds)
