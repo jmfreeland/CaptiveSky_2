@@ -33,10 +33,10 @@ class WoodlandWildStrawberryTests(unittest.TestCase):
     def test_patch_has_a_bounded_repeatable_species_composition(self):
         values, _materials, _collision = source_contract()
         self.assertEqual(values["NAME"], "WoodlandWildStrawberry")
-        self.assertEqual(values["LEAF_COUNTS"], (3, 3, 2))
-        self.assertEqual(sum(values["LEAF_COUNTS"]), 8)
-        self.assertEqual(len(values["FLOWER_POSITIONS"]), 3)
-        self.assertEqual(len(values["BERRY_POSITIONS"]), 2)
+        self.assertEqual(values["LEAF_COUNTS"], (4, 4, 4, 3))
+        self.assertEqual(sum(values["LEAF_COUNTS"]), 15)
+        self.assertEqual(len(values["FLOWER_POSITIONS"]), 5)
+        self.assertEqual(len(values["BERRY_POSITIONS"]), 4)
 
     def test_palette_covers_leaf_stem_flower_pollen_and_fruit(self):
         tree = ast.parse(ASSET.read_text(encoding="utf-8"), filename=str(ASSET))
