@@ -7,6 +7,9 @@ uproject, -RenderOffscreen, and -ExecutePythonScript=<absolute script path>.
 CAPTIVESKY_SKINNED_PREVIEW_ASSET and CAPTIVESKY_SKINNED_PREVIEW_OUTPUT may
 override the default Beech A asset and project-relative output directory.
 CAPTIVESKY_SKINNED_PREVIEW_HOUR selects a transient capture hour (default noon).
+CAPTIVESKY_SKINNED_PREVIEW_SUN_INTENSITY optionally overrides only the transient
+sun intensity for material diagnostics. CAPTIVESKY_SKINNED_PREVIEW_CAPTURE_SOURCE
+may be "final_color_ldr" or "base_color" to separate material color from lighting.
 The default output folder and comparison filenames are derived from the asset
 name so alternate species and variants cannot overwrite or masquerade as Beech.
 """
@@ -30,6 +33,18 @@ TARGET_LABEL = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_TARGET", "Roost_West")
 PREVIEW_HOUR = float(os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_HOUR", "12.0"))
 if not 0.0 <= PREVIEW_HOUR < 24.0:
     raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_HOUR must be in [0, 24)")
+PREVIEW_SUN_INTENSITY = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_SUN_INTENSITY")
+if PREVIEW_SUN_INTENSITY is not None:
+    PREVIEW_SUN_INTENSITY = float(PREVIEW_SUN_INTENSITY)
+    if PREVIEW_SUN_INTENSITY < 0.0:
+        raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_SUN_INTENSITY must be non-negative")
+CAPTURE_SOURCE_NAME = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_CAPTURE_SOURCE", "final_color_ldr").lower()
+CAPTURE_SOURCES = {
+    "final_color_ldr": unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR,
+    "base_color": unreal.SceneCaptureSource.SCS_BASE_COLOR,
+}
+if CAPTURE_SOURCE_NAME not in CAPTURE_SOURCES:
+    raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_CAPTURE_SOURCE must be final_color_ldr or base_color")
 OUTPUT_RELATIVE = os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_OUTPUT",
     "Saved/Playtests/Codex_InstancedSkinned_" + ASSET_LABEL,
@@ -99,6 +114,18 @@ def material_parameters(material):
     return result
 
 
+def lod_material_slots(mesh, lod_index=0):
+    try:
+        subsystem = unreal.get_editor_subsystem(unreal.SkeletalMeshEditorSubsystem)
+        section_count = int(subsystem.get_num_sections(mesh, lod_index))
+        return [
+            int(subsystem.get_lod_material_slot(mesh, lod_index, section_index))
+            for section_index in range(section_count)
+        ]
+    except Exception as error:
+        return "unavailable: " + str(error)
+
+
 def on_preview_tick(delta_seconds):
     state = PREVIEW_STATE
     state["ticks"] += 1
@@ -149,7 +176,14 @@ def main():
             ))
     sun_actor = island_clock.get_editor_property("sun")
     sun_component = sun_actor.get_component_by_class(unreal.DirectionalLightComponent) if sun_actor else None
+    if PREVIEW_SUN_INTENSITY is not None:
+        require(sun_component, "IslandDayNight Sun has no DirectionalLightComponent")
+        sun_component.set_intensity(PREVIEW_SUN_INTENSITY)
     capture_sun_intensity = float(sun_component.get_editor_property("intensity")) if sun_component else None
+    try:
+        capture_sun_units = str(sun_component.get_light_units()) if sun_component else None
+    except Exception as error:
+        capture_sun_units = "unavailable: " + str(error)
     capture_sun_rotation = None
     if sun_actor:
         sun_rotation = sun_actor.get_actor_rotation()
@@ -157,12 +191,14 @@ def main():
             round(float(getattr(sun_rotation, axis)), 2) for axis in ("pitch", "yaw", "roll")
         ]
     log("transient Island clock set to {:.2f}; map will not be saved".format(capture_hour))
-    log("preview sun intensity={} rotation_pitch_yaw_roll={}".format(
-        capture_sun_intensity, capture_sun_rotation
+    log("preview sun intensity={} units={} rotation_pitch_yaw_roll={}".format(
+        capture_sun_intensity, capture_sun_units, capture_sun_rotation
     ))
     mesh = require(unreal.load_asset(ASSET), "Could not load Skeletal Mesh: " + ASSET)
     if not isinstance(mesh, unreal.SkeletalMesh):
         raise TypeError("Expected a SkeletalMesh, got " + mesh.get_class().get_name())
+    section_material_slots = lod_material_slots(mesh)
+    log("LOD0 section material slots={}".format(section_material_slots))
 
     skeletal_component_class = getattr(unreal, "InstancedSkinnedMeshComponent", None)
     if skeletal_component_class is None:
@@ -239,20 +275,39 @@ def main():
 
     base_foliage_material = component.get_material(1)
     preview_color = unreal.LinearColor(*FOLIAGE_TINT)
-    foliage_tint_parameters = [
+    material_tint_parameters = [
         entry["name"]
         for entry in (materials[1] or {}).get("vector_parameter_values", [])
         if entry.get("name", "").replace(" ", "").lower().startswith("basecolortint")
     ] if len(materials) > 1 and materials[1] else []
-    require(foliage_tint_parameters,
+    foliage_tint_parameters = list(dict.fromkeys(
+        ["BaseColor Tint", "Base Color Tint"] + material_tint_parameters
+    ))
+    require(material_tint_parameters,
             "Foliage material exposes no BaseColor Tint vector parameters")
     for label, foliage_component in (("instanced", component), ("ordinary", standard_component)):
         preview_material = foliage_component.create_dynamic_material_instance(1)
         require(preview_material, "Could not create transient {} foliage MID".format(label))
         for parameter_name in foliage_tint_parameters:
             preview_material.set_vector_parameter_value(parameter_name, preview_color)
-        log("{} foliage tint {} applied to transient MID parameter(s) {} from {}".format(
-            label, list(FOLIAGE_TINT), foliage_tint_parameters,
+        foliage_component.set_material(1, preview_material)
+        parameter_readback = {}
+        for parameter_name in foliage_tint_parameters:
+            try:
+                value = preview_material.get_vector_parameter_value(parameter_name)
+                parameter_readback[parameter_name] = [
+                    round(float(getattr(value, axis)), 4) for axis in ("r", "g", "b", "a")
+                ]
+            except Exception as error:
+                parameter_readback[parameter_name] = "unavailable: " + str(error)
+        assigned_material = foliage_component.get_material(1)
+        log("{} foliage MID {} assigned={} parameters={} readback={}".format(
+            label, preview_material.get_path_name(),
+            assigned_material.get_class().get_name() if assigned_material else "<none>",
+            foliage_tint_parameters, parameter_readback,
+        ))
+        log("{} foliage tint {} set on transient MID from {}".format(
+            label, list(FOLIAGE_TINT),
             base_foliage_material.get_path_name() if base_foliage_material else "<none>",
         ))
 
@@ -277,7 +332,7 @@ def main():
     capture.set_editor_property("capture_every_frame", False)
     capture.set_editor_property("capture_on_movement", False)
     capture.set_editor_property("fov_angle", FOV_ANGLE)
-    capture.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    capture.set_editor_property("capture_source", CAPTURE_SOURCES[CAPTURE_SOURCE_NAME])
     capture.set_editor_property(
         "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
     )
@@ -304,7 +359,7 @@ def main():
     standard_capture.set_editor_property("capture_every_frame", False)
     standard_capture.set_editor_property("capture_on_movement", False)
     standard_capture.set_editor_property("fov_angle", FOV_ANGLE)
-    standard_capture.set_editor_property("capture_source", unreal.SceneCaptureSource.SCS_FINAL_COLOR_LDR)
+    standard_capture.set_editor_property("capture_source", CAPTURE_SOURCES[CAPTURE_SOURCE_NAME])
     standard_capture.set_editor_property(
         "primitive_render_mode", unreal.SceneCapturePrimitiveRenderMode.PRM_USE_SHOW_ONLY_LIST
     )
@@ -328,19 +383,23 @@ def main():
     report = {
         "asset": ASSET,
         "mesh_class": mesh.get_class().get_name(),
+        "lod0_section_material_slots": section_material_slots,
         "component_class": component.get_class().get_name(),
         "instance_count": instance_count,
         "material_slot_count": material_count,
         "transform_provider": transform_provider_path,
         "materials": materials,
         "transient_foliage_tint": list(FOLIAGE_TINT),
+        "material_tint_parameters": material_tint_parameters,
         "applied_foliage_tint_parameters": foliage_tint_parameters,
         "bounds_origin_cm": components(bounds_origin),
         "bounds_extent_cm": components(bounds_extent),
         "height_cm": round(height, 2),
         "target": TARGET_LABEL,
         "capture_hour": capture_hour,
+        "capture_source": CAPTURE_SOURCE_NAME,
         "capture_sun_intensity": capture_sun_intensity,
+        "capture_sun_units": capture_sun_units,
         "capture_sun_rotation_pitch_yaw_roll": capture_sun_rotation,
         "map_saved": False,
         "outputs": [
