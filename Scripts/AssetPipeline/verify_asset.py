@@ -60,12 +60,22 @@ print("PROBLEMS", problems)
 dims = mesh.dimensions
 size = max(dims)
 center = Vector((sum(v.x for v in bbox) / 8, sum(v.y for v in bbox) / 8, sum(v.z for v in bbox) / 8))
-for e in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
-    try:
-        sc.render.engine = e
-        break
-    except TypeError:
-        pass
+preview_engine = os.environ.get("ASSET_PREVIEW_ENGINE", "EEVEE").strip().upper()
+if preview_engine == "CYCLES_CPU":
+    sc.render.engine = "CYCLES"
+    sc.cycles.device = "CPU"
+    sc.cycles.samples = max(1, int(os.environ.get("ASSET_PREVIEW_SAMPLES", "24")))
+elif preview_engine == "EEVEE":
+    for e in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
+        try:
+            sc.render.engine = e
+            break
+        except TypeError:
+            pass
+else:
+    raise ValueError("ASSET_PREVIEW_ENGINE must be EEVEE or CYCLES_CPU")
+print("PREVIEW ENGINE", sc.render.engine, "device",
+      "CPU" if preview_engine == "CYCLES_CPU" else "default")
 sc.render.resolution_x = sc.render.resolution_y = 900
 w = bpy.data.worlds.new("W")
 sc.world = w
