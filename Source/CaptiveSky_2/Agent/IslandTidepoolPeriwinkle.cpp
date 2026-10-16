@@ -4,6 +4,8 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -207,14 +209,42 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	ElapsedSeconds += FMath::Max(0.f, DeltaSeconds);
+	// Close visitors draw a quiet glance; the animal stays planted on its rock.
+	float TargetAttentionYaw = 0.f;
+	if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
+		TargetAttentionYaw = CalculateAttentionYaw(PlayerPawn->GetActorLocation());
+	UpdateAttentionYaw(TargetAttentionYaw, DeltaSeconds);
+
 	// Barely perceptible antenna and body motion rewards a close look without
 	// turning naturally slow intertidal life into a conspicuous moving prop.
 	const float Sway = FMath::Sin(ElapsedSeconds * 0.8f + Phase) * 2.4f;
 	for (int32 Index = 0; Index < EyeStalks.Num(); ++Index)
 	{
 		if (EyeStalks[Index])
-			EyeStalks[Index]->SetRelativeRotation(FRotator(0.f, (Index == 0 ? 1.f : -1.f) * (12.f + Sway), (Index == 0 ? -1.f : 1.f) * 12.f));
+			EyeStalks[Index]->SetRelativeRotation(FRotator(0.f, (Index == 0 ? 1.f : -1.f) * (12.f + Sway) + AttentionYaw, (Index == 0 ? -1.f : 1.f) * 12.f));
 	}
 	SetActorRotation(FRotator(0.f, Sway * 0.45f, 0.f));
 	SetActorLocation(HomeLocation + FVector(0.f, 0.f, FMath::Sin(ElapsedSeconds * 0.55f + Phase) * 0.8f));
+}
+
+void AIslandTidepoolPeriwinkle::UpdateAttentionYaw(float TargetYaw, float DeltaSeconds)
+{
+	// Turn toward a nearby visitor attentively, but relax the gaze more slowly.
+	const float InterpSpeed = FMath::IsNearlyZero(TargetYaw) ? 1.2f : 2.4f;
+	AttentionYaw = FMath::FInterpTo(AttentionYaw, TargetYaw, DeltaSeconds, InterpSpeed);
+}
+
+float AIslandTidepoolPeriwinkle::CalculateAttentionYaw(const FVector& TargetLocation) const
+{
+	constexpr float AttentionRadius = 220.f;
+	constexpr float MaximumYaw = 35.f;
+	FVector ToTarget = TargetLocation - GetActorLocation();
+	ToTarget.Z = 0.f;
+	if (ToTarget.IsNearlyZero() || ToTarget.SizeSquared() > FMath::Square(AttentionRadius))
+		return 0.f;
+
+	const FVector LocalDirection = GetActorTransform().InverseTransformVectorNoScale(ToTarget);
+	if (LocalDirection.X <= 0.f)
+		return 0.f;
+	return FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(LocalDirection.Y, LocalDirection.X)), -MaximumYaw, MaximumYaw);
 }

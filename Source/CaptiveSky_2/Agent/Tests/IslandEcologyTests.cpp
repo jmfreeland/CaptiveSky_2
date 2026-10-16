@@ -1271,6 +1271,19 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			Snail->Foot && Snail->Shell && Snail->Aperture && Snail->EyeStalks.Num() == 2 && Snail->Eyes.Num() == 2 &&
 			Snail->ShellSpiral && Snail->ShellSpiral->GetProcMeshSection(0) &&
 			Snail->ShellSpiral->GetProcMeshSection(0)->ProcVertexBuffer.Num() >= 300);
+		TestTrue(TEXT("A close visitor ahead draws a forward glance"),
+			FMath::IsNearlyZero(Snail->CalculateAttentionYaw(Snail->GetActorLocation() + Snail->GetActorForwardVector() * 120.f), 0.1f));
+		const FVector CloseSideVisitor = Snail->GetActorLocation() + Snail->GetActorForwardVector() * 60.f + Snail->GetActorRightVector() * 104.f;
+		const float SideAttentionYaw = FMath::Abs(Snail->CalculateAttentionYaw(CloseSideVisitor));
+		TestTrue(TEXT("A close visitor to the side draws a bounded glance"), SideAttentionYaw > 30.f && SideAttentionYaw <= 35.01f);
+		TestTrue(TEXT("An approach from behind does not pull the eye stalks around"),
+			FMath::IsNearlyZero(Snail->CalculateAttentionYaw(Snail->GetActorLocation() - Snail->GetActorForwardVector() * 120.f), 0.1f));
+		TestTrue(TEXT("Distant visitors do not attract the periwinkle's attention"),
+			FMath::IsNearlyZero(Snail->CalculateAttentionYaw(Snail->GetActorLocation() + Snail->GetActorRightVector() * 300.f), 0.1f));
+		Snail->AttentionYaw = 30.f;
+		Snail->UpdateAttentionYaw(0.f, 0.2f);
+		TestTrue(TEXT("A periwinkle relaxes its gaze instead of snapping back"), Snail->AttentionYaw < 30.f && Snail->AttentionYaw > 20.f);
+		Snail->AttentionYaw = 0.f;
 		TestEqual(TEXT("Periwinkle shell cannot block shoreline movement"), Snail->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestEqual(TEXT("Periwinkle spiral cannot block shoreline movement"), Snail->ShellSpiral->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestTrue(TEXT("Periwinkle shell palette is available for each resident"), Snail->ShellMaterial != nullptr);

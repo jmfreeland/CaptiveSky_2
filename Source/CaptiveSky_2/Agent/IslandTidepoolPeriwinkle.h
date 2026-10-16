@@ -48,8 +48,11 @@ private:
 
 	float ElapsedSeconds = 0.f;
 	float Phase = 0.f;
+	float AttentionYaw = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
+	float CalculateAttentionYaw(const FVector& TargetLocation) const;
+	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void BuildShellSpiral();
 	void ApplyPalette();
 };
