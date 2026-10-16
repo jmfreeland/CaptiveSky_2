@@ -7,6 +7,12 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+#include <Windows.h>
+#include "Windows/HideWindowsPlatformTypes.h"
+#endif
+
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandAssetRequestQueueTest,
@@ -111,6 +117,23 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Unknown review states fail closed"), IslandAssetRequestQueue::ReadReviewedOutcomes(
 		TEXT("Agent_Aster_01"), ReviewedOutcomes, Error, ReviewInboxPath));
 	TestTrue(TEXT("No partial outcomes escape a malformed inbox"), ReviewedOutcomes.IsEmpty());
+
+#if PLATFORM_WINDOWS
+	const FString LockedInboxPath = FPaths::Combine(TestDirectory, TEXT("locked-inbox.jsonl"));
+	const FString LockPath = LockedInboxPath + TEXT(".lock");
+	HANDLE ExternalLock = ::CreateFileW(*LockPath, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	TestTrue(TEXT("A reviewer or Discord process can hold the shared Windows inbox lock"), ExternalLock != INVALID_HANDLE_VALUE);
+	if (ExternalLock != INVALID_HANDLE_VALUE)
+	{
+		TestFalse(TEXT("Unreal fails closed instead of bypassing another process's inbox lock"), IslandAssetRequestQueue::AppendRequest(
+			TEXT("Agent_Aster_01"), TEXT("Add a sheltered fern patch while locked"), RequestId, Error, LockedInboxPath));
+		TestTrue(TEXT("A contested inbox reports a short retry instead of stalling gameplay"), Error.Contains(TEXT("busy")));
+		::CloseHandle(ExternalLock);
+		TestTrue(TEXT("Unreal can append after the other process releases the lock"), IslandAssetRequestQueue::AppendRequest(
+			TEXT("Agent_Aster_01"), TEXT("Add a sheltered fern patch after release"), RequestId, Error, LockedInboxPath));
+	}
+#endif
 
 	const FString LegacyInboxPath = FPaths::Combine(TestDirectory, TEXT("legacy-inbox.jsonl"));
 	const FString LegacyRecord = TEXT("{\n  \"id\": \"legacy\",\n  \"requester\": \"Agent_Aster_01\",\n  \"description\": \"A small weatherproof bird shelter\",\n  \"pipeline\": \"ComfyBlender\",\n  \"status\": \"pending_review\"\n}\n");

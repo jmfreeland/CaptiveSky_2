@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using CaptiveSky.Gateway.Domain;
 
 namespace CaptiveSky.Gateway.Proposals;
@@ -9,6 +10,8 @@ public sealed class AssetProposalQueue(string projectRoot)
     private const int MaxPending = 64;
     private const int MaxPendingPerRequester = 3;
     private const int MaxRecentHistory = 5;
+    private static readonly TimeSpan InboxLockTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan InboxLockRetry = TimeSpan.FromMilliseconds(25);
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private readonly string _path = Path.Combine(Path.GetFullPath(projectRoot), "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
 
@@ -29,6 +32,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
             var pending = 0;
             var requesterPending = 0;
             if (File.Exists(_path))
@@ -67,6 +71,10 @@ public sealed class AssetProposalQueue(string projectRoot)
             await File.AppendAllTextAsync(_path, JsonSerializer.Serialize(entry) + "\n", cancellationToken);
             return (true, id, $"Proposal `{id[..8]}` is queued for human review. Nothing has been generated or changed in the world.");
         }
+        catch (ProposalInboxBusyException)
+        {
+            return (false, "", "The shared proposal inbox is busy; please try again shortly. Nothing was added.");
+        }
         catch (JsonException)
         {
             return (false, "", "The proposal inbox contains an unreadable record; no request was added.");
@@ -91,6 +99,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         {
             if (!File.Exists(_path))
                 return "No proposal with that ID was found for this correspondent.";
+            await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
 
             var matches = new List<(string Id, string Status)>();
             foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
@@ -144,6 +153,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         try
         {
             if (!File.Exists(_path)) return "(none recorded)";
+            await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
 
             var entries = new List<string>();
             foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
@@ -196,6 +206,32 @@ public sealed class AssetProposalQueue(string projectRoot)
 
     private static string Get(JsonElement record, string property) =>
         record.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+
+    private async Task<FileStream> AcquireInboxLockAsync(CancellationToken cancellationToken)
+    {
+        var timer = Stopwatch.StartNew();
+        var lockPath = _path + ".lock";
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException exception) when (IsFileShareConflict(exception))
+            {
+                if (timer.Elapsed >= InboxLockTimeout)
+                    throw new ProposalInboxBusyException("The shared proposal inbox remained locked until the timeout.", exception);
+                await Task.Delay(InboxLockRetry, cancellationToken);
+            }
+        }
+    }
+
+    private static bool IsFileShareConflict(IOException exception) =>
+        (exception.HResult & 0xFFFF) is 32 or 33; // ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION
+
+    private sealed class ProposalInboxBusyException(string message, Exception innerException)
+        : IOException(message, innerException);
 
     private static string CleanText(string value, int maximumCharacters)
     {

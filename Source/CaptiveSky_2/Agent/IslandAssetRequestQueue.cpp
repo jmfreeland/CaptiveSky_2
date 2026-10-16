@@ -4,10 +4,18 @@
 #include "Agent/AgentDataPaths.h"
 
 #include "HAL/FileManager.h"
+#include "HAL/PlatformProcess.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+
+#if PLATFORM_WINDOWS
+#include "Windows/AllowWindowsPlatformTypes.h"
+#include <Windows.h>
+#include "Windows/HideWindowsPlatformTypes.h"
+#endif
 
 namespace IslandAssetRequestQueue
 {
@@ -16,6 +24,58 @@ namespace IslandAssetRequestQueue
 		constexpr int32 MaxDescriptionCharacters = 240;
 		constexpr int32 MaxPendingRequests = 64;
 		constexpr int32 MaxPendingRequestsPerRequester = 3;
+		// Proposal calls run on the game thread. Fail closed quickly rather than stall play if
+		// the Discord process or another reviewer holds the shared lock unexpectedly.
+		constexpr double InboxLockTimeoutSeconds = 0.05;
+
+		/** Cross-process lock shared with the Discord gateway's FileShare.None handle. */
+		class FProposalInboxLock
+		{
+		public:
+			~FProposalInboxLock()
+			{
+#if PLATFORM_WINDOWS
+				if (Handle != INVALID_HANDLE_VALUE)
+				{
+					::CloseHandle(Handle);
+				}
+#endif
+			}
+
+			bool Acquire(const FString& InboxPath, FString& OutError)
+			{
+#if PLATFORM_WINDOWS
+				const FString LockPath = FPaths::ConvertRelativePathToFull(InboxPath) + TEXT(".lock");
+				const double Deadline = FPlatformTime::Seconds() + InboxLockTimeoutSeconds;
+				do
+				{
+					Handle = ::CreateFileW(*LockPath, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+						OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+					if (Handle != INVALID_HANDLE_VALUE) return true;
+
+					const DWORD ErrorCode = ::GetLastError();
+					if (ErrorCode != ERROR_SHARING_VIOLATION && ErrorCode != ERROR_LOCK_VIOLATION)
+					{
+						OutError = FString::Printf(TEXT("The asset request inbox lock could not be opened (Windows error %lu)."), ErrorCode);
+						return false;
+					}
+					FPlatformProcess::Sleep(0.005f);
+				}
+				while (FPlatformTime::Seconds() < Deadline);
+
+				OutError = TEXT("The asset request inbox is busy; no request was added. Please try again shortly.");
+				return false;
+#else
+				OutError = TEXT("Cross-process asset request locking is currently supported on Windows only; no request was added.");
+				return false;
+#endif
+			}
+
+		private:
+#if PLATFORM_WINDOWS
+			HANDLE Handle = INVALID_HANDLE_VALUE;
+#endif
+		};
 
 		bool SplitJsonObjects(const FString& Text, TArray<FString>& OutObjects)
 		{
@@ -165,6 +225,8 @@ namespace IslandAssetRequestQueue
 			OutError = TEXT("The asset request inbox could not be created; no request was added.");
 			return false;
 		}
+		FProposalInboxLock InboxLock;
+		if (!InboxLock.Acquire(Path, OutError)) return false;
 
 		int32 PendingCount = 0;
 		int32 RequesterPendingCount = 0;
@@ -230,6 +292,10 @@ namespace IslandAssetRequestQueue
 		const FString Path = InboxPathOverride.IsEmpty()
 			? CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl"))
 			: InboxPathOverride;
+		if (!IFileManager::Get().FileExists(*Path)) return true;
+		FProposalInboxLock InboxLock;
+		if (!InboxLock.Acquire(Path, OutError)) return false;
+
 		FString Existing;
 		if (!FFileHelper::LoadFileToString(Existing, *Path))
 		{

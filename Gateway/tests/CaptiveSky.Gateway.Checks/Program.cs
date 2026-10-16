@@ -6,6 +6,16 @@ using CaptiveSky.Gateway.Infrastructure;
 using CaptiveSky.Gateway.Routing;
 using CaptiveSky.Gateway.Channels;
 using CaptiveSky.Gateway.Proposals;
+using System.Diagnostics;
+using System.Reflection;
+
+if (args.Length == 2 && args[0] == "--hold-proposal-inbox-lock")
+{
+    await using var heldLock = new FileStream(args[1], FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+    Console.WriteLine("LOCKED");
+    await Task.Delay(500);
+    return 0;
+}
 
 var configuredRoot = Environment.GetEnvironmentVariable("CAPTIVESKY_GATEWAY_CHECKS_ROOT");
 var rootBase = string.IsNullOrWhiteSpace(configuredRoot) ? Path.GetTempPath() : configuredRoot;
@@ -367,6 +377,34 @@ try
         objectProposal! with { Description = "Add a sheltered rain gauge" }, "42", "Visitor", "10", "109", CancellationToken.None);
     Assert(replacementProposal.Success,
         "a reviewed proposal frees one of the resident's pending slots");
+
+    var lockedRoot = Path.Combine(root, "locked-proposals");
+    var lockedQueue = new AssetProposalQueue(lockedRoot);
+    var lockedInboxPath = Path.Combine(lockedRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    Directory.CreateDirectory(Path.GetDirectoryName(lockedInboxPath)!);
+    var lockHolderStart = new ProcessStartInfo(Environment.ProcessPath ?? throw new InvalidOperationException("Current process path is unavailable."))
+    {
+        UseShellExecute = false,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true
+    };
+    lockHolderStart.ArgumentList.Add(Assembly.GetEntryAssembly()?.Location
+        ?? throw new InvalidOperationException("Checks assembly path is unavailable."));
+    lockHolderStart.ArgumentList.Add("--hold-proposal-inbox-lock");
+    lockHolderStart.ArgumentList.Add(lockedInboxPath + ".lock");
+    using var lockHolder = Process.Start(lockHolderStart)
+        ?? throw new InvalidOperationException("Could not start proposal lock-holder process.");
+    var lockSignal = await lockHolder.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(lockSignal == "LOCKED", "separate process acquires the shared inbox lock");
+    var waitingAppend = lockedQueue.AppendAsync(home.AgentId,
+        objectProposal! with { Description = "Add one more safely serialized proposal" }, "42", "Visitor", "10", "110", CancellationToken.None);
+    await Task.Delay(100);
+    var appendWaitedForOtherProcess = !waitingAppend.IsCompleted;
+    await lockHolder.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(lockHolder.ExitCode == 0, "separate process releases the shared inbox lock cleanly");
+    Assert(appendWaitedForOtherProcess, "Discord waits while another process owns the shared inbox lock");
+    Assert((await waitingAppend).Success, "Discord appends after the shared inbox lock is released");
+
     var proposalHistory = await proposals.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
     Assert(proposalHistory.Contains("A copper bell", StringComparison.Ordinal) &&
            proposalHistory.Contains("Add brass trim", StringComparison.Ordinal) &&
