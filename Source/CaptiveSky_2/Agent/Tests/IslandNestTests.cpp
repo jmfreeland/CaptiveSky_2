@@ -636,6 +636,26 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("The visual shelter cannot alter navigation"), Materialized->GetShelterMesh()->CanEverAffectNavigation());
 		TestTrue(TEXT("The imported entrance is aligned to its saved anchor"),
 			Materialized->GetShelterMesh()->GetRelativeLocation().Equals(FVector(AIslandWildlifeHome::RatHollowEntranceOffsetCm, 0.f, 0.f), 0.01f));
+		UInstancedStaticMeshComponent* CacheDisplay = Materialized->GetCacheDisplayMesh();
+		TestNotNull(TEXT("A transient cache display component is created"), CacheDisplay);
+		if (CacheDisplay)
+		{
+			TestTrue(TEXT("The bounded hazelnut cache uses the imported Common Hazel nut branch"), CacheDisplay->GetStaticMesh() &&
+				CacheDisplay->GetStaticMesh()->GetPathName() == TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Instances/Branch_Common_Hazel_Nut_01.Branch_Common_Hazel_Nut_01"));
+			TestEqual(TEXT("Three cached hazelnuts appear as three visual items"), CacheDisplay->GetInstanceCount(), 3);
+			TestEqual(TEXT("The cache remains non-colliding"), CacheDisplay->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+			TestFalse(TEXT("The cache cannot alter navigation"), CacheDisplay->CanEverAffectNavigation());
+
+			FIslandWildlifeHomeRecord DenseCache = Home;
+			DenseCache.CachedSupplies[0].Quantity = UIslandWorldStateSubsystem::MaxWildlifeHomeCacheQuantity;
+			TestTrue(TEXT("A full cache record can be reapplied"), Materialized->ApplyHomeRecord(DenseCache));
+			TestEqual(TEXT("A full canonical cache stays visually bounded"), CacheDisplay->GetInstanceCount(), 4);
+			FIslandWildlifeHomeRecord EmptyCache = Home;
+			EmptyCache.CachedSupplies.Reset();
+			TestTrue(TEXT("Removing cached supplies updates the materialized home"), Materialized->ApplyHomeRecord(EmptyCache));
+			TestEqual(TEXT("Removed supplies leave no stale cache visuals"), CacheDisplay->GetInstanceCount(), 0);
+			TestTrue(TEXT("The canonical home can restore its current cache"), Materialized->ApplyHomeRecord(Home));
+		}
 	}
 
 	TestTrue(TEXT("The updated file can be read again"), State->ReadStateFile(StateFile));
