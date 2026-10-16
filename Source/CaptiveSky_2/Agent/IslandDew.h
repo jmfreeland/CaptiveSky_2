@@ -32,6 +32,8 @@ struct FIslandDewGlint
 	FVector Position = FVector::ZeroVector;
 	float Size = 1.f;
 	bool bPlaced = false;
+	/** Whether its current transform has been uploaded as a visible instance. */
+	bool bRendered = false;
 };
 
 /** A scatter of tiny glints near the ground around the viewer, twinkled by a local additive material. */
@@ -56,6 +58,8 @@ public:
 	/** False when the optional material asset is missing; the actor then stays hidden. */
 	bool HasMaterial() const { return Material != nullptr; }
 	float GetStrength() const { return CurrentStrength; }
+	/** Number of instance transforms uploaded by the most recent Advance call. */
+	int32 GetLastTransformUploadCount() const { return LastTransformUploadCount; }
 	/** Finds the nearest active glint that could plausibly be noticed from Origin. */
 	bool FindNearestGlint(const FVector& Origin, float MaxDistance, FVector& OutLocation) const;
 	/** Keep Strength's worth of glints scattered around Viewer, re-seating any that fall out of range. */
@@ -67,9 +71,11 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> Material;
 	TArray<FIslandDewGlint> Slots;
+	TArray<int32> PendingTransformUpdates;
 	FRandomStream Random;
 	float CurrentStrength = 0.f;
 	float LastStrength = -1.f;
+	int32 LastTransformUploadCount = 0;
 
 	float GroundHeightAt(const FVector2D& XY, float ReferenceZ) const;
 	void Seat(int32 Slot, const FVector& Viewer);

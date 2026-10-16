@@ -60,6 +60,7 @@ AIslandDewActor::AIslandDewActor()
 	if (Sphere.Succeeded()) Glints->SetStaticMesh(Sphere.Object);
 	PrimaryActorTick.bCanEverTick = false;
 	Slots.SetNum(MaxGlints);
+	PendingTransformUpdates.Reserve(MaxGlints);
 	Random.Initialize(0x0de3a1);
 	Tags.AddUnique(TEXT("IslandDew"));
 }
@@ -124,6 +125,7 @@ void AIslandDewActor::Seat(int32 Slot, const FVector& Viewer)
 
 void AIslandDewActor::Advance(const FVector& Viewer, float Strength)
 {
+	LastTransformUploadCount = 0;
 	if (!Glints) return;
 	if (!Material)
 	{
@@ -143,22 +145,41 @@ void AIslandDewActor::Advance(const FVector& Viewer, float Strength)
 
 	while (Glints->GetInstanceCount() < MaxGlints) Glints->AddInstance(FTransform(FQuat::Identity, Viewer, FVector(0.0001f)), true);
 
+	PendingTransformUpdates.Reset();
 	int32 SeatsLeft = SeatsPerTick;
 	const float RadiusSquared = Radius * Radius;
 	for (int32 Slot = 0; Slot < MaxGlints; ++Slot)
 	{
 		FIslandDewGlint& Glint = Slots[Slot];
 		const bool bActive = Slot < Wanted;
-		if (bActive && (!Glint.bPlaced || FVector::DistSquared2D(Glint.Position, Viewer) > RadiusSquared))
+		const bool bNeedsSeat = bActive && (!Glint.bPlaced || FVector::DistSquared2D(Glint.Position, Viewer) > RadiusSquared);
+		bool bReseated = false;
+		if (bNeedsSeat)
 		{
 			if (SeatsLeft <= 0) continue;
 			--SeatsLeft;
 			Seat(Slot, Viewer);
+			bReseated = true;
 		}
-		const FTransform Transform(FQuat::Identity, bActive && Glint.bPlaced ? Glint.Position : Viewer,
-			FVector(bActive && Glint.bPlaced ? Glint.Size / 100.f : 0.0001f));
-		Glints->UpdateInstanceTransform(Slot, Transform, true, Slot == MaxGlints - 1, true);
+
+		const bool bShouldRender = bActive && Glint.bPlaced;
+		if (bShouldRender != Glint.bRendered || bReseated)
+		{
+			PendingTransformUpdates.Add(Slot);
+		}
+		Glint.bRendered = bShouldRender;
 	}
+
+	for (int32 UpdateIndex = 0; UpdateIndex < PendingTransformUpdates.Num(); ++UpdateIndex)
+	{
+		const int32 Slot = PendingTransformUpdates[UpdateIndex];
+		const FIslandDewGlint& Glint = Slots[Slot];
+		const bool bLastUpdate = UpdateIndex == PendingTransformUpdates.Num() - 1;
+		const FTransform Transform(FQuat::Identity, Glint.bRendered ? Glint.Position : Viewer,
+			FVector(Glint.bRendered ? Glint.Size / 100.f : 0.0001f));
+		Glints->UpdateInstanceTransform(Slot, Transform, true, bLastUpdate, true);
+	}
+	LastTransformUploadCount = PendingTransformUpdates.Num();
 }
 
 FString UIslandDewSubsystem::DescribeDew(float InStrength)

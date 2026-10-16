@@ -247,6 +247,28 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		FishHalfHeight > HighWaterSwimHeight && FishHalfHeight > LowWaterSwimHeight);
 	Clock->CurrentHour = 12.f;
 	School->UpdateSchool(0.f);
+	const float SavedSwimPhase = School->SwimPhaseRadians;
+	School->SwimPhaseRadians = 0.f;
+	School->UpdateSchool(0.f);
+	const FVector FirstOrbitPosition = School->Fish[0]->GetRelativeLocation();
+	const float FirstNormalizedOrbitRadius = FMath::Sqrt(
+		FMath::Square(FirstOrbitPosition.X / 135.f) + FMath::Square(FirstOrbitPosition.Y / 82.f));
+	School->SwimPhaseRadians = 2.4f;
+	School->UpdateSchool(0.f);
+	const FVector LaterOrbitPosition = School->Fish[0]->GetRelativeLocation();
+	const float LaterNormalizedOrbitRadius = FMath::Sqrt(
+		FMath::Square(LaterOrbitPosition.X / 135.f) + FMath::Square(LaterOrbitPosition.Y / 82.f));
+	TestTrue(TEXT("Individual orbital spacing drifts gently over time instead of staying on a rigid carousel"),
+		FMath::Abs(LaterNormalizedOrbitRadius - FirstNormalizedOrbitRadius) > 0.04f);
+	TestTrue(TEXT("Individual orbit drift preserves the measured pool footprint"), AreFishInsidePoolFootprint());
+	School->SwimPhaseRadians = 0.f;
+	School->UpdateSchool(0.f);
+	School->SwimPhaseRadians = 2.4f;
+	School->UpdateSchool(0.f);
+	TestTrue(TEXT("The same swim phase reproduces the same individual orbit exactly"),
+		School->Fish[0]->GetRelativeLocation().Equals(LaterOrbitPosition, 0.001f));
+	School->SwimPhaseRadians = SavedSwimPhase;
+	School->UpdateSchool(0.f);
 	int32 DistinctColorCount = 0;
 	for (int32 Index = 0; Index < FishColors.Num(); ++Index)
 	{

@@ -782,10 +782,14 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 	{
 		UProceduralMeshComponent* Minnow = Fish[Index];
 		if (!Minnow) continue;
-		const float Angle = Phase + SwimPhaseRadians + Index * 2.f * PI / FishCount;
+		// Keep the school coordinated, but let each fish drift slightly in its orbit
+		// so the five bodies do not read as a rigid, perfectly spaced carousel.
+		const float IndividualPhase = Index * 2.f * PI / FishCount;
+		const float RadiusScale = 1.f + 0.07f * FMath::Sin(SwimPhaseRadians * 0.55f + Index * 2.17f);
+		const float Angle = Phase + SwimPhaseRadians + IndividualPhase;
 		const FVector IdleOffset(
-			FMath::Cos(Angle) * 135.f * TuckScale * CircleScale,
-			FMath::Sin(Angle) * 82.f * TuckScale * CircleScale,
+			FMath::Cos(Angle) * 135.f * RadiusScale * TuckScale * CircleScale,
+			FMath::Sin(Angle) * 82.f * RadiusScale * TuckScale * CircleScale,
 			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f * NightScale);
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
