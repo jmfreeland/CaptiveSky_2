@@ -12,7 +12,7 @@ The UE 5.8.3 log for both variants warns that building the Nanite Assembly faile
 - Each run spawned exactly one transient instance and one ordinary skeletal-mesh comparison, captured two images, and exited without saving the Island or any asset. Character thinking was disabled and model requests were capped at zero.
 - A third A-variant run passed `r.Nanite.AllowAssemblies 1` with `-ExecCmds`; UE rejected it as read-only, so it did not test Nanite assemblies.
 - Captures/logs are disposable evidence under `Saved/CompileScratch/Claude_Props/Saved/Playtests/Codex_NorwayMaple{A,D}*_20261016` and `Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_NorwayMaple*20261016.log`.
-- The primary Unreal editor was left running as requested; no UI interaction, process termination, project setting change, map edit, or asset save was performed.
+- No UI interaction or process termination was issued. At the final read-only process check, PID 22688 and all `UnrealEditor*` processes no longer resolved. The main project log had no explicit crash or clean-shutdown record; the latest Island autosave was `Saved/Autosaves/Game/Maps/Island_Auto1.umap` at 11:07 on 2026-10-16. Why the editor process disappeared is unknown, and unsaved edits after that autosave are not confirmed preserved. The Island was not saved or restored by these preview runs.
 
 ## Next gate
 
