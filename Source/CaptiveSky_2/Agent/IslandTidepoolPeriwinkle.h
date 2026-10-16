@@ -19,6 +19,8 @@ class CAPTIVESKY_2_API AIslandTidepoolPeriwinkle : public AActor
 public:
 	AIslandTidepoolPeriwinkle();
 	void SetColorVariant(int32 Variant);
+	/** A brief, reversible shell-tuck response to quiet observation; never moves or persists. */
+	bool RespondToQuietObservation();
 	/** Smoothly tucks an intertidal snail in during the most exposed part of the ebb. */
 	static float ExposureRestAmount(float TideOffsetCm);
 
@@ -52,6 +54,8 @@ private:
 	float ElapsedSeconds = 0.f;
 	float Phase = 0.f;
 	float AttentionYaw = 0.f;
+	float ObservationRestRemaining = 0.f;
+	float ObservationCooldownRemaining = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;

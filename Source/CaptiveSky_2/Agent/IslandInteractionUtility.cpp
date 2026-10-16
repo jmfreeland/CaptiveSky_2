@@ -14,6 +14,7 @@
 #include "IslandRainBasin.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTidepoolPeriwinkle.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
@@ -32,6 +33,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 		if (Target->ActorHasTag(TEXT("WoodlandDeer"))) return FName(TEXT("WoodlandDeer"));
 		if (Target->ActorHasTag(TEXT("Firefly"))) return FName(TEXT("Firefly"));
 		if (Target->ActorHasTag(TEXT("TidepoolCrab"))) return FName(TEXT("TidepoolCrab"));
+		if (Target->ActorHasTag(TEXT("TidepoolPeriwinkle"))) return FName(TEXT("TidepoolPeriwinkle"));
 		if (Target->ActorHasTag(TEXT("TideglassDragonfly"))) return FName(TEXT("TideglassDragonfly"));
 		if (Target->ActorHasTag(TEXT("MinnowSchool"))) return FName(TEXT("MinnowSchool"));
 		return NAME_None;
@@ -221,6 +223,17 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		if (AIslandTidepoolCrab* Crab = Cast<AIslandTidepoolCrab>(Target)) Crab->RespondToQuietObservation(Observer->GetActorLocation());
 		OutFact = TEXT("You quietly watched a small shore crab. It scuttled a short way toward cover, paused, then resumed its usual Tideglass path. It remains wild and independent; you did not touch, catch, or claim it, and nothing persistent changed.");
 		return true;
+	}
+	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("TidepoolPeriwinkle")))
+	{
+		if (AIslandTidepoolPeriwinkle* Periwinkle = Cast<AIslandTidepoolPeriwinkle>(Target))
+		{
+			const bool bResponded = Periwinkle->RespondToQuietObservation();
+			OutFact = bResponded
+				? TEXT("A tiny wild periwinkle drew its eyestalks in and narrowed its shell opening for a moment, then began to relax again. It stays attached to its rock; you did not touch or collect it, and nothing persistent changed.")
+				: TEXT("The tiny periwinkle is already tucked in from your recent quiet observation. You leave it undisturbed; it stays wild and nothing persistent changes.");
+			return true;
+		}
 	}
 	if (Target->ActorHasTag(TEXT("IslandLife")) && TargetTag == FName(TEXT("TideglassDragonfly")))
 	{

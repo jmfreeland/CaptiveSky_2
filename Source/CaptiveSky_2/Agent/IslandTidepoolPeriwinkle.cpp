@@ -136,6 +136,14 @@ float AIslandTidepoolPeriwinkle::ExposureRestAmount(float TideOffsetCm)
 	return 1.f - FMath::SmoothStep(-0.72f, -0.12f, NormalizedTide);
 }
 
+bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
+{
+	if (ObservationCooldownRemaining > 0.f) return false;
+	ObservationRestRemaining = 1.6f;
+	ObservationCooldownRemaining = 4.2f;
+	return true;
+}
+
 void AIslandTidepoolPeriwinkle::SetColorVariant(int32 Variant)
 {
 	ColorVariant = FMath::Clamp(Variant, 0, 2);
@@ -229,7 +237,12 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float TideOffset = IslandClock.IsValid()
 		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
 		: UIslandTideglassSubsystem::MaximumTideOffsetCm;
-	const float ExposureRest = ExposureRestAmount(TideOffset);
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	ObservationRestRemaining = FMath::Max(0.f, ObservationRestRemaining - SafeDelta);
+	ObservationCooldownRemaining = FMath::Max(0.f, ObservationCooldownRemaining - SafeDelta);
+	const float TideRest = ExposureRestAmount(TideOffset);
+	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);
+	const float ExposureRest = FMath::Max(TideRest, ObservationRest);
 	const float StalkExtension = FMath::Lerp(1.f, 0.46f, ExposureRest);
 	const float ApertureExtension = FMath::Lerp(1.f, 0.5f, ExposureRest);
 	const float AttentionScale = FMath::Lerp(1.f, 0.35f, ExposureRest);

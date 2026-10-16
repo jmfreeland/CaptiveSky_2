@@ -1273,7 +1273,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (!Snail->HasActorBegunPlay()) Snail->DispatchBeginPlay();
 		++PeriwinkleCount;
 		DayPeriwinkles.Add(Snail);
-		TestTrue(TEXT("Periwinkle remains untargeted Tideglass wildlife"),
+		TestTrue(TEXT("Periwinkle remains wild, non-landmark Tideglass wildlife"),
 			Snail->ActorHasTag(TEXT("IslandLife")) && Snail->ActorHasTag(TEXT("TidepoolPeriwinkle")) && !Snail->ActorHasTag(TEXT("IslandLandmark")));
 		TestTrue(TEXT("Periwinkle's small shell sits beside the Tideglass habitat"),
 			FVector::Dist2D(Snail->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
@@ -2012,6 +2012,48 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Repeated quiet attention only refreshes the short natural startle response"), WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+
+		if (Clock && DayPeriwinkles.Num() > 0 && DayPeriwinkles[0].IsValid())
+		{
+			AIslandTidepoolPeriwinkle* WatchablePeriwinkle = DayPeriwinkles[0].Get();
+			const float OriginalPeriwinkleTestHour = Clock->CurrentHour;
+			const int32 OriginalPeriwinkleTestDay = Clock->DayNumber;
+			Clock->DayNumber = 1;
+			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			const FVector PeriwinkleTestHome = TestPoolLocation + FVector(120.f, 0.f, 0.f);
+			WatchablePeriwinkle->SetActorLocation(PeriwinkleTestHome);
+			WatchablePeriwinkle->HomeLocation = PeriwinkleTestHome;
+			WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+			WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+			WatchablePeriwinkle->Tick(0.f);
+			const float OpenPeriwinkleStalk = WatchablePeriwinkle->EyeStalks[0]->GetRelativeScale3D().Z;
+			TestTrue(TEXT("The shared interaction resolver exposes a periwinkle for quiet inspection"),
+				IslandInteractionUtility::GetTargetTag(WatchablePeriwinkle) == FName(TEXT("TidepoolPeriwinkle")));
+			TestFalse(TEXT("Inspectable periwinkles remain excluded from movement and chasing"),
+				IslandInteractionUtility::IsMovementTargetAllowed(WatchablePeriwinkle));
+			TestTrue(TEXT("A visitor can inspect a nearby visible periwinkle"),
+				IslandInteractionUtility::CanInteract(Observer, WatchablePeriwinkle));
+			FString PeriwinkleFact;
+			TestTrue(TEXT("Quiet periwinkle inspection succeeds without an agent-only capability"),
+				IslandInteractionUtility::Perform(Observer, WatchablePeriwinkle, PeriwinkleFact));
+			TestTrue(TEXT("Inspection describes a wild, attached snail without a persistent change"),
+				PeriwinkleFact.Contains(TEXT("wild")) && PeriwinkleFact.Contains(TEXT("stays attached")) &&
+				PeriwinkleFact.Contains(TEXT("nothing persistent changed")));
+			WatchablePeriwinkle->Tick(0.2f);
+			TestTrue(TEXT("Quiet inspection briefly retracts the periwinkle's eyestalks"),
+				WatchablePeriwinkle->ObservationRestRemaining > 0.f &&
+				WatchablePeriwinkle->EyeStalks[0]->GetRelativeScale3D().Z < OpenPeriwinkleStalk);
+			FString RepeatedPeriwinkleFact;
+			TestTrue(TEXT("Repeated inspection remains a read-only response during its cooldown"),
+				IslandInteractionUtility::Perform(Observer, WatchablePeriwinkle, RepeatedPeriwinkleFact) &&
+				RepeatedPeriwinkleFact.Contains(TEXT("already tucked in")));
+			WatchablePeriwinkle->Tick(2.f);
+			TestTrue(TEXT("The snail naturally reopens after its brief observation response"),
+				FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining) &&
+				FMath::IsNearlyEqual(WatchablePeriwinkle->EyeStalks[0]->GetRelativeScale3D().Z, OpenPeriwinkleStalk, 0.001f));
+			Clock->CurrentHour = OriginalPeriwinkleTestHour;
+			Clock->DayNumber = OriginalPeriwinkleTestDay;
+		}
 
 		if (Weather->IslandMeadowFlowers.IsValidIndex(0) && Weather->IslandMeadowFlowers[0])
 		{
