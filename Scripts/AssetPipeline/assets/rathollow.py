@@ -5,9 +5,9 @@ import bmesh
 from mathutils import Vector
 
 
-NAME = "RatHollow_TornEntranceV2"
-ENTRANCE_BARK_BREAK_SEGMENTS = (9, 10)
-ENTRANCE_RIM_IRREGULARITY = 1.35
+NAME = "RatHollow_WeatherSplitV3"
+ENTRANCE_BARK_BREAK_SEGMENTS = tuple(range(7, 14))
+ENTRANCE_RIM_IRREGULARITY = 1.65
 
 
 def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0, irregularity=1.0):
@@ -17,10 +17,10 @@ def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0, irregularity=1
         # A few broad, offset deformations keep the trunk from reading as a
         # manufactured cylinder; the small high-frequency term breaks the rim.
         variation = (1.0 + irregularity * (
-            0.060 * math.sin(3.0 * angle + phase)
-            + 0.026 * math.sin(7.0 * angle - phase * 0.7)
-            + 0.022 * math.sin(2.0 * angle + phase * 1.3)))
-        x_jitter = 0.024 * math.sin(5.0 * angle + phase)
+            0.085 * math.sin(3.0 * angle + phase)
+            + 0.038 * math.sin(7.0 * angle - phase * 0.7)
+            + 0.032 * math.sin(2.0 * angle + phase * 1.3)))
+        x_jitter = 0.045 * math.sin(5.0 * angle + phase)
         r = radius * variation
         verts.append(bm.verts.new((x + x_jitter, center_y + r * math.cos(angle), center_z + r * math.sin(angle))))
     return verts
@@ -46,9 +46,9 @@ def _hollow_log(A):
     bm = bmesh.new()
 
     outer_stations = [
-        (-1.30, 0.57, 0.65), (-1.17, 0.62, 0.66), (-0.88, 0.67, 0.67),
-        (-0.48, 0.65, 0.66), (0.05, 0.63, 0.66), (0.55, 0.61, 0.65),
-        (1.00, 0.58, 0.65), (1.24, 0.52, 0.65),
+        (-1.30, 0.56, 0.65), (-1.17, 0.64, 0.66), (-0.88, 0.68, 0.69),
+        (-0.48, 0.64, 0.65), (0.05, 0.66, 0.68), (0.55, 0.60, 0.64),
+        (1.00, 0.59, 0.66), (1.24, 0.50, 0.64),
     ]
     outer = [_ring(bm, x, radius, z, k * 0.61, segments, 0.035 * math.sin(k * 0.83))
              for k, (x, radius, z) in enumerate(outer_stations)]
@@ -99,14 +99,20 @@ def _hollow_log(A):
     A.tube("wood", [Vector((-1.26, 0.25, 1.25)), Vector((-1.32, 0.18, 1.18)),
                      Vector((-1.35, 0.13, 1.12))], 0.038, segs=7,
            taper=lambda t: 1.0 - 0.88 * t, tile=0.8, name="entranceSplinter")
+    A.tube("wood", [Vector((-1.20, -0.30, 0.98)), Vector((-1.30, -0.43, 1.07)),
+                     Vector((-1.42, -0.52, 0.98))], 0.060, segs=8,
+           taper=lambda t: 1.0 - 0.86 * t, tile=0.8, name="splitRimEast")
+    A.tube("wood", [Vector((-1.12, 0.34, 0.92)), Vector((-1.25, 0.48, 0.99)),
+                     Vector((-1.36, 0.55, 0.87))], 0.052, segs=8,
+           taper=lambda t: 1.0 - 0.84 * t, tile=0.8, name="splitRimWest")
 
     # Moss sits in separate soft clumps so it remains readable rather than painting the whole log green.
     for i, (x, y, z, radii) in enumerate((
-        (-0.78, -0.10, 1.19, (0.26, 0.17, 0.055)),
-        (-0.30, 0.13, 1.23, (0.32, 0.14, 0.05)),
-        (0.22, 0.08, 1.20, (0.29, 0.18, 0.060)),
-        (0.78, -0.07, 1.15, (0.22, 0.13, 0.045)),
-        (-0.54, 0.42, 0.97, (0.18, 0.13, 0.045)),
+        (-0.78, -0.10, 1.30, (0.28, 0.18, 0.035)),
+        (-0.30, 0.13, 1.31, (0.34, 0.16, 0.038)),
+        (0.22, 0.08, 1.30, (0.31, 0.19, 0.035)),
+        (0.78, -0.07, 1.24, (0.24, 0.15, 0.030)),
+        (-0.54, 0.42, 1.17, (0.20, 0.15, 0.030)),
     )):
         A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.22,
                flat_bottom=0.35, tile=0.4, name="moss{:02d}".format(i))
