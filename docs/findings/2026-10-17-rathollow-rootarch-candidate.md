@@ -26,6 +26,20 @@ and their UVs remain intact. The latest export emitted no tangent-space warning;
 re-import found no face larger than a quad and retained the `UVMap`. Unreal-side
 tangent handling has not been checked.
 
+## Runtime integration constraint
+
+`AIslandWildlifeHome` currently places the original RatHollow mesh at a fixed
+`(+117, 0, 0) cm` component offset from the recorded entrance anchor
+(`IslandWildlifeHome.cpp` / `IslandWildlifeHome.h`). This candidate's opening
+center is approximately `(-78, -1, 47) cm` in mesh-local coordinates, with an
+inner radius of 27.5 cm. Reusing the existing offset would put the opening
+center about 39 cm forward and 47 cm above the actor anchor; its lower edge
+would still sit roughly 19.5 cm above it. Do not swap the asset path under the
+old transform. Before integration, confirm whether `EntranceLocation` denotes
+the opening center or the ground threshold, then give this mesh its own
+component offset and verify Rat approach/navigation in the disposable map.
+The persisted home record and its anchor remain unchanged.
+
 The current three-quarter preview is
 `Saved/CaptiveSky/ComfyBlender/RatHollowRootArch/Preview.png` (generated,
 gitignored output). It was rendered in Blender 5.2.2 with Cycles CPU, 12 samples,
