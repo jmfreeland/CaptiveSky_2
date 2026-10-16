@@ -149,3 +149,16 @@ def build(A):
         A.tube("straw", [start, mid, end], radius, segs=6,
                taper=lambda t: 0.65 + 0.25 * math.sin(math.pi * t), tile=0.4,
                name="nestTwig{:02d}".format(index))
+
+    # Tube end caps are n-gons (six or nine sides); Blender's FBX exporter
+    # warns that it cannot export tangent space for those faces. Triangulate
+    # only those caps before export, leaving the UV-mapped shell quads intact.
+    for obj, _material in A.parts:
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        ngons = [face for face in bm.faces if len(face.verts) > 4]
+        if ngons:
+            bmesh.ops.triangulate(bm, faces=ngons, ngon_method="BEAUTY")
+            bm.to_mesh(obj.data)
+            obj.data.update()
+        bm.free()
