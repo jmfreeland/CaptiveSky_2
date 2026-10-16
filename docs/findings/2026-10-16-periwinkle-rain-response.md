@@ -28,3 +28,36 @@ This does not yet show whether the small visual cue reads clearly in ordinary
 play. Inspect it at Tideglass during a naturally occurring shower once the
 Island editor/game path is available; keep the standard playtime and model-call
 caps in place.
+
+## Bounded real-RHI review — 2026-10-16
+
+The scratch project successfully loaded the actual `/Game/Maps/Island` for two
+standalone Game checks without changing or saving the authored map. Both used
+an isolated `CaptiveSkyDataRoot`, disabled resident thinking, set the model
+request limit to zero, forced a short storm, and exited at their real-time cap:
+
+- A 90-second broad Tideglass pass ended after 90.3 seconds with zero model
+  requests. It captured five 1600x900 frames at 8-second intervals. The storm
+  atmosphere and pool are visible, but these views are too wide to judge the
+  snail response. Log and frames:
+  [`game log`](../../Saved/Playtests/Codex_PerwinkleRain_20261016_144027/Logs/PeriwinkleRainGame.log),
+  [`001`](../../Saved/Playtests/Codex_PerwinkleRain_20261016_144027/Screenshots/001_Tideglass.png),
+  [`005`](../../Saved/Playtests/Codex_PerwinkleRain_20261016_144027/Screenshots/005_Tideglass.png).
+- A 45-second close Tideglass pass ran with Python disabled and ended after
+  45.2 seconds with zero model requests. Its frames show the shell, but tall
+  foreground plants obscure the eye stalks and most of the animal; the
+  rain-driven tuck therefore remains **not visually verified**. The same
+  capture displays `TEXTURE STREAMING POOL OVER 4.449 MiB BUDGET`, so this
+  close frame is also evidence of a remaining texture-budget problem, not a
+  candidate hero shot. Log and frame:
+  [`close-up log`](../../Saved/Playtests/Codex_PerwinkleRain_20261016_144027/Closeup/Logs/PeriwinkleCloseup.log),
+  [`close-up frame`](../../Saved/Playtests/Codex_PerwinkleRain_20261016_144027/Closeup/Screenshots/006_Perwinkle__Close.png).
+
+The visible gap is now specific: periwinkles exist and respond in deterministic
+automation, but their current ground-traced homes can sit behind much taller
+cover, making the small expressive parts unreadable from a close visitor view.
+Next, inspect how the close shoreline vegetation and texture pool can be
+art-directed to preserve a legible rocky microhabitat before enlarging the
+primitive animal or claiming the rain behavior reads in play. No authored map
+or Content asset was changed; the custom viewpoint and all runtime data remain
+local under `Saved/Playtests/`.
