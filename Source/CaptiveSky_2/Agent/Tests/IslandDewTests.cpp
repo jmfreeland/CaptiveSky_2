@@ -3,6 +3,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandDewTest, "CaptiveSky2.Agent.IslandDew",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -58,12 +59,24 @@ bool FIslandDewTest::RunTest(const FString& Parameters)
 	const float Clamped = ComputeDewStrength(Nonsense);
 	TestTrue(TEXT("Out-of-range inputs stay within 0..1"), Clamped >= 0.f && Clamped <= 1.f);
 
+	FIslandDewInputs InvalidWeather = Dawn;
+	InvalidWeather.CloudCover = std::numeric_limits<float>::quiet_NaN();
+	TestEqual(TEXT("A non-finite weather sample suppresses dew instead of propagating NaN"),
+		ComputeDewStrength(InvalidWeather), 0.f);
+	InvalidWeather = Dawn;
+	InvalidWeather.Hour = std::numeric_limits<float>::infinity();
+	TestEqual(TEXT("A non-finite clock sample suppresses dew"), ComputeDewStrength(InvalidWeather), 0.f);
+
 	TestEqual(TEXT("No strength, no glints"), AIslandDewActor::DesiredCount(0.f), 0);
 	TestEqual(TEXT("Full strength fills every slot"), AIslandDewActor::DesiredCount(1.f), AIslandDewActor::MaxGlints);
 	TestEqual(TEXT("Strength beyond range is clamped"), AIslandDewActor::DesiredCount(7.f), AIslandDewActor::MaxGlints);
 	TestTrue(TEXT("Half strength is about half the glints"), FMath::Abs(AIslandDewActor::DesiredCount(0.5f) - AIslandDewActor::MaxGlints / 2) <= 1);
+	TestEqual(TEXT("A non-finite strength cannot request glint instances"),
+		AIslandDewActor::DesiredCount(std::numeric_limits<float>::quiet_NaN()), 0);
 	TestTrue(TEXT("Far glints are larger than near ones"), AIslandDewActor::GlintSize(1200.f) > AIslandDewActor::GlintSize(100.f));
 	TestTrue(TEXT("Glint size stays bounded"), AIslandDewActor::GlintSize(1e6f) <= AIslandDewActor::GlintSize(AIslandDewActor::Radius) + 0.001f);
+	TestTrue(TEXT("A non-finite distance resolves to a small finite glint"),
+		FMath::IsFinite(AIslandDewActor::GlintSize(std::numeric_limits<float>::quiet_NaN())));
 
 	TestTrue(TEXT("Nothing is said without dew"), UIslandDewSubsystem::DescribeDew(0.1f).IsEmpty());
 	TestTrue(TEXT("A little dew is mentioned"), UIslandDewSubsystem::DescribeDew(0.5f).Contains(TEXT("little dew")));

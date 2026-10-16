@@ -25,6 +25,13 @@ namespace
 
 float ComputeDewStrength(const FIslandDewInputs& In)
 {
+	// Environmental values normally come from the world subsystem, but malformed
+	// overrides or an interrupted transition must never turn the visual scatter NaN.
+	if (!FMath::IsFinite(In.SunHeight) || !FMath::IsFinite(In.Hour) || !FMath::IsFinite(In.Rain) ||
+		!FMath::IsFinite(In.Wetness) || !FMath::IsFinite(In.CloudCover) || !FMath::IsFinite(In.Storm))
+	{
+		return 0.f;
+	}
 	const auto Unit = [](float Value) { return FMath::Clamp(Value, 0.f, 1.f); };
 	// Needs the sun up to catch the beads, but fades as it climbs and burns the dew off.
 	const float Sun = FMath::SmoothStep(0.02f, 0.12f, In.SunHeight) * (1.f - FMath::SmoothStep(0.45f, 0.75f, In.SunHeight));
@@ -59,6 +66,7 @@ AIslandDewActor::AIslandDewActor()
 
 int32 AIslandDewActor::DesiredCount(float Strength)
 {
+	if (!FMath::IsFinite(Strength)) return 0;
 	return FMath::Clamp(FMath::RoundToInt(MaxGlints * FMath::Clamp(Strength, 0.f, 1.f)), 0, MaxGlints);
 }
 
@@ -86,6 +94,7 @@ bool AIslandDewActor::FindNearestGlint(const FVector& Origin, float MaxDistance,
 
 float AIslandDewActor::GlintSize(float Distance)
 {
+	if (!FMath::IsFinite(Distance)) Distance = 0.f;
 	// A sphere mesh is 100 cm across; this is the diameter wanted, in cm.
 	return 2.5f + FMath::Clamp(Distance, 0.f, Radius) * 0.007f;
 }
@@ -124,12 +133,13 @@ void AIslandDewActor::Advance(const FVector& Viewer, float Strength)
 		Glints->SetMaterial(0, Material);
 	}
 
-	const int32 Wanted = DesiredCount(Strength);
-	CurrentStrength = FMath::Clamp(Strength, 0.f, 1.f);
-	const bool bVisible = Strength > 0.002f && Wanted > 0;
+	const float SafeStrength = FMath::IsFinite(Strength) ? FMath::Clamp(Strength, 0.f, 1.f) : 0.f;
+	const int32 Wanted = DesiredCount(SafeStrength);
+	CurrentStrength = SafeStrength;
+	const bool bVisible = SafeStrength > 0.002f && Wanted > 0;
 	Glints->SetVisibility(bVisible);
 	if (!bVisible) return;
-	Material->SetScalarParameterValue(TEXT("Intensity"), Strength);
+	Material->SetScalarParameterValue(TEXT("Intensity"), SafeStrength);
 
 	while (Glints->GetInstanceCount() < MaxGlints) Glints->AddInstance(FTransform(FQuat::Identity, Viewer, FVector(0.0001f)), true);
 
