@@ -2773,21 +2773,36 @@ void AIslandWeather::RefreshNightEcology()
 
 	// A few small periwinkles give the Tideglass margin quiet close-range life.
 	// Their ground-traced homes are deterministic and persist through day/night.
+	// Shoreline collision can be discontinuous, so search each resident's own
+	// bounded arc instead of letting one missed ray suppress the whole population.
 	constexpr int32 PeriwinklePopulation = 3;
 	while (TidepoolPeriwinkles.Num() < PeriwinklePopulation)
 	{
 		const int32 Index = TidepoolPeriwinkles.Num();
-		const float Angle = PI / 3.f + Index * 2.f * PI / PeriwinklePopulation;
-		const FVector ShoreOffset(FMath::Cos(Angle) * 660.f, FMath::Sin(Angle) * 660.f, 900.f);
-		const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
-		FHitResult GroundHit;
-		FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolPeriwinkleShore), false, this);
-		GroundParams.AddIgnoredActor(Habitat);
-		if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, GroundParams)) break;
+		const float BaseAngle = PI / 3.f + Index * 2.f * PI / PeriwinklePopulation;
+		FVector SpawnLocation = FVector::ZeroVector;
+		bool bFoundShoreGround = false;
+		for (int32 Attempt = 0; Attempt < 9; ++Attempt)
+		{
+			// Probe the slot centre first, then alternating offsets up to +/-60
+			// degrees. The three slots therefore keep separate shoreline sectors.
+			const int32 Step = (Attempt + 1) / 2;
+			const int32 SignedStep = Attempt == 0 ? 0 : (Attempt % 2 == 1 ? Step : -Step);
+			const float Angle = BaseAngle + SignedStep * (PI / 12.f);
+			const FVector ShoreOffset(FMath::Cos(Angle) * 660.f, FMath::Sin(Angle) * 660.f, 900.f);
+			const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
+			FHitResult GroundHit;
+			FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolPeriwinkleShore), false, this);
+			GroundParams.AddIgnoredActor(Habitat);
+			if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, GroundParams)) continue;
+			SpawnLocation = GroundHit.Location + FVector(0.f, 0.f, 0.5f);
+			bFoundShoreGround = true;
+			break;
+		}
+		if (!bFoundShoreGround) break;
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		const FVector Location = GroundHit.Location + FVector(0.f, 0.f, 0.5f);
-		if (AIslandTidepoolPeriwinkle* Snail = GetWorld()->SpawnActor<AIslandTidepoolPeriwinkle>(Location, FRotator::ZeroRotator, SpawnParameters))
+		if (AIslandTidepoolPeriwinkle* Snail = GetWorld()->SpawnActor<AIslandTidepoolPeriwinkle>(SpawnLocation, FRotator::ZeroRotator, SpawnParameters))
 		{
 			Snail->SetColorVariant(Index);
 			TidepoolPeriwinkles.Add(Snail);

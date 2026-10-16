@@ -2016,6 +2016,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (Clock && DayPeriwinkles.Num() > 0 && DayPeriwinkles[0].IsValid())
 		{
 			AIslandTidepoolPeriwinkle* WatchablePeriwinkle = DayPeriwinkles[0].Get();
+			const FVector OriginalPeriwinkleLocation = WatchablePeriwinkle->GetActorLocation();
+			const FVector OriginalPeriwinkleHome = WatchablePeriwinkle->HomeLocation;
 			const float OriginalPeriwinkleTestHour = Clock->CurrentHour;
 			const int32 OriginalPeriwinkleTestDay = Clock->DayNumber;
 			Clock->DayNumber = 1;
@@ -2051,6 +2053,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("The snail naturally reopens after its brief observation response"),
 				FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining) &&
 				FMath::IsNearlyEqual(WatchablePeriwinkle->EyeStalks[0]->GetRelativeScale3D().Z, OpenPeriwinkleStalk, 0.001f));
+			WatchablePeriwinkle->HomeLocation = OriginalPeriwinkleHome;
+			WatchablePeriwinkle->SetActorLocation(OriginalPeriwinkleLocation);
 			Clock->CurrentHour = OriginalPeriwinkleTestHour;
 			Clock->DayNumber = OriginalPeriwinkleTestDay;
 		}
