@@ -45,8 +45,8 @@ private:
 	bool BuildStoneForms(const FTransform& MarkerTransform, const TArray<AStaticMeshActor*>& Proxies);
 	virtual void BeginPlay() override;
 	void CheckForNaturalGust(float DeltaSeconds);
-	void ObserveAmbientWind(float CurrentSpeed);
-	void BeginNaturalResonance(float WindSpeed);
+	void ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection = FVector::ZeroVector);
+	void BeginNaturalResonance(float WindSpeed, const FVector& WindDirection);
 	virtual void Tick(float DeltaSeconds) override;
 };
 

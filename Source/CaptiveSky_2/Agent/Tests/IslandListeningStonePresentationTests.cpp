@@ -222,9 +222,10 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	if (Subsystem && Presentation)
 	{
 		TestEqual(TEXT("Natural wind monitoring stays on with no resonance active"), Presentation->GetResonanceRemaining(), 0.f);
-		Presentation->ObserveAmbientWind(70.f);
+		Presentation->ObserveAmbientWind(70.f, FVector(70.f, 0.f, 0.f));
 		TestEqual(TEXT("The first wind sample establishes a quiet baseline"), Presentation->GetResonanceRemaining(), 0.f);
-		Presentation->ObserveAmbientWind(120.f);
+		const FVector GustDirection(0.f, 120.f, 0.f);
+		Presentation->ObserveAmbientWind(120.f, GustDirection);
 		TestTrue(TEXT("A rising natural gust starts the transient stone resonance"), Presentation->GetResonanceRemaining() > 2.7f);
 		int32 NaturalChimeCount = 0;
 		AIslandListeningStonesChime* NaturalChime = nullptr;
@@ -234,6 +235,10 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			NaturalChime = *It;
 		}
 		TestEqual(TEXT("A natural gust creates one finite chime actor"), NaturalChimeCount, 1);
+		TestTrue(TEXT("A natural gust's direction shapes its chime pitch"), NaturalChime &&
+			FMath::IsNearlyEqual(NaturalChime->AppliedPitchRatio,
+				AIslandListeningStonesChime::CalculateWindPitchRatio(GustDirection.Size2D()) *
+				AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(GustDirection, Presentation->GetActorForwardVector())));
 		AIslandFirefly* NearbyFirefly = World->SpawnActor<AIslandFirefly>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
 		AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(
 			FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f), FRotator::ZeroRotator);

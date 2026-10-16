@@ -291,10 +291,11 @@ void AListeningStonePresentation::CheckForNaturalGust(float DeltaSeconds)
 	AmbientWindCheckAccumulator = FMath::Fmod(AmbientWindCheckAccumulator, 1.f);
 	if (!Weather.IsValid() || !GetWorld()) return;
 
-	ObserveAmbientWind(Weather->GetLocalWind(GetActorLocation(), this).Size2D());
+	const FVector LocalWind = Weather->GetLocalWind(GetActorLocation(), this);
+	ObserveAmbientWind(LocalWind.Size2D(), LocalWind);
 }
 
-void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed)
+void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)
 {
 	CurrentSpeed = FMath::IsFinite(CurrentSpeed) ? FMath::Clamp(CurrentSpeed, 0.f, 300.f) : 0.f;
 	const bool bGustOnset = bHasAmbientWindSample && ShouldResonateForWind(LastAmbientWindSpeed, CurrentSpeed);
@@ -303,10 +304,10 @@ void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed)
 	if (!bGustOnset || GetResonanceRemaining() > 0.f || GetWorld()->GetTimeSeconds() - LastAmbientChimeAt < 45.0)
 		return;
 
-	BeginNaturalResonance(CurrentSpeed);
+	BeginNaturalResonance(CurrentSpeed, WindDirection);
 }
 
-void AListeningStonePresentation::BeginNaturalResonance(float WindSpeed)
+void AListeningStonePresentation::BeginNaturalResonance(float WindSpeed, const FVector& WindDirection)
 {
 	BeginResonance(WindSpeed);
 	UWorld* World = GetWorld();
@@ -315,7 +316,7 @@ void AListeningStonePresentation::BeginNaturalResonance(float WindSpeed)
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
-		Chime->BeginChime(WindSpeed);
+		Chime->BeginChime(WindDirection);
 }
 
 void AListeningStonePresentation::Tick(float DeltaSeconds)

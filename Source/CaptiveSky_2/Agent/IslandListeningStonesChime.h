@@ -20,6 +20,7 @@ public:
 	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
 	static constexpr float ResidentContextLifetimeSeconds = 305.f;
 	void BeginChime(float HorizontalWindSpeed = 0.f);
+	void BeginChime(const FVector& HorizontalWind);
 	/** Whether a nearby animal can still physically hear the tone. */
 	bool IsAudibleAt(const FVector& ListenerLocation) const;
 	/** Fading or just-faded tone fact for nearby residents; no enduring discovery is implied. */
@@ -41,5 +42,7 @@ private:
 	float SampledWindSpeed = 0.f;
 	float AppliedPitchRatio = 1.f;
 	static float CalculateWindPitchRatio(float HorizontalWindSpeed);
+	static float CalculateWindDirectionPitchRatio(const FVector& HorizontalWind, const FVector& LandmarkForward);
+	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio);
 	void BuildChimeWave(float PitchRatio);
 };

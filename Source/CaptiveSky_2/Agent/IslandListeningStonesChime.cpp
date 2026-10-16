@@ -24,8 +24,21 @@ AIslandListeningStonesChime::AIslandListeningStonesChime()
 
 void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed)
 {
-	SampledWindSpeed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
-	AppliedPitchRatio = CalculateWindPitchRatio(SampledWindSpeed);
+	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
+	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed));
+}
+
+void AIslandListeningStonesChime::BeginChime(const FVector& HorizontalWind)
+{
+	const float Speed = HorizontalWind.ContainsNaN() ? 0.f : FMath::Clamp(HorizontalWind.Size2D(), 0.f, 300.f);
+	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed) *
+		CalculateWindDirectionPitchRatio(HorizontalWind, GetActorForwardVector()));
+}
+
+void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio)
+{
+	SampledWindSpeed = HorizontalWindSpeed;
+	AppliedPitchRatio = PitchRatio;
 	if (GetWorld())
 	{
 		ContextExpiresAt = GetWorld()->GetTimeSeconds() + ResidentContextLifetimeSeconds;
@@ -62,6 +75,18 @@ float AIslandListeningStonesChime::CalculateWindPitchRatio(float HorizontalWindS
 {
 	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
 	const float Semitones = (Speed / 300.f) * 1.5f;
+	return FMath::Pow(2.f, Semitones / 12.f);
+}
+
+float AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(const FVector& HorizontalWind, const FVector& LandmarkForward)
+{
+	if (HorizontalWind.ContainsNaN() || LandmarkForward.ContainsNaN() || HorizontalWind.SizeSquared2D() <= KINDA_SMALL_NUMBER)
+		return 1.f;
+	const FVector WindDirection = HorizontalWind.GetSafeNormal2D();
+	const FVector ForwardDirection = LandmarkForward.GetSafeNormal2D();
+	if (WindDirection.IsNearlyZero() || ForwardDirection.IsNearlyZero()) return 1.f;
+	const float Alignment = FMath::Clamp(FVector::DotProduct(WindDirection, ForwardDirection), -1.f, 1.f);
+	const float Semitones = Alignment * 0.35f;
 	return FMath::Pow(2.f, Semitones / 12.f);
 }
 

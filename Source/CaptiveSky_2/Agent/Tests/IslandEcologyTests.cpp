@@ -1784,6 +1784,13 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Stronger wind raises the pitch more than lighter wind"), AIslandListeningStonesChime::CalculateWindPitchRatio(240.f) > AIslandListeningStonesChime::CalculateWindPitchRatio(90.f));
 	TestTrue(TEXT("Even maximum wind keeps the resonance within one and a half semitones"), AIslandListeningStonesChime::CalculateWindPitchRatio(900.f) <= FMath::Pow(2.f, 1.5f / 12.f));
 	TestEqual(TEXT("Non-finite wind falls back to the calm-air pitch"), AIslandListeningStonesChime::CalculateWindPitchRatio(std::numeric_limits<float>::quiet_NaN()), 1.f);
+	const float AlongStoneWindRatio = AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(FVector(120.f, 0.f, 0.f), FVector::ForwardVector);
+	const float AgainstStoneWindRatio = AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(FVector(-120.f, 0.f, 0.f), FVector::ForwardVector);
+	TestTrue(TEXT("Wind along the standing stones gently raises their resonance"), AlongStoneWindRatio > 1.f);
+	TestTrue(TEXT("Wind from the opposite direction gently lowers their resonance"), AgainstStoneWindRatio < 1.f);
+	TestTrue(TEXT("Crosswind keeps the directional pitch neutral"), FMath::IsNearlyEqual(
+		AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(FVector(0.f, 120.f, 0.f), FVector::ForwardVector), 1.f));
+	TestEqual(TEXT("Calm wind has no direction-dependent pitch"), AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(FVector::ZeroVector, FVector::ForwardVector), 1.f);
 	AIslandFirefly* VisibleStoneFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandFirefly* HiddenStoneFirefly = World->SpawnActor<AIslandFirefly>(TestPoolLocation + FVector(650.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	TestNotNull(TEXT("Nearby night-life fixture spawned within the chime radius"), VisibleStoneFirefly);
@@ -1803,11 +1810,13 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (Chime)
 	{
 		TestNotNull(TEXT("Chime uses a procedural sound wave without external assets"), Chime->ChimeWave.Get());
-		const float ExpectedWindSpeed = Weather->GetLocalWind(StonesTarget->GetActorLocation(), StonesTarget).Size2D();
+		const FVector ExpectedWind = Weather->GetLocalWind(StonesTarget->GetActorLocation(), StonesTarget);
+		const float ExpectedWindSpeed = ExpectedWind.Size2D();
 		TestTrue(TEXT("Active fixture weather supplies a changing local wind sample"), ExpectedWindSpeed > 0.f);
 		TestEqual(TEXT("Chime uses wind sampled at the ListeningStones"), Chime->SampledWindSpeed, ExpectedWindSpeed);
 		TestEqual(TEXT("Chime waveform matches the local wind pitch sample"), Chime->AppliedPitchRatio,
-			AIslandListeningStonesChime::CalculateWindPitchRatio(Chime->SampledWindSpeed));
+			AIslandListeningStonesChime::CalculateWindPitchRatio(Chime->SampledWindSpeed) *
+			AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(ExpectedWind, StonesTarget->GetActorForwardVector()));
 		if (Chime->ChimeWave)
 		{
 			TestEqual(TEXT("Chime uses mono audio"), Chime->ChimeWave->NumChannels, 1);

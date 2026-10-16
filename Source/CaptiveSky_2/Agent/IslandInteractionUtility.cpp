@@ -259,11 +259,11 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		}
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(Target->GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
+		AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(Target->GetActorLocation(), Target->GetActorRotation(), SpawnParameters);
 		bool bVisibleFireflyResponse = false;
 		if (Chime)
 		{
-			Chime->BeginChime(LocalWind.Size2D());
+			Chime->BeginChime(LocalWind);
 			if (UIslandListeningStonePresentationSubsystem* Presentation = World->GetSubsystem<UIslandListeningStonePresentationSubsystem>())
 				Presentation->NotifyChime(LocalWind.Size2D());
 			for (TActorIterator<AIslandFirefly> FireflyIt(World); FireflyIt; ++FireflyIt)
