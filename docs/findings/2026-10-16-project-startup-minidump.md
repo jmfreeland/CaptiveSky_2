@@ -48,6 +48,29 @@ an engine, SDK, cache, or project-configuration change. Do not terminate the
 current editor solely to repeat a same-day launch that has already succeeded
 once.
 
+## Separate .NET WER event — 2026-10-16 17:31 local
+
+Read-only Windows Application log inspection found an `Application Error`
+event at 17:31:09 and matching `Windows Error Reporting` record at 17:31:12.
+The faulting process was `C:\Program Files\dotnet\dotnet.exe` (host
+10.0.1026.32716), running `Microsoft.NETCore.App 8.0.29`; it exited with
+exception `0xe0434352` in `KERNELBASE.dll` at offset `0x00000000000c408a`.
+The matching `Report.wer` module list includes
+`Saved/CompileScratch/Codex_GatewayQuotaBuild/CaptiveSky.Gateway.Checks.dll`
+and `CaptiveSky.Gateway.dll`. This identifies a .NET process that loaded the
+isolated gateway checks, but the event retained neither the command line nor
+the attached temporary dump. It does not identify the managed exception or
+prove that the event came from Unreal's build/run path.
+
+A later direct invocation of the lock-holder check exited `0`, and a later full
+gateway-check invocation also exited `0` with all checks passing; no new
+`dotnet.exe` APPCRASH appeared in the following five-minute event-log window.
+The 17:31 record is therefore preserved as an unresolved, non-reproduced
+managed exception rather than attributed to either the Unreal startup
+minidump or the gateway lock change. For the next popup, record the displayed
+time and correlate its process start time/module list and matching UnrealBuildTool
+log before making runtime, SDK, or project changes.
+
 ## Diagnostic limit and next step
 
 The matching `UnrealEditor-Core.pdb` is absent from the installed UE 5.8 tree,
