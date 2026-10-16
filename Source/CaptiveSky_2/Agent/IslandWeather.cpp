@@ -8,6 +8,7 @@
 #include "IslandFirefly.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTidepoolPeriwinkle.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandForestStag.h"
@@ -2054,6 +2055,9 @@ void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 		if (Crab.IsValid()) Crab->Destroy();
 	DayCrabs.Reset();
+	for (const TWeakObjectPtr<AIslandTidepoolPeriwinkle>& Snail : TidepoolPeriwinkles)
+		if (Snail.IsValid()) Snail->Destroy();
+	TidepoolPeriwinkles.Reset();
 	for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
 		if (Dragonfly.IsValid()) Dragonfly->Destroy();
 	DayDragonflies.Reset();
@@ -2464,6 +2468,7 @@ void AIslandWeather::RefreshNightEcology()
 {
 	NightFireflies.RemoveAll([](const TWeakObjectPtr<AIslandFirefly>& Firefly) { return !Firefly.IsValid(); });
 	DayCrabs.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolCrab>& Crab) { return !Crab.IsValid(); });
+	TidepoolPeriwinkles.RemoveAll([](const TWeakObjectPtr<AIslandTidepoolPeriwinkle>& Snail) { return !Snail.IsValid(); });
 	DayDragonflies.RemoveAll([](const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly) { return !Dragonfly.IsValid(); });
 	if (!TidepoolMinnowSchool.IsValid()) TidepoolMinnowSchool.Reset();
 	if (!GetWorld()) return;
@@ -2674,6 +2679,9 @@ void AIslandWeather::RefreshNightEcology()
 		for (const TWeakObjectPtr<AIslandTidepoolCrab>& Crab : DayCrabs)
 			if (Crab.IsValid()) Crab->Destroy();
 		DayCrabs.Reset();
+		for (const TWeakObjectPtr<AIslandTidepoolPeriwinkle>& Snail : TidepoolPeriwinkles)
+			if (Snail.IsValid()) Snail->Destroy();
+		TidepoolPeriwinkles.Reset();
 		for (const TWeakObjectPtr<AIslandTideglassDragonfly>& Dragonfly : DayDragonflies)
 			if (Dragonfly.IsValid()) Dragonfly->Destroy();
 		DayDragonflies.Reset();
@@ -2741,6 +2749,31 @@ void AIslandWeather::RefreshNightEcology()
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		TidepoolMinnowSchool = GetWorld()->SpawnActor<AIslandTidepoolMinnows>(Habitat->GetActorLocation() + FVector(0.f, 0.f, 24.f), FRotator::ZeroRotator, SpawnParameters);
+	}
+
+	// A few small periwinkles give the Tideglass margin quiet close-range life.
+	// Their ground-traced homes are deterministic and persist through day/night.
+	constexpr int32 PeriwinklePopulation = 3;
+	while (TidepoolPeriwinkles.Num() < PeriwinklePopulation)
+	{
+		const int32 Index = TidepoolPeriwinkles.Num();
+		const float Angle = PI / 3.f + Index * 2.f * PI / PeriwinklePopulation;
+		const FVector ShoreOffset(FMath::Cos(Angle) * 660.f, FMath::Sin(Angle) * 660.f, 900.f);
+		const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
+		FHitResult GroundHit;
+		FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolPeriwinkleShore), false, this);
+		GroundParams.AddIgnoredActor(Habitat);
+		if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, GroundParams)) break;
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Location = GroundHit.Location + FVector(0.f, 0.f, 0.5f);
+		if (AIslandTidepoolPeriwinkle* Snail = GetWorld()->SpawnActor<AIslandTidepoolPeriwinkle>(Location, FRotator::ZeroRotator, SpawnParameters))
+		{
+			Snail->SetColorVariant(Index);
+			TidepoolPeriwinkles.Add(Snail);
+		}
+		else
+			break;
 	}
 
 	if (!bDay)

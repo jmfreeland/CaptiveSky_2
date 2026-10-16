@@ -6,6 +6,7 @@
 #include "IslandInteractionUtility.h"
 #include "IslandFirefly.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTidepoolPeriwinkle.h"
 #include "IslandTideglassSubsystem.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
@@ -1253,6 +1254,39 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		}
 	}
 	TestEqual(TEXT("A small bounded crab population is active by day"), CrabPopulation, 2);
+	int32 PeriwinkleCount = 0;
+	TArray<TWeakObjectPtr<AIslandTidepoolPeriwinkle>> DayPeriwinkles;
+	TArray<FLinearColor> PeriwinkleShellColors;
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It)
+	{
+		AIslandTidepoolPeriwinkle* Snail = *It;
+		if (!Snail->HasActorBegunPlay()) Snail->DispatchBeginPlay();
+		++PeriwinkleCount;
+		DayPeriwinkles.Add(Snail);
+		TestTrue(TEXT("Periwinkle remains untargeted Tideglass wildlife"),
+			Snail->ActorHasTag(TEXT("IslandLife")) && Snail->ActorHasTag(TEXT("TidepoolPeriwinkle")) && !Snail->ActorHasTag(TEXT("IslandLandmark")));
+		TestTrue(TEXT("Periwinkle's small shell sits beside the Tideglass habitat"),
+			FVector::Dist2D(Snail->GetActorLocation(), Habitat->GetActorLocation()) < 1000.f);
+		TestTrue(TEXT("Periwinkle has its foot, shell, aperture, eye stalks and spiral growth seam"),
+			Snail->Foot && Snail->Shell && Snail->Aperture && Snail->EyeStalks.Num() == 2 && Snail->Eyes.Num() == 2 &&
+			Snail->ShellSpiral && Snail->ShellSpiral->GetProcMeshSection(0) &&
+			Snail->ShellSpiral->GetProcMeshSection(0)->ProcVertexBuffer.Num() >= 300);
+		TestEqual(TEXT("Periwinkle shell cannot block shoreline movement"), Snail->Shell->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestEqual(TEXT("Periwinkle spiral cannot block shoreline movement"), Snail->ShellSpiral->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("Periwinkle shell palette is available for each resident"), Snail->ShellMaterial != nullptr);
+		if (Snail->ShellMaterial) PeriwinkleShellColors.Add(Snail->ShellMaterial->K2_GetVectorParameterValue(TEXT("Color")));
+	}
+	TestEqual(TEXT("Tideglass has three bounded periwinkles by day"), PeriwinkleCount, 3);
+	TestEqual(TEXT("The three periwinkles carry distinct natural shell colors"), PeriwinkleShellColors.Num(), 3);
+	if (PeriwinkleShellColors.Num() == 3)
+	{
+		TestFalse(TEXT("First and second periwinkles have different shells"), PeriwinkleShellColors[0].Equals(PeriwinkleShellColors[1], 0.01f));
+		TestFalse(TEXT("Second and third periwinkles have different shells"), PeriwinkleShellColors[1].Equals(PeriwinkleShellColors[2], 0.01f));
+	}
+	Weather->RefreshNightEcology();
+	PeriwinkleCount = 0;
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It) ++PeriwinkleCount;
+	TestEqual(TEXT("Repeated daytime refresh does not duplicate periwinkles"), PeriwinkleCount, 3);
 	int32 DragonflyPopulation = 0;
 	TArray<FLinearColor> DragonflyColors;
 	const FLinearColor ExpectedDragonflyWingColors[] = {
@@ -1392,6 +1426,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	CrabPopulation = 0;
 	for (TActorIterator<AIslandTidepoolCrab> It(World); It; ++It) ++CrabPopulation;
 	TestEqual(TEXT("Shore crabs remain active in the late afternoon"), CrabPopulation, 2);
+	PeriwinkleCount = 0;
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It) ++PeriwinkleCount;
+	TestEqual(TEXT("Periwinkles persist through the late afternoon"), PeriwinkleCount, 3);
 	DragonflyPopulation = 0;
 	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
 	TestEqual(TEXT("Dragonflies remain active in late afternoon"), DragonflyPopulation, 3);
@@ -1479,6 +1516,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Night-sheltered crabs pause their local routine"), It->IsActorTickEnabled());
 	}
 	TestEqual(TEXT("The same two shore-crab residents persist through nightfall"), CrabPopulation, 2);
+	PeriwinkleCount = 0;
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It) ++PeriwinkleCount;
+	TestEqual(TEXT("The same small periwinkle population remains through nightfall"), PeriwinkleCount, 3);
+	for (const TWeakObjectPtr<AIslandTidepoolPeriwinkle>& Snail : DayPeriwinkles)
+		TestTrue(TEXT("Each original periwinkle actor persists through nightfall"), Snail.IsValid());
 	if (DayCrabResidents.Num() > 0 && DayCrabResidents[0].IsValid())
 	{
 		ACharacter* NightObserver = World->SpawnActor<ACharacter>(DayCrabResidents[0]->GetActorLocation() + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator, Spawn);
@@ -1552,6 +1594,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Daylight resumes each resident's local routine"), It->IsActorTickEnabled());
 	}
 	TestEqual(TEXT("The same shore-crab residents re-emerge at midday"), CrabPopulation, 2);
+	PeriwinkleCount = 0;
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It) ++PeriwinkleCount;
+	TestEqual(TEXT("Periwinkles remain in place when daylight returns"), PeriwinkleCount, 3);
 	DragonflyPopulation = 0;
 	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It) ++DragonflyPopulation;
 	TestEqual(TEXT("Three dragonflies return when daytime resumes"), DragonflyPopulation, 3);

@@ -9,6 +9,7 @@
 class AIslandFirefly;
 class AIslandLightning;
 class AIslandTidepoolCrab;
+class AIslandTidepoolPeriwinkle;
 class AIslandTidepoolMinnows;
 class AIslandTideglassDragonfly;
 class AIslandForestStag;
@@ -130,6 +131,7 @@ private:
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
+	TArray<TWeakObjectPtr<AIslandTidepoolPeriwinkle>> TidepoolPeriwinkles;
 	TArray<TWeakObjectPtr<AIslandTideglassDragonfly>> DayDragonflies;
 	TWeakObjectPtr<AIslandTidepoolMinnows> TidepoolMinnowSchool;
 	TWeakObjectPtr<AIslandForestStag> WoodlandDeer;
