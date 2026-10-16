@@ -15,6 +15,7 @@ namespace IslandAssetRequestQueue
 	{
 		constexpr int32 MaxDescriptionCharacters = 240;
 		constexpr int32 MaxPendingRequests = 64;
+		constexpr int32 MaxPendingRequestsPerRequester = 3;
 
 		bool SplitJsonObjects(const FString& Text, TArray<FString>& OutObjects)
 		{
@@ -51,11 +52,12 @@ namespace IslandAssetRequestQueue
 			return BraceDepth == 0 && !bInString;
 		}
 
-		bool ReadPendingRequests(const FString& Path, int32& OutCount, FString& OutError,
+		bool ReadPendingRequests(const FString& Path, int32& OutCount, int32& OutRequesterCount, FString& OutError,
 			const FString& Requester, const FString& Description, const FString& RequestType,
 			const FString& Target, const FString& UpgradeKind)
 		{
 			OutCount = 0;
+			OutRequesterCount = 0;
 			FString Existing;
 			if (!FFileHelper::LoadFileToString(Existing, *Path))
 			{
@@ -101,6 +103,10 @@ namespace IslandAssetRequestQueue
 				Record->TryGetStringField(TEXT("request_type"), ExistingType);
 				Record->TryGetStringField(TEXT("target"), ExistingTarget);
 				Record->TryGetStringField(TEXT("upgrade_kind"), ExistingKind);
+				if (ExistingRequester == Requester)
+				{
+					++OutRequesterCount;
+				}
 				if (ExistingType.IsEmpty()) ExistingType = TEXT("new_object");
 				if (ExistingRequester == Requester && ExistingDescription.TrimStartAndEnd().Equals(Description, ESearchCase::IgnoreCase) &&
 					ExistingType == RequestType && ExistingTarget == Target && ExistingKind == UpgradeKind)
@@ -161,8 +167,16 @@ namespace IslandAssetRequestQueue
 		}
 
 		int32 PendingCount = 0;
-		if (!ReadPendingRequests(Path, PendingCount, OutError, Requester, CleanDescription, RequestType, Target, UpgradeKind))
+		int32 RequesterPendingCount = 0;
+		if (!ReadPendingRequests(Path, PendingCount, RequesterPendingCount, OutError,
+			Requester, CleanDescription, RequestType, Target, UpgradeKind))
 		{
+			return false;
+		}
+		if (RequesterPendingCount >= MaxPendingRequestsPerRequester)
+		{
+			OutError = FString::Printf(TEXT("You have %d proposals awaiting human review; wait for one to be reviewed before adding another."),
+				MaxPendingRequestsPerRequester);
 			return false;
 		}
 		if (PendingCount >= MaxPendingRequests)

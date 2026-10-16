@@ -64,6 +64,32 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 		InboxContents.Contains(DescriptiveTarget) &&
 		InboxContents.Contains(TEXT("shore more sheltered from the prevailing wind")));
 
+	const FString QuotaInboxPath = FPaths::Combine(TestDirectory, TEXT("quota-inbox.jsonl"));
+	const FString QuotaInbox =
+		TEXT("{\"id\":\"quota-1\",\"requester\":\"Agent_Aster_01\",\"description\":\"A weatherproof bird shelter\",\"request_type\":\"new_object\",\"status\":\"pending_review\"}\n")
+		TEXT("{\"id\":\"quota-2\",\"requester\":\"Agent_Aster_01\",\"description\":\"A small wind bell\",\"request_type\":\"new_object\",\"status\":\"pending_review\"}\n");
+	TestTrue(TEXT("A mixed proposal quota fixture is written"), FFileHelper::SaveStringToFile(QuotaInbox, *QuotaInboxPath));
+	TestTrue(TEXT("An upgrade may fill the resident's third pending slot"), IslandAssetRequestQueue::AppendRequest(
+		TEXT("Agent_Aster_01"), TEXT("Add a mossy cap to the listening stone"), RequestId, Error,
+		QuotaInboxPath, TEXT("upgrade"), TEXT("ListeningStone_North"), TEXT("aesthetic")));
+	RequestId.Reset();
+	TestFalse(TEXT("A resident cannot exceed three different pending proposals"), IslandAssetRequestQueue::AppendRequest(
+		TEXT("Agent_Aster_01"), TEXT("Add a sheltered fern patch nearby"), RequestId, Error,
+		QuotaInboxPath, TEXT("upgrade"), TEXT("woodland edge"), TEXT("variation")));
+	TestTrue(TEXT("The per-resident cap explains how to regain a proposal slot"), Error.Contains(TEXT("3 proposals awaiting human review")));
+	TestTrue(TEXT("A rejected over-quota proposal gets no request ID"), RequestId.IsEmpty());
+	TestTrue(TEXT("Another resident can still use the shared inbox"), IslandAssetRequestQueue::AppendRequest(
+		TEXT("Agent_Raven_01"), TEXT("Add a small perch hook to the east roost"), RequestId, Error,
+		QuotaInboxPath, TEXT("upgrade"), TEXT("Roost_East"), TEXT("functionality")));
+
+	const FString ReviewedQuotaInbox =
+		TEXT("{\"id\":\"quota-1\",\"requester\":\"Agent_Aster_01\",\"description\":\"A weatherproof bird shelter\",\"request_type\":\"new_object\",\"status\":\"accepted\"}\n")
+		TEXT("{\"id\":\"quota-2\",\"requester\":\"Agent_Aster_01\",\"description\":\"A small wind bell\",\"request_type\":\"new_object\",\"status\":\"pending_review\"}\n");
+	TestTrue(TEXT("A reviewed proposal is reflected in the test inbox"), FFileHelper::SaveStringToFile(ReviewedQuotaInbox, *QuotaInboxPath));
+	TestTrue(TEXT("A resident regains capacity when a proposal is reviewed"), IslandAssetRequestQueue::AppendRequest(
+		TEXT("Agent_Aster_01"), TEXT("Add a sheltered fern patch nearby"), RequestId, Error,
+		QuotaInboxPath, TEXT("upgrade"), TEXT("woodland edge"), TEXT("variation")));
+
 	const FString ReviewInboxPath = FPaths::Combine(TestDirectory, TEXT("review-inbox.jsonl"));
 	const FString ReviewInbox =
 		TEXT("{\"id\":\"review-1\",\"requester\":\"Agent_Aster_01\",\"description\":\"Add a sheltered perch\",\"request_type\":\"upgrade\",\"target\":\"WindArch_UpperBeam\",\"upgrade_kind\":\"functionality\",\"status\":\"accepted\"}\n")
