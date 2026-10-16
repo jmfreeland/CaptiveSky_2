@@ -21,13 +21,19 @@ persistent world state is changed.
   unsuccessful startup, not a passing test. The retained crash context was not
   updated by this attempt, so its cause remains unknown; see
   [`Unreal startup crash triage`](2026-10-13-unreal-startup-triage.md).
+- A read-only probe of the local editor MCP configured in `.mcp.json`
+  (`http://127.0.0.1:8000/mcp`) also failed with an `HttpRequestException`, and
+  no listening TCP entry for port 8000 was visible. This session therefore
+  cannot use the editor MCP as an alternate automation runner. This is separate
+  evidence from the headless startup failure and does not identify its cause.
 - No real-RHI capture exists yet. The procedural silhouette, palette, ground
   placement, and close-range readability remain unreviewed in-game.
 
 ## Next step
 
 After project startup can be observed reliably, run `CaptiveSky2.Agent.NightEcology`
-under NullRHI with thinking and model requests disabled. Then make one short,
+under NullRHI with thinking and model requests disabled, or make the local
+editor MCP reachable and run the test in the open editor. Then make one short,
 fixed Tideglass shoreline capture to review scale and material response before
 deciding whether the fallback is good enough or should be replaced with a
 proper snail mesh.
