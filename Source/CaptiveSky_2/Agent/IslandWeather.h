@@ -114,6 +114,8 @@ public:
 	/** Clear editor-only ground-cover instances after an offscreen visual preview. */
 	void ClearGroundCoverPreview();
 	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
+	/** Keep nearby plant bending around controlled or visibly rendered residents, not offscreen actors. */
+	static bool ShouldIncludeResidentInSwayFocus(bool bIsPlayerControlled, bool bWasRecentlyRendered);
 
 protected:
 	virtual void BeginPlay() override;

@@ -20,6 +20,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWe
 bool FIslandWeatherTest::RunTest(const FString& Parameters)
 {
 	const AIslandWeather* Weather = GetDefault<AIslandWeather>();
+	TestTrue(TEXT("The player-controlled character retains local plant response even if its mesh is hidden"),
+		AIslandWeather::ShouldIncludeResidentInSwayFocus(true, false));
+	TestTrue(TEXT("A recently rendered resident retains local plant response"),
+		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, true));
+	TestFalse(TEXT("An offscreen non-player resident does not create an invisible plant-sway neighborhood"),
+		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, false));
 	float MinimumRain = 2.f;
 	float MaximumRain = -1.f;
 	double MinimumRainTime = 0.0;

@@ -22,6 +22,7 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/AudioComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -50,6 +51,10 @@ static TAutoConsoleVariable<float> CVarIslandFoliageSwayUpdateIntervalSeconds(
 static TAutoConsoleVariable<float> CVarIslandGroundCoverLandscapeDensity(
 	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 1.f,
 	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. 1 preserves the authored density; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
+	ECVF_Default);
+static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
+	TEXT("CaptiveSky.Island.FoliageSwayFocusTelemetry"), 0,
+	TEXT("When non-zero, logs rendered resident focus counts and foliage transforms updated by each periodic sway pass."),
 	ECVF_Default);
 
 namespace
@@ -1789,8 +1794,18 @@ void AIslandWeather::UpdateGroundCoverSway()
 	}
 	// Nearby residents brush plants aside without collision, navmesh, state writes, or model calls.
 	// The root capsule bottom provides a useful ground reference for both walking and low flight.
+	// Offscreen residents cannot contribute visible plant response, so don't build and update sway
+	// neighborhoods around their last-known locations. The player-controlled character stays in
+	// scope even when its mesh is hidden from the current view.
+	int32 CandidateResidentCount = 0;
+	int32 IncludedResidentCount = 0;
 	for (TActorIterator<ACharacter> CharacterIt(GetWorld()); CharacterIt; ++CharacterIt)
 	{
+		++CandidateResidentCount;
+		const USkeletalMeshComponent* CharacterMesh = CharacterIt->GetMesh();
+		const bool bWasRecentlyRendered = CharacterMesh && CharacterMesh->WasRecentlyRendered();
+		if (!ShouldIncludeResidentInSwayFocus(CharacterIt->IsPlayerControlled(), bWasRecentlyRendered)) continue;
+		++IncludedResidentCount;
 		FVector GroundPoint = CharacterIt->GetActorLocation();
 		if (const UCapsuleComponent* Capsule = CharacterIt->GetCapsuleComponent())
 			GroundPoint.Z -= Capsule->GetScaledCapsuleHalfHeight();
@@ -1899,6 +1914,11 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(IslandFestuca, IslandFestucaBaseTransforms, 0, IslandFestucaBaseTransforms.Num(), FestucaCells, SwayedFestucaIndices);
 	UpdateSpecies(IslandPhalaris, IslandPhalarisBaseTransforms, 0, IslandPhalarisBaseTransforms.Num(), PhalarisCells, SwayedPhalarisIndices);
 	UpdateSpruceSway(FocusPoints, FocusRadius);
+	if (CVarIslandFoliageSwayFocusTelemetry.GetValueOnGameThread() != 0)
+		UE_LOG(LogIslandWeather, Display,
+			TEXT("FoliageSwayFocus characters=%d included=%d excluded=%d points=%d ground-cover=%d spruce=%d"),
+			CandidateResidentCount, IncludedResidentCount, CandidateResidentCount - IncludedResidentCount,
+			FocusPoints.Num(), GroundCoverSwayLastUpdatedInstanceCount, SpruceSwayLastUpdatedInstanceCount);
 }
 
 void AIslandWeather::UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius)
@@ -2964,6 +2984,11 @@ FVector AIslandWeather::EvaluateTransientGust(const FIslandTransientGust& Gust, 
 	const float SpatialWeight = 1.f - FMath::Clamp(FVector::Dist(Position, Gust.Center) / Gust.Radius, 0.f, 1.f);
 	const float TemporalWeight = FMath::Clamp(static_cast<float>((Gust.ExpiresAt - CurrentTime) / Duration), 0.f, 1.f);
 	return Gust.Direction * Gust.PeakSpeed * SpatialWeight * TemporalWeight;
+}
+
+bool AIslandWeather::ShouldIncludeResidentInSwayFocus(bool bIsPlayerControlled, bool bWasRecentlyRendered)
+{
+	return bIsPlayerControlled || bWasRecentlyRendered;
 }
 
 void AIslandWeather::AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds)
