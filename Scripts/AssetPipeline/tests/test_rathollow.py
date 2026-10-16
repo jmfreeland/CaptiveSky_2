@@ -39,7 +39,27 @@ def entrance_break_segments():
         if not isinstance(node, ast.Assign):
             continue
         if any(isinstance(target, ast.Name) and target.id == "ENTRANCE_BARK_BREAK_SEGMENTS" for target in node.targets):
-            return ast.literal_eval(node.value)
+            value = node.value
+            if (
+                isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Name)
+                and value.func.id == "tuple"
+                and len(value.args) == 1
+                and not value.keywords
+            ):
+                range_call = value.args[0]
+                if (
+                    isinstance(range_call, ast.Call)
+                    and isinstance(range_call.func, ast.Name)
+                    and range_call.func.id == "range"
+                    and 1 <= len(range_call.args) <= 3
+                    and not range_call.keywords
+                ):
+                    range_args = [ast.literal_eval(arg) for arg in range_call.args]
+                    if not all(type(arg) is int for arg in range_args):
+                        raise AssertionError("entrance break range must use integer literals")
+                    return tuple(range(*range_args))
+            return ast.literal_eval(value)
     raise AssertionError("the entrance needs an explicit broken-bark sector")
 
 
@@ -74,7 +94,9 @@ class RatHollowClearanceTests(unittest.TestCase):
         segments = entrance_break_segments()
         self.assertTrue(entrance_uses_broken_rim())
         self.assertGreaterEqual(len(segments), 2)
-        self.assertLessEqual(len(segments), 3)
+        # RatHollow V4 uses a wider torn-bark sector, but it must remain at or
+        # below one fifth of the 40-segment rim.
+        self.assertLessEqual(len(segments), 8)
         self.assertEqual(sorted(segments), list(range(min(segments), max(segments) + 1)))
         self.assertTrue(all(0 <= segment < 40 for segment in segments))
 
