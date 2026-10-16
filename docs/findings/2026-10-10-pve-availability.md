@@ -126,3 +126,14 @@ plugin descriptors contain no `Aura` reference, so this checkout's source does
 not explain the prompt. No level or PVE graph was loaded. Resolve the project
 plugin prompt before the editor-only Static Mesh export step; do not accept the
 dialog's disable-and-continue option until the owning reference is identified.
+
+**Successful project session (2026-10-16):** the main project's
+`Saved/Logs/CaptiveSky_2.log` later records the `ProceduralVegetationEditor`
+feature mounting, an automation worker discovering the project's tests, and
+`CaptiveSky2.Agent.NightEcology` completing successfully at 10:07. This
+supersedes the 2026-10-13 missing-plugin prompt as the latest project-loader
+evidence: at least one later session loaded the project and PVE without stopping
+at that prompt. It does not explain why the launcher previously offered the
+missing `Aura` prompt, prove the editor is currently responsive, or complete a
+PVE export. The disposable Static Mesh export remains the next asset step once
+the editor is stably targetable; do not use the source graph or Island map.
