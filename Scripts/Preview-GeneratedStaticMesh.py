@@ -69,11 +69,23 @@ for index, slot in enumerate(mesh.get_editor_property("static_materials")):
                 detail = ""
                 if class_name == "MaterialExpressionConstant3Vector":
                     detail = " value={}".format(input_node.get_editor_property("constant"))
+                elif class_name.startswith("MaterialExpressionTextureSample"):
+                    texture = input_node.get_editor_property("texture")
+                    texture_path = texture.get_path_name() if texture else "<none>"
+                    detail = " texture={}".format(texture_path)
                 log("base_color_input path={} class={} output={}{}".format(
                     material_path, class_name, output_name, detail
                 ))
             else:
                 log("base_color_input path={} <none>".format(material_path))
+            for expression in material.get_editor_property("expressions"):
+                if not expression.get_class().get_name().startswith("MaterialExpressionTextureSample"):
+                    continue
+                texture = expression.get_editor_property("texture")
+                texture_path = texture.get_path_name() if texture else "<none>"
+                log("texture_sample material={} node={} texture={}".format(
+                    material_path, expression.get_name(), texture_path
+                ))
         except Exception as exc:
             log("material_graph_inspection_unavailable path={} reason={}".format(material_path, exc))
 
