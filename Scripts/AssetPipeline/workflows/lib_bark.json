@@ -1,0 +1,10 @@
+{
+  "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"}},
+  "2": {"class_type": "SeamlessTile", "inputs": {"model": ["1", 0], "vae": ["1", 2], "enable": true}},
+  "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": "seamless tileable photogrammetry PBR base color texture, straight-on orthographic macro photograph of real weathered oak tree trunk bark, unmistakable natural bark surface, mostly vertical fibrous ridges and narrow furrows, small irregular flaky bark plates, fine subtle cracks following the grain, warm dark umber and charcoal brown with restrained muted grey variation, flat even overcast diffuse light, evenly exposed, crisp fine organic detail, texture fills the frame, no cast shadows, no perspective"}},
+  "4": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": "rock, stone, shale, slate, concrete, cracked earth, dry mud, roots, vines, branches, sticks, wood planks, lumber, boards, saw-cut end grain, log cross-section, knots, nails, moss, lichen, leaves, background, perspective, horizon, vignette, border, frame, text, watermark, dramatic lighting, cast shadows, specular highlights, blurry, low quality, oversaturated, cartoon, illustration, painting, 3d render"}},
+  "5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 4}},
+  "6": {"class_type": "KSampler", "inputs": {"model": ["2", 0], "positive": ["3", 0], "negative": ["4", 0], "latent_image": ["5", 0], "seed": 20261016, "steps": 25, "cfg": 7.0, "sampler_name": "dpmpp_2m", "scheduler": "karras", "denoise": 1.0}},
+  "7": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["2", 1]}},
+  "8": {"class_type": "SaveImage", "inputs": {"images": ["7", 0], "filename_prefix": "lib_bark"}}
+}

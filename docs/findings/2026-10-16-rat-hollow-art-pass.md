@@ -26,13 +26,44 @@ Local output (gitignored):
 
 ## Art decision
 
-This is a technical candidate, not approved final art. The revised silhouette
-is more broken and the moss is visible, but the exported wood still reads as
-plank-like grain and the moss as separate green pads in the neutral preview.
-Do not place it on the Island yet. ComfyUI could not start because its local
-environment lacks `filelock`. Two generated bark-albedo attempts also failed
-an objective wrap check (mean absolute opposite-edge RGB differences of 23–33
-on a 0–255 scale), so neither was copied into the project or used by this
-candidate. The next art step is a genuinely tile-aware bark surface, followed
-by a woodland-context review; keep the original and V2 exports unchanged until
-then.
+This V3 remains a technical candidate, not approved final art. The revised
+silhouette is more broken and the moss is visible, but the exported wood still
+reads as plank-like grain and the moss as separate green pads in the neutral
+preview. Do not place it on the Island yet. The notes above record the initial
+ComfyUI startup failure and two earlier rejected bark attempts.
+
+## V4 bark-texture candidate — 2026-10-16
+
+The local ComfyUI server was still running on `127.0.0.1:8188`; its
+`SeamlessTile` node was available, so no dependency install or network-exposed
+listener was needed. The first new four-image batch looked like cracked stone
+and tangled roots and was rejected. After changing the prompt to emphasize
+weathered oak bark with mostly vertical ridges, candidate 6 was selected from
+the second batch. The other generated images remain only in the local ComfyUI
+output folder.
+
+The selected 1024² albedo is preserved under the ignored
+`Saved/CaptiveSky/ComfyBlender/Library/Sources/rat_hollow_bark/source.png`.
+`pbr.py` produced local albedo, normal and ORM maps; these are separate from the
+existing shared wood texture, use a 1.2 m tile size, and feed the new
+`RatHollow_BarkV4` export. The generated map files remain under ignored
+`Saved/CaptiveSky/ComfyBlender/Library/Textures/`. The reusable prompt graph is
+`Scripts/AssetPipeline/workflows/lib_bark.json`; the selected image was
+processed with `pbr.py --normal-strength 2.0 --delight 0.8`, then packed as
+`RatHollow_Bark` with `pack_library.py`.
+
+Verification: Blender 5.2.2 exported 2,072 triangles at 2.708 × 1.452 ×
+1.419 m with five box colliders. Re-importing the FBX reported `UVMap`, all
+four material slots resolved, five colliders, and `PROBLEMS []`; the floor
+minimum remains -0.0321 m. Candidate 6's mean RGB difference across opposite
+edges was 18.48 horizontally and 11.09 vertically, versus mean adjacent-pixel
+differences of 18.63 and 11.12 respectively. This is a useful wrap diagnostic,
+not proof of seamless appearance at every scale.
+
+The local `Preview-Entrance.png` shows the hollow and straw bed; the oblique
+preview shows stronger continuous bark-like ridging than V3, though the grain
+is still quite directional and may read as weathered wood at close range. V4
+is therefore the better preview candidate, not approved final art. It has not
+been imported into Unreal, placed on the Island, or reviewed in woodland
+lighting/gameplay. Keep all existing imports and Island state untouched until
+that contextual review.

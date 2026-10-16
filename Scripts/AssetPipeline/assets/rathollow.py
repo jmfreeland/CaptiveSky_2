@@ -3,11 +3,13 @@ import math
 
 import bmesh
 from mathutils import Vector
+import lib
 
 
-NAME = "RatHollow_WeatherSplitV3"
+NAME = "RatHollow_BarkV4"
 ENTRANCE_BARK_BREAK_SEGMENTS = tuple(range(7, 14))
 ENTRANCE_RIM_IRREGULARITY = 1.65
+lib.TILED["bark"] = ("T_Lib_RatHollow_Bark", 1.2)
 
 
 def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0, irregularity=1.0):
@@ -71,7 +73,7 @@ def _hollow_log(A):
         _bridge(bm, first, second)
     # Keep the tunnel open to the dark backing below; a wood cap here hides the cavity.
 
-    A._finish(bm, "hollowBark", "wood", (0, 0, 0), (0, 0, 0), "box", "X", 1.0, True, 55)
+    A._finish(bm, "hollowBark", "bark", (0, 0, 0), (0, 0, 0), "box", "X", 1.2, True, 55)
 
     # A dark inner end and a little dry nest lining make the opening legible at game scale.
     # Keep the recess dark, but let warm brown earth tone and ambient light
@@ -86,23 +88,23 @@ def _hollow_log(A):
                taper=lambda t: 0.65 + 0.2 * (1.0 - t), tile=0.4, name="nestTwig{:02d}".format(i))
 
     # Wind-worn root fibres and broken branch stubs; keep their silhouette low and asymmetric.
-    A.tube("wood", [Vector((-0.93, 0.22, 0.36)), Vector((-1.05, 0.42, 0.20)),
+    A.tube("bark", [Vector((-0.93, 0.22, 0.36)), Vector((-1.05, 0.42, 0.20)),
                      Vector((-1.22, 0.47, 0.04))], 0.075, segs=9,
            taper=lambda t: 1.0 - 0.72 * t, tile=0.9, name="rootEast")
-    A.tube("wood", [Vector((0.34, -0.27, 0.94)), Vector((0.48, -0.34, 1.10)),
+    A.tube("bark", [Vector((0.34, -0.27, 0.94)), Vector((0.48, -0.34, 1.10)),
                      Vector((0.62, -0.40, 1.22))], 0.085, segs=9,
            taper=lambda t: 1.0 - 0.83 * t, tile=0.9, name="brokenBranch")
-    A.tube("wood", [Vector((0.92, 0.28, 0.92)), Vector((1.08, 0.39, 1.02)),
+    A.tube("bark", [Vector((0.92, 0.28, 0.92)), Vector((1.08, 0.39, 1.02)),
                      Vector((1.25, 0.43, 1.00))], 0.060, segs=8,
            taper=lambda t: 1.0 - 0.78 * t, tile=0.9, name="rearBrokenRoot")
     # One off-centre splinter continues the torn edge into the bark.
-    A.tube("wood", [Vector((-1.26, 0.25, 1.25)), Vector((-1.32, 0.18, 1.18)),
+    A.tube("bark", [Vector((-1.26, 0.25, 1.25)), Vector((-1.32, 0.18, 1.18)),
                      Vector((-1.35, 0.13, 1.12))], 0.038, segs=7,
            taper=lambda t: 1.0 - 0.88 * t, tile=0.8, name="entranceSplinter")
-    A.tube("wood", [Vector((-1.20, -0.30, 0.98)), Vector((-1.30, -0.43, 1.07)),
+    A.tube("bark", [Vector((-1.20, -0.30, 0.98)), Vector((-1.30, -0.43, 1.07)),
                      Vector((-1.42, -0.52, 0.98))], 0.060, segs=8,
            taper=lambda t: 1.0 - 0.86 * t, tile=0.8, name="splitRimEast")
-    A.tube("wood", [Vector((-1.12, 0.34, 0.92)), Vector((-1.25, 0.48, 0.99)),
+    A.tube("bark", [Vector((-1.12, 0.34, 0.92)), Vector((-1.25, 0.48, 0.99)),
                      Vector((-1.36, 0.55, 0.87))], 0.052, segs=8,
            taper=lambda t: 1.0 - 0.84 * t, tile=0.8, name="splitRimWest")
 
