@@ -32,7 +32,10 @@ tangent handling has not been checked.
 `(+117, 0, 0) cm` component offset from the recorded entrance anchor
 (`IslandWildlifeHome.cpp` / `IslandWildlifeHome.h`). This candidate's opening
 center is approximately `(-78, -1, 47) cm` in mesh-local coordinates, with an
-inner radius of 27.5 cm. Reusing the existing offset would put the opening
+inner radius of 27.5 cm. These coordinates are now named `entrance_center` and
+`entrance_threshold` in the asset manifest; the pipeline verifier checks that
+each anchor remains inside the re-imported FBX bounds (1 cm tolerance).
+Reusing the existing offset would put the opening
 center about 39 cm forward and 47 cm above the actor anchor; its lower edge
 would still sit roughly 19.5 cm above it. Do not swap the asset path under the
 old transform. Before integration, confirm whether `EntranceLocation` denotes

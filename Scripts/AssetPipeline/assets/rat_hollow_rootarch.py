@@ -7,6 +7,10 @@ import lib
 
 
 NAME = "RatHollowRootArch"
+ASSET_ANCHORS_CM = {
+    "entrance_center": (-78.0, -1.0, 47.0),
+    "entrance_threshold": (-78.0, -1.0, 19.5),
+}
 lib.TILED["bark"] = ("T_Lib_RatHollow_Bark", 1.2)
 lib.PLAIN["hollowwood"] = {"BaseColor": [0.22, 0.12, 0.065], "Roughness": 1.0}
 

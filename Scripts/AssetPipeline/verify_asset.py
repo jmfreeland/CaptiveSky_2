@@ -1,4 +1,4 @@
-"""Blender headless: re-import the exported FBX, rebuild materials from the exported PNGs only, render.
+"""Blender headless: re-import the FBX, validate mesh/anchor metadata, rebuild materials, render.
 
 blender -b --factory-startup -P verify_asset.py -- <Folder>
 Writes <Folder>/Preview.png and prints structure facts.
@@ -33,6 +33,41 @@ zmin = min(v.z for v in bbox)
 print("ZMIN", round(zmin, 4))
 
 problems = []
+anchors_cm = man.get("anchors_cm", {})
+if not isinstance(anchors_cm, dict):
+    problems.append("anchors_cm must be a mapping of names to XYZ centimetres")
+else:
+    local_bounds_cm = [
+        (min(corner[axis] for corner in mesh.bound_box) * 100.0,
+         max(corner[axis] for corner in mesh.bound_box) * 100.0)
+        for axis in range(3)
+    ]
+    for anchor_name, position in anchors_cm.items():
+        if (
+            not isinstance(anchor_name, str)
+            or not anchor_name.strip()
+            or not isinstance(position, list)
+            or len(position) != 3
+        ):
+            problems.append(f"invalid asset anchor {anchor_name!r}; expected a named XYZ centimetre list")
+            continue
+        try:
+            coordinates = [float(value) for value in position]
+        except (TypeError, ValueError):
+            problems.append(f"asset anchor {anchor_name!r} contains a non-numeric coordinate")
+            continue
+        if not all(math.isfinite(value) for value in coordinates):
+            problems.append(f"asset anchor {anchor_name!r} contains a non-finite coordinate")
+            continue
+        outside = [
+            axis for axis, value in enumerate(coordinates)
+            if value < local_bounds_cm[axis][0] - 1.0 or value > local_bounds_cm[axis][1] + 1.0
+        ]
+        if outside:
+            problems.append(f"asset anchor {anchor_name!r} lies outside the mesh bounds on axes {outside}")
+    if anchors_cm:
+        print("ANCHORS CM", anchors_cm)
+
 for slot in mesh.material_slots:
     m = slot.material
     name = m.name.split(".")[0]
