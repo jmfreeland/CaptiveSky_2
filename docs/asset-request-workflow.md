@@ -54,3 +54,13 @@ the documented `D:\python\3d` venv still points to a missing base Python, but
 the request runner inherits the interpreter used to launch `requests.py`, so a
 working Python with NumPy/Pillow can run the same guarded handoff without
 repairing that external venv.
+
+**Regression refresh (2026-10-16):** the complete suite now contains 31 tests
+and passes with the desktop's bundled Python 3.12.14 runtime (Pillow 12.3.0,
+NumPy 2.3.5):
+`python -B -m unittest discover -s Scripts/AssetPipeline/tests -p "test_*.py" -v`.
+This includes the bread texture, rat-hollow geometry, Wind Arch clearance,
+authored plant source contracts, and request inbox/routing guard tests. The
+suite verifies deterministic source and pipeline boundaries; it does not show
+that a generated prop is attractive in Unreal, imported, or placed in the
+world.
