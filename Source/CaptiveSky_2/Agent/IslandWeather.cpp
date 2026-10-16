@@ -428,6 +428,36 @@ bool AIslandWeather::IsWithinCurioGroundCoverClearance(const FVector& Position, 
 	return FVector::DistSquared2D(Position, CurioPosition) < FMath::Square(ClearanceRadius);
 }
 
+void AIslandWeather::BuildTidepoolPeriwinkleShoreOffsets(int32 Index, TArray<FVector>& OutOffsets)
+{
+	OutOffsets.Reset();
+	constexpr int32 Population = 3;
+	constexpr int32 CandidateCount = 9;
+	constexpr float ShoreRadius = 660.f;
+	if (Index < 0 || Index >= Population) return;
+
+	const float BaseAngle = PI / 3.f + Index * 2.f * PI / Population;
+	OutOffsets.Reserve(CandidateCount);
+	for (int32 Attempt = 0; Attempt < CandidateCount; ++Attempt)
+	{
+		// Probe the slot centre first, then alternating offsets up to +/-60 degrees.
+		const int32 Step = (Attempt + 1) / 2;
+		const int32 SignedStep = Attempt == 0 ? 0 : (Attempt % 2 == 1 ? Step : -Step);
+		const float Angle = BaseAngle + SignedStep * (PI / 12.f);
+		OutOffsets.Emplace(FMath::Cos(Angle) * ShoreRadius, FMath::Sin(Angle) * ShoreRadius, 900.f);
+	}
+}
+
+bool AIslandWeather::IsWithinTidepoolPeriwinkleClearance(const FVector& Position, const FVector& HomePosition,
+	float VisualFootprintRadius)
+{
+	if (Position.ContainsNaN() || HomePosition.ContainsNaN()) return false;
+	const float Footprint = FMath::IsFinite(VisualFootprintRadius) ? FMath::Max(0.f, VisualFootprintRadius) : 0.f;
+	constexpr float ResidentScaleClearance = 125.f;
+	const float ClearanceRadius = ResidentScaleClearance + Footprint;
+	return FVector::DistSquared2D(Position, HomePosition) < FMath::Square(ClearanceRadius);
+}
+
 bool AIslandWeather::IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
 	const FVector& OutwardDirection, float VisualFootprintRadius)
 {
@@ -673,6 +703,7 @@ void AIslandWeather::InitializeGroundCover()
 	SpruceSwayLastUpdatedInstanceCount = 0;
 	GroundCoverInstanceCount = 0;
 	GroundCoverTrailClearedInstanceCount = 0;
+	GroundCoverPeriwinkleClearedInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
@@ -707,6 +738,7 @@ void AIslandWeather::InitializeGroundCover()
 	TArray<FVector> OtherHabitatAnchors;
 	FVector TideglassFlowerAnchor = FVector::ZeroVector;
 	bool bHasTideglassFlowerAnchor = false;
+	const AActor* TideglassHabitat = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("IslandLandmark")) && It->ActorHasTag(TEXT("WindArch")))
@@ -717,6 +749,27 @@ void AIslandWeather::InitializeGroundCover()
 		{
 			TideglassFlowerAnchor = It->GetActorLocation();
 			bHasTideglassFlowerAnchor = true;
+			TideglassHabitat = *It;
+		}
+	}
+	TArray<FVector> PeriwinkleGroundCoverHomes;
+	if (TideglassHabitat)
+	{
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			TArray<FVector> CandidateOffsets;
+			BuildTidepoolPeriwinkleShoreOffsets(Index, CandidateOffsets);
+			FCollisionQueryParams ShoreParams(SCENE_QUERY_STAT(IslandTidepoolPeriwinkleShore), false, this);
+			ShoreParams.AddIgnoredActor(TideglassHabitat);
+			for (const FVector& Offset : CandidateOffsets)
+			{
+				const FVector TraceStart = TideglassHabitat->GetActorLocation() + Offset;
+				FHitResult GroundHit;
+				if (!GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart,
+					TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, ShoreParams)) continue;
+				PeriwinkleGroundCoverHomes.Add(GroundHit.Location + FVector(0.f, 0.f, 0.5f));
+				break;
+			}
 		}
 	}
 	TArray<FIslandCurioRecord> ScatterCurios;
@@ -752,7 +805,8 @@ void AIslandWeather::InitializeGroundCover()
 			FMath::Max(MeshBounds.BoxExtent.X, MeshBounds.BoxExtent.Y));
 	}
 	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios,
-		&RatHollowApproaches, &RatHollowClearedInstanceCount, &GroundCoverMeshFootprintRadii](
+		&PeriwinkleGroundCoverHomes, &RatHollowApproaches, &RatHollowClearedInstanceCount,
+		&GroundCoverMeshFootprintRadii](
 		const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
 		if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, GroundHit.ImpactPoint))
@@ -803,12 +857,22 @@ void AIslandWeather::InitializeGroundCover()
 			const int32 GrassVariant = (SpeciesVariant - 5) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
-		if (!RatHollowApproaches.IsEmpty())
+		if (!RatHollowApproaches.IsEmpty() || !PeriwinkleGroundCoverHomes.IsEmpty())
 		{
 			if (const float* MeshFootprintRadius = GroundCoverMeshFootprintRadii.Find(Species->GetStaticMesh()))
 			{
 				const float InstanceScaleXY = FMath::Max(FMath::Abs(Scale.X), FMath::Abs(Scale.Y));
 				const float VisualFootprintRadius = *MeshFootprintRadius * InstanceScaleXY;
+				// Keep the low shoreline understorey and species mix intact; only tall grasses
+				// are withheld from a periwinkle's immediate sightline.
+				const bool bTallGrass = Species == ShoreGrassA.Get() || Species == ShoreGrassB.Get() || Species == GrassC;
+				if (bTallGrass)
+					for (const FVector& Home : PeriwinkleGroundCoverHomes)
+						if (IsWithinTidepoolPeriwinkleClearance(GroundHit.ImpactPoint, Home, VisualFootprintRadius))
+						{
+							++GroundCoverPeriwinkleClearedInstanceCount;
+							return;
+						}
 				for (const TPair<FVector, FVector>& Approach : RatHollowApproaches)
 					if (IsWithinRatHollowApproachClearance(GroundHit.ImpactPoint, Approach.Key, Approach.Value,
 						VisualFootprintRadius))
@@ -1683,6 +1747,9 @@ void AIslandWeather::InitializeGroundCover()
 	if (!RatHollowApproaches.IsEmpty())
 		UE_LOG(LogIslandWeather, Log, TEXT("Rat-hollow habitat clearance preserved surrounding cover and skipped %d candidate ground-cover instances."),
 			RatHollowClearedInstanceCount);
+	if (!PeriwinkleGroundCoverHomes.IsEmpty())
+		UE_LOG(LogIslandWeather, Log, TEXT("Tideglass periwinkle clearings preserved %d grounded homes and skipped %d candidate ground-cover instances."),
+			PeriwinkleGroundCoverHomes.Num(), GroundCoverPeriwinkleClearedInstanceCount);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }
@@ -1751,6 +1818,7 @@ void AIslandWeather::ClearGroundCover()
 	SpruceCells.Reset();
 	GroundCoverInstanceCount = 0;
 	GroundCoverTrailClearedInstanceCount = 0;
+	GroundCoverPeriwinkleClearedInstanceCount = 0;
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
@@ -2779,17 +2847,12 @@ void AIslandWeather::RefreshNightEcology()
 	while (TidepoolPeriwinkles.Num() < PeriwinklePopulation)
 	{
 		const int32 Index = TidepoolPeriwinkles.Num();
-		const float BaseAngle = PI / 3.f + Index * 2.f * PI / PeriwinklePopulation;
+		TArray<FVector> CandidateOffsets;
+		BuildTidepoolPeriwinkleShoreOffsets(Index, CandidateOffsets);
 		FVector SpawnLocation = FVector::ZeroVector;
 		bool bFoundShoreGround = false;
-		for (int32 Attempt = 0; Attempt < 9; ++Attempt)
+		for (const FVector& ShoreOffset : CandidateOffsets)
 		{
-			// Probe the slot centre first, then alternating offsets up to +/-60
-			// degrees. The three slots therefore keep separate shoreline sectors.
-			const int32 Step = (Attempt + 1) / 2;
-			const int32 SignedStep = Attempt == 0 ? 0 : (Attempt % 2 == 1 ? Step : -Step);
-			const float Angle = BaseAngle + SignedStep * (PI / 12.f);
-			const FVector ShoreOffset(FMath::Cos(Angle) * 660.f, FMath::Sin(Angle) * 660.f, 900.f);
 			const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
 			FHitResult GroundHit;
 			FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolPeriwinkleShore), false, this);

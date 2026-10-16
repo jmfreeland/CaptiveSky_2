@@ -198,6 +198,7 @@ private:
 	int32 ActiveRainGroundImpactCount = 0;
 	int32 GroundCoverInstanceCount = 0;
 	int32 GroundCoverTrailClearedInstanceCount = 0;
+	int32 GroundCoverPeriwinkleClearedInstanceCount = 0;
 	int32 GroundCoverMeadowInstanceCount = 0;
 	int32 GroundCoverTreeCount = 0;
 	int32 GroundCoverShrubCount = 0;
@@ -232,6 +233,10 @@ private:
 		const TArray<FVector>& OtherAnchors);
 	/** Keep a resident-scale open patch around lasting curios so meadow cover cannot bury them. */
 	static bool IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind);
+	/** Deterministic candidate offsets shared by Tideglass shoreline scatter and periwinkle homes. */
+	static void BuildTidepoolPeriwinkleShoreOffsets(int32 Index, TArray<FVector>& OutOffsets);
+	/** Preserve a small readable ground-level clearing around each grounded periwinkle home. */
+	static bool IsWithinTidepoolPeriwinkleClearance(const FVector& Position, const FVector& HomePosition, float VisualFootprintRadius = 0.f);
 	/** Keep the Rat-hollow mouth and its short, narrow approach lane open while preserving nearby cover. */
 	static bool IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
 		const FVector& OutwardDirection, float VisualFootprintRadius = 0.f);

@@ -230,6 +230,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			bFoundGround ? *Hit.ImpactPoint.ToCompactString() : TEXT("no location")));
 	}
 	Weather->InitializeGroundCover();
+	TestTrue(TEXT("Ground-cover initialization uses grounded Tideglass periwinkle clearings"),
+		Weather->GroundCoverPeriwinkleClearedInstanceCount > 0 && TideglassLandmarkCount == 1);
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
 	TestTrue(TEXT("PlantFactory Festuca mesh and all six imported materials resolve"),
@@ -320,6 +322,25 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(160.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::SeedPod));
 	TestFalse(TEXT("Small trail stones clear only their immediate footprint"),
 		AIslandWeather::IsWithinCurioGroundCoverClearance(FVector(70.f, 0.f, 0.f), FVector::ZeroVector, EIslandCurioKind::PaleStone));
+	TArray<FVector> PeriwinkleOffsets;
+	AIslandWeather::BuildTidepoolPeriwinkleShoreOffsets(0, PeriwinkleOffsets);
+	TestEqual(TEXT("Each periwinkle retains nine bounded shoreline fallback traces"), PeriwinkleOffsets.Num(), 9);
+	if (!PeriwinkleOffsets.IsEmpty())
+	{
+		TestTrue(TEXT("The periwinkle's preferred home stays at its 6.6 m pool-margin radius"),
+			FMath::IsNearlyEqual(FVector::Dist2D(PeriwinkleOffsets[0], FVector::ZeroVector), 660.f, 0.1f));
+		TestTrue(TEXT("Shoreline fallback candidates stay in their own angular sector"),
+			FVector::Dist2D(PeriwinkleOffsets[0], PeriwinkleOffsets.Last()) < 1200.f);
+	}
+	AIslandWeather::BuildTidepoolPeriwinkleShoreOffsets(-1, PeriwinkleOffsets);
+	TestTrue(TEXT("Invalid periwinkle slots cannot reserve an accidental clearing"), PeriwinkleOffsets.IsEmpty());
+	const FVector PeriwinkleHome(500.f, -300.f, 20.f);
+	TestTrue(TEXT("The small resident home receives a clear ground-level sightline"),
+		AIslandWeather::IsWithinTidepoolPeriwinkleClearance(PeriwinkleHome + FVector(170.f, 0.f, 900.f), PeriwinkleHome, 50.f));
+	TestFalse(TEXT("The clearing stops beyond the plant footprint and resident-scale margin"),
+		AIslandWeather::IsWithinTidepoolPeriwinkleClearance(PeriwinkleHome + FVector(176.f, 0.f, 0.f), PeriwinkleHome, 50.f));
+	TestFalse(TEXT("Invalid home positions do not clear vegetation"),
+		AIslandWeather::IsWithinTidepoolPeriwinkleClearance(FVector::ZeroVector, FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f)));
 	const FVector RatEntrance(1000.f, 2000.f, 300.f);
 	const FVector RatOutward(-1.f, 0.f, 0.f);
 	TestTrue(TEXT("The hollow mouth itself stays open at Rat scale"),
@@ -832,6 +853,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Repeating a weather update at the same time does not accumulate transform drift"), bRepeatedSwayIsStable);
 	const int32 GroundCoverCountAfterFirstInitialization = Weather->GroundCoverInstanceCount;
+	const int32 PeriwinkleClearCountAfterFirstInitialization = Weather->GroundCoverPeriwinkleClearedInstanceCount;
 	UHierarchicalInstancedStaticMeshComponent* TrailSampleComponent = nullptr;
 	const TArray<UHierarchicalInstancedStaticMeshComponent*> GrassComponents = { Weather->ShoreGrassA, Weather->ShoreGrassB, GrassC,
 		Weather->ShoreGroundPlants, Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB, Weather->ShoreGroundPlantLowC, Weather->ShoreGroundPlantLowD };
@@ -849,6 +871,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("The marker-only fixture has no landscape shrub understorey"), Weather->GroundCoverShrubCount, 0);
 	Weather->ClearGroundCover();
 	TestEqual(TEXT("Transient cleanup clears all grass instances"), Weather->GroundCoverInstanceCount, 0);
+	TestEqual(TEXT("Transient cleanup clears periwinkle-clearing diagnostics"), Weather->GroundCoverPeriwinkleClearedInstanceCount, 0);
 	TestEqual(TEXT("Transient cleanup clears the meadow-patch diagnostic count"), Weather->GroundCoverMeadowInstanceCount, 0);
 	TestEqual(TEXT("Transient cleanup clears the spruce-tree count"), Weather->GroundCoverTreeCount, 0);
 	TestEqual(TEXT("Transient cleanup clears the broadleaf-shrub count"), Weather->GroundCoverShrubCount, 0);
@@ -881,7 +904,9 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			Weather->InitializeGroundCover();
 			TestTrue(TEXT("A well-worn persistent path suppresses real scatter candidates"), Weather->GroundCoverTrailClearedInstanceCount > 0);
 			TestEqual(TEXT("Every skipped ground-cover candidate is reflected in the placement total"),
-				Weather->GroundCoverInstanceCount + Weather->GroundCoverTrailClearedInstanceCount, GroundCoverCountAfterFirstInitialization);
+				Weather->GroundCoverInstanceCount + Weather->GroundCoverTrailClearedInstanceCount +
+				Weather->GroundCoverPeriwinkleClearedInstanceCount - PeriwinkleClearCountAfterFirstInitialization,
+				GroundCoverCountAfterFirstInitialization);
 			Weather->ClearGroundCover();
 			TrailLedger.Cells.Reset();
 		}

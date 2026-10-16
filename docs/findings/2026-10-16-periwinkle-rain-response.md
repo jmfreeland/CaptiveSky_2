@@ -61,3 +61,32 @@ art-directed to preserve a legible rocky microhabitat before enlarging the
 primitive animal or claiming the rain behavior reads in play. No authored map
 or Content asset was changed; the custom viewpoint and all runtime data remain
 local under `Saved/Playtests/`.
+
+## Ground-cover sightline pass — 2026-10-16
+
+Ground-cover initialization now shares the exact deterministic nine-point
+shoreline candidate sequence used by the three periwinkles. Before scattering,
+it traces each candidate against the same shoreline collision and records the
+first grounded home; only full-height grass whose visual footprint overlaps a
+125 cm resident-scale margin is withheld. Short shoreline understorey, the
+species budget, the three-resident population, and all authored map/Content
+assets remain unchanged. This reserves small readable pockets rather than
+clearing broad swathes of the Tideglass meadow.
+
+The scratch `CaptiveSky_2Editor` target rebuilt successfully with the editor
+left open. `CaptiveSky2.Agent.NightEcology` passed (exit 0), and its shared
+home-selection code was exercised. The enabled `CaptiveSky2.Agent.GroundCover`
+fixture logged three grounded homes and seven tall-grass candidates skipped;
+its new integration assertion passed. That broader test still exits 1 on four
+existing assertions: one variant-visibility check (including two absent
+understorey variants) and three resident-sway checks. A control build with the
+clearing disabled produced the same four failures, so they are not regressions
+from this pass. Logs:
+[`NightEcology`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_PeriwinkleClearance_NightEcology_20261016.log),
+[`enabled GroundCover`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_PeriwinkleClearance_GrassOnly_20261016.log),
+[`no-clearing control`](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_PeriwinkleClearance_BaselineCompare_20261016.log).
+
+Visual confirmation is still pending. The last close-up was obscured by tall
+foreground plants and over texture budget; rerun a capped, zero-request real-RHI
+close-up when the open editor is no longer needed, then tune the clearing only
+if the resident still fails to read naturally against the shore.
