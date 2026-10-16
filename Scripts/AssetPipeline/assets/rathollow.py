@@ -28,6 +28,50 @@ def _ring(bm, x, radius, center_z, phase, segments, center_y=0.0, irregularity=1
     return verts
 
 
+def _outer_surface_point(x, angle, stations):
+    upper = next((index for index, station in enumerate(stations) if station[0] >= x), len(stations) - 1)
+    lower = max(0, upper - 1)
+    first, second = stations[lower], stations[upper]
+    amount = 0.0 if upper == lower else (x - first[0]) / (second[0] - first[0])
+    radius = first[1] + (second[1] - first[1]) * amount
+    center_z = first[2] + (second[2] - first[2]) * amount
+    first_y = 0.035 * math.sin(lower * 0.83)
+    second_y = 0.035 * math.sin(upper * 0.83)
+    center_y = first_y + (second_y - first_y) * amount
+    phase = (lower + amount) * 0.61
+    variation = 1.0 + (
+        0.085 * math.sin(3.0 * angle + phase)
+        + 0.038 * math.sin(7.0 * angle - phase * 0.7)
+        + 0.032 * math.sin(2.0 * angle + phase * 1.3)
+    )
+    radius *= variation
+    return Vector((
+        x + 0.045 * math.sin(5.0 * angle + phase),
+        center_y + radius * math.cos(angle),
+        center_z + radius * math.sin(angle),
+    ))
+
+
+def _moss_patch_grid(center_x, center_angle, length, angle_width, seed, stations):
+    rows = []
+    row_count, column_count = 7, 5
+    for row in range(row_count):
+        u = row / (row_count - 1) * 2.0 - 1.0
+        points = []
+        for column in range(column_count):
+            v = column / (column_count - 1) * 2.0 - 1.0
+            x_edge = 0.88 + 0.12 * math.sin(seed + column * 1.7 + row * 0.43)
+            angle_edge = 0.88 + 0.12 * math.sin(seed * 0.7 + row * 1.3 - column * 0.51)
+            x = center_x + u * (length * 0.5) * x_edge
+            angle = center_angle + v * (angle_width * 0.5) * angle_edge
+            point = _outer_surface_point(x, angle, stations)
+            interior = max(0.0, 1.0 - u * u) * max(0.0, 1.0 - v * v)
+            point += Vector((0.0, math.cos(angle), math.sin(angle))) * (0.006 + 0.006 * interior)
+            points.append(point)
+        rows.append(points)
+    return rows
+
+
 def _bridge(bm, first, second, skip_segments=()):
     for i in range(len(first)):
         if i in skip_segments:
@@ -42,7 +86,7 @@ def _cap(bm, ring, x, center_z):
         bm.faces.new((center, ring[i], ring[(i + 1) % len(ring)]))
 
 
-def _hollow_log(A):
+def _hollow_log(A, conform_moss=False):
     segments = 40
     center_z = 0.66
     bm = bmesh.new()
@@ -108,16 +152,33 @@ def _hollow_log(A):
                      Vector((-1.36, 0.55, 0.87))], 0.052, segs=8,
            taper=lambda t: 1.0 - 0.84 * t, tile=0.8, name="splitRimWest")
 
-    # Moss sits in separate soft clumps so it remains readable rather than painting the whole log green.
-    for i, (x, y, z, radii) in enumerate((
-        (-0.78, -0.10, 1.30, (0.28, 0.18, 0.035)),
-        (-0.30, 0.13, 1.31, (0.34, 0.16, 0.038)),
-        (0.22, 0.08, 1.30, (0.31, 0.19, 0.035)),
-        (0.78, -0.07, 1.24, (0.24, 0.15, 0.030)),
-        (-0.54, 0.42, 1.17, (0.20, 0.15, 0.030)),
-    )):
-        A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.22,
-               flat_bottom=0.35, tile=0.4, name="moss{:02d}".format(i))
+    moss_sites = (
+        (-0.78, 1.58, 0.48, 0.44),
+        (-0.30, 1.48, 0.58, 0.48),
+        (0.22, 1.64, 0.50, 0.52),
+        (0.78, 1.76, 0.38, 0.43),
+        (-0.54, 1.10, 0.34, 0.48),
+    )
+    if conform_moss:
+        for i, (x, angle, length, angle_width) in enumerate(moss_sites):
+            A.cloth(
+                "moss",
+                _moss_patch_grid(x, angle, length, angle_width, 43 + i, outer_stations),
+                thick=0.006,
+                tile=0.4,
+                name="mossPatch{:02d}".format(i),
+            )
+    else:
+        moss_rocks = (
+            (-0.78, -0.10, 1.30, (0.28, 0.18, 0.035)),
+            (-0.30, 0.13, 1.31, (0.34, 0.16, 0.038)),
+            (0.22, 0.08, 1.30, (0.31, 0.19, 0.035)),
+            (0.78, -0.07, 1.24, (0.24, 0.15, 0.030)),
+            (-0.54, 0.42, 1.17, (0.20, 0.15, 0.030)),
+        )
+        for i, (x, y, z, radii) in enumerate(moss_rocks):
+            A.rock("moss", radii, loc=(x, y, z), seed=43 + i, sub=2, rough=0.22,
+                   flat_bottom=0.35, tile=0.4, name="moss{:02d}".format(i))
 
     # Five simple collision shapes follow the shell. Keep the two low runners at
     # the sides: a full-width floor box here makes an impassable raised sill for

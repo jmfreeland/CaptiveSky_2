@@ -67,3 +67,22 @@ is therefore the better preview candidate, not approved final art. It has not
 been imported into Unreal, placed on the Island, or reviewed in woodland
 lighting/gameplay. Keep all existing imports and Island state untouched until
 that contextual review.
+
+## V5 moss-conforming candidate — 2026-10-16
+
+V5 keeps the V4 log, entrance, straw nest and collision layout, but replaces
+the five detached moss-rock pads with thin irregular patches projected onto
+the trunk's curved outer profile. The V4 source remains the default; the
+versioned `rathollow_barkv5.py` builder produces a separate local export.
+
+Blender 5.2.2 exported and re-imported the FBX successfully: 2,352 triangles,
+2.708 × 1.452 × 1.424 m, five box colliders, `UVMap`, four resolved material
+slots, and `PROBLEMS []`. The surface-following patches read as more attached
+to the trunk in the entrance and oblique previews ([entrance](../../Saved/CaptiveSky/ComfyBlender/RatHollow_BarkV5/Preview-Entrance.png),
+[oblique](../../Saved/CaptiveSky/ComfyBlender/RatHollow_BarkV5/Preview-Oblique.png)).
+The bark still has strong directional contrast, the moss remains conspicuously
+bright, and the export's minimum Z is -0.0321 m. This is an art/structure
+candidate only: it has not been imported into Unreal, checked against a real
+terrain surface or rat capsule, or approved for the canonical home. Keep V4
+and the current Unreal import untouched until a bounded Island review can
+compare them in woodland lighting from both rat-eye and human approach views.
