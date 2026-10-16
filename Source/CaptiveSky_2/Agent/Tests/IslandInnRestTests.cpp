@@ -5,6 +5,8 @@
 #include "AgentConsolidationComponent.h"
 #include "AgentMemoryComponent.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandWildlifeHome.h"
+#include "IslandWorldStateSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Engine/Engine.h"
@@ -129,9 +131,85 @@ bool FIslandInnRestTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Failed roof evidence is reported honestly and does not claim a sheltered memory"),
 		Controller->DescribeActionState().Contains(TEXT("will not be recorded as sheltered inn rest")));
 	TestEqual(TEXT("A bed without verified enclosure creates no additional sheltered-rest memory"), Memory->GetMemoryCount(), 1);
+	Rest->WakeUp();
+
+	const FString WorldStateFile = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("WildlifeHomeRest") /
+		(TEXT("WorldState_") + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".json")));
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(WorldStateFile), true);
+	UIslandWorldStateSubsystem* WorldState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	TestNotNull(TEXT("Fixture world has an isolated wildlife-home store"), WorldState);
+	if (WorldState)
+	{
+		WorldState->StorageFileOverride = WorldStateFile;
+		FIslandWildlifeHomeRecord Home;
+		Home.Id = TEXT("Fenrus_FallenWood");
+		Home.Species = TEXT("Rat");
+		Home.OccupantAgentId = Memory->GetResolvedAgentId();
+		Home.EntranceLocation = FVector(2000.f, 0.f, 0.f);
+		Home.ShelterQuality = 4;
+		Home.ShelterState = EIslandWildlifeShelterState::Settled;
+		Home.LastUsedUtc = FDateTime(2000, 1, 1);
+		TestTrue(TEXT("A bounded assigned Rat home is stored outside the real world-state file"), WorldState->StoreWildlifeHome(Home));
+		AActor* HomeActor = WorldState->FindWildlifeHomeActor(Home.Id);
+		if (!HomeActor)
+		{
+			HomeActor = World->SpawnActor<AActor>(Home.EntranceLocation, Home.EntranceRotation);
+			if (HomeActor)
+			{
+				HomeActor->Tags.AddUnique(TEXT("IslandWildlifeHome"));
+				HomeActor->Tags.AddUnique(FName(*(TEXT("WildlifeHome_") + Home.Id.ToString())));
+			}
+		}
+		TestNotNull(TEXT("Assigned wildlife home has a visible place actor"), HomeActor);
+		if (HomeActor)
+		{
+			Resident->SetActorLocation(Home.EntranceLocation, false, nullptr, ETeleportType::TeleportPhysics);
+			const FString HomeSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+			TestTrue(TEXT("The resident sees its own nearby home as an exact optional movement target"),
+				HomeSituation.Contains(TEXT("optional move_to target: WildlifeHome_Fenrus_FallenWood")) && HomeSituation.Contains(TEXT("Sleep is optional")));
+			TestTrue(TEXT("Home perception does not promise shelter, safety, comfort, or recovery"),
+				HomeSituation.Contains(TEXT("does not establish shelter, safety, comfort, or recovery")));
+
+			Resident->SetActorLocation(FVector::ZeroVector, false, nullptr, ETeleportType::TeleportPhysics);
+			TestFalse(TEXT("A requested home cannot teleport a resident into sleep"), Controller->TryRest(TEXT("WildlifeHome_Fenrus_FallenWood")));
+			TestTrue(TEXT("A distant home request leaves the resident awake"), Rest->IsAwake());
+
+			Home.OccupantAgentId = TEXT("Agent_Someone_Else");
+			TestTrue(TEXT("The ownership fixture can be changed reversibly"), WorldState->StoreWildlifeHome(Home));
+			Resident->SetActorLocation(Home.EntranceLocation, false, nullptr, ETeleportType::TeleportPhysics);
+			const FString OtherResidentSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+			TestFalse(TEXT("Another resident does not receive this home's optional target"),
+				OtherResidentSituation.Contains(TEXT("optional move_to target: WildlifeHome_Fenrus_FallenWood")));
+			TestFalse(TEXT("A resident cannot sleep at another agent's assigned home"), Controller->TryRest(TEXT("WildlifeHome_Fenrus_FallenWood")));
+			TestTrue(TEXT("Rejecting another resident's home leaves consciousness unchanged"), Rest->IsAwake());
+
+			Home.OccupantAgentId = Memory->GetResolvedAgentId();
+			TestTrue(TEXT("The assigned home owner is restored"), WorldState->StoreWildlifeHome(Home));
+			TestTrue(TEXT("The owner may sleep after arriving at its named home"), Controller->TryRest(TEXT("WildlifeHome_Fenrus_FallenWood")));
+			TestFalse(TEXT("Home sleep pauses ordinary thought"), Rest->IsAwake());
+			TestTrue(TEXT("Home sleep queues only a cautious lived-place memory"),
+				Rest->PendingSleepExperience.Contains(TEXT("Fenrus_FallenWood")) &&
+				Rest->PendingSleepExperience.Contains(TEXT("not proof of weather protection")) &&
+				!Rest->PendingSleepExperience.Contains(TEXT("sheltered")));
+			TestTrue(TEXT("Home sleep never claims verified comfort, safety, or recovery"),
+				Controller->DescribeActionState().Contains(TEXT("does not verify weather protection, safety, comfort, or recovery")));
+			const FIslandWildlifeHomeRecord* UsedHome = WorldState->FindWildlifeHome(Home.Id);
+			TestTrue(TEXT("Using the home updates its persistent last-used time"), UsedHome && UsedHome->LastUsedUtc > FDateTime(2000, 1, 1));
+
+			Rest->WakeUp();
+			TestTrue(TEXT("Waking early cancels the pending home memory"), Rest->PendingSleepExperience.IsEmpty());
+			TestTrue(TEXT("The owner may also rest without repeating the target after arriving home"), Controller->TryRest());
+			Rest->AppendPendingSleepExperience();
+			const TArray<FAgentMemoryRecord> MemoriesAfterHomeRest = Memory->GetMemoriesSince(FDateTime::MinValue());
+			TestTrue(TEXT("A completed home rest becomes a durable place-specific memory"),
+				MemoriesAfterHomeRest.Num() == 2 && MemoriesAfterHomeRest.Last().Text.Contains(TEXT("Fenrus_FallenWood")) &&
+				MemoriesAfterHomeRest.Last().Text.Contains(TEXT("not proof of weather protection")));
+		}
+	}
 
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
 	IFileManager::Get().DeleteDirectory(*TestMemoryDirectory, false, true);
+	IFileManager::Get().Delete(*WorldStateFile, false, true, true);
 	return true;
 }

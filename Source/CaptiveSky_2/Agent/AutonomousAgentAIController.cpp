@@ -565,8 +565,33 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 		return false;
 	}
 
+	UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
+	const FString AgentId = Memory ? Memory->GetResolvedAgentId() : FString();
+	constexpr const TCHAR* WildlifeHomeTagPrefix = TEXT("WildlifeHome_");
+	auto FindOwnedWildlifeHome = [&](FName HomeId, FIslandWildlifeHomeRecord& OutRecord) -> AActor*
+	{
+		const FIslandWildlifeHomeRecord* Record = WorldState ? WorldState->FindWildlifeHome(HomeId) : nullptr;
+		if (!Record || AgentId.IsEmpty() || !Record->OccupantAgentId.Equals(AgentId, ESearchCase::IgnoreCase)) return nullptr;
+		const FName HomeTag(*(FString(WildlifeHomeTagPrefix) + HomeId.ToString()));
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (!It->ActorHasTag(TEXT("IslandWildlifeHome")) || !It->ActorHasTag(HomeTag)) continue;
+			OutRecord = *Record;
+			return *It;
+		}
+		return nullptr;
+	};
+	auto IsAtRestSite = [Body](const AActor* Site)
+	{
+		return Site && FVector::Dist2D(Body->GetActorLocation(), Site->GetActorLocation()) <= 250.f &&
+			FMath::Abs(Body->GetActorLocation().Z - Site->GetActorLocation().Z) <= 250.f;
+	};
+
 	AActor* RequestedBed = nullptr;
 	AActor* RequestedPerch = nullptr;
+	AActor* RestingWildlifeHomeActor = nullptr;
+	FIslandWildlifeHomeRecord RestingWildlifeHome;
 	if (!RequestedRestSite.IsNone())
 	{
 		if (RequestedRestSite.ToString().StartsWith(TEXT("InnBed_")))
@@ -576,6 +601,16 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 			if (!RequestedBed)
 			{
 				ReportAction(TEXT("That tagged inn bed is not present here. Nothing changed."));
+				return false;
+			}
+		}
+		else if (RequestedRestSite.ToString().StartsWith(WildlifeHomeTagPrefix))
+		{
+			const FString HomeIdText = RequestedRestSite.ToString().RightChop(FCString::Strlen(WildlifeHomeTagPrefix));
+			RestingWildlifeHomeActor = FindOwnedWildlifeHome(FName(*HomeIdText), RestingWildlifeHome);
+			if (!RestingWildlifeHomeActor)
+			{
+				ReportAction(TEXT("That is not a current wildlife home assigned to you. Nothing changed."));
 				return false;
 			}
 		}
@@ -589,9 +624,8 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 				return false;
 			}
 		}
-		AActor* RequestedLocation = RequestedBed ? RequestedBed : RequestedPerch;
-		if (FVector::Dist2D(Body->GetActorLocation(), RequestedLocation->GetActorLocation()) > 250.f ||
-			FMath::Abs(Body->GetActorLocation().Z - RequestedLocation->GetActorLocation().Z) > 250.f)
+		AActor* RequestedLocation = RequestedBed ? RequestedBed : (RequestedPerch ? RequestedPerch : RestingWildlifeHomeActor);
+		if (!IsAtRestSite(RequestedLocation))
 		{
 			ReportAction(FString::Printf(TEXT("You are not at %s yet. Move there first; sleep does not teleport you."), *RequestedRestSite.ToString()));
 			return false;
@@ -609,7 +643,7 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	RepeatedActions = 0;
 
 	AActor* BedAtRest = RequestedBed;
-	if (!BedAtRest && !RequestedPerch)
+	if (!BedAtRest && !RequestedPerch && !RestingWildlifeHomeActor)
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 			if (It->ActorHasTag(TEXT("IslandInn")) && It->Tags.ContainsByPredicate([](FName Tag) { return Tag.ToString().StartsWith(TEXT("InnBed_")); }) &&
 				FVector::Dist2D(Body->GetActorLocation(), It->GetActorLocation()) <= 250.f &&
@@ -618,6 +652,20 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 				BedAtRest = *It;
 				break;
 			}
+	if (!RestingWildlifeHomeActor && WorldState && !AgentId.IsEmpty())
+	{
+		for (const FIslandWildlifeHomeRecord& Home : WorldState->GetWildlifeHomes())
+		{
+			FIslandWildlifeHomeRecord CandidateRecord;
+			AActor* CandidateActor = FindOwnedWildlifeHome(Home.Id, CandidateRecord);
+			if (CandidateActor && IsAtRestSite(CandidateActor))
+			{
+				RestingWildlifeHomeActor = CandidateActor;
+				RestingWildlifeHome = CandidateRecord;
+				break;
+			}
+		}
+	}
 	const bool bShelteredInnRest = BedAtRest && UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), Body->GetActorLocation(), Body);
 	if (bShelteredInnRest)
 	{
@@ -638,6 +686,23 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	{
 		ReportAction(TEXT("Settled to sleep near the tagged inn bed, but the roof-and-wall enclosure did not pass the current check. This will not be recorded as sheltered inn rest; ordinary thoughts pause during sleep."));
 	}
+	else if (RestingWildlifeHomeActor)
+	{
+		RestingWildlifeHome.LastUsedUtc = FDateTime::UtcNow();
+		const bool bHomeUseSaved = WorldState && WorldState->StoreWildlifeHome(RestingWildlifeHome);
+		if (!bHomeUseSaved)
+			UE_LOG(LogAutonomousAgentAI, Warning, TEXT("%s began sleep at wildlife home %s but its last-used time could not be saved."),
+				*GetName(), *RestingWildlifeHome.Id.ToString());
+		if (Memory)
+		{
+			const FString Experience = FString::Printf(TEXT("I slept at my recorded wildlife home %s. This records where I rested, not proof of weather protection, safety, comfort, or recovery."),
+				*RestingWildlifeHome.Id.ToString());
+			Rest->QueueSleepExperience(Experience, { TEXT("sleep"), TEXT("rest"), TEXT("wildlife-home") });
+		}
+		ReportAction(Memory
+			? TEXT("Settled to sleep at your recorded wildlife home. The place record does not verify weather protection, safety, comfort, or recovery. A memory of this rest will be kept only if the sleep finishes; waking early cancels it. Ordinary thoughts pause during sleep.")
+			: TEXT("Settled to sleep at your recorded wildlife home. The place record does not verify weather protection, safety, comfort, or recovery, and this body has no memory store. Ordinary thoughts pause during sleep."));
+	}
 	else if (Cast<ARavenAgentAIController>(this))
 	{
 		AActor* RestingNestSite = RequestedPerch;
@@ -650,14 +715,12 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 					RestingNestSite = *It;
 					break;
 				}
-		const UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
 		const FName NestSiteTag = RestingNestSite && RestingNestSite->Tags.Num() > 0 ? RestingNestSite->Tags[0] : NAME_None;
 		const FIslandNestRecord* Nest = WorldState && RestingNestSite &&
 			RestingNestSite->ActorHasTag(TEXT("RavenPerch")) && RestingNestSite->ActorHasTag(TEXT("RavenNestSite"))
 			? WorldState->FindNest(NestSiteTag) : nullptr;
 		if (Nest)
 		{
-			UAgentMemoryComponent* Memory = Body->FindComponentByClass<UAgentMemoryComponent>();
 			if (Memory)
 			{
 				const bool bHelpedWeave = Nest->Builders.Contains(Memory->GetResolvedAgentId());

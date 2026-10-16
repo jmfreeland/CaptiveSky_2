@@ -366,6 +366,22 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			const FString OwnId = OwnMemory ? OwnMemory->GetResolvedAgentId() : FString();
 			if (!OwnId.IsEmpty())
 			{
+				for (const FIslandWildlifeHomeRecord& Home : WorldState->GetWildlifeHomes())
+				{
+					if (!Home.OccupantAgentId.Equals(OwnId, ESearchCase::IgnoreCase)) continue;
+					const FName HomeTag(*(TEXT("WildlifeHome_") + Home.Id.ToString()));
+					AActor* HomeActor = nullptr;
+					for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+						if (It->ActorHasTag(TEXT("IslandWildlifeHome")) && It->ActorHasTag(HomeTag)) { HomeActor = *It; break; }
+					if (!HomeActor || FVector::DistSquared(Location, HomeActor->GetActorLocation()) > FMath::Square(2500.f)) continue;
+					FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentWildlifeHomeVisibility), false, Owner);
+					Params.AddIgnoredActor(HomeActor);
+					FHitResult Hit;
+					if (GetWorld()->LineTraceSingleByChannel(Hit, Location, HomeActor->GetActorLocation(), ECC_Visibility, Params)) continue;
+					NearbyBeings += FString::Printf(TEXT(" Your recorded wildlife home %s is %.0f metres away (optional move_to target: WildlifeHome_%s). If you choose sleep after arriving, the system can remember that you rested there; the place record does not establish shelter, safety, comfort, or recovery. Sleep is optional."),
+						*Home.Id.ToString(), FVector::Dist(Location, HomeActor->GetActorLocation()) / 100.f, *Home.Id.ToString());
+					break;
+				}
 				for (const FIslandCraftTraditionRecord& Tradition : WorldState->GetCraftTraditions())
 				{
 					if (!WorldState->HasCraftKnowledge(Tradition.Id, OwnId)) continue;
@@ -1005,7 +1021,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"In an in-world conversation with another resident, you may optionally set teach_craft to one exact ID from the craft traditions you personally know, only when your speech deliberately shares that practice. The nearby recipient gains attributed knowledge only after the line is delivered in the reserved, in-range resident conversation. Do not set it for the player, Discord, or any external correspondent; do not claim an item was made or given. Teaching is optional; do not invent an ID or make teaching a duty. "
 		"You may optionally choose practice_craft only when the current situation explicitly says you are close enough to the lit InnHearth. Use target InnHearth. If you already know the tradition, copy its exact ID and do not rename it; otherwise you may begin one only when genuinely curious, with a short safe craft_id (ASCII letters, digits, _ or -), a concise craft_name, and a brief source grounded in your memory, observation, or curiosity. Give one to four intended settings using only hydration, rise, heat, or salt, each in range 0..1. These are speculative notes, not measured ingredients, quality, or proof of success. The record is unrated, one attempt per Island day, and creates no ingredients, food, or prop. This action uses the current thought only; do not repeat it as a duty. "
-		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
+		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. If the situation names your assigned WildlifeHome target, you may move_to there and choose sleep after arriving; that records where you rested, not proof of shelter, safety, comfort, or recovery. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
 		"You may optionally use request_object to ask the human caretaker for one useful physical object to consider making. Put a concise, concrete description (at most 240 characters) in object_request, grounded in a need or curiosity you actually have; do not claim it exists or that it will be made. This only places a proposal in a review queue; it does not create, import, or place anything. Requests are optional and should be occasional, not repeated. "
 		"You may also occasionally use request_upgrade to suggest an improvement to any existing object or feature in the landscape or level, including props, vegetation, structures, paths, water, lighting, sounds, or other world elements. Choose upgrade_kind as aesthetic (appearance/material), variation (more distinct forms/species/details), or functionality (use/interaction/behavior). Give one concise, concrete idea in upgrade_request (at most 240 characters). If the situation names the thing, copy its exact identifier into upgrade_target. If a visible object has no listed identifier, describe its visible kind and relative location instead; do not invent a proper name. Omit the target only for a genuinely broad world-level suggestion. This is a proposal for human review, not permission to change the world: it does not edit, generate, import, or place anything. Do not imply the upgrade exists or was approved. Requests are optional and should be occasional, not repeated. "
