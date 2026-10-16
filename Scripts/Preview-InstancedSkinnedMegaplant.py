@@ -1,4 +1,4 @@
-"""Compare one transient Beech through instanced and ordinary skeletal paths.
+"""Compare one transient Megaplant through instanced and ordinary skeletal paths.
 
 This is a disposable visual/API probe. It loads the Island as a lighting and
 scale reference, adds exactly one transient instance, captures one frame, and
@@ -6,6 +6,7 @@ never saves the map or any asset. Run with UnrealEditor-Cmd.exe, the project
 uproject, -RenderOffscreen, and -ExecutePythonScript=<absolute script path>.
 CAPTIVESKY_SKINNED_PREVIEW_ASSET and CAPTIVESKY_SKINNED_PREVIEW_OUTPUT may
 override the default Beech A asset and project-relative output directory.
+CAPTIVESKY_SKINNED_PREVIEW_HOUR selects a transient capture hour (default noon).
 The default output folder and comparison filenames are derived from the asset
 name so alternate species and variants cannot overwrite or masquerade as Beech.
 """
@@ -26,6 +27,9 @@ ASSET = os.environ.get(
 ASSET_PACKAGE_NAME = os.path.basename(ASSET.rsplit(".", 1)[0])
 ASSET_LABEL = re.sub(r"[^A-Za-z0-9_-]+", "_", ASSET_PACKAGE_NAME).strip("_") or "Candidate"
 TARGET_LABEL = os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_TARGET", "Roost_West")
+PREVIEW_HOUR = float(os.environ.get("CAPTIVESKY_SKINNED_PREVIEW_HOUR", "12.0"))
+if not 0.0 <= PREVIEW_HOUR < 24.0:
+    raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_HOUR must be in [0, 24)")
 OUTPUT_RELATIVE = os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_OUTPUT",
     "Saved/Playtests/Codex_InstancedSkinned_" + ASSET_LABEL,
@@ -131,6 +135,31 @@ def main():
     )
     actor_tools = require(unreal.get_editor_subsystem(unreal.EditorActorSubsystem),
                           "Editor Actor Subsystem is unavailable")
+    island_clock = next(
+        (actor for actor in actor_tools.get_all_level_actors()
+         if actor.get_class().get_name() == "IslandDayNight"),
+        None,
+    )
+    require(island_clock, "Could not find IslandDayNight clock actor")
+    island_clock.set_editor_property("start_hour", PREVIEW_HOUR)
+    capture_hour = float(island_clock.get_editor_property("current_hour"))
+    require(abs(capture_hour - PREVIEW_HOUR) < 0.05,
+            "Transient clock override did not apply: expected {}, got {}".format(
+                PREVIEW_HOUR, capture_hour
+            ))
+    sun_actor = island_clock.get_editor_property("sun")
+    sun_component = sun_actor.get_component_by_class(unreal.DirectionalLightComponent) if sun_actor else None
+    capture_sun_intensity = float(sun_component.get_editor_property("intensity")) if sun_component else None
+    capture_sun_rotation = None
+    if sun_actor:
+        sun_rotation = sun_actor.get_actor_rotation()
+        capture_sun_rotation = [
+            round(float(getattr(sun_rotation, axis)), 2) for axis in ("pitch", "yaw", "roll")
+        ]
+    log("transient Island clock set to {:.2f}; map will not be saved".format(capture_hour))
+    log("preview sun intensity={} rotation_pitch_yaw_roll={}".format(
+        capture_sun_intensity, capture_sun_rotation
+    ))
     mesh = require(unreal.load_asset(ASSET), "Could not load Skeletal Mesh: " + ASSET)
     if not isinstance(mesh, unreal.SkeletalMesh):
         raise TypeError("Expected a SkeletalMesh, got " + mesh.get_class().get_name())
@@ -210,12 +239,20 @@ def main():
 
     base_foliage_material = component.get_material(1)
     preview_color = unreal.LinearColor(*FOLIAGE_TINT)
+    foliage_tint_parameters = [
+        entry["name"]
+        for entry in (materials[1] or {}).get("vector_parameter_values", [])
+        if entry.get("name", "").replace(" ", "").lower().startswith("basecolortint")
+    ] if len(materials) > 1 and materials[1] else []
+    require(foliage_tint_parameters,
+            "Foliage material exposes no BaseColor Tint vector parameters")
     for label, foliage_component in (("instanced", component), ("ordinary", standard_component)):
         preview_material = foliage_component.create_dynamic_material_instance(1)
         require(preview_material, "Could not create transient {} foliage MID".format(label))
-        preview_material.set_vector_parameter_value("Base Color Tint", preview_color)
-        log("{} foliage tint {} applied to transient MID from {}".format(
-            label, list(FOLIAGE_TINT),
+        for parameter_name in foliage_tint_parameters:
+            preview_material.set_vector_parameter_value(parameter_name, preview_color)
+        log("{} foliage tint {} applied to transient MID parameter(s) {} from {}".format(
+            label, list(FOLIAGE_TINT), foliage_tint_parameters,
             base_foliage_material.get_path_name() if base_foliage_material else "<none>",
         ))
 
@@ -297,10 +334,14 @@ def main():
         "transform_provider": transform_provider_path,
         "materials": materials,
         "transient_foliage_tint": list(FOLIAGE_TINT),
+        "applied_foliage_tint_parameters": foliage_tint_parameters,
         "bounds_origin_cm": components(bounds_origin),
         "bounds_extent_cm": components(bounds_extent),
         "height_cm": round(height, 2),
         "target": TARGET_LABEL,
+        "capture_hour": capture_hour,
+        "capture_sun_intensity": capture_sun_intensity,
+        "capture_sun_rotation_pitch_yaw_roll": capture_sun_rotation,
         "map_saved": False,
         "outputs": [
             os.path.join(output_directory, OUTPUT_FILENAME),
