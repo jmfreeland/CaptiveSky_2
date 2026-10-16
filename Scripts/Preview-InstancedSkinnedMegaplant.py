@@ -10,6 +10,8 @@ CAPTIVESKY_SKINNED_PREVIEW_HOUR selects a transient capture hour (default noon).
 CAPTIVESKY_SKINNED_PREVIEW_SUN_INTENSITY optionally overrides only the transient
 sun intensity for material diagnostics. CAPTIVESKY_SKINNED_PREVIEW_CAPTURE_SOURCE
 may be "final_color_ldr" or "base_color" to separate material color from lighting.
+CAPTIVESKY_SKINNED_PREVIEW_BASECOLOR_CONTROL_ALPHA optionally overrides the alpha
+channel of foliage BaseColor Controls vectors on transient MIDs only.
 The default output folder and comparison filenames are derived from the asset
 name so alternate species and variants cannot overwrite or masquerade as Beech.
 """
@@ -45,6 +47,13 @@ CAPTURE_SOURCES = {
 }
 if CAPTURE_SOURCE_NAME not in CAPTURE_SOURCES:
     raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_CAPTURE_SOURCE must be final_color_ldr or base_color")
+PREVIEW_BASECOLOR_CONTROL_ALPHA = os.environ.get(
+    "CAPTIVESKY_SKINNED_PREVIEW_BASECOLOR_CONTROL_ALPHA"
+)
+if PREVIEW_BASECOLOR_CONTROL_ALPHA is not None:
+    PREVIEW_BASECOLOR_CONTROL_ALPHA = float(PREVIEW_BASECOLOR_CONTROL_ALPHA)
+    if not 0.0 <= PREVIEW_BASECOLOR_CONTROL_ALPHA <= 1.0:
+        raise ValueError("CAPTIVESKY_SKINNED_PREVIEW_BASECOLOR_CONTROL_ALPHA must be in [0, 1]")
 OUTPUT_RELATIVE = os.environ.get(
     "CAPTIVESKY_SKINNED_PREVIEW_OUTPUT",
     "Saved/Playtests/Codex_InstancedSkinned_" + ASSET_LABEL,
@@ -285,11 +294,28 @@ def main():
     ))
     require(material_tint_parameters,
             "Foliage material exposes no BaseColor Tint vector parameters")
+    basecolor_control_parameters = [
+        entry["name"]
+        for entry in (materials[1] or {}).get("vector_parameter_values", [])
+        if entry.get("name", "").replace(" ", "").lower().startswith("basecolorcontrols")
+    ] if len(materials) > 1 and materials[1] else []
     for label, foliage_component in (("instanced", component), ("ordinary", standard_component)):
         preview_material = foliage_component.create_dynamic_material_instance(1)
         require(preview_material, "Could not create transient {} foliage MID".format(label))
         for parameter_name in foliage_tint_parameters:
             preview_material.set_vector_parameter_value(parameter_name, preview_color)
+        overridden_control_parameters = []
+        if PREVIEW_BASECOLOR_CONTROL_ALPHA is not None:
+            for parameter_name in basecolor_control_parameters:
+                current = preview_material.get_vector_parameter_value(parameter_name)
+                preview_material.set_vector_parameter_value(
+                    parameter_name,
+                    unreal.LinearColor(
+                        current.r, current.g, current.b,
+                        PREVIEW_BASECOLOR_CONTROL_ALPHA,
+                    ),
+                )
+                overridden_control_parameters.append(parameter_name)
         foliage_component.set_material(1, preview_material)
         parameter_readback = {}
         for parameter_name in foliage_tint_parameters:
@@ -300,12 +326,20 @@ def main():
                 ]
             except Exception as error:
                 parameter_readback[parameter_name] = "unavailable: " + str(error)
+        control_alpha_readback = {}
+        for parameter_name in overridden_control_parameters:
+            value = preview_material.get_vector_parameter_value(parameter_name)
+            control_alpha_readback[parameter_name] = round(float(value.a), 4)
         assigned_material = foliage_component.get_material(1)
         log("{} foliage MID {} assigned={} parameters={} readback={}".format(
             label, preview_material.get_path_name(),
             assigned_material.get_class().get_name() if assigned_material else "<none>",
             foliage_tint_parameters, parameter_readback,
         ))
+        if overridden_control_parameters:
+            log("{} foliage BaseColor Controls alpha override={} readback={}".format(
+                label, PREVIEW_BASECOLOR_CONTROL_ALPHA, control_alpha_readback,
+            ))
         log("{} foliage tint {} set on transient MID from {}".format(
             label, list(FOLIAGE_TINT),
             base_foliage_material.get_path_name() if base_foliage_material else "<none>",
@@ -392,6 +426,8 @@ def main():
         "transient_foliage_tint": list(FOLIAGE_TINT),
         "material_tint_parameters": material_tint_parameters,
         "applied_foliage_tint_parameters": foliage_tint_parameters,
+        "basecolor_control_alpha_override": PREVIEW_BASECOLOR_CONTROL_ALPHA,
+        "applied_basecolor_control_alpha_parameters": basecolor_control_parameters if PREVIEW_BASECOLOR_CONTROL_ALPHA is not None else [],
         "bounds_origin_cm": components(bounds_origin),
         "bounds_extent_cm": components(bounds_extent),
         "height_cm": round(height, 2),
