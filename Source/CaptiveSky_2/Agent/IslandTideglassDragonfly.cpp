@@ -24,8 +24,10 @@ namespace
 		0,
 		TEXT("When non-zero, logs the start, completion, and interruption of dragonfly flower visits."));
 
-	constexpr float FlowerInterestDurationSeconds = 4.8f;
-	constexpr float FlowerInterestFadeStartSeconds = 3.8f;
+	constexpr float FlowerInterestDurationSeconds = 6.0f;
+	constexpr float FlowerInterestFadeStartSeconds = 4.8f;
+	// Stay close to a bloom instead of orbiting a full metre above its instance pivot.
+	constexpr float FlowerHoverHeight = 70.f;
 
 	void BuildWingSurface(UProceduralMeshComponent* Wing, float Side, float Sweep, float Length, float MaximumHalfWidth,
 		const FLinearColor& WingColor)
@@ -444,7 +446,7 @@ bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocat
 	FlowerInterestLocation = FlowerLocation + FVector(
 		FMath::Cos(HoverAngle) * HoverRadius,
 		FMath::Sin(HoverAngle) * HoverRadius,
-		100.f);
+		FlowerHoverHeight);
 	FlowerInterestRemaining = FlowerInterestDurationSeconds;
 	FlowerInterestCooldownRemaining = 16.f;
 	LogFlowerInterestTelemetry(TEXT("started"));

@@ -1952,9 +1952,9 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			Weather->WeatherSeed = DryWeatherSeed;
 			WatchableDragonfly->CheckForNearbyMeadowFlower();
 			TestTrue(TEXT("A calm dragonfly briefly visits a nearby meadow bloom"),
-				WatchableDragonfly->FlowerInterestRemaining > 0.f && WatchableDragonfly->FlowerInterestRemaining <= 4.8f);
+				WatchableDragonfly->FlowerInterestRemaining > 0.f && WatchableDragonfly->FlowerInterestRemaining <= 6.0f);
 			TestTrue(TEXT("The hover station is just above and beside the existing bloom"),
-				FMath::IsNearlyEqual(WatchableDragonfly->FlowerInterestLocation.Z, BloomLocation.Z + 100.f) &&
+				FMath::IsNearlyEqual(WatchableDragonfly->FlowerInterestLocation.Z, BloomLocation.Z + 70.f) &&
 				FMath::IsNearlyEqual(FVector::Dist2D(WatchableDragonfly->FlowerInterestLocation, BloomLocation), 32.f, 0.1f));
 			TestFalse(TEXT("One dragonfly cannot immediately repeat the same flower visit"),
 				WatchableDragonfly->RespondToMeadowFlower(BloomLocation));
@@ -1966,7 +1966,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			WatchableDragonfly->Tick(1.2f);
 			TestTrue(TEXT("The dragonfly holds a readable pause above the bloom after approaching"),
 				WatchableDragonfly->GetFlowerInterestAlpha() > 0.99f);
-			WatchableDragonfly->Tick(3.6f);
+			WatchableDragonfly->Tick(4.8f);
 			TestTrue(TEXT("The bloom visit fades and the dragonfly returns to its patrol"),
 				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining) &&
 				FMath::IsNearlyZero(WatchableDragonfly->GetFlowerInterestAlpha()));
