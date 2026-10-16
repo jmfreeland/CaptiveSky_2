@@ -30,3 +30,19 @@ enabled; compare included resident/transform counts and p50/p95 frame, Game,
 Render, and RHI timings against the recorded full-focus and sway-disabled
 baselines. Keep the local plant response and full species composition in the
 visual acceptance review, along with the 30-FPS floor.
+
+## Focused automation follow-up (2026-10-16)
+
+The current source and test were copied into the isolated
+`Saved/CompileScratch/Codex_RavenCrabAttention_20261008` project and verified
+identical to the main-tree files before running. The UE 5.8.3 scratch editor
+target was up to date, and `CaptiveSky2.Agent.IslandWeather` completed under
+NullRHI with exit code 0, thinking disabled, zero model requests, and a
+60-second realtime cap. The focused assertions confirm that a player-controlled
+character is retained even with a hidden mesh, a recently rendered resident is
+retained, and an offscreen non-player does not create a sway neighborhood.
+The teardown emitted `DestroyActor: World has no context` warnings for several
+fixture actors, but the automation result was `Success`; these warnings did not
+fail the test. This verifies the view-selection policy, not a sustained FPS
+gain or its visual quality. The matched real-Game performance comparison and
+visual check remain outstanding.
