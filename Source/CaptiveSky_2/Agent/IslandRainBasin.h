@@ -6,7 +6,10 @@
 #include "IslandRainBasin.generated.h"
 
 class UInstancedStaticMeshComponent;
+class UProceduralMeshComponent;
 class UStaticMeshComponent;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 
 /** A leaf a resident set afloat. */
 struct FIslandBasinLeaf
@@ -67,9 +70,18 @@ public:
 	static FLinearColor LeafColor(int32 AgeDays);
 	/** Wind-driven presentation transform from an immutable base; always stays within a few cm. Pure. */
 	static FTransform FloatingLeafWindTransform(const FTransform& Base, const FVector& Wind, double Seconds, int32 Seed);
+	/** Rain-ripple radius (cm) at normalized age 0..1. Pure. */
+	static float RainRippleRadius(float Age);
+	/** Rain-ripple brightness at normalized age 0..1. Pure. */
+	static float RainRipplePulse(float Age);
 
 	void Show(const FIslandBasinState& State, int32 Today);
 	void UpdateFloatingLeaves(const FVector& Wind, double Seconds);
+	/** Start one subtle transient impact at a local water-surface position. */
+	void StartRainRipple(const FVector& LocalPosition);
+	bool IsRainRippleActive() const { return bRainRippleActive; }
+
+	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	friend class FIslandRainBasinWorldTest;
@@ -79,6 +91,8 @@ private:
 	TObjectPtr<UStaticMeshComponent> Floor;
 	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
 	TObjectPtr<UStaticMeshComponent> Surface;
+	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
+	TObjectPtr<UProceduralMeshComponent> RainRipple;
 	/** Fresh, aging and old leaves, each tinted for its age bucket. */
 	UPROPERTY(VisibleAnywhere, Category="Island|RainBasin")
 	TArray<TObjectPtr<UInstancedStaticMeshComponent>> LeafLayers;
@@ -90,6 +104,12 @@ private:
 		int32 Seed = 0;
 	};
 	TArray<FFloatingLeafInstance> FloatingLeaves;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> RainRippleMaterial;
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> RippleBaseMaterial;
+	float RainRippleElapsed = 0.f;
+	bool bRainRippleActive = false;
 	bool bBuilt = false;
 };
 
@@ -105,6 +125,8 @@ class CAPTIVESKY_2_API UIslandRainBasinSubsystem : public UTickableWorldSubsyste
 public:
 	/** How the basin looks to a resident. Pure. */
 	static FString DescribeWater(float Water, int32 LeafCount);
+	/** Minimum separation between rain impacts, in seconds. Zero means rain is too light for visible rings. Pure. */
+	static float RainRippleInterval(float RainIntensity);
 	/** What a resident at Position notices, with the move_to/interact target; empty when out of range. */
 	FString DescribeNearby(const FVector& Position) const;
 	/** Try to set a leaf afloat; OutFact says what happened. Returns true when something lasting changed. */
@@ -134,6 +156,8 @@ private:
 	float SinceSave = 0.f;
 	float SinceShow = 0.f;
 	float SinceLeafMotion = 0.f;
+	float NextRainRippleAt = 0.f;
+	FRandomStream RainRandom;
 	float ShownWater = -1.f;
 
 	FString GetStorageFilePath() const;

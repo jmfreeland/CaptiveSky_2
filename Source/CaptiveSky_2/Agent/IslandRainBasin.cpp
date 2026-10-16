@@ -3,6 +3,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/StaticMesh.h"
@@ -134,10 +135,14 @@ bool FIslandBasinState::FromJson(const FString& Json)
 AIslandRainBasin::AIslandRainBasin()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 0.05f;
+	SetActorTickEnabled(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Basic(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Emissive(TEXT("/Engine/EngineMaterials/EmissiveMeshMaterial.EmissiveMeshMaterial"));
+	if (Emissive.Succeeded()) RippleBaseMaterial = Emissive.Object;
 	UMaterialInterface* Material = Basic.Succeeded() ? Basic.Object : nullptr;
 	auto Prepare = [this, Material](UStaticMeshComponent* Part, UStaticMesh* Mesh)
 	{
@@ -156,6 +161,49 @@ AIslandRainBasin::AIslandRainBasin()
 	Prepare(Surface, Cylinder.Succeeded() ? Cylinder.Object : nullptr);
 	Surface->SetCastShadow(false);
 	Surface->SetVisibility(false);
+	RainRipple = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("RainRipple"));
+	RainRipple->SetupAttachment(RootComponent);
+	RainRipple->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RainRipple->SetGenerateOverlapEvents(false);
+	RainRipple->SetCanEverAffectNavigation(false);
+	RainRipple->SetCastShadow(false);
+	RainRipple->SetVisibility(false, true);
+	{
+		constexpr int32 Segments = 40;
+		constexpr float InnerRadius = 0.82f;
+		TArray<FVector> Vertices;
+		TArray<int32> Triangles;
+		TArray<FVector> Normals;
+		TArray<FVector2D> UVs;
+		TArray<FLinearColor> Colors;
+		TArray<FProcMeshTangent> Tangents;
+		Vertices.Reserve(Segments * 2);
+		Triangles.Reserve(Segments * 6);
+		for (int32 Index = 0; Index < Segments; ++Index)
+		{
+			const float Angle = 2.f * PI * Index / Segments;
+			const float X = FMath::Cos(Angle);
+			const float Y = FMath::Sin(Angle);
+			Vertices.Add(FVector(X * InnerRadius, Y * InnerRadius, 0.f));
+			Vertices.Add(FVector(X, Y, 0.f));
+			for (int32 Edge = 0; Edge < 2; ++Edge)
+			{
+				Normals.Add(FVector::UpVector);
+				UVs.Add(FVector2D((X + 1.f) * 0.5f, (Y + 1.f) * 0.5f));
+				Colors.Add(FLinearColor::White);
+				Tangents.Add(FProcMeshTangent(FVector(-Y, X, 0.f), false));
+			}
+		}
+		for (int32 Index = 0; Index < Segments; ++Index)
+		{
+			const int32 Inner = Index * 2;
+			const int32 Outer = Inner + 1;
+			const int32 NextInner = ((Index + 1) % Segments) * 2;
+			const int32 NextOuter = NextInner + 1;
+			Triangles.Append({ Inner, Outer, NextOuter, Inner, NextOuter, NextInner });
+		}
+		RainRipple->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, Colors, Tangents, false);
+	}
 	for (const TCHAR* Name : { TEXT("LeavesFresh"), TEXT("LeavesAging"), TEXT("LeavesOld") })
 	{
 		UInstancedStaticMeshComponent* Layer = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
@@ -195,6 +243,56 @@ FTransform AIslandRainBasin::FloatingLeafWindTransform(const FTransform& Base, c
 	FRotator Rotation = Base.GetRotation().Rotator();
 	Rotation.Yaw += 6.f * Activity * FMath::Sin(Phase * 0.47f + 0.6f);
 	return FTransform(Rotation, Base.GetLocation() + Drift, Base.GetScale3D());
+}
+
+float AIslandRainBasin::RainRippleRadius(float Age)
+{
+	return FMath::Lerp(2.5f, 15.f, FMath::SmoothStep(0.f, 1.f, FMath::Clamp(Age, 0.f, 1.f)));
+}
+
+float AIslandRainBasin::RainRipplePulse(float Age)
+{
+	return FMath::Sin(PI * FMath::Clamp(Age, 0.f, 1.f));
+}
+
+void AIslandRainBasin::StartRainRipple(const FVector& LocalPosition)
+{
+	if (!RainRipple || !RippleBaseMaterial || !FMath::IsFinite(LocalPosition.X) || !FMath::IsFinite(LocalPosition.Y) || !FMath::IsFinite(LocalPosition.Z)) return;
+	if (!RainRippleMaterial)
+	{
+		RainRippleMaterial = UMaterialInstanceDynamic::Create(RippleBaseMaterial, this);
+		if (RainRippleMaterial) RainRipple->SetMaterial(0, RainRippleMaterial);
+	}
+	RainRipple->SetRelativeLocation(LocalPosition);
+	RainRippleElapsed = 0.f;
+	bRainRippleActive = true;
+	RainRipple->SetVisibility(true, true);
+	SetActorTickEnabled(true);
+	Tick(0.f);
+}
+
+void AIslandRainBasin::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!bRainRippleActive || !RainRipple) return;
+	RainRippleElapsed += FMath::Max(0.f, DeltaSeconds);
+	const float Age = FMath::Clamp(RainRippleElapsed / 1.1f, 0.f, 1.f);
+	const float Radius = RainRippleRadius(Age);
+	RainRipple->SetRelativeScale3D(FVector(Radius, Radius, 1.f));
+	if (RainRippleMaterial)
+	{
+		const float Pulse = RainRipplePulse(Age);
+		const FLinearColor Tint(0.006f, 0.026f, 0.033f, Pulse);
+		RainRippleMaterial->SetVectorParameterValue(TEXT("Color"), Tint);
+		RainRippleMaterial->SetVectorParameterValue(TEXT("BaseColor"), Tint);
+		RainRippleMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), Tint * Pulse);
+	}
+	if (Age >= 1.f)
+	{
+		bRainRippleActive = false;
+		RainRipple->SetVisibility(false, true);
+		SetActorTickEnabled(false);
+	}
 }
 
 void AIslandRainBasin::UpdateFloatingLeaves(const FVector& Wind, double Seconds)
@@ -290,6 +388,14 @@ FString UIslandRainBasinSubsystem::DescribeWater(float Water, int32 LeafCount)
 			: FString::Printf(TEXT(" %d dried %s %s on the stone."), LeafCount, Noun, LeafCount == 1 ? TEXT("lies") : TEXT("lie"));
 	}
 	return Out;
+}
+
+float UIslandRainBasinSubsystem::RainRippleInterval(float RainIntensity)
+{
+	if (!FMath::IsFinite(RainIntensity)) return 0.f;
+	const float Rain = FMath::Clamp(RainIntensity, 0.f, 1.f);
+	if (Rain < 0.18f) return 0.f;
+	return FMath::Lerp(3.6f, 1.5f, FMath::SmoothStep(0.18f, 1.f, Rain));
 }
 
 FString UIslandRainBasinSubsystem::DescribeNearby(const FVector& Position) const
@@ -445,6 +551,8 @@ void UIslandRainBasinSubsystem::Refresh()
 void UIslandRainBasinSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	RainRandom.Initialize(0x7A1B451);
+	NextRainRippleAt = InWorld.GetTimeSeconds() + 1.5f;
 	Load();
 	if (!State.bPlaced && PlaceBasin()) bDirty = true;
 	Refresh();
@@ -468,6 +576,20 @@ void UIslandRainBasinSubsystem::Tick(float DeltaTime)
 		SinceLeafMotion = FMath::Fmod(SinceLeafMotion, 0.25f);
 		if (State.Water >= 0.02f && State.Leaves.Num() > 0)
 			if (AIslandRainBasin* Basin = Actor.Get()) Basin->UpdateFloatingLeaves(Environment->GetWind(), World->GetTimeSeconds());
+	}
+	const float RippleInterval = RainRippleInterval(Environment->GetRainIntensity());
+	const float WorldTime = World->GetTimeSeconds();
+	if (RippleInterval > 0.f && State.Water >= FIslandBasinState::FloatLevel && WorldTime >= NextRainRippleAt)
+	{
+		if (AIslandRainBasin* Basin = Actor.Get())
+		{
+			const float Radius = FMath::Sqrt(RainRandom.FRand()) * (AIslandRainBasin::RimRadius - 12.f);
+			const float Angle = RainRandom.FRandRange(0.f, UE_TWO_PI);
+			const FVector LocalPosition(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius,
+				-AIslandRainBasin::OriginLift + AIslandRainBasin::FloorThickness + AIslandRainBasin::WaterDepth(State.Water) + 0.25f);
+			Basin->StartRainRipple(LocalPosition);
+		}
+		NextRainRippleAt = WorldTime + RippleInterval * RainRandom.FRandRange(0.8f, 1.25f);
 	}
 	if (SinceShow >= 1.f)
 	{

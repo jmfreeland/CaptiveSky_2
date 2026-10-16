@@ -69,6 +69,16 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Water is deeper when fuller"), AIslandRainBasin::WaterDepth(0.9f) > AIslandRainBasin::WaterDepth(0.2f));
 	TestTrue(TEXT("Water stays below the rim"), AIslandRainBasin::WaterDepth(9.f) < AIslandRainBasin::RimHeight);
 	TestTrue(TEXT("Leaves brown with age"), AIslandRainBasin::LeafColor(0).G > AIslandRainBasin::LeafColor(8).G);
+	TestEqual(TEXT("A rain ripple begins small"), AIslandRainBasin::RainRippleRadius(0.f), 2.5f);
+	TestEqual(TEXT("A rain ripple expands to a basin-scale ring"), AIslandRainBasin::RainRippleRadius(1.f), 15.f);
+	TestEqual(TEXT("A rain ripple is quiet at its beginning"), AIslandRainBasin::RainRipplePulse(0.f), 0.f);
+	TestTrue(TEXT("A rain ripple briefly brightens before fading"), AIslandRainBasin::RainRipplePulse(0.5f) > 0.99f);
+	TestEqual(TEXT("A rain ripple fades to nothing"), AIslandRainBasin::RainRipplePulse(1.f), 0.f);
+	TestEqual(TEXT("Very light rain makes no visible basin impacts"), UIslandRainBasinSubsystem::RainRippleInterval(0.1f), 0.f);
+	TestTrue(TEXT("Heavy rain creates impacts more often than a shower"),
+		UIslandRainBasinSubsystem::RainRippleInterval(0.9f) < UIslandRainBasinSubsystem::RainRippleInterval(0.3f));
+	TestTrue(TEXT("Heavy-rain impacts remain deliberately spaced"), UIslandRainBasinSubsystem::RainRippleInterval(1.f) >= 1.5f);
+	TestEqual(TEXT("Invalid rain cannot schedule ripples"), UIslandRainBasinSubsystem::RainRippleInterval(NAN), 0.f);
 
 	TestTrue(TEXT("A dry basin says so"), UIslandRainBasinSubsystem::DescribeWater(0.f, 0).Contains(TEXT("dry")));
 	TestTrue(TEXT("A full basin says so"), UIslandRainBasinSubsystem::DescribeWater(1.f, 0).Contains(TEXT("full")));
@@ -162,6 +172,14 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 		const FString Nearby = Basin->DescribeNearby(BasinActor->GetActorLocation());
 		TestTrue(TEXT("A resident nearby receives the basin interaction affordance"), Nearby.Contains(TEXT("RainBasin")) && Nearby.Contains(TEXT("interact")));
 		TestTrue(TEXT("A resident outside the notice radius receives no basin prompt"), Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(0.f, 0.f, UIslandRainBasinSubsystem::NoticeRadius + 100.f)).IsEmpty());
+		BasinActor->StartRainRipple(FVector(0.f, 0.f, 0.f));
+		TestTrue(TEXT("A water impact starts a transient basin ripple"), BasinActor->IsRainRippleActive());
+		TestTrue(TEXT("The active impact enables only the basin actor's lightweight presentation tick"), BasinActor->IsActorTickEnabled());
+		BasinActor->Tick(1.2f);
+		TestFalse(TEXT("A basin ripple fades and disables its tick after its short life"), BasinActor->IsRainRippleActive() || BasinActor->IsActorTickEnabled());
+		BasinActor->StartRainRipple(FVector(0.f, 0.f, 0.f));
+		BasinActor->Tick(1.2f);
+		TestFalse(TEXT("A completed basin ripple can be reused for the next rain drop"), BasinActor->IsRainRippleActive());
 	}
 	FIslandBasinState PlacedState;
 	FString Json;
