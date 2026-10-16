@@ -350,6 +350,23 @@ try
                descriptiveRecord.GetProperty("pipeline").GetString() == "human_review",
             "multi-word target is preserved for human review without automatic world changes");
     }
+    var overRequesterLimit = await proposals.AppendAsync(home.AgentId,
+        objectProposal! with { Description = "Add a sheltered survey perch" }, "42", "Visitor", "10", "107", CancellationToken.None);
+    Assert(!overRequesterLimit.Success && overRequesterLimit.Message.Contains("3 proposals awaiting human review", StringComparison.Ordinal),
+        "Discord cannot exceed the shared three-pending-proposal limit for one resident");
+    var anotherResidentProposal = await proposals.AppendAsync("Agent_Aster_01",
+        objectProposal! with { Description = "Add a small hazel seed cache" }, "42", "Visitor", "10", "108", CancellationToken.None);
+    Assert(anotherResidentProposal.Success,
+        "one resident reaching their pending limit does not block another resident");
+    var reviewedRows = await File.ReadAllLinesAsync(inbox);
+    var reviewedFirst = System.Text.Json.Nodes.JsonNode.Parse(reviewedRows[0])!.AsObject();
+    reviewedFirst["status"] = "accepted";
+    reviewedRows[0] = reviewedFirst.ToJsonString();
+    await File.WriteAllLinesAsync(inbox, reviewedRows);
+    var replacementProposal = await proposals.AppendAsync(home.AgentId,
+        objectProposal! with { Description = "Add a sheltered rain gauge" }, "42", "Visitor", "10", "109", CancellationToken.None);
+    Assert(replacementProposal.Success,
+        "a reviewed proposal frees one of the resident's pending slots");
     var proposalHistory = await proposals.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
     Assert(proposalHistory.Contains("A copper bell", StringComparison.Ordinal) &&
            proposalHistory.Contains("Add brass trim", StringComparison.Ordinal) &&
@@ -357,11 +374,11 @@ try
         "proposal history summarizes this correspondent's own requests and review state");
     Assert(await proposals.GetRecentSummaryAsync(home.AgentId, "99", CancellationToken.None) == "(none recorded)",
         "proposal history does not expose another correspondent's requests");
-    var queuedStatus = await proposals.GetStatusAsync(home.AgentId, "42", queuedObject.RequestId[..8], CancellationToken.None);
+    var queuedStatus = await proposals.GetStatusAsync(home.AgentId, "42", queuedUpgrade.RequestId[..8], CancellationToken.None);
     Assert(queuedStatus.Contains("awaiting human review", StringComparison.Ordinal) &&
            queuedStatus.Contains("Nothing has been generated or changed", StringComparison.Ordinal),
         "status lookup reports pending review without changing the world");
-    var otherCorrespondentStatus = await proposals.GetStatusAsync(home.AgentId, "99", queuedObject.RequestId[..8], CancellationToken.None);
+    var otherCorrespondentStatus = await proposals.GetStatusAsync(home.AgentId, "99", queuedUpgrade.RequestId[..8], CancellationToken.None);
     Assert(otherCorrespondentStatus.Contains("No proposal", StringComparison.Ordinal),
         "status lookup hides another correspondent's proposal");
 

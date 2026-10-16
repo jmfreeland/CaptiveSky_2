@@ -7,6 +7,7 @@ public sealed class AssetProposalQueue(string projectRoot)
 {
     private const int MaxDescriptionCharacters = 240;
     private const int MaxPending = 64;
+    private const int MaxPendingPerRequester = 3;
     private const int MaxRecentHistory = 5;
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private readonly string _path = Path.Combine(Path.GetFullPath(projectRoot), "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
@@ -29,6 +30,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
             var pending = 0;
+            var requesterPending = 0;
             if (File.Exists(_path))
             {
                 foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
@@ -38,6 +40,7 @@ public sealed class AssetProposalQueue(string projectRoot)
                     var record = existing.RootElement;
                     if (!record.TryGetProperty("status", out var status) || status.GetString() != "pending_review") continue;
                     pending++;
+                    if (Get(record, "requester") == requester) requesterPending++;
                     var existingType = Get(record, "request_type");
                     if (existingType.Length == 0) existingType = "new_object";
                     if (Get(record, "requester") == requester && Get(record, "description").Trim().Equals(description, StringComparison.OrdinalIgnoreCase) &&
@@ -46,6 +49,8 @@ public sealed class AssetProposalQueue(string projectRoot)
                         return (false, "", "You already have this proposal awaiting review; nothing was added.");
                 }
             }
+            if (requesterPending >= MaxPendingPerRequester)
+                return (false, "", $"You have {MaxPendingPerRequester} proposals awaiting human review; wait for one to be reviewed before adding another.");
             if (pending >= MaxPending) return (false, "", "The human-review proposal inbox is full; no request was added.");
 
             var id = Guid.NewGuid().ToString("D");
