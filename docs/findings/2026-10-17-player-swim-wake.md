@@ -9,7 +9,10 @@ direction at the queried ocean surface. It uses a 1.1-second, 82 cm ring with
 a restrained aqua emissive tint and zero point-light intensity. It is tagged
 `PlayerSwimImpact` and does not call the Tideglass material-ripple subsystem,
 so this open-ocean player cue stays separate from the prototype pool and
-wildlife ripple responses. It makes no LLM or network request.
+its material ripple. The minnow school has a separate ecological response to a
+nearby surface-swimming player: it briefly scatters within its 5 m startle
+radius, observes an 8-second cooldown, and rearms after the player leaves. The
+wake itself makes no LLM or network request.
 
 ## Validation
 
@@ -27,8 +30,11 @@ Both recorded stack hash `F405610C114D120D4B6F5ABA901EC469AC9FAA26`, matching th
 previously documented unsymbolized UE commandlet startup crash. The fresh dump
 is at `Saved/CompileScratch/Codex_PlayerSwimWake_20261017/Saved/Crashes/_0000/`.
 There are no matching editor PDBs in the installed UE 5.8.3 `Win64` binaries,
-so this evidence cannot identify the root cause. The automation assertions
-compiled but have not run, and the wake has not had a visual in-game review.
+so this evidence cannot identify the root cause. The wake assertions compiled
+but have not run, and the wake has not had a visual in-game review. The adjacent
+minnow behavior is covered by the existing
+`CaptiveSky2.Agent.TidepoolMinnows` test, but that test has not been rerun in
+the current startup environment.
 
 The user's existing Unreal editor was left untouched. Do not repeat this
 commandlet launch until the startup stack can be symbolized or a meaningfully
