@@ -358,6 +358,27 @@ void AIslandWeather::PersistWeatherTime()
 		WorldState->SaveWeatherSeconds(WeatherTimeOffset + GetWorld()->GetTimeSeconds());
 }
 
+FVector AIslandWeather::BuildNightFireflySpawnLocation(const FVector& HabitatLocation,
+	const FVector& LandmarkLocation, int32 FireflyIndex, int32 Population)
+{
+	if (Population <= 0) return HabitatLocation;
+	const int32 SafePopulation = FMath::Max(1, Population);
+	const int32 SafeIndex = FMath::Clamp(FireflyIndex, 0, SafePopulation - 1);
+	const FVector Route = (HabitatLocation - LandmarkLocation).GetSafeNormal2D();
+	if (Route.IsNearlyZero()) return HabitatLocation;
+
+	// Keep the little night chorus close enough to the stones to answer their tone,
+	// while staggering each home point along the habitat-facing side of the landmark.
+	const float IndexAlpha = SafePopulation > 1
+		? static_cast<float>(SafeIndex) / static_cast<float>(SafePopulation - 1)
+		: 0.5f;
+	const float RouteFraction = FMath::Lerp(0.24f, 0.55f, IndexAlpha);
+	const float Side = SafeIndex == SafePopulation - 1 ? 0.f : (SafeIndex % 2 == 0 ? -1.f : 1.f);
+	const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Route).GetSafeNormal();
+	return LandmarkLocation + Route * (AIslandListeningStonesChime::AudibleRadius * RouteFraction) +
+		Lateral * (90.f * Side) + FVector::UpVector * (18.f + 24.f * IndexAlpha);
+}
+
 void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms)
 {
 	BuildGroundCoverOffsets(Seed, 96, 260.f, 720.f, OutTransforms);
@@ -2836,13 +2857,10 @@ void AIslandWeather::RefreshNightEcology()
 		while (NightFireflies.Num() < NightPopulation)
 		{
 			FVector SpawnLocation = Habitat->GetActorLocation();
-			if (NightFireflies.IsEmpty() && NearbyListeningStones)
+			if (NearbyListeningStones)
 			{
-				const FVector Route = (Habitat->GetActorLocation() - NearbyListeningStones->GetActorLocation()).GetSafeNormal2D();
-				SpawnLocation = NearbyListeningStones->GetActorLocation() + Route * (AIslandListeningStonesChime::AudibleRadius * 0.65f);
-				SpawnLocation.Z = FMath::Lerp(NearbyListeningStones->GetActorLocation().Z, Habitat->GetActorLocation().Z,
-					AIslandListeningStonesChime::AudibleRadius * 0.65f / FVector::Dist2D(NearbyListeningStones->GetActorLocation(), Habitat->GetActorLocation()));
-				SpawnLocation.Z += FMath::FRandRange(15.f, 35.f);
+				SpawnLocation = BuildNightFireflySpawnLocation(Habitat->GetActorLocation(),
+					NearbyListeningStones->GetActorLocation(), NightFireflies.Num(), NightPopulation);
 			}
 			else
 			{

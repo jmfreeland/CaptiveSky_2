@@ -985,6 +985,28 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 {
 	// Isolated world: no Island agents, brains, memory files, or model requests.
+	const FVector FireflyHabitat(2400.f, 200.f, 90.f);
+	const FVector FireflyStones(0.f, 0.f, 0.f);
+	TArray<FVector> FireflyHomes;
+	for (int32 FireflyIndex = 0; FireflyIndex < 3; ++FireflyIndex)
+	{
+		const FVector Home = AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat,
+			FireflyStones, FireflyIndex, 3);
+		FireflyHomes.Add(Home);
+		TestTrue(TEXT("Night firefly home starts inside the Listening Stones sound field"),
+			FVector::Dist2D(Home, FireflyStones) < AIslandListeningStonesChime::AudibleRadius);
+		TestTrue(TEXT("Night firefly home remains elevated above the landmark surface"), Home.Z > FireflyStones.Z);
+	}
+	TestTrue(TEXT("Three night fireflies occupy distinct, locally staggered homes"),
+		FireflyHomes.Num() == 3 &&
+		FVector::Dist2D(FireflyHomes[0], FireflyHomes[1]) > 150.f &&
+		FVector::Dist2D(FireflyHomes[1], FireflyHomes[2]) > 150.f);
+	TestTrue(TEXT("Firefly placement is stable when the same Island locations are sampled again"),
+		FireflyHomes[1].Equals(AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat,
+			FireflyStones, 1, 3), 0.001f));
+	TestTrue(TEXT("Firefly placement safely ignores a collapsed habitat-to-landmark route"),
+		AIslandWeather::BuildNightFireflySpawnLocation(FireflyStones, FireflyStones, 1, 3).Equals(FireflyStones));
+
 	TArray<FTransform> GrassOffsetsA;
 	TArray<FTransform> GrassOffsetsB;
 	TArray<FTransform> GrassOffsetsOtherSeed;
