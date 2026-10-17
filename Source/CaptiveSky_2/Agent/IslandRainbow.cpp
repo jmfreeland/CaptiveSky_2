@@ -33,6 +33,13 @@ float ComputeRainbowStrength(const FIslandRainbowInputs& In)
 	return Sun * Damp * Clearing * OpenSky * Calm;
 }
 
+float ResolveRainbowObservationStrength(float InStrength, bool bCanRenderRainbow)
+{
+	return bCanRenderRainbow && FMath::IsFinite(InStrength)
+		? FMath::Clamp(InStrength, 0.f, 1.f)
+		: 0.f;
+}
+
 AIslandRainbowActor::AIslandRainbowActor()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -89,6 +96,12 @@ FString UIslandRainbowSubsystem::DescribeRainbow(float InStrength)
 TStatId UIslandRainbowSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UIslandRainbowSubsystem, STATGROUP_Tickables);
+}
+
+float UIslandRainbowSubsystem::GetStrength() const
+{
+	const AIslandRainbowActor* Bow = Actor.Get();
+	return ResolveRainbowObservationStrength(Strength, Bow && Bow->HasMaterial());
 }
 
 bool UIslandRainbowSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const

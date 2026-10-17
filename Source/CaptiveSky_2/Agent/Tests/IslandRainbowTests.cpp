@@ -52,6 +52,12 @@ bool FIslandRainbowTest::RunTest(const FString& Parameters)
 	Nonsense.Storm = -1.f;
 	const float Clamped = ComputeRainbowStrength(Nonsense);
 	TestTrue(TEXT("Out-of-range inputs stay within 0..1"), Clamped >= 0.f && Clamped <= 1.f);
+	TestEqual(TEXT("Residents do not notice a bow whose optional material cannot render"),
+		ResolveRainbowObservationStrength(0.95f, false), 0.f);
+	TestTrue(TEXT("A renderable bow remains observable at its bounded strength"),
+		FMath::IsNearlyEqual(ResolveRainbowObservationStrength(0.8f, true), 0.8f));
+	TestEqual(TEXT("A non-finite visible strength is still suppressed"),
+		ResolveRainbowObservationStrength(std::numeric_limits<float>::quiet_NaN(), true), 0.f);
 
 	const float NotANumber = std::numeric_limits<float>::quiet_NaN();
 	TArray<FIslandRainbowInputs> InvalidWeather;

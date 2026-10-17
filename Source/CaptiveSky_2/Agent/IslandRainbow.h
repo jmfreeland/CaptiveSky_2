@@ -26,6 +26,9 @@ struct FIslandRainbowInputs
  */
 CAPTIVESKY_2_API float ComputeRainbowStrength(const FIslandRainbowInputs& Inputs);
 
+/** Strength residents may observe: hidden/missing presentation should never be described as visible. */
+CAPTIVESKY_2_API float ResolveRainbowObservationStrength(float InStrength, bool bCanRenderRainbow);
+
 /** The little arc of sky the bow sits in: a plane facing the viewer, shaded by an optional local material. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandRainbowActor : public AActor
@@ -66,7 +69,7 @@ public:
 	/** What a resident notices; empty when there is no bow. Pure. */
 	static FString DescribeRainbow(float Strength);
 
-	float GetStrength() const { return Strength; }
+	float GetStrength() const;
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
