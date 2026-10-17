@@ -5,6 +5,7 @@ import unittest
 
 
 ASSET = Path(__file__).resolve().parents[1] / "assets" / "coastal_sea_lavender.py"
+IMPORTER = Path(__file__).resolve().parents[2] / "Import-ComfyBlenderAsset.py"
 
 
 def source_contract():
@@ -24,6 +25,20 @@ def source_contract():
     rng_imports = [node for node in tree.body if isinstance(node, ast.Import)
                    and any(alias.name == "random" for alias in node.names)]
     return values, tree, calls, collisions, rng_imports
+
+
+def plain_material_contract(tree):
+    materials = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (isinstance(target, ast.Subscript)
+                    and isinstance(target.value, ast.Attribute)
+                    and target.value.attr == "PLAIN"
+                    and isinstance(target.slice, ast.Constant)):
+                materials[target.slice.value] = ast.literal_eval(node.value)
+    return materials
 
 
 class CoastalSeaLavenderTests(unittest.TestCase):
@@ -54,6 +69,16 @@ class CoastalSeaLavenderTests(unittest.TestCase):
                               and node.name == "_star_floret")
         self.assertIn("PETALS_PER_FLOWER", ast.unparse(petal_function))
         self.assertIn("no generated textures", values["PROVENANCE"])
+
+    def test_candidate_keeps_default_shading_but_importer_supports_opt_in(self):
+        _values, tree, *_ = source_contract()
+        materials = plain_material_contract(tree)
+        self.assertTrue(all("TwoSided" not in material for material in materials.values()))
+
+        importer = IMPORTER.read_text(encoding="utf-8")
+        self.assertIn('description.get("TwoSided", False)', importer)
+        self.assertIn('"material_properties"', importer)
+        self.assertIn('material.get_editor_property("two_sided")', importer)
 
 
 if __name__ == "__main__":

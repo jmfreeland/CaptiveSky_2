@@ -149,7 +149,7 @@ def create_material(asset_path, material_name, description, textures):
     unreal.EditorAssetLibrary.make_directory(material_path)
     material = create_or_reuse_material(material_path, material_name)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
-    material.set_editor_property("two_sided", False)
+    material.set_editor_property("two_sided", bool(description.get("TwoSided", False)))
 
     base = description.get("BaseColor")
     if isinstance(base, str):
@@ -315,6 +315,13 @@ def run():
             map_name: texture.get_path_name() for map_name, texture in textures.items()
         }
 
+    material_properties = {
+        material_name: {
+            "two_sided": bool(material.get_editor_property("two_sided")),
+        }
+        for material_name, material in material_assets.items()
+    }
+
     mesh_path, imported_paths = import_mesh(fbx_path, asset_path)
     mesh = unreal.load_asset(mesh_path)
     assignments = []
@@ -341,6 +348,7 @@ def run():
             if path.startswith(shared_library_path + "/")
         ],
         "material_texture_assignments": material_texture_assignments,
+        "material_properties": material_properties,
         "size_cm_xyz": [round(size.x, 1), round(size.y, 1), round(size.z, 1)],
         "material_assignments": assignments,
         "collision_shapes": collisions,

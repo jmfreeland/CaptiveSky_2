@@ -21,9 +21,11 @@ normal play distance. This is a promising structure candidate, not final art
 approval.
 
 The procedural source and local trial import are review candidates, not final
-art approval. Next gate: inspect the imported mesh under real Unreal lighting,
-then check a deliberately sparse population against the project's 30-FPS floor.
-Do not add it to the main map from this candidate review alone.
+art approval. The isolated Unreal captures below show that its current material
+and fine-stem presentation is not ready for map placement. Next gate: improve
+the stem/flower readability or choose a better-fit asset, then review a sparse
+population against the project's 30-FPS floor. Do not add it to the main map
+from this candidate review alone.
 
 ## Unreal trial import
 
@@ -41,5 +43,32 @@ all four imported assets. See
 The importer did not save a level. Unreal's startup log does show the default
 `/Game/Maps/Island` map being loaded while the commandlet initialized, so this
 was not a map-free process; no Island level save appears in the log, and the
-only reported package saves are the four trial assets. Unreal shading and
-in-world appearance remain unreviewed.
+only reported package saves are the four trial assets.
+
+## Isolated Unreal shading review
+
+Two real-RHI previews used the non-saving `Preview-GeneratedStaticMesh.py`
+harness in `isolated` mode beside `ListeningStones`, so no landscape or
+population obscured the mesh. The original material capture is
+`Saved/Playtests/Codex_SeaLavenderUnrealPreview_20261017/SeaLavender_Isolated_RealRHI.png`.
+The broad basal leaves render as pale, hard facets, while many fine upright
+stems/branches read as black lines and the tiny flowers are difficult to pick
+out. The preceding full-scene capture is
+`Saved/Playtests/Codex_SeaLavenderUnrealPreview_20261017/SeaLavender_RealRHI.png`;
+the isolated view confirms the problem is intrinsic to this candidate rather
+than only background clutter.
+
+As a narrow A/B, the same source was imported into
+`/Game/Generated/ComfyBlender/CoastalSeaLavender_TwoSided_20261017/` with only
+leaf and flower materials marked `TwoSided: true`. The Unreal import report
+confirmed those properties (`true`, with stem remaining `false`), correct
+material assignments, intended zero collision, and no validation errors. Its
+isolated real-RHI capture is
+`Saved/Playtests/Codex_SeaLavenderUnrealPreview_20261017/SeaLavender_TwoSided_Isolated_RealRHI.png`.
+Visual review finds no material improvement in the pale leaves, dark stem
+structure, or flower readability.
+Two-sided shading is therefore not retained as a candidate-specific fix; the
+importer keeps it as an optional manifest property for other assets. These
+captures are a transient review only: the script spawned an actor in the
+loaded Island world but never called a level-save API. No placement or
+gameplay/population cost is approved.
