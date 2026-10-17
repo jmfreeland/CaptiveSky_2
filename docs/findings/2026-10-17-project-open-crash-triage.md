@@ -20,8 +20,30 @@ no OOM, and its stack contains only unsymbolized `UnrealEditor-Core` and
 the crash-side log ends during engine pre-initialization.
 
 This is distinct from the live editor PID 22688 that the user asked to leave
-running; it does not justify terminating or reopening that editor. No build,
-project launch, or additional Unreal process was started during this triage.
+running; it does not justify terminating or reopening that editor. No build or
+new Unreal process was started during the 2026-10-16 crash-log review.
+
+## Repeat during a bounded Rat-hollow review (2026-10-17)
+
+Before the attempt, no `UnrealEditor`, `UnrealEditor-Cmd`, UBT, or shader worker
+process was present. A real-RHI `UnrealEditor.exe -game` review was then started
+with agent thinking disabled, zero model requests, an isolated playtest data
+root containing temporary Site A and Site B RatHollow records, and a 90-second
+play cap. It terminated during pre-initialization before the Island loaded or
+any screenshot was saved. `Saved/Crashes/_0000/CrashContext.runtime-xml` again
+reports a null-address access violation at `SecondsSinceStart=0`, no OOM, and
+PCallStackHash `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`—the same signature
+recorded for the earlier NullRHI project-open crash. The crash-side log contains
+the full command line; the main Island state file was not used or changed. Do
+not repeat this launch until symbols or a meaningfully different startup path
+can distinguish the fault.
+
+The isolated test records are not a canonical Rat home. The current
+`WorldState/Island.json` still has an empty `wildlife_homes` array, and the Rat
+subsystem therefore falls back to the Inn; the earlier Site A screenshot has a
+`stat streaming` overlay and does not complete the two-site human/Rat-height
+visual review. Keep the user's chosen “hidden fallen-wood hollow” intent, but
+do not promote either candidate coordinate without readable visual evidence.
 
 ## Next diagnostic step
 
