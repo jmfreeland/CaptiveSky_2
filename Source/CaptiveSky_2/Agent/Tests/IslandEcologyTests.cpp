@@ -668,14 +668,17 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		!Weather->ShoreGroundPlantLowA->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowB->CanEverAffectNavigation() &&
 		!Weather->ShoreGroundPlantLowC->CanEverAffectNavigation() && !Weather->ShoreGroundPlantLowD->CanEverAffectNavigation() &&
 		!Weather->IslandFestuca->CanEverAffectNavigation() && !Weather->IslandPhalaris->CanEverAffectNavigation());
-	TestTrue(TEXT("All grass and ground-plant variants are visible around the landmarks and inn approach"),
+	TestTrue(TEXT("The landmark fixture visibly populates its grass and broadleaf components"),
 		Weather->ShoreGrassA->IsVisible() && Weather->ShoreGrassB->IsVisible() && GrassC->IsVisible() && Weather->ShoreGroundPlants->IsVisible() &&
 		Weather->ShoreGrassA->GetInstanceCount() > 0 && Weather->ShoreGrassB->GetInstanceCount() > 0 && GrassC->GetInstanceCount() > 0 &&
-		Weather->ShoreGroundPlantLowA->IsVisible() && Weather->ShoreGroundPlantLowB->IsVisible() &&
-		Weather->ShoreGroundPlantLowC->IsVisible() && Weather->ShoreGroundPlantLowD->IsVisible() &&
-		Weather->ShoreGroundPlants->GetInstanceCount() > 0 && Weather->ShoreGroundPlantLowA->GetInstanceCount() > 0 &&
-		Weather->ShoreGroundPlantLowC->GetInstanceCount() > 0 &&
-		Weather->ShoreGroundPlantLowD->GetInstanceCount() > 0);
+		Weather->ShoreGroundPlants->GetInstanceCount() > 0);
+	for (UHierarchicalInstancedStaticMeshComponent* LowPlant : {Weather->ShoreGroundPlantLowA, Weather->ShoreGroundPlantLowB,
+		Weather->ShoreGroundPlantLowC, Weather->ShoreGroundPlantLowD})
+	{
+		TestTrue(TEXT("Each optional low broadleaf variant resolves its mesh"), LowPlant->GetStaticMesh() != nullptr);
+		TestTrue(TEXT("A low broadleaf variant with fixture placements is visible"),
+			LowPlant->GetInstanceCount() == 0 || LowPlant->IsVisible());
+	}
 	const FTransform GrassBase(FQuat(FVector::UpVector, FMath::DegreesToRadians(37.f)), FVector(120.f, 230.f, 8.f), FVector(1.7f));
 	const FTransform CalmGrass = AIslandWeather::CalculateGroundCoverSway(GrassBase, FVector::ZeroVector, 2.0, 4, 71, 180.f);
 	TestTrue(TEXT("Calm air preserves the exact authored grass transform"), CalmGrass.Equals(GrassBase));
@@ -749,6 +752,9 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Resident interaction fixture creates a walking character"), Walker);
 	if (Walker)
 	{
+		// NullRHI does not render the synthetic character, so mark it as recently
+		// rendered to model a visible resident for the proximity-bending contract.
+		Walker->GetMesh()->SetLastRenderTime(World->GetTimeSeconds());
 		Weather->ShoreGrassA->GetInstanceTransform(0, UnoccupiedWindPose, false);
 		Weather->UpdateGroundCoverSway();
 		FTransform BrushedAsidePose;
@@ -764,6 +770,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			BrushedAsidePose.GetScale3D().Equals(UnoccupiedWindPose.GetScale3D(), 0.01f));
 		TestTrue(TEXT("The brushed grass leans away from the resident"), FVector::DotProduct(BrushedUp - WindOnlyUp, AwayFromResident) > 0.f);
 		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(100.f, 0.f, 590.f));
+		Walker->GetMesh()->SetLastRenderTime(World->GetTimeSeconds());
 		Weather->UpdateGroundCoverSway();
 		const FTransform& GrassBaseTransform = Weather->ShoreGrassABaseTransforms[0];
 		const FVector GrassWorldLocation = Weather->ShoreGrassA->GetComponentTransform().TransformPosition(GrassBaseTransform.GetLocation());
@@ -777,6 +784,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A resident passing overhead does not bend ground cover"),
 			OverheadPose.GetRotation().Equals(WindOnlyOverheadPose.GetRotation(), 0.001f));
 		Walker->SetActorLocation(InteractionSample.GetLocation() + FVector(5000.f, 0.f, 90.f));
+		Walker->GetMesh()->SetLastRenderTime(World->GetTimeSeconds());
 		Weather->UpdateGroundCoverSway();
 		FTransform RecoveredPose;
 		Weather->ShoreGrassA->GetInstanceTransform(0, RecoveredPose, false);

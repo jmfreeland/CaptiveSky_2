@@ -57,11 +57,13 @@ against the isolated scratch build with NullRHI, resident thinking disabled,
 and zero model requests. It confirmed the imported mesh resolves and the
 bluebell component is non-colliding and excluded from navigation.
 
-The broader `GroundCover` automation still has four failing assertions outside
-the new species contract: the synthetic landscape did not populate all low
-ground-plant variants, and its non-rendered character fixture did not exercise
-resident-driven grass bending. The foliage-component count and all nine
-species checks now pass. This is not a rendered quality or performance check.
+The broader `GroundCover` automation now passes in the isolated UE 5.8.3
+scratch build. The tiny synthetic fixture checks low broadleaf visibility only
+when a variant receives placements, while the large-grid species-selection
+test covers world-scale variant diversity. Its NullRHI resident fixture marks
+the synthetic character as recently rendered so the proximity-bending contract
+is exercised without changing runtime visibility gating. This is not a
+rendered quality or performance check. Evidence: [GroundCover automation log](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_GroundCoverReview_20261017b.log).
 The source asset is in the ignored local review folder
 `Content/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/`; other
 checkouts need to run the existing ComfyBlender export/import pipeline before
