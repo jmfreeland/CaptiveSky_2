@@ -11,6 +11,7 @@
 #include "IslandTideglassDragonfly.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandRainBasin.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandWeather.h"
 #include "IslandTrail.h"
@@ -2342,6 +2343,61 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Repeated quiet attention only refreshes the short natural startle response"), WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+
+		if (Weather)
+		{
+			UIslandRainBasinSubsystem* Basin = World->GetSubsystem<UIslandRainBasinSubsystem>();
+			TestNotNull(TEXT("The ecology fixture exposes the persistent rain basin state"), Basin);
+			if (Basin)
+			{
+				const FIslandBasinState OriginalBasinState = Basin->GetState();
+				const bool bOriginalBasinStorage = Basin->bAllowStorage;
+				Basin->bAllowStorage = false;
+				FIslandBasinState& BasinState = Basin->GetStateMutable();
+				BasinState.bPlaced = true;
+				BasinState.Location = TestPoolLocation + FVector(420.f, 0.f, 0.f);
+				BasinState.Water = FIslandBasinState::FloatLevel - 0.01f;
+				WatchableDragonfly->Weather = Weather;
+				Weather->WeatherSeed = DryWeatherSeed;
+				WatchableDragonfly->CheckForNearbyRainBasin();
+				TestTrue(TEXT("A dragonfly ignores a basin that is too dry to hold floating leaves"),
+					FMath::IsNearlyZero(WatchableDragonfly->BasinInterestRemaining));
+
+				BasinState.Water = 0.5f;
+				WatchableDragonfly->CheckForNearbyRainBasin();
+				TestTrue(TEXT("A nearby, water-filled basin draws a brief dragonfly visit"),
+					WatchableDragonfly->BasinInterestRemaining > 0.f && WatchableDragonfly->BasinInterestRemaining <= 6.5f);
+				const float BasinSurfaceHeight = AIslandRainBasin::FloorThickness + AIslandRainBasin::WaterDepth(BasinState.Water);
+				TestTrue(TEXT("The basin hover sits outside the rim and above the measured water surface"),
+					FMath::IsNearlyEqual(FVector::Dist2D(WatchableDragonfly->BasinInterestLocation, BasinState.Location),
+						AIslandRainBasin::RimRadius + 12.f, 0.1f) &&
+					FMath::IsNearlyEqual(WatchableDragonfly->BasinInterestLocation.Z,
+						BasinState.Location.Z + BasinSurfaceHeight + 78.f, 0.1f));
+				TestEqual(TEXT("One visit starts a bounded twenty-two-second cooldown"),
+					WatchableDragonfly->BasinInterestCooldownRemaining, 22.f);
+				const FVector BeforeBasinApproach = WatchableDragonfly->GetActorLocation();
+				WatchableDragonfly->Tick(0.35f);
+				TestTrue(TEXT("The dragonfly curves toward its temporary basin station"),
+					FVector::DistSquared(WatchableDragonfly->GetActorLocation(), WatchableDragonfly->BasinInterestLocation) <
+					FVector::DistSquared(BeforeBasinApproach, WatchableDragonfly->BasinInterestLocation));
+				Weather->WeatherSeed = StormSeed;
+				TestTrue(TEXT("The interruption fixture has heavy rain"),
+					Weather->SampleRainIntensity(World->GetTimeSeconds()) > 0.55f);
+				WatchableDragonfly->CheckForNearbyRainBasin();
+				TestTrue(TEXT("Heavy rain interrupts the temporary basin visit without erasing its cooldown"),
+					FMath::IsNearlyZero(WatchableDragonfly->BasinInterestRemaining) &&
+					WatchableDragonfly->BasinInterestCooldownRemaining > 0.f);
+				Weather->WeatherSeed = DryWeatherSeed;
+				WatchableDragonfly->BasinInterestCooldownRemaining = 0.f;
+				BasinState.Water = FIslandBasinState::FloatLevel - 0.01f;
+				WatchableDragonfly->CheckForNearbyRainBasin();
+				TestTrue(TEXT("After the shower, a basin below the floating-leaf threshold does not retrigger"),
+					FMath::IsNearlyZero(WatchableDragonfly->BasinInterestRemaining));
+				Basin->GetStateMutable() = OriginalBasinState;
+				Basin->bAllowStorage = bOriginalBasinStorage;
+				Weather->WeatherSeed = OriginalWeatherSeed;
+			}
+		}
 
 		if (Clock && DayPeriwinkles.Num() > 0 && DayPeriwinkles[0].IsValid())
 		{
