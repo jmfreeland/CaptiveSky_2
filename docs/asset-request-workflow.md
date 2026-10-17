@@ -82,3 +82,15 @@ behavior evidence for that isolated build, not proof that the unresponsive main
 editor finished its Live Coding compile. These checks also do not show an
 actual character choosing a proposal or prove any proposed upgrade was
 implemented in the world.
+
+**Regression refresh (2026-10-17):** the full asset-pipeline suite ran 57 tests
+and passed with the desktop-bundled Python runtime. The first run was blocked
+by access denied in the Windows app-sandbox temp directory; rerunning with
+process-only `TEMP`/`TMP` pointed at this project's ignored
+`Saved/CompileScratch/` resolved the environment issue without changing
+system settings or source files. The default project inbox
+`Saved/CaptiveSky/ComfyBlender/Requests/inbox.jsonl` was absent at this check,
+so there was no default-root proposal to fulfill. A `CaptiveSkyDataRoot`
+override was not independently inspected; this does not prove that another
+data root is empty. The synthetic offline tests do not prove an actual resident
+has chosen a request or that an upgrade was implemented in the Island.
