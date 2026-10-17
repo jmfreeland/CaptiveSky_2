@@ -12,11 +12,16 @@ wind/rain/daylight behavior and the 96-mote cap.
 `IslandDriftTests.cpp` adds coverage for malformed scalar and vector inputs,
 including a runtime call that checks the actor, mote positions, and velocities
 remain finite. The copied Source tree compiled and linked as a UE 5.8.3 editor
-target in an isolated, minimal scratch project (175/175 UBT actions). This
-verifies compilation, not the main project's full plugin/content startup.
+target in an isolated, minimal scratch project (175/175 UBT actions). The
+scratch copies of both changed files were SHA-256-identical to the committed
+sources.
 
-The focused `CaptiveSky2.Agent.IslandDrift` commandlet attempt produced no log
-or automation result, so it is **not counted as a test pass**. Do not infer a
-result from its shell exit alone. Once a usable Unreal test session is available,
-run the focused test, then capture one ordinary breeze and one rain-cleared
-view to confirm the unchanged visual response.
+The focused `CaptiveSky2.Agent.IslandDrift` automation then passed in that
+minimal project under NullRHI: the log reports one matching test and
+`Test Completed. Result={Success}`. It ran with agent thinking disabled,
+`CaptiveSkyMaxModelRequests=0`, and scratch-local DDC and shader directories.
+Log: `Saved/CompileScratch/Codex_DriftSafety_20261018/IslandDriftTest.log`.
+This verifies deterministic behavior without the main project's Content; it
+does not validate the live Island's visuals, ordinary gameplay readability, or
+the full project's startup path. A real-RHI breeze and rain-cleared capture is
+still the visual follow-up when the editor is usable.
