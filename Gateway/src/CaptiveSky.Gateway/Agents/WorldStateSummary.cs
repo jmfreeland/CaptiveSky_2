@@ -104,7 +104,14 @@ public static class WorldStateSummary
             var quality = home.TryGetProperty("shelter_quality", out var qualityNode) && qualityNode.TryGetInt32(out var score)
                 ? $" (shelter quality {Math.Clamp(score, 0, 5)}/5)"
                 : string.Empty;
-            facts.Add($"On {level}, your {species} home{homeName} was last saved as {state}{quality}.");
+            var supplies = Items(home, "cached_supplies")
+                .Select(cache => (Item: Text(cache, "item"), Quantity: Int(cache, "quantity")))
+                .Where(cache => IsSafeIdentifier(cache.Item) && cache.Quantity is > 0 and <= 20)
+                .Take(4)
+                .Select(cache => $"{cache.Quantity} × {cache.Item}")
+                .ToArray();
+            var cacheSummary = supplies.Length == 0 ? string.Empty : $" Your last saved cache there lists {string.Join(", ", supplies)}.";
+            facts.Add($"On {level}, your {species} home{homeName} was last saved as {state}{quality}.{cacheSummary}");
         }
 
         foreach (var curio in Items(root, "curios"))
@@ -146,6 +153,9 @@ public static class WorldStateSummary
 
     private static string Text(JsonElement element, string name) =>
         element.TryGetProperty(name, out var node) && node.ValueKind == JsonValueKind.String ? node.GetString()?.Trim() ?? string.Empty : string.Empty;
+
+    private static bool IsSafeIdentifier(string value) =>
+        value.Length is > 0 and <= 48 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 
     private static int Int(JsonElement element, string name) =>
         element.TryGetProperty(name, out var node) && node.TryGetInt32(out var value) ? value : 0;
