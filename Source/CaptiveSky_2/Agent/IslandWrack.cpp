@@ -12,6 +12,7 @@
 #include "HAL/IConsoleManager.h"
 #include "IslandChronicle.h"
 #include "IslandOceanSubsystem.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWorldStateSubsystem.h"
 #include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -428,7 +429,7 @@ EIslandWrackKind UIslandWrackSubsystem::PickKind(int32 Seed)
 FString UIslandWrackSubsystem::FindFor(EIslandWrackKind Kind, int32 Seed)
 {
 	static const TCHAR* Wood[] = {
-		TEXT("a small crab sheltering in a hollow of the wood, which scuttles off sideways"),
+		TEXT("a small crab's hollow in the wood, its damp tracks leading into the sand"),
 		TEXT("a fine line of tiny holes bored along the grain, like stitches, where shipworm have been at it"),
 		TEXT("a rusted nail still driven through one end - this was part of something built, once, far from here"),
 		TEXT("a notch cut too regularly to be the sea's work, worn smooth by the water"),
@@ -758,12 +759,35 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 			*DescribeItem(Item.Kind, Age, false), Item.TurnedBy.IsEmpty() ? TEXT("Someone") : *Item.TurnedBy.Left(24), *Item.Find, Remaining);
 		return true;
 	}
+	bool bNearbyCrabScurried = false;
+	if (Item.Kind == EIslandWrackKind::Driftwood && Item.Find.StartsWith(TEXT("a small crab's hollow")) && GetWorld())
+	{
+		AIslandTidepoolCrab* NearestCrab = nullptr;
+		float NearestDistanceSquared = FMath::Square(175.f);
+		for (TActorIterator<AIslandTidepoolCrab> It(GetWorld()); It; ++It)
+		{
+			if (It->IsSheltered() || It->IsScurrying()) continue;
+			const float DistanceSquared = FVector::DistSquared2D(It->GetActorLocation(), Item.Position);
+			if (DistanceSquared <= NearestDistanceSquared)
+			{
+				NearestDistanceSquared = DistanceSquared;
+				NearestCrab = *It;
+			}
+		}
+		if (NearestCrab)
+		{
+			NearestCrab->RespondToQuietObservation(Item.Position);
+			bNearbyCrabScurried = true;
+		}
+	}
 	bDirty = true;
 	if (TWeakObjectPtr<AIslandWrack>* Slot = Actors.Find(ItemId))
 		if (AIslandWrack* Actor = Slot->Get()) Actor->Show(Item.Id, Item.Kind, Item.Seed, Age, true);
 	Save();
 	OutFact = FString::Printf(TEXT("You crouched by %s and turned it over. Underneath: %s. You left it turned over, and the shore remembers it until the sea takes it back in about %d Island days; the next storm leaves more wrack along this shore."),
 		*DescribeItem(Item.Kind, Age, false), *Item.Find, Remaining);
+	if (bNearbyCrabScurried)
+		OutFact += TEXT(" A nearby shore crab darts sideways from the disturbance, then settles again.");
 	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("wrack_turned"), AgentId,
 		FString::Printf(TEXT("Turned over %s on the shore and found %s."), *DescribeItem(Item.Kind, Age, false), *Item.Find));
 	return true;

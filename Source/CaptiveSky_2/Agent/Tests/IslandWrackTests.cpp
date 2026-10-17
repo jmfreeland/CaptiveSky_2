@@ -6,6 +6,7 @@
 #include "IslandChronicle.h"
 #include "IslandDayNight.h"
 #include "IslandInteractionUtility.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWrack.h"
 #include "RavenAgentAIController.h"
 #include "GameFramework/Character.h"
@@ -169,6 +170,82 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	}
 	TestEqual(TEXT("A full shore is capped"), Full.Items.Num(), FIslandWrackLedger::MaxItems);
 	TestNull(TEXT("The oldest wrack was taken back"), Full.Find(First));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWrackCrabDisturbanceTest, "CaptiveSky2.Agent.IslandWrackCrabDisturbance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWrackCrabDisturbanceTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Transient wrack/crab world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	const FString TestFolder = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/WrackCrab"));
+	const FString TestStem = FPaths::Combine(TestFolder, FGuid::NewGuid().ToString(EGuidFormats::Digits));
+	const FString ChroniclePath = TestStem + TEXT("_chronicle.jsonl");
+	const FString WrackPath = TestStem + TEXT("_wrack.json");
+	IFileManager::Get().MakeDirectory(*TestFolder, true);
+	ON_SCOPE_EXIT
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		IFileManager::Get().Delete(*ChroniclePath, false, true);
+		IFileManager::Get().Delete(*WrackPath, false, true);
+	};
+
+	UIslandChronicleSubsystem* Chronicle = World->GetSubsystem<UIslandChronicleSubsystem>();
+	UIslandWrackSubsystem* Wrack = World->GetSubsystem<UIslandWrackSubsystem>();
+	if (!TestNotNull(TEXT("Chronicle subsystem exists"), Chronicle) || !TestNotNull(TEXT("Wrack subsystem exists"), Wrack)) return false;
+	Chronicle->ChronicleFileOverride = ChroniclePath;
+	Wrack->StorageFileOverride = WrackPath;
+	Wrack->bAllowStorage = true;
+	World->BeginPlay();
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandTidepoolCrab* NearbyCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandTidepoolCrab* DistantCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(800.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandTidepoolCrab* UnrelatedCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(3000.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandTidepoolCrab* ShelteredCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(4000.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Nearby crab fixture exists"), NearbyCrab) ||
+		!TestNotNull(TEXT("Distant crab fixture exists"), DistantCrab) ||
+		!TestNotNull(TEXT("Unrelated crab fixture exists"), UnrelatedCrab) ||
+		!TestNotNull(TEXT("Sheltered crab fixture exists"), ShelteredCrab)) return false;
+
+	const int32 CrabWoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector::ZeroVector, 0.f, 28, 0).Id; // seed 28 deterministically hides a crab under driftwood
+	FString Fact;
+	TestTrue(TEXT("Matching driftwood is examined"), Wrack->Examine(CrabWoodId, 0, TEXT("Visitor"), Fact));
+	TestTrue(TEXT("A nearby real crab briefly scurries from the turned wood"), NearbyCrab->IsScurrying());
+	TestFalse(TEXT("A crab outside the small shelter radius is undisturbed"), DistantCrab->IsScurrying());
+	TestTrue(TEXT("The factual observation reports the nearby crab's brief response"), Fact.Contains(TEXT("darts sideways")));
+
+	const int32 EmptyShelterWoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector(6000.f, 0.f, 0.f), 0.f, 28, 0).Id;
+	TestTrue(TEXT("A crab-trace discovery is still examined without a crab actor nearby"),
+		Wrack->Examine(EmptyShelterWoodId, 0, TEXT("Visitor"), Fact));
+	TestTrue(TEXT("The empty shelter is described through traces, not a fabricated scurry"),
+		Fact.Contains(TEXT("damp tracks")) && !Fact.Contains(TEXT("darts sideways")) && !Fact.Contains(TEXT("scuttles off sideways")));
+
+	const int32 OtherWoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector(3000.f, 0.f, 0.f), 0.f, 7, 0).Id; // seed 7 reveals no crab
+	TestTrue(TEXT("Unrelated driftwood is still examined"), Wrack->Examine(OtherWoodId, 0, TEXT("Visitor"), Fact));
+	TestFalse(TEXT("A deterministic non-crab find does not startle wildlife"), UnrelatedCrab->IsScurrying());
+
+	ShelteredCrab->SetSheltered(true);
+	const int32 ShelteredWoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
+		FVector(4000.f, 0.f, 0.f), 0.f, 28, 0).Id;
+	TestTrue(TEXT("Matching driftwood beside a shelter is examined"), Wrack->Examine(ShelteredWoodId, 0, TEXT("Visitor"), Fact));
+	TestTrue(TEXT("The crab remains sheltered and undisturbed"), ShelteredCrab->IsSheltered() && !ShelteredCrab->IsScurrying());
 	return true;
 }
 
