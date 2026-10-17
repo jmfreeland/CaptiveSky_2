@@ -640,21 +640,30 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("A transient cache display component is created"), CacheDisplay);
 		if (CacheDisplay)
 		{
-			TestTrue(TEXT("The bounded hazelnut cache uses the imported Common Hazel nut branch"), CacheDisplay->GetStaticMesh() &&
-				CacheDisplay->GetStaticMesh()->GetPathName() == TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Instances/Branch_Common_Hazel_Nut_01.Branch_Common_Hazel_Nut_01"));
-			TestEqual(TEXT("Three cached hazelnuts appear as three visual items"), CacheDisplay->GetInstanceCount(), 3);
+			TestFalse(TEXT("A provisional home keeps its cache tucked inside"), CacheDisplay->IsVisible());
+			TestEqual(TEXT("A provisional cache has no public display instances"), CacheDisplay->GetInstanceCount(), 0);
+			const FIslandWildlifeHomeRecord* CanonicalHome = State->FindWildlifeHome(Home.Id);
+			TestTrue(TEXT("Hiding provisional supplies does not change canonical cache quantity"), CanonicalHome &&
+				CanonicalHome->CachedSupplies.Num() == 1 && CanonicalHome->CachedSupplies[0].Quantity == 3);
 			TestEqual(TEXT("The cache remains non-colliding"), CacheDisplay->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 			TestFalse(TEXT("The cache cannot alter navigation"), CacheDisplay->CanEverAffectNavigation());
 
 			FIslandWildlifeHomeRecord DenseCache = Home;
+			DenseCache.ShelterState = EIslandWildlifeShelterState::Settled;
+			TestTrue(TEXT("A settled home reveals the canonical cache"), Materialized->ApplyHomeRecord(DenseCache));
+			TestTrue(TEXT("A settled cache is visible"), CacheDisplay->IsVisible());
+			TestTrue(TEXT("The settled hazelnut cache uses the imported Common Hazel nut branch"), CacheDisplay->GetStaticMesh() &&
+				CacheDisplay->GetStaticMesh()->GetPathName() == TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Instances/Branch_Common_Hazel_Nut_01.Branch_Common_Hazel_Nut_01"));
+			TestEqual(TEXT("Three canonical hazelnuts appear after settlement"), CacheDisplay->GetInstanceCount(), 3);
+			const FIslandWildlifeHomeRecord SettledCache = DenseCache;
 			DenseCache.CachedSupplies[0].Quantity = UIslandWorldStateSubsystem::MaxWildlifeHomeCacheQuantity;
 			TestTrue(TEXT("A full cache record can be reapplied"), Materialized->ApplyHomeRecord(DenseCache));
 			TestEqual(TEXT("A full canonical cache stays visually bounded"), CacheDisplay->GetInstanceCount(), 4);
-			FIslandWildlifeHomeRecord EmptyCache = Home;
+			FIslandWildlifeHomeRecord EmptyCache = DenseCache;
 			EmptyCache.CachedSupplies.Reset();
 			TestTrue(TEXT("Removing cached supplies updates the materialized home"), Materialized->ApplyHomeRecord(EmptyCache));
 			TestEqual(TEXT("Removed supplies leave no stale cache visuals"), CacheDisplay->GetInstanceCount(), 0);
-			TestTrue(TEXT("The canonical home can restore its current cache"), Materialized->ApplyHomeRecord(Home));
+			TestTrue(TEXT("The canonical settled home can restore its current cache"), Materialized->ApplyHomeRecord(SettledCache));
 		}
 	}
 
@@ -670,6 +679,9 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Three observed rest-start days produce a settled canonical state"), SettledHome &&
 		SettledHome->RestVisitDays == 3 && SettledHome->LastRestStartIslandDay == 3 &&
 		SettledHome->ShelterState == EIslandWildlifeShelterState::Settled);
+	TestTrue(TEXT("The canonical settlement transition updates the home materializer"), Materialized &&
+		Materialized->GetCacheDisplayMesh() && Materialized->GetCacheDisplayMesh()->IsVisible() &&
+		Materialized->GetCacheDisplayMesh()->GetInstanceCount() == 3);
 
 	TestTrue(TEXT("The updated file can be read again"), State->ReadStateFile(StateFile));
 	const FIslandWildlifeHomeRecord* Loaded = State->FindWildlifeHome(Home.Id);
@@ -693,6 +705,17 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 		FIslandWildlifeHomeRecord DisturbedHome = *Loaded;
 		DisturbedHome.ShelterState = EIslandWildlifeShelterState::Disturbed;
 		TestTrue(TEXT("An explicit disturbance is stored"), State->StoreWildlifeHome(DisturbedHome));
+		AIslandWildlifeHome* DisturbedActor = State->FindWildlifeHomeActor(Home.Id);
+		UInstancedStaticMeshComponent* DisturbedCacheDisplay = DisturbedActor ? DisturbedActor->GetCacheDisplayMesh() : nullptr;
+		TestNotNull(TEXT("The disturbed RatHollow still has a visual cache component"), DisturbedCacheDisplay);
+		if (DisturbedCacheDisplay)
+		{
+			TestFalse(TEXT("A disturbed home tucks its cache back inside"), DisturbedCacheDisplay->IsVisible());
+			TestEqual(TEXT("A disturbed cache is not publicly displayed"), DisturbedCacheDisplay->GetInstanceCount(), 0);
+		}
+		const FIslandWildlifeHomeRecord* DisturbedCanonicalHome = State->FindWildlifeHome(Home.Id);
+		TestTrue(TEXT("Tucking away a disturbed cache does not erase canonical supplies"), DisturbedCanonicalHome &&
+			DisturbedCanonicalHome->CachedSupplies.Num() == 1 && DisturbedCanonicalHome->CachedSupplies[0].Quantity == 3);
 		TestTrue(TEXT("A later rest visit is recorded without erasing disturbance"), State->RecordWildlifeHomeRestStart(Home.Id, 4));
 		TestTrue(TEXT("Repeated future use remains recordable"), State->RecordWildlifeHomeRestStart(Home.Id, 5));
 		TestTrue(TEXT("A third later rest visit is recorded"), State->RecordWildlifeHomeRestStart(Home.Id, 6));

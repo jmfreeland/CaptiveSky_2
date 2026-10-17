@@ -49,29 +49,36 @@ bool AIslandWildlifeHome::ApplyHomeRecord(const FIslandWildlifeHomeRecord& Recor
 	ShelterMesh->SetStaticMesh(HollowMesh);
 	CacheDisplayMesh->ClearInstances();
 	CacheDisplayMesh->SetStaticMesh(nullptr);
-	for (const FIslandWildlifeHomeCache& Cache : Record.CachedSupplies)
+	const bool bCachesArePubliclyVisible = Record.ShelterState == EIslandWildlifeShelterState::Settled;
+	CacheDisplayMesh->SetVisibility(bCachesArePubliclyVisible, true);
+	// Canonical supplies remain in world state throughout every shelter state.
+	// Only a settled, trusted home places its cache outside the hollow.
+	if (bCachesArePubliclyVisible)
 	{
-		if (Cache.ItemId != FName(TEXT("Hazelnut")) || Cache.Quantity < 1) continue;
-
-		UStaticMesh* HazelnutMesh = LoadObject<UStaticMesh>(nullptr, HazelnutCacheMeshPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
-		if (!HazelnutMesh) break;
-		CacheDisplayMesh->SetStaticMesh(HazelnutMesh);
-
-		const FBoxSphereBounds MeshBounds = HazelnutMesh->GetBounds();
-		const float Extent = MeshBounds.BoxExtent.GetMax();
-		if (Extent <= KINDA_SMALL_NUMBER) break;
-		const float MeshScale = 7.f / Extent;
-		const int32 VisibleCount = FMath::Clamp(Cache.Quantity, 0, MaxVisibleCacheItems);
-		for (int32 Index = 0; Index < VisibleCount; ++Index)
+		for (const FIslandWildlifeHomeCache& Cache : Record.CachedSupplies)
 		{
-			const float Side = (Index % 2 == 0) ? -1.f : 1.f;
-			const float Row = static_cast<float>(Index / 2);
-			const float GroundedZ = 2.f + (MeshBounds.BoxExtent.Z - MeshBounds.Origin.Z) * MeshScale;
-			const FVector LocalLocation(-18.f - Row * 7.f, Side * (18.f + Row * 5.f), GroundedZ + (Index % 3) * 0.6f);
-			const FRotator LocalRotation(0.f, static_cast<float>((Index * 67) % 360), (Index % 2 == 0) ? -8.f : 8.f);
-			CacheDisplayMesh->AddInstance(FTransform(LocalRotation, LocalLocation, FVector(MeshScale)));
+			if (Cache.ItemId != FName(TEXT("Hazelnut")) || Cache.Quantity < 1) continue;
+
+			UStaticMesh* HazelnutMesh = LoadObject<UStaticMesh>(nullptr, HazelnutCacheMeshPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+			if (!HazelnutMesh) break;
+			CacheDisplayMesh->SetStaticMesh(HazelnutMesh);
+
+			const FBoxSphereBounds MeshBounds = HazelnutMesh->GetBounds();
+			const float Extent = MeshBounds.BoxExtent.GetMax();
+			if (Extent <= KINDA_SMALL_NUMBER) break;
+			const float MeshScale = 7.f / Extent;
+			const int32 VisibleCount = FMath::Clamp(Cache.Quantity, 0, MaxVisibleCacheItems);
+			for (int32 Index = 0; Index < VisibleCount; ++Index)
+			{
+				const float Side = (Index % 2 == 0) ? -1.f : 1.f;
+				const float Row = static_cast<float>(Index / 2);
+				const float GroundedZ = 2.f + (MeshBounds.BoxExtent.Z - MeshBounds.Origin.Z) * MeshScale;
+				const FVector LocalLocation(-18.f - Row * 7.f, Side * (18.f + Row * 5.f), GroundedZ + (Index % 3) * 0.6f);
+				const FRotator LocalRotation(0.f, static_cast<float>((Index * 67) % 360), (Index % 2 == 0) ? -8.f : 8.f);
+				CacheDisplayMesh->AddInstance(FTransform(LocalRotation, LocalLocation, FVector(MeshScale)));
+			}
+			break;
 		}
-		break;
 	}
 	SetActorLocationAndRotation(Record.EntranceLocation, Record.EntranceRotation, false, nullptr, ETeleportType::TeleportPhysics);
 	Tags.AddUnique(FName(*(TEXT("WildlifeHome_") + Record.Id.ToString())));
