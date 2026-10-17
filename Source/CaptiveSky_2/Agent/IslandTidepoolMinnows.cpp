@@ -575,7 +575,8 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		return;
 	}
 
-	UProceduralMeshComponent* FishThatBrokeSurface = Fish[SurfaceBreakFishIndex % Fish.Num()];
+	const int32 BreakingFishIndex = SurfaceBreakFishIndex % Fish.Num();
+	UProceduralMeshComponent* FishThatBrokeSurface = Fish[BreakingFishIndex];
 	if (!FishThatBrokeSurface)
 	{
 		SurfaceBreakRemaining = FMath::Lerp(4.f, 16.f, NightRest);
@@ -593,6 +594,8 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		RippleLocation, FRotator::ZeroRotator, SpawnParameters))
 	{
 		Ripple->ConfigureAsMinnowImpact();
+		SurfaceBreakHopFishIndex = BreakingFishIndex;
+		SurfaceBreakHopRemaining = SurfaceBreakHopDurationSeconds;
 		SurfaceBreakFishIndex = (SurfaceBreakFishIndex + 1) % Fish.Num();
 		SurfaceBreakRemaining = SurfaceBreakInterval(NightRest);
 		SurfaceBreakContextRemaining = SurfaceBreakContextLifetime;
@@ -778,6 +781,10 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 	const float ScatterAlpha = GetScatterAlpha();
 	const float CircleScale = 1.f + 0.65f * GetSurfacePulseAlpha();
 	const FVector Side(-ScatterDirection.Y, ScatterDirection.X, 0.f);
+	const float HopAlpha = SurfaceBreakHopDurationSeconds > KINDA_SMALL_NUMBER
+		? FMath::Clamp(1.f - SurfaceBreakHopRemaining / SurfaceBreakHopDurationSeconds, 0.f, 1.f)
+		: 1.f;
+	const float HopProgress = SurfaceBreakHopRemaining > 0.f ? FMath::Sin(PI * HopAlpha) : 0.f;
 	for (int32 Index = 0; Index < Fish.Num(); ++Index)
 	{
 		UProceduralMeshComponent* Minnow = Fish[Index];
@@ -791,14 +798,17 @@ void AIslandTidepoolMinnows::UpdateSchool(float RainIntensity)
 			FMath::Cos(Angle) * 135.f * RadiusScale * TuckScale * CircleScale,
 			FMath::Sin(Angle) * 82.f * RadiusScale * TuckScale * CircleScale,
 			TideOffset + 0.8f + FMath::Sin(Angle * 1.7f) * 0.4f * NightScale);
+		const bool bBreakingSurface = Index == SurfaceBreakHopFishIndex && SurfaceBreakHopRemaining > 0.f;
+		const float HopHeight = bBreakingSurface ? SurfaceBreakHopHeightCm * HopProgress : 0.f;
+		const float HopPitch = bBreakingSurface ? 12.f * HopProgress : 0.f;
 		const float FanOffset = (Index - (FishCount - 1) * 0.5f) * 22.f;
 		const FVector ScatterOffset = ScatterDirection * 210.f + Side * FanOffset;
-		Minnow->SetRelativeLocation(ClampToPoolSwimmingBounds(IdleOffset + ScatterOffset * ScatterAlpha));
+		Minnow->SetRelativeLocation(ClampToPoolSwimmingBounds(IdleOffset + ScatterOffset * ScatterAlpha + FVector(0.f, 0.f, HopHeight)));
 
 		FVector Facing(-FMath::Sin(Angle), FMath::Cos(Angle), 0.f);
 		Facing += ScatterDirection * (ScatterAlpha * 1.2f);
 		if (!Facing.IsNearlyZero())
-			Minnow->SetRelativeRotation(FRotator(0.f, Facing.Rotation().Yaw, 0.f));
+			Minnow->SetRelativeRotation(FRotator(HopPitch, Facing.Rotation().Yaw, 0.f));
 
 		if (Tails.IsValidIndex(Index) && Tails[Index])
 		{
@@ -843,6 +853,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 		: 0.f;
 	SurfaceBreakRemaining -= SafeDelta;
 	SurfaceBreakContextRemaining = FMath::Max(0.f, SurfaceBreakContextRemaining - SafeDelta);
+	SurfaceBreakHopRemaining = FMath::Max(0.f, SurfaceBreakHopRemaining - SafeDelta);
 	if (SurfaceBreakRemaining <= 0.f)
 	{
 		TryCreateSurfaceBreak(Rain);

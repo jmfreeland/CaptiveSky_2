@@ -39,6 +39,8 @@ private:
 	static constexpr int32 FishCount = 5;
 	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
 	static constexpr float StartleRippleEdgeClearanceCm = 120.f;
+	static constexpr float SurfaceBreakHopDurationSeconds = 0.54f;
+	static constexpr float SurfaceBreakHopHeightCm = 14.f;
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
@@ -73,9 +75,11 @@ private:
 	float RippleCheckRemaining = 0.f;
 	float SurfaceBreakRemaining = 13.f;
 	float SurfaceBreakContextRemaining = 0.f;
+	float SurfaceBreakHopRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
 	float SwimPhaseRadians = 0.f;
 	int32 SurfaceBreakFishIndex = 0;
+	int32 SurfaceBreakHopFishIndex = INDEX_NONE;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<APawn> PlayerWaterPresenceLatch;
 	float RavenCheckRemaining = 0.f;

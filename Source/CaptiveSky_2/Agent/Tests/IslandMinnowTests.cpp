@@ -495,6 +495,28 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("One calm surface break creates exactly one transient ripple"), MinnowRippleCount, 1);
 	if (MinnowRipple)
 	{
+		School->UpdateSchool(0.f);
+		const int32 BreakingFishIndex = School->SurfaceBreakHopFishIndex;
+		UProceduralMeshComponent* BreakingFish = School->Fish.IsValidIndex(BreakingFishIndex)
+			? School->Fish[BreakingFishIndex] : nullptr;
+		TestTrue(TEXT("The emitted surface ripple starts a short hop on exactly its source fish"),
+			BreakingFish && FMath::IsNearlyEqual(School->SurfaceBreakHopRemaining,
+				AIslandTidepoolMinnows::SurfaceBreakHopDurationSeconds));
+		if (BreakingFish)
+		{
+			const FVector RestingLocation = BreakingFish->GetRelativeLocation();
+			School->SurfaceBreakHopRemaining = AIslandTidepoolMinnows::SurfaceBreakHopDurationSeconds * 0.5f;
+			School->UpdateSchool(0.f);
+			TestTrue(TEXT("At mid-hop the minnow visibly clears the waterline and tips upward"),
+				FMath::IsNearlyEqual(BreakingFish->GetRelativeLocation().Z - RestingLocation.Z,
+					AIslandTidepoolMinnows::SurfaceBreakHopHeightCm, 0.05f) && BreakingFish->GetRelativeRotation().Pitch > 11.f);
+			School->Tick(AIslandTidepoolMinnows::SurfaceBreakHopDurationSeconds * 0.5f);
+			TestTrue(TEXT("The brief surface hop returns the same fish to its ordinary orbit"),
+				FMath::IsNearlyZero(School->SurfaceBreakHopRemaining) &&
+				BreakingFish->GetRelativeLocation().Equals(RestingLocation, 0.01f) &&
+				FMath::IsNearlyZero(BreakingFish->GetRelativeRotation().Pitch));
+			School->SurfaceBreakHopRemaining = AIslandTidepoolMinnows::SurfaceBreakHopDurationSeconds;
+		}
 		TestTrue(TEXT("The fish ripple is short, small, and visually restrained"),
 			FMath::IsNearlyEqual(MinnowRipple->DurationSeconds, 0.95f) &&
 			FMath::IsNearlyEqual(MinnowRipple->SurfaceRadius, 48.f) &&
