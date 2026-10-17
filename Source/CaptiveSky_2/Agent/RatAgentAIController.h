@@ -26,6 +26,10 @@ public:
 
 	/** Pure speed/rest mapping shared by the runtime animation selector and regression test. */
 	static ERatLocomotionMode SelectLocomotionMode(float HorizontalSpeed, bool bSleeping);
+	/** A quiet rat may give a nearby visible raven one brief glance, never during an action or rest. */
+	static bool ShouldBeginRavenNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
+		bool bRatResting, bool bRavenResting, bool bAlreadyNoticing);
+	static constexpr float RavenNoticeRadius = 800.f;
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -50,8 +54,13 @@ private:
 	ERatLocomotionMode CurrentMode = ERatLocomotionMode::Idle;
 	float IdleLookTimer = 0.f;
 	float IdleLookRemaining = 0.f;
+	float RavenScanRemaining = 0.f;
+	float RavenAttentionRemaining = 0.f;
+	float RavenAttentionCooldownRemaining = 0.f;
+	FVector RavenAttentionTarget = FVector::ZeroVector;
 
 	void CacheAnimations(APawn* Rat);
 	void UpdateAnimation(float DeltaSeconds);
+	void UpdateRavenAttention(float DeltaSeconds);
 	void UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping);
 };

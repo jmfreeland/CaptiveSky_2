@@ -1,8 +1,12 @@
 #include "RatAgentAIController.h"
 
 #include "Animation/AnimSequence.h"
+#include "AgentConsolidationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "RavenAgentAIController.h"
 
 namespace
 {
@@ -10,6 +14,9 @@ namespace
 	constexpr float RunSpeedThreshold = 105.f;
 	constexpr float IdleLookInterval = 7.5f;
 	constexpr float IdleLookJitter = 2.5f;
+	constexpr float RavenScanInterval = 0.8f;
+	constexpr float RavenAttentionDuration = 1.7f;
+	constexpr float RavenAttentionCooldown = 16.f;
 
 	UAnimSequence* LoadFoxAnimation(const TCHAR* AssetName)
 	{
@@ -31,9 +38,20 @@ ERatLocomotionMode ARatAgentAIController::SelectLocomotionMode(float HorizontalS
 	return HorizontalSpeed >= RunSpeedThreshold ? ERatLocomotionMode::Running : ERatLocomotionMode::Walking;
 }
 
+bool ARatAgentAIController::ShouldBeginRavenNotice(float DistanceCm, bool bHasLineOfSight,
+	bool bRatBusy, bool bRatResting, bool bRavenResting, bool bAlreadyNoticing)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= RavenNoticeRadius &&
+		bHasLineOfSight && !bRatBusy && !bRatResting && !bRavenResting && !bAlreadyNoticing;
+}
+
 void ARatAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
+	RavenScanRemaining = 0.f;
+	RavenAttentionRemaining = 0.f;
+	RavenAttentionCooldownRemaining = 0.f;
+	RavenAttentionTarget = FVector::ZeroVector;
 	CacheAnimations(InPawn);
 	UpdateAnimation(0.f);
 }
@@ -47,13 +65,90 @@ void ARatAgentAIController::OnUnPossess()
 	RunAnimation = nullptr;
 	SleepAnimation = nullptr;
 	CurrentAnimation = nullptr;
+	RavenScanRemaining = 0.f;
+	RavenAttentionRemaining = 0.f;
+	RavenAttentionCooldownRemaining = 0.f;
+	RavenAttentionTarget = FVector::ZeroVector;
 	Super::OnUnPossess();
 }
 
 void ARatAgentAIController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateRavenAttention(DeltaSeconds);
 	UpdateAnimation(DeltaSeconds);
+}
+
+void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
+{
+	APawn* Rat = GetPawn();
+	UWorld* World = GetWorld();
+	if (!Rat || !World) return;
+
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	RavenAttentionCooldownRemaining = FMath::Max(0.f, RavenAttentionCooldownRemaining - SafeDelta);
+	RavenAttentionRemaining = FMath::Max(0.f, RavenAttentionRemaining - SafeDelta);
+	if (RavenAttentionRemaining > 0.f)
+	{
+		if (IsActionInProgress() || IsResting())
+		{
+			RavenAttentionRemaining = 0.f;
+			return;
+		}
+
+		const FVector Direction = RavenAttentionTarget - Rat->GetActorLocation();
+		if (!Direction.IsNearlyZero())
+		{
+			FRotator Facing = Direction.Rotation();
+			Facing.Pitch = 0.f;
+			Facing.Roll = 0.f;
+			Rat->SetActorRotation(FMath::RInterpTo(Rat->GetActorRotation(), Facing, SafeDelta, 2.5f));
+		}
+		return;
+	}
+
+	if (RavenAttentionCooldownRemaining > 0.f)
+	{
+		RavenScanRemaining = FMath::Max(RavenScanRemaining, RavenAttentionCooldownRemaining);
+		return;
+	}
+	RavenScanRemaining -= SafeDelta;
+	if (RavenScanRemaining > 0.f) return;
+	RavenScanRemaining = RavenScanInterval;
+	if (IsActionInProgress() || IsResting()) return;
+
+	ARavenAgentAIController* BestRaven = nullptr;
+	APawn* BestRavenBody = nullptr;
+	float BestDistanceSquared = FMath::Square(RavenNoticeRadius);
+	for (TActorIterator<ARavenAgentAIController> It(World); It; ++It)
+	{
+		ARavenAgentAIController* Raven = *It;
+		APawn* RavenBody = IsValid(Raven) ? Raven->GetPawn() : nullptr;
+		if (!RavenBody) continue;
+		const UAgentConsolidationComponent* RavenRest = RavenBody->FindComponentByClass<UAgentConsolidationComponent>();
+		const bool bRavenResting = RavenRest && !RavenRest->IsAwake();
+		const float DistanceSquared = FVector::DistSquared(Rat->GetActorLocation(), RavenBody->GetActorLocation());
+		if (DistanceSquared > BestDistanceSquared) continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RatNoticesRaven), false, Rat);
+		Query.AddIgnoredActor(RavenBody);
+		FHitResult Hit;
+		const FVector Start = Rat->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		const FVector End = RavenBody->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		const bool bHasLineOfSight = !World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query);
+		if (!ShouldBeginRavenNotice(FMath::Sqrt(DistanceSquared), bHasLineOfSight,
+			false, false, bRavenResting, false)) continue;
+
+		BestDistanceSquared = DistanceSquared;
+		BestRaven = Raven;
+		BestRavenBody = RavenBody;
+	}
+
+	if (!BestRaven || !BestRavenBody) return;
+	RavenAttentionTarget = BestRavenBody->GetActorLocation();
+	RavenAttentionRemaining = RavenAttentionDuration;
+	RavenAttentionCooldownRemaining = RavenAttentionCooldown;
+	IdleLookTimer = 0.f;
 }
 
 void ARatAgentAIController::CacheAnimations(APawn* Rat)

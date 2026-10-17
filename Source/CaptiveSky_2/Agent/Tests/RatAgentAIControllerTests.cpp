@@ -24,6 +24,33 @@ bool FRatAgentAIControllerTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRatRavenAttentionTest, "CaptiveSky2.Agent.RatRavenAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRatRavenAttentionTest::RunTest(const FString& Parameters)
+{
+	using Rat = ARatAgentAIController;
+	TestTrue(TEXT("A quiet rat notices a nearby visible raven"),
+		Rat::ShouldBeginRavenNotice(Rat::RavenNoticeRadius, true, false, false, false, false));
+	TestFalse(TEXT("A wall or thicket prevents an unseen glimpse"),
+		Rat::ShouldBeginRavenNotice(300.f, false, false, false, false, false));
+	TestFalse(TEXT("A moving rat keeps following its chosen route"),
+		Rat::ShouldBeginRavenNotice(300.f, true, true, false, false, false));
+	TestFalse(TEXT("A resting rat is not pulled out of sleep"),
+		Rat::ShouldBeginRavenNotice(300.f, true, false, true, false, false));
+	TestFalse(TEXT("The rat does not disturb a resting raven"),
+		Rat::ShouldBeginRavenNotice(300.f, true, false, false, true, false));
+	TestFalse(TEXT("The cooldown prevents repetitive glances"),
+		Rat::ShouldBeginRavenNotice(300.f, true, false, false, false, true));
+	TestFalse(TEXT("The glimpse has a strict range"),
+		Rat::ShouldBeginRavenNotice(Rat::RavenNoticeRadius + 1.f, true, false, false, false, false));
+	TestFalse(TEXT("Invalid negative distance never starts an attention cue"),
+		Rat::ShouldBeginRavenNotice(-1.f, true, false, false, false, false));
+	TestFalse(TEXT("Invalid distances never start an attention cue"),
+		Rat::ShouldBeginRavenNotice(std::numeric_limits<float>::quiet_NaN(), true, false, false, false, false));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRatAnimationAssetsTest, "CaptiveSky2.Agent.RatAnimationAssets",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
