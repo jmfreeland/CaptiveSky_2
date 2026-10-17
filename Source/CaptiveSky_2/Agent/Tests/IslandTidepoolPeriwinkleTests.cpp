@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandTidepoolPeriwinkle.h"
+#include "IslandTideglassSubsystem.h"
 #include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleCrabCueTest, "CaptiveSky2.Agent.TidepoolPeriwinkleCrabCue",
@@ -56,5 +57,34 @@ bool FIslandPeriwinkleGrazingPathTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Negative frame time cannot reverse the path"), Periwinkle::AdvanceGrazingTime(4.f, -2.f, 0.f), 4.f);
 	TestEqual(TEXT("Invalid rest state resets safely"),
 		Periwinkle::AdvanceGrazingTime(4.f, 2.f, std::numeric_limits<float>::quiet_NaN()), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleIntertidalZonationTest,
+	"CaptiveSky2.Agent.TidepoolPeriwinkleIntertidalZonation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleIntertidalZonationTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	constexpr float SeaLevel = 1000.f;
+	const float Ebb = -UIslandTideglassSubsystem::MaximumTideOffsetCm;
+	const float SameLevel = Periwinkle::LocalWaterlineOffsetCm(Ebb, SeaLevel, SeaLevel);
+	const float HighRock = Periwinkle::LocalWaterlineOffsetCm(Ebb, SeaLevel + 20.f, SeaLevel);
+	const float LowRock = Periwinkle::LocalWaterlineOffsetCm(Ebb, SeaLevel - 20.f, SeaLevel);
+	TestEqual(TEXT("A snail at mean water level keeps the existing tide response"), SameLevel, Ebb);
+	TestTrue(TEXT("A higher rock experiences a more exposed local ebb"), HighRock < SameLevel);
+	TestTrue(TEXT("A lower rock remains wetter through the same ebb"), LowRock > SameLevel);
+	TestTrue(TEXT("The higher snail tucks more than the lower snail"),
+		Periwinkle::ExposureRestAmount(HighRock) > Periwinkle::ExposureRestAmount(LowRock));
+	TestTrue(TEXT("The lower snail keeps a wetter shell than the higher snail"),
+		Periwinkle::WetShellAmount(LowRock, 0.f) > Periwinkle::WetShellAmount(HighRock, 0.f));
+	TestEqual(TEXT("Missing shore height falls back to the global tide offset"),
+		Periwinkle::LocalWaterlineOffsetCm(Ebb, std::numeric_limits<float>::quiet_NaN(), SeaLevel), Ebb);
+	TestEqual(TEXT("A non-finite tide offset resolves safely"),
+		Periwinkle::LocalWaterlineOffsetCm(std::numeric_limits<float>::infinity(), SeaLevel, SeaLevel), 0.f);
+	TestTrue(TEXT("Extreme finite heights remain bounded to a finite response"),
+		FMath::IsFinite(Periwinkle::LocalWaterlineOffsetCm(Ebb, -std::numeric_limits<float>::max(),
+			std::numeric_limits<float>::max())));
 	return true;
 }

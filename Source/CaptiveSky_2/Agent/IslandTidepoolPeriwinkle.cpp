@@ -106,6 +106,11 @@ void AIslandTidepoolPeriwinkle::BeginPlay()
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
 	Phase = FMath::Fmod(FMath::Abs(HomeLocation.X * 0.001f + HomeLocation.Y * 0.0017f), 2.f * PI);
+	if (const UStaticMeshComponent* PoolSurface = UIslandTideglassSubsystem::FindPoolSurface(GetWorld()))
+	{
+		SeaLevelZ = PoolSurface->GetComponentLocation().Z;
+		bHasSeaLevel = FMath::IsFinite(SeaLevelZ);
+	}
 	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 	{
 		IslandClock = *It;
@@ -142,6 +147,18 @@ float AIslandTidepoolPeriwinkle::ExposureRestAmount(float TideOffsetCm)
 		TideOffsetCm / UIslandTideglassSubsystem::MaximumTideOffsetCm, -1.f, 1.f);
 	// Stay open while water is returning; tuck in only through the exposed ebb.
 	return 1.f - FMath::SmoothStep(-0.72f, -0.12f, NormalizedTide);
+}
+
+float AIslandTidepoolPeriwinkle::LocalWaterlineOffsetCm(float TideOffsetCm, float GroundZCm, float SeaLevelZCm)
+{
+	if (!FMath::IsFinite(TideOffsetCm)) return 0.f;
+	if (!FMath::IsFinite(GroundZCm) || !FMath::IsFinite(SeaLevelZCm)) return TideOffsetCm;
+
+	// A positive result means the current waterline is high relative to this
+	// snail's rock; a high rock instead experiences a more severe local ebb.
+	const double RelativeWaterline = static_cast<double>(TideOffsetCm) +
+		static_cast<double>(SeaLevelZCm) - static_cast<double>(GroundZCm);
+	return static_cast<float>(FMath::Clamp(RelativeWaterline, -1000000.0, 1000000.0));
 }
 
 float AIslandTidepoolPeriwinkle::RainRestAmount(float RainIntensity)
@@ -386,6 +403,9 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float TideOffset = IslandClock.IsValid()
 		? UIslandTideglassSubsystem::TideOffsetCm(IslandClock->CurrentHour, IslandClock->DayNumber)
 		: UIslandTideglassSubsystem::MaximumTideOffsetCm;
+	const float LocalTideOffset = bHasSeaLevel
+		? LocalWaterlineOffsetCm(TideOffset, HomeLocation.Z, SeaLevelZ)
+		: TideOffset;
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ObservationRestRemaining = FMath::Max(0.f, ObservationRestRemaining - SafeDelta);
 	ObservationCooldownRemaining = FMath::Max(0.f, ObservationCooldownRemaining - SafeDelta);
@@ -397,12 +417,12 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
 		CheckForNearbyCrabDisturbance();
 	}
-	const float TideRest = ExposureRestAmount(TideOffset);
+	const float TideRest = ExposureRestAmount(LocalTideOffset);
 	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);
 	const float RainIntensity = IslandWeather.IsValid() && GetWorld()
 		? IslandWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
-	const float TargetShellWetness = WetShellAmount(TideOffset, RainIntensity);
+	const float TargetShellWetness = WetShellAmount(LocalTideOffset, RainIntensity);
 	const float PreviousShellWetness = ShellWetness;
 	ShellWetness = FMath::FInterpTo(ShellWetness, TargetShellWetness, SafeDelta, 0.8f);
 	if (FMath::Abs(ShellWetness - PreviousShellWetness) > 0.001f)

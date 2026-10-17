@@ -27,6 +27,8 @@ public:
 	bool RespondToQuietObservation();
 	/** Smoothly tucks an intertidal snail in during the most exposed part of the ebb. */
 	static float ExposureRestAmount(float TideOffsetCm);
+	/** Converts the Island tide into the waterline offset experienced at a shore elevation. */
+	static float LocalWaterlineOffsetCm(float TideOffsetCm, float GroundZCm, float SeaLevelZCm);
 	/** Heavy rain causes a smaller, temporary tuck; dry weather leaves the snail unchanged. */
 	static float RainRestAmount(float RainIntensity);
 	/** A nearby crab startles the snail only while actively scurrying, not while calmly foraging. */
@@ -76,6 +78,8 @@ private:
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	float ShellWetness = 0.f;
+	float SeaLevelZ = 0.f;
+	bool bHasSeaLevel = false;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
