@@ -4,6 +4,7 @@
 #include "IslandTideglassSubsystem.h"
 #include "RavenAgentAIController.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Components/StaticMeshComponent.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
@@ -256,10 +257,10 @@ void AIslandTidepoolCrab::CheckForNearbyPlayerPresence()
 	constexpr float NoticeRadius = 240.f;
 	constexpr float PresenceRearmRadius = 500.f;
 	constexpr float MaximumHeightDifference = 220.f;
-	for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+	for (TActorIterator<APlayerController> It(GetWorld()); It; ++It)
 	{
-		APawn* Player = *It;
-		if (!IsValid(Player) || !Player->IsPlayerControlled()) continue;
+		APawn* Player = It->GetPawn();
+		if (!IsValid(Player)) continue;
 
 		const FVector Offset = Player->GetActorLocation() - GetActorLocation();
 		const float DistanceSquared = Offset.SizeSquared2D();

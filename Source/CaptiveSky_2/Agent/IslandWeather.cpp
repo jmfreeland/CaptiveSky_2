@@ -359,24 +359,19 @@ void AIslandWeather::PersistWeatherTime()
 }
 
 FVector AIslandWeather::BuildNightFireflySpawnLocation(const FVector& HabitatLocation,
-	const FVector& LandmarkLocation, int32 FireflyIndex, int32 Population)
+	const FVector& LandmarkLocation)
 {
-	if (Population <= 0) return HabitatLocation;
-	const int32 SafePopulation = FMath::Max(1, Population);
-	const int32 SafeIndex = FMath::Clamp(FireflyIndex, 0, SafePopulation - 1);
 	const FVector Route = (HabitatLocation - LandmarkLocation).GetSafeNormal2D();
 	if (Route.IsNearlyZero()) return HabitatLocation;
 
-	// Keep the little night chorus close enough to the stones to answer their tone,
-	// while staggering each home point along the habitat-facing side of the landmark.
-	const float IndexAlpha = SafePopulation > 1
-		? static_cast<float>(SafeIndex) / static_cast<float>(SafePopulation - 1)
-		: 0.5f;
-	const float RouteFraction = FMath::Lerp(0.24f, 0.55f, IndexAlpha);
-	const float Side = SafeIndex == SafePopulation - 1 ? 0.f : (SafeIndex % 2 == 0 ? -1.f : 1.f);
+	// Anchor one firefly within the stones' listening field. The remaining two
+	// keep their separate habitat homes; extra lights do not crowd the landmark.
+	constexpr float RouteFraction = 0.65f;
 	const FVector Lateral = FVector::CrossProduct(FVector::UpVector, Route).GetSafeNormal();
-	return LandmarkLocation + Route * (AIslandListeningStonesChime::AudibleRadius * RouteFraction) +
-		Lateral * (90.f * Side) + FVector::UpVector * (18.f + 24.f * IndexAlpha);
+	const float HabitatAlpha = FMath::Clamp(
+		AIslandListeningStonesChime::AudibleRadius * RouteFraction /
+		FVector::Dist2D(HabitatLocation, LandmarkLocation), 0.f, 1.f);
+	return FMath::Lerp(LandmarkLocation, HabitatLocation, HabitatAlpha) + Lateral * 90.f + FVector::UpVector * 25.f;
 }
 
 void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, TArray<FTransform>& OutTransforms)
@@ -2857,10 +2852,10 @@ void AIslandWeather::RefreshNightEcology()
 		while (NightFireflies.Num() < NightPopulation)
 		{
 			FVector SpawnLocation = Habitat->GetActorLocation();
-			if (NearbyListeningStones)
+			if (NightFireflies.IsEmpty() && NearbyListeningStones)
 			{
 				SpawnLocation = BuildNightFireflySpawnLocation(Habitat->GetActorLocation(),
-					NearbyListeningStones->GetActorLocation(), NightFireflies.Num(), NightPopulation);
+					NearbyListeningStones->GetActorLocation());
 			}
 			else
 			{

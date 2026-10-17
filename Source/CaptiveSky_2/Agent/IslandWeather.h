@@ -84,9 +84,8 @@ public:
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
 	static constexpr float ListeningStonesFlowerOuterRadius = 4300.f;
-	/** Spread a fixed night-firefly trio within the stones' sound field; returns one stable home point. */
-	static FVector BuildNightFireflySpawnLocation(const FVector& HabitatLocation, const FVector& LandmarkLocation,
-		int32 FireflyIndex, int32 Population);
+	/** Stable home point for the single night firefly that lives within Listening Stones chime range. */
+	static FVector BuildNightFireflySpawnLocation(const FVector& HabitatLocation, const FVector& LandmarkLocation);
 
 	// Pure and repeatable for a given position/time; speeds are Unreal cm/s.
 	FVector SampleWind(const FVector& Position, double Seconds) const;

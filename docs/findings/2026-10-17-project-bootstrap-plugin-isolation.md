@@ -1,4 +1,4 @@
-# Project bootstrap with the MCP plugin isolated — 2026-10-17
+# Project bootstrap A/B with the MCP plugin — 2026-10-17
 
 The project-opening NullRHI automation attempt previously crashed before the
 project log or test run, with
@@ -7,28 +7,27 @@ project log or test run, with
 `MCPClientToolset`.
 
 In the ignored `Codex_VisitorResonance_20261017` scratch project, a UE 5.8.3
-editor target linked successfully (35 actions, 72.52 s). Launching the same
-scratch project with only `-DisablePlugins=ModelContextProtocol`, NullRHI,
-thinking disabled, zero model requests, and `-NoWorldState` passed the focused
-`CaptiveSky2.Agent.FireflyCorridorPlacement` automation test and exited with
-code 0. The engine's separate `MCPClientToolset` remained mounted. This is the
-first project-opening automation run that reached a test after the earlier
-bootstrap crashes, and it makes the project MCP plugin a strong suspect; it is
-not yet a controlled proof of causality, since this was not a paired retry with
-the plugin enabled under identical cache/session conditions.
+editor target linked successfully. With `ModelContextProtocol` disabled,
+`CaptiveSky2.Agent.FireflyCorridorPlacement` and the corrected
+`CaptiveSky2.Agent.NightEcology` passed under NullRHI, thinking disabled, zero
+model requests, and `-NoWorldState`.
 
-A separate run in the same plugin-disabled scratch configuration reached
-`CaptiveSky2.Agent.NightEcology` but failed four existing shore-crab player
-presence assertions (startle, direction, cooldown, re-arm). No firefly
-placement assertion failed. The narrow test isolates and verifies the new
-firefly placement behavior; the broader ecology fixture issue remains open.
+A paired scratch startup with `ModelContextProtocol` enabled also loaded the
+plugin's engine, editor, and engine-extension modules, mounted the separate
+`MCPClientToolset`, registered tool-search meta-tools, and passed
+`FireflyCorridorPlacement`. A further enabled-plugin run passed the full
+`NightEcology` suite with exit code 0. Thus the project MCP plugin is not by
+itself sufficient to reproduce the earlier crash. The prior Core-only
+null-access violation remains unexplained; the successful runs followed a full
+scratch link and warmed project-local cache, so the cause could be first-start
+cache/build state or an intermittent startup path. No permanent plugin toggle
+is justified.
 
 The main `.uproject`, enabled MCP plugin, and saved map were not modified. PID
-22688 was observed unresponsive after the scratch build and absent from the
-process list after the focused test; this work did not terminate it. Keep the
-project's MCP plugin enabled for normal editor use; use the isolated disable
-flag only for bounded headless tests. Next:
-inspect the four crab fixture failures, then make a controlled comparison of
-project startup with and without `ModelContextProtocol` only when the main editor
-is no longer holding the project open. A successful NullRHI automation test does
-not constitute a visual or real-RHI play review.
+22688 was observed unresponsive after an earlier scratch build and later absent
+from the process list; this work did not terminate it. Keep the project's MCP
+plugin enabled for normal editor use. The crash is not currently reproducible
+in the linked, warmed scratch project; capture the next occurrence before
+changing plugin settings. The remaining gap is real-RHI night/play review: a
+NullRHI automation pass verifies deterministic behavior, not visual readability
+or gameplay feel.

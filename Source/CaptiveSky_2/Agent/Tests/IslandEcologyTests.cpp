@@ -62,27 +62,15 @@ bool FIslandFireflyCorridorPlacementTest::RunTest(const FString& Parameters)
 {
 	const FVector FireflyHabitat(2400.f, 200.f, 90.f);
 	const FVector FireflyStones(0.f, 0.f, 0.f);
-	TArray<FVector> FireflyHomes;
-	for (int32 FireflyIndex = 0; FireflyIndex < 3; ++FireflyIndex)
-	{
-		const FVector Home = AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat,
-			FireflyStones, FireflyIndex, 3);
-		FireflyHomes.Add(Home);
-		TestTrue(TEXT("Night firefly home starts inside the Listening Stones sound field"),
-			FVector::Dist2D(Home, FireflyStones) < AIslandListeningStonesChime::AudibleRadius);
-		TestTrue(TEXT("Night firefly home remains elevated above the landmark surface"), Home.Z > FireflyStones.Z);
-	}
-	TestTrue(TEXT("Three night fireflies occupy distinct, locally staggered homes"),
-		FireflyHomes.Num() == 3 &&
-		FVector::Dist2D(FireflyHomes[0], FireflyHomes[1]) > 150.f &&
-		FVector::Dist2D(FireflyHomes[1], FireflyHomes[2]) > 150.f);
+	const FVector Home = AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat, FireflyStones);
+	TestTrue(TEXT("The landmark firefly home starts inside the Listening Stones sound field"),
+		FVector::Dist2D(Home, FireflyStones) < AIslandListeningStonesChime::AudibleRadius);
+	TestTrue(TEXT("The landmark firefly home remains elevated above the stone surface"), Home.Z > FireflyStones.Z);
 	TestTrue(TEXT("Firefly placement is stable when the same Island locations are sampled again"),
-		FireflyHomes[1].Equals(AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat,
-			FireflyStones, 1, 3), 0.001f));
+		Home.Equals(AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat,
+			FireflyStones), 0.001f));
 	TestTrue(TEXT("Firefly placement safely ignores a collapsed habitat-to-landmark route"),
-		AIslandWeather::BuildNightFireflySpawnLocation(FireflyStones, FireflyStones, 1, 3).Equals(FireflyStones));
-	TestTrue(TEXT("An empty population safely resolves to the habitat origin"),
-		AIslandWeather::BuildNightFireflySpawnLocation(FireflyHabitat, FireflyStones, 0, 0).Equals(FireflyHabitat));
+		AIslandWeather::BuildNightFireflySpawnLocation(FireflyStones, FireflyStones).Equals(FireflyStones));
 	return true;
 }
 
@@ -2072,6 +2060,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (ShoreVisitorController && ShoreVisitor)
 		{
 			ShoreVisitorController->Possess(ShoreVisitor);
+			TestTrue(TEXT("The visitor player controller owns the spawned pawn"), ShoreVisitorController->GetPawn() == ShoreVisitor);
 			WatchableCrab->SetActorLocation(CrabStart);
 			WatchableCrab->CheckForNearbyPlayerPresence();
 			TestTrue(TEXT("A nearby player approach briefly startles the wild shore crab"),
