@@ -2437,6 +2437,14 @@ FVector2D AIslandWeather::CalculateAmbienceGains(float HorizontalWindSpeed, floa
 	return FVector2D(0.055f * WindStrength * ShelterScale, 0.035f * RainStrength * ShelterScale);
 }
 
+float AIslandWeather::InterpolateAmbienceGain(float CurrentGain, float TargetGain, float DeltaSeconds)
+{
+	const float Current = FMath::Clamp(CurrentGain, 0.f, 1.f);
+	const float Target = FMath::Clamp(TargetGain, 0.f, 1.f);
+	const float Blend = FMath::Clamp(FMath::Max(0.f, DeltaSeconds) * 3.5f, 0.f, 1.f);
+	return FMath::Lerp(Current, Target, Blend);
+}
+
 void AIslandWeather::InitializeWeatherAmbience()
 {
 	if (!WindAmbienceAudio || !RainAmbienceAudio || (WindAmbienceWave && RainAmbienceWave)) return;
@@ -2495,38 +2503,45 @@ void AIslandWeather::UpdateWeatherAmbience(float DeltaSeconds)
 {
 	if (!GetWorld() || !WindAmbienceWave || !RainAmbienceWave || !WindAmbienceAudio || !RainAmbienceAudio) return;
 	AmbienceUpdateAccumulator += FMath::Max(0.f, DeltaSeconds);
-	if (AmbienceUpdateAccumulator < 0.25f) return;
-	AmbienceUpdateAccumulator = 0.f;
-	APawn* Listener = nullptr;
-	if (APlayerController* Player = GetWorld()->GetFirstPlayerController()) Listener = Player->GetPawn();
-	if (!Listener)
+	if (AmbienceUpdateAccumulator >= 0.25f)
 	{
-		WindAmbienceAudio->SetVolumeMultiplier(0.f);
-		RainAmbienceAudio->SetVolumeMultiplier(0.f);
-		WindAmbienceAudio->Stop();
-		RainAmbienceAudio->Stop();
-		return;
+		AmbienceUpdateAccumulator = 0.f;
+		APawn* Listener = nullptr;
+		if (APlayerController* Player = GetWorld()->GetFirstPlayerController()) Listener = Player->GetPawn();
+		if (Listener)
+		{
+			const double Now = GetWorld()->GetTimeSeconds();
+			const FVector ListenerLocation = Listener->GetActorLocation();
+			const bool bIndoors = UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), ListenerLocation, Listener);
+			const FVector2D Gains = CalculateAmbienceGains(GetLocalWind(ListenerLocation, Listener).Size(), SampleRainIntensity(Now), bIndoors);
+			TargetWindAmbienceGain = Gains.X;
+			TargetRainAmbienceGain = Gains.Y;
+		}
+		else
+		{
+			TargetWindAmbienceGain = 0.f;
+			TargetRainAmbienceGain = 0.f;
+		}
 	}
-	const double Now = GetWorld()->GetTimeSeconds();
-	const FVector ListenerLocation = Listener->GetActorLocation();
-	const bool bIndoors = UIslandEnvironmentSubsystem::IsInsideInnAt(GetWorld(), ListenerLocation, Listener);
-	const FVector2D Gains = CalculateAmbienceGains(GetLocalWind(ListenerLocation, Listener).Size(), SampleRainIntensity(Now), bIndoors);
-	WindAmbienceAudio->SetVolumeMultiplier(Gains.X);
-	RainAmbienceAudio->SetVolumeMultiplier(Gains.Y);
-	if (Gains.X > 0.0001f)
+
+	const float WindGain = InterpolateAmbienceGain(WindAmbienceAudio->VolumeMultiplier, TargetWindAmbienceGain, DeltaSeconds);
+	const float RainGain = InterpolateAmbienceGain(RainAmbienceAudio->VolumeMultiplier, TargetRainAmbienceGain, DeltaSeconds);
+	WindAmbienceAudio->SetVolumeMultiplier(WindGain);
+	RainAmbienceAudio->SetVolumeMultiplier(RainGain);
+	if (TargetWindAmbienceGain > 0.0001f)
 	{
 		if (!WindAmbienceAudio->IsPlaying()) WindAmbienceAudio->Play();
 	}
-	else WindAmbienceAudio->Stop();
-	if (Gains.Y > 0.0001f)
+	else if (WindGain <= 0.0001f && WindAmbienceAudio->IsPlaying()) WindAmbienceAudio->Stop();
+	if (TargetRainAmbienceGain > 0.0001f)
 	{
 		if (!RainAmbienceAudio->IsPlaying()) RainAmbienceAudio->Play();
 	}
-	else RainAmbienceAudio->Stop();
+	else if (RainGain <= 0.0001f && RainAmbienceAudio->IsPlaying()) RainAmbienceAudio->Stop();
 	constexpr int32 BytesPerSecond = 24000 * 2 * sizeof(int16);
-	if (WindAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
+	if (WindAmbienceAudio->IsPlaying() && WindAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
 		QueueAmbienceSamples(WindAmbienceWave, WindNoiseStream, WindNoiseFilterLeft, WindNoiseFilterRight, false);
-	if (RainAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
+	if (RainAmbienceAudio->IsPlaying() && RainAmbienceWave->GetAvailableAudioByteCount() < BytesPerSecond)
 		QueueAmbienceSamples(RainAmbienceWave, RainNoiseStream, RainNoiseFilterLeft, RainNoiseFilterRight, true);
 }
 
