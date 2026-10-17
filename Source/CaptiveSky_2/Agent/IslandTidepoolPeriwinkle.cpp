@@ -2,6 +2,7 @@
 
 #include "IslandDayNight.h"
 #include "IslandTideglassSubsystem.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
 #include "RavenAgentAIController.h"
 #include "ProceduralMeshComponent.h"
@@ -149,6 +150,14 @@ float AIslandTidepoolPeriwinkle::RainRestAmount(float RainIntensity)
 	return 0.42f * FMath::SmoothStep(0.45f, 0.9f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 }
 
+bool AIslandTidepoolPeriwinkle::ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset)
+{
+	constexpr float ThreatRadius = 175.f;
+	constexpr float MaximumVerticalOffset = 100.f;
+	return bCrabScurrying && FMath::IsFinite(Distance) && Distance >= 0.f && FMath::IsFinite(VerticalOffset) &&
+		Distance <= ThreatRadius && FMath::Abs(VerticalOffset) <= MaximumVerticalOffset;
+}
+
 float AIslandTidepoolPeriwinkle::WetShellAmount(float TideOffsetCm, float RainIntensity)
 {
 	const float TideWetness = FMath::IsFinite(TideOffsetCm)
@@ -166,6 +175,34 @@ bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
 	ObservationRestRemaining = 1.6f;
 	ObservationCooldownRemaining = 4.2f;
 	return true;
+}
+
+void AIslandTidepoolPeriwinkle::CheckForNearbyCrabDisturbance()
+{
+	if (!GetWorld()) return;
+
+	constexpr float CrabRearmRadius = 500.f;
+	for (TActorIterator<AIslandTidepoolCrab> It(GetWorld()); It; ++It)
+	{
+		AIslandTidepoolCrab* Crab = *It;
+		if (!IsValid(Crab)) continue;
+
+		const FVector Offset = Crab->GetActorLocation() - GetActorLocation();
+		const float Distance = Offset.Size2D();
+		if (CrabPresenceLatch.Get() == Crab)
+		{
+			// One tuck per scurry; a calm interval or a clear retreat rearms the cue.
+			if (!Crab->IsScurrying() || Distance > CrabRearmRadius)
+				CrabPresenceLatch.Reset();
+			else
+				continue;
+		}
+
+		if (!ShouldTuckForCrab(Crab->IsScurrying(), Distance, Offset.Z)) continue;
+		if (!RespondToQuietObservation()) continue;
+		CrabPresenceLatch = Crab;
+		return;
+	}
 }
 
 void AIslandTidepoolPeriwinkle::CheckForNearbyRavenDisturbance()
@@ -332,6 +369,7 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 		RavenCheckRemaining = 0.4f;
 		CheckForNearbyRavenDisturbance();
 		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
+		CheckForNearbyCrabDisturbance();
 	}
 	const float TideRest = ExposureRestAmount(TideOffset);
 	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);

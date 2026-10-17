@@ -10,6 +10,7 @@ class UProceduralMeshComponent;
 class UStaticMeshComponent;
 class AIslandDayNight;
 class AIslandWeather;
+class AIslandTidepoolCrab;
 class ARavenAgentAIController;
 class APawn;
 
@@ -28,6 +29,8 @@ public:
 	static float ExposureRestAmount(float TideOffsetCm);
 	/** Heavy rain causes a smaller, temporary tuck; dry weather leaves the snail unchanged. */
 	static float RainRestAmount(float RainIntensity);
+	/** A nearby crab startles the snail only while actively scurrying, not while calmly foraging. */
+	static bool ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset);
 	/** Tide and rain keep the shell briefly darkened while its exposed surface is wet. */
 	static float WetShellAmount(float TideOffsetCm, float RainIntensity);
 
@@ -65,6 +68,7 @@ private:
 	float ObservationCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
+	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	float ShellWetness = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
@@ -73,6 +77,7 @@ private:
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
+	void CheckForNearbyCrabDisturbance();
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNearbyPlayerDisturbance(APawn* PlayerPawn);
 	void BuildShellSpiral();
