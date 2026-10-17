@@ -1,18 +1,24 @@
 # Instanced skinned Megaplant provider — 2026-10-17
 
-`AIslandInstancedSkinnedFoliage` exposed a skeletal mesh and transforms, then
-added every instance with animation index zero, but it had no way to assign the
-UE 5.8 `UTransformProviderData` required to drive those instances. The host now
-exposes an optional editable provider and passes it to
+`AIslandInstancedSkinnedFoliage` exposes an optional editable
+`UTransformProviderData` and passes it to
 `UInstancedSkinnedMeshComponent::SetTransformProvider` whenever it rebuilds.
-The provider is cleared too when the property is unset, so repeated rebuilds
-cannot leave a stale animation source attached.
+When a mesh has enabled UE 5.8 `UDynamicWindSkeletalData` and the user has not
+supplied another provider, the host now creates a transient `UDynamicWindData`
+and binds it automatically. Clearing an explicit provider clears the component
+provider too, so repeated rebuilds cannot leave a stale animation source
+attached. `DynamicWind` is declared as a module dependency and an enabled
+project plugin.
 
 Added `CaptiveSky2.Agent.InstancedSkinnedFoliageProvider` to verify provider
-assignment and clearing through the host API. The current-source UE 5.8 editor
-target built successfully in the isolated
-`Saved/CompileScratch/Codex_WrackCrabIsolated_20261017/Project` project (6
-actions, including UHT, the wrapper, its test translation unit, and module link).
+assignment and clearing and, when the installed European Beech asset and its
+wind profile are available/enabled, automatic provider selection. The
+current-source UE 5.8 editor target built successfully in the isolated
+`Saved/CompileScratch/Codex_WrackCrabIsolated_20261017/Project` project (172
+actions including UHT, both changed translation units, and module link). The
+first build exposed a missing direct `DynamicWind` plugin entry in the
+scratch descriptor; after syncing it with the main project, UBT regenerated the
+makefile and reported the target up to date with no plugin dependency warning.
 The main editor's loaded DLL was not replaced.
 
 The automation test has not run. Launching it from the existing

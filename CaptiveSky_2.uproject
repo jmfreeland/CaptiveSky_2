@@ -21,6 +21,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "DynamicWind",
+			"Enabled": true
+		},
+		{
 			"Name": "ProceduralMeshComponent",
 			"Enabled": true
 		},

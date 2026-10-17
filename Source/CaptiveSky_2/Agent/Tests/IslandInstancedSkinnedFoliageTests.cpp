@@ -2,7 +2,10 @@
 #include "Agent/IslandInstancedSkinnedFoliage.h"
 #include "Animation/AnimSequenceTransformProviderData.h"
 #include "Components/InstancedSkinnedMeshComponent.h"
+#include "DynamicWindData.h"
+#include "DynamicWindSkeletalData.h"
 #include "Engine/Engine.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "Misc/ScopeExit.h"
 
@@ -52,5 +55,30 @@ bool FIslandInstancedSkinnedFoliageProviderTest::RunTest(const FString& Paramete
 	Host->RebuildInstances();
 	TestNull(TEXT("Rebuilding after clearing the provider removes the prior component provider"),
 		Host->Instances->GetTransformProvider());
+
+	USkeletalMesh* Beech = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"));
+	if (Beech)
+	{
+		const UDynamicWindSkeletalData* WindData = Cast<UDynamicWindSkeletalData>(
+			Beech->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()));
+		TestNotNull(TEXT("Installed PVE Beech keeps its DynamicWind skeletal profile"), WindData);
+		if (WindData && WindData->bIsEnabled)
+		{
+			Host->SourceMesh = Beech;
+			Host->RebuildInstances();
+			TestTrue(TEXT("An enabled PVE wind profile automatically selects UE's DynamicWind transform provider"),
+				Host->TransformProvider && Host->TransformProvider->IsA<UDynamicWindData>() &&
+				Host->Instances->GetTransformProvider() == Host->TransformProvider);
+		}
+		else if (WindData)
+		{
+			AddInfo(TEXT("The installed Beech carries DynamicWind data, but it is disabled; the host correctly leaves it in ref pose."));
+		}
+	}
+	else
+	{
+		AddInfo(TEXT("The installed Beech Megaplant is absent in this test project; the generic provider lifecycle checks still ran."));
+	}
 	return true;
 }

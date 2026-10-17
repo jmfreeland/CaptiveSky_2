@@ -2,6 +2,8 @@
 
 #include "Components/InstancedSkinnedMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "DynamicWindData.h"
+#include "DynamicWindSkeletalData.h"
 #include "Engine/SkeletalMesh.h"
 
 AIslandInstancedSkinnedFoliage::AIslandInstancedSkinnedFoliage()
@@ -27,6 +29,17 @@ void AIslandInstancedSkinnedFoliage::RebuildInstances()
 
 	Instances->ClearInstances();
 	Instances->SetSkinnedAssetAndUpdate(SourceMesh);
+	if (!TransformProvider && SourceMesh)
+	{
+		const UDynamicWindSkeletalData* WindData = Cast<UDynamicWindSkeletalData>(
+			SourceMesh->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()));
+		if (WindData && WindData->bIsEnabled)
+		{
+			// PVE-exported Megaplants carry this skeletal wind profile as mesh user data.
+			// UE's DynamicWind transform provider consumes that profile on the render thread.
+			TransformProvider = NewObject<UDynamicWindData>(this, NAME_None, RF_Transient);
+		}
+	}
 	Instances->SetTransformProvider(TransformProvider);
 	if (!SourceMesh)
 	{

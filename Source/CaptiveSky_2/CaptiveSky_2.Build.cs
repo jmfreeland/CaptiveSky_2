@@ -34,6 +34,7 @@ public class CaptiveSky_2 : ModuleRules
 			"ImageCore",
 			"Landscape",
 			"Water",
+			"DynamicWind",
 			"ProceduralMeshComponent"
 		});
 
