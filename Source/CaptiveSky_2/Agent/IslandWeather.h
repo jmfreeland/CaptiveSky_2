@@ -84,8 +84,9 @@ public:
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
 	static constexpr float ListeningStonesFlowerOuterRadius = 4300.f;
-	/** A light woodland-edge accent: roughly one hazel thicket per eight eligible spruce groves. */
-	static bool ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed);
+	/** A light woodland-edge accent: roughly one thicket per eight eligible groves, never over this count. */
+	static constexpr int32 MaxWoodlandHazelThicketCount = 72;
+	static bool ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed, int32 CurrentlyPlacedCount);
 	/** Stable home point for the single night firefly that lives within Listening Stones chime range. */
 	static FVector BuildNightFireflySpawnLocation(const FVector& HabitatLocation, const FVector& LandmarkLocation);
 

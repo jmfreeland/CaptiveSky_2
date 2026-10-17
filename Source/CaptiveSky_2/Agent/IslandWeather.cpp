@@ -544,9 +544,9 @@ float AIslandWeather::CalculateGroundCoverWetEdgeMoisture(const FVector& Positio
 	return 1.f - SmoothAlpha;
 }
 
-bool AIslandWeather::ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed)
+bool AIslandWeather::ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed, int32 CurrentlyPlacedCount)
 {
-	if (GroveIndex < 0) return false;
+	if (GroveIndex < 0 || CurrentlyPlacedCount < 0 || CurrentlyPlacedCount >= MaxWoodlandHazelThicketCount) return false;
 	uint32 Hash = static_cast<uint32>(GroveIndex) * 0x9e3779b9u ^ static_cast<uint32>(Seed) * 0x85ebca6bu;
 	Hash ^= Hash >> 16;
 	Hash *= 0x7feb352du;
@@ -1471,7 +1471,7 @@ void AIslandWeather::InitializeGroundCover()
 					// A single hazel silhouette on a deterministic subset of grove edges adds
 					// a mid-distance broadleaf layer without multiplying the full grove shrub count.
 					if (IslandHazelThickets && IslandHazelThickets->GetStaticMesh() &&
-						ShouldPlaceWoodlandHazelThicket(GroveIndex, WeatherSeed))
+						ShouldPlaceWoodlandHazelThicket(GroveIndex, WeatherSeed, GroundCoverHazelThicketCount))
 					{
 						constexpr int32 MaxHazelThicketTracesPerGrove = 24;
 						const FBoxSphereBounds HazelBounds = IslandHazelThickets->GetStaticMesh()->GetBounds();

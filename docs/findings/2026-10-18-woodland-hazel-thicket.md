@@ -9,7 +9,7 @@ is not tracked by Git, so other checkouts without that imported package will
 gracefully omit this optional accent.
 
 Eligible spruce groves are selected by a stable world-seed hash at roughly one
-in eight. Each selected grove can receive at most one thicket, chosen in a
+in eight, with a hard cap of 72 instances across the whole Island. Each selected grove can receive at most one thicket, chosen in a
 23.5–33 m edge ring with bounded landscape traces, a 26 m landmark clearance,
 and spacing checks against nearby trees, shrubs, flowers, and other thickets.
 The HISM has no collision, navigation, or shadow contribution and is culled
