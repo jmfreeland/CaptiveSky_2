@@ -2401,6 +2401,23 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			WatchableDragonfly->CheckForNearbyMeadowFlower();
 			TestTrue(TEXT("A calm dragonfly briefly visits a nearby meadow bloom"),
 				WatchableDragonfly->FlowerInterestRemaining > 0.f && WatchableDragonfly->FlowerInterestRemaining <= 8.0f);
+			Weather->WeatherSeed = StormSeed;
+			TestTrue(TEXT("The interruption fixture is still in heavier rain"),
+				Weather->SampleRainIntensity(World->GetTimeSeconds()) > 0.55f);
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("A heavier shower interrupts an active bloom hover at the paced flower check"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining) &&
+				FMath::IsNearlyZero(WatchableDragonfly->GetFlowerInterestAlpha()));
+			TestTrue(TEXT("Rain interruption preserves the visit cooldown rather than causing immediate retries"),
+				WatchableDragonfly->FlowerInterestCooldownRemaining > 0.f);
+			Weather->WeatherSeed = DryWeatherSeed;
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("The dragonfly waits for its existing cooldown after the shower passes"),
+				FMath::IsNearlyZero(WatchableDragonfly->FlowerInterestRemaining));
+			WatchableDragonfly->FlowerInterestCooldownRemaining = 0.f;
+			WatchableDragonfly->CheckForNearbyMeadowFlower();
+			TestTrue(TEXT("A calm dragonfly can begin a later bloom visit after the cooldown"),
+				WatchableDragonfly->FlowerInterestRemaining > 0.f && WatchableDragonfly->FlowerInterestRemaining <= 8.0f);
 			TestTrue(TEXT("The hover station is just above and beside the existing bloom"),
 				FMath::IsNearlyEqual(WatchableDragonfly->FlowerInterestLocation.Z, BloomLocation.Z + 70.f) &&
 				FMath::IsNearlyEqual(FVector::Dist2D(WatchableDragonfly->FlowerInterestLocation, BloomLocation), 32.f, 0.1f));

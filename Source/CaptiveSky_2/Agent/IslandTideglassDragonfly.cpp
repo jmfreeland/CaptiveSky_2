@@ -422,10 +422,22 @@ bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLoca
 
 void AIslandTideglassDragonfly::CheckForNearbyMeadowFlower()
 {
-	if (!Weather.IsValid() || FlowerInterestRemaining > 0.f || FlowerInterestCooldownRemaining > 0.f ||
-		ScatterRemaining > 0.f || RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f)
+	if (!Weather.IsValid() || !GetWorld()) return;
+
+	const float RainIntensity = Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds());
+	if (FlowerInterestRemaining > 0.f)
+	{
+		if (RainIntensity > 0.45f)
+		{
+			LogFlowerInterestTelemetry(TEXT("interrupted: heavy rain"));
+			FlowerInterestRemaining = 0.f;
+		}
 		return;
-	if (Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) > 0.45f) return;
+	}
+
+	if (FlowerInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
+		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || RainIntensity > 0.45f)
+		return;
 
 	FVector FlowerLocation;
 	if (Weather->FindNearestMeadowFlower(GetActorLocation(), 900.f, FlowerLocation))
