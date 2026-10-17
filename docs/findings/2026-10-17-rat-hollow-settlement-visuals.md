@@ -14,12 +14,15 @@ refreshed from that canonical record. The current runtime does not yet set a
 home to `Disturbed` from a visitor interaction; the disturbed visual is covered
 for canonical records and future behavior, not claimed as live player agency.
 
-`CaptiveSky2.Agent.WildlifeHomeRecord` now covers provisional hiding, visible
-cache presentation after settlement, persistence/re-materialization, bounded
-display count, and hiding after disturbance without deleting stored supplies.
-The UE 5.8.3 editor target compiled and linked in the isolated `Claude_Props`
-scratch project (5 actions; 7.89 seconds). The focused automation was not run:
-project startup is still known to fail with a Core null access before tests
-begin, and the editor window is not currently targetable for an in-editor run.
-Rendered appearance remains unverified. No Content assets, map data, or model
-calls are involved.
+`CaptiveSky2.Agent.WildlifeHomeRecord` covers provisional hiding, visible cache
+presentation after settlement, persistence/re-materialization, bounded display
+count, and hiding after disturbance without deleting stored supplies. The
+current-source test passed in the isolated
+`Codex_VisitorResonance_20261017` scratch project under NullRHI, with agent
+thinking disabled, zero model requests, a 120-second cap, and the Model Context
+Protocol plugin disabled (exit 0):
+`Saved/CompileScratch/Codex_VisitorResonance_20261017/Saved/Logs/Codex_WildlifeHomeRecord_20261017.log`.
+This validates the canonical state/materializer contract and the imported mesh
+reference, not the mesh's appearance, entrance readability, collision in-game,
+or Rat-scale traversal. Real-RHI placement review remains necessary. No map data
+or model calls are involved.
