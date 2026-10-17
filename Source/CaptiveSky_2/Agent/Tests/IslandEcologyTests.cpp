@@ -1884,6 +1884,8 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	}
 	WindTarget->Tags = {TEXT("WindArch"), TEXT("IslandLandmark")};
 	Controller->InspectTarget(TEXT("WindArch"));
+	TestTrue(TEXT("WindArch inspection reports the eighteen-second local gust and visual cue lifetime"),
+		Controller->LastActionOutcome.Contains(TEXT("both effects fade over eighteen seconds of Island time")));
 	AIslandWindMoteEffect* Motes = nullptr;
 	for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) { Motes = *It; break; }
 	TestNotNull(TEXT("Interacting with WindArch creates a transient visible airflow cue"), Motes);
@@ -1903,10 +1905,30 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 				Light && !Light->CastShadows && Light->AttenuationRadius >= 500.f && Light->Intensity > 100.f);
 		}
 		TestTrue(TEXT("Wind motes follow the normalized simulated gust direction"), Motes->FlowDirection.IsNormalized());
+		const FVector FlowSide = FVector::CrossProduct(Motes->FlowDirection, FVector::UpVector)
+			.GetSafeNormal(SMALL_NUMBER, FVector::RightVector);
+		const FVector FlowUp = FVector::CrossProduct(FlowSide, Motes->FlowDirection)
+			.GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
+		const auto CrossFlowSeparation = [Motes, &FlowSide, &FlowUp](int32 FirstIndex, int32 SecondIndex)
+		{
+			const FVector Delta = Motes->MoteMeshes[FirstIndex]->GetRelativeLocation() -
+				Motes->MoteMeshes[SecondIndex]->GetRelativeLocation();
+			return FVector::DotProduct(Delta, FlowSide) * FVector::DotProduct(Delta, FlowSide) +
+				FVector::DotProduct(Delta, FlowUp) * FVector::DotProduct(Delta, FlowUp);
+		};
+		TestTrue(TEXT("Wind motes occupy distinct cross-flow paths around the current"),
+			CrossFlowSeparation(0, 1) > FMath::Square(45.f) &&
+			CrossFlowSeparation(1, 2) > FMath::Square(45.f) &&
+			CrossFlowSeparation(2, 0) > FMath::Square(45.f));
 		const FVector StartingPosition = Motes->MoteMeshes[0]->GetRelativeLocation();
 		Motes->Tick(2.f);
-		const FVector Displacement = Motes->MoteMeshes[0]->GetRelativeLocation() - StartingPosition;
+		const FVector QuarterPathPosition = Motes->MoteMeshes[0]->GetRelativeLocation();
+		const FVector Displacement = QuarterPathPosition - StartingPosition;
 		TestTrue(TEXT("Airflow motes advance along the actual gust direction"), FVector::DotProduct(Displacement, Motes->FlowDirection) > 0.f);
+		Motes->Tick(0.1f);
+		const FVector ShortStep = Motes->MoteMeshes[0]->GetRelativeLocation() - QuarterPathPosition;
+		TestTrue(TEXT("The corkscrew path advances smoothly without wrapping across the gust"),
+			ShortStep.Size() < 50.f && FVector::DotProduct(ShortStep, Motes->FlowDirection) > 0.f);
 		Motes->Tick(17.f);
 		TestTrue(TEXT("WindArch visual response disappears when the gust expires"), Motes->IsActorBeingDestroyed());
 	}

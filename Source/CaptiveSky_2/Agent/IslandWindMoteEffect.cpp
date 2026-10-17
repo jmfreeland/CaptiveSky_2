@@ -105,13 +105,21 @@ void AIslandWindMoteEffect::UpdateMotes(float Alpha)
 {
 	const FVector Side = FVector::CrossProduct(FlowDirection, FVector::UpVector).GetSafeNormal(SMALL_NUMBER, FVector::RightVector);
 	const FVector Up = FVector::CrossProduct(Side, FlowDirection).GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
-	const float RemainingLight = 1.f - Alpha;
+	const float Progress = FMath::Clamp(Alpha, 0.f, 1.f);
+	const float RemainingLight = 1.f - Progress;
 	for (int32 Index = 0; Index < MoteMeshes.Num(); ++Index)
 	{
-		const float Phase = (static_cast<float>(Index) / MoteMeshes.Num()) + Alpha;
-		const float Along = (2.f * FMath::Fmod(Phase, 1.f) - 1.f) * FlowRadius;
+		const float Along = (2.f * Progress - 1.f) * FlowRadius;
+		const float HelixPhase = Progress * (2.f * PI * 1.15f) +
+			(2.f * PI * static_cast<float>(Index) / FMath::Max(1, MoteMeshes.Num()));
+		const float HelixRadius = FMath::Clamp(FlowRadius * 0.11f, 45.f, 135.f);
 		const float Flutter = static_cast<float>(ElapsedSeconds) * 2.4f + Index * 2.1f;
-		const FVector Offset = FlowDirection * Along + Side * (FMath::Sin(Flutter) * 35.f) + Up * (FMath::Cos(Flutter * 0.77f) * 28.f);
+		// Three phased corkscrew paths make the WindArch's local current legible
+		// in depth. Progress is deliberately not wrapped: every mote travels
+		// smoothly from the upwind edge to the downwind edge before fading.
+		const float Across = FMath::Cos(HelixPhase) * HelixRadius + FMath::Sin(Flutter) * 14.f;
+		const float Lift = FMath::Sin(HelixPhase) * HelixRadius * 0.62f + FMath::Cos(Flutter * 0.77f) * 10.f;
+		const FVector Offset = FlowDirection * Along + Side * Across + Up * Lift;
 		const float Pulse = 0.82f + 0.18f * FMath::Square(FMath::Sin(Flutter * 1.3f));
 		const float FadeScale = FMath::Sqrt(RemainingLight);
 		if (MoteMeshes[Index])
