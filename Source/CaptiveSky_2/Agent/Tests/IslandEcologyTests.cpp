@@ -1981,8 +1981,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("The firefly reaction uses the same inner-plus-falloff range as the chime audio"),
 			AIslandListeningStonesChime::AudibleRadius,
 			AIslandListeningStonesChime::AttenuationInnerRadius + AIslandListeningStonesChime::AttenuationFalloffDistance);
+		// Earlier ecology checks can advance this actor past its 2.8-second sound.
+		// Start the range-response fixture at the onset of the same transient cue.
+		Chime->ElapsedSeconds = 0.f;
 		ChimeListener = World->SpawnActor<AIslandFirefly>(
-			StonesTarget->GetActorLocation() + FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f),
+			Chime->GetActorLocation() + FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f),
 			FRotator::ZeroRotator, Spawn);
 		TestNotNull(TEXT("A wild firefly fixture can sense the transient stone resonance"), ChimeListener);
 		if (ChimeListener)
@@ -1990,10 +1993,13 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			ChimeListener->CheckForNearbyStoneChime();
 			TestTrue(TEXT("A firefly outside the chime's attenuation range does not react"),
 				FMath::IsNearlyZero(ChimeListener->ChimeResponseRemaining));
-			ChimeListener->SetActorLocation(StonesTarget->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+			ChimeListener->SetActorLocation(Chime->GetActorLocation() + FVector(800.f, 0.f, 0.f));
+			TestTrue(TEXT("The range fixture places the listener within the sound actor's audible radius"),
+				Chime->IsAudibleAt(ChimeListener->GetActorLocation()));
 			ChimeListener->CheckForNearbyStoneChime();
 			TestTrue(TEXT("A firefly inside the audible range receives one brief pulse"),
-				ChimeListener->ChimeResponseRemaining > 0.f && ChimeListener->ChimeResponseRemaining <= 1.2f);
+				ChimeListener->ChimeResponseRemaining > 0.f &&
+				ChimeListener->ChimeResponseRemaining <= AIslandFirefly::ChimeResponseDurationSeconds);
 			TestTrue(TEXT("The firefly records only which transient sound it already answered"),
 				ChimeListener->RespondedChimes.Contains(TWeakObjectPtr<AIslandListeningStonesChime>(Chime)));
 			ChimeListener->Phase = 0.f;

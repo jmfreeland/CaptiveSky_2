@@ -22,3 +22,22 @@ the ordinary path, and the glow lift. A separate broader
 visitor-controller assertions in its synthetic player setup; its log contains
 no failure from the firefly-specific assertions. In-world visual readability
 remains pending because the editor is not currently running.
+
+## NightEcology regression recheck
+
+A later current-source `NightEcology` run exposed a stale test bound, not a
+runtime response defect: the firefly correctly recorded the active chime and
+started its 1.8-second response, while the assertion still capped the remaining
+time at 1.2 seconds. The check now uses `AIslandFirefly::ChimeResponseDurationSeconds`.
+Its fixture is anchored to the spawned sound actor and resets that transient
+cue's elapsed time before the range check, keeping the assertion independent of
+the longer ecology checks that precede it. No production response behavior or
+timing changed.
+
+Verification: the current-source UE 5.8.3 scratch target rebuilt successfully
+(four actions, 12.75 seconds), and `CaptiveSky2.Agent.NightEcology` passed under
+NullRHI with resident thinking disabled, zero model requests, a 120-second cap,
+and the Model Context Protocol plugin disabled. Log:
+`Saved/CompileScratch/Codex_VisitorResonance_20261017/Saved/Logs/Codex_CurrentSource_NightEcology_Final_20261017.log`.
+The editor could not be observed in this session, so in-world nighttime
+readability is still unverified.
