@@ -83,8 +83,9 @@ editor finished its Live Coding compile. These checks also do not show an
 actual character choosing a proposal or prove any proposed upgrade was
 implemented in the world.
 
-**Regression refresh (2026-10-17):** the full asset-pipeline suite ran 57 tests
-and passed with the desktop-bundled Python runtime. The first run was blocked
+**Regression refresh (2026-10-17):** an earlier full asset-pipeline suite ran
+57 tests and passed with the desktop-bundled Python runtime. The first run was
+blocked
 by access denied in the Windows app-sandbox temp directory; rerunning with
 process-only `TEMP`/`TMP` pointed at this project's ignored
 `Saved/CompileScratch/` resolved the environment issue without changing
@@ -94,3 +95,13 @@ so there was no default-root proposal to fulfill. A `CaptiveSkyDataRoot`
 override was not independently inspected; this does not prove that another
 data root is empty. The synthetic offline tests do not prove an actual resident
 has chosen a request or that an upgrade was implemented in the Island.
+
+**Repeat (2026-10-17):** the current full suite ran 64 tests and passed with the
+desktop-bundled Python runtime (`Ran 64 tests in 0.740s`). The expanded set
+includes source contracts for cross-leaved heath, sea holly, sea pea, and
+RatHollow root-arch clearance, alongside the request inbox, route, and
+generator safeguards. A synthetic request also rebuilt the authored RatHollow
+asset through Blender and its FBX verifier (`PROBLEMS []`); no real inbox entry,
+Unreal import, or Island placement was involved. Scratch/temp data stayed under
+the ignored `Saved/CompileScratch/` directory. These checks establish pipeline
+and asset-source integrity, not in-game visual approval.
