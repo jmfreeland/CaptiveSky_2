@@ -67,3 +67,21 @@ found no `UnrealEditor*.pdb` beside its Win64 binaries and no `cdb.exe`,
 in the checked Windows Kits debugger directory. The matching stack therefore
 remains unsymbolized; this recheck does not identify a cause and does not
 authorize another identical project launch.
+
+## Repeat during the transient Norway Maple preview — 2026-10-17
+
+After confirming no Unreal Editor, commandlet, UBT, or shader-worker process was
+running, a one-instance Norway Maple D preview was attempted through the
+existing transient `Preview-InstancedSkinnedMegaplant.py` path with
+`-RenderOffscreen`. The process crashed during `StartOfEnginePreInit`, before
+the script ran, before the Island loaded, and before any preview image was
+written. The crash-side log is
+`Saved/Crashes/_0000/Codex_InstancedSkinnedNorwayMapleD_20261017.log`; the
+matching context reports a null-address read at `SecondsSinceStart=0`, no OOM,
+and PCallStackHash `F405610C114D120D4B6F5ABA901EC469AC9FAA26`—the same
+signature as the earlier UE 5.8.3 NullRHI project-open crash. No source asset,
+Content asset, or Island map was changed. The engine-only `UnrealEditor-Cmd
+-version` probe returned exit code 0 after about 55 seconds but printed no
+version text; this is not a known-good project-open control. Do not retry the
+Maple preview or another identical project launch until a symbolized stack or a
+meaningfully different startup path is available.
