@@ -9,9 +9,16 @@ point-light count, movement radius, model-request budget, and persisted world
 state are unchanged.
 
 The placement helper is deterministic and handles an invalid or collapsed
-route. `CaptiveSky_2Editor` compiled the changed weather runtime and ecology
-regression test with UE 5.8.3 `-NoLink` (12 actions, 57.52 s). The project-opening
-NullRHI crash remains a known blocker to automation execution, and the revised
-night composition has not yet had visual or play-time review. Compilation and
-placement assertions do not prove that the lights read well among the authored
-stones; inspect it in a real-RHI night session before tuning the spacing.
+route. The UE 5.8.3 scratch editor target linked successfully (35 actions,
+72.52 s), then `CaptiveSky2.Agent.FireflyCorridorPlacement` passed under
+NullRHI with model requests and world-state writes disabled. The successful
+startup used `-DisablePlugins=ModelContextProtocol`; the main project still has
+that plugin enabled, so this does not establish that its normal startup is
+fixed. The broader `NightEcology` test ran in the same session but failed four
+shore-crab player-presence assertions; those failures do not involve firefly
+placement and are recorded separately in the project-bootstrap finding.
+
+The revised night composition still has not had visual or play-time review.
+Passing placement assertions do not prove that the lights read well among the
+authored stones; inspect it in a real-RHI night session before tuning the
+spacing.
