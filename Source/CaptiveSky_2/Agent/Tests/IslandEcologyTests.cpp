@@ -1090,6 +1090,17 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		AIslandTidepoolPeriwinkle::RainRestAmount(-1.f) == 0.f &&
 		AIslandTidepoolPeriwinkle::RainRestAmount(2.f) == AIslandTidepoolPeriwinkle::RainRestAmount(1.f) &&
 		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::RainRestAmount(std::numeric_limits<float>::quiet_NaN())));
+	TestTrue(TEXT("High tide leaves a periwinkle shell fully wet while exposed ebb dries it"),
+		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::WetShellAmount(-UIslandTideglassSubsystem::MaximumTideOffsetCm, 0.f)) &&
+		FMath::IsNearlyEqual(AIslandTidepoolPeriwinkle::WetShellAmount(UIslandTideglassSubsystem::MaximumTideOffsetCm, 0.f), 1.f));
+	TestTrue(TEXT("Heavy rain adds bounded shell wetness at ebb and dry weather does not"),
+		AIslandTidepoolPeriwinkle::WetShellAmount(-UIslandTideglassSubsystem::MaximumTideOffsetCm, 1.f) > 0.f &&
+		AIslandTidepoolPeriwinkle::WetShellAmount(-UIslandTideglassSubsystem::MaximumTideOffsetCm, 1.f) < 0.56f &&
+		FMath::IsNearlyZero(AIslandTidepoolPeriwinkle::WetShellAmount(-UIslandTideglassSubsystem::MaximumTideOffsetCm, 0.f)));
+	TestTrue(TEXT("Wet-shell response remains finite and bounded for invalid or extreme environment samples"),
+		AIslandTidepoolPeriwinkle::WetShellAmount(std::numeric_limits<float>::quiet_NaN(), 1.f) <= 0.55f &&
+		AIslandTidepoolPeriwinkle::WetShellAmount(100000.f, std::numeric_limits<float>::infinity()) == 1.f &&
+		AIslandTidepoolPeriwinkle::WetShellAmount(-100000.f, std::numeric_limits<float>::quiet_NaN()) == 0.f);
 	TestTrue(TEXT("Dry weather leaves firefly movement, glow, and wingbeats unchanged"),
 		FMath::IsNearlyEqual(AIslandFirefly::RainMovementScale(0.f), 1.f) &&
 		FMath::IsNearlyEqual(AIslandFirefly::RainGlowScale(0.f), 1.f) &&
@@ -1428,6 +1439,21 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	if (DayPeriwinkles.Num() > 0 && DayPeriwinkles[0].IsValid())
 	{
 		AIslandTidepoolPeriwinkle* RainResponsiveSnail = DayPeriwinkles[0].Get();
+		if (TestNotNull(TEXT("Periwinkle shell material exists for wet-shell response"), RainResponsiveSnail->ShellMaterial.Get()))
+		{
+			const float OriginalShellWetness = RainResponsiveSnail->ShellWetness;
+			RainResponsiveSnail->ShellWetness = 0.f;
+			RainResponsiveSnail->ApplyPalette();
+			const FLinearColor DryShellTint = RainResponsiveSnail->ShellMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			RainResponsiveSnail->ShellWetness = 1.f;
+			RainResponsiveSnail->ApplyPalette();
+			const FLinearColor WetShellTint = RainResponsiveSnail->ShellMaterial->K2_GetVectorParameterValue(TEXT("Color"));
+			TestTrue(TEXT("Tide/rain wetness darkens the shell without changing its natural palette"),
+				WetShellTint.GetLuminance() < DryShellTint.GetLuminance() &&
+				WetShellTint.R < DryShellTint.R && WetShellTint.G < DryShellTint.G && WetShellTint.B < DryShellTint.B);
+			RainResponsiveSnail->ShellWetness = OriginalShellWetness;
+			RainResponsiveSnail->ApplyPalette();
+		}
 		const float OriginalHour = Clock->CurrentHour;
 		Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
 		Weather->WeatherSeed = StormSeed;

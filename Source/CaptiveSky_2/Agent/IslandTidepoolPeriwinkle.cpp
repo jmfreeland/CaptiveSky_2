@@ -148,6 +148,17 @@ float AIslandTidepoolPeriwinkle::RainRestAmount(float RainIntensity)
 	return 0.42f * FMath::SmoothStep(0.45f, 0.9f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 }
 
+float AIslandTidepoolPeriwinkle::WetShellAmount(float TideOffsetCm, float RainIntensity)
+{
+	const float TideWetness = FMath::IsFinite(TideOffsetCm)
+		? 1.f - ExposureRestAmount(TideOffsetCm)
+		: 0.f;
+	const float RainWetness = FMath::IsFinite(RainIntensity)
+		? 0.55f * FMath::SmoothStep(0.45f, 0.9f, FMath::Clamp(RainIntensity, 0.f, 1.f))
+		: 0.f;
+	return FMath::Clamp(FMath::Max(TideWetness, RainWetness), 0.f, 1.f);
+}
+
 bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
 {
 	if (ObservationCooldownRemaining > 0.f) return false;
@@ -170,9 +181,12 @@ void AIslandTidepoolPeriwinkle::ApplyPalette()
 		FLinearColor(0.48f, 0.34f, 0.18f)
 	};
 	const FLinearColor ShellColor = ShellPalettes[FMath::Clamp(ColorVariant, 0, 2)];
+	const float Wetness = FMath::Clamp(ShellWetness, 0.f, 1.f);
+	const FLinearColor DampShellColor = FMath::Lerp(ShellColor,
+		FLinearColor(ShellColor.R * 0.78f, ShellColor.G * 0.84f, ShellColor.B * 0.9f, 1.f), Wetness);
 	if (FootMaterial) FootMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.22f, 0.25f, 0.15f));
-	if (ShellMaterial) ShellMaterial->SetVectorParameterValue(TEXT("Color"), ShellColor);
-	if (SpiralMaterial) SpiralMaterial->SetVectorParameterValue(TEXT("Color"), ShellColor * 0.42f);
+	if (ShellMaterial) ShellMaterial->SetVectorParameterValue(TEXT("Color"), DampShellColor);
+	if (SpiralMaterial) SpiralMaterial->SetVectorParameterValue(TEXT("Color"), DampShellColor * 0.42f);
 	for (UStaticMeshComponent* Eye : Eyes)
 		if (Eye && BaseShapeMaterial) Eye->SetMaterial(0, BaseShapeMaterial);
 }
@@ -257,6 +271,11 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float RainIntensity = IslandWeather.IsValid() && GetWorld()
 		? IslandWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
+	const float TargetShellWetness = WetShellAmount(TideOffset, RainIntensity);
+	const float PreviousShellWetness = ShellWetness;
+	ShellWetness = FMath::FInterpTo(ShellWetness, TargetShellWetness, SafeDelta, 0.8f);
+	if (FMath::Abs(ShellWetness - PreviousShellWetness) > 0.001f)
+		ApplyPalette();
 	const float WeatherRest = RainRestAmount(RainIntensity);
 	const float ExposureRest = FMath::Max(TideRest, FMath::Max(ObservationRest, WeatherRest));
 	const float StalkExtension = FMath::Lerp(1.f, 0.46f, ExposureRest);

@@ -26,6 +26,8 @@ public:
 	static float ExposureRestAmount(float TideOffsetCm);
 	/** Heavy rain causes a smaller, temporary tuck; dry weather leaves the snail unchanged. */
 	static float RainRestAmount(float RainIntensity);
+	/** Tide and rain keep the shell briefly darkened while its exposed surface is wet. */
+	static float WetShellAmount(float TideOffsetCm, float RainIntensity);
 
 protected:
 	virtual void BeginPlay() override;
@@ -59,6 +61,7 @@ private:
 	float AttentionYaw = 0.f;
 	float ObservationRestRemaining = 0.f;
 	float ObservationCooldownRemaining = 0.f;
+	float ShellWetness = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
