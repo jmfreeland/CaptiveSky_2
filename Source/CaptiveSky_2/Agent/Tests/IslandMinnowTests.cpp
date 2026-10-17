@@ -15,12 +15,24 @@
 #include "GameFramework/Character.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralMeshComponent.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMinnowTest, "CaptiveSky2.Agent.TidepoolMinnows",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandMinnowTest::RunTest(const FString& Parameters)
 {
+	TestTrue(TEXT("An awake rat near the shoreline can startle the school"),
+		AIslandTidepoolMinnows::ShouldScatterForRat(true, 400.f, 120.f));
+	TestFalse(TEXT("A resting rat does not disturb the fish"),
+		AIslandTidepoolMinnows::ShouldScatterForRat(false, 300.f, 0.f));
+	TestFalse(TEXT("A rat farther inland cannot affect the school"),
+		AIslandTidepoolMinnows::ShouldScatterForRat(true, AIslandTidepoolMinnows::RatPresenceRadiusCm + 1.f, 0.f));
+	TestFalse(TEXT("A rat high above or below the water is ignored"),
+		AIslandTidepoolMinnows::ShouldScatterForRat(true, 300.f, AIslandTidepoolMinnows::RatPresenceHeightToleranceCm + 1.f));
+	TestFalse(TEXT("Invalid distances do not startle the school"),
+		AIslandTidepoolMinnows::ShouldScatterForRat(true, std::numeric_limits<float>::infinity(), 0.f));
+
 	TestTrue(TEXT("Calm shallows allow ordinary school movement"), FMath::IsNearlyEqual(AIslandTidepoolMinnows::RainMovementScale(0.f), 1.f));
 	TestTrue(TEXT("Heavy rain gently tightens, but does not stop, the school"),
 		AIslandTidepoolMinnows::RainMovementScale(1.f) > 0.f && AIslandTidepoolMinnows::RainMovementScale(1.f) < 1.f);

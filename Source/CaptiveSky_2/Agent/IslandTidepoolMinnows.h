@@ -7,6 +7,7 @@
 class AIslandWeather;
 class AIslandDayNight;
 class ARavenAgentAIController;
+class ARatAgentAIController;
 class APawn;
 class UMaterialInterface;
 class UProceduralMeshComponent;
@@ -26,6 +27,8 @@ public:
 	bool RespondToSurfaceRipple();
 	/** Describes a recent surface break to a nearby observer for the next already-scheduled decision. */
 	FString DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const;
+	/** An awake rat close to the shore startles the school within bounded horizontal/vertical limits. */
+	static bool ShouldScatterForRat(bool bRatAwake, float DistanceCm, float VerticalOffsetCm);
 	static float RainMovementScale(float RainIntensity);
 
 protected:
@@ -44,11 +47,16 @@ private:
 	static constexpr float SurfaceBreakContextLifetime = 305.f;
 	static constexpr float ScatterSurfaceCueCooldownSeconds = 5.f;
 	static constexpr float RavenCheckIntervalSeconds = 0.06f;
+	static constexpr float RatCheckIntervalSeconds = 0.4f;
+	static constexpr float RatPresenceRadiusCm = 550.f;
+	static constexpr float RatPresenceRearmRadiusCm = 850.f;
+	static constexpr float RatPresenceHeightToleranceCm = 350.f;
 	static constexpr float PlayerWaterCheckIntervalSeconds = 0.2f;
 	static constexpr float PlayerWaterStartleRadiusCm = 500.f;
 	static constexpr float PlayerWaterRearmRadiusCm = 850.f;
 	static constexpr float PlayerWaterHeightToleranceCm = 250.f;
 	static constexpr float PlayerWaterStartleCooldownSeconds = 8.f;
+	static constexpr float RatPresenceCooldownSeconds = 8.f;
 	static float NightRestAmount(float CurrentHour);
 	static float NightActivityScale(float RestAmount);
 	static float SwimRateForRest(float RestAmount);
@@ -81,9 +89,12 @@ private:
 	int32 SurfaceBreakFishIndex = 0;
 	int32 SurfaceBreakHopFishIndex = INDEX_NONE;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
+	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
 	TWeakObjectPtr<APawn> PlayerWaterPresenceLatch;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
+	float RatCheckRemaining = 0.f;
+	float RatPresenceCooldownRemaining = 0.f;
 	float PlayerWaterCheckRemaining = 0.f;
 	float PlayerWaterStartleCooldownRemaining = 0.f;
 	float Phase = 0.73f;
@@ -97,6 +108,7 @@ private:
 	FVector ClampToPoolSwimmingBounds(const FVector& DesiredRelativeLocation, float EdgeClearanceCm = 0.f) const;
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
+	void CheckForNearbyRatDisturbance();
 	void CheckForPlayerWaterDisturbance();
 	void UpdatePlayerWaterPresence(APawn* PlayerPawn, bool bIsSurfaceSwimming);
 	void CheckForNearbySurfaceCue();

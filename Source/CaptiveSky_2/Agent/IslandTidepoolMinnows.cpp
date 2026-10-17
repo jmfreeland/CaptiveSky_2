@@ -1,11 +1,13 @@
 #include "IslandTidepoolMinnows.h"
 
 #include "EngineUtils.h"
+#include "AgentConsolidationComponent.h"
 #include "IslandDayNight.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "IslandTideglassSubsystem.h"
 #include "RavenAgentAIController.h"
+#include "RatAgentAIController.h"
 #include "CaptiveSky_2Character.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -494,6 +496,13 @@ void AIslandTidepoolMinnows::RespondToQuietObservation(const FVector& ObserverLo
 	CreateScatterSurfaceCue(ObserverLocation);
 }
 
+bool AIslandTidepoolMinnows::ShouldScatterForRat(bool bRatAwake, float DistanceCm, float VerticalOffsetCm)
+{
+	return bRatAwake && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f &&
+		DistanceCm <= RatPresenceRadiusCm && FMath::IsFinite(VerticalOffsetCm) &&
+		FMath::Abs(VerticalOffsetCm) <= RatPresenceHeightToleranceCm;
+}
+
 void AIslandTidepoolMinnows::CreateScatterSurfaceCue(const FVector& ObserverLocation)
 {
 	if (!GetWorld() || Fish.IsEmpty() || ScatterSurfaceCueCooldownRemaining > 0.f) return;
@@ -712,6 +721,40 @@ void AIslandTidepoolMinnows::CheckForNearbyRavenDisturbance()
 	}
 }
 
+void AIslandTidepoolMinnows::CheckForNearbyRatDisturbance()
+{
+	if (!GetWorld()) return;
+
+	for (TActorIterator<ARatAgentAIController> It(GetWorld()); It; ++It)
+	{
+		ARatAgentAIController* RatController = *It;
+		const APawn* Rat = IsValid(RatController) ? RatController->GetPawn() : nullptr;
+		if (!IsValid(Rat)) continue;
+
+		const FVector Offset = Rat->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (RatPresenceLatch.Get() == RatController)
+		{
+			if (DistanceSquared > FMath::Square(RatPresenceRearmRadiusCm))
+				RatPresenceLatch.Reset();
+			else
+				continue;
+		}
+
+		const UAgentConsolidationComponent* RatRest = Rat->FindComponentByClass<UAgentConsolidationComponent>();
+		const bool bRatAwake = !RatRest || RatRest->IsAwake();
+		if (!ShouldScatterForRat(bRatAwake, FMath::Sqrt(DistanceSquared), Offset.Z)) continue;
+		RatPresenceLatch = RatController;
+		if (RatPresenceCooldownRemaining > 0.f || ScatterRemaining > 0.f) continue;
+
+		// A single awake shoreline approach can scatter the school. The rat must
+		// leave the wider ring before another encounter is eligible.
+		RespondToQuietObservation(Rat->GetActorLocation());
+		RatPresenceCooldownRemaining = RatPresenceCooldownSeconds;
+		return;
+	}
+}
+
 void AIslandTidepoolMinnows::CheckForPlayerWaterDisturbance()
 {
 	if (!GetWorld()) return;
@@ -842,6 +885,13 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = RavenCheckIntervalSeconds;
 		CheckForNearbyRavenDisturbance();
+	}
+	RatPresenceCooldownRemaining = FMath::Max(0.f, RatPresenceCooldownRemaining - SafeDelta);
+	RatCheckRemaining -= SafeDelta;
+	if (RatCheckRemaining <= 0.f)
+	{
+		RatCheckRemaining = RatCheckIntervalSeconds;
+		CheckForNearbyRatDisturbance();
 	}
 	PlayerWaterCheckRemaining -= SafeDelta;
 	if (PlayerWaterCheckRemaining <= 0.f)
