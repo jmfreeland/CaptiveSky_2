@@ -99,6 +99,27 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 
 bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 {
+	TArray<int32> CandidateIndices = {8, 2, 2, 5, 8, 3, 5, 2};
+	CandidateIndices.Sort();
+	AIslandWeather::CompactSortedUniqueIndices(CandidateIndices);
+	const TArray<int32> ExpectedUniqueIndices = {2, 3, 5, 8};
+	TestTrue(TEXT("Sorted duplicate sway candidates compact to the exact ascending set"),
+		CandidateIndices == ExpectedUniqueIndices);
+	TArray<int32> EmptyIndices;
+	AIslandWeather::CompactSortedUniqueIndices(EmptyIndices);
+	TestTrue(TEXT("Compacting an empty sway candidate list remains empty"), EmptyIndices.IsEmpty());
+
+	const TArray<int32> PreviousSwayedIndices = {1, 3, 5, 9};
+	const TArray<int32> CurrentSwayedIndices = {2, 3, 6, 9};
+	TArray<int32> UpdateIndices;
+	AIslandWeather::MergeSortedUniqueIndices(PreviousSwayedIndices, CurrentSwayedIndices, UpdateIndices);
+	const TArray<int32> ExpectedUpdateIndices = {1, 2, 3, 5, 6, 9};
+	TestTrue(TEXT("Sway updates merge previous and current indices once in ascending unique order"),
+		UpdateIndices == ExpectedUpdateIndices);
+	AIslandWeather::MergeSortedUniqueIndices(EmptyIndices, CurrentSwayedIndices, UpdateIndices);
+	TestTrue(TEXT("Merging with an empty previous set resets and copies the current set"),
+		UpdateIndices == CurrentSwayedIndices);
+
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
 		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);

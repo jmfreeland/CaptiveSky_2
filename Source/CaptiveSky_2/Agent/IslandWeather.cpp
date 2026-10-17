@@ -1,5 +1,4 @@
 #include "IslandWeather.h"
-#include "Algo/BinarySearch.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandLightning.h"
@@ -1882,6 +1881,46 @@ void AIslandWeather::ClearGroundCover()
 	bGroundCoverInitialized = false;
 }
 
+void AIslandWeather::CompactSortedUniqueIndices(TArray<int32>& Indices)
+{
+	int32 UniqueCount = 0;
+	for (int32 ReadIndex = 0; ReadIndex < Indices.Num(); ++ReadIndex)
+	{
+		const int32 Value = Indices[ReadIndex];
+		if (UniqueCount > 0 && Indices[UniqueCount - 1] == Value) continue;
+		Indices[UniqueCount++] = Value;
+	}
+	if (UniqueCount < Indices.Num()) Indices.SetNum(UniqueCount, EAllowShrinking::No);
+}
+
+void AIslandWeather::MergeSortedUniqueIndices(const TArray<int32>& First, const TArray<int32>& Second,
+	TArray<int32>& OutIndices)
+{
+	OutIndices.Reset();
+	OutIndices.Reserve(First.Num() + Second.Num());
+	int32 FirstIndex = 0;
+	int32 SecondIndex = 0;
+	while (FirstIndex < First.Num() && SecondIndex < Second.Num())
+	{
+		if (First[FirstIndex] < Second[SecondIndex])
+		{
+			OutIndices.Add(First[FirstIndex++]);
+		}
+		else if (Second[SecondIndex] < First[FirstIndex])
+		{
+			OutIndices.Add(Second[SecondIndex++]);
+		}
+		else
+		{
+			OutIndices.Add(First[FirstIndex]);
+			++FirstIndex;
+			++SecondIndex;
+		}
+	}
+	while (FirstIndex < First.Num()) OutIndices.Add(First[FirstIndex++]);
+	while (SecondIndex < Second.Num()) OutIndices.Add(Second[SecondIndex++]);
+}
+
 void AIslandWeather::UpdateGroundCoverSway()
 {
 	if (!GetWorld() || !bGroundCoverInitialized) return;
@@ -1955,33 +1994,36 @@ void AIslandWeather::UpdateGroundCoverSway()
 						CurrentSwayedIndices.Append(*CellIndices);
 		}
 		CurrentSwayedIndices.Sort();
-		for (int32 Index = CurrentSwayedIndices.Num() - 1; Index > 0; --Index)
-			if (CurrentSwayedIndices[Index] == CurrentSwayedIndices[Index - 1]) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
-		for (int32 Index = CurrentSwayedIndices.Num() - 1; Index >= 0; --Index)
+		AIslandWeather::CompactSortedUniqueIndices(CurrentSwayedIndices);
+		const float FocusRadiusSquared = FMath::Square(FocusRadius);
+		CurrentSwayedIndices.RemoveAll([&](int32 InstanceIndex)
 		{
-			const FVector WorldLocation = ComponentTransform.TransformPosition(BaseTransforms[FirstBaseline + CurrentSwayedIndices[Index]].GetLocation());
-			bool bWithinSwayRange = false;
+			if (InstanceIndex < 0 || InstanceIndex >= InstanceCount) return true;
+			const FVector WorldLocation = ComponentTransform.TransformPosition(
+				BaseTransforms[FirstBaseline + InstanceIndex].GetLocation());
 			for (const FVector& Focus : FocusPoints)
-			if (FVector::DistSquared(WorldLocation, Focus) <= FMath::Square(FocusRadius)) { bWithinSwayRange = true; break; }
-			if (!bWithinSwayRange) CurrentSwayedIndices.RemoveAt(Index, 1, EAllowShrinking::No);
-		}
-		TArray<int32> UpdateIndices = PreviousSwayedIndices;
-		UpdateIndices.Append(CurrentSwayedIndices);
-		UpdateIndices.Sort();
-		for (int32 Index = UpdateIndices.Num() - 1; Index > 0; --Index)
-			if (UpdateIndices[Index] == UpdateIndices[Index - 1]) UpdateIndices.RemoveAt(Index, 1, EAllowShrinking::No);
+				if (FVector::DistSquared(WorldLocation, Focus) <= FocusRadiusSquared) return false;
+			return true;
+		});
+		TArray<int32> UpdateIndices;
+		AIslandWeather::MergeSortedUniqueIndices(PreviousSwayedIndices, CurrentSwayedIndices, UpdateIndices);
 		if (UpdateIndices.IsEmpty())
 		{
 			PreviousSwayedIndices.Reset();
 			return;
 		}
+		int32 CurrentSwayedPosition = 0;
 		for (int32 Position = 0; Position < UpdateIndices.Num(); ++Position)
 		{
 			const int32 InstanceIndex = UpdateIndices[Position];
 			if (InstanceIndex < 0 || InstanceIndex >= InstanceCount) continue;
 			const FTransform& Base = BaseTransforms[FirstBaseline + InstanceIndex];
 			FTransform Updated = Base;
-			if (Algo::BinarySearch(CurrentSwayedIndices, InstanceIndex) != INDEX_NONE)
+			while (CurrentSwayedPosition < CurrentSwayedIndices.Num() &&
+				CurrentSwayedIndices[CurrentSwayedPosition] < InstanceIndex)
+				++CurrentSwayedPosition;
+			if (CurrentSwayedPosition < CurrentSwayedIndices.Num() &&
+				CurrentSwayedIndices[CurrentSwayedPosition] == InstanceIndex)
 			{
 				const FVector WorldLocation = ComponentTransform.TransformPosition(Base.GetLocation());
 				const FVector WorldWind = GetLocalWind(WorldLocation, this);

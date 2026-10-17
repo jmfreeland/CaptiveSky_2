@@ -261,6 +261,11 @@ private:
 	/** Stable member offset for a small flower pocket; member indices start at zero. */
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	static FVector SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex);
+	/** Compact a sorted index array in one pass, preserving sorted uniqueness. */
+	static void CompactSortedUniqueIndices(TArray<int32>& Indices);
+	/** Merge two sorted, unique index arrays without another sort or repeated shifting. */
+	static void MergeSortedUniqueIndices(const TArray<int32>& First, const TArray<int32>& Second,
+		TArray<int32>& OutIndices);
 	/** Calculate one bounded wind lean from an immutable base transform (never accumulates drift). */
 	static FTransform CalculateGroundCoverSway(const FTransform& BaseTransform, const FVector& LocalWind,
 		double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
