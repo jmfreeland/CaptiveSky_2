@@ -48,9 +48,9 @@ class CoastalSeaLavenderTests(unittest.TestCase):
         self.assertIn("Limonium vulgare-inspired", values["PROVENANCE"])
         self.assertEqual(len(values["ROSETTE_CENTRES"]), 6)
         self.assertEqual(len(values["FLOWER_STEMS"]), 8)
-        self.assertEqual(values["ROSETTE_LEAVES"], 7)
-        self.assertEqual(values["BRANCHES_PER_STEM"], 4)
-        self.assertEqual(values["FLOWERS_PER_BRANCH"], 5)
+        self.assertEqual(values["ROSETTE_LEAVES"], 6)
+        self.assertEqual(values["BRANCHES_PER_STEM"], 3)
+        self.assertEqual(values["FLOWERS_PER_BRANCH"], 4)
         self.assertEqual(values["PETALS_PER_FLOWER"], 5)
         self.assertGreater(min(stem[2] for stem in values["FLOWER_STEMS"]), 0.4)
         self.assertLess(max(stem[2] for stem in values["FLOWER_STEMS"]), 0.6)
@@ -65,15 +65,21 @@ class CoastalSeaLavenderTests(unittest.TestCase):
         self.assertTrue(all(call.args and isinstance(call.args[0], ast.Constant)
                             and call.args[0].value == "sea_lavender_stem"
                             for call in tube_calls))
+        self.assertEqual(sorted(ast.literal_eval(call.args[2]) for call in tube_calls),
+                         [0.0026, 0.0042])
         petal_function = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
                               and node.name == "_star_floret")
         self.assertIn("PETALS_PER_FLOWER", ast.unparse(petal_function))
+        self.assertIn("0.014", ast.unparse(tree))
         self.assertIn("no generated textures", values["PROVENANCE"])
 
     def test_candidate_keeps_default_shading_but_importer_supports_opt_in(self):
         _values, tree, *_ = source_contract()
         materials = plain_material_contract(tree)
         self.assertTrue(all("TwoSided" not in material for material in materials.values()))
+        self.assertLess(max(materials["sea_lavender_leaf"]["BaseColor"]), 0.3)
+        self.assertGreater(min(materials["sea_lavender_stem"]["BaseColor"]), 0.25)
+        self.assertGreater(materials["sea_lavender_flower"]["BaseColor"][2], 0.8)
 
         importer = IMPORTER.read_text(encoding="utf-8")
         self.assertIn('description.get("TwoSided", False)', importer)

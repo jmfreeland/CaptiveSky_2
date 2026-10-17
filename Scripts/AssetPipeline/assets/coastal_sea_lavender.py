@@ -13,14 +13,14 @@ ROSETTE_CENTRES = (
     (-0.11, -0.04), (-0.045, 0.12), (0.035, -0.14),
     (0.12, 0.045), (-0.015, 0.005), (0.17, -0.09),
 )
-ROSETTE_LEAVES = 7
+ROSETTE_LEAVES = 6
 FLOWER_STEMS = (
     (-0.12, -0.06, 0.49), (-0.07, 0.11, 0.44), (0.015, -0.12, 0.53),
     (0.06, 0.08, 0.46), (0.13, 0.02, 0.55), (0.17, -0.10, 0.47),
     (-0.015, 0.02, 0.58), (0.045, -0.045, 0.50),
 )
-BRANCHES_PER_STEM = 4
-FLOWERS_PER_BRANCH = 5
+BRANCHES_PER_STEM = 3
+FLOWERS_PER_BRANCH = 4
 PETALS_PER_FLOWER = 5
 
 
@@ -69,9 +69,13 @@ def _star_floret(bm, centre, direction, size, phase):
 
 
 def build(A):
-    lib.PLAIN["sea_lavender_leaf"] = {"BaseColor": [0.28, 0.39, 0.22], "Roughness": 0.9}
-    lib.PLAIN["sea_lavender_stem"] = {"BaseColor": [0.34, 0.38, 0.22], "Roughness": 0.92}
-    lib.PLAIN["sea_lavender_flower"] = {"BaseColor": [0.58, 0.44, 0.76], "Roughness": 0.84}
+    # Unreal's first real-RHI trial washed the basal leaves toward grey and
+    # lost the sub-centimetre stems/flowers at play distance. A deeper sage
+    # leaf and slightly brighter, thicker inflorescence are a measured art
+    # iteration, not a final Island material approval.
+    lib.PLAIN["sea_lavender_leaf"] = {"BaseColor": [0.16, 0.28, 0.17], "Roughness": 0.94}
+    lib.PLAIN["sea_lavender_stem"] = {"BaseColor": [0.43, 0.50, 0.28], "Roughness": 0.92}
+    lib.PLAIN["sea_lavender_flower"] = {"BaseColor": [0.70, 0.58, 0.88], "Roughness": 0.84}
 
     leaf_bm = bmesh.new()
     flower_bm = bmesh.new()
@@ -86,32 +90,32 @@ def build(A):
                           0.028 + 0.004 * ((plant_index + 2 * leaf_index) % 3),
                           angle * 0.41)
 
-    # Each stem forks into fine upright and lateral sprays; tiny stars keep the
-    # silhouette open instead of turning the plant into a dense purple pom-pom.
+    # Each stem forks into a sparse upright spray. Thicker export-safe rods
+    # and larger stars keep the cluster legible without making a purple pom-pom.
     for stem_index, (x, y, height) in enumerate(FLOWER_STEMS):
         base = Vector((x, y, 0.015))
         top = Vector((x + 0.025 * math.sin(stem_index),
                       y + 0.022 * math.cos(stem_index * 0.7), height))
         A.tube("sea_lavender_stem", [base, base.lerp(top, 0.52), top],
-               0.0028, segs=5, taper=lambda t: 1.0 - 0.45 * t,
+               0.0042, segs=5, taper=lambda t: 1.0 - 0.45 * t,
                name="seaLavenderStem{:02d}".format(stem_index + 1))
         for branch_index in range(BRANCHES_PER_STEM):
-            t = 0.34 + 0.105 * branch_index
+            t = 0.37 + 0.14 * branch_index
             anchor = base.lerp(top, t)
             angle = stem_index * 2.399963229728653 + branch_index * math.tau / BRANCHES_PER_STEM
             radial = Vector((math.cos(angle), math.sin(angle), 0.0))
             branch_end = anchor + radial * (0.09 + 0.012 * (branch_index % 2))
             branch_end.z += 0.045 + 0.012 * ((stem_index + branch_index) % 3)
             A.tube("sea_lavender_stem", [anchor, anchor.lerp(branch_end, 0.55), branch_end],
-                   0.0017, segs=4, taper=lambda t: 1.0 - 0.62 * t,
+                   0.0026, segs=4, taper=lambda t: 1.0 - 0.62 * t,
                    name="seaLavenderBranch{:02d}_{:02d}".format(stem_index + 1, branch_index + 1))
             branch_axis = (branch_end - anchor).normalized()
             for flower_index in range(FLOWERS_PER_BRANCH):
-                flower_t = 0.2 + flower_index * 0.13
+                flower_t = 0.14 + flower_index * 0.23
                 flower_centre = anchor.lerp(branch_end, flower_t)
                 flower_centre.z += 0.009 * math.sin(flower_index * 1.7 + stem_index)
                 _star_floret(flower_bm, flower_centre, branch_axis,
-                             0.009 + 0.001 * ((stem_index + flower_index) % 3),
+                             0.014 + 0.002 * ((stem_index + flower_index) % 3),
                              angle + flower_index * 0.61)
 
     if leaf_bm.faces:

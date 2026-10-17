@@ -72,3 +72,25 @@ importer keeps it as an optional manifest property for other assets. These
 captures are a transient review only: the script spawned an actor in the
 loaded Island world but never called a level-save API. No placement or
 gameplay/population cost is approved.
+
+## Source readability iteration (2026-10-17)
+
+In response to the real-RHI result, the source now uses a darker sage basal
+rosette, thicker/brighter stem tubes, larger lavender stars, and fewer
+branch/flower elements. The source contract remains deterministic and
+collisionless. Blender 5.2.2 rebuilt this candidate into the isolated
+`Saved/Playtests/Codex_SeaLavenderReadabilityTrial_20261017/CoastalSeaLavender/`
+output, leaving the original `Saved/CaptiveSky/ComfyBlender/` export and both
+Unreal trial imports untouched. The exported mesh is 68 × 72 × 57 cm with
+4,528 triangles (down from 5,808), one UV layer, three material slots, no
+colliders, and verifier `PROBLEMS []`; all three source tests pass. The
+[Blender preview](../../Saved/Playtests/Codex_SeaLavenderReadabilityTrial_20261017/CoastalSeaLavender/Preview.png)
+shows distinct pale-purple florets and export-safe stems, but Blender shading
+does not predict the earlier Unreal lighting failure. This is an improved
+source candidate, not approval for import or Island placement.
+
+Next: when the UE preview path is available, import this exact FBX to a fresh
+disposable destination and repeat the same isolated real-RHI capture beside
+the baseline. Compare stem visibility, leaf color, normal play distance,
+shadows, and a 5–10-clump frame-time sample before considering any shoreline
+population.
