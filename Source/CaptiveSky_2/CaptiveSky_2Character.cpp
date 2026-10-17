@@ -12,6 +12,7 @@
 #include "WaterBodyComponent.h"
 #include "WaterSubsystem.h"
 #include "IslandOceanSubsystem.h"
+#include "IslandPoolRippleEffect.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -157,6 +158,37 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 	FHitResult SurfaceFollowHit;
 	SetActorLocation(TargetLocation, true, &SurfaceFollowHit, ETeleportType::None);
 	Movement->Velocity.Z = 0.f;
+	TrySpawnSurfaceSwimWake(WaterSurfaceLocation);
+}
+
+void ACaptiveSky_2Character::TrySpawnSurfaceSwimWake(const FVector& WaterSurfaceLocation)
+{
+	UWorld* World = GetWorld();
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!World || !Movement) return;
+
+	constexpr float MinimumWakeSpeed = 80.f;
+	constexpr float WakeIntervalSeconds = 1.15f;
+	const FVector HorizontalVelocity = FVector(Movement->Velocity.X, Movement->Velocity.Y, 0.f);
+	if (HorizontalVelocity.SizeSquared() < FMath::Square(MinimumWakeSpeed) ||
+		World->GetTimeSeconds() < NextSurfaceSwimWakeTime)
+	{
+		return;
+	}
+
+	const FVector WakeDirection = HorizontalVelocity.GetSafeNormal();
+	FVector WakeLocation = GetActorLocation() - WakeDirection * 48.f;
+	WakeLocation.Z = WaterSurfaceLocation.Z + 2.f;
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = this;
+	SpawnParameters.Instigator = this;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandPoolRippleEffect* Wake = World->SpawnActor<AIslandPoolRippleEffect>(
+		WakeLocation, FRotator::ZeroRotator, SpawnParameters);
+	if (!Wake) return;
+
+	Wake->ConfigureAsPlayerSwimImpact();
+	NextSurfaceSwimWakeTime = World->GetTimeSeconds() + WakeIntervalSeconds;
 }
 
 void ACaptiveSky_2Character::EnterSurfaceSwimming(float WaterSurfaceZ)

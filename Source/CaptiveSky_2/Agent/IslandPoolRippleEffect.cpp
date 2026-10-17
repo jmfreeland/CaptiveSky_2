@@ -96,6 +96,21 @@ void AIslandPoolRippleEffect::ConfigureAsMinnowStartleImpact()
 	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
 }
 
+void AIslandPoolRippleEffect::ConfigureAsPlayerSwimImpact()
+{
+	DurationSeconds = 1.1f;
+	SurfaceRadius = 82.f;
+	PeakLightIntensity = 0.f;
+	Tags.AddUnique(TEXT("PlayerSwimImpact"));
+	EnsureStartleRingMaterial();
+	if (StartleRing)
+	{
+		StartleRing->SetRelativeLocation(FVector(0.f, 0.f, 3.f));
+		StartleRing->SetVisibility(true, true);
+	}
+	UpdateRipple(FMath::Clamp(ElapsedSeconds / DurationSeconds, 0.f, 1.f));
+}
+
 void AIslandPoolRippleEffect::TriggerWaterRipple(float Strength)
 {
 	if (!GetWorld()) return;
@@ -129,7 +144,10 @@ void AIslandPoolRippleEffect::UpdateRipple(float Alpha)
 		{
 			// The moving highlights carry most of the cue. Keep this wider band dark,
 			// desaturated teal so it feels embedded in the pool instead of drawn on it.
-			const FLinearColor RingTint = FLinearColor(0.001f, 0.018f, 0.022f) * Pulse;
+			const FLinearColor BaseRingTint = ActorHasTag(TEXT("PlayerSwimImpact"))
+				? FLinearColor(0.035f, 0.28f, 0.36f)
+				: FLinearColor(0.001f, 0.018f, 0.022f);
+			const FLinearColor RingTint = BaseRingTint * Pulse;
 			StartleRingMaterial->SetVectorParameterValue(TEXT("Color"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("BaseColor"), RingTint);
 			StartleRingMaterial->SetVectorParameterValue(TEXT("EmissiveColor"), RingTint);

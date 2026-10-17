@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "IslandOceanSubsystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/Engine.h"
@@ -10,7 +11,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/Material.h"
 #include "CaptiveSky_2Character.h"
+#include "IslandPoolRippleEffect.h"
 #include "IslandOceanTestCharacter.h"
+#include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "WaterBodyComponent.h"
 #include "WaterBodyOceanActor.h"
@@ -161,6 +164,39 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 				WaterPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
 				WaterPlayer->Tick(1.f / 60.f);
 				TestTrue(TEXT("A falling player enters surface swimming from the real ocean query"), WaterPlayer->IsSurfaceSwimming());
+
+				TArray<AIslandPoolRippleEffect*> SwimWakes;
+				for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+					if (It->ActorHasTag(TEXT("PlayerSwimImpact"))) SwimWakes.Add(*It);
+				TestEqual(TEXT("A stationary swimmer does not emit a wake"), SwimWakes.Num(), 0);
+
+				WaterPlayer->GetCharacterMovement()->Velocity = FVector(120.f, 0.f, 0.f);
+				WaterPlayer->Tick(1.f / 60.f);
+				for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+					if (It->ActorHasTag(TEXT("PlayerSwimImpact"))) SwimWakes.AddUnique(*It);
+				TestEqual(TEXT("Moving across the ocean leaves one short water wake"), SwimWakes.Num(), 1);
+				if (SwimWakes.Num() == 1)
+				{
+					TestTrue(TEXT("The wake trails behind the player's swimming direction"),
+						SwimWakes[0]->GetActorLocation().X < WaterPlayer->GetActorLocation().X);
+					TestTrue(TEXT("The wake's thin procedural ring is visible"),
+						SwimWakes[0]->StartleRing && SwimWakes[0]->StartleRing->IsVisible());
+					TestTrue(TEXT("The visible wake ring has a surface material"),
+						SwimWakes[0]->StartleRing && SwimWakes[0]->StartleRing->GetMaterial(0) != nullptr);
+					TestEqual(TEXT("A player wake does not add active point-light draw cost"),
+						SwimWakes[0]->PeakLightIntensity, 0.f);
+					TestTrue(TEXT("The wake uses the player-only ripple type"),
+						SwimWakes[0]->ActorHasTag(TEXT("PlayerSwimImpact")) &&
+						!SwimWakes[0]->ActorHasTag(TEXT("MinnowImpact")) &&
+						!SwimWakes[0]->ActorHasTag(TEXT("RainImpact")) &&
+						!SwimWakes[0]->ActorHasTag(TEXT("WindImpact")));
+				}
+
+				WaterPlayer->Tick(1.f / 60.f);
+				int32 WakeCountDuringCooldown = 0;
+				for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+					if (It->ActorHasTag(TEXT("PlayerSwimImpact"))) ++WakeCountDuringCooldown;
+				TestEqual(TEXT("A swimming wake is rate-limited while the player keeps moving"), WakeCountDuringCooldown, 1);
 			}
 
 			AIslandOceanTestCharacter* GroundedWaterPlayer = World->SpawnActor<AIslandOceanTestCharacter>(

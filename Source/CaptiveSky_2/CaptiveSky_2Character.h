@@ -110,6 +110,8 @@ private:
 
 	bool bSurfaceSwimming = false;
 	float PreviousMaxFlySpeed = 0.f;
+	double NextSurfaceSwimWakeTime = 0.0;
+	void TrySpawnSurfaceSwimWake(const FVector& WaterSurfaceLocation);
 
 public:
 

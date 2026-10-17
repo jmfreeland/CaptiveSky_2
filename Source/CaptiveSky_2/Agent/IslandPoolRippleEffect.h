@@ -25,6 +25,8 @@ public:
 	void ConfigureAsMinnowImpact();
 	/** A restrained surface cue when the school startles from nearby quiet attention. */
 	void ConfigureAsMinnowStartleImpact();
+	/** A dim, short ring left behind a moving player; does not disturb wildlife. */
+	void ConfigureAsPlayerSwimImpact();
 	static float WindRippleActivity(float HorizontalWindSpeed);
 
 protected:
@@ -35,6 +37,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandWeatherTest;
+	friend class FIslandOceanTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TArray<TObjectPtr<UPointLightComponent>> RippleLights;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
