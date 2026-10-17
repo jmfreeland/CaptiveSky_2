@@ -82,6 +82,31 @@ public static class WorldStateSummary
             facts.Add($"On {level}, you have woven {Int(nest, "layers")} of 5 layers of a nest at {Text(nest, "site")}.");
         }
 
+        foreach (var home in Items(root, "wildlife_homes"))
+        {
+            if (Text(home, "occupant") != agentId)
+                continue;
+
+            var species = Text(home, "species");
+            if (string.IsNullOrEmpty(species))
+                continue;
+
+            var id = Text(home, "id");
+            var homeName = string.IsNullOrEmpty(id) ? string.Empty : $" \"{id}\"";
+            var state = Text(home, "shelter_state") switch
+            {
+                "Exposed" => "exposed",
+                "Temporary" => "temporary",
+                "Settled" => "settled",
+                "Disturbed" => "disturbed",
+                _ => "recorded with an unknown condition",
+            };
+            var quality = home.TryGetProperty("shelter_quality", out var qualityNode) && qualityNode.TryGetInt32(out var score)
+                ? $" (shelter quality {Math.Clamp(score, 0, 5)}/5)"
+                : string.Empty;
+            facts.Add($"On {level}, your {species} home{homeName} was last saved as {state}{quality}.");
+        }
+
         foreach (var curio in Items(root, "curios"))
         {
             if (Text(curio, "kind") == "Cairn" && Contains(curio, "contributors", agentId))
