@@ -85,3 +85,24 @@ Content asset, or Island map was changed. The engine-only `UnrealEditor-Cmd
 version text; this is not a known-good project-open control. Do not retry the
 Maple preview or another identical project launch until a symbolized stack or a
 meaningfully different startup path is available.
+
+## Startup-plugin comparison and symbol path — 2026-10-17
+
+The current `.uproject` enables `ProceduralVegetationEditor` and `DynamicWind`;
+both plugin folders exist in the installed UE 5.8 engine. DynamicWind was added
+to the project on 2026-10-17 at 17:01 (`2389f2e`), to support the Megaplant
+transform provider. However, the identical NullRHI project-open hash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26` was already recorded on 2026-10-13,
+before DynamicWind was enabled. The plugin change therefore cannot explain the
+first occurrence and should not be disabled as a presumed fix. PVE was enabled
+on 2026-10-10 and is present, but the available crash evidence does not isolate
+it either.
+
+The latest Maple preview still fails at `SecondsSinceStart=0`; its crash context
+contains Core/Cmd module offsets and a minidump, but no local debugger or engine
+symbols were found. Epic's UE 5.8 installation options provide an optional
+**Editor symbols for debugging** component, intended to make engine crash
+information more detailed ([installation options](https://dev.epicgames.com/documentation/en-us/unreal-engine/install-unreal-engine)).
+If that component is installed for the matching 5.8.3 build, use the existing
+minidump/crash context to resolve the current Core offsets before another
+project-open run. This is a diagnostic prerequisite, not a proposed crash fix.
