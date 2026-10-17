@@ -247,6 +247,20 @@ void AIslandFirefly::RespondToQuietObservation()
 	ObservationPulseRemaining = 3.f;
 }
 
+FVector AIslandFirefly::EvaluateChimeResponseDisplacement(const FVector& DirectionToChime, float ElapsedSeconds)
+{
+	if (DirectionToChime.ContainsNaN() || !FMath::IsFinite(ElapsedSeconds) || ElapsedSeconds <= 0.f ||
+		ElapsedSeconds >= ChimeResponseDurationSeconds)
+	{
+		return FVector::ZeroVector;
+	}
+	const FVector Direction = DirectionToChime.GetSafeNormal2D();
+	if (Direction.IsNearlyZero()) return FVector::ZeroVector;
+	const float Progress = ElapsedSeconds / ChimeResponseDurationSeconds;
+	const float Arc = FMath::Sin(PI * Progress);
+	return Direction * ChimeApproachDistanceCm * Arc;
+}
+
 bool AIslandFirefly::RespondToSoftChime(AIslandListeningStonesChime* Chime)
 {
 	if (!IsValid(Chime) || !GetWorld() || Chime->GetWorld() != GetWorld()) return false;
@@ -263,7 +277,9 @@ bool AIslandFirefly::RespondToSoftChime(AIslandListeningStonesChime* Chime)
 		return false;
 	}
 	RespondedChimes.Add(ChimeRef);
-	ChimeResponseRemaining = 1.2f;
+	ChimeResponseDirection = (Chime->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	ChimeResponseElapsed = 0.f;
+	ChimeResponseRemaining = ChimeResponseDurationSeconds;
 	return true;
 }
 
@@ -289,6 +305,7 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	const double Time = GetWorld()->GetTimeSeconds();
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - SafeDelta);
+	ChimeResponseElapsed = FMath::Min(ChimeResponseDurationSeconds, ChimeResponseElapsed + SafeDelta);
 	ChimeResponseRemaining = FMath::Max(0.f, ChimeResponseRemaining - SafeDelta);
 	ChimeCheckRemaining -= SafeDelta;
 	if (ChimeCheckRemaining <= 0.f)
@@ -305,7 +322,10 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 		WanderRadius * 0.65f * RainMovementScale(Rain) * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
 		FMath::Lerp(HoverHeight, 22.f, RainActivityFactor) + FMath::Lerp(34.f, 10.f, RainActivityFactor) * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
 	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
-	const FVector DesiredLocation = HomeLocation + Offset + WindDisplacement(Wind);
+	const FVector ChimeDisplacement = ChimeResponseRemaining > 0.f
+		? EvaluateChimeResponseDisplacement(ChimeResponseDirection, ChimeResponseElapsed)
+		: FVector::ZeroVector;
+	const FVector DesiredLocation = HomeLocation + Offset + WindDisplacement(Wind) + ChimeDisplacement;
 	SetActorLocation(ResolveFlightPath(GetActorLocation(), DesiredLocation), false);
 	UpdateGlow(Time, Rain);
 	UpdateWings(Time, Rain);
@@ -327,8 +347,8 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	// Keep a visible ember between flashes so the insect does not disappear at the pulse trough.
 	const float NaturalPulse = 0.24f + 0.76f * FMath::Pow(Pulse, 4.f);
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
-	const float ChimeAccent = FMath::Clamp(ChimeResponseRemaining / 1.2f, 0.f, 1.f);
-	const float ChimePulse = FMath::Lerp(NaturalPulse, FMath::Max(NaturalPulse, 0.32f), ChimeAccent);
+	const float ChimeAccent = FMath::Clamp(ChimeResponseRemaining / ChimeResponseDurationSeconds, 0.f, 1.f);
+	const float ChimePulse = NaturalPulse * (1.f + 0.25f * ChimeAccent);
 	const float LunarIllumination = DayNight.IsValid()
 		? AIslandDayNight::LunarIllumination(DayNight->DayNumber, DayNight->CurrentHour)
 		: 0.f;

@@ -51,6 +51,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandFireflyChimeCuriosityTest;
 	friend class FIslandListeningStonePresentationTest;
 	friend class FIslandViewpointCaptureTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -89,6 +90,10 @@ private:
 	float ObservationPulseRemaining = 0.f;
 	float ChimeCheckRemaining = 0.f;
 	float ChimeResponseRemaining = 0.f;
+	float ChimeResponseElapsed = 0.f;
+	FVector ChimeResponseDirection = FVector::ZeroVector;
+	static constexpr float ChimeResponseDurationSeconds = 1.8f;
+	static constexpr float ChimeApproachDistanceCm = 55.f;
 	TWeakObjectPtr<AIslandDayNight> DayNight;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TArray<TWeakObjectPtr<AIslandListeningStonesChime>> RespondedChimes;
@@ -98,6 +103,7 @@ private:
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 	void ConfigureBodyAppearance();
 	void EnsureGlowMaterial();
+	static FVector EvaluateChimeResponseDisplacement(const FVector& DirectionToChime, float ElapsedSeconds);
 	void CheckForNearbyStoneChime();
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
 	void UpdateWings(double IslandTimeSeconds, float RainIntensity);

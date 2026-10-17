@@ -316,13 +316,33 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		AIslandFirefly* NearbyFirefly = World->SpawnActor<AIslandFirefly>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
 		AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(
 			FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f), FRotator::ZeroRotator);
-		if (NearbyFirefly)
+		if (NearbyFirefly && NaturalChime)
 		{
 			NearbyFirefly->CheckForNearbyStoneChime();
-			TestTrue(TEXT("A nearby firefly notices the natural chime and lifts its glow pulse"), NearbyFirefly->ChimeResponseRemaining > 0.f);
+			TestTrue(TEXT("A nearby firefly notices the natural chime and begins a bounded response"),
+				NearbyFirefly->ChimeResponseRemaining > 0.f);
 			TestEqual(TEXT("The firefly remembers which transient tone it answered"), NearbyFirefly->RespondedChimes.Num(), 1);
+			const FVector TowardStones = (NaturalChime->GetActorLocation() - NearbyFirefly->GetActorLocation()).GetSafeNormal2D();
+			const FVector ChimeArcStart = AIslandFirefly::EvaluateChimeResponseDisplacement(TowardStones, 0.f);
+			const FVector ChimeArcMidpoint = AIslandFirefly::EvaluateChimeResponseDisplacement(
+				TowardStones, AIslandFirefly::ChimeResponseDurationSeconds * 0.5f);
+			const FVector ChimeArcEnd = AIslandFirefly::EvaluateChimeResponseDisplacement(
+				TowardStones, AIslandFirefly::ChimeResponseDurationSeconds);
+			TestTrue(TEXT("The firefly makes a 55 cm mid-flight drift toward the stones"),
+				FMath::IsNearlyEqual(ChimeArcMidpoint.Size(), AIslandFirefly::ChimeApproachDistanceCm, 0.01f) &&
+				FVector::DotProduct(ChimeArcMidpoint, TowardStones) > 0.f && FMath::IsNearlyZero(ChimeArcMidpoint.Z));
+		TestTrue(TEXT("The curiosity arc eases in and returns to the ordinary flight path"),
+			ChimeArcStart.IsNearlyZero() && ChimeArcEnd.IsNearlyZero());
+		NearbyFirefly->Phase = 0.f;
+		NearbyFirefly->PulseRate = 1.f;
+		NearbyFirefly->UpdateGlow(0.0, 0.f);
+		const float ChimeGlowIntensity = NearbyFirefly->Glow->Intensity;
+		NearbyFirefly->ChimeResponseRemaining = 0.f;
+		NearbyFirefly->UpdateGlow(0.0, 0.f);
+		TestTrue(TEXT("A chime raises the firefly's dim-phase glow by a restrained 25 percent"),
+			FMath::IsNearlyEqual(ChimeGlowIntensity, NearbyFirefly->Glow->Intensity * 1.25f, 0.01f));
 		}
-		else AddError(TEXT("A nearby firefly is required to verify natural chime response."));
+		else AddError(TEXT("A nearby firefly and the natural chime are required to verify the bounded response."));
 		if (DistantFirefly)
 		{
 			DistantFirefly->CheckForNearbyStoneChime();
@@ -389,6 +409,71 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	bool bPresentationRemains = false;
 	for (TActorIterator<AListeningStonePresentation> It(World); It; ++It) bPresentationRemains = true;
 	TestFalse(TEXT("Transient presentation actor is destroyed on restore"), bPresentationRemains);
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFireflyChimeCuriosityTest, "CaptiveSky2.Agent.FireflyChimeCuriosity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandFireflyChimeCuriosityTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Firefly curiosity fixture world created"), World) ||
+		!TestNotNull(TEXT("Engine is available for firefly curiosity fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(FVector(0.f, 0.f, 80.f), FRotator::ZeroRotator, Spawn);
+	AIslandFirefly* Firefly = World->SpawnActor<AIslandFirefly>(FVector(500.f, 0.f, 80.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Listening Stones chime spawned"), Chime) ||
+		!TestNotNull(TEXT("Nearby firefly spawned"), Firefly))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->BeginPlay();
+	Chime->BeginChime(0.f);
+	TestTrue(TEXT("The nearby firefly answers an audible transient chime"), Firefly->RespondToSoftChime(Chime));
+	TestFalse(TEXT("One transient chime cannot trigger repeated curiosity"), Firefly->RespondToSoftChime(Chime));
+	TestTrue(TEXT("The response records the direction from the firefly toward the stones"),
+		FVector::DotProduct(Firefly->ChimeResponseDirection,
+			(Chime->GetActorLocation() - Firefly->GetActorLocation()).GetSafeNormal2D()) > 0.99f);
+
+	Firefly->Phase = 0.f;
+	Firefly->PulseRate = 1.f;
+	Firefly->Tick(0.f);
+	const FVector OrdinaryFlightPosition = Firefly->GetActorLocation();
+	Firefly->UpdateGlow(0.0, 0.f);
+	const float ChimeGlowIntensity = Firefly->Glow->Intensity;
+	Firefly->ChimeResponseRemaining = 0.f;
+	Firefly->UpdateGlow(0.0, 0.f);
+	const float OrdinaryGlowIntensity = Firefly->Glow->Intensity;
+	TestTrue(TEXT("A chime raises the dim-phase glow by a restrained 25 percent"),
+		FMath::IsNearlyEqual(ChimeGlowIntensity, OrdinaryGlowIntensity * 1.25f, 0.01f));
+	Firefly->ChimeResponseRemaining = Firefly->ChimeResponseDurationSeconds;
+	Firefly->ChimeResponseElapsed = 0.f;
+	Firefly->Tick(0.45f);
+	const FVector FirstCuriousPosition = Firefly->GetActorLocation();
+	Firefly->Tick(0.45f);
+	const FVector ApproachedPosition = Firefly->GetActorLocation();
+	const FVector TowardStones = Firefly->ChimeResponseDirection;
+	TestTrue(TEXT("The firefly's flight arc visibly advances toward the chime"),
+		FVector::DotProduct(ApproachedPosition - FirstCuriousPosition, TowardStones) > 0.f);
+	Firefly->Tick(0.9f);
+	TestTrue(TEXT("The firefly returns to its ordinary flight path when curiosity fades"),
+		Firefly->GetActorLocation().Equals(OrdinaryFlightPosition, 0.1f));
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
