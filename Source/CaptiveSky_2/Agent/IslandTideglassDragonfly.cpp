@@ -24,8 +24,8 @@ namespace
 		0,
 		TEXT("When non-zero, logs the start, completion, and interruption of dragonfly flower visits."));
 
-	constexpr float FlowerInterestDurationSeconds = 6.0f;
-	constexpr float FlowerInterestFadeStartSeconds = 4.8f;
+	constexpr float FlowerInterestDurationSeconds = 8.0f;
+	constexpr float FlowerInterestFadeStartSeconds = 6.8f;
 	// Stay close to a bloom instead of orbiting a full metre above its instance pivot.
 	constexpr float FlowerHoverHeight = 70.f;
 
