@@ -146,3 +146,26 @@ bool FRatAnimationAssetsTest::RunTest(const FString& Parameters)
 	GEngine->DestroyWorldContext(World);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRatPeriwinkleAttentionTest, "CaptiveSky2.Agent.RatPeriwinkleAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRatPeriwinkleAttentionTest::RunTest(const FString& Parameters)
+{
+	using Rat = ARatAgentAIController;
+	TestTrue(TEXT("An idle rat notices a nearby visible periwinkle"),
+		Rat::ShouldBeginPeriwinkleNotice(Rat::PeriwinkleNoticeRadius, true, false, false, false));
+	TestFalse(TEXT("A wall or terrain fold hides the small snail"),
+		Rat::ShouldBeginPeriwinkleNotice(200.f, false, false, false, false));
+	TestFalse(TEXT("A rat following an action does not divert its attention"),
+		Rat::ShouldBeginPeriwinkleNotice(200.f, true, true, false, false));
+	TestFalse(TEXT("A resting rat remains asleep"),
+		Rat::ShouldBeginPeriwinkleNotice(200.f, true, false, true, false));
+	TestFalse(TEXT("The attention cooldown prevents repetitive glances"),
+		Rat::ShouldBeginPeriwinkleNotice(200.f, true, false, false, true));
+	TestFalse(TEXT("A snail outside close range is ignored"),
+		Rat::ShouldBeginPeriwinkleNotice(Rat::PeriwinkleNoticeRadius + 1.f, true, false, false, false));
+	TestFalse(TEXT("Invalid distance is ignored"),
+		Rat::ShouldBeginPeriwinkleNotice(std::numeric_limits<float>::infinity(), true, false, false, false));
+	return true;
+}

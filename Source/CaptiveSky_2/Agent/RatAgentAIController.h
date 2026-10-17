@@ -7,6 +7,7 @@
 class USkeletalMeshComponent;
 class UAnimSequence;
 class AIslandListeningStonesChime;
+class AIslandTidepoolPeriwinkle;
 
 enum class ERatLocomotionMode : uint8
 {
@@ -33,7 +34,11 @@ public:
 	/** A live, audible landmark tone earns one brief glance from an otherwise idle rat. */
 	static bool ShouldBeginStoneChimeNotice(float DistanceCm, bool bChimeAudible, bool bRatBusy,
 		bool bRatResting, bool bAlreadyNoticing);
+	/** An idle rat may briefly look at a nearby, visible tidepool snail. */
+	static bool ShouldBeginPeriwinkleNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
+		bool bRatResting, bool bAlreadyNoticing);
 	static constexpr float RavenNoticeRadius = 800.f;
+	static constexpr float PeriwinkleNoticeRadius = 420.f;
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -66,10 +71,15 @@ private:
 	float StoneChimeAttentionRemaining = 0.f;
 	float StoneChimeAttentionCooldownRemaining = 0.f;
 	FVector StoneChimeAttentionTarget = FVector::ZeroVector;
+	float PeriwinkleScanRemaining = 0.f;
+	float PeriwinkleAttentionRemaining = 0.f;
+	float PeriwinkleAttentionCooldownRemaining = 0.f;
+	FVector PeriwinkleAttentionTarget = FVector::ZeroVector;
 
 	void CacheAnimations(APawn* Rat);
 	void UpdateAnimation(float DeltaSeconds);
 	void UpdateRavenAttention(float DeltaSeconds);
 	void UpdateStoneChimeAttention(float DeltaSeconds);
+	void UpdatePeriwinkleAttention(float DeltaSeconds);
 	void UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping);
 };

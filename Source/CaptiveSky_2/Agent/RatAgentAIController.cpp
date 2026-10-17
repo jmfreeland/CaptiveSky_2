@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "IslandListeningStonesChime.h"
+#include "IslandTidepoolPeriwinkle.h"
 #include "RavenAgentAIController.h"
 
 namespace
@@ -20,6 +21,8 @@ namespace
 	constexpr float RavenAttentionCooldown = 16.f;
 	constexpr float StoneChimeAttentionDuration = 1.7f;
 	constexpr float StoneChimeAttentionCooldown = 16.f;
+	constexpr float PeriwinkleAttentionDuration = 2.2f;
+	constexpr float PeriwinkleAttentionCooldown = 24.f;
 
 	UAnimSequence* LoadFoxAnimation(const TCHAR* AssetName)
 	{
@@ -56,6 +59,13 @@ bool ARatAgentAIController::ShouldBeginStoneChimeNotice(float DistanceCm, bool b
 		!bRatBusy && !bRatResting && !bAlreadyNoticing;
 }
 
+bool ARatAgentAIController::ShouldBeginPeriwinkleNotice(float DistanceCm, bool bHasLineOfSight,
+	bool bRatBusy, bool bRatResting, bool bAlreadyNoticing)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= PeriwinkleNoticeRadius &&
+		bHasLineOfSight && !bRatBusy && !bRatResting && !bAlreadyNoticing;
+}
+
 void ARatAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -67,6 +77,10 @@ void ARatAgentAIController::OnPossess(APawn* InPawn)
 	StoneChimeAttentionRemaining = 0.f;
 	StoneChimeAttentionCooldownRemaining = 0.f;
 	StoneChimeAttentionTarget = FVector::ZeroVector;
+	PeriwinkleScanRemaining = 0.f;
+	PeriwinkleAttentionRemaining = 0.f;
+	PeriwinkleAttentionCooldownRemaining = 0.f;
+	PeriwinkleAttentionTarget = FVector::ZeroVector;
 	CacheAnimations(InPawn);
 	UpdateAnimation(0.f);
 }
@@ -88,6 +102,10 @@ void ARatAgentAIController::OnUnPossess()
 	StoneChimeAttentionRemaining = 0.f;
 	StoneChimeAttentionCooldownRemaining = 0.f;
 	StoneChimeAttentionTarget = FVector::ZeroVector;
+	PeriwinkleScanRemaining = 0.f;
+	PeriwinkleAttentionRemaining = 0.f;
+	PeriwinkleAttentionCooldownRemaining = 0.f;
+	PeriwinkleAttentionTarget = FVector::ZeroVector;
 	Super::OnUnPossess();
 }
 
@@ -96,7 +114,77 @@ void ARatAgentAIController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UpdateRavenAttention(DeltaSeconds);
 	UpdateStoneChimeAttention(DeltaSeconds);
+	UpdatePeriwinkleAttention(DeltaSeconds);
 	UpdateAnimation(DeltaSeconds);
+}
+
+void ARatAgentAIController::UpdatePeriwinkleAttention(float DeltaSeconds)
+{
+	APawn* Rat = GetPawn();
+	UWorld* World = GetWorld();
+	if (!Rat || !World) return;
+
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	PeriwinkleAttentionCooldownRemaining = FMath::Max(0.f, PeriwinkleAttentionCooldownRemaining - SafeDelta);
+	PeriwinkleAttentionRemaining = FMath::Max(0.f, PeriwinkleAttentionRemaining - SafeDelta);
+	if (PeriwinkleAttentionRemaining > 0.f)
+	{
+		if (IsActionInProgress() || IsResting())
+		{
+			PeriwinkleAttentionRemaining = 0.f;
+			return;
+		}
+
+		const FVector Direction = PeriwinkleAttentionTarget - Rat->GetActorLocation();
+		if (!Direction.IsNearlyZero())
+		{
+			FRotator Facing = Direction.Rotation();
+			Facing.Pitch = 0.f;
+			Facing.Roll = 0.f;
+			Rat->SetActorRotation(FMath::RInterpTo(Rat->GetActorRotation(), Facing, SafeDelta, 2.f));
+		}
+		return;
+	}
+
+	if (RavenAttentionRemaining > 0.f || StoneChimeAttentionRemaining > 0.f ||
+		PeriwinkleAttentionCooldownRemaining > 0.f)
+	{
+		PeriwinkleScanRemaining = FMath::Max(PeriwinkleScanRemaining,
+			FMath::Max(RavenAttentionRemaining, StoneChimeAttentionRemaining));
+		return;
+	}
+	PeriwinkleScanRemaining -= SafeDelta;
+	if (PeriwinkleScanRemaining > 0.f) return;
+	PeriwinkleScanRemaining = 1.2f;
+	if (IsActionInProgress() || IsResting()) return;
+
+	AIslandTidepoolPeriwinkle* BestSnail = nullptr;
+	float BestDistanceSquared = FMath::Square(PeriwinkleNoticeRadius);
+	for (TActorIterator<AIslandTidepoolPeriwinkle> It(World); It; ++It)
+	{
+		AIslandTidepoolPeriwinkle* Snail = *It;
+		if (!IsValid(Snail)) continue;
+		const float DistanceSquared = FVector::DistSquared2D(Rat->GetActorLocation(), Snail->GetActorLocation());
+		if (DistanceSquared > BestDistanceSquared || !ShouldBeginPeriwinkleNotice(
+			FMath::Sqrt(DistanceSquared), true, false, false, false)) continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RatNoticesPeriwinkle), false, Rat);
+		Query.AddIgnoredActor(Snail);
+		FHitResult Hit;
+		const FVector Start = Rat->GetActorLocation() + FVector(0.f, 0.f, 24.f);
+		const FVector End = Snail->GetActorLocation() + FVector(0.f, 0.f, 8.f);
+		const bool bHasLineOfSight = !World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query);
+		if (!ShouldBeginPeriwinkleNotice(FMath::Sqrt(DistanceSquared), bHasLineOfSight,
+			false, false, false)) continue;
+		BestDistanceSquared = DistanceSquared;
+		BestSnail = Snail;
+	}
+
+	if (!BestSnail) return;
+	PeriwinkleAttentionTarget = BestSnail->GetActorLocation();
+	PeriwinkleAttentionRemaining = PeriwinkleAttentionDuration;
+	PeriwinkleAttentionCooldownRemaining = PeriwinkleAttentionCooldown;
+	IdleLookTimer = 0.f;
 }
 
 void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
@@ -108,7 +196,7 @@ void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	RavenAttentionCooldownRemaining = FMath::Max(0.f, RavenAttentionCooldownRemaining - SafeDelta);
 	RavenAttentionRemaining = FMath::Max(0.f, RavenAttentionRemaining - SafeDelta);
-	if (StoneChimeAttentionRemaining > 0.f)
+	if (StoneChimeAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f)
 	{
 		RavenScanRemaining = FMath::Max(RavenScanRemaining, SafeDelta);
 		return;
@@ -204,7 +292,8 @@ void ARatAgentAIController::UpdateStoneChimeAttention(float DeltaSeconds)
 		return;
 	}
 
-	if (RavenAttentionRemaining > 0.f || StoneChimeAttentionCooldownRemaining > 0.f)
+	if (RavenAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f ||
+		StoneChimeAttentionCooldownRemaining > 0.f)
 	{
 		StoneChimeScanRemaining = FMath::Max(RavenAttentionRemaining,
 			StoneChimeAttentionCooldownRemaining);
