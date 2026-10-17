@@ -185,14 +185,6 @@ AIslandWeather::AIslandWeather()
 	IslandShrubs->SetCastShadow(false);
 	IslandShrubs->bReceivesDecals = false;
 	IslandShrubs->SetVisibility(false);
-	IslandHazelThickets = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandHazelThickets"));
-	IslandHazelThickets->SetupAttachment(RootComponent);
-	IslandHazelThickets->SetMobility(EComponentMobility::Movable);
-	IslandHazelThickets->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	IslandHazelThickets->SetCanEverAffectNavigation(false);
-	IslandHazelThickets->SetCastShadow(false);
-	IslandHazelThickets->bReceivesDecals = false;
-	IslandHazelThickets->SetVisibility(false);
 	IslandRhododendrons = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandRhododendrons"));
 	IslandRhododendrons->SetupAttachment(RootComponent);
 	IslandRhododendrons->SetMobility(EComponentMobility::Movable);
@@ -258,7 +250,6 @@ AIslandWeather::AIslandWeather()
 	// Let existing broadleaf grove clusters carry farther into the mid-distance.
 	// This changes visibility only: it adds no instances, collision, or navigation cost.
 	SetFoliageCullRange(IslandShrubs, 11000, 32000);
-	SetFoliageCullRange(IslandHazelThickets, 10000, 24000);
 	SetFoliageCullRange(IslandRhododendrons, 8000, 14000);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		SetFoliageCullRange(MeadowFlower, 6000, 9000);
@@ -291,7 +282,6 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowDMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_12_01.ground_12_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> HazelThicketMesh(TEXT("/Game/Generated/ComfyBlender/WoodlandHazelThicket_Review_20261012/SM_WoodlandHazelThicket_01.SM_WoodlandHazelThicket_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerA(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerB(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerC(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_17_01.flower_17_01"));
@@ -315,7 +305,6 @@ AIslandWeather::AIslandWeather()
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
-	if (HazelThicketMesh.Succeeded()) IslandHazelThickets->SetStaticMesh(HazelThicketMesh.Object);
 	if (MeadowFlowerA.Succeeded()) IslandMeadowFlowers[0]->SetStaticMesh(MeadowFlowerA.Object);
 	if (MeadowFlowerB.Succeeded()) IslandMeadowFlowers[1]->SetStaticMesh(MeadowFlowerB.Object);
 	if (MeadowFlowerC.Succeeded()) IslandMeadowFlowers[2]->SetStaticMesh(MeadowFlowerC.Object);
@@ -544,18 +533,6 @@ float AIslandWeather::CalculateGroundCoverWetEdgeMoisture(const FVector& Positio
 	return 1.f - SmoothAlpha;
 }
 
-bool AIslandWeather::ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed, int32 CurrentlyPlacedCount)
-{
-	if (GroveIndex < 0 || CurrentlyPlacedCount < 0 || CurrentlyPlacedCount >= MaxWoodlandHazelThicketCount) return false;
-	uint32 Hash = static_cast<uint32>(GroveIndex) * 0x9e3779b9u ^ static_cast<uint32>(Seed) * 0x85ebca6bu;
-	Hash ^= Hash >> 16;
-	Hash *= 0x7feb352du;
-	Hash ^= Hash >> 15;
-	Hash *= 0x846ca68bu;
-	Hash ^= Hash >> 16;
-	return Hash % 8u == 3u;
-}
-
 int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity)
 {
 	// Keep flower color/shape in coarse 18 m patches, not an alternating per-instance mix.
@@ -744,7 +721,6 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowD->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandShrubs->ClearInstances();
-	if (IslandHazelThickets) IslandHazelThickets->ClearInstances();
 	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		if (MeadowFlower) MeadowFlower->ClearInstances();
@@ -781,7 +757,6 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
-	GroundCoverHazelThicketCount = 0;
 	GroundCoverFlowerCount = 0;
 	GroundCoverWetlandCount = 0;
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandGroundCover), false, this);
@@ -1301,7 +1276,6 @@ void AIslandWeather::InitializeGroundCover()
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
 				TArray<FVector> ShrubLocations;
-				TArray<FVector> HazelThicketLocations;
 				TArray<FVector> RhododendronLocations;
 				int32 SpruceTraceCount = 0;
 				int32 SpruceSaplingCount = 0;
@@ -1466,52 +1440,6 @@ void AIslandWeather::InitializeGroundCover()
 							ShrubLocations.Add(ShrubHit.ImpactPoint);
 							++GroundCoverShrubCount;
 						}
-					}
-
-					// A single hazel silhouette on a deterministic subset of grove edges adds
-					// a mid-distance broadleaf layer without multiplying the full grove shrub count.
-					if (IslandHazelThickets && IslandHazelThickets->GetStaticMesh() &&
-						ShouldPlaceWoodlandHazelThicket(GroveIndex, WeatherSeed, GroundCoverHazelThicketCount))
-					{
-						constexpr int32 MaxHazelThicketTracesPerGrove = 24;
-						const FBoxSphereBounds HazelBounds = IslandHazelThickets->GetStaticMesh()->GetBounds();
-						if (HazelBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
-							for (int32 Attempt = 0; Attempt < MaxHazelThicketTracesPerGrove; ++Attempt)
-							{
-								const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-								const float Radius = SpruceRandom.FRandRange(2350.f, 3300.f);
-								const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
-								bool bNearLandmark = false;
-								for (const FVector& Exclusion : ExclusionLocations)
-									if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
-								if (bNearLandmark) continue;
-								bool bTooClose = false;
-								for (const FVector& ExistingThicket : HazelThicketLocations)
-									if (FVector::Dist2D(Candidate, ExistingThicket) < 1100.f) { bTooClose = true; break; }
-								if (!bTooClose)
-									for (const FVector& ExistingTree : SpruceLocations)
-										if (FVector::Dist2D(Candidate, ExistingTree) < 500.f) { bTooClose = true; break; }
-								if (!bTooClose)
-									for (const FVector& ExistingShrub : ShrubLocations)
-										if (FVector::Dist2D(Candidate, ExistingShrub) < 650.f) { bTooClose = true; break; }
-								if (!bTooClose)
-									for (const FVector& ExistingFlower : RhododendronLocations)
-										if (FVector::Dist2D(Candidate, ExistingFlower) < 800.f) { bTooClose = true; break; }
-								if (bTooClose) continue;
-
-								FHitResult ThicketHit;
-								if (!TraceSpruceGround(Candidate, ThicketHit) || ThicketHit.ImpactNormal.Z < 0.72f) continue;
-								const float TargetHeight = SpruceRandom.FRandRange(175.f, 235.f);
-								const FVector Scale(TargetHeight / (2.f * HazelBounds.BoxExtent.Z));
-								const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, ThicketHit.ImpactNormal);
-								const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector, FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
-								const FVector MeshBottom(HazelBounds.Origin.X, HazelBounds.Origin.Y, HazelBounds.Origin.Z - HazelBounds.BoxExtent.Z);
-								const FVector Location = ThicketHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
-								IslandHazelThickets->AddInstance(FTransform(Rotation, Location, Scale), true);
-								HazelThicketLocations.Add(ThicketHit.ImpactPoint);
-								++GroundCoverHazelThicketCount;
-								break;
-							}
 					}
 
 					// Flowering rhododendron accents the outer grove edge; keep this
@@ -1715,9 +1643,8 @@ void AIslandWeather::InitializeGroundCover()
 					MeadowFlowerSpeciesCounts[6], MeadowFlowerSpeciesCounts[7], MeadowFlowerSpeciesCounts[8],
 					MeadowFlowerCandidateSites, AIslandWeather::TideglassPollinatorFlowerSiteCount, MeadowFlowerTraceCount);
 				}
-				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, %d hazel edge thickets, and %d flowering rhododendrons in %d groves after %d bounded traces."),
-					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroundCoverHazelThicketCount,
-					GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
+					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
 		}
 	}
 	}
@@ -1862,7 +1789,6 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowD->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
-	if (IslandHazelThickets) IslandHazelThickets->SetVisibility(GroundCoverHazelThicketCount > 0, true);
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		if (MeadowFlower) MeadowFlower->SetVisibility(MeadowFlower->GetInstanceCount() > 0, true);
@@ -1891,7 +1817,6 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowD) { ShoreGroundPlantLowD->ClearInstances(); ShoreGroundPlantLowD->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
-	if (IslandHazelThickets) { IslandHazelThickets->ClearInstances(); IslandHazelThickets->SetVisibility(false, true); }
 	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		if (MeadowFlower) { MeadowFlower->ClearInstances(); MeadowFlower->SetVisibility(false, true); }
@@ -1948,7 +1873,6 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverMeadowInstanceCount = 0;
 	GroundCoverTreeCount = 0;
 	GroundCoverShrubCount = 0;
-	GroundCoverHazelThicketCount = 0;
 	GroundCoverFlowerCount = 0;
 	GroundCoverWetlandCount = 0;
 	GroundCoverSwayLastUpdatedInstanceCount = 0;

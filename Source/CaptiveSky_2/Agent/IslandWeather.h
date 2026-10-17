@@ -84,9 +84,6 @@ public:
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
 	static constexpr float ListeningStonesFlowerOuterRadius = 4300.f;
-	/** A light woodland-edge accent: roughly one thicket per eight eligible groves, never over this count. */
-	static constexpr int32 MaxWoodlandHazelThicketCount = 72;
-	static bool ShouldPlaceWoodlandHazelThicket(int32 GroveIndex, int32 Seed, int32 CurrentlyPlacedCount);
 	/** Stable home point for the single night firefly that lives within Listening Stones chime range. */
 	static FVector BuildNightFireflySpawnLocation(const FVector& HabitatLocation, const FVector& LandmarkLocation);
 
@@ -175,8 +172,6 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowB;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandSpruce;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandShrubs;
-	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
-	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandHazelThickets;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
@@ -213,7 +208,6 @@ private:
 	int32 GroundCoverMeadowInstanceCount = 0;
 	int32 GroundCoverTreeCount = 0;
 	int32 GroundCoverShrubCount = 0;
-	int32 GroundCoverHazelThicketCount = 0;
 	float CurrentRainIntensity = 0.f;
 	double NextCloudDiscoveryTime = 0.0;
 	double NextRainPoolRippleTime = 0.0;
