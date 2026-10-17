@@ -80,7 +80,7 @@ private:
 	void LogFlowerInterestTelemetry(const TCHAR* Event) const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
-	void CheckForNearbyNaturalSurfaceRipple();
+	void CheckForNearbySurfaceCue();
 	void CheckForNearbyMeadowFlower();
 	bool RespondToSurfaceRipple(const FVector& RippleLocation);
 	float GetRippleInterestAlpha() const;

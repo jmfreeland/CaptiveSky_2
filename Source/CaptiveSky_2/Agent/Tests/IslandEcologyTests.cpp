@@ -2520,11 +2520,31 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("A nearby untagged pool ripple is available for filtering"), VisitorRipple);
 		if (VisitorRipple)
 		{
-			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
-			TestTrue(TEXT("Visitor ripples do not trigger the dragonfly's natural response"),
+			WatchableDragonfly->CheckForNearbySurfaceCue();
+			TestTrue(TEXT("Untyped visitor ripples do not trigger a dragonfly surface cue"),
 				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
+			AIslandPoolRippleEffect* PlayerWake = World->SpawnActor<AIslandPoolRippleEffect>(
+				WatchableDragonfly->GetActorLocation() + FVector(100.f, 0.f, -160.f), FRotator::ZeroRotator, Spawn);
+			TestNotNull(TEXT("A nearby player swim wake is available to the dragonfly"), PlayerWake);
+			if (PlayerWake)
+			{
+				PlayerWake->ConfigureAsPlayerSwimImpact();
+				WatchableDragonfly->CheckForNearbySurfaceCue();
+				TestTrue(TEXT("A nearby swimmer wake draws a brief dragonfly hover"),
+					WatchableDragonfly->RippleInterestRemaining > 0.f && WatchableDragonfly->RippleInterestRemaining <= 1.8f);
+				TestTrue(TEXT("The dragonfly hovers above the visitor-made disturbance"),
+					FMath::IsNearlyEqual(WatchableDragonfly->RippleInterestLocation.Z, PlayerWake->GetActorLocation().Z + 110.f));
+				TestEqual(TEXT("A swimmer wake uses the existing bounded seven-second response cooldown"),
+					WatchableDragonfly->RippleInterestCooldownRemaining, 7.f);
+				WatchableDragonfly->RippleInterestRemaining = 0.f;
+				WatchableDragonfly->CheckForNearbySurfaceCue();
+				TestTrue(TEXT("The same swim wake cannot repeatedly summon the dragonfly during cooldown"),
+					FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
+				WatchableDragonfly->RippleInterestCooldownRemaining = 0.f;
+				PlayerWake->Destroy();
+			}
 			VisitorRipple->ConfigureAsMinnowImpact();
-			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
+			WatchableDragonfly->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("A nearby fish surface break draws a brief, temporary dragonfly interest response"),
 				WatchableDragonfly->RippleInterestRemaining > 0.f && WatchableDragonfly->RippleInterestRemaining <= 1.8f);
 			TestTrue(TEXT("The dragonfly aims just above the water surface"),
@@ -2555,7 +2575,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			const FVector FirstRippleTarget = WatchableDragonfly->RippleInterestLocation;
 			VisitorRipple->SetActorLocation(WatchableDragonfly->GetActorLocation() + FVector(40.f, 0.f, -160.f));
 			WatchableDragonfly->RippleInterestRemaining = 0.f;
-			WatchableDragonfly->CheckForNearbyNaturalSurfaceRipple();
+			WatchableDragonfly->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("A second nearby ripple cannot retrigger during cooldown"),
 				FMath::IsNearlyZero(WatchableDragonfly->RippleInterestRemaining));
 			TestTrue(TEXT("Cooldown preserves the first ephemeral focus point"),

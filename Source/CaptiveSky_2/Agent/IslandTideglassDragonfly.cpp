@@ -483,14 +483,14 @@ float AIslandTideglassDragonfly::GetFlowerInterestAlpha() const
 		(1.f - FMath::SmoothStep(FlowerInterestFadeStartSeconds, FlowerInterestDurationSeconds, Elapsed));
 }
 
-void AIslandTideglassDragonfly::CheckForNearbyNaturalSurfaceRipple()
+void AIslandTideglassDragonfly::CheckForNearbySurfaceCue()
 {
 	if (!GetWorld() || RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f) return;
 
 	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
 	{
 		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact")) &&
-			!It->ActorHasTag(TEXT("MinnowImpact"))) continue;
+			!It->ActorHasTag(TEXT("MinnowImpact")) && !It->ActorHasTag(TEXT("PlayerSwimImpact"))) continue;
 		if (RespondToSurfaceRipple(It->GetActorLocation())) return;
 	}
 }
@@ -548,7 +548,7 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	if (RippleCheckRemaining <= 0.f)
 	{
 		RippleCheckRemaining = 0.35f;
-		CheckForNearbyNaturalSurfaceRipple();
+		CheckForNearbySurfaceCue();
 	}
 	FlowerCheckRemaining -= SafeDelta;
 	if (FlowerCheckRemaining <= 0.f)
