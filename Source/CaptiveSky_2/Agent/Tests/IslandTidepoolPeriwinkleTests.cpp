@@ -25,6 +25,27 @@ bool FIslandPeriwinkleCrabCueTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleRatCueTest, "CaptiveSky2.Agent.TidepoolPeriwinkleRatCue",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleRatCueTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	TestTrue(TEXT("A close rat approach briefly startles the snail"),
+		Periwinkle::ShouldTuckForRat(130.f, 15.f));
+	TestTrue(TEXT("The rat cue radius edge is inclusive"),
+		Periwinkle::ShouldTuckForRat(190.f, 0.f));
+	TestFalse(TEXT("A rat still on the broader shore does not startle the snail"),
+		Periwinkle::ShouldTuckForRat(191.f, 0.f));
+	TestFalse(TEXT("A rat far above or below the rock does not trigger the cue"),
+		Periwinkle::ShouldTuckForRat(120.f, 121.f));
+	TestFalse(TEXT("Negative distance is rejected"),
+		Periwinkle::ShouldTuckForRat(-1.f, 0.f));
+	TestFalse(TEXT("Non-finite distance is rejected"),
+		Periwinkle::ShouldTuckForRat(std::numeric_limits<float>::infinity(), 0.f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleGrazingPathTest, "CaptiveSky2.Agent.TidepoolPeriwinkleGrazingPath",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 

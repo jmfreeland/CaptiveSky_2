@@ -4,6 +4,7 @@
 #include "IslandTideglassSubsystem.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
+#include "RatAgentAIController.h"
 #include "RavenAgentAIController.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -175,6 +176,14 @@ bool AIslandTidepoolPeriwinkle::ShouldTuckForCrab(bool bCrabScurrying, float Dis
 		Distance <= ThreatRadius && FMath::Abs(VerticalOffset) <= MaximumVerticalOffset;
 }
 
+bool AIslandTidepoolPeriwinkle::ShouldTuckForRat(float Distance, float VerticalOffset)
+{
+	constexpr float ThreatRadius = 190.f;
+	constexpr float MaximumVerticalOffset = 120.f;
+	return FMath::IsFinite(Distance) && Distance >= 0.f && FMath::IsFinite(VerticalOffset) &&
+		Distance <= ThreatRadius && FMath::Abs(VerticalOffset) <= MaximumVerticalOffset;
+}
+
 float AIslandTidepoolPeriwinkle::WetShellAmount(float TideOffsetCm, float RainIntensity)
 {
 	const float TideWetness = FMath::IsFinite(TideOffsetCm)
@@ -274,6 +283,36 @@ void AIslandTidepoolPeriwinkle::CheckForNearbyRavenDisturbance()
 		// Notice only the first settled approach. A bird lingering nearby does not
 		// keep the snail tucked, and an airborne pass never counts as a threat cue.
 		RavenPresenceLatch = *It;
+		RespondToQuietObservation();
+		return;
+	}
+}
+
+void AIslandTidepoolPeriwinkle::CheckForNearbyRatDisturbance()
+{
+	if (!GetWorld()) return;
+
+	constexpr float RatRearmRadius = 520.f;
+	for (TActorIterator<ARatAgentAIController> It(GetWorld()); It; ++It)
+	{
+		ARatAgentAIController* RatController = *It;
+		const APawn* Rat = IsValid(RatController) ? RatController->GetPawn() : nullptr;
+		if (!IsValid(Rat)) continue;
+
+		const FVector Offset = Rat->GetActorLocation() - GetActorLocation();
+		const float Distance = Offset.Size2D();
+		if (RatPresenceLatch.Get() == RatController)
+		{
+			if (Distance > RatRearmRadius)
+				RatPresenceLatch.Reset();
+			else
+				continue;
+		}
+
+		if (!ShouldTuckForRat(Distance, Offset.Z)) continue;
+		// A single close approach is enough; the rat must leave the wider ring
+		// before a later encounter can startle the snail again.
+		RatPresenceLatch = RatController;
 		RespondToQuietObservation();
 		return;
 	}
@@ -414,6 +453,7 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = 0.4f;
 		CheckForNearbyRavenDisturbance();
+		CheckForNearbyRatDisturbance();
 		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
 		CheckForNearbyCrabDisturbance();
 	}

@@ -11,6 +11,7 @@ class UStaticMeshComponent;
 class AIslandDayNight;
 class AIslandWeather;
 class AIslandTidepoolCrab;
+class ARatAgentAIController;
 class ARavenAgentAIController;
 class APawn;
 
@@ -33,6 +34,8 @@ public:
 	static float RainRestAmount(float RainIntensity);
 	/** A nearby crab startles the snail only while actively scurrying, not while calmly foraging. */
 	static bool ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset);
+	/** A close rat approach can briefly startle the snail, but a lingering rat cannot repeat it. */
+	static bool ShouldTuckForRat(float Distance, float VerticalOffset);
 	/** Tide and rain keep the shell briefly darkened while its exposed surface is wet. */
 	static float WetShellAmount(float TideOffsetCm, float RainIntensity);
 	/** A small closed graze path, in cm from home, over one calm two-minute cycle. */
@@ -85,10 +88,12 @@ private:
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	TWeakObjectPtr<AIslandWeather> IslandWeather;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
+	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void CheckForNearbyCrabDisturbance();
 	void CheckForNearbyRavenDisturbance();
+	void CheckForNearbyRatDisturbance();
 	void CheckForNearbyPlayerDisturbance(APawn* PlayerPawn);
 	void BuildShellSpiral();
 	void ApplyPalette();
