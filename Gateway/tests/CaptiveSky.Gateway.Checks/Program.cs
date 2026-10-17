@@ -398,14 +398,21 @@ try
     var lockedQueue = new AssetProposalQueue(lockedRoot);
     var lockedInboxPath = Path.Combine(lockedRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
     Directory.CreateDirectory(Path.GetDirectoryName(lockedInboxPath)!);
-    var lockHolderStart = new ProcessStartInfo(Environment.ProcessPath ?? throw new InvalidOperationException("Current process path is unavailable."))
+    var currentExecutable = Environment.ProcessPath ?? throw new InvalidOperationException("Current process path is unavailable.");
+    var lockHolderStart = new ProcessStartInfo(currentExecutable)
     {
         UseShellExecute = false,
         RedirectStandardOutput = true,
         RedirectStandardError = true
     };
-    lockHolderStart.ArgumentList.Add(Assembly.GetEntryAssembly()?.Location
-        ?? throw new InvalidOperationException("Checks assembly path is unavailable."));
+    // When invoked by `dotnet <assembly.dll>`, the host needs the assembly path.
+    // When launched through its generated apphost, pass only application args;
+    // treating the assembly path as an app argument recursively starts the suite.
+    if (string.Equals(Path.GetFileNameWithoutExtension(currentExecutable), "dotnet", StringComparison.OrdinalIgnoreCase))
+    {
+        lockHolderStart.ArgumentList.Add(Assembly.GetEntryAssembly()?.Location
+            ?? throw new InvalidOperationException("Checks assembly path is unavailable."));
+    }
     lockHolderStart.ArgumentList.Add("--hold-proposal-inbox-lock");
     lockHolderStart.ArgumentList.Add(lockedInboxPath + ".lock");
     using var lockHolder = Process.Start(lockHolderStart)

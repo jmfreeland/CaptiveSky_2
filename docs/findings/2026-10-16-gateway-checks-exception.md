@@ -41,4 +41,26 @@ time it appears before changing Unreal, the SDK, or the gateway.
   rooted under `Saved/CompileScratch`: all checks passed, including message
   routing, proposal parsing/review-only behavior, duplicate handling, and
   request caps.
-- No gateway source or persistent state was changed by this investigation.
+- The earlier investigation did not change gateway application source or persistent state.
+
+## Later event correlation and test-harness fix — 2026-10-17
+
+A separate Application/.NET Runtime pair at 20:30 names `dotnet.exe` hosting
+`Gateway/tests/CaptiveSky.Gateway.Checks` and throws
+`InvalidOperationException: Check failed: agents who made nothing get no
+facts`. The current source instead expects public saved-weather context for
+residents with no personal world changes; the checks PDB in `bin/Debug/net8.0`
+was last written on 2026-10-13. This event therefore came from an outdated
+checks executable and is not evidence of an UnrealBuildTool or UnrealEditor
+failure. The screenshot's original popup still needs its own timestamp/PID
+correlation.
+
+Rebuilding current checks into a unique `Saved/CompileScratch` output exposed a
+current harness bug: the shared-inbox lock test always passed the assembly path
+to `Environment.ProcessPath`. With an apphost process this was interpreted as
+an application argument, recursively launching the checks instead of the
+lock-holder mode. `Program.cs` now adds the assembly path only when the current
+executable is `dotnet.exe`. The full current-source check suite passed both via
+`dotnet run` (apphost) and via `dotnet <checks.dll>` (direct host), including
+the cross-process lock and proposal privacy/cap tests. The live gateway was not
+stopped or overwritten; the isolated output avoids its locked executable.
