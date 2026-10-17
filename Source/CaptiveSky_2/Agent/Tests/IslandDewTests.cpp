@@ -19,6 +19,14 @@ bool FIslandDewTest::RunTest(const FString& Parameters)
 	Dawn.Storm = 0.f;
 	TestTrue(TEXT("Clear low morning sun over damp grass glitters"), ComputeDewStrength(Dawn) > 0.7f);
 
+	FIslandDewInputs BreezyDawn = Dawn;
+	BreezyDawn.WindSpeed = 160.f;
+	TestTrue(TEXT("A breeze softens the dew without removing it"),
+		ComputeDewStrength(BreezyDawn) > 0.f && ComputeDewStrength(BreezyDawn) < ComputeDewStrength(Dawn));
+	FIslandDewInputs WindyDawn = Dawn;
+	WindyDawn.WindSpeed = 320.f;
+	TestEqual(TEXT("Wind at the established mist-clearance speed suppresses dew"), ComputeDewStrength(WindyDawn), 0.f);
+
 	FIslandDewInputs DryDawn = Dawn;
 	DryDawn.Wetness = 0.f;
 	TestTrue(TEXT("Dry ground still carries some dew, less than wet"), ComputeDewStrength(DryDawn) > 0.f && ComputeDewStrength(DryDawn) < ComputeDewStrength(Dawn));
@@ -63,6 +71,9 @@ bool FIslandDewTest::RunTest(const FString& Parameters)
 	InvalidWeather.CloudCover = std::numeric_limits<float>::quiet_NaN();
 	TestEqual(TEXT("A non-finite weather sample suppresses dew instead of propagating NaN"),
 		ComputeDewStrength(InvalidWeather), 0.f);
+	InvalidWeather = Dawn;
+	InvalidWeather.WindSpeed = std::numeric_limits<float>::quiet_NaN();
+	TestEqual(TEXT("A non-finite wind sample suppresses dew instead of propagating NaN"), ComputeDewStrength(InvalidWeather), 0.f);
 	InvalidWeather = Dawn;
 	InvalidWeather.Hour = std::numeric_limits<float>::infinity();
 	TestEqual(TEXT("A non-finite clock sample suppresses dew"), ComputeDewStrength(InvalidWeather), 0.f);

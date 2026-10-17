@@ -19,11 +19,13 @@ struct FIslandDewInputs
 	float Wetness = 0.f;
 	float CloudCover = 0.f;
 	float Storm = 0.f;
+	/** Local wind speed in cm/s; stronger air movement suppresses dew formation. */
+	float WindSpeed = 0.f;
 };
 
 /**
- * How much dew glitters on the grass, 0..1. Needs a low morning sun to catch the beads, a sky open
- * enough to let it through, no rain falling and no storm. Wet ground carries more dew than dry. Pure.
+ * How much dew glitters on the grass, 0..1. Needs low morning sun, an open sky, no rain or storm,
+ * and calm air. Wet ground carries more dew than dry. Pure.
  */
 CAPTIVESKY_2_API float ComputeDewStrength(const FIslandDewInputs& Inputs);
 

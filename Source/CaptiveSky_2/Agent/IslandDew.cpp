@@ -28,7 +28,8 @@ float ComputeDewStrength(const FIslandDewInputs& In)
 	// Environmental values normally come from the world subsystem, but malformed
 	// overrides or an interrupted transition must never turn the visual scatter NaN.
 	if (!FMath::IsFinite(In.SunHeight) || !FMath::IsFinite(In.Hour) || !FMath::IsFinite(In.Rain) ||
-		!FMath::IsFinite(In.Wetness) || !FMath::IsFinite(In.CloudCover) || !FMath::IsFinite(In.Storm))
+		!FMath::IsFinite(In.Wetness) || !FMath::IsFinite(In.CloudCover) || !FMath::IsFinite(In.Storm) ||
+		!FMath::IsFinite(In.WindSpeed))
 	{
 		return 0.f;
 	}
@@ -39,8 +40,10 @@ float ComputeDewStrength(const FIslandDewInputs& In)
 	const float Moisture = 0.45f + 0.55f * Unit(In.Wetness);
 	const float Clearing = 1.f - FMath::SmoothStep(0.05f, 0.3f, Unit(In.Rain));
 	const float OpenSky = 1.f - FMath::SmoothStep(0.5f, 0.9f, Unit(In.CloudCover));
-	const float Calm = 1.f - FMath::SmoothStep(0.1f, 0.4f, Unit(In.Storm));
-	return Sun * Morning * Moisture * Clearing * OpenSky * Calm;
+	const float NoStorm = 1.f - FMath::SmoothStep(0.1f, 0.4f, Unit(In.Storm));
+	// Share the established calm-air band used by Island mist (80–320 cm/s).
+	const float CalmAir = 1.f - FMath::SmoothStep(80.f, 320.f, FMath::Max(0.f, In.WindSpeed));
+	return Sun * Morning * Moisture * Clearing * OpenSky * NoStorm * CalmAir;
 }
 
 AIslandDewActor::AIslandDewActor()
@@ -231,6 +234,7 @@ void UIslandDewSubsystem::Tick(float DeltaTime)
 	Inputs.Wetness = Environment->GetWetness();
 	Inputs.CloudCover = Environment->GetCloudCover();
 	Inputs.Storm = Environment->GetStorm();
+	Inputs.WindSpeed = Environment->GetWindSpeed();
 	const float Forced = CVarIslandDew.GetValueOnGameThread();
 	const float Target = Forced >= 0.f ? FMath::Min(Forced, 1.f) : ComputeDewStrength(Inputs);
 	Strength = FMath::FInterpConstantTo(Strength, Target, DeltaTime, 1.f / 20.f);
