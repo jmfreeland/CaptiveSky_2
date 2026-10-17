@@ -6,7 +6,7 @@ its script and rerun (10-60 s). Exports land in `Saved/CaptiveSky/ComfyBlender/<
 local; only these scripts are in git). Same review-then-import idea as `Saved/CaptiveSky/Tripo/`, but geometry and textures are
 authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
-The generated index currently covers 21 reviewed props: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory now has 22 prop scripts. The original `RatHollow` export was imported into Unreal for an isolated Island trial; its editor view looked too regular and still needs a bounded gameplay/understory check. A more irregular source revision is exported locally at `Saved/CaptiveSky/ComfyBlender/RatHollow_ArtPass_20261011/RatHollow/`; it is not imported and has not had a preview render yet, so the trial asset remains unchanged.
+The generated index lists 27 local exports and previews: `Saved/CaptiveSky/ComfyBlender/ASSETS.md`. The source directory has 23 prop scripts. `BracketFungusLog` is a new local prop (198 x 54 x 47 cm, 1,278 triangles, one box collider). Its source now aligns the bark UV grain with the branch's X axis; Blender's exported-FBX verifier reports `PROBLEMS []`. A separate Unreal candidate at `/Game/Generated/ComfyBlender/BracketFungusLog_GrainAligned_20261012/` passed import validation and a bounded real-RHI preview. The bark now reads longitudinally, but the close preview still shows strong wood contrast, vivid/repetitive moss ground, and partly occluded shelf caps. Neither this candidate nor the earlier `/BracketFungusLog/` asset has been placed on the Island; treat this as a source/preview iteration, not final art approval. The original `RatHollow` export was imported into Unreal for an isolated Island trial; its editor view looked too regular and still needs a bounded gameplay/understory check. A more irregular source revision is exported locally at `Saved/CaptiveSky/ComfyBlender/RatHollow_ArtPass_20261011/RatHollow/`; it is not imported and has not had a preview render yet, so the trial asset remains unchanged.
 
 After importing a reviewed mesh, `Config/IslandProps.json` can reference it with an explicit Unreal object path, for example `"asset_path": "/Game/Generated/ComfyBlender/RatHollow/SM_RatHollow_01"`. The placement script still accepts legacy `"asset"` entries under `/Game/Generated/Tripo`. It preflights all meshes and ground samples before replacing generated-prop actors; `PLACE_PROPS_DRYRUN=1` reports the plan without destroying, spawning, or saving actors. Do not add the Rat's location until the hollow has been imported and checked in the world.
 
@@ -45,6 +45,8 @@ For face-specific previews, set `ASSET_PREVIEW_DIRECTION` to a non-zero comma-se
 | Blender | 5.2 LTS, run headless; set `BLENDER_EXE` if it is not under Program Files. No addon/MCP needed |
 | Source maps | the stone bake reads `Library/Sources/{stone_face,moss}/{albedo,roughness,normal_gl}.png` (made with `pbr.py`, see below) |
 | GPU | RTX 4080 Laptop 12 GB: ComfyUI and Cycles baking compete for VRAM, so stop ComfyUI before baking |
+
+**Local Python venv check (2026-10-12):** `D:\python\3d\Scripts\python.exe` currently fails because its `pyvenv.cfg` points to a missing Microsoft Store Python under `WindowsApps`. The Blender-side build and FBX verifier still run directly with Blender 5.2, but the `make.py` orchestrator and `pack_asset.py` need that venv repaired before the documented full pipeline works on this machine.
 
 ```powershell
 D:\python\3d\Scripts\activate

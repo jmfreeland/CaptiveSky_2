@@ -2,8 +2,8 @@
 
 Reads Saved/CaptiveSky/ComfyBlender/<ASSET>/ and writes only to
 /Game/Generated/ComfyBlender/<ASSET> plus an unreal_import.json report beside the source.
-It never opens or saves a level. Existing assets with the same names are replaced in place;
-unrelated assets are left alone.
+It never opens or saves a level. Shared textures may be updated in the central Library;
+per-asset mesh destinations must be new so a reimport cannot silently change FBX scale.
 
 Select the asset with COMFYBLENDER_ASSET, for example:
   $env:COMFYBLENDER_ASSET = 'NoticeBoard'
@@ -69,6 +69,14 @@ def import_files(paths, destination):
 
 
 def import_mesh(fbx_path, destination):
+    mesh_name = os.path.splitext(os.path.basename(fbx_path))[0]
+    existing_path = destination + "/" + mesh_name + "." + mesh_name
+    if unreal.load_asset(existing_path):
+        raise RuntimeError(
+            "Refusing in-place static-mesh reimport at {}. A repeated FBX import with the "
+            "legacy 100x unit conversion changed mesh scale in UE 5.8; choose a new "
+            "COMFYBLENDER_DESTINATION for a revised export.".format(existing_path))
+
     task = unreal.AssetImportTask()
     task.set_editor_property("filename", fbx_path)
     task.set_editor_property("destination_path", destination)
@@ -263,9 +271,27 @@ def run():
                 texture_sources[(os.path.basename(resolved), map_name)] = resolved
 
     asset_path = DEST_ROOT + "/" + DESTINATION_NAME
+    mesh_name = os.path.splitext(os.path.basename(fbx_path))[0]
+    existing_mesh_path = asset_path + "/" + mesh_name + "." + mesh_name
+    if unreal.EditorAssetLibrary.does_asset_exist(existing_mesh_path):
+        raise RuntimeError(
+            "Refusing in-place static-mesh reimport at {}. A repeated FBX import with the "
+            "legacy 100x unit conversion changed mesh scale in UE 5.8; choose a new "
+            "COMFYBLENDER_DESTINATION for a revised export.".format(existing_mesh_path))
     texture_folder = asset_path + "/Textures"
     unreal.EditorAssetLibrary.make_directory(texture_folder)
-    imported_textures = import_files(sorted(set(texture_sources.values())), texture_folder)
+    shared_texture_root = os.path.realpath(os.path.join(SOURCE_ROOT, "Library", "Textures"))
+    shared_library_path = DEST_ROOT + "/Library"
+    unreal.EditorAssetLibrary.make_directory(shared_library_path)
+    shared_textures = []
+    asset_textures = []
+    for source in sorted(set(texture_sources.values())):
+        if os.path.commonpath((os.path.realpath(source), shared_texture_root)) == shared_texture_root:
+            shared_textures.append(source)
+        else:
+            asset_textures.append(source)
+    imported_textures = import_files(shared_textures, shared_library_path)
+    imported_textures += import_files(asset_textures, texture_folder)
     texture_by_filename = {}
     for obj_path in imported_textures:
         texture = unreal.load_asset(obj_path)
@@ -273,6 +299,7 @@ def run():
             texture_by_filename[os.path.basename(obj_path.split(".")[0])] = texture
 
     material_assets = {}
+    material_texture_assignments = {}
     for material_name, material_description in manifest.get("materials", {}).items():
         textures = {}
         for map_name in ("BaseColor", "Normal", "ORM"):
@@ -284,6 +311,9 @@ def run():
                 configure_texture(texture, map_name)
                 textures[map_name] = texture
         material_assets[material_name] = create_material(asset_path, material_name, material_description, textures)
+        material_texture_assignments[material_name] = {
+            map_name: texture.get_path_name() for map_name, texture in textures.items()
+        }
 
     mesh_path, imported_paths = import_mesh(fbx_path, asset_path)
     mesh = unreal.load_asset(mesh_path)
@@ -305,6 +335,12 @@ def run():
         "destination": asset_path,
         "static_mesh": mesh.get_path_name(),
         "imported_objects": imported_paths,
+        "imported_textures": imported_textures,
+        "shared_library_textures": [
+            path for path in imported_textures
+            if path.startswith(shared_library_path + "/")
+        ],
+        "material_texture_assignments": material_texture_assignments,
         "size_cm_xyz": [round(size.x, 1), round(size.y, 1), round(size.z, 1)],
         "material_assignments": assignments,
         "collision_shapes": collisions,

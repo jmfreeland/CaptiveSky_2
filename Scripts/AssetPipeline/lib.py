@@ -46,6 +46,9 @@ PLAIN = {
     "felt": dict(BaseColor=[0.18, 0.13, 0.09], Roughness=0.95),
     "mushcap": dict(BaseColor=[0.62, 0.1, 0.07], Roughness=0.55),
     "mushstem": dict(BaseColor=[0.82, 0.77, 0.66], Roughness=0.7),
+    "polypore_umber": dict(BaseColor=[0.24, 0.15, 0.09], Roughness=0.94),
+    "polypore_tan": dict(BaseColor=[0.43, 0.29, 0.17], Roughness=0.92),
+    "polypore_cream": dict(BaseColor=[0.58, 0.47, 0.32], Roughness=0.9),
     "pumpkin": dict(BaseColor=[0.75, 0.32, 0.05], Roughness=0.6),
 }
 
