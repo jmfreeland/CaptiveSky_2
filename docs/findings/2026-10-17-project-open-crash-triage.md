@@ -106,3 +106,23 @@ information more detailed ([installation options](https://dev.epicgames.com/docu
 If that component is installed for the matching 5.8.3 build, use the existing
 minidump/crash context to resolve the current Core offsets before another
 project-open run. This is a diagnostic prerequisite, not a proposed crash fix.
+
+## Focused intertidal test launch — 2026-10-17
+
+After correcting the quoting of command-line values containing spaces, a
+NullRHI scratch launch requested only
+`CaptiveSky2.Agent.TidepoolPeriwinkleIntertidalZonation`. It still terminated
+before the requested `Saved/Logs/IntertidalZonation_20261017.log` was created,
+so the automation test itself did not run and has no pass/fail assertion result.
+The crash-side launch record is
+`Saved/CompileScratch/Codex_VisitorResonance_20261017/Saved/Crashes/_0000/IntertidalZonation_20261017.log`;
+the corresponding `CrashContext.runtime-xml` reports a null-address access
+violation at `SecondsSinceStart=0` and PCallStackHash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`, matching the earlier UE 5.8.3
+project-open failures above. Thinking, Python, and ModelContextProtocol were
+disabled, the agent model-request budget was zero, and the play cap was 120
+seconds; none of those settings advanced startup far enough to exercise the
+intertidal behavior. Do not repeat this launch unchanged. The periwinkle source
+change is compiled but remains runtime-unverified until the startup stack can
+be resolved or a meaningfully different known-good project-open path is
+established.
