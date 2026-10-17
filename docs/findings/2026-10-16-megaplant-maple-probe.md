@@ -17,6 +17,23 @@ The UE 5.8.3 log for the default-setting runs warns that building the Nanite Ass
 - Captures/logs are disposable evidence under `Saved/CompileScratch/Claude_Props/Saved/Playtests/Codex_NorwayMaple*20261016` and `Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_NorwayMaple*20261016.log`; the Beech control uses `Codex_BeechA_BaseColorControl_20261016`.
 - No UI interaction or process termination was issued. At the final read-only process check, PID 22688 and all `UnrealEditor*` processes no longer resolved. The main project log had no explicit crash or clean-shutdown record; the latest Island autosave was `Saved/Autosaves/Game/Maps/Island_Auto1.umap` at 11:07 on 2026-10-16. Why the editor process disappeared is unknown, and unsaved edits after that autosave are not confirmed preserved. The Island was not saved or restored by these preview runs.
 
+## Launch recheck — 2026-10-17
+
+The transient `BaseColor Controls` alpha-1.0 Maple preview was retried in the
+isolated `Claude_Props` project with its own output path, resident thinking
+disabled, and the model-request cap set to zero. UnrealEditor-Cmd returned exit
+code 0, but wrote neither the requested log nor a capture directory, so the
+override remains untested. A subsequent `UnrealEditor-Cmd.exe -version`
+diagnostic was run without a project; the process remained live for about 74
+seconds, then exited 0 with empty stdout and stderr. This reproduces the
+startup-without-output symptom but does not identify its cause.
+
+No source material, asset, or saved Island map was intentionally edited, and no
+editor process was terminated. Do not infer from either zero exit code that
+the preview succeeded. Resume only when a scratch launch produces a new log
+and both expected images; keep the alpha change transient until a real-RHI
+comparison shows a readable, correctly colored canopy.
+
 ## Next gate
 
 Next, recover a successful disposable preview launch, then test the control-alpha override and inspect the Maple LOD section bindings against Beech's working material. Keep the investigation scratch-only; do not change the main project setting or scatter Maple until leaf color/silhouette is correct and runtime performance is measured. Existing Island profiling warns that experimental Nanite Foliage has been costly for dense ground cover; that does not quantify this tree asset, but argues against enabling the feature globally without a paired runtime profile.
