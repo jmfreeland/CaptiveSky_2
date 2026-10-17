@@ -2248,11 +2248,31 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("A nearby untagged pool ripple is available for filtering"), ShoreRipple);
 		if (ShoreRipple)
 		{
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("Untyped visitor ripples do not startle shore crabs"),
 				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			AIslandPoolRippleEffect* PlayerWake = World->SpawnActor<AIslandPoolRippleEffect>(
+				CrabStart + FVector(160.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+			TestNotNull(TEXT("A nearby player-made wake is available for the shore-crab response"), PlayerWake);
+			if (PlayerWake)
+			{
+				PlayerWake->ConfigureAsPlayerSwimImpact();
+				WatchableCrab->CheckForNearbySurfaceCue();
+				const FVector AwayFromWake = (CrabStart - PlayerWake->GetActorLocation()).GetSafeNormal2D();
+				TestTrue(TEXT("A nearby swimmer briefly sends the shore crab away from the wake"),
+					WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f &&
+					FVector::DotProduct(WatchableCrab->ScurryDirection, AwayFromWake) > 0.95f);
+				TestEqual(TEXT("One swimmer wake starts a bounded eight-second response cooldown"),
+					WatchableCrab->RippleResponseCooldownRemaining, 8.f);
+				WatchableCrab->ScurryRemaining = 0.f;
+				WatchableCrab->CheckForNearbySurfaceCue();
+				TestTrue(TEXT("The same swimmer wake cannot repeatedly startle the crab during cooldown"),
+					FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+				WatchableCrab->RippleResponseCooldownRemaining = 0.f;
+				PlayerWake->Destroy();
+			}
 			ShoreRipple->ConfigureAsWindImpact(110.f);
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			const FVector AwayFromRipple = (CrabStart - ShoreRipple->GetActorLocation()).GetSafeNormal2D();
 			TestTrue(TEXT("A nearby natural wind ripple prompts a brief shoreward scurry"),
 				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
@@ -2261,7 +2281,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("One natural ripple starts a bounded eight-second response cooldown"),
 				WatchableCrab->RippleResponseCooldownRemaining, 8.f);
 			WatchableCrab->ScurryRemaining = 0.f;
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("The same nearby ripple cannot retrigger during cooldown"),
 				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 			ShoreRipple->Destroy();
@@ -2274,7 +2294,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (MinnowSplash)
 		{
 			MinnowSplash->ConfigureAsMinnowImpact();
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			const FVector TowardMinnowSplash = (MinnowSplash->GetActorLocation() - CrabStart).GetSafeNormal2D();
 			TestTrue(TEXT("A nearby minnow splash draws a brief cautious crab step toward the water"),
 				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 1.8f &&
@@ -2282,7 +2302,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("A minnow splash shares the bounded natural-cue cooldown"),
 				WatchableCrab->RippleResponseCooldownRemaining, 8.f);
 			WatchableCrab->ScurryRemaining = 0.f;
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("The same minnow splash cannot repeatedly pull the crab during cooldown"),
 				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 			MinnowSplash->Destroy();
@@ -2295,7 +2315,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		if (DistantShoreRipple)
 		{
 			DistantShoreRipple->ConfigureAsRainImpact();
-			WatchableCrab->CheckForNearbyNaturalRipple();
+			WatchableCrab->CheckForNearbySurfaceCue();
 			TestTrue(TEXT("A distant rain ripple does not startle the shore crab"),
 				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
 			DistantShoreRipple->SetActorLocation(CrabStart + FVector(180.f, 0.f, 0.f));

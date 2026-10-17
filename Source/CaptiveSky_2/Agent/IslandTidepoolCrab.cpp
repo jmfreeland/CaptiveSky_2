@@ -219,7 +219,7 @@ void AIslandTidepoolCrab::CheckForNearbyRavenDisturbance()
 	}
 }
 
-void AIslandTidepoolCrab::CheckForNearbyNaturalRipple()
+void AIslandTidepoolCrab::CheckForNearbySurfaceCue()
 {
 	if (!GetWorld() || bIsSheltered || ScurryRemaining > 0.f || RippleResponseCooldownRemaining > 0.f) return;
 
@@ -229,13 +229,14 @@ void AIslandTidepoolCrab::CheckForNearbyNaturalRipple()
 		AIslandPoolRippleEffect* Ripple = *It;
 		if (!IsValid(Ripple)) continue;
 		const bool bMinnowSplash = Ripple->ActorHasTag(TEXT("MinnowImpact"));
-		if (!bMinnowSplash && !Ripple->ActorHasTag(TEXT("WindImpact")) && !Ripple->ActorHasTag(TEXT("RainImpact"))) continue;
+		const bool bPlayerWake = Ripple->ActorHasTag(TEXT("PlayerSwimImpact"));
+		if (!bMinnowSplash && !bPlayerWake && !Ripple->ActorHasTag(TEXT("WindImpact")) && !Ripple->ActorHasTag(TEXT("RainImpact"))) continue;
 		if (FVector::DistSquared2D(GetActorLocation(), Ripple->GetActorLocation()) > FMath::Square(RippleResponseRadius)) continue;
 
 		if (bMinnowSplash)
 		{
 			// A nearby minnow breach draws a short, cautious step toward the water;
-			// weather impacts still startle the crab away, and visitor ripples stay inert.
+			// Weather and visitor impacts briefly send the crab away from the disturbance.
 			ScurryDirection = (Ripple->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 			if (ScurryDirection.IsNearlyZero()) continue;
 			ScurryRemaining = 1.8f;
@@ -346,7 +347,7 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	if (RippleCheckRemaining <= 0.f)
 	{
 		RippleCheckRemaining = 0.35f;
-		CheckForNearbyNaturalRipple();
+		CheckForNearbySurfaceCue();
 	}
 	const float Angle = Time * 0.12f + Phase;
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;

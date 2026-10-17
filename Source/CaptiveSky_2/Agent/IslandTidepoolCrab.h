@@ -69,6 +69,6 @@ private:
 	bool bIsSheltered = false;
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNearbyPlayerPresence();
-	void CheckForNearbyNaturalRipple();
+	void CheckForNearbySurfaceCue();
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;
 };
