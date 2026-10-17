@@ -35,3 +35,15 @@ active. The logon trigger is installed, but a fresh logon-triggered launch has
 not been tested because that would require logging out/restarting the user's
 session. A successful future logon is therefore configured, not yet directly
 observed.
+
+## Current session recheck — 2026-10-17
+
+An elevated read-only Task Scheduler query confirms `CaptiveSky Agent Gateway`
+is enabled, has a logon trigger, and is currently `Running`. Its configured
+action remains the hidden PowerShell launcher with the project gateway config.
+The live process chain is `powershell.exe` PID 6536 → `dotnet.exe` PID 23140 →
+`CaptiveSky.Gateway.exe` PID 27696; the gateway owns an established outbound
+TCP/443 connection. Its startup transcript reports readiness passed, with the
+Discord token and LLM key present (values not logged here). This confirms the
+current gateway is alive and connected, but does not prove a fresh logon-trigger
+start; no logout or restart was performed.
