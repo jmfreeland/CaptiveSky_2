@@ -2,6 +2,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "IslandDrift.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandDriftTest, "CaptiveSky2.Agent.IslandDrift",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -15,6 +16,12 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rain holds the leaves down"), Drift::DesiredCount(400.f, 1.f, 1.f), 0);
 	TestEqual(TEXT("Night holds them too"), Drift::DesiredCount(400.f, 0.f, 0.f), 0);
 	TestEqual(TEXT("Negative wind is clamped"), Drift::DesiredCount(-50.f, 0.f, 1.f), 6);
+	TestEqual(TEXT("A malformed wind sample suppresses new motes"),
+		Drift::DesiredCount(std::numeric_limits<float>::quiet_NaN(), 0.f, 1.f), 0);
+	TestEqual(TEXT("A malformed rain sample suppresses new motes"),
+		Drift::DesiredCount(400.f, std::numeric_limits<float>::infinity(), 1.f), 0);
+	TestEqual(TEXT("A malformed daylight sample suppresses new motes"),
+		Drift::DesiredCount(400.f, 0.f, std::numeric_limits<float>::quiet_NaN()), 0);
 
 	TestTrue(TEXT("Seeds lift before petals"), Drift::LiftWindSpeed(EIslandDriftKind::Seed) < Drift::LiftWindSpeed(EIslandDriftKind::Petal));
 	TestTrue(TEXT("Petals lift before leaves"), Drift::LiftWindSpeed(EIslandDriftKind::Petal) < Drift::LiftWindSpeed(EIslandDriftKind::DryLeaf));
@@ -40,6 +47,17 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	const FVector Gust = Drift::StepVelocity(FVector::ZeroVector, Wind, EIslandDriftKind::GreenLeaf, 0.1f);
 	const FVector GustSeed = Drift::StepVelocity(FVector::ZeroVector, Wind, EIslandDriftKind::Seed, 0.1f);
 	TestTrue(TEXT("A seed answers a gust faster than a green leaf"), GustSeed.X > Gust.X);
+	const FVector InvalidStep = Drift::StepVelocity(
+		FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f),
+		FVector(std::numeric_limits<float>::infinity(), 0.f, 0.f), EIslandDriftKind::Seed,
+		std::numeric_limits<float>::quiet_NaN());
+	TestTrue(TEXT("A malformed velocity, wind, or timestep cannot poison a mote transform"),
+		FMath::IsFinite(InvalidStep.X) && FMath::IsFinite(InvalidStep.Y) && FMath::IsFinite(InvalidStep.Z));
+	const FVector ExtremeStep = Drift::StepVelocity(
+		FVector(std::numeric_limits<double>::max(), 0.0, 0.0),
+		FVector(std::numeric_limits<double>::max(), 0.0, 0.0), EIslandDriftKind::Seed, 0.1f);
+	TestTrue(TEXT("Extreme but finite weather values cannot overflow the velocity step"),
+		FMath::IsFinite(ExtremeStep.X) && FMath::IsFinite(ExtremeStep.Y) && FMath::IsFinite(ExtremeStep.Z));
 
 	if (!TestNotNull(TEXT("Engine is available"), GEngine)) return false;
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
@@ -73,6 +91,31 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 		const TFunctionRef<FVector(const FVector&)> Storm = [](const FVector&) { return FVector(400.f, 0.f, 0.f); };
 		for (int32 Step = 0; Step < 100; ++Step) Actor->Advance(0.1f, Viewer, Storm, 1.f, 1.f);
 		TestEqual(TEXT("Heavy rain clears the air"), Actor->GetActiveCount(), 0);
+
+		const TFunctionRef<FVector(const FVector&)> InvalidWind = [](const FVector&)
+		{
+			return FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f);
+		};
+		Actor->Motes[0].bActive = true;
+		Actor->Motes[0].Position.X = std::numeric_limits<double>::quiet_NaN();
+		Actor->Motes[1].bActive = true;
+		Actor->Motes[1].Velocity.Y = std::numeric_limits<double>::infinity();
+		Actor->Motes[2].bActive = true;
+		Actor->Motes[2].Spin = std::numeric_limits<double>::quiet_NaN();
+		Actor->Advance(std::numeric_limits<float>::infinity(),
+			FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), InvalidWind,
+			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity());
+		TestEqual(TEXT("Malformed weather and wind fail closed without spawning motes"), Actor->GetActiveCount(), 0);
+		TestTrue(TEXT("A malformed viewer location cannot move the drift actor to an invalid transform"),
+			FMath::IsFinite(Actor->GetActorLocation().X) && FMath::IsFinite(Actor->GetActorLocation().Y) &&
+			FMath::IsFinite(Actor->GetActorLocation().Z));
+		bool bFiniteMotes = true;
+		for (const FIslandDriftMote& Mote : Actor->GetMotes())
+		{
+			bFiniteMotes &= FMath::IsFinite(Mote.Position.X) && FMath::IsFinite(Mote.Position.Y) && FMath::IsFinite(Mote.Position.Z);
+			bFiniteMotes &= FMath::IsFinite(Mote.Velocity.X) && FMath::IsFinite(Mote.Velocity.Y) && FMath::IsFinite(Mote.Velocity.Z);
+		}
+		TestTrue(TEXT("Malformed weather never leaves a non-finite drift position or velocity"), bFiniteMotes);
 	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

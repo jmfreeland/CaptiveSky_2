@@ -22,6 +22,22 @@ namespace
 
 	constexpr int32 SlotsPerKind[static_cast<int32>(EIslandDriftKind::Count)] = {18, 28, 20, 30};
 
+	bool IsFiniteVector(const FVector& Value)
+	{
+		return FMath::IsFinite(Value.X) && FMath::IsFinite(Value.Y) && FMath::IsFinite(Value.Z);
+	}
+
+	FVector ClampFiniteVectorOrCalm(const FVector& Value)
+	{
+		if (!IsFiniteVector(Value)) return FVector::ZeroVector;
+		// Weather and velocity values far beyond any Island condition must not overflow
+		// squared-speed or interpolation math, even when the components are finite.
+		constexpr double MaxComponent = 2000.0;
+		return FVector(FMath::Clamp(Value.X, -MaxComponent, MaxComponent),
+			FMath::Clamp(Value.Y, -MaxComponent, MaxComponent),
+			FMath::Clamp(Value.Z, -MaxComponent, MaxComponent));
+	}
+
 	// Flat leaf-like boxes (cm = 100 * scale) for leaves and petals, a small round seed head.
 	FVector BaseScale(EIslandDriftKind Kind)
 	{
@@ -81,6 +97,7 @@ AIslandDrift::AIslandDrift()
 
 int32 AIslandDrift::DesiredCount(float WindSpeed, float Rain, float Daylight)
 {
+	if (!FMath::IsFinite(WindSpeed) || !FMath::IsFinite(Rain) || !FMath::IsFinite(Daylight)) return 0;
 	const float Lift = FMath::SmoothStep(25.f, 260.f, FMath::Max(0.f, WindSpeed));
 	const float DayGate = FMath::SmoothStep(0.1f, 0.5f, FMath::Clamp(Daylight, 0.f, 1.f));
 	const float DryGate = 1.f - FMath::SmoothStep(0.05f, 0.35f, FMath::Clamp(Rain, 0.f, 1.f));
@@ -115,9 +132,12 @@ FVector AIslandDrift::StepVelocity(const FVector& Velocity, const FVector& Wind,
 	// Light things follow the air quickly; a green leaf lags behind a gust.
 	static constexpr float Response[] = {0.5f, 0.8f, 1.1f, 1.4f};
 	const float Tau = Response[static_cast<int32>(Kind)];
-	const float Alpha = 1.f - FMath::Exp(-FMath::Max(0.f, Seconds) / Tau);
-	const FVector Target(Wind.X, Wind.Y, Wind.Z - SinkSpeed(Kind));
-	return Velocity + (Target - Velocity) * Alpha;
+	const float SafeSeconds = FMath::IsFinite(Seconds) ? FMath::Max(0.f, Seconds) : 0.f;
+	const FVector SafeVelocity = ClampFiniteVectorOrCalm(Velocity);
+	const FVector SafeWind = ClampFiniteVectorOrCalm(Wind);
+	const float Alpha = 1.f - FMath::Exp(-SafeSeconds / Tau);
+	const FVector Target(SafeWind.X, SafeWind.Y, SafeWind.Z - SinkSpeed(Kind));
+	return SafeVelocity + (Target - SafeVelocity) * Alpha;
 }
 
 EIslandDriftKind AIslandDrift::KindForSlot(int32 Index)
@@ -211,11 +231,14 @@ void AIslandDrift::EnsureMaterials()
 
 void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<FVector(const FVector&)>& WindAt, float Rain, float Daylight)
 {
-	Dt = FMath::Clamp(Dt, 0.f, 0.1f);
+	Dt = FMath::IsFinite(Dt) ? FMath::Clamp(Dt, 0.f, 0.1f) : 0.f;
+	Rain = FMath::IsFinite(Rain) ? FMath::Clamp(Rain, 0.f, 1.f) : 1.f;
+	Daylight = FMath::IsFinite(Daylight) ? FMath::Clamp(Daylight, 0.f, 1.f) : 0.f;
+	const FVector SafeViewer = IsFiniteVector(Viewer) ? Viewer : GetActorLocation();
 	EnsureMaterials();
-	SetActorLocation(Viewer);
+	SetActorLocation(SafeViewer);
 
-	const FVector ViewerWind = WindAt(Viewer);
+	const FVector ViewerWind = ClampFiniteVectorOrCalm(WindAt(SafeViewer));
 	const float ViewerWindSpeed = ViewerWind.Size2D();
 	const int32 Desired = DesiredCount(ViewerWindSpeed, Rain, Daylight);
 
@@ -224,8 +247,16 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 	{
 		FIslandDriftMote& Mote = Motes[Slot];
 		if (!Mote.bActive) continue;
+		if (!IsFiniteVector(Mote.Position) || !IsFiniteVector(Mote.Velocity) || !IsFiniteVector(Mote.SpinAxis) ||
+			!FMath::IsFinite(Mote.GroundZ) || !FMath::IsFinite(Mote.Age) || !FMath::IsFinite(Mote.Life) ||
+			!FMath::IsFinite(Mote.Spin) || !FMath::IsFinite(Mote.SpinRate) || !FMath::IsFinite(Mote.Phase) ||
+			!FMath::IsFinite(Mote.Size))
+		{
+			Mote = FIslandDriftMote();
+			continue;
+		}
 		const EIslandDriftKind Kind = KindForSlot(Slot);
-		const FVector Wind = WindAt(Mote.Position);
+		const FVector Wind = ClampFiniteVectorOrCalm(WindAt(Mote.Position));
 		Mote.Velocity = StepVelocity(Mote.Velocity, Wind, Kind, Dt);
 		// Eddies: a sideways wobble and some lift that grow with the wind, strongest on the broad leaves.
 		const float Amp = (4.f + 0.16f * Wind.Size2D()) * (Kind == EIslandDriftKind::Seed ? 0.6f : 1.f);
@@ -235,7 +266,7 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 		Mote.Age += Dt;
 		Mote.Spin += Mote.SpinRate * Dt;
 		const bool bLanded = Mote.Position.Z <= Mote.GroundZ + 4.f;
-		const bool bGone = FVector::DistSquared2D(Mote.Position, Viewer) > FMath::Square(Radius * 1.15f);
+		const bool bGone = FVector::DistSquared2D(Mote.Position, SafeViewer) > FMath::Square(Radius * 1.15f);
 		if (bLanded || bGone || Mote.Age >= Mote.Life) Mote.bActive = false;
 		else ++Active;
 	}
@@ -259,7 +290,7 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 		for (const int32 Slot : EligibleSlots)
 		{
 			if (Active >= Desired) break;
-			Place(Motes[Slot], Slot, Viewer, ViewerWind, true);
+			Place(Motes[Slot], Slot, SafeViewer, ViewerWind, true);
 			++Active;
 		}
 	}
@@ -270,7 +301,7 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 		{
 			const int32 Slot = Random.RandRange(0, MaxMotes - 1);
 			if (Motes[Slot].bActive || ViewerWindSpeed < LiftWindSpeed(KindForSlot(Slot))) continue;
-			Place(Motes[Slot], Slot, Viewer, ViewerWind, false);
+			Place(Motes[Slot], Slot, SafeViewer, ViewerWind, false);
 			SpawnBudget -= 1.f;
 			++Active;
 		}
@@ -286,7 +317,7 @@ void AIslandDrift::Advance(float Dt, const FVector& Viewer, const TFunctionRef<F
 		for (int32 Local = 0; Local < Count; ++Local)
 		{
 			const FIslandDriftMote& Mote = Motes[FirstSlotOfKind[KindIndex] + Local];
-			FTransform Transform(FQuat::Identity, Viewer, FVector(0.0001f));
+			FTransform Transform(FQuat::Identity, SafeViewer, FVector(0.0001f));
 			if (Mote.bActive)
 			{
 				const float FadeIn = FMath::SmoothStep(0.f, 0.8f, Mote.Age);
