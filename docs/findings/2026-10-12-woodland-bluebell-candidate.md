@@ -72,7 +72,30 @@ raise the per-site flower cap. The focused
 and its HISM is non-colliding and excluded from navigation. This resolves the
 placement-history discrepancy, but not the visual gate described above:
 NullRHI cannot judge material appearance, player-scale readability, or the
-cost of the 5,116-triangle clump in a rendered scene. Treat bluebells as an
+cost of the original 5,116-triangle clump in a rendered scene. Treat bluebells as an
 integrated but visually unapproved variant until a normal viewport/gameplay
 review and a frame-time check are available. See also
 [`meadow-flower-clusters.md`](../ecology/meadow-flower-clusters.md).
+
+## Follow-up: geometry budget pass (2026-10-17)
+
+The source now keeps the seven-stem colony but simplifies leaf profile rows,
+bell rings, stem/pedicel radial segments, and uses one or two flowers per stem
+instead of two or three. This preserves the species' low strap leaves and
+pendant-flower silhouette while reducing fine geometry that is unlikely to
+read at meadow distance.
+
+Built into an isolated, ignored review root with Blender 5.2.2:
+`Saved/CaptiveSky/ComfyBlender/Codex_BluebellBudget_20261017/`. `run_asset.py`
+completed successfully; the exported FBX re-imported with all three material
+slots populated (stem 448, leaf 784, bloom 1,200 triangles), 2,432 triangles
+total, and bounds 64 x 54 x 35 cm. This is a 52.5% triangle reduction from the
+previous 5,116-triangle export. The original export audit also confirmed its
+three slots were used (732 / 1,120 / 3,264 triangles), so the monochrome Unreal
+capture was not caused by empty source material indices.
+
+No preview render was run while the user's Unreal editor was unresponsive, and
+the improved silhouette has not passed a normal Unreal viewport or gameplay
+review. The existing Unreal asset and Island placement were not modified; the
+local review FBX is not imported. Keep the visual/material gate and an in-game
+frame-time check open before treating this as a completed species improvement.

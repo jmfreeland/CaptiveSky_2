@@ -15,8 +15,8 @@ def _leaf(leaf_bm, origin, angle, length, width):
     direction = Vector((math.cos(angle), math.sin(angle), 0.0))
     across = Vector((-direction.y, direction.x, 0.0))
     rows = []
-    for i in range(7):
-        t = i / 6
+    for i in range(5):
+        t = i / 4
         centre = origin + direction * (length * t)
         centre.z += 0.012 * math.sin(math.pi * t)
         half_width = width * (math.sin(math.pi * t) ** 0.72) * (1.0 - 0.28 * t)
@@ -26,7 +26,7 @@ def _leaf(leaf_bm, origin, angle, length, width):
             point.z += 0.006 * (1.0 - side * side) * math.sin(math.pi * t)
             row.append(leaf_bm.verts.new(point))
         rows.append(row)
-    for row in range(6):
+    for row in range(4):
         for col in range(2):
             leaf_bm.faces.new((rows[row][col], rows[row + 1][col],
                                rows[row + 1][col + 1], rows[row][col + 1]))
@@ -37,10 +37,10 @@ def _bell(bloom_bm, attachment, down, radius, length, phase):
     across = Vector((0.0, 0.0, 1.0)).cross(down).normalized()
     side = down.cross(across).normalized()
     # The narrow neck sits at the stem; the flared, five-lobed mouth points down.
-    rings = ((0.0, 0.005), (0.18, 0.008), (0.42, radius * 0.54),
-             (0.70, radius * 0.84), (0.90, radius), (1.0, radius * 0.91))
+    rings = ((0.0, 0.005), (0.24, 0.008), (0.62, radius * 0.72),
+             (0.90, radius), (1.0, radius * 0.91))
     ring_verts = []
-    count = 8
+    count = 6
     for t, ring_radius in rings:
         ring = []
         for i in range(count):
@@ -66,7 +66,7 @@ def build(A):
     leaf_bm = bmesh.new()
     bloom_bm = bmesh.new()
 
-    # Nine slender stems make a loose, irregular colony rather than a dense ball.
+    # Seven slender stems make a loose, irregular colony rather than a dense ball.
     stems = []
     for index in range(7):
         angle = math.tau * index / 7 + rng.uniform(-0.22, 0.22)
@@ -77,19 +77,19 @@ def build(A):
         top = base + lean + Vector((0.0, 0.0, height))
         points = [base.lerp(top, t / 5) + Vector((0, 0, 0.008 * math.sin(math.pi * t / 5)))
                   for t in range(6)]
-        A.tube("bluebell_stem", points, 0.0035, segs=5,
+        A.tube("bluebell_stem", points, 0.0035, segs=4,
                taper=lambda t: 1.0 - 0.30 * t, name=f"bluebellStem{index + 1:02d}")
         stems.append((base, top, angle, height))
 
-        # Two or three strap leaves lie low and sweep away from each stem.
+        # Two strap leaves lie low and sweep away from each stem.
         for leaf_index in range(2):
             leaf_angle = angle + math.pi + (leaf_index - 0.5) * 1.08 + rng.uniform(-0.18, 0.18)
             leaf_length = rng.uniform(0.24, 0.38)
             _leaf(leaf_bm, base + Vector((0.0, 0.0, 0.012)), leaf_angle,
                   leaf_length, rng.uniform(0.018, 0.026))
 
-        # Pendulous flowers alternate along the upper stem, with individual droop.
-        flower_count = 2 + (index % 3 == 0)
+        # One or two pendulous flowers alternate along the upper stem.
+        flower_count = 1 + (index % 3 == 0)
         for flower_index in range(flower_count):
             t = 0.62 + 0.31 * (flower_index / max(1, flower_count - 1))
             attachment = base.lerp(top, t)
@@ -99,7 +99,7 @@ def build(A):
             attachment += Vector((0.0, 0.0, 0.012 * math.sin(flower_index * 1.7 + index)))
             branch_start = base.lerp(top, t)
             A.tube("bluebell_stem", [branch_start, branch_start.lerp(attachment, 0.55), attachment],
-                   0.0022, segs=4, taper=lambda u: 1.0 - 0.34 * u,
+                   0.0022, segs=3, taper=lambda u: 1.0 - 0.34 * u,
                    name=f"bluebellPedicel{index + 1:02d}_{flower_index + 1:02d}")
             tangent = (lean + Vector((0.0, 0.0, height))).normalized()
             down = (tangent * 0.30 + Vector((0.0, 0.0, -0.94)) + radial * 0.22)
