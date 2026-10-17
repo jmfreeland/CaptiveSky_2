@@ -51,6 +51,20 @@ It shows the bark maps and entrance bedding. No Unreal import or map change was
 made. Gameplay, Rat-scale clearance, collision, in-world bark scale, and
 human-height concealment remain unverified.
 
+**Entrance-angle review (2026-10-17):** to inspect the collision-ready
+`RatHollowRootArchBurrow` export without changing its source pack, the verifier
+rendered a scratch copy from the local `-X` entrance direction. FBX re-import
+reported 1.92 × 1.177 × 0.886 m, 559 polygons, all five material slots, eight
+embedded box-collision shapes, and `PROBLEMS []`; the scratch preview is
+`Saved/CompileScratch/RatHollowEntranceReview_20261017/RatHollowRootArchBurrow/Preview.png`.
+The straight-on view confirms the bed and narrowing interior, but its regular
+annular rim still reads pipe-like when isolated, and the root fans do not provide
+woodland concealment by themselves. This is an asset inspection only: no source
+pack, Unreal Content, or map was modified. Do not create another geometry
+variant solely from this empty-background view; the next useful judgment is a
+disposable Island composition at human and Rat heights with the existing
+woodland understory.
+
 ## Next step
 
 Keep the canonical Rat home and saved Island unchanged. When the editor is
