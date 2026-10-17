@@ -525,7 +525,7 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The ripple originates under the source fish at the shallow surface"), SourceFish &&
 			FVector::Dist2D(MinnowRipple->GetActorLocation(), SourceFish->GetComponentLocation()) < 1.f &&
 			FMath::IsNearlyEqual(MinnowRipple->GetActorLocation().Z, School->GetActorLocation().Z + School->GetTideOffsetCm() - 24.f));
-		School->CheckForNaturalSurfaceRipple();
+		School->CheckForNearbySurfaceCue();
 		TestTrue(TEXT("The minnow school ignores its own surface break instead of feeding back"),
 			FMath::IsNearlyZero(School->SurfacePulseRemaining));
 		TestTrue(TEXT("The next surface break is delayed to keep wildlife effects sparse"),

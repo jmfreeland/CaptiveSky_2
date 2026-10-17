@@ -99,7 +99,7 @@ private:
 	void CheckForNearbyRavenDisturbance();
 	void CheckForPlayerWaterDisturbance();
 	void UpdatePlayerWaterPresence(APawn* PlayerPawn, bool bIsSurfaceSwimming);
-	void CheckForNaturalSurfaceRipple();
+	void CheckForNearbySurfaceCue();
 	void TryCreateSurfaceBreak(float RainIntensity);
 	void CreateScatterSurfaceCue(const FVector& ObserverLocation);
 	void UpdateSchool(float RainIntensity);

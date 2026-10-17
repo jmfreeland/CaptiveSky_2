@@ -1221,6 +1221,57 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	// This isolated fixture does not begin the whole world (Weather would scatter
 	// the full Island cover); dispatch the minnow actor's lifecycle correctly.
 	Minnows->DispatchBeginPlay();
+	Minnows->SwimPhaseRadians = 0.f;
+	Minnows->SurfacePulseRemaining = 0.f;
+	Minnows->UpdateSchool(0.f);
+	const float BaseMinnowOrbitRadius = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+		? Minnows->Fish[0]->GetRelativeLocation().Size2D() : 0.f;
+	AIslandPoolRippleEffect* UntypedRipple = World->SpawnActor<AIslandPoolRippleEffect>(
+		Minnows->GetActorLocation() + FVector(150.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("An untyped visitor ripple is available for minnow-cue filtering"), UntypedRipple);
+	if (UntypedRipple)
+	{
+		Minnows->CheckForNearbySurfaceCue();
+		TestTrue(TEXT("Unclassified ripples do not make the minnow school pulse"),
+			FMath::IsNearlyZero(Minnows->SurfacePulseRemaining));
+		UntypedRipple->Destroy();
+	}
+	AIslandPoolRippleEffect* DistantSwimWake = World->SpawnActor<AIslandPoolRippleEffect>(
+		Minnows->GetActorLocation() + FVector(400.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A distant player-made swim wake is available for radius filtering"), DistantSwimWake);
+	if (DistantSwimWake)
+	{
+		DistantSwimWake->ConfigureAsPlayerSwimImpact();
+		Minnows->CheckForNearbySurfaceCue();
+		TestTrue(TEXT("A swim wake beyond the short response radius is ignored"),
+			FMath::IsNearlyZero(Minnows->SurfacePulseRemaining));
+		DistantSwimWake->Destroy();
+	}
+	AIslandPoolRippleEffect* SwimWake = World->SpawnActor<AIslandPoolRippleEffect>(
+		Minnows->GetActorLocation() + FVector(150.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	TestNotNull(TEXT("A nearby player-made swim wake is available to the minnow school"), SwimWake);
+	if (SwimWake)
+	{
+		SwimWake->ConfigureAsPlayerSwimImpact();
+		Minnows->CheckForNearbySurfaceCue();
+		TestTrue(TEXT("A close player swim wake briefly widens the minnow school"),
+			FMath::IsNearlyEqual(Minnows->SurfacePulseRemaining, 1.2f));
+		TestTrue(TEXT("The swim-wake response has a bounded cooldown"),
+			FMath::IsNearlyEqual(Minnows->SurfacePulseCooldownRemaining, 3.f));
+		Minnows->SurfacePulseRemaining = 0.95f;
+		Minnows->UpdateSchool(0.f);
+		const float WidenedMinnowOrbitRadius = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
+			? Minnows->Fish[0]->GetRelativeLocation().Size2D() : 0.f;
+		TestTrue(TEXT("The wake pulse visibly widens the minnow orbit"),
+			BaseMinnowOrbitRadius > 0.f && WidenedMinnowOrbitRadius > BaseMinnowOrbitRadius * 1.5f);
+		Minnows->SurfacePulseRemaining = 0.f;
+		Minnows->CheckForNearbySurfaceCue();
+		TestTrue(TEXT("The same wake cannot repeatedly widen the school during cooldown"),
+			FMath::IsNearlyZero(Minnows->SurfacePulseRemaining));
+		Minnows->SurfacePulseCooldownRemaining = 0.f;
+		SwimWake->Destroy();
+		Minnows->UpdateSchool(0.f);
+	}
 	const FVector DaySchoolStart = Minnows->Fish.IsValidIndex(0) && Minnows->Fish[0]
 		? Minnows->Fish[0]->GetRelativeLocation() : FVector::ZeroVector;
 	Minnows->Tick(1.f);

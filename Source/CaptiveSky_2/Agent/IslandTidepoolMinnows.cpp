@@ -551,14 +551,15 @@ FString AIslandTidepoolMinnows::DescribeRecentSurfaceBreak(const FVector& Observ
 	return TEXT("A minnow made a brief surface break in the Tideglass shallows within the last few minutes. The ripple has faded; the school remains wild and nothing lasting changed.");
 }
 
-void AIslandTidepoolMinnows::CheckForNaturalSurfaceRipple()
+void AIslandTidepoolMinnows::CheckForNearbySurfaceCue()
 {
 	if (!GetWorld() || SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f) return;
 
 	constexpr float RippleResponseRadius = 250.f;
 	for (TActorIterator<AIslandPoolRippleEffect> It(GetWorld()); It; ++It)
 	{
-		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact"))) continue;
+		if (!It->ActorHasTag(TEXT("WindImpact")) && !It->ActorHasTag(TEXT("RainImpact")) &&
+			!It->ActorHasTag(TEXT("PlayerSwimImpact"))) continue;
 		if (FVector::DistSquared2D(GetActorLocation(), It->GetActorLocation()) > FMath::Square(RippleResponseRadius)) continue;
 		RespondToSurfaceRipple();
 		return;
@@ -833,7 +834,7 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 	if (RippleCheckRemaining <= 0.f)
 	{
 		RippleCheckRemaining = 0.35f;
-		CheckForNaturalSurfaceRipple();
+		CheckForNearbySurfaceCue();
 	}
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
