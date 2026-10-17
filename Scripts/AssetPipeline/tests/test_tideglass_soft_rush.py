@@ -42,6 +42,11 @@ class TideglassSoftRushTests(unittest.TestCase):
         self.assertEqual(len(values["STEM_HEIGHTS"]), len(values["STEM_BASES"]))
         self.assertGreater(min(values["STEM_HEIGHTS"]), 0.5)
         self.assertLess(max(values["STEM_HEIGHTS"]), 1.0)
+        self.assertEqual(len(set(values["STEM_BASES"])), len(values["STEM_BASES"]))
+        self.assertLessEqual(max(abs(value) for base in values["STEM_BASES"]
+                                 for value in base), 0.17)
+        self.assertLess(values["MIN_CULM_LEAN"], values["MAX_CULM_LEAN"])
+        self.assertGreater(values["MID_STEM_CURVE"], 0.0)
 
     def test_side_panicles_have_distinct_seed_pods_and_two_muted_materials(self):
         values, materials, _collisions, tree = source_contract()

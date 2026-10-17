@@ -10,13 +10,16 @@ import lib
 NAME = "TideglassSoftRush"
 PROVENANCE = "Collisionless procedural geometry authored in Blender 5.2; two flat-color material slots; no generated textures."
 STEM_BASES = (
-    (-0.14, -0.10), (-0.07, 0.13), (0.03, -0.16), (0.12, 0.07),
-    (0.19, -0.03), (-0.19, 0.04), (-0.11, 0.20), (0.07, 0.19),
-    (0.23, 0.12), (0.01, 0.03), (-0.24, -0.09), (0.16, -0.18),
-    (-0.03, -0.24), (0.24, -0.14), (-0.18, 0.17), (0.10, -0.02),
+    (-0.10, -0.07), (-0.05, 0.09), (0.02, -0.11), (0.08, 0.05),
+    (0.13, -0.02), (-0.13, 0.03), (-0.08, 0.14), (0.05, 0.13),
+    (0.16, 0.08), (0.01, 0.02), (-0.17, -0.06), (0.11, -0.13),
+    (-0.02, -0.17), (0.17, -0.10), (-0.13, 0.12), (0.07, -0.01),
 )
 STEM_HEIGHTS = (0.66, 0.78, 0.59, 0.86, 0.72, 0.63, 0.82, 0.69,
                 0.57, 0.91, 0.74, 0.61, 0.80, 0.68, 0.55, 0.76)
+MIN_CULM_LEAN = 0.025
+MAX_CULM_LEAN = 0.065
+MID_STEM_CURVE = 0.012
 SEED_BRANCHES = 3
 SPIKELETS_PER_BRANCH = 3
 
@@ -44,10 +47,14 @@ def build(A):
     for stem_index, ((x, y), height) in enumerate(zip(STEM_BASES, STEM_HEIGHTS)):
         base = Vector((x, y, 0.004))
         lean_angle = stem_index * 2.399963229728653
-        lean = Vector((0.025 * math.cos(lean_angle),
-                       0.025 * math.sin(lean_angle), 0.0))
+        lean_length = MIN_CULM_LEAN + (MAX_CULM_LEAN - MIN_CULM_LEAN) * (stem_index % 5) / 4.0
+        lean = Vector((lean_length * math.cos(lean_angle),
+                       lean_length * math.sin(lean_angle), 0.0))
+        curve = Vector((MID_STEM_CURVE * math.cos(lean_angle + 1.1),
+                        MID_STEM_CURVE * math.sin(lean_angle + 1.1), 0.0))
         top = base + lean + Vector((0.0, 0.0, height))
         path = [base.lerp(top, step / 6.0)
+                + curve * math.sin(math.pi * step / 6.0)
                 + Vector((0.0, 0.0, 0.006 * math.sin(math.pi * step / 6.0)))
                 for step in range(7)]
         A.tube("soft_rush_stem", path, 0.0048, segs=6,
