@@ -12,12 +12,13 @@ values. This keeps the resident description tied to the actual presentation
 without changing the weather calculation or making the material a hard project
 dependency.
 
-Validation: UE 5.8.3 `CaptiveSky_2Editor` built successfully in the existing
-`Saved/CompileScratch/Claude_Props` project (7 actions, including
-`IslandRainbow.cpp` and `IslandRainbowTests.cpp`). The focused automation test
-compiled but was not run: opening this project for NullRHI automation has
-repeatedly crashed before tests begin with the documented Core null-access
-startup failure (`F405610C114D120D4B6F5ABA901EC469AC9FAA26`). No Content assets
-or level data were changed. Once that startup issue is resolved, run
-`CaptiveSky2.Agent.IslandRainbow` and verify both a renderable material and the
-missing-material path; in-world visual review remains pending.
+Validation: the current-source UE 5.8.3 scratch target built successfully, then
+`CaptiveSky2.Agent.IslandRainbow` passed under NullRHI with agent thinking
+disabled, zero model requests, a 120-second cap, and the Model Context Protocol
+plugin disabled. Log:
+`Saved/CompileScratch/Codex_VisitorResonance_20261017/Saved/Logs/Codex_Rainbow_CurrentSource_20261017.log`.
+The test covers the weather window, horizon geometry, resident observation
+thresholds, missing-material suppression, and non-finite inputs. It is a pure
+automation pass: it does not load the optional rainbow material or prove its
+appearance. No Content assets or level data were changed; real-RHI material and
+in-world visual review remain pending.
