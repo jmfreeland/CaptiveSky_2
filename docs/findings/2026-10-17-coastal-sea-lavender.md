@@ -26,3 +26,16 @@ Next gate: import into an isolated Unreal trial folder and inspect its material,
 scale, silhouette and salt-meadow ground fit under real lighting. Only after
 that should a sparse test population be considered and profiled against the
 30-FPS floor. Do not add it to the main map from this candidate review alone.
+
+## Unreal import attempt
+
+The user editor process was absent at the time of the attempt. The documented
+UE 5.8.3 `UnrealEditor-Cmd` content-only import was run with an isolated
+destination (`CoastalSeaLavender_20261017`), `-NullRHI`, a project-local shader
+working directory, and an explicit project-local `-abslog` path. PowerShell
+reported exit code 0, but the expected Unreal log, importer report, and
+destination folder were all absent. An engine-only `-version` probe also exited
+0 without console text. Therefore this is **not** evidence of a successful
+import, and no Content assets were created. Diagnose command execution/log
+routing before retrying; keep the export and source as the authoritative
+candidate meanwhile.
