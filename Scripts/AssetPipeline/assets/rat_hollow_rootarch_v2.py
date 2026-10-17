@@ -54,6 +54,45 @@ COLLISION_BOXES = (
 NEST_DETAIL_Z_OFFSET_M = -0.17
 NEST_BED_SCALE = (1.5, 1.4, 1.25)
 REAR_SOIL_Z_OFFSET_M = 0.09
+TRUNK_UV_CENTER_Y_M = 0.02
+TRUNK_UV_CENTER_Z_M = 0.43
+TRUNK_UV_RADIUS_M = 0.40
+
+
+def _uv_trunk_axis(bm, tile):
+    """Wrap cylindrical wood grain around the fallen trunk's local X axis."""
+    for name in list(bm.loops.layers.uv.keys()):
+        bm.loops.layers.uv.remove(bm.loops.layers.uv[name])
+    uv_layer = bm.loops.layers.uv.new("UVMap")
+    repeats_around = max(1, round(math.tau * TRUNK_UV_RADIUS_M / tile))
+
+    for face in bm.faces:
+        points = [loop.vert.co for loop in face.loops]
+        x_span = max(point.x for point in points) - min(point.x for point in points)
+        if abs(face.normal.x) > 0.85 or x_span <= 0.05:
+            # Cut ends and the ragged entrance lip face the trunk axis; keep
+            # their mapping planar instead of wrapping the bark across them.
+            for loop, point in zip(face.loops, points):
+                loop[uv_layer].uv = (
+                    point.y / tile,
+                    point.z / tile,
+                )
+            continue
+
+        angles = [
+            (math.atan2(
+                loop.vert.co.z - TRUNK_UV_CENTER_Z_M,
+                loop.vert.co.y - TRUNK_UV_CENTER_Y_M,
+            ) / math.tau) % 1.0
+            for loop in face.loops
+        ]
+        if max(angles) - min(angles) > 0.5:
+            angles = [angle + 1.0 if angle < 0.5 else angle for angle in angles]
+        for loop, angle in zip(face.loops, angles):
+            loop[uv_layer].uv = (
+                angle * repeats_around,
+                loop.vert.co.x / tile,
+            )
 
 
 def _trunk_shell_with_broken_ground_entry():
@@ -88,8 +127,17 @@ def _interior_shell_with_ground_ramp():
 
 
 def build(A):
+    base_finish = A._finish
+
+    def finish_with_trunk_uv(bm, name, mat, loc, rot, uv, grain, tile, smooth, sharp):
+        if name in ("outerShell", "innerShell"):
+            _uv_trunk_axis(bm, tile or A.tile(mat))
+            uv = None  # Preserve the explicit trunk-axis UV layer.
+        return base_finish(bm, name, mat, loc, rot, uv, grain, tile, smooth, sharp)
+
     _BASE._trunk_shell = _trunk_shell_with_broken_ground_entry
     _BASE._interior_shell = _interior_shell_with_ground_ramp
+    A._finish = finish_with_trunk_uv
     _BASE.build(A)
 
     # Seat the straw and soil on the lowered interior floor rather than leaving

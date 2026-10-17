@@ -89,6 +89,20 @@ class RatHollowRootArchV2Tests(unittest.TestCase):
         self.assertTrue(all(scale > 1.0 for scale in config["NEST_BED_SCALE"]))
         self.assertGreater(config["REAR_SOIL_Z_OFFSET_M"], 0.0)
 
+    def test_trunk_shells_use_cylindrical_uvs_along_their_length(self):
+        tree = ast.parse(ASSET_SCRIPT.read_text(encoding="utf-8"), filename=str(ASSET_SCRIPT))
+        functions = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        uv_source = ast.get_source_segment(ASSET_SCRIPT.read_text(encoding="utf-8"), functions["_uv_trunk_axis"])
+        build_source = ast.get_source_segment(ASSET_SCRIPT.read_text(encoding="utf-8"), functions["build"])
+        self.assertIn("math.atan2", uv_source)
+        self.assertIn("math.tau", uv_source)
+        self.assertIn("loop.vert.co.x / tile", uv_source)
+        self.assertIn('name in ("outerShell", "innerShell")', build_source)
+        self.assertIn("_uv_trunk_axis(bm", build_source)
+
 
 if __name__ == "__main__":
     unittest.main()
