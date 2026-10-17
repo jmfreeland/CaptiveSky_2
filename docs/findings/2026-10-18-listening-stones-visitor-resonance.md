@@ -20,3 +20,18 @@ per visit, re-entry suppression, and the shared natural-gust cooldown. The
 existing editor process is unresponsive, so the automation test and normal
 viewport/game audio-light review remain unrun. Do not treat compile evidence as
 proof of in-game audibility or visual quality.
+
+## Isolated runtime validation follow-up (2026-10-17)
+
+The project was copied into an ignored scratch directory with its own `Binaries`,
+`Intermediate`, `Saved`, and DDC while linking `Source` and `Content` back to the
+working tree. The UE 5.8.3 editor target built and linked there successfully
+(173 actions, 240.31 seconds), leaving the open editor's DLL untouched.
+
+Launching that scratch project with `UnrealEditor-Cmd -NullRHI` for the focused
+automation test crashed before the test ran: `EXCEPTION_ACCESS_VIOLATION` reading
+null, with crash hash `F405610C114D120D4B6F5ABA901EC469AC9FAA26`. This matches the
+previously observed project-bootstrap NullRHI crash. No second launch using the
+same startup path is warranted. The focused automation and in-game audio/light
+review therefore remain outstanding; successful compilation is the only new
+validation evidence. The user's main editor process was left untouched.
