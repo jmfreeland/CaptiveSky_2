@@ -201,7 +201,7 @@ AIslandWeather::AIslandWeather()
 	const FName MeadowFlowerComponentNames[MeadowFlowerSpeciesCount] =
 		{ TEXT("IslandMeadowFlowerA"), TEXT("IslandMeadowFlowerB"), TEXT("IslandMeadowFlowerC"),
 		  TEXT("IslandMeadowFlowerD"), TEXT("IslandMeadowFlowerE"), TEXT("IslandMeadowFlowerF"),
-		  TEXT("IslandMeadowFlowerG"), TEXT("IslandMeadowFlowerH") };
+		  TEXT("IslandMeadowFlowerG"), TEXT("IslandMeadowFlowerH"), TEXT("IslandMeadowBluebells") };
 	for (int32 SpeciesIndex = 0; SpeciesIndex < MeadowFlowerSpeciesCount; ++SpeciesIndex)
 	{
 		UHierarchicalInstancedStaticMeshComponent* MeadowFlower =
@@ -291,6 +291,7 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerF(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_20_01.flower_20_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerG(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_02_01.flower_02_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerH(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_03_01.flower_03_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> WoodlandBluebells(TEXT("/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/SM_WoodlandBluebells_01.SM_WoodlandBluebells_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CattailMesh(TEXT("/Game/Plants/Meshes/Typha_latifolia_LD.Typha_latifolia_LD"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> FestucaMesh(TEXT("/Game/Plants/Meshes/Festuca_gautieri_LD.Festuca_gautieri_LD"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> PhalarisMesh(TEXT("/Game/Plants/Meshes/Phalaris_arundinacea_LD.Phalaris_arundinacea_LD"));
@@ -313,6 +314,7 @@ AIslandWeather::AIslandWeather()
 	if (MeadowFlowerF.Succeeded()) IslandMeadowFlowers[5]->SetStaticMesh(MeadowFlowerF.Object);
 	if (MeadowFlowerG.Succeeded()) IslandMeadowFlowers[6]->SetStaticMesh(MeadowFlowerG.Object);
 	if (MeadowFlowerH.Succeeded()) IslandMeadowFlowers[7]->SetStaticMesh(MeadowFlowerH.Object);
+	if (WoodlandBluebells.Succeeded()) IslandMeadowFlowers[8]->SetStaticMesh(WoodlandBluebells.Object);
 	if (CattailMesh.Succeeded()) IslandCattails->SetStaticMesh(CattailMesh.Object);
 	if (FestucaMesh.Succeeded()) IslandFestuca->SetStaticMesh(FestucaMesh.Object);
 	if (PhalarisMesh.Succeeded()) IslandPhalaris->SetStaticMesh(PhalarisMesh.Object);
@@ -1585,11 +1587,11 @@ void AIslandWeather::InitializeGroundCover()
 							}
 						}
 					}
-					UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d Fab flowers (%d Tideglass pollinator sites, %d in the ListeningStones meadow; %d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig) across %d general candidate sites plus up to %d Tideglass slots after %d bounded traces."),
+					UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow accents placed %d flowers (%d Tideglass pollinator sites, %d in the ListeningStones meadow; %d species: %d pale, %d broad-petal, %d yellow, %d pink spray, %d low white, %d daisy, %d purple spike, %d pink sprig, %d woodland bluebell clumps) across %d general candidate sites plus up to %d Tideglass slots after %d bounded traces."),
 					MeadowFlowerPatchCount, TideglassPollinatorSitesPlaced, ListeningStonesMeadowFlowerCount, MeadowFlowerSpeciesCount,
 					MeadowFlowerSpeciesCounts[0], MeadowFlowerSpeciesCounts[1], MeadowFlowerSpeciesCounts[2],
 					MeadowFlowerSpeciesCounts[3], MeadowFlowerSpeciesCounts[4], MeadowFlowerSpeciesCounts[5],
-					MeadowFlowerSpeciesCounts[6], MeadowFlowerSpeciesCounts[7],
+					MeadowFlowerSpeciesCounts[6], MeadowFlowerSpeciesCounts[7], MeadowFlowerSpeciesCounts[8],
 					MeadowFlowerCandidateSites, AIslandWeather::TideglassPollinatorFlowerSiteCount, MeadowFlowerTraceCount);
 				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),

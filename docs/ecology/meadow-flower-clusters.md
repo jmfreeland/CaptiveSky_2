@@ -1,19 +1,28 @@
 # Meadow flower pockets
 
-The eight existing Fab flower species now grow in small, coherent pockets rather
-than as isolated single accents. Each accepted deterministic site keeps one
+Eight Fab flower species and one woodland bluebell clump now grow in small,
+coherent pockets rather than as isolated single accents. Each accepted deterministic site keeps one
 anchor bloom and attempts at most two same-species neighbors, at roughly 5.75 m
 and 8.5 m from that anchor. The existing landscape-only ground trace, slope and
 sea-level checks, landmark exclusions, grove clearances, minimum spacing,
 species selection, and per-site attempt bounds still gate every bloom. Pockets
 do not create collision, navigation, memory, persistent state, or model calls.
 
-The site budget remains 512; the strict upper bound is therefore 1,536 meadow
-flowers before terrain and clearance rejections, plus the pre-existing sparse
-rhododendrons. Their total is a small cap alongside the roughly 1.8 million
-ground-cover instances, not a general increase to the grass budget. A
-deterministic offset regression checks the pocket radii and minimum stem
-spacing.
+The current code tries at most 256 general meadow sites (the first 160 are
+reserved for the ListeningStones annulus) plus eight Tideglass pollinator sites.
+With three flowers per accepted site, the strict upper bound is 792 before
+terrain and clearance rejections, plus the pre-existing sparse rhododendrons.
+That is a small cap alongside the ground-cover population, not a general
+increase to the grass budget. A deterministic offset regression checks the
+pocket radii and minimum stem spacing.
+
+The woodland bluebell mesh is used as the ninth deterministic patch variant,
+not scattered as a separate population. Its HISM shares the existing
+collisionless, navigation-free, culling, cleanup, and sway paths. Adding it
+does not change candidate sites, per-site attempts, flower count ceiling,
+ground-cover count, or model-request budget. The asset is currently stored in
+the local generated-content review folder; a clean checkout needs the existing
+ComfyBlender export/import step before the runtime reference can resolve.
 
 ## UE 5.8.3 validation (2026-10-10)
 
@@ -36,3 +45,25 @@ The roughly 631-instance increase over the previous 359-flower baseline still
 needs a matched rendered view and frame-time profile. The grouping intent and
 placement bounds are verified; gameplay-scale readability and performance are
 not yet verified.
+
+## Woodland bluebell variant (2026-10-17)
+
+The existing locally imported `WoodlandBluebells` clump is now a ninth
+deterministic meadow-pocket variant. It uses the same HISM lifecycle, sway,
+culling, collision and navigation policy as the eight Fab flower forms; it
+does not add placement sites or raise the per-site or ground-cover limits.
+The focused UE 5.8.3 `CaptiveSky2.Agent.MeadowFlowerSpecies` automation passed
+against the isolated scratch build with NullRHI, resident thinking disabled,
+and zero model requests. It confirmed the imported mesh resolves and the
+bluebell component is non-colliding and excluded from navigation.
+
+The broader `GroundCover` automation still has four failing assertions outside
+the new species contract: the synthetic landscape did not populate all low
+ground-plant variants, and its non-rendered character fixture did not exercise
+resident-driven grass bending. The foliage-component count and all nine
+species checks now pass. This is not a rendered quality or performance check.
+The source asset is in the ignored local review folder
+`Content/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/`; other
+checkouts need to run the existing ComfyBlender export/import pipeline before
+the new species can render. A gameplay-scale screenshot and 30 FPS screening
+pass remain necessary before treating its placement as visually approved.

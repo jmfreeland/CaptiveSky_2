@@ -52,6 +52,32 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandNightEcologyTest, "CaptiveSky2.Agent.Nig
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandGroundCoverTest, "CaptiveSky2.Agent.GroundCover",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMeadowFlowerSpeciesTest, "CaptiveSky2.Agent.MeadowFlowerSpecies",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
+{
+	const AIslandWeather* WeatherDefaults = AIslandWeather::StaticClass()->GetDefaultObject<AIslandWeather>();
+	if (!TestNotNull(TEXT("Island weather class defaults are available"), WeatherDefaults)) return false;
+	TestEqual(TEXT("The capped meadow mix has nine deterministic species components"),
+		WeatherDefaults->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
+	if (!WeatherDefaults->IslandMeadowFlowers.IsValidIndex(8)) return false;
+
+	UStaticMesh* Bluebells = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/SM_WoodlandBluebells_01.SM_WoodlandBluebells_01"));
+	TestNotNull(TEXT("The imported woodland bluebell clump resolves"), Bluebells);
+	const UHierarchicalInstancedStaticMeshComponent* BluebellInstances = WeatherDefaults->IslandMeadowFlowers[8];
+	TestNotNull(TEXT("A dedicated HISM holds the woodland bluebell variant"), BluebellInstances);
+	if (BluebellInstances)
+	{
+		TestEqual(TEXT("The bluebell HISM uses its imported mesh"), BluebellInstances->GetStaticMesh().Get(), Bluebells);
+		TestEqual(TEXT("Bluebells remain non-colliding"), BluebellInstances->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Bluebells do not alter navigation"), BluebellInstances->CanEverAffectNavigation());
+	}
+
+	return true;
+}
+
 bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 {
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
@@ -142,7 +168,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherFoliageComponents;
 	Weather->GetComponents(WeatherFoliageComponents);
-	TestEqual(TEXT("All current foliage component groups are covered by the rendering contract"), WeatherFoliageComponents.Num(), 22);
+	TestEqual(TEXT("All current foliage component groups are covered by the rendering contract"), WeatherFoliageComponents.Num(), 23);
 	const bool bExpectedFoliageDistanceFields = FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageDistanceFields"));
 	for (const UHierarchicalInstancedStaticMeshComponent* Component : WeatherFoliageComponents)
 	{
@@ -238,7 +264,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->IslandFestuca->GetStaticMesh() && Weather->IslandFestuca->GetStaticMesh()->GetStaticMaterials().Num() == 6);
 	TestTrue(TEXT("PlantFactory Phalaris mesh and all five imported materials resolve"),
 		Weather->IslandPhalaris->GetStaticMesh() && Weather->IslandPhalaris->GetStaticMesh()->GetStaticMaterials().Num() == 5);
-	TestEqual(TEXT("Eight collisionless HISM components carry the expanded Fab meadow flower mix"),
+	TestEqual(TEXT("Nine collisionless HISM components carry the meadow flower mix"),
 		Weather->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
 	const TCHAR* MeadowFlowerPaths[AIslandWeather::MeadowFlowerSpeciesCount] = {
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"),
@@ -248,18 +274,19 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_13_01.flower_13_01"),
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_20_01.flower_20_01"),
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_02_01.flower_02_01"),
-		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_03_01.flower_03_01") };
+		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_03_01.flower_03_01"),
+		TEXT("/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/SM_WoodlandBluebells_01.SM_WoodlandBluebells_01") };
 	for (int32 SpeciesIndex = 0; SpeciesIndex < Weather->IslandMeadowFlowers.Num(); ++SpeciesIndex)
 	{
 		UStaticMesh* MeadowFlowerMesh = LoadObject<UStaticMesh>(nullptr, MeadowFlowerPaths[SpeciesIndex]);
-		TestNotNull(FString::Printf(TEXT("Fab meadow flower mesh %d is available"), SpeciesIndex), MeadowFlowerMesh);
-		TestNotNull(FString::Printf(TEXT("Fab meadow flower HISM %d is present"), SpeciesIndex), Weather->IslandMeadowFlowers[SpeciesIndex].Get());
+		TestNotNull(FString::Printf(TEXT("Meadow flower mesh %d is available"), SpeciesIndex), MeadowFlowerMesh);
+		TestNotNull(FString::Printf(TEXT("Meadow flower HISM %d is present"), SpeciesIndex), Weather->IslandMeadowFlowers[SpeciesIndex].Get());
 		if (Weather->IslandMeadowFlowers[SpeciesIndex])
 		{
 			TestTrue(TEXT("Imported flowers stay nonblocking and outside navigation"),
 				Weather->IslandMeadowFlowers[SpeciesIndex]->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 				!Weather->IslandMeadowFlowers[SpeciesIndex]->CanEverAffectNavigation());
-			TestEqual(FString::Printf(TEXT("Fab meadow flower HISM %d uses its matching imported mesh"), SpeciesIndex),
+			TestEqual(FString::Printf(TEXT("Meadow flower HISM %d uses its matching imported mesh"), SpeciesIndex),
 				Weather->IslandMeadowFlowers[SpeciesIndex]->GetStaticMesh().Get(), MeadowFlowerMesh);
 		}
 	}
@@ -484,8 +511,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		MinimumFlowerPatches = FMath::Min(MinimumFlowerPatches, Count);
 		MaximumFlowerPatches = FMath::Max(MaximumFlowerPatches, Count);
 	}
-	TestTrue(TEXT("All eight imported flower forms occupy balanced, spatially coherent meadow patches"),
-		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 28);
+	TestTrue(TEXT("All nine flower forms occupy balanced, spatially coherent meadow patches"),
+		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 38);
 	TestTrue(TEXT("ListeningStones flower pockets stay outside the landmark clearing and within the 45 m flower fade range"),
 		AIslandWeather::ListeningStonesFlowerInnerRadius > 2600.f &&
 		AIslandWeather::ListeningStonesFlowerInnerRadius < AIslandWeather::ListeningStonesFlowerOuterRadius &&

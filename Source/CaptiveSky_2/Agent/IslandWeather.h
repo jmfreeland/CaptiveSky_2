@@ -69,8 +69,8 @@ public:
 	double WeatherTimeOffset = 0.0;
 	/** Storms add up to this fraction on top of the usual wind. */
 	static constexpr float StormWindBoost = 0.9f;
-	/** Number of visually distinct Fab flower meshes used for the capped meadow accents. */
-	static constexpr int32 MeadowFlowerSpeciesCount = 8;
+	/** Number of locally available flower forms used for the capped meadow accents. */
+	static constexpr int32 MeadowFlowerSpeciesCount = 9;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
 	static constexpr int32 MeadowFlowersPerPocket = 3;
 	/** Small, deterministic pollinator edge just beyond the Tideglass water clearance. */
@@ -126,6 +126,7 @@ private:
 	friend class FIslandWeatherTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandGroundCoverTest;
+	friend class FIslandMeadowFlowerSpeciesTest;
 	friend class FIslandFoxResidentGlanceCaptureTest;
 	friend class FIslandFoxStagAwarenessCaptureTest;
 	friend class FIslandMinnowTest;
