@@ -34,3 +34,21 @@ reload; do not delete the graph or PCG map based on the old floating appearance.
 Evidence: `Saved/Logs/Codex_PCGWorldReadOnlyFinal_20261011.log` and the
 read-only inventory script at
 `Saved/Playtests/Codex_PCGWorldAudit_20261011/Inspect-PCGWorld.py`.
+
+## Current saved-map audit boundary (2026-10-17)
+
+A fresh file hash of `Content/Maps/Island.umap` is
+`72708A860E97801191D7ED404C16CC99026796B1186C8084DD7F8199BE699083`, which
+differs from the `CCCC9742...996A` hash recorded during the 2026-10-11 PCG
+cleanup. This check read only the package bytes; it did not load Unreal or
+verify the current actor/component state. The 2026-10-11 finding that the
+Island's forest PCG component was deactivated and its five generated ISM
+components hidden is therefore historical evidence, not proof of today's
+saved map. Do not infer that the forest was re-enabled or remove the preserved
+PCG graph/test map from this hash difference alone.
+
+Before changing PCG state, rerun `Scripts/Inspect-IslandPCGForest.py` against
+the current saved Island when no interactive editor is open, as that script's
+read-only usage notes require. If the floating forest is visible only in an
+existing editor/PIE session, first establish whether that session has unsaved
+work and compare it with a clean Island reload; do not overwrite the live map.
