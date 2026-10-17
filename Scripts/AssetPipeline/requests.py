@@ -2,6 +2,8 @@
 """Review resident proposals without executing their text or launching asset tools."""
 
 import argparse
+from contextlib import contextmanager
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -9,6 +11,8 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+from ctypes import wintypes
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -19,6 +23,8 @@ MAKE_SCRIPT = PIPELINE_ROOT / "make.py"
 ASSET_SCRIPT_NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 FINAL_STATUSES = ("accepted", "generated", "declined")
 ALL_STATUSES = ("pending_review",) + FINAL_STATUSES
+INBOX_LOCK_TIMEOUT_SECONDS = 5.0
+INBOX_LOCK_RETRY_SECONDS = 0.025
 STATUS_TRANSITIONS = {
     "pending_review": ("accepted", "declined"),
     "accepted": ("generated", "declined"),
@@ -29,6 +35,55 @@ STATUS_TRANSITIONS = {
 
 class InboxError(Exception):
     """Raised when inbox contents cannot be safely reviewed or updated."""
+
+
+@contextmanager
+def inbox_lock(path: Path):
+    """Share the exclusive Windows lock used by Unreal and the Discord gateway."""
+    lock_path = Path(str(path.resolve()) + ".lock")
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            raise InboxError("Cross-process proposal review locking is currently supported on Windows only.")
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel32.CreateFileW
+        create_file.argtypes = (
+            wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+        )
+        create_file.restype = wintypes.HANDLE
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = (wintypes.HANDLE,)
+        close_handle.restype = wintypes.BOOL
+
+        invalid_handle = ctypes.c_void_p(-1).value
+        deadline = time.monotonic() + INBOX_LOCK_TIMEOUT_SECONDS
+        handle = None
+        while True:
+            handle = create_file(
+                str(lock_path), 0x80000000 | 0x40000000, 0,
+                None, 4, 0x80, None,
+            )
+            if handle not in (None, invalid_handle):
+                break
+            error_code = ctypes.get_last_error()
+            if error_code not in (32, 33):
+                raise InboxError(
+                    f"The asset request inbox lock could not be opened (Windows error {error_code})."
+                )
+            if time.monotonic() >= deadline:
+                raise InboxError("The asset request inbox is busy; no changes were made. Please try again shortly.")
+            time.sleep(INBOX_LOCK_RETRY_SECONDS)
+
+        try:
+            yield
+        finally:
+            close_handle(handle)
+    except InboxError:
+        raise
+    except OSError as exc:
+        raise InboxError(f"Cannot acquire the asset request inbox lock: {exc}") from exc
 
 
 def read_records(path: Path) -> list[dict]:
@@ -185,52 +240,61 @@ def run_accepted_build(records: list[dict], request_id: str, asset_script: str) 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        records = read_records(args.inbox)
-        if args.command == "list":
-            visible = records if args.all else [record for record in records if record["status"] == "pending_review"]
-            if not visible:
-                print("No matching resident proposals.")
-                return 0
-            for index, record in enumerate(visible):
-                if index:
-                    print()
-                print_record(record)
-            return 0
-
         if args.command == "build":
+            with inbox_lock(args.inbox):
+                records = read_records(args.inbox)
             return run_accepted_build(records, args.request_id, args.asset_script)
 
-        if args.command == "route":
+        if args.command == "list" and not args.inbox.exists():
+            print("No matching resident proposals.")
+            return 0
+
+        # Hold the same lock from read through atomic replacement. Otherwise a
+        # concurrent Unreal/Discord append between those operations could be lost.
+        with inbox_lock(args.inbox):
+            records = read_records(args.inbox)
+            if args.command == "list":
+                visible = records if args.all else [record for record in records if record["status"] == "pending_review"]
+                if not visible:
+                    print("No matching resident proposals.")
+                    return 0
+                for index, record in enumerate(visible):
+                    if index:
+                        print()
+                    print_record(record)
+                return 0
+
+            if args.command == "route":
+                matches = [record for record in records if record["id"] == args.request_id]
+                if not matches:
+                    raise InboxError(f"Request ID {args.request_id!r} was not found; no changes made.")
+                record = matches[0]
+                if record["status"] != "accepted":
+                    raise InboxError("Only accepted requests may be routed; no changes made.")
+                if record.get("request_type", "new_object") != "upgrade":
+                    raise InboxError("Only upgrade requests can be routed; new objects already use ComfyBlender.")
+                if args.pipeline == "ComfyBlender" and record.get("upgrade_kind") not in ("aesthetic", "variation"):
+                    raise InboxError("Functionality upgrades stay on human review; no changes made.")
+                record["pipeline"] = args.pipeline
+                write_records(args.inbox, records)
+                print(f"Routed {args.request_id} to {args.pipeline}. No generator or Unreal import was run.")
+                return 0
+
             matches = [record for record in records if record["id"] == args.request_id]
             if not matches:
                 raise InboxError(f"Request ID {args.request_id!r} was not found; no changes made.")
             record = matches[0]
-            if record["status"] != "accepted":
-                raise InboxError("Only accepted requests may be routed; no changes made.")
-            if record.get("request_type", "new_object") != "upgrade":
-                raise InboxError("Only upgrade requests can be routed; new objects already use ComfyBlender.")
-            if args.pipeline == "ComfyBlender" and record.get("upgrade_kind") not in ("aesthetic", "variation"):
-                raise InboxError("Functionality upgrades stay on human review; no changes made.")
-            record["pipeline"] = args.pipeline
+            current_status = record["status"]
+            if args.status not in STATUS_TRANSITIONS[current_status]:
+                allowed = ", ".join(STATUS_TRANSITIONS[current_status]) or "no further transitions"
+                raise InboxError(
+                    f"Request {args.request_id!r} is {current_status}; allowed next status: {allowed}. "
+                    "No changes made."
+                )
+            record["status"] = args.status
             write_records(args.inbox, records)
-            print(f"Routed {args.request_id} to {args.pipeline}. No generator or Unreal import was run.")
+            print(f"Marked {args.request_id} as {args.status}. No generator or Unreal import was run.")
             return 0
-
-        matches = [record for record in records if record["id"] == args.request_id]
-        if not matches:
-            raise InboxError(f"Request ID {args.request_id!r} was not found; no changes made.")
-        record = matches[0]
-        current_status = record["status"]
-        if args.status not in STATUS_TRANSITIONS[current_status]:
-            allowed = ", ".join(STATUS_TRANSITIONS[current_status]) or "no further transitions"
-            raise InboxError(
-                f"Request {args.request_id!r} is {current_status}; allowed next status: {allowed}. "
-                "No changes made."
-            )
-        record["status"] = args.status
-        write_records(args.inbox, records)
-        print(f"Marked {args.request_id} as {args.status}. No generator or Unreal import was run.")
-        return 0
     except InboxError as exc:
         print(f"Request review error: {exc}", file=sys.stderr)
         return 2

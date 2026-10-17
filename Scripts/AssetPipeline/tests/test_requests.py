@@ -48,6 +48,30 @@ class RequestInboxTests(unittest.TestCase):
         )
         self.assertEqual(updated["pipeline"], "human_review")
 
+    @unittest.skipUnless(asset_requests.os.name == "nt", "The Unreal/Discord inbox lock is Windows-specific")
+    def test_review_status_update_fails_closed_while_shared_inbox_lock_is_held(self):
+        original = {
+            "id": "req-locked", "requester": "Aster", "description": "A sheltered fern patch",
+            "request_type": "upgrade", "target": "WoodlandEdge", "upgrade_kind": "variation",
+            "pipeline": "human_review", "status": "pending_review",
+        }
+        self.inbox.write_text(json.dumps(original) + "\n", encoding="utf-8")
+        before = self.inbox.read_text(encoding="utf-8")
+
+        with asset_requests.inbox_lock(self.inbox):
+            with patch.object(asset_requests, "INBOX_LOCK_TIMEOUT_SECONDS", 0):
+                self.assertEqual(asset_requests.main([
+                    "--inbox", str(self.inbox), "status", "req-locked", "accepted"
+                ]), 2)
+            self.assertEqual(self.inbox.read_text(encoding="utf-8"), before)
+
+        self.assertEqual(asset_requests.main([
+            "--inbox", str(self.inbox), "status", "req-locked", "accepted"
+        ]), 0)
+        updated = asset_requests.read_records(self.inbox)[0]
+        self.assertEqual(updated["status"], "accepted")
+        self.assertEqual(updated["target"], original["target"])
+
     def test_request_must_be_accepted_before_generation(self):
         self.inbox.write_text(
             json.dumps({"id": "req-1", "status": "pending_review", "description": "A sheltered perch"}) + "\n",

@@ -58,6 +58,8 @@ python -I Scripts/AssetPipeline/requests.py list --all
 python -I Scripts/AssetPipeline/requests.py status <request-id> accepted
 ```
 
+The reviewer takes the same exclusive `inbox.jsonl.lock` used by Unreal and the Discord gateway. Read/replace operations therefore cannot race with a live append and silently drop a proposal; if another process holds the lock, the command fails closed without changing the inbox.
+
 `accepted` only records the human decision; it does not invoke ComfyUI, Blender, or Unreal. For an accepted `new_object`, create or adapt a reviewed script under `Scripts/AssetPipeline/assets/`, build it with `make.py`, inspect its exported preview and manifest, and import it separately using the procedure above. For an `upgrade`, decide whether to use this asset pipeline, change code, author an Unreal asset, or decline the proposal; upgrades are not limited to pipeline-generated props. Mark the request `generated` only after the result is actually made, or `declined` if it will not be pursued. The inbox remains a review queue, not an autonomous asset-generation command channel.
 
 `CaptiveSky2.Agent.AssetRequestQueue` now exercises a structure target, a specific foliage-instance target, and a targetless world-level proposal. The focused Unreal 5.8.3 automation test passed on 2026-10-10.
