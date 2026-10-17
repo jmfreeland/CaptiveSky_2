@@ -13,9 +13,15 @@ runtime ecology assertion also compares dry and wet dynamic-material colors.
 
 ## Validation
 
-The change is covered by `CaptiveSky2.Agent.NightEcology` assertions for tide,
-rain, non-finite values, and the palette response. The user's Unreal Editor is
-currently open and unresponsive; by request it remains running, so the main
-project module cannot be relinked while its DLL is loaded. The source and tests
-have not yet been compiled or run in the editor during this iteration. Do not
-interpret the source-level checks as runtime validation.
+The UE 5.8.3 main target's compile-only build passed for both changed C++ files.
+To validate the complete module without relinking the main editor's loaded DLL,
+the isolated `Saved/CompileScratch/Claude_Props` target was also built and linked
+successfully (41 actions); its periwinkle implementation and ecology-test files
+matched the pushed source byte-for-byte.
+
+The focused `CaptiveSky2.Agent.NightEcology` launch against that scratch target
+did not produce a project/test log, so its exit code is not treated as a test
+pass. A separate engine-only `UnrealEditor-Cmd.exe -version` diagnostic remained
+in startup without producing a version result; only that diagnostic process was
+stopped. The user's main editor was left untouched. The change is compiled and
+linked, but its automation assertions and in-world appearance remain unverified.
