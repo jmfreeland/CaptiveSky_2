@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandRainbow.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandRainbowTest, "CaptiveSky2.Agent.IslandRainbow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -52,6 +53,19 @@ bool FIslandRainbowTest::RunTest(const FString& Parameters)
 	const float Clamped = ComputeRainbowStrength(Nonsense);
 	TestTrue(TEXT("Out-of-range inputs stay within 0..1"), Clamped >= 0.f && Clamped <= 1.f);
 
+	const float NotANumber = std::numeric_limits<float>::quiet_NaN();
+	TArray<FIslandRainbowInputs> InvalidWeather;
+	InvalidWeather.Add(Clearing); InvalidWeather.Last().SunHeight = NotANumber;
+	InvalidWeather.Add(Clearing); InvalidWeather.Last().Rain = NotANumber;
+	InvalidWeather.Add(Clearing); InvalidWeather.Last().Wetness = NotANumber;
+	InvalidWeather.Add(Clearing); InvalidWeather.Last().CloudCover = NotANumber;
+	InvalidWeather.Add(Clearing); InvalidWeather.Last().Storm = NotANumber;
+	for (int32 Index = 0; Index < InvalidWeather.Num(); ++Index)
+	{
+		TestEqual(*FString::Printf(TEXT("Non-finite weather field %d suppresses the bow"), Index),
+			ComputeRainbowStrength(InvalidWeather[Index]), 0.f);
+	}
+
 	// The morning sun sits at yaw 215, so the anti-solar point is at yaw 35, below the horizon.
 	const FVector Morning = UIslandRainbowSubsystem::AntiSolarAxis(8.f);
 	TestTrue(TEXT("Morning anti-solar point is below the horizon"), Morning.Z < 0.f);
@@ -62,5 +76,7 @@ bool FIslandRainbowTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Nothing is said without a bow"), UIslandRainbowSubsystem::DescribeRainbow(0.1f).IsEmpty());
 	TestTrue(TEXT("A faint bow is mentioned"), UIslandRainbowSubsystem::DescribeRainbow(0.5f).Contains(TEXT("faint rainbow")));
 	TestTrue(TEXT("A bright bow is mentioned"), UIslandRainbowSubsystem::DescribeRainbow(0.9f).Contains(TEXT("bright")));
+	TestTrue(TEXT("A non-finite strength is not described to residents"),
+		UIslandRainbowSubsystem::DescribeRainbow(NotANumber).IsEmpty());
 	return true;
 }

@@ -17,6 +17,12 @@ static TAutoConsoleVariable<float> CVarIslandRainbow(
 
 float ComputeRainbowStrength(const FIslandRainbowInputs& In)
 {
+	if (!FMath::IsFinite(In.SunHeight) || !FMath::IsFinite(In.Rain) || !FMath::IsFinite(In.Wetness) ||
+		!FMath::IsFinite(In.CloudCover) || !FMath::IsFinite(In.Storm))
+	{
+		return 0.f;
+	}
+
 	const auto Unit = [](float Value) { return FMath::Clamp(Value, 0.f, 1.f); };
 	// sin(3 deg) .. sin(42 deg) is the window in which a bow stands above the horizon.
 	const float Sun = FMath::SmoothStep(0.05f, 0.14f, In.SunHeight) * (1.f - FMath::SmoothStep(0.5f, 0.66f, In.SunHeight));
@@ -74,7 +80,7 @@ FVector UIslandRainbowSubsystem::AntiSolarAxis(float IslandHour)
 
 FString UIslandRainbowSubsystem::DescribeRainbow(float InStrength)
 {
-	if (InStrength < 0.3f) return FString();
+	if (!FMath::IsFinite(InStrength) || InStrength < 0.3f) return FString();
 	return InStrength > 0.7f
 		? TEXT(" A rainbow stands bright in the sky opposite the sun, the shower's last gift.")
 		: TEXT(" A faint rainbow shows in the sky opposite the sun.");
