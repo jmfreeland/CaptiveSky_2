@@ -86,6 +86,7 @@ class RatHollowRootArchV2Tests(unittest.TestCase):
     def test_nest_bedding_tracks_the_lowered_floor(self):
         config = constants()
         self.assertLess(config["NEST_DETAIL_Z_OFFSET_M"], 0.0)
+        self.assertTrue(all(scale > 1.0 for scale in config["NEST_BED_SCALE"]))
         self.assertGreater(config["REAR_SOIL_Z_OFFSET_M"], 0.0)
 
 

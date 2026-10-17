@@ -52,6 +52,7 @@ COLLISION_BOXES = (
 )
 
 NEST_DETAIL_Z_OFFSET_M = -0.17
+NEST_BED_SCALE = (1.5, 1.4, 1.25)
 REAR_SOIL_Z_OFFSET_M = 0.09
 
 
@@ -94,7 +95,12 @@ def build(A):
     # Seat the straw and soil on the lowered interior floor rather than leaving
     # them suspended at the old tunnel height.
     for obj, _material in A.parts:
-        if obj.name.startswith(("frontNestBed_", "nestTwig")):
+        if obj.name.startswith("frontNestBed_"):
+            obj.location.z += NEST_DETAIL_Z_OFFSET_M
+            obj.scale.x *= NEST_BED_SCALE[0]
+            obj.scale.y *= NEST_BED_SCALE[1]
+            obj.scale.z *= NEST_BED_SCALE[2]
+        elif obj.name.startswith("nestTwig"):
             obj.location.z += NEST_DETAIL_Z_OFFSET_M
         elif obj.name.startswith("rearSoil_"):
             obj.location.z += REAR_SOIL_Z_OFFSET_M

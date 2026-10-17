@@ -10,7 +10,7 @@ separate source/export candidate and has not been imported into the Island.
 
 - Source: `Scripts/AssetPipeline/assets/rat_hollow_rootarch_v2.py`
 - Export: `Saved/CaptiveSky/ComfyBlender/RatHollowRootArchBurrow/`
-- Overall dimensions: 187 x 118 x 89 cm; approximately 924 triangles.
+- Overall dimensions: 192 x 118 x 89 cm; approximately 924 triangles.
 - Materials: bark, hollowwood, moss, dirt, and straw.
 - Eight simple UBX colliders define two side walls, a roof, four overlapping
   floor sections, and a rear stop. The passage is 56 cm wide, with floor tops
@@ -18,6 +18,9 @@ separate source/export candidate and has not been imported into the Island.
   capsule at the center of each ramp section.
 - The entrance threshold anchor is 3 cm above the asset origin. The broken rim
   removes six lower annular sectors to merge the opening with the ground.
+- The 22.5 x 16.8 cm bedding patch is enlarged and seated on the lowered ramp;
+  it remains shallow enough to step over and does not narrow the 56 cm collider
+  corridor.
 
 ## Validation
 
