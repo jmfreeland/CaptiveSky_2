@@ -60,3 +60,19 @@ the transient SceneCapture diagnostics are unreliable; translucency/two-sided
 foliage settings, wind response, LODs, PCG distribution, and gameplay
 frame-time are also unvalidated. Do not place it in the Island until a normal
 viewport or gameplay viewpoint passes review.
+
+## Follow-up: bounded runtime integration (2026-10-17)
+
+The later change `5d3f86a` did integrate this mesh as the ninth deterministic
+meadow-flower variant. It replaces another species at an existing candidate
+site; it does not add a separate scatter pass, increase the site budget, or
+raise the per-site flower cap. The focused
+`CaptiveSky2.Agent.MeadowFlowerSpecies` test passed against the isolated UE
+5.8.3 scratch build under NullRHI, confirming that the imported mesh resolves
+and its HISM is non-colliding and excluded from navigation. This resolves the
+placement-history discrepancy, but not the visual gate described above:
+NullRHI cannot judge material appearance, player-scale readability, or the
+cost of the 5,116-triangle clump in a rendered scene. Treat bluebells as an
+integrated but visually unapproved variant until a normal viewport/gameplay
+review and a frame-time check are available. See also
+[`meadow-flower-clusters.md`](../ecology/meadow-flower-clusters.md).
