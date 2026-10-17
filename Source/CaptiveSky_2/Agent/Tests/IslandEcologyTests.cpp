@@ -2243,6 +2243,41 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("The snail naturally reopens after its brief observation response"),
 				FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining) &&
 				FMath::IsNearlyEqual(WatchablePeriwinkle->EyeStalks[0]->GetRelativeScale3D().Z, OpenPeriwinkleStalk, 0.001f));
+
+		// A settled Raven earns one quiet shell-tuck per approach; flight does not.
+		const FVector OriginalObserverLocation = Observer->GetActorLocation();
+		WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+		WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+		WatchablePeriwinkle->RavenPresenceLatch.Reset();
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(120.f, 0.f, 90.f));
+		Controller->LocomotionState = ERavenLocomotionState::Grounded;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A nearby settled Raven briefly draws the periwinkle into its shell"),
+			WatchablePeriwinkle->ObservationRestRemaining > 0.f && WatchablePeriwinkle->ObservationRestRemaining <= 1.6f);
+		WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A Raven lingering through one approach does not repeatedly tuck the periwinkle"),
+			FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining));
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(600.f, 0.f, 90.f));
+		WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(120.f, 0.f, 90.f));
+		Controller->LocomotionState = ERavenLocomotionState::Flying;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A low Raven flyby does not startle the attached snail"),
+			FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining));
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(120.f, 0.f, 500.f));
+		Controller->LocomotionState = ERavenLocomotionState::Grounded;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("A settled Raven high overhead does not startle the attached snail"),
+			FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining));
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(120.f, 0.f, 90.f));
+		Controller->LocomotionState = ERavenLocomotionState::Perched;
+		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
+		TestTrue(TEXT("Leaving the wider ring rearms one new response to a later settled approach"),
+			WatchablePeriwinkle->ObservationRestRemaining > 0.f);
+		Observer->SetActorLocation(OriginalObserverLocation);
+		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 			WatchablePeriwinkle->HomeLocation = OriginalPeriwinkleHome;
 			WatchablePeriwinkle->SetActorLocation(OriginalPeriwinkleLocation);
 			Clock->CurrentHour = OriginalPeriwinkleTestHour;

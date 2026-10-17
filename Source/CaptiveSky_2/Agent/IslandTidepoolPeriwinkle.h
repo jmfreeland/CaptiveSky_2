@@ -10,6 +10,7 @@ class UProceduralMeshComponent;
 class UStaticMeshComponent;
 class AIslandDayNight;
 class AIslandWeather;
+class ARavenAgentAIController;
 
 /** A tiny, slow-moving periwinkle that adds close-range life to Tideglass's rocky edge. */
 UCLASS()
@@ -61,13 +62,16 @@ private:
 	float AttentionYaw = 0.f;
 	float ObservationRestRemaining = 0.f;
 	float ObservationCooldownRemaining = 0.f;
+	float RavenCheckRemaining = 0.f;
 	float ShellWetness = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	TWeakObjectPtr<AIslandWeather> IslandWeather;
+	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
+	void CheckForNearbyRavenDisturbance();
 	void BuildShellSpiral();
 	void ApplyPalette();
 };

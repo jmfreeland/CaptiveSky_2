@@ -3,6 +3,7 @@
 #include "IslandDayNight.h"
 #include "IslandTideglassSubsystem.h"
 #include "IslandWeather.h"
+#include "RavenAgentAIController.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
@@ -167,6 +168,37 @@ bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
 	return true;
 }
 
+void AIslandTidepoolPeriwinkle::CheckForNearbyRavenDisturbance()
+{
+	if (!GetWorld()) return;
+	constexpr float RavenRadius = 300.f;
+	constexpr float RavenRearmRadius = 520.f;
+	constexpr float MaximumVerticalOffset = 180.f;
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		const APawn* Raven = It->GetPawn();
+		if (!IsValid(Raven)) continue;
+
+		const FVector Offset = Raven->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (RavenPresenceLatch.Get() == *It && DistanceSquared > FMath::Square(RavenRearmRadius))
+			RavenPresenceLatch.Reset();
+
+		const bool bSettledRaven = It->LocomotionState == ERavenLocomotionState::Grounded ||
+			It->LocomotionState == ERavenLocomotionState::Hopping ||
+			It->LocomotionState == ERavenLocomotionState::Perched;
+		if (!bSettledRaven || FMath::Abs(Offset.Z) > MaximumVerticalOffset ||
+			DistanceSquared > FMath::Square(RavenRadius) || RavenPresenceLatch.Get() == *It)
+			continue;
+
+		// Notice only the first settled approach. A bird lingering nearby does not
+		// keep the snail tucked, and an airborne pass never counts as a threat cue.
+		RavenPresenceLatch = *It;
+		RespondToQuietObservation();
+		return;
+	}
+}
+
 void AIslandTidepoolPeriwinkle::SetColorVariant(int32 Variant)
 {
 	ColorVariant = FMath::Clamp(Variant, 0, 2);
@@ -266,6 +298,12 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ObservationRestRemaining = FMath::Max(0.f, ObservationRestRemaining - SafeDelta);
 	ObservationCooldownRemaining = FMath::Max(0.f, ObservationCooldownRemaining - SafeDelta);
+	RavenCheckRemaining = FMath::Max(0.f, RavenCheckRemaining - SafeDelta);
+	if (RavenCheckRemaining <= 0.f)
+	{
+		RavenCheckRemaining = 0.4f;
+		CheckForNearbyRavenDisturbance();
+	}
 	const float TideRest = ExposureRestAmount(TideOffset);
 	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);
 	const float RainIntensity = IslandWeather.IsValid() && GetWorld()
