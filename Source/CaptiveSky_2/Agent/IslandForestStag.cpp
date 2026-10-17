@@ -71,6 +71,7 @@ void AIslandForestStag::PlayLoop(UAnimSequence* Animation)
 void AIslandForestStag::BeginGrazing()
 {
 	bMoving = false;
+	bIdleLooking = false;
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
@@ -79,6 +80,8 @@ void AIslandForestStag::BeginGrazing()
 	bStartled = false;
 	MoveSpeed = 0.f;
 	WakeRemaining = 0.f;
+	IdleLookRemaining = 0.f;
+	IdleLookCheckRemaining = FMath::FRandRange(4.f, 8.f);
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
@@ -347,12 +350,14 @@ bool AIslandForestStag::ChooseWanderTarget(FVector& OutTarget) const
 void AIslandForestStag::StartMove(const FVector& Target, bool bRun)
 {
 	if (bResting) return;
+	bIdleLooking = false;
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
 	bNoticingFox = false;
 	bNoticingVisitor = false;
 	WakeRemaining = 0.f;
+	IdleLookRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
@@ -389,6 +394,7 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	if (bResting == bShouldRest) return;
 	bResting = bShouldRest;
 	bMoving = false;
+	bIdleLooking = false;
 	bWakingUp = false;
 	bListeningToChime = false;
 	bNoticingResident = false;
@@ -398,6 +404,8 @@ void AIslandForestStag::SetResting(bool bShouldRest)
 	MoveSpeed = 0.f;
 	ActivityRemaining = 0.f;
 	WakeRemaining = 0.f;
+	IdleLookRemaining = 0.f;
+	IdleLookCheckRemaining = 0.f;
 	ListeningRemaining = 0.f;
 	ResidentNoticeRemaining = 0.f;
 	FoxNoticeRemaining = 0.f;
@@ -501,8 +509,34 @@ void AIslandForestStag::Tick(float DeltaSeconds)
 		if (VisitorNoticeRemaining <= 0.f) BeginGrazing();
 		return;
 	}
+	if (bIdleLooking)
+	{
+		IdleLookRemaining -= Delta;
+		if (IdleLookRemaining <= 0.f)
+		{
+			bIdleLooking = false;
+			IdleLookCheckRemaining = FMath::FRandRange(12.f, 22.f);
+			PlayLoop(GrazeAnimation);
+		}
+		return;
+	}
 	if (!bMoving)
 	{
+		if (LookAroundAnimation)
+		{
+			IdleLookCheckRemaining -= Delta;
+			if (IdleLookCheckRemaining <= 0.f && ActivityRemaining > 1.5f)
+			{
+				bIdleLooking = true;
+				IdleLookRemaining = FMath::Max(0.1f, LookAroundAnimation->GetPlayLength());
+				if (DeerMesh)
+				{
+					DeerMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+					DeerMesh->PlayAnimation(LookAroundAnimation, false);
+				}
+				return;
+			}
+		}
 		ActivityRemaining -= Delta;
 		if (ActivityRemaining <= 0.f)
 		{

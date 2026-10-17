@@ -235,6 +235,31 @@ bool FIslandForestStagTest::RunTest(const FString& Parameters)
 	Deer->Tick(WakeDuration);
 	TestFalse(TEXT("The stag returns to grazing after standing"), Deer->bWakingUp || Deer->IsResting());
 
+	// A quiet grazing interval occasionally includes one small, finite scan of the
+	// surroundings; this remains local animation, not an interaction or model turn.
+	Deer->ActivityRemaining = 30.f;
+	Deer->IdleLookCheckRemaining = 0.01f;
+	Deer->ThunderCheckRemaining = 100.f;
+	Deer->RavenCheckRemaining = 100.f;
+	Deer->ListeningStonesCheckRemaining = 100.f;
+	Deer->ResidentPresenceCheckRemaining = 100.f;
+	Deer->FoxPresenceCheckRemaining = 100.f;
+	Deer->VisitorCheckRemaining = 100.f;
+	const FVector BeforeIdleLook = Deer->GetActorLocation();
+	Deer->Tick(0.1f);
+	TestTrue(TEXT("The stag occasionally pauses grazing to look around"), Deer->bIdleLooking && !Deer->bMoving);
+	TestTrue(TEXT("The ambient pause uses the existing one-shot look-around animation"),
+		Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+		Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->LookAroundAnimation);
+	TestTrue(TEXT("An ambient look neither moves nor startles the stag"),
+		Deer->GetActorLocation().Equals(BeforeIdleLook) && !Deer->IsStartled());
+	const float IdleLookDuration = Deer->IdleLookRemaining;
+	Deer->Tick(IdleLookDuration + 0.1f);
+	TestFalse(TEXT("The short scan ends and returns to grazing"), Deer->bIdleLooking || Deer->bMoving);
+	TestTrue(TEXT("The next scan is delayed rather than looping repeatedly"), Deer->IdleLookCheckRemaining >= 12.f);
+	TestTrue(TEXT("The returning idle animation is grazing"), Deer->GetDeerMesh()->GetSingleNodeInstance() &&
+		Deer->GetDeerMesh()->GetSingleNodeInstance()->GetAnimationAsset() == Deer->GrazeAnimation);
+
 	AIslandLightning* NearbyStrike = World->SpawnActor<AIslandLightning>(Spawn);
 	if (!TestNotNull(TEXT("A nearby storm strike can be observed by local ecology"), NearbyStrike))
 	{

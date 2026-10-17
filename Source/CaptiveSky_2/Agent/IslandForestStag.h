@@ -59,6 +59,8 @@ private:
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector TargetLocation = FVector::ZeroVector;
 	float ActivityRemaining = 0.f;
+	float IdleLookRemaining = 0.f;
+	float IdleLookCheckRemaining = 0.f;
 	float WakeRemaining = 0.f;
 	float ThunderCheckRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
@@ -77,6 +79,7 @@ private:
 	float VisitorNoticeRemaining = 0.f;
 	float MoveSpeed = 0.f;
 	bool bMoving = false;
+	bool bIdleLooking = false;
 	bool bWakingUp = false;
 	bool bListeningToChime = false;
 	bool bNoticingResident = false;
