@@ -67,5 +67,23 @@ rendered quality or performance check. Evidence: [GroundCover automation log](..
 The source asset is in the ignored local review folder
 `Content/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/`; other
 checkouts need to run the existing ComfyBlender export/import pipeline before
-the new species can render. A gameplay-scale screenshot and 30 FPS screening
-pass remain necessary before treating its placement as visually approved.
+the new species can render.
+
+### Woodland-edge niche (2026-10-17)
+
+Bluebell selection now follows the nearest accepted spruce-grove center. Its
+deterministic affinity is strongest within 12 m and fades smoothly
+to the original meadow mix by 38 m. Open meadow retains the existing nine-way
+selection; at a grove center bluebells rise to 35% of already-budgeted flower
+patches, with the other eight forms still represented. Members of each pocket
+continue sharing one species, and the Tideglass pollinator ring keeps its
+neutral mix. This changes neither the 256 general candidate sites, three-stem
+pocket cap, trace ceiling, nor total placement budget.
+
+UE 5.8.3 scratch build succeeded; `GroundCover` passed under NullRHI with
+thinking disabled and zero model requests. Tests cover the distance falloff,
+nearest grove, treeless meadow, deterministic patch choice, bounded bluebell
+share, and preservation of the other flower forms. The fixture has no landscape,
+so it does not execute saved-Island scatter; a real-RHI review is still needed
+to confirm the new bluebell group reads naturally at woodland distance and
+keeps the project above its 30 FPS target. Evidence: [GroundCover log](../../Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_WoodlandBluebellNiche_Final_20261017.log).

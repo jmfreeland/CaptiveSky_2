@@ -518,7 +518,7 @@ float AIslandWeather::CalculateGroundCoverWetEdgeMoisture(const FVector& Positio
 	return 1.f - SmoothAlpha;
 }
 
-int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed)
+int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity)
 {
 	// Keep flower color/shape in coarse 18 m patches, not an alternating per-instance mix.
 	constexpr float FlowerPatchSize = 1800.f;
@@ -530,7 +530,40 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	Hash ^= Hash >> 15;
 	Hash *= 0x846ca68bu;
 	Hash ^= Hash >> 16;
+	if (WoodlandAffinity > KINDA_SMALL_NUMBER)
+	{
+		// Bluebells are a woodland-edge accent, not an additional scatter pass.
+		// Keep the open-meadow mix at its original frequency and let the grove
+		// influence raise their share smoothly to 35% at the woodland core.
+		uint32 NicheHash = Hash ^ 0x9e3779b9u;
+		NicheHash ^= NicheHash >> 16;
+		NicheHash *= 0x7feb352du;
+		NicheHash ^= NicheHash >> 15;
+		NicheHash *= 0x846ca68bu;
+		NicheHash ^= NicheHash >> 16;
+		const float BluebellChance = FMath::Lerp(1.f / MeadowFlowerSpeciesCount, 0.35f, FMath::Clamp(WoodlandAffinity, 0.f, 1.f));
+		const float NicheRoll = static_cast<float>(NicheHash & 0x00ffffffu) / 16777215.f;
+		if (NicheRoll < BluebellChance) return WoodlandBluebellSpeciesIndex;
+		return static_cast<int32>(Hash % (MeadowFlowerSpeciesCount - 1));
+	}
 	return static_cast<int32>(Hash % MeadowFlowerSpeciesCount);
+}
+
+float AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance)
+{
+	if (!FMath::IsFinite(NearestSpruceGroveCenterDistance) || NearestSpruceGroveCenterDistance < 0.f) return 0.f;
+	return 1.f - FMath::SmoothStep(WoodlandBluebellInnerRadius, WoodlandBluebellOuterRadius,
+		NearestSpruceGroveCenterDistance);
+}
+
+float AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(const FVector& Position, TConstArrayView<FVector> SpruceGroveCenters)
+{
+	if (Position.ContainsNaN() || SpruceGroveCenters.IsEmpty()) return 0.f;
+	float NearestGroveCenterDistance = MAX_flt;
+	for (const FVector& GroveCenter : SpruceGroveCenters)
+		if (!GroveCenter.ContainsNaN())
+			NearestGroveCenterDistance = FMath::Min(NearestGroveCenterDistance, FVector::Dist2D(Position, GroveCenter));
+	return CalculateMeadowFlowerWoodlandAffinity(NearestGroveCenterDistance);
 }
 
 bool AIslandWeather::FindNearestMeadowFlower(const FVector& Position, float MaxDistance, FVector& OutFlowerLocation) const
@@ -1543,7 +1576,8 @@ void AIslandWeather::InitializeGroundCover()
 								Candidate = FVector(Cell.X + MeadowFlowerRandom.FRandRange(-HalfTerrainCellWidth, HalfTerrainCellWidth),
 									Cell.Y + MeadowFlowerRandom.FRandRange(-HalfTerrainCellHeight, HalfTerrainCellHeight), BoundsOrigin.Z);
 							}
-							const int32 SiteSpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed);
+							const float WoodlandAffinity = CalculateMeadowFlowerWoodlandAffinity(Candidate, SpruceGroveCenters);
+							const int32 SiteSpeciesIndex = SelectMeadowFlowerVariant(Candidate, WeatherSeed, WoodlandAffinity);
 							if (!TryPlaceMeadowFlower(Candidate, bListeningStonesMeadowSite, false, SiteSpeciesIndex)) continue;
 							bPlacedMeadowFlower = true;
 							for (int32 MemberIndex = 0; MemberIndex < MeadowFlowersPerPocket - 1; ++MemberIndex)

@@ -71,6 +71,9 @@ public:
 	static constexpr float StormWindBoost = 0.9f;
 	/** Number of locally available flower forms used for the capped meadow accents. */
 	static constexpr int32 MeadowFlowerSpeciesCount = 9;
+	static constexpr int32 WoodlandBluebellSpeciesIndex = 8;
+	static constexpr float WoodlandBluebellInnerRadius = 1200.f;
+	static constexpr float WoodlandBluebellOuterRadius = 3800.f;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
 	static constexpr int32 MeadowFlowersPerPocket = 3;
 	/** Small, deterministic pollinator edge just beyond the Tideglass water clearance. */
@@ -246,8 +249,10 @@ private:
 	/** Fade a Tideglass wet-edge habitat into the meadow unless another landmark owns the patch. */
 	static float CalculateGroundCoverWetEdgeMoisture(const FVector& Position, const FVector& TideglassAnchor,
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);
-	/** Select one stable Fab flower species for a world-space meadow patch. */
-	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed);
+	/** Select one stable flower species per world-space patch, with an optional woodland niche bias. */
+	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity = 0.f);
+	static float CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance);
+	static float CalculateMeadowFlowerWoodlandAffinity(const FVector& Position, TConstArrayView<FVector> SpruceGroveCenters);
 	/** Prefer a grounded fox spawn candidate near mature spruce and a sparse grass pocket; preserve a valid fallback. */
 	static int32 SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& CandidateLocations,
 		const TArray<float>& NearestMatureSpruceDistances, const TArray<int32>& NearbyGrassCounts, int32 FallbackIndex);

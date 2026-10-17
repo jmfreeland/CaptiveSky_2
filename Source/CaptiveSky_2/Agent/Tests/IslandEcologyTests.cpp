@@ -491,6 +491,19 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nearby meadow flowers share a botanical color patch"),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71),
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71));
+	TestTrue(TEXT("Woodland affinity rises toward a spruce grove and fades at its edge"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(AIslandWeather::WoodlandBluebellInnerRadius), 1.f) &&
+		FMath::IsNearlyEqual(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(
+			(AIslandWeather::WoodlandBluebellInnerRadius + AIslandWeather::WoodlandBluebellOuterRadius) * 0.5f), 0.5f) &&
+		FMath::IsNearlyZero(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(AIslandWeather::WoodlandBluebellOuterRadius)) &&
+		FMath::IsNearlyZero(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(-1.f)));
+	const TArray<FVector> FlowerGroveCenters = { FVector(1000.f, 0.f, 0.f), FVector(6000.f, 0.f, 0.f) };
+	TestTrue(TEXT("Flower niches use the nearest real grove center and leave treeless meadow neutral"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(FVector(2000.f, 0.f, 0.f), FlowerGroveCenters), 1.f) &&
+		FMath::IsNearlyZero(AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(FVector(2000.f, 0.f, 0.f), {})));
+	TestEqual(TEXT("Woodland flower choices remain deterministic within a patch"),
+		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe, 71, 0.8f),
+		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71, 0.8f));
 	const FVector FlowerPocketA = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0);
 	const FVector FlowerPocketB = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 1);
 	TestTrue(TEXT("Flower pocket offsets are deterministic, bounded, and spaced for separate stems"),
@@ -513,6 +526,24 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("All nine flower forms occupy balanced, spatially coherent meadow patches"),
 		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 38);
+	int32 OpenMeadowBluebells = 0;
+	int32 WoodlandEdgeBluebells = 0;
+	int32 WoodlandEdgeOtherSpecies[AIslandWeather::MeadowFlowerSpeciesCount - 1] = {};
+	for (int32 X = 0; X < 24; ++X)
+		for (int32 Y = 0; Y < 24; ++Y)
+		{
+			const FVector Position(X * 1800.f, Y * 1800.f, 0.f);
+			OpenMeadowBluebells += AIslandWeather::SelectMeadowFlowerVariant(Position, 71) == AIslandWeather::WoodlandBluebellSpeciesIndex ? 1 : 0;
+			const int32 WoodlandVariant = AIslandWeather::SelectMeadowFlowerVariant(Position, 71, 1.f);
+			if (WoodlandVariant == AIslandWeather::WoodlandBluebellSpeciesIndex) ++WoodlandEdgeBluebells;
+			else ++WoodlandEdgeOtherSpecies[WoodlandVariant];
+		}
+	int32 WoodlandEdgeDiverseSpecies = 0;
+	for (const int32 Count : WoodlandEdgeOtherSpecies)
+		if (Count > 0) ++WoodlandEdgeDiverseSpecies;
+	TestTrue(TEXT("Woodland affinity makes bluebells a stronger but still minority flower accent"),
+		WoodlandEdgeBluebells > OpenMeadowBluebells * 2 && WoodlandEdgeBluebells < 24 * 24 * 0.45f);
+	TestEqual(TEXT("All eight other flower species remain represented at the woodland edge"), WoodlandEdgeDiverseSpecies, 8);
 	TestTrue(TEXT("ListeningStones flower pockets stay outside the landmark clearing and within the 45 m flower fade range"),
 		AIslandWeather::ListeningStonesFlowerInnerRadius > 2600.f &&
 		AIslandWeather::ListeningStonesFlowerInnerRadius < AIslandWeather::ListeningStonesFlowerOuterRadius &&
