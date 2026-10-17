@@ -7,6 +7,7 @@
 class UInstancedSkinnedMeshComponent;
 class USceneComponent;
 class USkeletalMesh;
+class UTransformProviderData;
 
 /**
  * A collisionless, batched host for skeletal foliage meshes such as baked
@@ -23,6 +24,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage")
 	TObjectPtr<USkeletalMesh> SourceMesh;
+
+	/** Optional UE 5.8 animation source shared by the batched skeletal instances. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage")
+	TObjectPtr<UTransformProviderData> TransformProvider;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage")
 	TArray<FTransform> InstanceTransforms;

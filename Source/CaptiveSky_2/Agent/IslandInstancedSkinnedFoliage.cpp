@@ -27,6 +27,7 @@ void AIslandInstancedSkinnedFoliage::RebuildInstances()
 
 	Instances->ClearInstances();
 	Instances->SetSkinnedAssetAndUpdate(SourceMesh);
+	Instances->SetTransformProvider(TransformProvider);
 	if (!SourceMesh)
 	{
 		return;
