@@ -8,18 +8,21 @@ supplied another provider, the host now creates a transient `UDynamicWindData`
 and binds it automatically. Clearing an explicit provider clears the component
 provider too, so repeated rebuilds cannot leave a stale animation source
 attached. `DynamicWind` is declared as a module dependency and an enabled
-project plugin.
+project plugin. The host tracks its generated provider separately so switching
+away from a wind-enabled mesh clears that provider while preserving an explicit
+caller-supplied provider.
 
 Added `CaptiveSky2.Agent.InstancedSkinnedFoliageProvider` to verify provider
-assignment and clearing and, when the installed European Beech asset and its
-wind profile are available/enabled, automatic provider selection. The
-current-source UE 5.8 editor target built successfully in the isolated
-`Saved/CompileScratch/Codex_WrackCrabIsolated_20261017/Project` project (172
-actions including UHT, both changed translation units, and module link). The
-first build exposed a missing direct `DynamicWind` plugin entry in the
-scratch descriptor; after syncing it with the main project, UBT regenerated the
-makefile and reported the target up to date with no plugin dependency warning.
-The main editor's loaded DLL was not replaced.
+assignment and clearing, automatic selection from an enabled installed
+European Beech profile, and removal of the generated provider when the source
+mesh is cleared. The current-source UE 5.8 editor target built successfully in
+the isolated `Saved/CompileScratch/Codex_WrackCrabIsolated_20261017/Project`
+project (172 actions for the initial full build). A follow-up source-mesh
+rebinding fix compiled and linked in a six-action incremental build. The first
+build exposed a missing direct `DynamicWind` plugin entry in the scratch
+descriptor; after syncing it with the main project, UBT regenerated the
+makefile and no further plugin dependency warning appeared. The main editor's
+loaded DLL was not replaced.
 
 The automation test has not run. Launching it from the existing
 `Codex_VisitorResonance_20261017` scratch shell (where other NullRHI tests had

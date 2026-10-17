@@ -70,6 +70,12 @@ bool FIslandInstancedSkinnedFoliageProviderTest::RunTest(const FString& Paramete
 			TestTrue(TEXT("An enabled PVE wind profile automatically selects UE's DynamicWind transform provider"),
 				Host->TransformProvider && Host->TransformProvider->IsA<UDynamicWindData>() &&
 				Host->Instances->GetTransformProvider() == Host->TransformProvider);
+
+			Host->SourceMesh = nullptr;
+			Host->RebuildInstances();
+			TestNull(TEXT("Replacing a wind-enabled source mesh clears its auto-created provider"), Host->TransformProvider.Get());
+			TestNull(TEXT("The component does not retain a stale DynamicWind provider after the source mesh is removed"),
+				Host->Instances->GetTransformProvider());
 		}
 		else if (WindData)
 		{

@@ -11,8 +11,8 @@ class UTransformProviderData;
 
 /**
  * A collisionless, batched host for skeletal foliage meshes such as baked
- * Megaplant outputs. Instances use transform-provider animation index zero;
- * callers must supply a compatible provider before relying on animation.
+ * Megaplant outputs. Enabled DynamicWind mesh profiles are auto-bound unless
+ * the caller supplies an explicit transform provider.
  */
 UCLASS(BlueprintType)
 class CAPTIVESKY_2_API AIslandInstancedSkinnedFoliage : public AActor
@@ -38,4 +38,9 @@ public:
 	/** Rebuild from the editable transform list; safe to call repeatedly. */
 	UFUNCTION(BlueprintCallable, Category="Island|Foliage")
 	void RebuildInstances();
+
+private:
+	/** Tracks the provider created from SourceMesh user data so it can be cleared on mesh changes. */
+	UPROPERTY(Transient)
+	TObjectPtr<UTransformProviderData> AutoTransformProvider;
 };

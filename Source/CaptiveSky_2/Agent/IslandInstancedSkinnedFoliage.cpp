@@ -29,16 +29,28 @@ void AIslandInstancedSkinnedFoliage::RebuildInstances()
 
 	Instances->ClearInstances();
 	Instances->SetSkinnedAssetAndUpdate(SourceMesh);
-	if (!TransformProvider && SourceMesh)
+	if (TransformProvider != AutoTransformProvider)
 	{
-		const UDynamicWindSkeletalData* WindData = Cast<UDynamicWindSkeletalData>(
-			SourceMesh->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()));
-		if (WindData && WindData->bIsEnabled)
-		{
-			// PVE-exported Megaplants carry this skeletal wind profile as mesh user data.
-			// UE's DynamicWind transform provider consumes that profile on the render thread.
-			TransformProvider = NewObject<UDynamicWindData>(this, NAME_None, RF_Transient);
-		}
+		// A caller replaced or cleared the generated value; do not overwrite an explicit choice.
+		AutoTransformProvider = nullptr;
+	}
+
+	const UDynamicWindSkeletalData* WindData = SourceMesh
+		? Cast<UDynamicWindSkeletalData>(SourceMesh->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()))
+		: nullptr;
+	const bool bHasEnabledWindData = WindData && WindData->bIsEnabled;
+	if (AutoTransformProvider && !bHasEnabledWindData)
+	{
+		// A previously auto-bound tree may have been replaced with a static/ref-pose mesh.
+		TransformProvider = nullptr;
+		AutoTransformProvider = nullptr;
+	}
+	if (!TransformProvider && bHasEnabledWindData)
+	{
+		// PVE-exported Megaplants carry this skeletal wind profile as mesh user data.
+		// UE's DynamicWind transform provider consumes that profile on the render thread.
+		AutoTransformProvider = NewObject<UDynamicWindData>(this, NAME_None, RF_Transient);
+		TransformProvider = AutoTransformProvider;
 	}
 	Instances->SetTransformProvider(TransformProvider);
 	if (!SourceMesh)
