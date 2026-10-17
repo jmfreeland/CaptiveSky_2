@@ -172,14 +172,14 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 		const FString Nearby = Basin->DescribeNearby(BasinActor->GetActorLocation());
 		TestTrue(TEXT("A resident nearby receives the basin interaction affordance"), Nearby.Contains(TEXT("RainBasin")) && Nearby.Contains(TEXT("interact")));
 		TestTrue(TEXT("A resident outside the notice radius receives no basin prompt"), Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(0.f, 0.f, UIslandRainBasinSubsystem::NoticeRadius + 100.f)).IsEmpty());
-		BasinActor->StartRainRipple(FVector(0.f, 0.f, 0.f));
-		TestTrue(TEXT("A water impact starts a transient basin ripple"), BasinActor->IsRainRippleActive());
+		BasinActor->StartWaterRipple(FVector(0.f, 0.f, 0.f));
+		TestTrue(TEXT("A water impact starts a transient basin ripple"), BasinActor->IsWaterRippleActive());
 		TestTrue(TEXT("The active impact enables only the basin actor's lightweight presentation tick"), BasinActor->IsActorTickEnabled());
 		BasinActor->Tick(1.2f);
-		TestFalse(TEXT("A basin ripple fades and disables its tick after its short life"), BasinActor->IsRainRippleActive() || BasinActor->IsActorTickEnabled());
-		BasinActor->StartRainRipple(FVector(0.f, 0.f, 0.f));
+		TestFalse(TEXT("A basin ripple fades and disables its tick after its short life"), BasinActor->IsWaterRippleActive() || BasinActor->IsActorTickEnabled());
+		BasinActor->StartWaterRipple(FVector(0.f, 0.f, 0.f));
 		BasinActor->Tick(1.2f);
-		TestFalse(TEXT("A completed basin ripple can be reused for the next rain drop"), BasinActor->IsRainRippleActive());
+		TestFalse(TEXT("A completed basin ripple can be reused for the next rain drop"), BasinActor->IsWaterRippleActive());
 	}
 	FIslandBasinState PlacedState;
 	FString Json;
@@ -236,6 +236,8 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			FString Fact;
 			TestTrue(TEXT("Resident inspection uses the ordinary interaction path"), IslandInteractionUtility::Perform(Resident, BasinActor, Fact));
 			TestTrue(TEXT("The resident's first inspection sets a leaf afloat"), Fact.Contains(TEXT("set it on the water")) && Basin->GetState().Leaves.Num() == 1);
+			TestTrue(TEXT("Setting a leaf afloat makes one brief, non-persistent water ripple"), BasinActor->IsWaterRippleActive());
+			BasinActor->Tick(0.2f);
 			TestEqual(TEXT("One floating-leaf presentation slot is tracked"), BasinActor->FloatingLeaves.Num(), 1);
 			if (BasinActor->FloatingLeaves.Num() == 1)
 			{
@@ -250,8 +252,11 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("Wind updates the rendered instanced leaf transform"), !WindyTransform.Equals(Floating.BaseTransform, 0.01f));
 			}
 			const int32 LeafCount = Basin->GetState().Leaves.Num();
+			const float RippleAgeBeforeRepeat = BasinActor->RainRippleElapsed;
 			TestTrue(TEXT("A repeat inspection reports today's leaf without changing the basin"),
 				IslandInteractionUtility::Perform(Resident, BasinActor, Fact) && Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == LeafCount);
+			TestTrue(TEXT("A refused repeat does not restart the transient ripple"), BasinActor->IsWaterRippleActive() &&
+				FMath::IsNearlyEqual(BasinActor->RainRippleElapsed, RippleAgeBeforeRepeat, 0.001f));
 			TestTrue(TEXT("Water and the resident's leaf are durably saved"),
 				FFileHelper::LoadFileToString(Json, *StateFile) && PlacedState.FromJson(Json) &&
 				FMath::IsNearlyEqual(PlacedState.Water, Basin->GetState().Water) && PlacedState.Leaves.Num() == 1 &&

@@ -78,8 +78,8 @@ public:
 	void Show(const FIslandBasinState& State, int32 Today);
 	void UpdateFloatingLeaves(const FVector& Wind, double Seconds);
 	/** Start one subtle transient impact at a local water-surface position. */
-	void StartRainRipple(const FVector& LocalPosition);
-	bool IsRainRippleActive() const { return bRainRippleActive; }
+	void StartWaterRipple(const FVector& LocalPosition);
+	bool IsWaterRippleActive() const { return bRainRippleActive; }
 
 	virtual void Tick(float DeltaSeconds) override;
 

@@ -255,7 +255,7 @@ float AIslandRainBasin::RainRipplePulse(float Age)
 	return FMath::Sin(PI * FMath::Clamp(Age, 0.f, 1.f));
 }
 
-void AIslandRainBasin::StartRainRipple(const FVector& LocalPosition)
+void AIslandRainBasin::StartWaterRipple(const FVector& LocalPosition)
 {
 	if (!RainRipple || !RippleBaseMaterial || !FMath::IsFinite(LocalPosition.X) || !FMath::IsFinite(LocalPosition.Y) || !FMath::IsFinite(LocalPosition.Z)) return;
 	if (!RainRippleMaterial)
@@ -441,6 +441,12 @@ bool UIslandRainBasinSubsystem::Examine(const FString& AgentId, int32 Today, FSt
 	bDirty = true;
 	Save();
 	Refresh();
+	if (AIslandRainBasin* Basin = Actor.Get())
+	{
+		const float SurfaceZ = -AIslandRainBasin::OriginLift + AIslandRainBasin::FloorThickness
+			+ AIslandRainBasin::WaterDepth(State.Water) + 0.25f;
+		Basin->StartWaterRipple(FVector(0.f, 0.f, SurfaceZ));
+	}
 	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("basin"), AgentId,
 		FString::Printf(TEXT("set a leaf afloat on the rain basin; %d leaves now drift there."), State.Leaves.Num()),
 		{ { TEXT("leaves"), FString::FromInt(State.Leaves.Num()) } });
@@ -587,7 +593,7 @@ void UIslandRainBasinSubsystem::Tick(float DeltaTime)
 			const float Angle = RainRandom.FRandRange(0.f, UE_TWO_PI);
 			const FVector LocalPosition(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius,
 				-AIslandRainBasin::OriginLift + AIslandRainBasin::FloorThickness + AIslandRainBasin::WaterDepth(State.Water) + 0.25f);
-			Basin->StartRainRipple(LocalPosition);
+			Basin->StartWaterRipple(LocalPosition);
 		}
 		NextRainRippleAt = WorldTime + RippleInterval * RainRandom.FRandRange(0.8f, 1.25f);
 	}
