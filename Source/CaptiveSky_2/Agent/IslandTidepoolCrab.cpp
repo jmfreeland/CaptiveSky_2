@@ -249,6 +249,38 @@ void AIslandTidepoolCrab::CheckForNearbyNaturalRipple()
 	}
 }
 
+void AIslandTidepoolCrab::CheckForNearbyPlayerPresence()
+{
+	if (!GetWorld() || bIsSheltered) return;
+
+	constexpr float NoticeRadius = 240.f;
+	constexpr float PresenceRearmRadius = 500.f;
+	constexpr float MaximumHeightDifference = 220.f;
+	for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+	{
+		APawn* Player = *It;
+		if (!IsValid(Player) || !Player->IsPlayerControlled()) continue;
+
+		const FVector Offset = Player->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (PlayerPresenceLatch.Get() == Player && DistanceSquared > FMath::Square(PresenceRearmRadius))
+			PlayerPresenceLatch.Reset();
+
+		if (DistanceSquared > FMath::Square(NoticeRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+			continue;
+
+		// Notice one approach, not a lingering player. The wider exit ring prevents
+		// boundary jitter from repeatedly startling this small shore resident.
+		if (PlayerPresenceLatch.Get() == Player) continue;
+		PlayerPresenceLatch = Player;
+		if (PlayerPresenceCooldownRemaining > 0.f || ScurryRemaining > 0.f) return;
+
+		RespondToQuietObservation(Player->GetActorLocation());
+		PlayerPresenceCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 void AIslandTidepoolCrab::SetSheltered(bool bSheltered)
 {
 	if (bIsSheltered == bSheltered) return;
@@ -300,12 +332,14 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	ScurryRemaining = FMath::Max(0.f, ScurryRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	PlayerPresenceCooldownRemaining = FMath::Max(0.f, PlayerPresenceCooldownRemaining - SafeDelta);
 	RippleResponseCooldownRemaining = FMath::Max(0.f, RippleResponseCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.35f;
 		CheckForNearbyRavenDisturbance();
+		CheckForNearbyPlayerPresence();
 	}
 	RippleCheckRemaining -= SafeDelta;
 	if (RippleCheckRemaining <= 0.f)

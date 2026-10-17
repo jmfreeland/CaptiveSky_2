@@ -10,6 +10,7 @@ class AIslandWeather;
 class AIslandDayNight;
 class AIslandPoolRippleEffect;
 class ARavenAgentAIController;
+class APawn;
 
 /** Small, untargetable shore life: independently scuttles near its Tideglass habitat. */
 UCLASS()
@@ -60,11 +61,14 @@ private:
 	float ScurryRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	float PlayerPresenceCooldownRemaining = 0.f;
 	float RippleResponseCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
+	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	bool bIsSheltered = false;
 	void CheckForNearbyRavenDisturbance();
+	void CheckForNearbyPlayerPresence();
 	void CheckForNearbyNaturalRipple();
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;
 };

@@ -2008,6 +2008,38 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableCrab->Tick(2.f);
 		TestTrue(TEXT("Crab resumes its local idle path without a persistent state change"), FMath::IsNearlyZero(WatchableCrab->ScurryRemaining) && FVector::Dist2D(WatchableCrab->GetActorLocation(), CrabStart) < 100.f);
 
+		AIslandInteractionTestPlayerController* ShoreVisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>(Spawn);
+		ACharacter* ShoreVisitor = World->SpawnActor<ACharacter>(CrabStart + FVector(180.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A player-controlled visitor is available for the shore-crab response"), ShoreVisitorController);
+		TestNotNull(TEXT("A nearby visitor pawn is available for the shore-crab response"), ShoreVisitor);
+		if (ShoreVisitorController && ShoreVisitor)
+		{
+			ShoreVisitorController->Possess(ShoreVisitor);
+			WatchableCrab->SetActorLocation(CrabStart);
+			WatchableCrab->CheckForNearbyPlayerPresence();
+			TestTrue(TEXT("A nearby player approach briefly startles the wild shore crab"),
+				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+			TestTrue(TEXT("The shore crab moves away from the approaching visitor"),
+				FVector::DotProduct(WatchableCrab->ScurryDirection, (CrabStart - ShoreVisitor->GetActorLocation()).GetSafeNormal2D()) > 0.95f);
+			TestEqual(TEXT("One visitor approach starts a bounded response cooldown"), WatchableCrab->PlayerPresenceCooldownRemaining, 8.f);
+			WatchableCrab->ScurryRemaining = 0.f;
+			WatchableCrab->CheckForNearbyPlayerPresence();
+			TestTrue(TEXT("A lingering visitor does not repeatedly startle the same crab"),
+				FMath::IsNearlyZero(WatchableCrab->ScurryRemaining));
+			ShoreVisitor->SetActorLocation(CrabStart + FVector(600.f, 0.f, 0.f));
+			WatchableCrab->CheckForNearbyPlayerPresence();
+			WatchableCrab->PlayerPresenceCooldownRemaining = 0.f;
+			ShoreVisitor->SetActorLocation(CrabStart + FVector(180.f, 0.f, 0.f));
+			WatchableCrab->CheckForNearbyPlayerPresence();
+			TestTrue(TEXT("Leaving the wider ring and returning rearms the visitor response"),
+				WatchableCrab->ScurryRemaining > 0.f && WatchableCrab->ScurryRemaining <= 2.4f);
+			ShoreVisitorController->UnPossess();
+			ShoreVisitorController->Destroy();
+			ShoreVisitor->Destroy();
+			WatchableCrab->ScurryRemaining = 0.f;
+			WatchableCrab->PlayerPresenceCooldownRemaining = 0.f;
+		}
+
 		Controller->LocomotionState = ERavenLocomotionState::Flying;
 		const FVector LowPassLocation = CrabStart + FVector(200.f, 0.f, 260.f);
 		Observer->SetActorLocation(LowPassLocation);
