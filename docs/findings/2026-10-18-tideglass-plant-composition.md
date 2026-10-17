@@ -50,3 +50,24 @@ not provide that UE validation, so this is not placement or art approval.
 
 No `Content/` asset, Island map, runtime source, or persistent world state was
 changed by the composition render.
+
+## Curved-bank and sea-pea follow-up (2026-10-17)
+
+The preview script now lays the same shoreline candidates over a shallow,
+curving bank with a procedural wet-sand ribbon, subtly varied soil, textured
+water, a broken line of nine shore stones, and a lower camera angle than the
+first top-down study. A small sea-pea group was added to the upper bank to
+compare its spreading pink-flowered silhouette with samphire, sea thrift,
+marram, and soft rush. The deterministic report contains 21 review-only
+instances across those five candidate species.
+
+The updated render is
+[`TideglassShorelineComposition.png`](../../Saved/Playtests/Codex_TideglassPlantComposition_Curved_20261017/TideglassShorelineComposition.png);
+its transform report is
+[`composition.json`](../../Saved/Playtests/Codex_TideglassPlantComposition_Curved_20261017/composition.json).
+The curved wet edge and distinct plant groups read more like a habitat than the
+first rectangular slab study, but the broad upper bank remains visually quiet
+and the candidate materials remain palette stand-ins. This is a composition
+direction aid only: the sea pea and all transforms remain unapproved for the
+Island. Unreal lighting, ground contact, shadows, gameplay readability, and the
+30-FPS p95 screen still require the bounded real-RHI review described above.
