@@ -41,6 +41,42 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	const FLinearColor Wet = Trail::WearColor(1.f);
 	TestTrue(TEXT("Wet worn earth is darker"), Wet.R < Dry.R && Wet.G < Dry.G);
 
+	const FIntPoint WearCenter(4, -2);
+	auto AddWearCell = [](TMap<FIntPoint, FIslandTrailCell>& Cells, const FIntPoint& Key)
+	{
+		FIslandTrailCell& Cell = Cells.Add(Key);
+		Cell.Steps = Trail::WearFullSteps;
+	};
+	TMap<FIntPoint, FIslandTrailCell> StraightWear;
+	AddWearCell(StraightWear, WearCenter + FIntPoint(-1, 0));
+	AddWearCell(StraightWear, WearCenter + FIntPoint(1, 0));
+	float StraightAspect = 0.f;
+	const FQuat StraightRotation = Trail::CalculateWearRotation(WearCenter, StraightWear, FVector::UpVector, StraightAspect);
+	TestTrue(TEXT("Linked worn cells align their long axis with the route"),
+		FMath::Abs(FVector::DotProduct(StraightRotation.RotateVector(FVector::ForwardVector), FVector::ForwardVector)) > 0.99f);
+	TestTrue(TEXT("A straight path becomes gently elongated"), StraightAspect > 1.3f && StraightAspect <= 1.45f);
+
+	TMap<FIntPoint, FIslandTrailCell> DiagonalWear;
+	AddWearCell(DiagonalWear, WearCenter + FIntPoint(-1, -1));
+	AddWearCell(DiagonalWear, WearCenter + FIntPoint(1, 1));
+	float DiagonalAspect = 0.f;
+	const FQuat DiagonalRotation = Trail::CalculateWearRotation(WearCenter, DiagonalWear, FVector::UpVector, DiagonalAspect);
+	const FVector DiagonalAxis = FVector(1.f, 1.f, 0.f).GetSafeNormal();
+	TestTrue(TEXT("Diagonal worn cells follow their diagonal route"),
+		FMath::Abs(FVector::DotProduct(DiagonalRotation.RotateVector(FVector::ForwardVector), DiagonalAxis)) > 0.99f);
+
+	TMap<FIntPoint, FIslandTrailCell> CrossWear;
+	AddWearCell(CrossWear, WearCenter + FIntPoint(-1, 0));
+	AddWearCell(CrossWear, WearCenter + FIntPoint(1, 0));
+	AddWearCell(CrossWear, WearCenter + FIntPoint(0, -1));
+	AddWearCell(CrossWear, WearCenter + FIntPoint(0, 1));
+	float CrossAspect = 0.f;
+	const FQuat CrossRotation = Trail::CalculateWearRotation(WearCenter, CrossWear, FVector::UpVector, CrossAspect);
+	float RepeatedCrossAspect = 0.f;
+	const FQuat RepeatedCrossRotation = Trail::CalculateWearRotation(WearCenter, CrossWear, FVector::UpVector, RepeatedCrossAspect);
+	TestEqual(TEXT("A trail junction remains round instead of claiming one direction"), CrossAspect, 1.f);
+	TestTrue(TEXT("Junction fallback rotation stays deterministic"), CrossRotation.Equals(RepeatedCrossRotation));
+
 	FIslandTrailLedger Ledger;
 	const FVector Here(1234.f, -560.f, 90.f);
 	TestEqual(TEXT("Unwalked ground has no steps"), Ledger.StepsAt(Here), 0);

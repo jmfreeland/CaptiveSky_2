@@ -213,6 +213,48 @@ FLinearColor UIslandTrailSubsystem::WearColor(float Wetness)
 	return FMath::Lerp(FLinearColor(0.2f, 0.15f, 0.09f), FLinearColor(0.055f, 0.04f, 0.028f), FMath::SmoothStep(0.1f, 0.8f, Wetness));
 }
 
+FQuat UIslandTrailSubsystem::CalculateWearRotation(const FIntPoint& Key,
+	const TMap<FIntPoint, FIslandTrailCell>& Cells, const FVector& GroundNormal, float& OutAspectRatio)
+{
+	double XX = 0.0;
+	double YY = 0.0;
+	double XY = 0.0;
+	for (int32 DX = -1; DX <= 1; ++DX)
+	{
+		for (int32 DY = -1; DY <= 1; ++DY)
+		{
+			if (DX == 0 && DY == 0) continue;
+			const FIslandTrailCell* Neighbor = Cells.Find(Key + FIntPoint(DX, DY));
+			if (!Neighbor) continue;
+			const double Weight = WearAmount(Neighbor->Steps);
+			if (Weight <= 0.0) continue;
+
+			const double X = static_cast<double>(DX);
+			const double Y = static_cast<double>(DY);
+			XX += Weight * X * X;
+			YY += Weight * Y * Y;
+			XY += Weight * X * Y;
+		}
+	}
+
+	const double Trace = XX + YY;
+	double Angle = static_cast<double>(HashUnit(Key, 1)) * 2.0 * PI;
+	OutAspectRatio = 1.f;
+	if (Trace > UE_DOUBLE_SMALL_NUMBER)
+	{
+		const double Anisotropy = FMath::Sqrt(FMath::Square(XX - YY) + 4.0 * FMath::Square(XY)) / Trace;
+		if (Anisotropy > 0.2)
+		{
+			// The covariance's principal axis follows a line of adjacent, worn cells.
+			Angle = 0.5 * FMath::Atan2(2.0 * XY, XX - YY);
+			OutAspectRatio = 1.f + 0.45f * static_cast<float>(Anisotropy);
+		}
+	}
+	const FVector Tangent(static_cast<float>(FMath::Cos(Angle)), static_cast<float>(FMath::Sin(Angle)), 0.f);
+	const FVector Normal = GroundNormal.GetSafeNormal(UE_DOUBLE_SMALL_NUMBER, FVector::UpVector);
+	return FRotationMatrix::MakeFromXZ(Tangent, Normal).ToQuat();
+}
+
 TStatId UIslandTrailSubsystem::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UIslandTrailSubsystem, STATGROUP_Tickables);
@@ -422,11 +464,12 @@ void UIslandTrailSubsystem::RefreshWear(const FVector& Viewer, float Wetness)
 			const float Amount = WearAmount(Cell.Steps);
 			const float NormalZ = FMath::Sqrt(FMath::Max(0.01f, 1.f - Cell.NormalX * Cell.NormalX - Cell.NormalY * Cell.NormalY));
 			const FVector Normal = FVector(Cell.NormalX, Cell.NormalY, NormalZ).GetSafeNormal();
-			const FQuat Tilt = FQuat::FindBetweenNormals(FVector::UpVector, Normal);
-			const FQuat Spin(FVector::UpVector, HashUnit(Key, 1) * 2.f * PI);
+			float AspectRatio = 1.f;
+			const FQuat WearRotation = CalculateWearRotation(Key, Ledger.Cells, Normal, AspectRatio);
 			const float Diameter = FMath::Lerp(80.f, 150.f, Amount) * (0.85f + 0.3f * HashUnit(Key, 2));
 			const float Squash = 0.8f + 0.3f * HashUnit(Key, 3);
-			T = FTransform(Tilt * Spin, Cell.Position + Normal * 0.6f, FVector(Diameter / 100.f, Diameter / 100.f * Squash, 0.01f));
+			T = FTransform(WearRotation, Cell.Position + Normal * 0.6f,
+				FVector(Diameter / 100.f * AspectRatio, Diameter / 100.f / AspectRatio * Squash, 0.01f));
 		}
 		Layer->UpdateInstanceTransform(I, T, true, I == MaxWearDiscs - 1, true);
 	}

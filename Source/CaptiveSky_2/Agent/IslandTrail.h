@@ -145,4 +145,7 @@ private:
 	void Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness);
 	void RefreshPrints(double Now, float Wetness);
 	void RefreshWear(const FVector& Viewer, float Wetness);
+	/** Align adjacent wear patches to repeated travel while keeping junctions nearly round. */
+	static FQuat CalculateWearRotation(const FIntPoint& Key, const TMap<FIntPoint, FIslandTrailCell>& Cells,
+		const FVector& Normal, float& OutAspectRatio);
 };
