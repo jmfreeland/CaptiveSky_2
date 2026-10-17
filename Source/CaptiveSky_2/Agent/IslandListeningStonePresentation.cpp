@@ -9,6 +9,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -19,6 +20,12 @@ namespace
 	constexpr TCHAR ListeningStoneEngineCubeMeshPath[] = TEXT("/Engine/BasicShapes/Cube.Cube");
 	constexpr TCHAR ListeningStoneRockSurfacePath[] = TEXT("/Game/Materials/M_StandingStoneRockSurface.M_StandingStoneRockSurface");
 	constexpr float ChimeDurationSeconds = 2.8f;
+	constexpr float ChimeCooldownSeconds = 45.f;
+	constexpr float VisitorCheckIntervalSeconds = 0.25f;
+	constexpr float VisitorNoticeRadius = 325.f;
+	constexpr float VisitorRearmRadius = 575.f;
+	constexpr float VisitorMaximumHeightDifference = 240.f;
+	constexpr float VisitorMaximumApproachSpeed = 260.f;
 	constexpr int32 StoneRingCount = 6;
 	constexpr int32 StoneSideCount = 9;
 	constexpr int32 StoneRingVertexCount = StoneSideCount + 1;
@@ -295,13 +302,76 @@ void AListeningStonePresentation::CheckForNaturalGust(float DeltaSeconds)
 	ObserveAmbientWind(LocalWind.Size2D(), LocalWind);
 }
 
+void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
+{
+	VisitorCheckAccumulator += FMath::Max(0.f, DeltaSeconds);
+	if (VisitorCheckAccumulator < VisitorCheckIntervalSeconds) return;
+	VisitorCheckAccumulator = FMath::Fmod(VisitorCheckAccumulator, VisitorCheckIntervalSeconds);
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	if (APawn* LatchedVisitor = VisitorPresenceLatch.Get())
+	{
+		if (!IsValid(LatchedVisitor) || !LatchedVisitor->IsPlayerControlled())
+		{
+			VisitorPresenceLatch.Reset();
+		}
+		else
+		{
+			const FVector Offset = LatchedVisitor->GetActorLocation() - GetActorLocation();
+			if (Offset.SizeSquared2D() > FMath::Square(VisitorRearmRadius) ||
+				FMath::Abs(Offset.Z) > VisitorMaximumHeightDifference)
+				VisitorPresenceLatch.Reset();
+		}
+	}
+
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		APawn* Visitor = *It;
+		if (!IsValid(Visitor) || !Visitor->IsPlayerControlled()) continue;
+
+		const FVector Offset = Visitor->GetActorLocation() - GetActorLocation();
+		if (Offset.SizeSquared2D() > FMath::Square(VisitorNoticeRadius) ||
+			FMath::Abs(Offset.Z) > VisitorMaximumHeightDifference ||
+			Visitor->GetVelocity().SizeSquared2D() > FMath::Square(VisitorMaximumApproachSpeed))
+		{
+			continue;
+		}
+
+		// One quiet approach earns one brief response. A wider exit ring prevents
+		// repeated activation while a visitor lingers near the stones.
+		if (VisitorPresenceLatch.Get() == Visitor) return;
+		VisitorPresenceLatch = Visitor;
+		if (GetResonanceRemaining() > 0.f || World->GetTimeSeconds() - LastAmbientChimeAt < ChimeCooldownSeconds)
+			return;
+
+		BeginVisitorResonance();
+		return;
+	}
+}
+
+void AListeningStonePresentation::BeginVisitorResonance()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
+	BeginResonance(LocalWind.Size2D());
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
+		Chime->BeginChime(LocalWind);
+}
+
 void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)
 {
 	CurrentSpeed = FMath::IsFinite(CurrentSpeed) ? FMath::Clamp(CurrentSpeed, 0.f, 300.f) : 0.f;
 	const bool bGustOnset = bHasAmbientWindSample && ShouldResonateForWind(LastAmbientWindSpeed, CurrentSpeed);
 	LastAmbientWindSpeed = CurrentSpeed;
 	bHasAmbientWindSample = true;
-	if (!bGustOnset || GetResonanceRemaining() > 0.f || GetWorld()->GetTimeSeconds() - LastAmbientChimeAt < 45.0)
+	if (!bGustOnset || GetResonanceRemaining() > 0.f || GetWorld()->GetTimeSeconds() - LastAmbientChimeAt < ChimeCooldownSeconds)
 		return;
 
 	BeginNaturalResonance(CurrentSpeed, WindDirection);
@@ -323,6 +393,7 @@ void AListeningStonePresentation::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	CheckForNaturalGust(DeltaSeconds);
+	CheckForVisitorPresence(DeltaSeconds);
 	if (!bIsResonating) return;
 	ResonanceElapsed += FMath::Max(0.f, DeltaSeconds);
 	if (ResonanceElapsed >= ResonanceDuration)

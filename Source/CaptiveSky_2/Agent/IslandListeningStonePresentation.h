@@ -10,6 +10,7 @@ class UProceduralMeshComponent;
 class UPointLightComponent;
 class UStaticMesh;
 class AIslandWeather;
+class APawn;
 
 /** Collisionless, transient render forms and a short-lived resonance at the Listening Stones. */
 UCLASS()
@@ -41,10 +42,14 @@ private:
 	float LastAmbientWindSpeed = 0.f;
 	double LastAmbientChimeAt = -1000.0;
 	bool bHasAmbientWindSample = false;
+	float VisitorCheckAccumulator = 0.f;
+	TWeakObjectPtr<APawn> VisitorPresenceLatch;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	bool BuildStoneForms(const FTransform& MarkerTransform, const TArray<AStaticMeshActor*>& Proxies);
 	virtual void BeginPlay() override;
 	void CheckForNaturalGust(float DeltaSeconds);
+	void CheckForVisitorPresence(float DeltaSeconds);
+	void BeginVisitorResonance();
 	void ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection = FVector::ZeroVector);
 	void BeginNaturalResonance(float WindSpeed, const FVector& WindDirection);
 	virtual void Tick(float DeltaSeconds) override;

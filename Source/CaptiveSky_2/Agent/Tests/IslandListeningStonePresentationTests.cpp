@@ -11,6 +11,8 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
@@ -221,6 +223,59 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 
 	if (Subsystem && Presentation)
 	{
+		APawn* UncontrolledPawn = World->SpawnActor<APawn>(FVector(300.f, 0.f, 0.f), FRotator::ZeroRotator);
+		if (TestNotNull(TEXT("An unpossessed pawn can be staged at the Listening Stones"), UncontrolledPawn))
+		{
+			Presentation->CheckForVisitorPresence(0.25f);
+			TestEqual(TEXT("Ambient wildlife without a player controller does not trigger visitor resonance"),
+				Presentation->GetResonanceRemaining(), 0.f);
+			UncontrolledPawn->Destroy();
+		}
+
+		APlayerController* VisitorController = World->SpawnActor<APlayerController>();
+		APawn* VisitorPawn = World->SpawnActor<APawn>(FVector(600.f, 0.f, 0.f), FRotator::ZeroRotator);
+		if (TestNotNull(TEXT("A visitor controller can be staged near the landmark"), VisitorController) &&
+			TestNotNull(TEXT("A visitor pawn can be staged near the landmark"), VisitorPawn))
+		{
+			VisitorController->Possess(VisitorPawn);
+			TestTrue(TEXT("The staged visitor is player-controlled"), VisitorPawn->IsPlayerControlled());
+			Presentation->CheckForVisitorPresence(0.25f);
+			TestEqual(TEXT("A visitor outside the quiet approach radius does not wake the stones"),
+				Presentation->GetResonanceRemaining(), 0.f);
+
+			VisitorPawn->SetActorLocation(FVector(300.f, 0.f, 0.f));
+			Presentation->CheckForVisitorPresence(0.25f);
+			TestTrue(TEXT("A quiet visitor approaching within 3.25 m starts a brief stone resonance"),
+				Presentation->GetResonanceRemaining() > 2.7f);
+			int32 VisitorChimeCount = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++VisitorChimeCount;
+			TestEqual(TEXT("A quiet visitor approach creates one transient chime"), VisitorChimeCount, 1);
+
+			Presentation->CheckForVisitorPresence(0.25f);
+			VisitorPawn->SetActorLocation(FVector(700.f, 0.f, 0.f));
+			Presentation->CheckForVisitorPresence(0.25f);
+			VisitorPawn->SetActorLocation(FVector(300.f, 0.f, 0.f));
+			Presentation->CheckForVisitorPresence(0.25f);
+			int32 ChimesDuringVisitorCooldown = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimesDuringVisitorCooldown;
+			TestEqual(TEXT("Leaving and returning during the shared cooldown does not stack a second chime"),
+				ChimesDuringVisitorCooldown, 1);
+
+			VisitorController->UnPossess();
+			VisitorPawn->Destroy();
+			VisitorController->Destroy();
+		}
+		else
+		{
+			AddError(TEXT("The visitor response fixture needs both a player controller and pawn."));
+		}
+
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) It->Destroy();
+		Presentation->LastAmbientChimeAt = -1000.0;
+		Presentation->VisitorPresenceLatch.Reset();
+		Presentation->bIsResonating = false;
+		Presentation->ResonanceElapsed = 0.f;
+
 		TestEqual(TEXT("Natural wind monitoring stays on with no resonance active"), Presentation->GetResonanceRemaining(), 0.f);
 		Presentation->ObserveAmbientWind(70.f, FVector(70.f, 0.f, 0.f));
 		TestEqual(TEXT("The first wind sample establishes a quiet baseline"), Presentation->GetResonanceRemaining(), 0.f);
@@ -239,6 +294,25 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyEqual(NaturalChime->AppliedPitchRatio,
 				AIslandListeningStonesChime::CalculateWindPitchRatio(GustDirection.Size2D()) *
 				AIslandListeningStonesChime::CalculateWindDirectionPitchRatio(GustDirection, Presentation->GetActorForwardVector())));
+		APlayerController* CooldownVisitorController = World->SpawnActor<APlayerController>();
+		APawn* CooldownVisitor = World->SpawnActor<APawn>(FVector(300.f, 0.f, 0.f), FRotator::ZeroRotator);
+		if (TestNotNull(TEXT("A second visitor controller can be staged during natural resonance"), CooldownVisitorController) &&
+			TestNotNull(TEXT("A second visitor pawn can be staged during natural resonance"), CooldownVisitor))
+		{
+			CooldownVisitorController->Possess(CooldownVisitor);
+			Presentation->CheckForVisitorPresence(0.25f);
+			int32 ChimesDuringNaturalCooldown = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++ChimesDuringNaturalCooldown;
+			TestEqual(TEXT("A natural gust's shared cooldown prevents a visitor chime from stacking"),
+				ChimesDuringNaturalCooldown, 1);
+			CooldownVisitorController->UnPossess();
+			CooldownVisitor->Destroy();
+			CooldownVisitorController->Destroy();
+		}
+		else
+		{
+			AddError(TEXT("The natural-chime cooldown fixture needs both a player controller and pawn."));
+		}
 		AIslandFirefly* NearbyFirefly = World->SpawnActor<AIslandFirefly>(FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator);
 		AIslandFirefly* DistantFirefly = World->SpawnActor<AIslandFirefly>(
 			FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f), FRotator::ZeroRotator);
