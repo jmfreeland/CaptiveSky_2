@@ -688,8 +688,8 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 	}
 	else if (RestingWildlifeHomeActor)
 	{
-		RestingWildlifeHome.LastUsedUtc = FDateTime::UtcNow();
-		const bool bHomeUseSaved = WorldState && WorldState->StoreWildlifeHome(RestingWildlifeHome);
+		const bool bHomeUseSaved = WorldState && WorldState->RecordWildlifeHomeRestStart(
+			RestingWildlifeHome.Id, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
 		if (!bHomeUseSaved)
 			UE_LOG(LogAutonomousAgentAI, Warning, TEXT("%s began sleep at wildlife home %s but its last-used time could not be saved."),
 				*GetName(), *RestingWildlifeHome.Id.ToString());

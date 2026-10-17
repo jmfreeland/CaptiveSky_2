@@ -62,6 +62,14 @@ struct FIslandWildlifeHomeRecord
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
 	int32 ShelterQuality = 0;
 
+	/** Number of distinct Island days on which the occupant began resting here. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	int32 RestVisitDays = 0;
+
+	/** Last Island day on which a rest visit began; zero means never. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
+	int32 LastRestStartIslandDay = 0;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Island|Wildlife Home")
 	EIslandWildlifeShelterState ShelterState = EIslandWildlifeShelterState::Temporary;
 
@@ -241,6 +249,7 @@ public:
 	static constexpr int32 MaxWildlifeHomes = 32;
 	static constexpr int32 MaxWildlifeHomeCacheSlots = 8;
 	static constexpr int32 MaxWildlifeHomeCacheQuantity = 20;
+	static constexpr int32 MaxWildlifeHomeRestVisitDays = 10000;
 	static constexpr int32 MaxCraftTraditions = 16;
 	static constexpr int32 MaxCraftIdLength = 48;
 	static constexpr int32 MaxCraftLessons = 32;
@@ -261,6 +270,8 @@ public:
 	const FIslandWildlifeHomeRecord* FindWildlifeHome(FName Id) const;
 	/** Stores validated canonical facts and refreshes a visual-only materializer for supported species; it does not validate or authorize the chosen site. */
 	bool StoreWildlifeHome(const FIslandWildlifeHomeRecord& Record);
+	/** Records a physically present rest start once per Island day; three distinct days settle a non-disturbed home. */
+	bool RecordWildlifeHomeRestStart(FName Id, int32 IslandDay);
 	/** Developer reversal for a home record. */
 	bool RemoveWildlifeHome(FName Id);
 	AIslandWildlifeHome* FindWildlifeHomeActor(FName Id) const;

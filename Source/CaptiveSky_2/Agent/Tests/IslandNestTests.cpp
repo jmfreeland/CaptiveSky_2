@@ -608,7 +608,7 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	Home.EntranceLocation = FVector(-104500.f, 105000.f, 2337.5f);
 	Home.EntranceRotation = FRotator(0.f, 180.f, 0.f);
 	Home.ShelterQuality = 4;
-	Home.ShelterState = EIslandWildlifeShelterState::Settled;
+	Home.ShelterState = EIslandWildlifeShelterState::Temporary;
 	Home.LastUsedUtc = FDateTime::UtcNow();
 	FIslandWildlifeHomeCache Cache;
 	Cache.ItemId = TEXT("Hazelnut");
@@ -658,6 +658,19 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	TestFalse(TEXT("An invalid day cannot change the Rat's home"), State->RecordWildlifeHomeRestStart(Home.Id, 0));
+	TestTrue(TEXT("A physical rest start is recorded on the first Island day"), State->RecordWildlifeHomeRestStart(Home.Id, 1));
+	TestTrue(TEXT("A second rest start on the same day is idempotent"), State->RecordWildlifeHomeRestStart(Home.Id, 1));
+	const FIslandWildlifeHomeRecord* AfterFirstDay = State->FindWildlifeHome(Home.Id);
+	TestTrue(TEXT("One day of use keeps a provisional home temporary"), AfterFirstDay &&
+		AfterFirstDay->RestVisitDays == 1 && AfterFirstDay->ShelterState == EIslandWildlifeShelterState::Temporary);
+	TestTrue(TEXT("A second distinct Island day is recorded"), State->RecordWildlifeHomeRestStart(Home.Id, 2));
+	TestTrue(TEXT("The third distinct Island day settles the occupied home"), State->RecordWildlifeHomeRestStart(Home.Id, 3));
+	const FIslandWildlifeHomeRecord* SettledHome = State->FindWildlifeHome(Home.Id);
+	TestTrue(TEXT("Three observed rest-start days produce a settled canonical state"), SettledHome &&
+		SettledHome->RestVisitDays == 3 && SettledHome->LastRestStartIslandDay == 3 &&
+		SettledHome->ShelterState == EIslandWildlifeShelterState::Settled);
+
 	TestTrue(TEXT("The updated file can be read again"), State->ReadStateFile(StateFile));
 	const FIslandWildlifeHomeRecord* Loaded = State->FindWildlifeHome(Home.Id);
 	TestNotNull(TEXT("The wildlife home survives a JSON round trip"), Loaded);
@@ -666,6 +679,8 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Species survives persistence"), Loaded->Species == FName(TEXT("Rat")));
 		TestTrue(TEXT("Entrance anchor survives persistence"), Loaded->EntranceLocation.Equals(Home.EntranceLocation, 0.01f));
 		TestTrue(TEXT("Shelter state survives persistence"), Loaded->ShelterState == EIslandWildlifeShelterState::Settled);
+		TestEqual(TEXT("Distinct rest-visit days survive persistence"), Loaded->RestVisitDays, 3);
+		TestEqual(TEXT("Last rest day survives persistence"), Loaded->LastRestStartIslandDay, 3);
 		TestEqual(TEXT("Cached supplies survive persistence"), Loaded->CachedSupplies.Num(), 1);
 		if (Loaded->CachedSupplies.Num() == 1)
 			TestEqual(TEXT("Cache quantity survives persistence"), Loaded->CachedSupplies[0].Quantity, 3);
@@ -673,6 +688,19 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Older nest data is preserved when the new field is written"), State->GetNests().Num(), 1);
 	State->LoadAndSpawn();
 	TestEqual(TEXT("Loading the saved record recreates exactly one transient RatHollow"), CountWildlifeHomeActors(World, Home.Id), 1);
+	if (Loaded)
+	{
+		FIslandWildlifeHomeRecord DisturbedHome = *Loaded;
+		DisturbedHome.ShelterState = EIslandWildlifeShelterState::Disturbed;
+		TestTrue(TEXT("An explicit disturbance is stored"), State->StoreWildlifeHome(DisturbedHome));
+		TestTrue(TEXT("A later rest visit is recorded without erasing disturbance"), State->RecordWildlifeHomeRestStart(Home.Id, 4));
+		TestTrue(TEXT("Repeated future use remains recordable"), State->RecordWildlifeHomeRestStart(Home.Id, 5));
+		TestTrue(TEXT("A third later rest visit is recorded"), State->RecordWildlifeHomeRestStart(Home.Id, 6));
+		const FIslandWildlifeHomeRecord* StillDisturbed = State->FindWildlifeHome(Home.Id);
+		TestTrue(TEXT("Repeated use does not silently rehabilitate a disturbed home"), StillDisturbed &&
+			StillDisturbed->ShelterState == EIslandWildlifeShelterState::Disturbed &&
+			StillDisturbed->RestVisitDays == 6);
+	}
 	TestTrue(TEXT("Developer removal reverses only the wildlife-home record"), State->RemoveWildlifeHome(Home.Id));
 	TestEqual(TEXT("The legacy nest record remains after home removal"), State->GetNests().Num(), 1);
 	TestFalse(TEXT("The removed home is no longer present"), State->FindWildlifeHome(Home.Id) != nullptr);

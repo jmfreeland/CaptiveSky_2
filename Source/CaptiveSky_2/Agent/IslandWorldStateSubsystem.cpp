@@ -54,6 +54,8 @@ namespace
 		!FMath::IsFinite(Record.EntranceLocation.X) || !FMath::IsFinite(Record.EntranceLocation.Y) || !FMath::IsFinite(Record.EntranceLocation.Z) ||
 		!FMath::IsFinite(Record.EntranceRotation.Pitch) || !FMath::IsFinite(Record.EntranceRotation.Yaw) || !FMath::IsFinite(Record.EntranceRotation.Roll) ||
 		Record.ShelterQuality < 0 || Record.ShelterQuality > 5 ||
+		Record.RestVisitDays < 0 || Record.RestVisitDays > UIslandWorldStateSubsystem::MaxWildlifeHomeRestVisitDays ||
+		Record.LastRestStartIslandDay < 0 || Record.LastRestStartIslandDay > 10000000 ||
 		Record.CachedSupplies.Num() > UIslandWorldStateSubsystem::MaxWildlifeHomeCacheSlots)
 		return false;
 
@@ -400,6 +402,8 @@ bool UIslandWorldStateSubsystem::ReadStateFile(const FString& Path)
 			Record.EntranceLocation = FVector((*Location)[0]->AsNumber(), (*Location)[1]->AsNumber(), (*Location)[2]->AsNumber());
 			Record.EntranceRotation = FRotator((*Rotation)[0]->AsNumber(), (*Rotation)[1]->AsNumber(), (*Rotation)[2]->AsNumber());
 			(*Object)->TryGetNumberField(TEXT("shelter_quality"), Record.ShelterQuality);
+			(*Object)->TryGetNumberField(TEXT("rest_visit_days"), Record.RestVisitDays);
+			(*Object)->TryGetNumberField(TEXT("last_rest_start_island_day"), Record.LastRestStartIslandDay);
 			if (!(*Object)->TryGetStringField(TEXT("shelter_state"), State) || !ParseWildlifeShelterState(State, Record.ShelterState)) continue;
 			if ((*Object)->TryGetStringField(TEXT("last_used_utc"), LastUsed)) FDateTime::ParseIso8601(*LastUsed, Record.LastUsedUtc);
 			if ((*Object)->TryGetStringField(TEXT("last_disturbed_utc"), LastDisturbed)) FDateTime::ParseIso8601(*LastDisturbed, Record.LastDisturbedUtc);
@@ -557,6 +561,24 @@ bool UIslandWorldStateSubsystem::StoreWildlifeHome(const FIslandWildlifeHomeReco
 	return false;
 }
 
+bool UIslandWorldStateSubsystem::RecordWildlifeHomeRestStart(FName Id, int32 IslandDay)
+{
+	if (Id.IsNone() || IslandDay < 1) return false;
+	const FIslandWildlifeHomeRecord* Existing = FindWildlifeHome(Id);
+	if (!Existing) return false;
+
+	FIslandWildlifeHomeRecord Updated = *Existing;
+	Updated.LastUsedUtc = FDateTime::UtcNow();
+	if (IslandDay > Updated.LastRestStartIslandDay)
+	{
+		Updated.LastRestStartIslandDay = IslandDay;
+		Updated.RestVisitDays = FMath::Min(Updated.RestVisitDays + 1, MaxWildlifeHomeRestVisitDays);
+	}
+	if (Updated.ShelterState != EIslandWildlifeShelterState::Disturbed && Updated.RestVisitDays >= 3)
+		Updated.ShelterState = EIslandWildlifeShelterState::Settled;
+	return StoreWildlifeHome(Updated);
+}
+
 bool UIslandWorldStateSubsystem::RemoveWildlifeHome(FName Id)
 {
 	const int32 Index = WildlifeHomes.IndexOfByPredicate([Id](const FIslandWildlifeHomeRecord& Record) { return Record.Id == Id; });
@@ -608,6 +630,8 @@ bool UIslandWorldStateSubsystem::Save() const
 		Object->SetArrayField(TEXT("entrance_rotation"), {
 			MakeShared<FJsonValueNumber>(Record.EntranceRotation.Pitch), MakeShared<FJsonValueNumber>(Record.EntranceRotation.Yaw), MakeShared<FJsonValueNumber>(Record.EntranceRotation.Roll) });
 		Object->SetNumberField(TEXT("shelter_quality"), Record.ShelterQuality);
+		Object->SetNumberField(TEXT("rest_visit_days"), Record.RestVisitDays);
+		Object->SetNumberField(TEXT("last_rest_start_island_day"), Record.LastRestStartIslandDay);
 		Object->SetStringField(TEXT("shelter_state"), WildlifeShelterStateName(Record.ShelterState));
 		Object->SetStringField(TEXT("last_used_utc"), Record.LastUsedUtc.ToIso8601());
 		Object->SetStringField(TEXT("last_disturbed_utc"), Record.LastDisturbedUtc.ToIso8601());
