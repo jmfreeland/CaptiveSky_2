@@ -23,3 +23,38 @@ bool FIslandPeriwinkleCrabCueTest::RunTest(const FString& Parameters)
 		AIslandTidepoolPeriwinkle::ShouldTuckForCrab(true, -1.f, 0.f));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleGrazingPathTest, "CaptiveSky2.Agent.TidepoolPeriwinkleGrazingPath",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleGrazingPathTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	const FVector2D AtStart = Periwinkle::GrazingOffset(0.f, 0.f);
+	TestTrue(TEXT("The grazing path starts at its home point"), AtStart.IsNearlyZero());
+
+	const FVector2D MidCycle = Periwinkle::GrazingOffset(30.f, 0.f);
+	TestTrue(TEXT("The snail progresses across its patch while active"), MidCycle.Size() > 5.f);
+	TestTrue(TEXT("Mid-cycle movement remains local"), MidCycle.Size() <= Periwinkle::GrazingMaxExcursionCm);
+
+	const FVector2D FullCycle = Periwinkle::GrazingOffset(120.f, 0.f);
+	TestTrue(TEXT("The closed path returns to its starting point"), FullCycle.Size() < 0.01f);
+
+	bool bAllSamplesBounded = true;
+	for (int32 Sample = 0; Sample <= 240; ++Sample)
+	{
+		const FVector2D Offset = Periwinkle::GrazingOffset(Sample * 0.5f, 1.37f);
+		bAllSamplesBounded &= Offset.Size() <= Periwinkle::GrazingMaxExcursionCm + 0.001f;
+	}
+	TestTrue(TEXT("Every sampled step stays inside the bounded home patch"), bAllSamplesBounded);
+
+	const FVector2D Invalid = Periwinkle::GrazingOffset(std::numeric_limits<float>::quiet_NaN(), 0.f);
+	TestTrue(TEXT("Non-finite time cannot move the snail"), Invalid.IsNearlyZero());
+	TestEqual(TEXT("Active grazing advances at full openness"), Periwinkle::AdvanceGrazingTime(4.f, 2.f, 0.f), 6.f);
+	TestEqual(TEXT("A fully tucked snail pauses its graze path"), Periwinkle::AdvanceGrazingTime(4.f, 2.f, 1.f), 4.f);
+	TestEqual(TEXT("Partial shelter proportionally slows the path"), Periwinkle::AdvanceGrazingTime(4.f, 2.f, 0.5f), 5.f);
+	TestEqual(TEXT("Negative frame time cannot reverse the path"), Periwinkle::AdvanceGrazingTime(4.f, -2.f, 0.f), 4.f);
+	TestEqual(TEXT("Invalid rest state resets safely"),
+		Periwinkle::AdvanceGrazingTime(4.f, 2.f, std::numeric_limits<float>::quiet_NaN()), 0.f);
+	return true;
+}

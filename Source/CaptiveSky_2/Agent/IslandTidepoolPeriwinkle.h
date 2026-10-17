@@ -33,6 +33,11 @@ public:
 	static bool ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset);
 	/** Tide and rain keep the shell briefly darkened while its exposed surface is wet. */
 	static float WetShellAmount(float TideOffsetCm, float RainIntensity);
+	/** A small closed graze path, in cm from home, over one calm two-minute cycle. */
+	static FVector2D GrazingOffset(float ActiveSeconds, float InitialPhaseRadians);
+	/** Active grazing time advances with openness and stops completely while fully tucked. */
+	static float AdvanceGrazingTime(float ActiveSeconds, float DeltaSeconds, float ExposureRest);
+	static constexpr float GrazingMaxExcursionCm = 16.f;
 
 protected:
 	virtual void BeginPlay() override;
@@ -67,6 +72,7 @@ private:
 	float ObservationRestRemaining = 0.f;
 	float ObservationCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	float GrazingActiveSeconds = 0.f;
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	float ShellWetness = 0.f;

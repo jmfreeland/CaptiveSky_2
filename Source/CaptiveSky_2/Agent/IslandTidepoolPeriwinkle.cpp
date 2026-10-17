@@ -169,6 +169,32 @@ float AIslandTidepoolPeriwinkle::WetShellAmount(float TideOffsetCm, float RainIn
 	return FMath::Clamp(FMath::Max(TideWetness, RainWetness), 0.f, 1.f);
 }
 
+FVector2D AIslandTidepoolPeriwinkle::GrazingOffset(float ActiveSeconds, float InitialPhaseRadians)
+{
+	if (!FMath::IsFinite(ActiveSeconds) || !FMath::IsFinite(InitialPhaseRadians))
+	{
+		return FVector2D::ZeroVector;
+	}
+
+	constexpr float PathRadiusCm = GrazingMaxExcursionCm * 0.5f;
+	constexpr float CycleSeconds = 120.f;
+	const float StartAngle = InitialPhaseRadians;
+	const float CurrentAngle = StartAngle + FMath::Fmod(ActiveSeconds, CycleSeconds) * (2.f * PI / CycleSeconds);
+	const FVector2D Start(FMath::Cos(StartAngle), FMath::Sin(StartAngle));
+	const FVector2D Current(FMath::Cos(CurrentAngle), FMath::Sin(CurrentAngle));
+	return (Current - Start) * PathRadiusCm;
+}
+
+float AIslandTidepoolPeriwinkle::AdvanceGrazingTime(float ActiveSeconds, float DeltaSeconds, float ExposureRest)
+{
+	if (!FMath::IsFinite(ActiveSeconds) || !FMath::IsFinite(DeltaSeconds) || !FMath::IsFinite(ExposureRest))
+	{
+		return 0.f;
+	}
+	const float Activity = 1.f - FMath::Clamp(ExposureRest, 0.f, 1.f);
+	return FMath::Max(0.f, ActiveSeconds) + FMath::Max(0.f, DeltaSeconds) * Activity;
+}
+
 bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
 {
 	if (ObservationCooldownRemaining > 0.f) return false;
@@ -395,9 +421,34 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 		if (EyeStalk) EyeStalk->SetRelativeScale3D(FVector(0.018f, 0.018f, 0.10f * StalkExtension));
 	if (Aperture) Aperture->SetRelativeScale3D(FVector(0.035f, 0.105f, 0.10f * ApertureExtension));
 
-	// Barely perceptible antenna and body motion rewards a close look without
-	// turning naturally slow intertidal life into a conspicuous moving prop.
-	const float ActivityScale = FMath::Lerp(1.f, 0.3f, ExposureRest);
+	// A periwinkle grazes over a small patch only while conditions let it stay
+	// extended. The closed two-minute path returns to its starting point and
+	// remains within a 16 cm radius of its home, so it cannot wander off its rock.
+	const float CrawlActivity = 1.f - FMath::Clamp(ExposureRest, 0.f, 1.f);
+	GrazingActiveSeconds = AdvanceGrazingTime(GrazingActiveSeconds, SafeDelta, ExposureRest);
+	FVector CrawlGround(GetActorLocation().X, GetActorLocation().Y, HomeLocation.Z);
+	if (CrawlActivity > 0.01f)
+	{
+		const FVector2D CrawlOffsetCm = GrazingOffset(GrazingActiveSeconds, Phase);
+		const FVector DesiredGround = HomeLocation + FVector(CrawlOffsetCm.X, CrawlOffsetCm.Y, 0.f);
+		if (UWorld* World = GetWorld())
+		{
+			FHitResult GroundHit;
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(PeriwinkleGrazing), false, this);
+			const FVector TraceStart = DesiredGround + FVector(0.f, 0.f, 80.f);
+			const FVector TraceEnd = DesiredGround - FVector(0.f, 0.f, 140.f);
+			if (World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, Query) &&
+				GroundHit.ImpactNormal.Z >= 0.45f &&
+				FMath::Abs(GroundHit.ImpactPoint.Z - HomeLocation.Z) <= 24.f)
+			{
+				CrawlGround = GroundHit.ImpactPoint;
+			}
+		}
+	}
+
+		// Barely perceptible antenna and body motion rewards a close look without
+		// turning naturally slow intertidal life into a conspicuous moving prop.
+		const float ActivityScale = FMath::Lerp(1.f, 0.3f, ExposureRest);
 	const float Sway = FMath::Sin(ElapsedSeconds * 0.8f + Phase) * 2.4f * ActivityScale;
 	for (int32 Index = 0; Index < EyeStalks.Num(); ++Index)
 	{
@@ -406,7 +457,7 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	}
 	SetActorRotation(FRotator(0.f, Sway * 0.45f, 0.f));
 	const float BodyBob = FMath::Sin(ElapsedSeconds * 0.55f + Phase) * FMath::Lerp(0.8f, 0.2f, ExposureRest);
-	SetActorLocation(HomeLocation + FVector(0.f, 0.f, BodyBob));
+	SetActorLocation(CrawlGround + FVector(0.f, 0.f, BodyBob));
 }
 
 void AIslandTidepoolPeriwinkle::UpdateAttentionYaw(float TargetYaw, float DeltaSeconds)
