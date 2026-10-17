@@ -6,6 +6,7 @@
 
 class USkeletalMeshComponent;
 class UAnimSequence;
+class AIslandListeningStonesChime;
 
 enum class ERatLocomotionMode : uint8
 {
@@ -29,6 +30,9 @@ public:
 	/** A quiet rat may give a nearby visible raven one brief glance, never during an action or rest. */
 	static bool ShouldBeginRavenNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
 		bool bRatResting, bool bRavenResting, bool bAlreadyNoticing);
+	/** A live, audible landmark tone earns one brief glance from an otherwise idle rat. */
+	static bool ShouldBeginStoneChimeNotice(float DistanceCm, bool bChimeAudible, bool bRatBusy,
+		bool bRatResting, bool bAlreadyNoticing);
 	static constexpr float RavenNoticeRadius = 800.f;
 
 protected:
@@ -58,9 +62,14 @@ private:
 	float RavenAttentionRemaining = 0.f;
 	float RavenAttentionCooldownRemaining = 0.f;
 	FVector RavenAttentionTarget = FVector::ZeroVector;
+	float StoneChimeScanRemaining = 0.f;
+	float StoneChimeAttentionRemaining = 0.f;
+	float StoneChimeAttentionCooldownRemaining = 0.f;
+	FVector StoneChimeAttentionTarget = FVector::ZeroVector;
 
 	void CacheAnimations(APawn* Rat);
 	void UpdateAnimation(float DeltaSeconds);
 	void UpdateRavenAttention(float DeltaSeconds);
+	void UpdateStoneChimeAttention(float DeltaSeconds);
 	void UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping);
 };

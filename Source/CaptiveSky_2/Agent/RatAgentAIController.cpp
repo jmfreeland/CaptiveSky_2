@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "IslandListeningStonesChime.h"
 #include "RavenAgentAIController.h"
 
 namespace
@@ -17,6 +18,8 @@ namespace
 	constexpr float RavenScanInterval = 0.8f;
 	constexpr float RavenAttentionDuration = 1.7f;
 	constexpr float RavenAttentionCooldown = 16.f;
+	constexpr float StoneChimeAttentionDuration = 1.7f;
+	constexpr float StoneChimeAttentionCooldown = 16.f;
 
 	UAnimSequence* LoadFoxAnimation(const TCHAR* AssetName)
 	{
@@ -45,6 +48,14 @@ bool ARatAgentAIController::ShouldBeginRavenNotice(float DistanceCm, bool bHasLi
 		bHasLineOfSight && !bRatBusy && !bRatResting && !bRavenResting && !bAlreadyNoticing;
 }
 
+bool ARatAgentAIController::ShouldBeginStoneChimeNotice(float DistanceCm, bool bChimeAudible,
+	bool bRatBusy, bool bRatResting, bool bAlreadyNoticing)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f &&
+		DistanceCm <= AIslandListeningStonesChime::AudibleRadius && bChimeAudible &&
+		!bRatBusy && !bRatResting && !bAlreadyNoticing;
+}
+
 void ARatAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -52,6 +63,10 @@ void ARatAgentAIController::OnPossess(APawn* InPawn)
 	RavenAttentionRemaining = 0.f;
 	RavenAttentionCooldownRemaining = 0.f;
 	RavenAttentionTarget = FVector::ZeroVector;
+	StoneChimeScanRemaining = 0.f;
+	StoneChimeAttentionRemaining = 0.f;
+	StoneChimeAttentionCooldownRemaining = 0.f;
+	StoneChimeAttentionTarget = FVector::ZeroVector;
 	CacheAnimations(InPawn);
 	UpdateAnimation(0.f);
 }
@@ -69,6 +84,10 @@ void ARatAgentAIController::OnUnPossess()
 	RavenAttentionRemaining = 0.f;
 	RavenAttentionCooldownRemaining = 0.f;
 	RavenAttentionTarget = FVector::ZeroVector;
+	StoneChimeScanRemaining = 0.f;
+	StoneChimeAttentionRemaining = 0.f;
+	StoneChimeAttentionCooldownRemaining = 0.f;
+	StoneChimeAttentionTarget = FVector::ZeroVector;
 	Super::OnUnPossess();
 }
 
@@ -76,6 +95,7 @@ void ARatAgentAIController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateRavenAttention(DeltaSeconds);
+	UpdateStoneChimeAttention(DeltaSeconds);
 	UpdateAnimation(DeltaSeconds);
 }
 
@@ -88,6 +108,11 @@ void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	RavenAttentionCooldownRemaining = FMath::Max(0.f, RavenAttentionCooldownRemaining - SafeDelta);
 	RavenAttentionRemaining = FMath::Max(0.f, RavenAttentionRemaining - SafeDelta);
+	if (StoneChimeAttentionRemaining > 0.f)
+	{
+		RavenScanRemaining = FMath::Max(RavenScanRemaining, SafeDelta);
+		return;
+	}
 	if (RavenAttentionRemaining > 0.f)
 	{
 		if (IsActionInProgress() || IsResting())
@@ -148,6 +173,65 @@ void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
 	RavenAttentionTarget = BestRavenBody->GetActorLocation();
 	RavenAttentionRemaining = RavenAttentionDuration;
 	RavenAttentionCooldownRemaining = RavenAttentionCooldown;
+	IdleLookTimer = 0.f;
+}
+
+void ARatAgentAIController::UpdateStoneChimeAttention(float DeltaSeconds)
+{
+	APawn* Rat = GetPawn();
+	UWorld* World = GetWorld();
+	if (!Rat || !World) return;
+
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	StoneChimeAttentionCooldownRemaining = FMath::Max(0.f, StoneChimeAttentionCooldownRemaining - SafeDelta);
+	StoneChimeAttentionRemaining = FMath::Max(0.f, StoneChimeAttentionRemaining - SafeDelta);
+	if (StoneChimeAttentionRemaining > 0.f)
+	{
+		if (IsActionInProgress() || IsResting())
+		{
+			StoneChimeAttentionRemaining = 0.f;
+			return;
+		}
+
+		const FVector Direction = StoneChimeAttentionTarget - Rat->GetActorLocation();
+		if (!Direction.IsNearlyZero())
+		{
+			FRotator Facing = Direction.Rotation();
+			Facing.Pitch = 0.f;
+			Facing.Roll = 0.f;
+			Rat->SetActorRotation(FMath::RInterpTo(Rat->GetActorRotation(), Facing, SafeDelta, 2.5f));
+		}
+		return;
+	}
+
+	if (RavenAttentionRemaining > 0.f || StoneChimeAttentionCooldownRemaining > 0.f)
+	{
+		StoneChimeScanRemaining = FMath::Max(RavenAttentionRemaining,
+			StoneChimeAttentionCooldownRemaining);
+		return;
+	}
+	StoneChimeScanRemaining -= SafeDelta;
+	if (StoneChimeScanRemaining > 0.f) return;
+	StoneChimeScanRemaining = 0.8f;
+	if (IsActionInProgress() || IsResting()) return;
+
+	AIslandListeningStonesChime* BestChime = nullptr;
+	float BestDistanceSquared = FMath::Square(AIslandListeningStonesChime::AudibleRadius);
+	for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+	{
+		AIslandListeningStonesChime* Chime = *It;
+		if (!IsValid(Chime) || !Chime->IsAudibleAt(Rat->GetActorLocation())) continue;
+		const float DistanceSquared = FVector::DistSquared(Rat->GetActorLocation(), Chime->GetActorLocation());
+		if (DistanceSquared > BestDistanceSquared || !ShouldBeginStoneChimeNotice(
+			FMath::Sqrt(DistanceSquared), true, false, false, false)) continue;
+		BestDistanceSquared = DistanceSquared;
+		BestChime = Chime;
+	}
+
+	if (!BestChime) return;
+	StoneChimeAttentionTarget = BestChime->GetActorLocation();
+	StoneChimeAttentionRemaining = StoneChimeAttentionDuration;
+	StoneChimeAttentionCooldownRemaining = StoneChimeAttentionCooldown;
 	IdleLookTimer = 0.f;
 }
 

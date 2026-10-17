@@ -4,6 +4,7 @@
 #include "AutonomousAgentCharacter.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimSingleNodeInstance.h"
+#include "IslandListeningStonesChime.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/SkeletalMesh.h"
@@ -48,6 +49,31 @@ bool FRatRavenAttentionTest::RunTest(const FString& Parameters)
 		Rat::ShouldBeginRavenNotice(-1.f, true, false, false, false, false));
 	TestFalse(TEXT("Invalid distances never start an attention cue"),
 		Rat::ShouldBeginRavenNotice(std::numeric_limits<float>::quiet_NaN(), true, false, false, false, false));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRatListeningStonesAttentionTest, "CaptiveSky2.Agent.RatListeningStonesAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRatListeningStonesAttentionTest::RunTest(const FString& Parameters)
+{
+	using Rat = ARatAgentAIController;
+	TestTrue(TEXT("A quiet rat briefly notices a nearby audible stone chime"),
+		Rat::ShouldBeginStoneChimeNotice(900.f, true, false, false, false));
+	TestFalse(TEXT("A faded or inaudible tone is ignored"),
+		Rat::ShouldBeginStoneChimeNotice(300.f, false, false, false, false));
+	TestFalse(TEXT("An active rat action keeps its chosen focus"),
+		Rat::ShouldBeginStoneChimeNotice(300.f, true, true, false, false));
+	TestFalse(TEXT("A resting rat is not pulled out of sleep"),
+		Rat::ShouldBeginStoneChimeNotice(300.f, true, false, true, false));
+	TestFalse(TEXT("The rat does not repeatedly react during its attention cooldown"),
+		Rat::ShouldBeginStoneChimeNotice(300.f, true, false, false, true));
+	TestFalse(TEXT("A chime outside its audible radius cannot attract the rat"),
+		Rat::ShouldBeginStoneChimeNotice(AIslandListeningStonesChime::AudibleRadius + 1.f, true, false, false, false));
+	TestFalse(TEXT("Invalid negative distance never starts a sound cue"),
+		Rat::ShouldBeginStoneChimeNotice(-1.f, true, false, false, false));
+	TestFalse(TEXT("Invalid distances never start a sound cue"),
+		Rat::ShouldBeginStoneChimeNotice(std::numeric_limits<float>::quiet_NaN(), true, false, false, false));
 	return true;
 }
 
