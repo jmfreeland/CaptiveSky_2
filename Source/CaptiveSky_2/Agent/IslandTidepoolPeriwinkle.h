@@ -11,6 +11,7 @@ class UStaticMeshComponent;
 class AIslandDayNight;
 class AIslandWeather;
 class ARavenAgentAIController;
+class APawn;
 
 /** A tiny, slow-moving periwinkle that adds close-range life to Tideglass's rocky edge. */
 UCLASS()
@@ -63,6 +64,7 @@ private:
 	float ObservationRestRemaining = 0.f;
 	float ObservationCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	float ShellWetness = 0.f;
 	int32 ColorVariant = 0;
 	FVector HomeLocation = FVector::ZeroVector;
@@ -72,6 +74,7 @@ private:
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void CheckForNearbyRavenDisturbance();
+	void CheckForNearbyPlayerDisturbance(APawn* PlayerPawn);
 	void BuildShellSpiral();
 	void ApplyPalette();
 };

@@ -2276,6 +2276,34 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchablePeriwinkle->CheckForNearbyRavenDisturbance();
 		TestTrue(TEXT("Leaving the wider ring rearms one new response to a later settled approach"),
 			WatchablePeriwinkle->ObservationRestRemaining > 0.f);
+
+		// The player also earns one quiet tuck per close approach, without
+		// repeatedly startling a snail while lingering along the shoreline.
+		WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+		WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+		WatchablePeriwinkle->PlayerPresenceLatch.Reset();
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(180.f, 0.f, 90.f));
+		WatchablePeriwinkle->CheckForNearbyPlayerDisturbance(Observer);
+		TestTrue(TEXT("A player approaching within a few metres briefly tucks the periwinkle"),
+			WatchablePeriwinkle->ObservationRestRemaining > 0.f && WatchablePeriwinkle->ObservationRestRemaining <= 1.6f);
+		WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+		WatchablePeriwinkle->CheckForNearbyPlayerDisturbance(Observer);
+		TestTrue(TEXT("A player lingering beside the snail does not repeatedly trigger its tuck"),
+			FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining));
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(600.f, 0.f, 90.f));
+		WatchablePeriwinkle->CheckForNearbyPlayerDisturbance(Observer);
+		WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(180.f, 0.f, 90.f));
+		WatchablePeriwinkle->CheckForNearbyPlayerDisturbance(Observer);
+		TestTrue(TEXT("Leaving the wider shoreline ring rearms one response to a later player approach"),
+			WatchablePeriwinkle->ObservationRestRemaining > 0.f);
+		WatchablePeriwinkle->ObservationRestRemaining = 0.f;
+		WatchablePeriwinkle->ObservationCooldownRemaining = 0.f;
+		WatchablePeriwinkle->PlayerPresenceLatch.Reset();
+		Observer->SetActorLocation(PeriwinkleTestHome + FVector(180.f, 0.f, 500.f));
+		WatchablePeriwinkle->CheckForNearbyPlayerDisturbance(Observer);
+		TestTrue(TEXT("A player far above the shore does not startle a periwinkle"),
+			FMath::IsNearlyZero(WatchablePeriwinkle->ObservationRestRemaining));
 		Observer->SetActorLocation(OriginalObserverLocation);
 		Controller->LocomotionState = ERavenLocomotionState::Grounded;
 			WatchablePeriwinkle->HomeLocation = OriginalPeriwinkleHome;

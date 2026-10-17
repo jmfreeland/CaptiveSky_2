@@ -199,6 +199,34 @@ void AIslandTidepoolPeriwinkle::CheckForNearbyRavenDisturbance()
 	}
 }
 
+void AIslandTidepoolPeriwinkle::CheckForNearbyPlayerDisturbance(APawn* PlayerPawn)
+{
+	if (!IsValid(PlayerPawn))
+	{
+		PlayerPresenceLatch.Reset();
+		return;
+	}
+
+	constexpr float PlayerRadius = 240.f;
+	constexpr float PlayerRearmRadius = 520.f;
+	constexpr float MaximumVerticalOffset = 220.f;
+	const FVector Offset = PlayerPawn->GetActorLocation() - GetActorLocation();
+	const float DistanceSquared = Offset.SizeSquared2D();
+	if (PlayerPresenceLatch.Get() == PlayerPawn && DistanceSquared > FMath::Square(PlayerRearmRadius))
+		PlayerPresenceLatch.Reset();
+
+	if (FMath::Abs(Offset.Z) > MaximumVerticalOffset ||
+		DistanceSquared > FMath::Square(PlayerRadius) || PlayerPresenceLatch.Get() == PlayerPawn)
+	{
+		return;
+	}
+
+	// A single close approach is enough; lingering beside the snail does not
+	// keep it tucked, and the player must leave the wider ring before rearming.
+	PlayerPresenceLatch = PlayerPawn;
+	RespondToQuietObservation();
+}
+
 void AIslandTidepoolPeriwinkle::SetColorVariant(int32 Variant)
 {
 	ColorVariant = FMath::Clamp(Variant, 0, 2);
@@ -303,6 +331,7 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = 0.4f;
 		CheckForNearbyRavenDisturbance();
+		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
 	}
 	const float TideRest = ExposureRestAmount(TideOffset);
 	const float ObservationRest = FMath::SmoothStep(0.f, 0.35f, ObservationRestRemaining);
