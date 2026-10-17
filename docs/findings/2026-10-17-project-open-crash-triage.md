@@ -33,10 +33,14 @@ play cap. It terminated during pre-initialization before the Island loaded or
 any screenshot was saved. `Saved/Crashes/_0000/CrashContext.runtime-xml` again
 reports a null-address access violation at `SecondsSinceStart=0`, no OOM, and
 PCallStackHash `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`—the same signature
-recorded for the earlier NullRHI project-open crash. The crash-side log contains
-the full command line; the main Island state file was not used or changed. Do
-not repeat this launch until symbols or a meaningfully different startup path
-can distinguish the fault.
+recorded for the separate 2026-10-13 Game-mode startup failure. It is **not**
+the hash of the earlier NullRHI project-open crash (`F405610C...`); matching
+exception type and startup timing alone do not establish a shared fault. See
+[`2026-10-13-unreal-startup-triage.md`](2026-10-13-unreal-startup-triage.md)
+for the earlier distinction. The launch note contains the full command line;
+the main Island state file was not used or changed. Do not repeat this launch
+until symbols or a meaningfully different startup path can distinguish the
+fault.
 
 The isolated test records are not a canonical Rat home. The current
 `WorldState/Island.json` still has an empty `wildlife_homes` array, and the Rat
@@ -54,3 +58,12 @@ loading against a known-good project-open run. Do not infer that the absent
 Trace Server, optional profiler DLLs, plant plugin retirement, memory pressure,
 or the Gateway exceptions caused this null dereference; current evidence does
 not establish any of those causes.
+
+## Symbol/debugger availability recheck — 2026-10-17
+
+The installed engine resolves to `D:/Games/Epic/UE_5.8`. A read-only inventory
+found no `UnrealEditor*.pdb` beside its Win64 binaries and no `cdb.exe`,
+`windbg.exe`, or `llvm-symbolizer.exe` available on the local command path or
+in the checked Windows Kits debugger directory. The matching stack therefore
+remains unsymbolized; this recheck does not identify a cause and does not
+authorize another identical project launch.
