@@ -19,6 +19,9 @@ FLOWER_HEADS = (
 )
 ROSETTE_LEAVES_PER_STEM = 4
 FLORETS_PER_HEAD = 15
+ROSETTE_LEAF_LENGTH_RANGE_METERS = (0.13, 0.18)
+ROSETTE_LEAF_WIDTH_RANGE_METERS = (0.007, 0.009)
+LEAF_COLOR_LINEAR = (0.22, 0.36, 0.17)
 
 
 def _leaf(leaf_bm, origin, angle, length, width, phase):
@@ -29,7 +32,10 @@ def _leaf(leaf_bm, origin, angle, length, width, phase):
         t = row / 6
         centre = origin + direction * (length * t)
         centre += across * (0.018 * math.sin(math.pi * t + phase))
-        centre.z += 0.025 * t + 0.008 + 0.006 * (1.0 + math.sin(math.pi * t + phase))
+        # A short, raised arch keeps the rosette legible as a cushioned tuft
+        # instead of a flat star of crossing blades.
+        centre.z += 0.025 * t + 0.035 * math.sin(math.pi * t)
+        centre.z += 0.008 + 0.006 * (1.0 + math.sin(math.pi * t + phase))
         profile = math.sin(math.pi * t) ** 0.72
         half_width = width * profile * (0.58 + 0.42 * (1.0 - t))
         row_verts = []
@@ -84,7 +90,7 @@ def _floret(petal_bm, centre_bm, position, outward, phase):
 
 
 def build(A):
-    lib.PLAIN["sea_thrift_leaf"] = {"BaseColor": [0.12, 0.24, 0.12], "Roughness": 0.91}
+    lib.PLAIN["sea_thrift_leaf"] = {"BaseColor": list(LEAF_COLOR_LINEAR), "Roughness": 0.91}
     lib.PLAIN["sea_thrift_stem"] = {"BaseColor": [0.22, 0.31, 0.15], "Roughness": 0.88}
     lib.PLAIN["sea_thrift_petal"] = {"BaseColor": [0.76, 0.34, 0.56], "Roughness": 0.80}
     lib.PLAIN["sea_thrift_centre"] = {"BaseColor": [0.84, 0.64, 0.31], "Roughness": 0.84}
@@ -110,8 +116,12 @@ def build(A):
         for leaf_index in range(ROSETTE_LEAVES_PER_STEM):
             angle = plant_index * 1.97 + math.tau * leaf_index / ROSETTE_LEAVES_PER_STEM
             origin = base + Vector((0.0, 0.0, 0.006 + 0.001 * (leaf_index % 2)))
-            length = 0.20 + 0.025 * ((plant_index + leaf_index) % 4)
-            width = 0.010 + 0.0015 * ((plant_index + 2 * leaf_index) % 3)
+            length_t = ((plant_index + leaf_index) % 4) / 3.0
+            width_t = ((plant_index + 2 * leaf_index) % 3) / 2.0
+            length = ROSETTE_LEAF_LENGTH_RANGE_METERS[0] + (
+                ROSETTE_LEAF_LENGTH_RANGE_METERS[1] - ROSETTE_LEAF_LENGTH_RANGE_METERS[0]) * length_t
+            width = ROSETTE_LEAF_WIDTH_RANGE_METERS[0] + (
+                ROSETTE_LEAF_WIDTH_RANGE_METERS[1] - ROSETTE_LEAF_WIDTH_RANGE_METERS[0]) * width_t
             _leaf(leaf_bm, origin, angle, length, width, angle * 0.37)
 
         # Each round head is built from individual tiny five-petal florets.

@@ -69,6 +69,19 @@ class TideglassSeaThriftTests(unittest.TestCase):
                     for alias in node.names}
         self.assertNotIn("random", imported)
 
+    def test_rosette_is_compact_raised_and_uses_a_lighter_coastal_green(self):
+        values, *_ = source_contract()
+        leaf_lengths = values["ROSETTE_LEAF_LENGTH_RANGE_METERS"]
+        leaf_widths = values["ROSETTE_LEAF_WIDTH_RANGE_METERS"]
+        leaf_color = values["LEAF_COLOR_LINEAR"]
+        self.assertGreaterEqual(leaf_lengths[0], 0.12)
+        self.assertLessEqual(leaf_lengths[1], 0.18)
+        self.assertLess(leaf_widths[1], 0.01)
+        self.assertGreater(leaf_color[1], leaf_color[0])
+        self.assertGreater(leaf_color[1], 0.30)
+        source = ASSET.read_text(encoding="utf-8")
+        self.assertIn("0.035 * math.sin(math.pi * t)", source)
+
 
 if __name__ == "__main__":
     unittest.main()
