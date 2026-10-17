@@ -17,6 +17,26 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandHazelThicketDistributionTest, "CaptiveSky2.Agent.WoodlandHazelThicketDistribution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandHazelThicketDistributionTest::RunTest(const FString& Parameters)
+{
+	int32 SelectedGroves = 0;
+	int32 DifferentSeedSelections = 0;
+	for (int32 GroveIndex = 0; GroveIndex < 256; ++GroveIndex)
+	{
+		const bool bSelected = AIslandWeather::ShouldPlaceWoodlandHazelThicket(GroveIndex, 71);
+		TestEqual(TEXT("Grove selection is deterministic"), AIslandWeather::ShouldPlaceWoodlandHazelThicket(GroveIndex, 71), bSelected);
+		SelectedGroves += bSelected ? 1 : 0;
+		DifferentSeedSelections += AIslandWeather::ShouldPlaceWoodlandHazelThicket(GroveIndex, 72) != bSelected ? 1 : 0;
+	}
+	TestFalse(TEXT("Negative grove indices are never selected"), AIslandWeather::ShouldPlaceWoodlandHazelThicket(-1, 71));
+	TestTrue(TEXT("The thicket layer remains sparse across 256 candidate groves"), SelectedGroves >= 20 && SelectedGroves <= 44);
+	TestTrue(TEXT("Changing the world seed changes the selected grove pattern"), DifferentSeedSelections > 0);
+	return true;
+}
+
 bool FIslandWeatherTest::RunTest(const FString& Parameters)
 {
 	const AIslandWeather* Weather = GetDefault<AIslandWeather>();
