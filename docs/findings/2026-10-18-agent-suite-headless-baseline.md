@@ -54,3 +54,13 @@ Logging the values showed the failures were test drift, not a behaviour bug:
 - The tests ticked the school half a hop (0.27 s) and then expected the fish, ripple and timers to be exactly where they were
   before the tick. The orbit and timers legitimately advance, so the checks now compare against the ripple's emit position,
   the hop's own offset (tilt and height) and `19 - tick` / `305 - tick` seconds.
+
+### Remaining four (cycle 23)
+
+`IslandInnkeeperSpawn`, `IslandOcean`, `ListeningStonePresentation` and `WindArchPresentation` still fail in the scratch
+project even after copying the main project's `Config/Default*.ini` over the scratch copy (the scratch config was stale:
+different skin-cache settings and no `AutomationTestSettings`), so config drift is ruled out. The three presentation
+tests fail first at a `Possess` followed by `IsPlayerControlled()` on a bare `APlayerController`, which points at the
+headless `-NullRHI` game world rather than at project code; the installed engine here ships no `Pawn.cpp`, so I could not
+read `APawn::IsPlayerControlled` to confirm. The Innkeeper test reads `Agents/Agent_Innkeeper_01/`, which the scratch
+project does not mirror. Run these four in the main project's own automation environment.
