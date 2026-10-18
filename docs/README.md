@@ -38,7 +38,7 @@ this file is the text version and the map of everything under `docs/`.
 `AIslandDayNight::DescribeTime()` joins small pure functions (all covered by `CaptiveSky2.Agent.DayNight`):
 `LunarPhaseName` (eight named phases), `MoonHeight` (high / up / horizon / below), `IsMoonHiddenByCloud`,
 `DescribeSunEdge` (sunrise and sunset cues) and `DescribeCalendar` (Island day, days to full and new moon) and `IsShootingStarSlot` (rare meteors on clear dark nights). The sea is described by `UIslandSeaStateSubsystem::DescribeSea`.
-Developer console: `Island.Hour <h>`, `Island.Day <n>` (day 1 is a new moon), `Island.Storm`, `Island.Dew`, `Island.Sea`, `Island.Rainbow`.
+Developer console: `Island.Hour <h>`, `Island.Day <n>` (day 1 is a new moon), `Island.SkyReport` (logs what a resident would be told about sky and sea), `Island.Storm`, `Island.Dew`, `Island.Sea`, `Island.Rainbow`.
 
 ## Building and testing with the editor open
 
