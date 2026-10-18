@@ -15,13 +15,29 @@ no direct `Responding` measurement.
   followed by `LogLiveCoding: Starting Live Coding compile.`
 - There is no later Live Coding success, failure, or completion entry in that log.
 - Later periodic Derived Data Cache maintenance and UDP messages continue to be
-  logged, but every such line retains Unreal's frame counter `[148]`; the last
-  recorded activity is at `2026-10-17 21:49:21`.
+  logged, but every such line retains Unreal's frame counter `[148]`; on the
+  2026-10-18 recheck the last recorded activity had advanced to
+  `2026-10-18 00:49:21`.
 
 This strongly suggests that the editor stopped advancing during or immediately
 after the Live Coding compile request. It does not prove the exact cause or
 establish Windows' process responsiveness state; background maintenance logging
 can continue while the editor's main loop is stalled.
+
+### Recheck — 2026-10-18 00:57 UTC
+
+The desktop inventory still listed both Unreal windows. A fresh capture for the
+project window showed the browser underneath rather than the editor, and two
+`activate_window` attempts timed out, including one after refreshing the window
+inventory. This leaves the editor inaccessible through Computer Use but does
+not independently prove that the process is frozen. The periodic log activity
+above is recent, but still carries frame counter `[148]` and is not evidence of
+a responsive editor loop.
+
+The newest crash bundle at `Saved/Crashes/_0000/` belongs to a separate
+`-NullRHI -ExecutePythonScript` import invocation (PID is reported as zero in the
+context) and records a Core null-access startup crash. Do not conflate it with
+the GUI editor's state or treat it as a validated restart route.
 
 ## Recovery guidance
 
