@@ -361,6 +361,16 @@ FString AIslandDayNight::DescribeTime() const
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden);
 }
 
+static FAutoConsoleCommandWithWorldAndArgs GIslandDayCommand(
+	TEXT("Island.Day"),
+	TEXT("Developer override for testing and filming moon phases: jump the Island calendar to a day number (1 is a new moon). The hour is unchanged. Usage: Island.Day <day>"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World || Args.Num() < 1) return;
+		const int32 Day = FMath::Max(1, FCString::Atoi(*Args[0]));
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It) It->DayNumber = Day;
+	}));
+
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(
 	TEXT("Island.Hour"),
 	TEXT("Developer override for testing and filming: jump the Island clock to an hour (0..24). The day number is unchanged. Usage: Island.Hour <hour>"),
