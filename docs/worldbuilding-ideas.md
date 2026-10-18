@@ -1,5 +1,13 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## Concept-art exploration rule — 2026-10-18
+
+Weekly concept art should explore Captive Sky's possibility space rather than converge on a recurring house style. Avoid repeatedly defaulting to golden-hour Tideglass/coastal overlooks, terraces, craft tables, and idyllic vegetation compositions even when those are attractive.
+
+Vary location, scale, weather, season, time of day, camera language, degree of habitation, emotional register, technology, and the part of the simulation being visualized. Beauty need not always mean idyllic. Concepts may include storms, interiors, unusual viewpoints, wildlife-scale scenes, aerial/historical views, night gatherings, harsh or empty landscapes, future settlements, parallel worlds, the elevator, the endless white plane, the ocean stairway, or different levels of simulation.
+
+Do not reuse the previous four weekly concepts' primary location + composition + time-of-day combination. At least once every 3–4 weekly concepts, make the image a long-horizon **wild card**: adventurous concept art that explores what Captive Sky might eventually contain even when it is not the most immediately buildable recommendation that week. Weekly build recommendations should remain grounded in the current repository; the concept image is allowed to reach much farther.
+
 ## 2026-10-13 — Give the dragonfly's flower pause time to read
 
 The existing flower-interest cue was only 2.6 seconds end-to-end, leaving about
