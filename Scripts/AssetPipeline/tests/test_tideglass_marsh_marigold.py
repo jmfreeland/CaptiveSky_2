@@ -66,6 +66,18 @@ class TideglassMarshMarigoldTests(unittest.TestCase):
         self.assertTrue({"marigold_leaf", "marigold_stem", "marigold_sepal",
                          "marigold_centre"}.issubset(materials))
 
+    def test_zero_width_endpoints_are_single_vertex_fans_with_fbx_smoothing(self):
+        values, *_rest, tree = source_contract()
+        functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+        self.assertEqual(values["FBX_MESH_SMOOTH_TYPE"], "FACE")
+        leaf = ast.unparse(functions["_leaf"])
+        sepal = ast.unparse(functions["_sepal"])
+        self.assertIn("row in (0, LEAF_LONGITUDINAL_SEGMENTS)", leaf)
+        self.assertIn("row in (0, SEPAL_LONGITUDINAL_SEGMENTS)", sepal)
+        for geometry in (leaf, sepal):
+            self.assertIn("rows[0][0]", geometry)
+            self.assertIn("rows[-1][0]", geometry)
+
     def test_builder_uses_shared_meshes_for_organic_parts(self):
         *_rest, tree = source_contract()
         functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}

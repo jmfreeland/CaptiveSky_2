@@ -9,6 +9,7 @@ import lib
 
 
 NAME = "TideglassMarshMarigold"
+FBX_MESH_SMOOTH_TYPE = "FACE"
 PROVENANCE = (
     "Deterministic collisionless Caltha palustris-inspired procedural geometry; "
     "low rounded leaves and glossy five-to-eight-sepal flowers for a seasonally "
@@ -83,6 +84,9 @@ def _leaf(bm, start, direction, scale, phase):
         t = row / LEAF_LONGITUDINAL_SEGMENTS
         centre = start + direction * (LEAF_LENGTH_M * scale * t)
         centre.z += scale * (0.016 * math.sin(math.pi * t) + 0.007 * t)
+        if row in (0, LEAF_LONGITUDINAL_SEGMENTS):
+            rows.append([bm.verts.new(centre)])
+            continue
         half_width = LEAF_WIDTH_M * scale * LEAF_HALF_WIDTH_PROFILE[row]
         half_width *= 0.96 + 0.04 * math.sin(2.0 * math.pi * t + phase)
         # Split the first centimetre of the blade around its petiole, leaving a
@@ -97,10 +101,14 @@ def _leaf(bm, start, direction, scale, phase):
             point.z -= scale * (0.0045 * LEAF_HALF_WIDTH_PROFILE[row] * across_amount * across_amount)
             row_vertices.append(bm.verts.new(point))
         rows.append(row_vertices)
-    for row in range(len(rows) - 1):
+    for side in range(LEAF_LATERAL_SEGMENTS):
+        bm.faces.new((rows[0][0], rows[1][side], rows[1][side + 1]))
+    for row in range(1, len(rows) - 2):
         for side in range(LEAF_LATERAL_SEGMENTS):
             bm.faces.new((rows[row][side], rows[row + 1][side],
                           rows[row + 1][side + 1], rows[row][side + 1]))
+    for side in range(LEAF_LATERAL_SEGMENTS):
+        bm.faces.new((rows[-2][side], rows[-1][0], rows[-2][side + 1]))
 
 
 def _sepal(bm, centre, radial, side, index):
@@ -110,10 +118,13 @@ def _sepal(bm, centre, radial, side, index):
     for row in range(SEPAL_LONGITUDINAL_SEGMENTS + 1):
         t = row / SEPAL_LONGITUDINAL_SEGMENTS
         along = SEPAL_LENGTH_M * length_scale * t
-        half_width = SEPAL_WIDTH_M * SEPAL_HALF_WIDTH_PROFILE[row]
         tip_wave = 0.0007 * math.sin(index * 1.7 + t * math.pi)
         centre_z = 0.002 + SEPAL_TIP_RISE_M * t + 0.004 * math.sin(math.pi * t) - 0.003 * t * t + tip_wave
         mid = centre + radial * along + Vector((0.0, 0.0, centre_z))
+        if row in (0, SEPAL_LONGITUDINAL_SEGMENTS):
+            rows.append([bm.verts.new(mid)])
+            continue
+        half_width = SEPAL_WIDTH_M * SEPAL_HALF_WIDTH_PROFILE[row]
         row_vertices = []
         for column in range(SEPAL_LATERAL_SEGMENTS + 1):
             across_amount = -1.0 + 2.0 * column / SEPAL_LATERAL_SEGMENTS
@@ -121,7 +132,10 @@ def _sepal(bm, centre, radial, side, index):
             point.z -= SEPAL_EDGE_CUP_M * SEPAL_HALF_WIDTH_PROFILE[row] * across_amount * across_amount
             row_vertices.append(bm.verts.new(point))
         rows.append(row_vertices)
-    for row in range(len(rows) - 1):
+    for side_index in range(SEPAL_LATERAL_SEGMENTS):
+        bm.faces.new((rows[0][0], rows[1][side_index], rows[1][side_index + 1]))
+        bm.faces.new((rows[-2][side_index], rows[-1][0], rows[-2][side_index + 1]))
+    for row in range(1, len(rows) - 2):
         for side_index in range(SEPAL_LATERAL_SEGMENTS):
             bm.faces.new((rows[row][side_index], rows[row + 1][side_index],
                           rows[row + 1][side_index + 1], rows[row][side_index + 1]))
