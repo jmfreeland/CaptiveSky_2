@@ -8,6 +8,7 @@
 class AStaticMeshActor;
 class AIslandWindMoteEffect;
 class AIslandWeather;
+class APawn;
 class UInstancedStaticMeshComponent;
 class UStaticMesh;
 
@@ -23,6 +24,9 @@ public:
 	int32 GetStoneCount() const;
 	/** Stronger natural winds may create one nearby transient motes pass after the cooldown. */
 	static bool ShouldEmitNaturalWindMotes(float WindSpeed, float CooldownRemaining);
+	/** A nearby, slow visitor can prompt one brief mote pass; all inputs are measured at the arch. */
+	static bool ShouldEmitVisitorWindMotes(float Distance, float VerticalOffset, float PlanarSpeed,
+		float CooldownRemaining, bool bNearbyMotesAlreadyVisible);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -34,15 +38,25 @@ private:
 	TObjectPtr<UInstancedStaticMeshComponent> Stones;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TWeakObjectPtr<AIslandWindMoteEffect> AmbientMotes;
+	TWeakObjectPtr<APawn> VisitorPresenceLatch;
 	float AmbientMoteCooldownRemaining = 0.f;
+	float VisitorMoteCooldownRemaining = 0.f;
 	static constexpr float AmbientMoteWindThreshold = 105.f;
 	static constexpr float AmbientMoteCooldownSeconds = 30.f;
+	static constexpr float VisitorMoteCooldownSeconds = 36.f;
+	static constexpr float VisitorNoticeRadius = 380.f;
+	static constexpr float VisitorRearmRadius = 650.f;
+	static constexpr float VisitorMaximumHeightDifference = 240.f;
+	static constexpr float VisitorMaximumApproachSpeed = 260.f;
 
 	static float GetPillarStoneScale(const FVector& LocalHalfExtent, const FVector& RockHalfExtent);
 	static int32 GetPillarLayerCount(const FVector& LocalHalfExtent, const FVector& RockHalfExtent);
 	bool BuildStonework(UStaticMesh* RockMesh, const FTransform& MarkerTransform,
 		const TArray<AStaticMeshActor*>& Pillars, const AStaticMeshActor* Beam);
+	bool HasNearbyMotePass(UWorld* World) const;
+	bool SpawnMotePass(UWorld* World, const FVector& Direction);
 	void CheckForAmbientWind();
+	void CheckForVisitorPresence();
 };
 
 /** Replaces only the saved Wind Arch's cube visuals during Game/PIE; never saves map edits. */

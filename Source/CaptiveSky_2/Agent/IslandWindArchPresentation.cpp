@@ -7,6 +7,8 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "IslandWeather.h"
 #include "IslandWindMoteEffect.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -44,11 +46,57 @@ bool AWindArchStonework::ShouldEmitNaturalWindMotes(float WindSpeed, float Coold
 	return FMath::IsFinite(WindSpeed) && WindSpeed >= AmbientMoteWindThreshold && CooldownRemaining <= 0.f;
 }
 
+bool AWindArchStonework::ShouldEmitVisitorWindMotes(float Distance, float VerticalOffset, float PlanarSpeed,
+	float CooldownRemaining, bool bNearbyMotesAlreadyVisible)
+{
+	return FMath::IsFinite(Distance) && FMath::IsFinite(VerticalOffset) && FMath::IsFinite(PlanarSpeed) &&
+		FMath::IsFinite(CooldownRemaining) && Distance >= 0.f && FMath::Abs(VerticalOffset) <= VisitorMaximumHeightDifference &&
+		Distance <= VisitorNoticeRadius && PlanarSpeed >= 0.f && PlanarSpeed <= VisitorMaximumApproachSpeed &&
+		CooldownRemaining <= 0.f && !bNearbyMotesAlreadyVisible;
+}
+
 void AWindArchStonework::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	AmbientMoteCooldownRemaining = FMath::Max(0.f, AmbientMoteCooldownRemaining - FMath::Max(0.f, DeltaSeconds));
+	const float SafeDelta = FMath::IsFinite(DeltaSeconds) ? FMath::Max(0.f, DeltaSeconds) : 0.f;
+	AmbientMoteCooldownRemaining = FMath::Max(0.f, AmbientMoteCooldownRemaining - SafeDelta);
+	VisitorMoteCooldownRemaining = FMath::Max(0.f, VisitorMoteCooldownRemaining - SafeDelta);
 	CheckForAmbientWind();
+	CheckForVisitorPresence();
+}
+
+bool AWindArchStonework::HasNearbyMotePass(UWorld* World) const
+{
+	if (!World || AmbientMotes.IsValid()) return AmbientMotes.IsValid();
+	for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It)
+	{
+		if (FVector::DistSquared2D(It->GetActorLocation(), GetActorLocation()) <= FMath::Square(900.f))
+			return true;
+	}
+	return false;
+}
+
+bool AWindArchStonework::SpawnMotePass(UWorld* World, const FVector& Direction)
+{
+	if (!World || HasNearbyMotePass(World)) return false;
+	FVector Flow(Direction.X, Direction.Y, 0.f);
+	if (!FMath::IsFinite(Flow.X) || !FMath::IsFinite(Flow.Y) || Flow.IsNearlyZero())
+	{
+		const FVector Forward = GetActorForwardVector();
+		Flow = FVector(Forward.X, Forward.Y, 0.f);
+	}
+	Flow = Flow.GetSafeNormal2D(SMALL_NUMBER, FVector::ForwardVector);
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandWindMoteEffect* Motes = World->SpawnActor<AIslandWindMoteEffect>(
+		GetActorLocation() + FVector(0.f, 0.f, 120.f), FRotator::ZeroRotator, Spawn);
+	if (!Motes) return false;
+	Motes->InitializeGust(Flow, 800.f, 8.f);
+	AmbientMotes = Motes;
+	AmbientMoteCooldownRemaining = AmbientMoteCooldownSeconds;
+	return true;
 }
 
 void AWindArchStonework::CheckForAmbientWind()
@@ -70,24 +118,46 @@ void AWindArchStonework::CheckForAmbientWind()
 
 	// An explicit user gust may already have created its own short-lived motes here.
 	// Avoid doubling the light effect at the landmark.
-	for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It)
+	if (!SpawnMotePass(World, LocalWind)) AmbientMoteCooldownRemaining = 3.f;
+}
+
+void AWindArchStonework::CheckForVisitorPresence()
+{
+	UWorld* World = GetWorld();
+	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
+	APawn* Visitor = Player ? Player->GetPawn() : nullptr;
+	if (!World || !IsValid(Visitor) || !Visitor->IsPlayerControlled())
 	{
-		if (FVector::DistSquared2D(It->GetActorLocation(), GetActorLocation()) <= FMath::Square(900.f))
-		{
-			AmbientMoteCooldownRemaining = 3.f;
-			return;
-		}
+		VisitorPresenceLatch.Reset();
+		return;
 	}
 
-	FActorSpawnParameters Spawn;
-	Spawn.ObjectFlags |= RF_Transient;
-	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AIslandWindMoteEffect* Motes = World->SpawnActor<AIslandWindMoteEffect>(
-		GetActorLocation() + FVector(0.f, 0.f, 120.f), FRotator::ZeroRotator, Spawn);
-	if (!Motes) return;
-	Motes->InitializeGust(LocalWind, 800.f, 8.f);
-	AmbientMotes = Motes;
-	AmbientMoteCooldownRemaining = AmbientMoteCooldownSeconds;
+	const FVector Offset = Visitor->GetActorLocation() - GetActorLocation();
+	const float Distance = Offset.Size2D();
+	const float VerticalOffset = FMath::Abs(Offset.Z);
+	if (VisitorPresenceLatch.Get() == Visitor)
+	{
+		if (Distance <= VisitorRearmRadius && VerticalOffset <= VisitorMaximumHeightDifference) return;
+		VisitorPresenceLatch.Reset();
+	}
+
+	if (Distance > VisitorNoticeRadius || VerticalOffset > VisitorMaximumHeightDifference ||
+		Visitor->GetVelocity().SizeSquared2D() > FMath::Square(VisitorMaximumApproachSpeed))
+		return;
+
+	// One slow approach earns one brief pass. The wider rearm radius means standing
+	// still at the Arch does not repeatedly summon motes.
+	VisitorPresenceLatch = Visitor;
+	const bool bNearbyMotesAlreadyVisible = HasNearbyMotePass(World);
+	if (!ShouldEmitVisitorWindMotes(Distance, VerticalOffset, Visitor->GetVelocity().Size2D(),
+		VisitorMoteCooldownRemaining, bNearbyMotesAlreadyVisible))
+		return;
+
+	const FVector LocalWind = Weather.IsValid()
+		? Weather->SampleWind(GetActorLocation(), World->GetTimeSeconds())
+		: FVector::ZeroVector;
+	if (SpawnMotePass(World, LocalWind))
+		VisitorMoteCooldownRemaining = VisitorMoteCooldownSeconds;
 }
 
 int32 AWindArchStonework::GetStoneCount() const

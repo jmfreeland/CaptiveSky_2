@@ -9,9 +9,12 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Agent/IslandWeather.h"
 #include "Agent/IslandWindMoteEffect.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWindArchPresentationTest, "CaptiveSky2.Agent.WindArchPresentation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -26,6 +29,20 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		AWindArchStonework::ShouldEmitNaturalWindMotes(180.f, 0.1f));
 	TestFalse(TEXT("An invalid negative wind sample cannot produce motes"),
 		AWindArchStonework::ShouldEmitNaturalWindMotes(-1.f, 0.f));
+	TestTrue(TEXT("A quiet visitor inside the Arch can receive one mote response"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(300.f, 0.f, 0.f, 0.f, false));
+	TestFalse(TEXT("A visitor outside the close landmark radius receives no extra mote pass"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(381.f, 0.f, 0.f, 0.f, false));
+	TestFalse(TEXT("A visitor on a distant elevation receives no Arch response"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(200.f, 241.f, 0.f, 0.f, false));
+	TestFalse(TEXT("A fast pass does not trigger the quiet-visitor response"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(200.f, 0.f, 261.f, 0.f, false));
+	TestFalse(TEXT("A recent visitor response is rate-limited"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(200.f, 0.f, 0.f, 0.1f, false));
+	TestFalse(TEXT("An already-visible mote pass is never doubled by visitor presence"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(200.f, 0.f, 0.f, 0.f, true));
+	TestFalse(TEXT("Non-finite visitor measurements fail closed"),
+		AWindArchStonework::ShouldEmitVisitorWindMotes(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f, 0.f, false));
 
 	UWorld* Island = nullptr;
 	for (const FWorldContext& Context : GEngine->GetWorldContexts())
@@ -256,6 +273,59 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		if (WindArchObserverBrain)
 			TestFalse(TEXT("The transient cue disappears as soon as the lights are gone"),
 				WindArchObserverBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("pale lights are drifting with the wind around the Arch")));
+	}
+	if (Stonework)
+	{
+		// With weather calm, a slow, player-controlled approach should make the Arch's
+		// existing transient motes visible once without creating saved state or extra actors.
+		Weather->MaximumWindSpeed = 0.f;
+		Stonework->AmbientMotes.Reset();
+		Stonework->AmbientMoteCooldownRemaining = 0.f;
+		Stonework->VisitorMoteCooldownRemaining = 0.f;
+		Stonework->VisitorPresenceLatch.Reset();
+		APlayerController* VisitorController = World->SpawnActor<APlayerController>();
+		ACharacter* VisitorPawn = World->SpawnActor<ACharacter>(
+			Marker->GetActorLocation() + FVector(180.f, 0.f, 0.f), FRotator::ZeroRotator);
+		TestNotNull(TEXT("Player controller spawns for the quiet-approach interaction"), VisitorController);
+		TestNotNull(TEXT("Player character spawns for the quiet-approach interaction"), VisitorPawn);
+		if (VisitorController && VisitorPawn)
+		{
+			VisitorController->Possess(VisitorPawn);
+			TestTrue(TEXT("The test visitor is controlled by a player controller"), VisitorPawn->IsPlayerControlled());
+			Stonework->CheckForVisitorPresence();
+			AIslandWindMoteEffect* VisitorMotes = nullptr;
+			int32 VisitorMoteCount = 0;
+			for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It)
+			{
+				VisitorMotes = *It;
+				++VisitorMoteCount;
+			}
+			TestEqual(TEXT("Calm-weather visitor presence creates one transient Arch mote pass"), VisitorMoteCount, 1);
+			TestTrue(TEXT("The visitor response uses the normal Arch cooldown"),
+				FMath::IsNearlyEqual(Stonework->VisitorMoteCooldownRemaining, 36.f) &&
+				FMath::IsNearlyEqual(Stonework->AmbientMoteCooldownRemaining, 30.f));
+			Stonework->CheckForVisitorPresence();
+			int32 MotesWhileVisitorLingers = 0;
+			for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) ++MotesWhileVisitorLingers;
+			TestEqual(TEXT("Linger at the Arch does not summon a second mote pass"), MotesWhileVisitorLingers, 1);
+
+			if (VisitorMotes) VisitorMotes->Destroy();
+			Stonework->AmbientMotes.Reset();
+			Stonework->AmbientMoteCooldownRemaining = 0.f;
+			Stonework->VisitorMoteCooldownRemaining = 0.f;
+			VisitorPawn->SetActorLocation(Marker->GetActorLocation() + FVector(AWindArchStonework::VisitorRearmRadius + 50.f, 0.f, 0.f));
+			Stonework->CheckForVisitorPresence();
+			TestFalse(TEXT("Leaving the outer ring rearms the Arch's visitor response"), Stonework->VisitorPresenceLatch.IsValid());
+			VisitorPawn->SetActorLocation(Marker->GetActorLocation() + FVector(180.f, 0.f, 0.f));
+			Stonework->CheckForVisitorPresence();
+			int32 MotesAfterReturn = 0;
+			for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) ++MotesAfterReturn;
+			TestEqual(TEXT("A fresh quiet approach after leaving earns one new mote pass"), MotesAfterReturn, 1);
+			VisitorController->UnPossess();
+			VisitorController->Destroy();
+			VisitorPawn->Destroy();
+			for (TActorIterator<AIslandWindMoteEffect> It(World); It; ++It) It->Destroy();
+		}
 	}
 	if (PresentationSubsystem) PresentationSubsystem->RestorePresentation();
 	TestFalse(TEXT("A previously visible proxy is restored visible"), PillarA->IsHidden());
