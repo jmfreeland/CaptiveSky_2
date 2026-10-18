@@ -69,6 +69,28 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("At full moon the calendar says today"), AIslandDayNight::DescribeCalendar(15, 0.5f).Contains(TEXT("full today")));
 		TestTrue(TEXT("Non-finite progress is harmless"), AIslandDayNight::DescribeCalendar(1, NAN).IsEmpty());
 	}
+	{
+		int32 NightHits = 0;
+		int32 DayHits = 0;
+		int32 CloudyHits = 0;
+		int32 FullMoonHits = 0;
+		for (int32 Day = 1; Day <= 40; ++Day)
+			for (int32 Slot = 0; Slot < 144; ++Slot)
+			{
+				const float Hour = (Slot + 0.5f) / 6.f;
+				NightHits += AIslandDayNight::IsShootingStarSlot(Day, Hour, 0.f, 0.f) ? 1 : 0;
+				DayHits += (Hour > 9.f && Hour < 15.f && AIslandDayNight::IsShootingStarSlot(Day, Hour, 0.f, 0.f)) ? 1 : 0;
+				CloudyHits += AIslandDayNight::IsShootingStarSlot(Day, Hour, 0.9f, 0.f) ? 1 : 0;
+				FullMoonHits += AIslandDayNight::IsShootingStarSlot(Day, Hour, 0.f, 1.f) ? 1 : 0;
+			}
+		TestTrue(TEXT("Meteors do occur on clear dark nights"), NightHits > 0);
+		TestEqual(TEXT("No meteors by day"), DayHits, 0);
+		TestEqual(TEXT("No meteors under heavy cloud"), CloudyHits, 0);
+		TestTrue(TEXT("A full moon thins the meteors"), FullMoonHits < NightHits);
+		TestTrue(TEXT("Meteors stay rare"), NightHits < 40 * 60);
+		TestEqual(TEXT("The same slot always gives the same answer"),
+			AIslandDayNight::IsShootingStarSlot(7, 2.5f, 0.f, 0.f), AIslandDayNight::IsShootingStarSlot(7, 2.5f, 0.f, 0.f));
+	}
 	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
 	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
 	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));

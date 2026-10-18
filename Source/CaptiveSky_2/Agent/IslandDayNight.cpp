@@ -120,6 +120,21 @@ FString AIslandDayNight::DescribeCalendar(int32 IslandDay, float LunarProgress)
 		FMath::Max(1, IslandDay), *Days(ToFull), *Days(ToNew));
 }
 
+bool AIslandDayNight::IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination)
+{
+	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(CloudCover) || !FMath::IsFinite(LunarIllumination)) return false;
+	const float Dark = NightAmount(IslandHour);
+	if (Dark < 0.9f || CloudCover > 0.6f) return false;
+	const int32 Slot = FMath::FloorToInt(WrapHour(IslandHour) * 6.f);
+	// Murmur-style finaliser: neighbouring days and slots must not give correlated rolls.
+	uint32 Hash = static_cast<uint32>(IslandDay) * 2654435761u ^ (static_cast<uint32>(Slot) + 0x9e3779b9u) * 2246822519u;
+	Hash ^= Hash >> 16; Hash *= 0x85ebca6bu; Hash ^= Hash >> 13; Hash *= 0xc2b2ae35u; Hash ^= Hash >> 16;
+	const float Roll = static_cast<float>(Hash % 10000u) / 10000.f;
+	// About one slot in twelve on a clear moonless night, thinning to one in forty under a full moon.
+	const float Chance = FMath::Lerp(0.085f, 0.025f, FMath::Clamp(LunarIllumination, 0.f, 1.f)) * (1.f - CloudCover);
+	return Roll < Chance;
+}
+
 bool AIslandDayNight::IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover)
 {
 	if (!FMath::IsFinite(MoonElevation) || !FMath::IsFinite(Night) || !FMath::IsFinite(CloudCover)) return false;
@@ -355,10 +370,12 @@ FString AIslandDayNight::DescribeTime() const
 			break;
 		}
 	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeCalendar(DayNumber, LunarProgress);
+	const FString Meteor = IsShootingStarSlot(DayNumber, CurrentHour, CloudNow, LunarLight)
+		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s"),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden);
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s"),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Meteor);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandDayCommand(
