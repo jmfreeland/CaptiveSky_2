@@ -129,7 +129,7 @@ The well is now reproducible from `assets/well.py`, like the other current props
 
 ## Wetland species candidate (2026-10-18)
 
-`assets/wetland_yellow_flag_iris.py` builds a deterministic, collisionless yellow-flag iris clump for a still freshwater margin. It has ten sword-shaped leaves, three flower stalks, four blooms, and five plain material slots; Blender 5.2 exports about 5,052 triangles. The local FBX re-import check passes with a `UVMap`, no colliders, 1.2 cm ground clearance, and no verifier problems. This is an asset-pipeline candidate only: it has **not** been imported into Unreal or placed on the Island. Review at the intended waterline scale and lighting in Unreal before deciding whether it belongs in the scene. See [`docs/findings/2026-10-18-yellow-flag-iris-candidate.md`](../../docs/findings/2026-10-18-yellow-flag-iris-candidate.md) for validation and remaining review.
+`assets/wetland_yellow_flag_iris.py` builds a deterministic, collisionless yellow-flag iris clump for a still freshwater margin. It has ten sword-shaped leaves arranged as three fans, three flower stalks, four blooms, and five plain material slots; Blender 5.2 exports about 7,500 triangles. The local FBX re-import check passes with a `UVMap`, no colliders, 1.2 cm ground clearance, and no verifier problems. This is an asset-pipeline candidate only: it has **not** been imported into Unreal or placed on the Island. Review at the intended waterline scale and lighting in Unreal before deciding whether it belongs in the scene. See [`docs/findings/2026-10-18-yellow-flag-iris-candidate.md`](../../docs/findings/2026-10-18-yellow-flag-iris-candidate.md) for validation and remaining review.
 
 ## Gotchas hit so far
 

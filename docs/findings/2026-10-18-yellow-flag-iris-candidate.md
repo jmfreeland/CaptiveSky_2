@@ -9,7 +9,7 @@ Add a distinctive plant form for quiet freshwater margins: a broad-leaved iris r
 - Source: `Scripts/AssetPipeline/assets/wetland_yellow_flag_iris.py`
 - Local export: `Saved/CaptiveSky/ComfyBlender/WetlandYellowFlagIris/SM_WetlandYellowFlagIris_01.fbx` (gitignored)
 - Local preview: `Saved/CaptiveSky/ComfyBlender/WetlandYellowFlagIris/Preview.png` (gitignored; CPU render)
-- Geometry: 10 sword leaves, 3 flower stalks, 4 blooms; approximately 22.7 × 27.3 × 84.8 cm and 5,052 triangles.
+- Geometry: 10 sword leaves arranged as three fans, 3 flower stalks, 4 blooms; approximately 32.7 × 36.7 × 85.5 cm and 7,500 triangles. Amber signal marks sit on the visible upper side of each drooping fall.
 - Materials: five simple leaf, midrib, stalk, petal, and amber-signal slots; no baked or generated textures.
 - Collision: none, intentionally, so test placement cannot add blocking geometry at the shore.
 
@@ -17,10 +17,10 @@ Add a distinctive plant form for quiet freshwater margins: a broad-leaved iris r
 
 On 2026-10-18 with Blender 5.2.2 LTS:
 
-- The source-contract suite passed (3 tests).
-- `run_asset.py` exported the FBX successfully with the expected dimensions, materials, and triangle count.
+- The initial source-contract suite passed (3 tests); after adding refinement regressions, all 4 tests passed.
+- `run_asset.py` exported the FBX successfully with the expected dimensions, materials, and 7,500 triangle count.
 - `verify_asset.py` re-imported the FBX and reported `UVMap`, five expected slots, no collision meshes, `ZMIN 0.0117`, `PROBLEMS []`, and `VERIFY DONE`. The preview render used one Cycles CPU sample because the normal Eevee preview exceeded the available command window while the Unreal editor was open.
-- Visual inspection of the preview shows the fan of sword leaves and yellow blooms, but this is only a silhouette/palette sanity check. It does not validate Unreal material response, scale in the environment, performance, composition, or plant placement.
+- Visual inspection of the refreshed preview shows three broader leaf fans and contrasting amber marks on the yellow blooms. This remains a silhouette/palette sanity check only; it does not validate Unreal material response, scale in the environment, performance, composition, or plant placement.
 
 ## Next review gate
 

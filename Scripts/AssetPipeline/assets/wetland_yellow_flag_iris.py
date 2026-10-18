@@ -55,7 +55,7 @@ def _ellipsoid(bm, centre, axis, side, length, width, thickness):
     side = Vector(side).normalized()
     normal = axis.cross(side).normalized()
     sphere = bmesh.ops.create_uvsphere(
-        bm, u_segments=10, v_segments=6, radius=1.0, calc_uvs=False)
+        bm, u_segments=12, v_segments=8, radius=1.0, calc_uvs=False)
     for vert in sphere["verts"]:
         x, y, z = vert.co.copy()
         vert.co = centre + axis * (x * length * 0.5) + side * (y * width * 0.5) + normal * (z * thickness * 0.5)
@@ -65,18 +65,23 @@ def build(A):
     lib.PLAIN["yellow_flag_leaf"] = {"BaseColor": [0.20, 0.32, 0.13], "Roughness": 0.91}
     lib.PLAIN["yellow_flag_mid_rib"] = {"BaseColor": [0.31, 0.39, 0.16], "Roughness": 0.88}
     lib.PLAIN["yellow_flag_stem"] = {"BaseColor": [0.25, 0.34, 0.14], "Roughness": 0.9}
-    lib.PLAIN["yellow_flag_petal"] = {"BaseColor": [0.82, 0.62, 0.12], "Roughness": 0.84}
-    lib.PLAIN["yellow_flag_signal"] = {"BaseColor": [0.34, 0.18, 0.055], "Roughness": 0.88}
+    lib.PLAIN["yellow_flag_petal"] = {"BaseColor": [0.92, 0.70, 0.09], "Roughness": 0.84}
+    lib.PLAIN["yellow_flag_signal"] = {"BaseColor": [0.48, 0.20, 0.035], "Roughness": 0.88}
 
     leaves = bmesh.new()
     leaf_bases = []
     for index in range(LEAF_COUNT):
-        angle = math.tau * (index / LEAF_COUNT) + 0.17 * (index % 3)
-        radial = Vector((math.cos(angle), math.sin(angle), 0.0))
-        base = radial * (0.035 + 0.008 * (index % 3)) + Vector((0.0, 0.0, 0.012))
-        lean = 0.075 + 0.014 * (index % 4)
-        direction = Vector((radial.x * lean, radial.y * lean, 1.0)).normalized()
-        _blade(leaves, base, direction, LEAF_LENGTHS[index], LEAF_WIDTHS[index], radial * (0.018 + 0.004 * (index % 3)))
+        fan_index = index // 3
+        leaf_index = index % 3
+        fan_angle = math.tau * (fan_index % 3) / 3.0 + 0.08 * (fan_index % 2)
+        forward = Vector((math.cos(fan_angle), math.sin(fan_angle), 0.0))
+        across = Vector((-forward.y, forward.x, 0.0))
+        splay = (leaf_index - 1) * (0.20 + 0.025 * (fan_index % 2))
+        lean = 0.105 + 0.018 * (fan_index % 3)
+        direction = (forward * lean + across * splay + Vector((0.0, 0.0, 1.0))).normalized()
+        base = forward * (0.024 + 0.008 * (fan_index % 2)) + across * ((leaf_index - 1) * 0.012)
+        base += Vector((0.0, 0.0, 0.012))
+        _blade(leaves, base, direction, LEAF_LENGTHS[index], LEAF_WIDTHS[index], across * splay * 0.08)
         leaf_bases.append((base, direction, LEAF_LENGTHS[index]))
     A._finish(leaves, "yellowFlagSwordLeaves", "yellow_flag_leaf", (0, 0, 0), (0, 0, 0), "box", "Z", 1.0, True, 48)
 
@@ -110,13 +115,14 @@ def build(A):
 
                 standard_axis = (flower_radial * 0.26 + Vector((0.0, 0.0, 0.96))).normalized()
                 _ellipsoid(petals, flower_centre + standard_axis * 0.029,
-                           standard_axis, flower_side, 0.075, 0.031, 0.004)
+                           standard_axis, flower_side, 0.086, 0.037, 0.004)
 
                 fall_axis = (flower_radial * 0.68 + Vector((0.0, 0.0, -0.58))).normalized()
                 fall_centre = flower_centre + fall_axis * 0.033
-                _ellipsoid(petals, fall_centre, fall_axis, flower_side, 0.078, 0.037, 0.0045)
-                _ellipsoid(signals, fall_centre + fall_axis * 0.009 + Vector((0.0, 0.0, 0.002)),
-                           fall_axis, flower_side, 0.026, 0.008, 0.0015)
+                _ellipsoid(petals, fall_centre, fall_axis, flower_side, 0.09, 0.046, 0.0045)
+                fall_normal = fall_axis.cross(flower_side).normalized()
+                signal_centre = fall_centre + fall_axis * 0.014 + fall_normal * 0.003
+                _ellipsoid(signals, signal_centre, fall_axis, flower_side, 0.032, 0.012, 0.002)
 
             # A small golden centre keeps each bloom readable without enlarging it into a prop.
             centre_mesh = bmesh.ops.create_uvsphere(

@@ -78,6 +78,15 @@ class WetlandYellowFlagIrisTests(unittest.TestCase):
                     if isinstance(node, ast.Constant) and isinstance(node.value, str)}
         self.assertTrue({"yellow_flag_leaf", "yellow_flag_petal", "yellow_flag_signal"}.issubset(literals))
 
+    def test_builder_uses_fanned_leaf_groups_and_surface_set_marks(self):
+        *_rest, tree = source_contract()
+        functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+        builder = ast.unparse(functions["build"])
+        self.assertIn("fan_index = index // 3", builder)
+        self.assertIn("leaf_index = index % 3", builder)
+        self.assertIn("fall_normal = fall_axis.cross(flower_side).normalized()", builder)
+        self.assertIn("fall_normal * 0.003", builder)
+
 
 if __name__ == "__main__":
     unittest.main()
