@@ -13,6 +13,8 @@ RUNNER_COUNT = 6
 LEAF_PAIRS_PER_RUNNER = 3
 LEAFLET_PAIRS_PER_LEAF = 3
 FLOWERS_PER_RUNNER = 2
+FLOWER_PETAL_LENGTH_M = 0.022
+FLOWER_PETAL_HALF_WIDTH_M = 0.008
 
 
 def _leaflet(bm, base, tip, width):
@@ -42,10 +44,10 @@ def _pea_bloom(bm, centre, phase):
         radial = Vector((math.cos(angle), math.sin(angle), 0.0))
         side = Vector((-radial.y, radial.x, 0.0))
         root = origin + radial * 0.001
-        shoulder = origin + radial * 0.005 + Vector((0.0, 0.0, 0.002))
-        tip = origin + radial * 0.014 + Vector((0.0, 0.0, 0.006))
-        left = shoulder - side * 0.005
-        right = shoulder + side * 0.005
+        shoulder = origin + radial * (FLOWER_PETAL_LENGTH_M * 0.36) + Vector((0.0, 0.0, 0.003))
+        tip = origin + radial * FLOWER_PETAL_LENGTH_M + Vector((0.0, 0.0, 0.010))
+        left = shoulder - side * FLOWER_PETAL_HALF_WIDTH_M
+        right = shoulder + side * FLOWER_PETAL_HALF_WIDTH_M
         verts = [bm.verts.new(point) for point in (root, left, tip, right)]
         bm.faces.new((verts[0], verts[1], verts[2]))
         bm.faces.new((verts[0], verts[2], verts[3]))

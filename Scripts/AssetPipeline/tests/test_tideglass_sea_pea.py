@@ -42,6 +42,8 @@ class TideglassSeaPeaTests(unittest.TestCase):
         self.assertEqual(values["LEAF_PAIRS_PER_RUNNER"], 3)
         self.assertEqual(values["LEAFLET_PAIRS_PER_LEAF"], 3)
         self.assertEqual(values["FLOWERS_PER_RUNNER"], 2)
+        self.assertGreaterEqual(values["FLOWER_PETAL_LENGTH_M"], 0.02)
+        self.assertGreaterEqual(values["FLOWER_PETAL_HALF_WIDTH_M"], 0.007)
 
     def test_leaf_and_bloom_materials_are_separate_and_no_randomness_or_collision_is_used(self):
         _values, materials, collisions, tree = source_contract()
