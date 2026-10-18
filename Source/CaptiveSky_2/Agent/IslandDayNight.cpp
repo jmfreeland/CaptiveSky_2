@@ -1,6 +1,7 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandSeaStateSubsystem.h"
 #include "IslandWorldStateSubsystem.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
@@ -377,6 +378,24 @@ FString AIslandDayNight::DescribeTime() const
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s"),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Meteor);
 }
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandSkyReportCommand(
+	TEXT("Island.SkyReport"),
+	TEXT("Log the sky and sea text a resident would be told right now (time, moon, calendar, sea). Usage: Island.SkyReport"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World) return;
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Island.SkyReport:%s"), *It->DescribeTime());
+			break;
+		}
+		if (const UIslandSeaStateSubsystem* SeaState = World->GetSubsystem<UIslandSeaStateSubsystem>())
+		{
+			const FString Sea = UIslandSeaStateSubsystem::DescribeSea(SeaState->GetSea());
+			UE_LOG(LogTemp, Display, TEXT("Island.SkyReport:%s"), Sea.IsEmpty() ? TEXT(" The sea is calm.") : *Sea);
+		}
+	}));
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandDayCommand(
 	TEXT("Island.Day"),
