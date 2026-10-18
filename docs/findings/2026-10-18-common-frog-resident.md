@@ -23,6 +23,10 @@ the silhouette. This is deliberately a fallback, not the final art review.
 - A shore crab only startles the frog while actively scurrying inside the same
   close, low observer band. A completed scurry rearms the response, so a
   resting crab is not a cue and one event cannot repeatedly trigger hops.
+- A settled Raven within 650 cm and 250 cm vertical difference may give one
+  brief head glance when the frog hops. It does not move toward the frog; the
+  ordinary nearby-wildlife latch prevents repeat glances until that local group
+  disperses.
 - Hop arcs last 0.48 seconds and stay within 420 cm of the animal's original
   habitat. Ground destinations must pass a static-world trace and slope/height
   bounds.
@@ -39,9 +43,10 @@ activity ordering, and hop shape.
 The source-only UE 5.8.3 target
 `Saved/CompileScratch/Codex_CurrentSourceBuild_20261018` rebuilt successfully
 after adding the Raven/Rat/player approach checks, Rat's read-only awake query,
-and the scurrying-crab response. UHT completed, and the frog actor, Rat
-controller, and automation translation units compiled and linked. The
-automation cases themselves have not run in this pass.
+the scurrying-crab response, and the Raven's brief notice of a nearby frog hop.
+UHT completed, and the frog actor, Rat and Raven controllers, and automation
+translation units compiled and linked. The automation cases themselves have
+not run in this pass.
 
 The targeted automation did not start: `UnrealEditor-Cmd.exe` crashed at
 `StartOfEnginePreInit` with a null-address access violation before test

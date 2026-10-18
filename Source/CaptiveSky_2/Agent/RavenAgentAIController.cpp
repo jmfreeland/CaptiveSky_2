@@ -14,6 +14,7 @@
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "IslandDew.h"
+#include "IslandCommonFrog.h"
 #include "IslandForestFox.h"
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
@@ -34,6 +35,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogRavenAgentAI, Log, All);
 
 namespace
 {
+	constexpr float CommonFrogNoticeRadiusCm = 650.f;
+	constexpr float CommonFrogMaximumHeightDifferenceCm = 250.f;
 	struct FRavenProcMeshData
 	{
 		TArray<FVector> Vertices;
@@ -412,6 +415,14 @@ namespace
 				MoveTemp(Wing), MakeRavenMaterial(Raven, FLinearColor(0.018f, 0.029f, 0.048f, 1.f)));
 		}
 	}
+}
+
+bool ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(bool bFrogIsHopping, float DistanceCm,
+	float VerticalOffsetCm)
+{
+	return bFrogIsHopping && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f &&
+		DistanceCm <= CommonFrogNoticeRadiusCm && FMath::IsFinite(VerticalOffsetCm) &&
+		FMath::Abs(VerticalOffsetCm) <= CommonFrogMaximumHeightDifferenceCm;
 }
 
 ARavenAgentAIController::ARavenAgentAIController()
@@ -1289,6 +1300,35 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 		ClosestEligibleWildlife = Dragonfly;
 		ClosestDistanceSquared = DistanceSquared;
 		ClosestWildlifeAttentionLocation = DragonflyBody;
+	}
+
+	// A frog's short hop is an easy-to-miss cue, so let the settled Raven give
+	// it one brief look. The frog itself is never redirected or startled here.
+	for (TActorIterator<AIslandCommonFrog> It(GetWorld()); It; ++It)
+	{
+		AIslandCommonFrog* Frog = *It;
+		if (!IsValid(Frog)) continue;
+		const FVector Offset = Frog->GetActorLocation() - Raven->GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const TWeakObjectPtr<AActor> FrogWeak(Frog);
+		if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+		{
+			NoticedWildlifeInNearbyGroup.Remove(FrogWeak);
+			continue;
+		}
+		bWildlifeRemainsNearby = true;
+		if (!ShouldNoticeHoppingCommonFrog(Frog->IsHopping(), FMath::Sqrt(DistanceSquared), Offset.Z) ||
+			NoticedWildlifeInNearbyGroup.Contains(FrogWeak) ||
+			(ClosestEligibleWildlife && DistanceSquared >= ClosestDistanceSquared))
+		{
+			continue;
+		}
+
+		const FVector FrogHead = Frog->GetActorLocation() + FVector(0.f, 0.f, 5.f);
+		if (!IsVisibleFromRaven(Frog, FrogHead)) continue;
+		ClosestEligibleWildlife = Frog;
+		ClosestDistanceSquared = DistanceSquared;
+		ClosestWildlifeAttentionLocation = FrogHead;
 	}
 
 	if (!bWildlifeRemainsNearby) NoticedWildlifeInNearbyGroup.Reset();

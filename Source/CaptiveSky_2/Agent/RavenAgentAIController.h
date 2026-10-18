@@ -5,6 +5,7 @@
 #include "RavenAgentAIController.generated.h"
 
 class AIslandArrangement;
+class AIslandCommonFrog;
 class AIslandDewActor;
 class AIslandForestFox;
 class AIslandForestStag;
@@ -73,6 +74,8 @@ public:
 	}
 	/** Maximum visible distance for selecting an exact open-ground landing target. */
 	static constexpr float GroundLandingVisibilityRange = 3500.f;
+	/** A settled Raven may notice a close, visible Common Frog hop without chasing it. */
+	static bool ShouldNoticeHoppingCommonFrog(bool bFrogIsHopping, float DistanceCm, float VerticalOffsetCm);
 
 	/** Build options this body has right now (gathering twigs, weaving at the roost it is perched on). */
 	FString DescribeBuildOptions() const;

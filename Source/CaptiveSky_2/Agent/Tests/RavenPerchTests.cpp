@@ -42,6 +42,7 @@
 #include "NavigationSystem.h"
 #include "ContentStreaming.h"
 #include "Rendering/SkeletalMeshRenderData.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRavenPerchTest, "CaptiveSky2.Agent.RavenPerch",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -60,6 +61,16 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, SlightlyDifferentWind), 0);
 	TestEqual(TEXT("Malformed perch samples safely produce no candidate"),
 		ARavenAgentAIController::SelectWindAwarePerch(FVector::ZeroVector, 160.f, PerchOptions, IncompleteWindSamples), INDEX_NONE);
+	TestTrue(TEXT("A close hopping frog can hold a settled Raven's attention"),
+		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, 500.f, 120.f));
+	TestFalse(TEXT("A still frog does not repeatedly attract attention"),
+		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(false, 500.f, 120.f));
+	TestFalse(TEXT("A frog beyond the close notice radius is ignored"),
+		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, 651.f, 0.f));
+	TestFalse(TEXT("A frog too far above or below the Raven is ignored"),
+		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, 500.f, 251.f));
+	TestFalse(TEXT("Invalid distances are ignored"),
+		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, std::numeric_limits<float>::infinity(), 0.f));
 	const TArray<int32> OpenPerches = { 0, 0 };
 	const TArray<int32> CoveredAlternative = { 0, 4 };
 	const TArray<int32> SlightCoverDifference = { 2, 3 };
