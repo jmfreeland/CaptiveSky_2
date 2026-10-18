@@ -30,18 +30,24 @@ class WoodlandHazelCoppiceTests(unittest.TestCase):
         rows = values["LEAF_ROWS"]
         widths = values["LEAF_WIDTH_PROFILE"]
         self.assertEqual(values["NAME"], "WoodlandHazelCoppice")
-        self.assertEqual(len(rows), 7)
+        self.assertEqual(values["FBX_MESH_SMOOTH_TYPE"], "SMOOTH_GROUP")
+        self.assertFalse(values["FBX_USE_TSPACE"])
+        self.assertEqual(len(rows), 6)
         self.assertEqual(len(widths), len(rows))
         self.assertEqual(rows[0], 0.0)
         self.assertEqual(rows[-1], 1.0)
         self.assertTrue(all(a < b for a, b in zip(rows, rows[1:])))
         self.assertLess(widths[0], 0.05)
         self.assertLess(widths[-1], 0.05)
-        self.assertEqual(max(range(len(widths)), key=widths.__getitem__), 3)
+        self.assertIn(max(range(len(widths)), key=widths.__getitem__), (2, 3))
 
     def test_coppice_remains_soft_foliage_without_character_collision(self):
         _values, collisions = source_contract()
         self.assertEqual(collisions, [])
+
+    def test_leaf_edge_variation_scales_with_leaf_width(self):
+        source = ASSET.read_text(encoding="utf-8")
+        self.assertIn("0.12 * silhouette[row] * math.cos", source)
 
 
 if __name__ == "__main__":

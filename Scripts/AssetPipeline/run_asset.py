@@ -42,6 +42,8 @@ if anchors_cm is not None:
 
 A = lib.Asset(mod.NAME, getattr(mod, "BAKE_SIZE", 2048))
 A.description = " ".join((mod.__doc__ or "").split())
+A.fbx_mesh_smooth_type = getattr(mod, "FBX_MESH_SMOOTH_TYPE", "OFF")
+A.fbx_use_tspace = getattr(mod, "FBX_USE_TSPACE", True)
 mod.build(A)
 A.finalize()
 if metadata:

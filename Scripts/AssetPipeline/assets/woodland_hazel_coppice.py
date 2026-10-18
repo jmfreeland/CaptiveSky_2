@@ -8,8 +8,12 @@ import lib
 
 
 NAME = "WoodlandHazelCoppice"
-LEAF_ROWS = (0.0, 0.16, 0.32, 0.50, 0.68, 0.84, 1.0)
-LEAF_WIDTH_PROFILE = (0.015, 0.55, 0.88, 1.0, 0.84, 0.55, 0.015)
+FBX_MESH_SMOOTH_TYPE = "SMOOTH_GROUP"
+FBX_USE_TSPACE = False
+# Six longitudinal samples preserve a rounded broad-ovate outline while
+# avoiding one edge subdivision on each small mid-distance leaf.
+LEAF_ROWS = (0.0, 0.20, 0.40, 0.60, 0.80, 1.0)
+LEAF_WIDTH_PROFILE = (0.015, 0.62, 0.96, 0.94, 0.60, 0.015)
 
 
 def _leaf(bm, base, direction, width_axis, length, half_width, seed):
@@ -29,7 +33,7 @@ def _leaf(bm, base, direction, width_axis, length, half_width, seed):
             point += width_axis * (half_width * silhouette[row] * side * jitter)
             # Tiny opposing edge teeth keep a hazel-like toothed outline, while
             # a shallow central ridge gives each small leaf a readable face.
-            tooth = 0.035 * math.cos(seed * 1.37 + row * 2.41 + side * 0.7) * side
+            tooth = 0.12 * silhouette[row] * math.cos(seed * 1.37 + row * 2.41 + side * 0.7) * side
             point += width_axis * (half_width * tooth)
             point += normal * (0.035 * math.sin(math.pi * t) * (1.0 - abs(side)))
             point.z += 0.010 * math.sin(math.pi * t) * abs(side)

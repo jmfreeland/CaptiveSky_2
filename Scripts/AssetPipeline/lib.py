@@ -728,7 +728,8 @@ class Asset:
         bpy.ops.export_scene.fbx(
             filepath=f"{self.dir}/{self.name}.fbx", use_selection=True, object_types={"MESH"},
             axis_forward="-Y", axis_up="Z", apply_scale_options="FBX_SCALE_ALL", global_scale=1.0,
-            mesh_smooth_type="OFF", use_tspace=True, add_leaf_bones=False, path_mode="STRIP")
+            mesh_smooth_type=getattr(self, "fbx_mesh_smooth_type", "OFF"),
+            use_tspace=getattr(self, "fbx_use_tspace", True), add_leaf_bones=False, path_mode="STRIP")
         d = main.dimensions
         manifest = {
             "asset": self.name,
