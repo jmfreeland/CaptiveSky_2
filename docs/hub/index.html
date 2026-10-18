@@ -63,12 +63,15 @@ a{color:var(--c)}
 <div class="card"><div class="tag t2">Cloud</div><h3>IsMoonHiddenByCloud</h3><p>"Thick cloud hides the moon" on a dark night with cover above 0.8.</p></div>
 <div class="card"><div class="tag t2">Sun</div><h3>DescribeSunEdge</h3><p>Sunrise and sunset cues in the half hour either side of 06:00 and 18:00.</p></div>
 <div class="card"><div class="tag t2">Calendar</div><h3>DescribeCalendar</h3><p>Island day number plus days until the next full and new moon.</p></div>
+<div class="card"><div class="tag t2">Meteors</div><h3>IsShootingStarSlot</h3><p>Occasional shooting stars on clear dark nights; deterministic per day and ten-minute slot, rarer under a bright moon.</p></div>
+<div class="card"><div class="tag t3">Sea</div><h3>UIslandSeaStateSubsystem::DescribeSea</h3><p>Low swell, white-tipped waves or a violent storm sea, from the same level that drives the ocean's wave size.</p></div>
 </div>
 
 <h2>Building and testing</h2>
 <p class="lead">With the editor open, build in a scratch project that junctions <code>Source/</code>, so Live Coding does not block you. From <code>Saved/CompileScratch/Claude_Props</code>:</p>
 <p><code>Build.bat CaptiveSky_2Editor Win64 Development -Project=&lt;scratch&gt;\CaptiveSky_2.uproject -WaitMutex -MaxParallelActions=3 -NoHotReloadFromIDE</code></p>
 <p><code>UnrealEditor-Cmd.exe &lt;scratch&gt;\CaptiveSky_2.uproject -ExecCmds="Automation RunTests CaptiveSky2.Agent.DayNight; Quit" -NullRHI -NoSound -DisablePython -unattended</code></p>
+<p class="lead">Developer console: <code>Island.Hour &lt;h&gt;</code> and <code>Island.Day &lt;n&gt;</code> jump the clock and calendar (day 1 is a new moon), <code>Island.Storm</code> forces a storm, <code>Island.Dew</code>, <code>Island.Sea</code> and <code>Island.Rainbow</code> force their effects.</p>
 <p class="lead">A cold build takes about seven minutes; incremental ones a few seconds. Tests run headless with no model requests.</p>
 
 <h2>Where to look</h2>
@@ -80,5 +83,5 @@ a{color:var(--c)}
 <div class="card"><h3><a href="../ecology/">ecology/</a></h3><p>One note per living system.</p></div>
 <div class="card"><h3><a href="../worldbuilding-ideas.md">worldbuilding-ideas.md</a></h3><p>Weekly idea branches.</p></div>
 </div>
-<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 8). Text companion: <code>docs/README.md</code>.</p>
+<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 12). Text companion: <code>docs/README.md</code>.</p>
 </main></body></html>
