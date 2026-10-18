@@ -60,6 +60,16 @@ comfy --workspace C:\Users\freel\Documents\comfy\ComfyUI launch --background   #
 comfy --workspace C:\Users\freel\Documents\comfy\ComfyUI stop
 ```
 
+## Run the source tests
+
+From the repository root, run the asset-pipeline regression suite with a Python 3 interpreter:
+
+```powershell
+python -B -m unittest discover -s Scripts\AssetPipeline\tests -p 'test_*.py'
+```
+
+These tests inspect the authored scripts and manifests, exercise deterministic texture helpers, and use temporary inboxes/mocked subprocesses for request routing. They do not launch Blender, ComfyUI, Unreal, generate or import an asset, or prove how a mesh reads at Island scale. Inspect each exported `Preview.png`, then review a disposable Unreal import in-world before any Island placement.
+
 ## Make or change a prop
 
 ```powershell
