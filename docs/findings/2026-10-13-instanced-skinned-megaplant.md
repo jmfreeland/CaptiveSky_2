@@ -92,3 +92,27 @@ variants A-D; variant D is a reasonable low-cost candidate for the next
 isolated review, not yet a proven Island asset. Keep the review transient and
 compare its silhouette, foliage materials, bounds, and bounded-batch cost in
 the same lit woodland-transition composition before placing anything.
+
+## Current-source recheck (2026-10-18)
+
+The native wrapper has since gained automatic PVE wind-provider binding:
+`AIslandInstancedSkinnedFoliage::RebuildInstances()` detects enabled
+`UDynamicWindSkeletalData` on its source mesh and creates a transient
+`UDynamicWindData` provider. `IslandInstancedSkinnedFoliageTests.cpp` now checks
+this lifecycle against the installed Beech asset when its wind profile is
+enabled. This supersedes the earlier statement that the wrapper has no provider
+path; it does **not** supersede the visual or runtime evidence above, and the
+current-source automation test has not been run in this recheck.
+
+I revisited the saved Beech A comparison frames. The ordinary and instanced
+paths are visually alike: without renderer overrides the tree is nearly bare;
+with Nanite foliage, voxels, and assemblies enabled the leaves appear as coarse,
+dark cards; a transient green tint improves color but not the blocky silhouette.
+No mesh, material, renderer setting, or Island placement was changed. These
+captures still reject this Beech output as a canopy candidate.
+
+The Unreal editor process was absent during this review, so the next useful
+step remains an isolated PVE editor export of a complete candidate, followed by
+a lit woodland-transition comparison and bounded small-batch cost test. Do not
+place or scatter the imported skeletal trees on the Island based on the current
+evidence.
