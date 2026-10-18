@@ -40,3 +40,7 @@ project log or test began: null access at `SecondsSinceStart=0`, with the same
 This shows neither main `Content` nor copied build artifacts is needed to
 reproduce the startup failure; it does not distinguish among the project's
 startup modules/configuration. The automation assertions remain unexecuted.
+A final retry omitted the custom `-abslog` argument entirely; it reproduced the
+same startup crash and hash before the default project log or test began. The
+failure is therefore not explained by the custom log-path quoting used in the
+earlier attempts.
