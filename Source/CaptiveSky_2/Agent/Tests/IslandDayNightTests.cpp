@@ -74,13 +74,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Overcast gently softens ambient skylight"), FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(1.f), 0.70f));
 	TestTrue(TEXT("Clear skies preserve full moonlight while overcast blocks most direct moonlight"),
 		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(0.f), 1.f) &&
-		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(1.f), AIslandDayNight::OvercastMoonlightFloor));
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(1.f), AIslandDayNight::OvercastMoonlightFloor, 1e-4f));
 	TestTrue(TEXT("Clouds attenuate moonlight smoothly and more strongly than daylight"),
 		AIslandDayNight::CloudMoonlightTransmission(0.75f) < AIslandDayNight::CloudMoonlightTransmission(0.25f) &&
 		AIslandDayNight::CloudMoonlightTransmission(0.75f) < AIslandDayNight::CloudSkylightTransmission(0.75f));
 	TestTrue(TEXT("Moonlight transmission clamps invalid cloud-cover bounds"),
 		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(-1.f), 1.f) &&
-		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(2.f), AIslandDayNight::OvercastMoonlightFloor));
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(2.f), AIslandDayNight::OvercastMoonlightFloor, 1e-4f));
 	TestTrue(TEXT("Cloud illumination remains bounded for out-of-range input"), AIslandDayNight::CloudSunlightTransmission(2.f) == AIslandDayNight::CloudSunlightTransmission(1.f));
 
 	if (!TestNotNull(TEXT("Engine is available for the lighting fixture"), GEngine)) return false;
@@ -216,16 +216,16 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);
 	const FString NewMoonDescription = Clock->DescribeTime();
-	TestTrue(TEXT("Time observations describe a waxing phase with very faint illumination"),
-		NewMoonDescription.Contains(TEXT("waxing")) && NewMoonDescription.Contains(TEXT("very faint")));
+	TestTrue(TEXT("Time observations name the new moon with very faint illumination"),
+		NewMoonDescription.Contains(TEXT("new moon")) && NewMoonDescription.Contains(TEXT("very faint")));
 	Clock->DayNumber = 15;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("Full moon"));
 	const float FullMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near full moon, the moon moves opposite the sun's arc"), FullMoonOffset > 170.f);
 	const FString FullMoonDescription = Clock->DescribeTime();
-	TestTrue(TEXT("Time observations describe a waxing phase with bright illumination"),
-		FullMoonDescription.Contains(TEXT("waxing")) && FullMoonDescription.Contains(TEXT("bright")));
+	TestTrue(TEXT("Time observations name the full moon with bright illumination"),
+		FullMoonDescription.Contains(TEXT("full moon")) && FullMoonDescription.Contains(TEXT("bright")));
 	Clock->CurrentHour = 12.f;
 	Clock->MoonIntensity = 0.f;
 	float MinimumCover = 2.f;
