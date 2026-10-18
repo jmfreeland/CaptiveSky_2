@@ -42,6 +42,10 @@ public:
 	static float DaylightWanderScale(float CurrentHour);
 	/** Keep the bioluminescent pulse faint by day, emerging smoothly at night. */
 	static float DaylightGlowScale(float CurrentHour);
+	/** Nearby fireflies very slowly share pulse timing on calm nights. */
+	static float PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount);
+	/** Bounded shortest-arc nudge toward a nearby cluster's mean pulse phase. */
+	static float EvaluatePulsePhaseNudge(float CurrentPhaseRadians, float NeighborPhaseRadians, float CouplingScale);
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
@@ -55,6 +59,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandFireflyPulseClustersTest;
 	friend class FIslandFireflyChimeCuriosityTest;
 	friend class FIslandListeningStonePresentationTest;
 	friend class FIslandViewpointCaptureTest;
@@ -88,10 +93,12 @@ private:
 
 	FVector HomeLocation = FVector::ZeroVector;
 	float Phase = 0.f;
+	float GlowPhase = 0.f;
 	float MotionRate = 1.f;
 	float PulseRate = 1.f;
 	float WingBeatPhase = 0.f;
 	float ObservationPulseRemaining = 0.f;
+	float PulseClusterCheckRemaining = 0.f;
 	float ChimeCheckRemaining = 0.f;
 	float ChimeResponseRemaining = 0.f;
 	float ChimeResponseElapsed = 0.f;
@@ -108,6 +115,7 @@ private:
 	void ConfigureBodyAppearance();
 	void EnsureGlowMaterial();
 	static FVector EvaluateChimeResponseDisplacement(const FVector& DirectionToChime, float ElapsedSeconds);
+	void UpdatePulseCluster(float IslandTimeSeconds, float RainIntensity);
 	void CheckForNearbyStoneChime();
 	void UpdateGlow(double IslandTimeSeconds, float RainIntensity);
 	void UpdateWings(double IslandTimeSeconds, float RainIntensity);

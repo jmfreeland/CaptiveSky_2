@@ -168,6 +168,9 @@ void AIslandFirefly::BeginPlay()
 	HomeLocation = GetActorLocation();
 	EnsureGlowMaterial();
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
+	// Derive a separate pulse phase without consuming another shared RNG sample,
+	// so adding this visual behavior does not reshuffle later wildlife spawns.
+	GlowPhase = FMath::Fmod(Phase * 1.6180339f + 0.73f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.78f, 1.24f);
 	PulseRate = FMath::FRandRange(0.82f, 1.18f);
 	WingBeatPhase = FMath::FRandRange(0.f, 2.f * PI);
@@ -233,6 +236,78 @@ float AIslandFirefly::DaylightGlowScale(float CurrentHour)
 
 	constexpr float DaylightGlow = 0.16f;
 	return DaylightGlow + (1.f - DaylightGlow) * AIslandDayNight::NightAmount(CurrentHour);
+}
+
+float AIslandFirefly::PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount)
+{
+	if (!FMath::IsFinite(CurrentHour) || !FMath::IsFinite(RainIntensity) || NearbyFireflyCount <= 0)
+		return 0.f;
+
+	const float Night = AIslandDayNight::NightAmount(CurrentHour);
+	const float Calm = 1.f - RainActivity(RainIntensity);
+	const float LocalCohesion = FMath::Clamp(0.5f + 0.15f * (NearbyFireflyCount - 1), 0.f, 1.f);
+	return 0.055f * Night * Calm * LocalCohesion;
+}
+
+float AIslandFirefly::EvaluatePulsePhaseNudge(float CurrentPhaseRadians, float NeighborPhaseRadians, float CouplingScale)
+{
+	if (!FMath::IsFinite(CurrentPhaseRadians) || !FMath::IsFinite(NeighborPhaseRadians) || !FMath::IsFinite(CouplingScale))
+		return 0.f;
+
+	constexpr float MaximumNudgeRadians = 0.055f;
+	const float Difference = FMath::FindDeltaAngleRadians(CurrentPhaseRadians, NeighborPhaseRadians);
+	return FMath::Clamp(Difference * FMath::Clamp(CouplingScale, 0.f, 0.055f),
+		-MaximumNudgeRadians, MaximumNudgeRadians);
+}
+
+void AIslandFirefly::UpdatePulseCluster(float IslandTimeSeconds, float RainIntensity)
+{
+	UWorld* World = GetWorld();
+	if (!World || !DayNight.IsValid()) return;
+
+	const float CurrentHour = DayNight->CurrentHour;
+	if (PulseCouplingScale(CurrentHour, RainIntensity, 1) <= 0.f) return;
+
+	constexpr float PulseAngularRate = 4.2f;
+	constexpr float NeighbourRadius = 460.f;
+	constexpr float MaximumVerticalSeparation = 180.f;
+	float NeighbourSin = 0.f;
+	float NeighbourCos = 0.f;
+	float NeighbourRateTotal = 0.f;
+	int32 NeighbourCount = 0;
+	const FVector Here = GetActorLocation();
+
+	for (TActorIterator<AIslandFirefly> It(World); It; ++It)
+	{
+		AIslandFirefly* Other = *It;
+		if (!Other || Other == this || Other->IsActorBeingDestroyed()) continue;
+
+		const FVector Difference = Other->GetActorLocation() - Here;
+		if (FMath::Abs(Difference.Z) > MaximumVerticalSeparation ||
+			Difference.SizeSquared2D() > FMath::Square(NeighbourRadius))
+		{
+			continue;
+		}
+
+		const float OtherPhase = static_cast<float>(IslandTimeSeconds) * PulseAngularRate * Other->PulseRate + Other->GlowPhase;
+		if (!FMath::IsFinite(OtherPhase) || !FMath::IsFinite(Other->PulseRate)) continue;
+		NeighbourSin += FMath::Sin(OtherPhase);
+		NeighbourCos += FMath::Cos(OtherPhase);
+		NeighbourRateTotal += Other->PulseRate;
+		++NeighbourCount;
+	}
+
+	if (NeighbourCount == 0) return;
+
+	const float Coupling = PulseCouplingScale(CurrentHour, RainIntensity, NeighbourCount);
+	const float MeanRate = NeighbourRateTotal / static_cast<float>(NeighbourCount);
+	const float RateBlend = FMath::Clamp(Coupling * 0.75f, 0.f, 0.05f);
+	PulseRate = FMath::Lerp(PulseRate, MeanRate, RateBlend);
+
+	if (FMath::Square(NeighbourSin) + FMath::Square(NeighbourCos) <= 1.e-4f) return;
+	const float CurrentPhase = static_cast<float>(IslandTimeSeconds) * PulseAngularRate * PulseRate + GlowPhase;
+	const float MeanPhase = FMath::Atan2(NeighbourSin, NeighbourCos);
+	GlowPhase += EvaluatePulsePhaseNudge(CurrentPhase, MeanPhase, Coupling);
 }
 
 FVector AIslandFirefly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
@@ -325,6 +400,13 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	ObservationPulseRemaining = FMath::Max(0.f, ObservationPulseRemaining - SafeDelta);
 	ChimeResponseElapsed = FMath::Min(ChimeResponseDurationSeconds, ChimeResponseElapsed + SafeDelta);
 	ChimeResponseRemaining = FMath::Max(0.f, ChimeResponseRemaining - SafeDelta);
+	PulseClusterCheckRemaining -= SafeDelta;
+	if (PulseClusterCheckRemaining <= 0.f)
+	{
+		PulseClusterCheckRemaining = 0.4f;
+		if (ChimeResponseRemaining <= 0.f && ObservationPulseRemaining <= 0.f)
+			UpdatePulseCluster(static_cast<float>(Time), Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f);
+	}
 	ChimeCheckRemaining -= SafeDelta;
 	if (ChimeCheckRemaining <= 0.f)
 	{
@@ -365,7 +447,7 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	ConfigureBodyAppearance();
 	if (!Glow) return;
 	const float T = static_cast<float>(IslandTimeSeconds);
-	const float Pulse = FMath::Max(0.f, FMath::Sin(T * 4.2f * PulseRate + Phase));
+	const float Pulse = FMath::Max(0.f, FMath::Sin(T * 4.2f * PulseRate + GlowPhase));
 	// Keep a visible ember between flashes so the insect does not disappear at the pulse trough.
 	const float NaturalPulse = 0.24f + 0.76f * FMath::Pow(Pulse, 4.f);
 	const float ObservationAccent = 1.f + 0.7f * FMath::Clamp(ObservationPulseRemaining / 3.f, 0.f, 1.f);
