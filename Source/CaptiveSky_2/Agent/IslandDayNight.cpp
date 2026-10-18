@@ -82,6 +82,16 @@ float AIslandDayNight::LunarIllumination(int32 IslandDay, float IslandHour)
 	return 0.5f - 0.5f * FMath::Cos(PhaseAngle);
 }
 
+const TCHAR* AIslandDayNight::LunarPhaseName(float Progress)
+{
+	static const TCHAR* const Names[8] = {
+		TEXT("new moon"), TEXT("waxing crescent"), TEXT("first quarter"), TEXT("waxing gibbous"),
+		TEXT("full moon"), TEXT("waning gibbous"), TEXT("last quarter"), TEXT("waning crescent") };
+	if (!FMath::IsFinite(Progress)) return Names[0];
+	const float Wrapped = Progress - FMath::FloorToFloat(Progress);
+	return Names[FMath::FloorToInt(Wrapped * 8.f + 0.5f) % 8];
+}
+
 float AIslandDayNight::MoonlightScale(float LunarIlluminationAmount)
 {
 	return FMath::Lerp(NewMoonLightFloor, 1.f, FMath::Clamp(LunarIlluminationAmount, 0.f, 1.f));
@@ -296,12 +306,12 @@ FString AIslandDayNight::DescribeTime() const
 		CurrentHour < 7.f ? TEXT("dawn") : CurrentHour < 12.f ? TEXT("morning") :
 		CurrentHour < 17.f ? TEXT("afternoon") : TEXT("dusk");
 	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
-	const TCHAR* LunarTrend = LunarProgress < 0.5f ? TEXT("waxing") : TEXT("waning");
+	const TCHAR* LunarName = LunarPhaseName(LunarProgress);
 	const float LunarLight = LunarIllumination(DayNumber, CurrentHour);
 	const TCHAR* LunarBrightness = LunarLight < 0.12f ? TEXT("very faint") : LunarLight < 0.4f ? TEXT("faint") :
 		LunarLight < 0.72f ? TEXT("moderate") : TEXT("bright");
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The lunar phase is %s with %s illumination; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarTrend, LunarBrightness);
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(

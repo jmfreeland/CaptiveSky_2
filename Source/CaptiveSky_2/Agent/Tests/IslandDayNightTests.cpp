@@ -46,6 +46,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Half a lunar cycle reaches a full moon"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(15, FullMoonHour), 1.f, 0.001f));
 	TestTrue(TEXT("The 29.53-day cycle returns continuously to new moon"),
 		FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(30, NextNewMoonHour), 0.001f));
+	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
+	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
+	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));
+	TestEqual(TEXT("Late cycle is a waning crescent"), FString(AIslandDayNight::LunarPhaseName(0.88f)), FString(TEXT("waning crescent")));
+	TestEqual(TEXT("The end of the cycle wraps back to new moon"), FString(AIslandDayNight::LunarPhaseName(0.97f)), FString(TEXT("new moon")));
+	TestEqual(TEXT("Non-finite progress is harmless"), FString(AIslandDayNight::LunarPhaseName(NAN)), FString(TEXT("new moon")));
 	TestTrue(TEXT("Lunar phase advances smoothly across Island midnight"),
 		FMath::Abs(AIslandDayNight::LunarPhaseProgress(2, 0.f) - AIslandDayNight::LunarPhaseProgress(1, 23.99f)) < 0.001f);
 	TestTrue(TEXT("Clear weather leaves daylight unchanged"), FMath::IsNearlyEqual(AIslandDayNight::CloudSunlightTransmission(0.f), 1.f) && FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(0.f), 1.f));
