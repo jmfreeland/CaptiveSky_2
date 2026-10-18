@@ -35,7 +35,11 @@ and both the frog actor and automation translation unit compiled and linked.
 
 The targeted automation did not start: `UnrealEditor-Cmd.exe` crashed at
 `StartOfEnginePreInit` with a null-address access violation before test
-discovery. The report and log are in
+discovery. Its `PCallStackHash` is
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`, matching earlier scratch
+commandlet startup crashes already in `Saved/`. No local `UnrealEditor-Core.pdb`
+or `UnrealEditor-Cmd.pdb` is installed, so the raw Core offsets cannot be
+symbolized here. The report and log are in
 `Saved/CompileScratch/Codex_CurrentSourceBuild_20261018/Saved/Crashes/_0000/`
 (`CrashContext.runtime-xml`, `UEMinidump.dmp`, and `CommonFrogEcology.log`).
 This is an engine/project startup failure, not a failed frog assertion. No
