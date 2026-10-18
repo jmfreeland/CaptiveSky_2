@@ -33,6 +33,23 @@ this file is the text version and the map of everything under `docs/`.
 - **Places:** `IslandInnHearthSubsystem`, `IslandInnkeeperSubsystem`, `IslandListeningStone*`, `IslandWindArch*`.
 - **Tests:** `Tests/` (`CaptiveSky2.Agent.*` automation, `CaptiveSky2.Visual.*` captures).
 
+## What residents are told about the sky
+
+`AIslandDayNight::DescribeTime()` joins small pure functions (all covered by `CaptiveSky2.Agent.DayNight`):
+`LunarPhaseName` (eight named phases), `MoonHeight` (high / up / horizon / below), `IsMoonHiddenByCloud`,
+`DescribeSunEdge` (sunrise and sunset cues) and `DescribeCalendar` (Island day, days to full and new moon).
+
+## Building and testing with the editor open
+
+Use a scratch project whose `Source/` is a junction to the main tree (`Saved/CompileScratch/Claude_Props`):
+
+```
+Build.bat CaptiveSky_2Editor Win64 Development -Project=<scratch>\CaptiveSky_2.uproject -WaitMutex -MaxParallelActions=3 -NoHotReloadFromIDE
+UnrealEditor-Cmd.exe <scratch>\CaptiveSky_2.uproject -ExecCmds="Automation RunTests CaptiveSky2.Agent.DayNight; Quit" -NullRHI -NoSound -DisablePython -unattended
+```
+
+Cold build is about seven minutes. Tests are headless and make no model requests.
+
 ## Conventions worth knowing
 
 - Observation is not fact; movement is not consent; a temporary effect is not a lasting change.

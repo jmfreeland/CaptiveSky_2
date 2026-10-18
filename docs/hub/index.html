@@ -55,6 +55,22 @@ a{color:var(--c)}
 </svg>
 <p class="lead">Environment values flow outward into prompt text (pure <code>Describe*</code> functions, so they are testable without a model) and into materials. Anything lasting is written through the world-state subsystem.</p>
 
+<h2>What a resident is told about the sky</h2>
+<p class="lead">Time and sky text is assembled by <code>AIslandDayNight::DescribeTime()</code> from small pure functions, each unit-tested in <code>CaptiveSky2.Agent.DayNight</code>.</p>
+<div class="grid">
+<div class="card"><div class="tag t2">Phase</div><h3>LunarPhaseName</h3><p>One of eight named phases: new moon, waxing crescent, first quarter... waning crescent.</p></div>
+<div class="card"><div class="tag t2">Position</div><h3>MoonHeight</h3><p>High, up, at the horizon or below it, from the same direction the moon light uses.</p></div>
+<div class="card"><div class="tag t2">Cloud</div><h3>IsMoonHiddenByCloud</h3><p>"Thick cloud hides the moon" on a dark night with cover above 0.8.</p></div>
+<div class="card"><div class="tag t2">Sun</div><h3>DescribeSunEdge</h3><p>Sunrise and sunset cues in the half hour either side of 06:00 and 18:00.</p></div>
+<div class="card"><div class="tag t2">Calendar</div><h3>DescribeCalendar</h3><p>Island day number plus days until the next full and new moon.</p></div>
+</div>
+
+<h2>Building and testing</h2>
+<p class="lead">With the editor open, build in a scratch project that junctions <code>Source/</code>, so Live Coding does not block you. From <code>Saved/CompileScratch/Claude_Props</code>:</p>
+<p><code>Build.bat CaptiveSky_2Editor Win64 Development -Project=&lt;scratch&gt;\CaptiveSky_2.uproject -WaitMutex -MaxParallelActions=3 -NoHotReloadFromIDE</code></p>
+<p><code>UnrealEditor-Cmd.exe &lt;scratch&gt;\CaptiveSky_2.uproject -ExecCmds="Automation RunTests CaptiveSky2.Agent.DayNight; Quit" -NullRHI -NoSound -DisablePython -unattended</code></p>
+<p class="lead">A cold build takes about seven minutes; incremental ones a few seconds. Tests run headless with no model requests.</p>
+
 <h2>Where to look</h2>
 <div class="grid">
 <div class="card"><h3><a href="../../README.md">README.md</a></h3><p>Vision and the dated design record.</p></div>
@@ -64,5 +80,5 @@ a{color:var(--c)}
 <div class="card"><h3><a href="../ecology/">ecology/</a></h3><p>One note per living system.</p></div>
 <div class="card"><h3><a href="../worldbuilding-ideas.md">worldbuilding-ideas.md</a></h3><p>Weekly idea branches.</p></div>
 </div>
-<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18. Text companion: <code>docs/README.md</code>.</p>
+<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 8). Text companion: <code>docs/README.md</code>.</p>
 </main></body></html>
