@@ -1076,6 +1076,17 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Still air adds no wind displacement"), AIslandFirefly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
 	TestTrue(TEXT("Still air adds no dragonfly drift"), AIslandTideglassDragonfly::WindDisplacement(FVector::ZeroVector).IsNearlyZero());
 	TestTrue(TEXT("Dragonfly drift stays bounded in a strong gust"), AIslandTideglassDragonfly::WindDisplacement(FVector(1000.f, 0.f, 0.f)).Equals(FVector(54.f, 0.f, 0.f)));
+	TestTrue(TEXT("Calm air leaves dragonfly patrol and wingbeat unchanged"),
+		FMath::IsNearlyEqual(AIslandTideglassDragonfly::WindMovementScale(0.f), 1.f));
+	TestTrue(TEXT("A moderate breeze gently softens self-powered flight"),
+		AIslandTideglassDragonfly::WindMovementScale(90.f) < 1.f && AIslandTideglassDragonfly::WindMovementScale(90.f) > 0.55f);
+	TestTrue(TEXT("A strong gust slows but does not stop dragonfly flight"),
+		FMath::IsNearlyEqual(AIslandTideglassDragonfly::WindMovementScale(180.f), 0.55f));
+	TestTrue(TEXT("Wind response is smooth, monotonic, and bounded above the authored maximum"),
+		AIslandTideglassDragonfly::WindMovementScale(260.f) < AIslandTideglassDragonfly::WindMovementScale(90.f) &&
+		FMath::IsNearlyEqual(AIslandTideglassDragonfly::WindMovementScale(1000.f), 0.55f));
+	TestTrue(TEXT("Invalid wind samples leave the self-powered flight scale unchanged"),
+		FMath::IsNearlyEqual(AIslandTideglassDragonfly::WindMovementScale(std::numeric_limits<float>::quiet_NaN()), 1.f));
 	TestTrue(TEXT("Dry conditions leave dragonfly movement unchanged"), FMath::IsNearlyEqual(AIslandTideglassDragonfly::RainMovementScale(0.f), 1.f));
 	TestTrue(TEXT("Heavy rain slows but does not stop dragonfly movement"), AIslandTideglassDragonfly::RainMovementScale(1.f) > 0.f && AIslandTideglassDragonfly::RainMovementScale(1.f) < 1.f);
 	TestTrue(TEXT("Dragonfly rain response is smooth and monotonic"), AIslandTideglassDragonfly::RainMovementScale(0.8f) < AIslandTideglassDragonfly::RainMovementScale(0.45f));

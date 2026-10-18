@@ -364,6 +364,15 @@ float AIslandTideglassDragonfly::RainMovementScale(float RainIntensity)
 	return FMath::Lerp(1.f, 0.3f, RainActivity);
 }
 
+float AIslandTideglassDragonfly::WindMovementScale(float WindSpeedCmPerSecond)
+{
+	if (!FMath::IsFinite(WindSpeedCmPerSecond)) return 1.f;
+	const float WindActivity = FMath::SmoothStep(25.f, 180.f, FMath::Clamp(WindSpeedCmPerSecond, 0.f, 300.f));
+	// Dragonflies keep flying through a gust, but their own patrol and wingbeat
+	// soften as wind rises; local wind drift remains visible independently.
+	return FMath::Lerp(1.f, 0.55f, WindActivity);
+}
+
 void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& ObserverLocation)
 {
 	if (FlowerInterestRemaining > 0.f)
@@ -633,14 +642,14 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 		CheckForNearbyRainBasin();
 	}
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
-	const float MoveScale = RainMovementScale(Rain);
+	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
+	const float MoveScale = RainMovementScale(Rain) * WindMovementScale(LocalWind.Size());
 	const float MotionTime = Time * MotionRate;
 	const float ScatterAlpha = FMath::SmoothStep(0.f, 1.2f, ScatterRemaining);
 	const FVector Offset(
 		(190.f * FMath::Sin(MotionTime * 0.38f + Phase) + ScatterDirection.X * 270.f * ScatterAlpha) * MoveScale,
 		(150.f * FMath::Sin(MotionTime * 0.29f + Phase * 1.7f) + ScatterDirection.Y * 270.f * ScatterAlpha) * MoveScale,
 		110.f + 55.f * FMath::Sin(MotionTime * 0.9f + Phase * 1.2f) + (ScatterAlpha * 35.f));
-	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	const FVector PatrolLocation = HomeLocation + Offset + WindDisplacement(LocalWind);
 	const FVector RippleInterestLocationWithOrbit = RippleInterestLocation + FVector(0.f, 0.f, 12.f) + Offset * 0.12f;
 	const FVector FlowerInterestLocationWithOrbit = FlowerInterestLocation + Offset * 0.08f;

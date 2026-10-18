@@ -25,6 +25,8 @@ public:
 	void SetColorVariant(int32 Variant);
 	static FVector WindDisplacement(const FVector& LocalWind);
 	static float RainMovementScale(float RainIntensity);
+	/** Strong local wind slows self-powered patrol and wingbeats without stopping flight. */
+	static float WindMovementScale(float WindSpeedCmPerSecond);
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
