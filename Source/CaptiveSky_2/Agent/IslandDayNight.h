@@ -75,6 +75,8 @@ public:
 	static float LunarIllumination(int32 IslandDay, float IslandHour);
 	/** Traditional name of the phase at a 0..1 cycle progress (new moon at 0, full at 0.5): eight equal bins centred on the principal phases. Pure. */
 	static const TCHAR* LunarPhaseName(float Progress);
+	/** Sine of the moon's elevation, -1..1, matching the direction UpdateLighting gives the Moon light. Pure. */
+	static float MoonHeight(int32 IslandDay, float IslandHour);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
 	static float MoonlightScale(float LunarIlluminationAmount);
 	static float CloudSunlightTransmission(float CloudCover);

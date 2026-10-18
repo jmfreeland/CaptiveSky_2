@@ -46,6 +46,10 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Half a lunar cycle reaches a full moon"), FMath::IsNearlyEqual(AIslandDayNight::LunarIllumination(15, FullMoonHour), 1.f, 0.001f));
 	TestTrue(TEXT("The 29.53-day cycle returns continuously to new moon"),
 		FMath::IsNearlyZero(AIslandDayNight::LunarIllumination(30, NextNewMoonHour), 0.001f));
+	TestTrue(TEXT("A new moon rides with the sun: up at noon, down at midnight"),
+		AIslandDayNight::MoonHeight(1, 12.f) > 0.99f && AIslandDayNight::MoonHeight(1, 0.f) < -0.99f);
+	TestTrue(TEXT("A near-full moon is high at midnight and down at noon"),
+		AIslandDayNight::MoonHeight(15, 0.f) > 0.9f && AIslandDayNight::MoonHeight(15, 12.f) < -0.9f);
 	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
 	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
 	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));

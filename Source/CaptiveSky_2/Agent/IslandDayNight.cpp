@@ -92,6 +92,12 @@ const TCHAR* AIslandDayNight::LunarPhaseName(float Progress)
 	return Names[FMath::FloorToInt(Wrapped * 8.f + 0.5f) % 8];
 }
 
+float AIslandDayNight::MoonHeight(int32 IslandDay, float IslandHour)
+{
+	const float SunAngle = FMath::DegreesToRadians((WrapHour(IslandHour) - 6.f) * 15.f);
+	return FMath::Sin(SunAngle - LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI);
+}
+
 float AIslandDayNight::MoonlightScale(float LunarIlluminationAmount)
 {
 	return FMath::Lerp(NewMoonLightFloor, 1.f, FMath::Clamp(LunarIlluminationAmount, 0.f, 1.f));
@@ -310,8 +316,11 @@ FString AIslandDayNight::DescribeTime() const
 	const float LunarLight = LunarIllumination(DayNumber, CurrentHour);
 	const TCHAR* LunarBrightness = LunarLight < 0.12f ? TEXT("very faint") : LunarLight < 0.4f ? TEXT("faint") :
 		LunarLight < 0.72f ? TEXT("moderate") : TEXT("bright");
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness);
+	const float MoonElevation = MoonHeight(DayNumber, CurrentHour);
+	const TCHAR* MoonPosition = MoonElevation > 0.6f ? TEXT("high in the sky") : MoonElevation > 0.1f ? TEXT("up in the sky") :
+		MoonElevation > -0.1f ? TEXT("at the horizon") : TEXT("below the horizon");
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(
