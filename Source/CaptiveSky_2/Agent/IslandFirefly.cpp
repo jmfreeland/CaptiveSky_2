@@ -227,6 +227,14 @@ float AIslandFirefly::DaylightWanderScale(float CurrentHour)
 	return DaytimeWander + (1.f - DaytimeWander) * AIslandDayNight::NightAmount(CurrentHour);
 }
 
+float AIslandFirefly::DaylightGlowScale(float CurrentHour)
+{
+	if (!FMath::IsFinite(CurrentHour)) return 1.f;
+
+	constexpr float DaylightGlow = 0.16f;
+	return DaylightGlow + (1.f - DaylightGlow) * AIslandDayNight::NightAmount(CurrentHour);
+}
+
 FVector AIslandFirefly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
 {
 	UWorld* World = GetWorld();
@@ -366,7 +374,9 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	const float LunarIllumination = DayNight.IsValid()
 		? AIslandDayNight::LunarIllumination(DayNight->DayNumber, DayNight->CurrentHour)
 		: 0.f;
-	const float GlowScale = RainGlowScale(RainIntensity) * MoonlightGlowScale(LunarIllumination) * ChimePulse * ObservationAccent;
+	const float CircadianGlow = DayNight.IsValid() ? DaylightGlowScale(DayNight->CurrentHour) : 1.f;
+	const float GlowScale = CircadianGlow * RainGlowScale(RainIntensity) *
+		MoonlightGlowScale(LunarIllumination) * ChimePulse * ObservationAccent;
 	Glow->SetIntensity(GlowIntensity * GlowScale);
 	if (GlowMaterial)
 	{

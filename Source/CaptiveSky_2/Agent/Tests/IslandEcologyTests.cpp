@@ -1171,6 +1171,16 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wander activity wraps at a full day and safely handles invalid time"),
 		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(36.f), AIslandFirefly::DaylightWanderScale(12.f)) &&
 		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(std::numeric_limits<float>::quiet_NaN()), 1.f));
+	TestTrue(TEXT("Daylight keeps firefly bioluminescence faint"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightGlowScale(12.f), 0.16f));
+	TestTrue(TEXT("Nightfall reveals the full natural glow"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightGlowScale(0.f), 1.f));
+	TestTrue(TEXT("Firefly glow emerges through twilight without a hard switch"),
+		AIslandFirefly::DaylightGlowScale(18.5f) > AIslandFirefly::DaylightGlowScale(12.f) &&
+		AIslandFirefly::DaylightGlowScale(18.5f) < AIslandFirefly::DaylightGlowScale(0.f));
+	TestTrue(TEXT("Glow activity wraps at a full day and safely handles invalid time"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightGlowScale(36.f), AIslandFirefly::DaylightGlowScale(12.f)) &&
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightGlowScale(std::numeric_limits<float>::quiet_NaN()), 1.f));
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
