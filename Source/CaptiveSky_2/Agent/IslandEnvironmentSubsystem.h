@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "DynamicWindParameters.h"
 #include "IslandEnvironmentSubsystem.generated.h"
 
 class UMaterialParameterCollection;
+class UTexture2D;
 class AExponentialHeightFog;
 class ULandscapeComponent;
 class UMaterialInterface;
@@ -50,6 +52,7 @@ public:
 	/** The Fab collection exposes WindDirection as a scalar; this publisher supplies radians from Atan2. */
 	static const FName FoliageWindDirectionParameter;
 	static const FName FoliageWindStrengthParameter;
+	static FDynamicWindParameters MakeDynamicWindParameters(const FVector& Wind, UTexture2D* WindTexture);
 	/** Weather-driven foliage wind is the normal runtime behavior; the opt-out restores Fab's fixed MPC defaults. */
 	static bool ShouldPublishWeatherDrivenFoliageWind(bool bDisabledByCommandLine, bool bHasCollectionOverride)
 	{
@@ -125,6 +128,8 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> FoliageWindCollection;
 	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> DynamicWindTexture;
+	UPROPERTY(Transient)
 	TArray<FIslandLandscapeMaterialBackup> LandscapeMaterialBackups;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInterface>> LandscapeOriginalMaterials;
@@ -155,6 +160,8 @@ private:
 	FVector Wind = FVector::ZeroVector;
 	FVector FoliageWind = FVector::ZeroVector;
 	bool bFoliageMaterialWindEnabled = false;
+	bool bDynamicWindApiWarningReported = false;
+	float DynamicWindUpdateAccumulator = 0.f;
 	bool bWetnessInitialized = false;
 	bool bHasWeatherActorSample = false;
 	bool bLandscapeMaterialsInitialized = false;
@@ -162,6 +169,7 @@ private:
 
 	void InitializeLandscapeMaterials();
 	void ApplyLandscapeWetness();
+	UTexture2D* CreateDynamicWindNoiseTexture();
 	/** Editor builds: points the map's landscape instance at the wet graph in memory (nothing is saved). The graph reads the collection's Wetness. */
 	void UseWetLandscapeGraph();
 	void RestoreLandscapeGraph();

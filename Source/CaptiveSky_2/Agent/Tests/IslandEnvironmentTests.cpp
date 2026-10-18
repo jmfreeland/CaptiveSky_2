@@ -5,6 +5,7 @@
 #include "IslandWeather.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/Texture2D.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Components/ExponentialHeightFogComponent.h"
@@ -18,6 +19,7 @@
 #include "LandscapeLayerInfoObject.h"
 #include "LandscapeProxy.h"
 #include "UObject/Package.h"
+#include "UObject/UnrealType.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -160,6 +162,18 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
 	UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
 	if (!TestNotNull(TEXT("Play worlds own an environment subsystem"), Environment)) { GEngine->DestroyWorldContext(World); World->DestroyWorld(false); return false; }
+	UClass* DynamicWindClass = LoadClass<UWorldSubsystem>(nullptr, TEXT("/Script/DynamicWind.DynamicWindSubsystem"));
+	TestNotNull(TEXT("UE's DynamicWind world subsystem class is available"), DynamicWindClass);
+	if (DynamicWindClass)
+	{
+		TestNotNull(TEXT("The world creates its DynamicWind subsystem"), World->GetSubsystemBase(DynamicWindClass));
+		UFunction* UpdateWindFunction = DynamicWindClass->FindFunctionByName(TEXT("UpdateWindParameters"));
+		TestNotNull(TEXT("DynamicWind exposes its Blueprint-callable parameter update"), UpdateWindFunction);
+		FStructProperty* WindParametersProperty = UpdateWindFunction
+			? CastField<FStructProperty>(UpdateWindFunction->FindPropertyByName(TEXT("Parameters"))) : nullptr;
+		TestTrue(TEXT("DynamicWind updates accept FDynamicWindParameters"), WindParametersProperty &&
+			WindParametersProperty->Struct == FDynamicWindParameters::StaticStruct());
+	}
 	Environment->CollectionOverride = Collection;
 	Environment->FoliageWindCollectionOverride = FoliageWindCollection;
 	FActorSpawnParameters Spawn;
@@ -203,6 +217,36 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A point outside the roof is not perceived as indoors"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector(900.f, 0.f, 0.f)));
 	Clock->CurrentHour = 17.f;
 	Environment->Tick(0.5f);
+	UTexture2D* DynamicWindNoise = Environment->DynamicWindTexture;
+	TestNotNull(TEXT("The weather subsystem creates a lightweight DynamicWind noise texture at play start"), DynamicWindNoise);
+	if (DynamicWindNoise && DynamicWindNoise->GetPlatformData() && !DynamicWindNoise->GetPlatformData()->Mips.IsEmpty())
+	{
+		TestEqual(TEXT("DynamicWind noise stays at the intended compact 64-pixel size"), DynamicWindNoise->GetSizeX(), 64);
+		TestEqual(TEXT("DynamicWind noise is sampled as linear data"), DynamicWindNoise->SRGB, false);
+		TestEqual(TEXT("DynamicWind noise tiles across its edges"), DynamicWindNoise->AddressX, TA_Wrap);
+		const FColor* NoisePixels = static_cast<const FColor*>(DynamicWindNoise->GetPlatformData()->Mips[0].BulkData.LockReadOnly());
+		bool bHasNoiseVariation = false;
+		if (NoisePixels)
+		{
+			const FColor FirstPixel = NoisePixels[0];
+			for (int32 Index = 1; Index < 64 * 64; ++Index)
+			{
+				if (NoisePixels[Index].R != FirstPixel.R || NoisePixels[Index].A != FirstPixel.A)
+				{
+					bHasNoiseVariation = true;
+					break;
+				}
+			}
+			DynamicWindNoise->GetPlatformData()->Mips[0].BulkData.Unlock();
+		}
+		TestTrue(TEXT("The DynamicWind texture contains independently varying gust channels"), bHasNoiseVariation);
+		const FDynamicWindParameters WindParameters = UIslandEnvironmentSubsystem::MakeDynamicWindParameters(FVector(30.f, 40.f, 0.f), DynamicWindNoise);
+		TestTrue(TEXT("DynamicWind receives the normalized weather heading"), WindParameters.WindDirection.Equals(FVector(0.6f, 0.8f, 0.f), 0.001f));
+		TestTrue(TEXT("Wind speed is mapped from Island cm/s into the plugin field"), FMath::IsNearlyEqual(WindParameters.WindSpeed, 50.f));
+		TestTrue(TEXT("The weather bridge passes its transient wind texture and full profile amplitude"), WindParameters.WindTexture == DynamicWindNoise && FMath::IsNearlyEqual(WindParameters.WindAmplitude, 1.f));
+		const FDynamicWindParameters CalmParameters = UIslandEnvironmentSubsystem::MakeDynamicWindParameters(FVector::ZeroVector, DynamicWindNoise);
+		TestTrue(TEXT("Calm weather produces zero wind with a safe stable heading"), FMath::IsNearlyZero(CalmParameters.WindSpeed) && CalmParameters.WindDirection == FVector::ForwardVector);
+	}
 	UMaterialParameterCollectionInstance* Instance = World->GetParameterCollectionInstance(Collection);
 	float Published = -1.f;
 	TestTrue(TEXT("The environment collection publishes Indoors for the enclosed viewer"),

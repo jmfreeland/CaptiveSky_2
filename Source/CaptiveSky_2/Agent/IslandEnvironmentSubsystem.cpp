@@ -4,6 +4,7 @@
 #include "IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "Engine/Texture2D.h"
 #include "GameFramework/PlayerController.h"
 #include "LandscapeComponent.h"
 #include "LandscapeProxy.h"
@@ -18,6 +19,8 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Misc/App.h"
+#include "UObject/StructOnScope.h"
+#include "UObject/UnrealType.h"
 #if WITH_EDITOR
 #include "ShaderCompiler.h"
 #endif
@@ -29,6 +32,116 @@ const FName UIslandEnvironmentSubsystem::FoliageWindDirectionParameter(TEXT("Win
 const FName UIslandEnvironmentSubsystem::FoliageWindStrengthParameter(TEXT("WindStrength"));
 const FName UIslandEnvironmentSubsystem::LandscapeWetnessParameter(TEXT("Ground Wetness"));
 const TCHAR* UIslandEnvironmentSubsystem::WetLandscapeMaterialPath = TEXT("/Game/Materials/M_Island_Textured_Wet.M_Island_Textured_Wet");
+
+namespace
+{
+	constexpr int32 DynamicWindNoiseSize = 64;
+	constexpr float DynamicWindUpdateIntervalSeconds = 0.2f;
+
+	float SamplePeriodicValueNoise(float U, float V, int32 LatticeSize, uint32 Seed)
+	{
+		auto HashValue = [Seed](int32 X, int32 Y)
+		{
+			uint32 Value = static_cast<uint32>(X) * 374761393u + static_cast<uint32>(Y) * 668265263u + Seed * 2246822519u;
+			Value = (Value ^ (Value >> 13)) * 1274126177u;
+			Value ^= Value >> 16;
+			return static_cast<float>(Value & 0x00ffffffu) / 16777215.f;
+		};
+
+		const float ScaledU = U * LatticeSize;
+		const float ScaledV = V * LatticeSize;
+		const int32 CellX = FMath::FloorToInt(ScaledU);
+		const int32 CellY = FMath::FloorToInt(ScaledV);
+		const float BlendX = FMath::Square(FMath::Clamp(ScaledU - CellX, 0.f, 1.f)) * (3.f - 2.f * FMath::Clamp(ScaledU - CellX, 0.f, 1.f));
+		const float BlendY = FMath::Square(FMath::Clamp(ScaledV - CellY, 0.f, 1.f)) * (3.f - 2.f * FMath::Clamp(ScaledV - CellY, 0.f, 1.f));
+		const int32 X0 = (CellX % LatticeSize + LatticeSize) % LatticeSize;
+		const int32 Y0 = (CellY % LatticeSize + LatticeSize) % LatticeSize;
+		const int32 X1 = (X0 + 1) % LatticeSize;
+		const int32 Y1 = (Y0 + 1) % LatticeSize;
+		const float Top = FMath::Lerp(HashValue(X0, Y0), HashValue(X1, Y0), BlendX);
+		const float Bottom = FMath::Lerp(HashValue(X0, Y1), HashValue(X1, Y1), BlendX);
+		return FMath::Lerp(Top, Bottom, BlendY);
+	}
+
+	float SampleWindNoiseFractal(float U, float V, uint32 Seed)
+	{
+		constexpr int32 LatticeSizes[] = { 2, 4, 8, 16, 32 };
+		constexpr float Weights[] = { 0.34f, 0.25f, 0.18f, 0.13f, 0.10f };
+		float Value = 0.f;
+		for (int32 Octave = 0; Octave < UE_ARRAY_COUNT(LatticeSizes); ++Octave)
+			Value += SamplePeriodicValueNoise(U, V, LatticeSizes[Octave], Seed + Octave * 101u) * Weights[Octave];
+		return Value;
+	}
+
+	bool PublishDynamicWindParameters(UWorld* World, const FDynamicWindParameters& Parameters)
+	{
+		static UClass* DynamicWindClass = LoadClass<UWorldSubsystem>(nullptr, TEXT("/Script/DynamicWind.DynamicWindSubsystem"));
+		if (!World || !DynamicWindClass) return false;
+		UWorldSubsystem* DynamicWind = World->GetSubsystemBase(DynamicWindClass);
+		UFunction* UpdateFunction = DynamicWindClass->FindFunctionByName(TEXT("UpdateWindParameters"));
+		if (!DynamicWind || !UpdateFunction) return false;
+
+		FStructProperty* WindParameter = CastField<FStructProperty>(UpdateFunction->FindPropertyByName(TEXT("Parameters")));
+		if (!WindParameter || WindParameter->Struct != FDynamicWindParameters::StaticStruct()) return false;
+		FStructOnScope FunctionParameters(UpdateFunction);
+		FDynamicWindParameters* ParameterValue = WindParameter->ContainerPtrToValuePtr<FDynamicWindParameters>(FunctionParameters.GetStructMemory());
+		if (!ParameterValue) return false;
+		*ParameterValue = Parameters;
+		DynamicWind->ProcessEvent(UpdateFunction, FunctionParameters.GetStructMemory());
+		return true;
+	}
+}
+
+FDynamicWindParameters UIslandEnvironmentSubsystem::MakeDynamicWindParameters(const FVector& InWind, UTexture2D* WindTexture)
+{
+	FDynamicWindParameters Parameters;
+	Parameters.WindDirection = InWind.GetSafeNormal();
+	if (Parameters.WindDirection.IsNearlyZero()) Parameters.WindDirection = FVector::ForwardVector;
+	// The DynamicWind shader scales speed by 100; IslandWeather reports cm/s.
+	Parameters.WindSpeed = InWind.Size();
+	Parameters.WindAmplitude = 1.f;
+	Parameters.WindTexture = WindTexture;
+	return Parameters;
+}
+
+UTexture2D* UIslandEnvironmentSubsystem::CreateDynamicWindNoiseTexture()
+{
+	UTexture2D* Texture = UTexture2D::CreateTransient(DynamicWindNoiseSize, DynamicWindNoiseSize, PF_B8G8R8A8);
+	if (!Texture || !Texture->GetPlatformData() || Texture->GetPlatformData()->Mips.IsEmpty()) return nullptr;
+
+	Texture->SRGB = false;
+	Texture->Filter = TF_Bilinear;
+	Texture->AddressX = TA_Wrap;
+	Texture->AddressY = TA_Wrap;
+	Texture->NeverStream = true;
+	Texture->MipGenSettings = TMGS_NoMipmaps;
+
+	TArray<FColor> Pixels;
+	Pixels.SetNumUninitialized(DynamicWindNoiseSize * DynamicWindNoiseSize);
+	for (int32 Y = 0; Y < DynamicWindNoiseSize; ++Y)
+	{
+		for (int32 X = 0; X < DynamicWindNoiseSize; ++X)
+		{
+			const float U = static_cast<float>(X) / DynamicWindNoiseSize;
+			const float V = static_cast<float>(Y) / DynamicWindNoiseSize;
+			const uint8 Red = static_cast<uint8>(FMath::Clamp(FMath::RoundToInt(SampleWindNoiseFractal(U, V, 37u) * 255.f), 0, 255));
+			const uint8 Alpha = static_cast<uint8>(FMath::Clamp(FMath::RoundToInt(SampleWindNoiseFractal(U, V, 149u) * 255.f), 0, 255));
+			Pixels[Y * DynamicWindNoiseSize + X] = FColor(Red, 128, 128, Alpha);
+		}
+	}
+
+	FTexture2DMipMap& Mip = Texture->GetPlatformData()->Mips[0];
+	void* TextureData = Mip.BulkData.Lock(LOCK_READ_WRITE);
+	if (!TextureData)
+	{
+		Mip.BulkData.Unlock();
+		return nullptr;
+	}
+	FMemory::Memcpy(TextureData, Pixels.GetData(), Pixels.Num() * sizeof(FColor));
+	Mip.BulkData.Unlock();
+	Texture->UpdateResource();
+	return Texture;
+}
 
 const TArray<FName>& UIslandEnvironmentSubsystem::ScalarParameterNames()
 {
@@ -56,6 +169,10 @@ void UIslandEnvironmentSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		if (!FoliageWindCollection)
 			UE_LOG(LogTemp, Warning, TEXT("Weather-driven foliage wind is unavailable because PN_WindParameters could not be loaded; Fab asset defaults remain active."));
 	}
+	DynamicWindTexture = CreateDynamicWindNoiseTexture();
+	DynamicWindUpdateAccumulator = DynamicWindUpdateIntervalSeconds;
+	if (!DynamicWindTexture)
+		UE_LOG(LogTemp, Warning, TEXT("DynamicWind weather response is unavailable because its transient noise texture could not be created; other foliage wind paths remain active."));
 	UseWetLandscapeGraph();
 	InitializeLandscapeMaterials();
 	// Mist works through the level's height fog; a level without one gets a faint one for the session.
@@ -259,6 +376,9 @@ void UIslandEnvironmentSubsystem::Deinitialize()
 	LandscapeOriginalMaterials.Reset();
 	LandscapeWetnessBaselines.Reset();
 	LandscapeWetnessInstanceWasReused.Reset();
+	DynamicWindTexture = nullptr;
+	bDynamicWindApiWarningReported = false;
+	DynamicWindUpdateAccumulator = 0.f;
 	if (Fog.IsValid())
 	{
 		Fog->GetComponent()->SetFogDensity(BaseFogDensity);
@@ -415,6 +535,16 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 			FoliageInstance->SetScalarParameterValue(FoliageWindStrengthParameter,
 				FMath::Clamp(FoliageWind.Size2D() / FoliageWindReferenceSpeed, 0.f, 1.f));
 		}
+	}
+	DynamicWindUpdateAccumulator += FMath::Max(0.f, DeltaTime);
+	if (DynamicWindTexture && DynamicWindUpdateAccumulator >= DynamicWindUpdateIntervalSeconds)
+	{
+		if (!PublishDynamicWindParameters(World, MakeDynamicWindParameters(FoliageWind, DynamicWindTexture)) && !bDynamicWindApiWarningReported)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Weather-driven DynamicWind could not find its reflected world subsystem/update function; the existing foliage-material wind remains active."));
+			bDynamicWindApiWarningReported = true;
+		}
+		DynamicWindUpdateAccumulator = FMath::Fmod(DynamicWindUpdateAccumulator, DynamicWindUpdateIntervalSeconds);
 	}
 
 	UMaterialParameterCollectionInstance* Instance = Collection ? World->GetParameterCollectionInstance(Collection) : nullptr;
