@@ -8,6 +8,8 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
 #include "Misc/ScopeExit.h"
+#include "UObject/UnrealType.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandInstancedSkinnedFoliageProviderTest,
 	"CaptiveSky2.Agent.InstancedSkinnedFoliageProvider",
@@ -41,6 +43,31 @@ bool FIslandInstancedSkinnedFoliageProviderTest::RunTest(const FString& Paramete
 	{
 		return false;
 	}
+
+	Host->InstanceStartCullDistance = 1800;
+	Host->InstanceEndCullDistance = 2600;
+	Host->AnimationMinScreenSize = 0.015f;
+	Host->RebuildInstances();
+	int32 ActualStartCullDistance = 0;
+	int32 ActualEndCullDistance = 0;
+	Host->Instances->GetCullDistances(ActualStartCullDistance, ActualEndCullDistance);
+	TestEqual(TEXT("The host applies its fade start distance"), ActualStartCullDistance, 1800);
+	TestEqual(TEXT("The host applies its far cull distance"), ActualEndCullDistance, 2600);
+	const FFloatProperty* AnimationThresholdProperty = FindFProperty<FFloatProperty>(
+		UInstancedSkinnedMeshComponent::StaticClass(), FName(TEXT("AnimationMinScreenSize")));
+	if (!TestNotNull(TEXT("The animation screen-size threshold is reflected"), AnimationThresholdProperty)) return false;
+	TestTrue(TEXT("The host applies the per-instance animation screen-size threshold"),
+		FMath::IsNearlyEqual(AnimationThresholdProperty->GetPropertyValue_InContainer(Host->Instances), 0.015f));
+
+	Host->InstanceStartCullDistance = -1800;
+	Host->InstanceEndCullDistance = -2600;
+	Host->AnimationMinScreenSize = std::numeric_limits<float>::quiet_NaN();
+	Host->RebuildInstances();
+	Host->Instances->GetCullDistances(ActualStartCullDistance, ActualEndCullDistance);
+	TestEqual(TEXT("Invalid negative fade distances are clamped to zero"), ActualStartCullDistance, 0);
+	TestEqual(TEXT("Invalid negative end distances are clamped to zero"), ActualEndCullDistance, 0);
+	TestTrue(TEXT("A non-finite animation threshold falls back to the UE global setting"),
+		FMath::IsNearlyZero(AnimationThresholdProperty->GetPropertyValue_InContainer(Host->Instances)));
 
 	UAnimSequenceTransformProviderData* Provider = NewObject<UAnimSequenceTransformProviderData>(
 		Host->Instances, NAME_None, RF_Transient);

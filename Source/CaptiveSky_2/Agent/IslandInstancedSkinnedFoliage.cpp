@@ -29,6 +29,10 @@ void AIslandInstancedSkinnedFoliage::RebuildInstances()
 
 	Instances->ClearInstances();
 	Instances->SetSkinnedAssetAndUpdate(SourceMesh);
+	Instances->SetCullDistances(FMath::Max(0, InstanceStartCullDistance), FMath::Max(0, InstanceEndCullDistance));
+	Instances->SetAnimationMinScreenSize(FMath::IsFinite(AnimationMinScreenSize)
+		? AnimationMinScreenSize
+		: 0.0f);
 	if (TransformProvider != AutoTransformProvider)
 	{
 		// A caller replaced or cleared the generated value; do not overwrite an explicit choice.

@@ -32,6 +32,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage")
 	TArray<FTransform> InstanceTransforms;
 
+	/** Start fading instances at this camera distance; zero disables a per-instance fade start. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage|Culling", meta=(ClampMin="0"))
+	int32 InstanceStartCullDistance = 0;
+
+	/** Fully cull instances at this distance; zero disables the far cutoff. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage|Culling", meta=(ClampMin="0"))
+	int32 InstanceEndCullDistance = 0;
+
+	/** Screen-size threshold for stopping per-instance animation; zero inherits the UE global threshold. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Foliage|Culling")
+	float AnimationMinScreenSize = 0.0f;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> Instances;
 
