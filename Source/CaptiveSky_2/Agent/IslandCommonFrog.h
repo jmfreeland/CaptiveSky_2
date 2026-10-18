@@ -6,6 +6,9 @@
 
 class AIslandDayNight;
 class AIslandWeather;
+class APawn;
+class ARatAgentAIController;
+class ARavenAgentAIController;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UStaticMeshComponent;
@@ -22,6 +25,7 @@ public:
 	/** A close, low approach can start one short hop away; distant/high observers are ignored. */
 	bool RespondToQuietObservation(const FVector& ObserverLocation);
 	static bool ShouldHopFromObserver(float DistanceCm, float VerticalOffsetCm);
+	static bool ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm);
 	/** Rain and darkness encourage brief ambient movement; dry daylight remains restful. */
 	static float AmbientActivityScale(float RainIntensity, float NightAmount);
 	static float HopArcHeight(float Alpha, float MaximumHeightCm);
@@ -35,6 +39,8 @@ protected:
 private:
 	friend class FIslandCommonFrogTests;
 	void FindEnvironment();
+	void CheckForPlayerDisturbance();
+	void CheckForNearbyWildlife();
 	bool BeginHop(const FVector& Direction, float PreferredDistanceCm);
 	FVector ResolveGroundLocation(const FVector& Desired) const;
 	void SetColor(UMaterialInstanceDynamic* Material, const FLinearColor& Color);
@@ -62,6 +68,9 @@ private:
 
 	TWeakObjectPtr<AIslandWeather> Weather;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
+	TWeakObjectPtr<APawn> PlayerPresenceLatch;
+	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
+	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector HopStartLocation = FVector::ZeroVector;
 	FVector HopTargetLocation = FVector::ZeroVector;

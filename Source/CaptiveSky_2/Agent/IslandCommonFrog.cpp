@@ -11,6 +11,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
+#include "RatAgentAIController.h"
+#include "RavenAgentAIController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -20,6 +22,8 @@ namespace
 	constexpr TCHAR FrogMeshPath[] = TEXT("/Game/Generated/ComfyBlender/Tideglass_CommonFrog_Candidate/SM_Tideglass_CommonFrog_Candidate_01.SM_Tideglass_CommonFrog_Candidate_01");
 	constexpr float FrogObserverRadiusCm = 240.f;
 	constexpr float FrogObserverHeightCm = 180.f;
+	constexpr float FrogObserverRearmRadiusCm = 520.f;
+	constexpr float FrogObserverRearmHeightCm = 260.f;
 	constexpr float FrogHopHeightCm = 13.f;
 	constexpr float FrogHopDurationSeconds = 0.48f;
 }
@@ -123,10 +127,84 @@ void AIslandCommonFrog::FindEnvironment()
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It) { Weather = *It; break; }
 }
 
+void AIslandCommonFrog::CheckForPlayerDisturbance()
+{
+	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (!IsValid(Player))
+	{
+		PlayerPresenceLatch.Reset();
+		return;
+	}
+
+	const FVector Offset = Player->GetActorLocation() - GetActorLocation();
+	const float Distance = Offset.Size2D();
+	if (PlayerPresenceLatch.Get() == Player &&
+		(ShouldRearmFromObserver(Distance, FrogObserverRearmRadiusCm) ||
+		FMath::Abs(Offset.Z) > FrogObserverRearmHeightCm))
+	{
+		PlayerPresenceLatch.Reset();
+	}
+	if (PlayerPresenceLatch.Get() == Player || !ShouldHopFromObserver(Distance, Offset.Z)) return;
+	if (RespondToQuietObservation(Player->GetActorLocation())) PlayerPresenceLatch = Player;
+}
+
+void AIslandCommonFrog::CheckForNearbyWildlife()
+{
+	if (!GetWorld() || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
+
+	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
+	{
+		ARavenAgentAIController* Raven = *It;
+		const APawn* RavenPawn = IsValid(Raven) ? Raven->GetPawn() : nullptr;
+		if (!IsValid(RavenPawn)) continue;
+		const bool bSettled = Raven->LocomotionState == ERavenLocomotionState::Grounded ||
+			Raven->LocomotionState == ERavenLocomotionState::Hopping ||
+			Raven->LocomotionState == ERavenLocomotionState::Perched;
+		const FVector Offset = RavenPawn->GetActorLocation() - GetActorLocation();
+		const float Distance = Offset.Size2D();
+		if (RavenPresenceLatch.Get() == Raven && (!bSettled ||
+			ShouldRearmFromObserver(Distance, FrogObserverRearmRadiusCm) ||
+			FMath::Abs(Offset.Z) > FrogObserverRearmHeightCm))
+			RavenPresenceLatch.Reset();
+		if (!bSettled || RavenPresenceLatch.Get() == Raven || !ShouldHopFromObserver(Distance, Offset.Z)) continue;
+		if (RespondToQuietObservation(RavenPawn->GetActorLocation()))
+		{
+			RavenPresenceLatch = Raven;
+			return;
+		}
+	}
+
+	for (TActorIterator<ARatAgentAIController> It(GetWorld()); It; ++It)
+	{
+		ARatAgentAIController* Rat = *It;
+		const APawn* RatPawn = IsValid(Rat) ? Rat->GetPawn() : nullptr;
+		if (!IsValid(RatPawn)) continue;
+		const bool bAwake = Rat->IsAwake();
+		const FVector Offset = RatPawn->GetActorLocation() - GetActorLocation();
+		const float Distance = Offset.Size2D();
+		if (RatPresenceLatch.Get() == Rat && (!bAwake ||
+			ShouldRearmFromObserver(Distance, FrogObserverRearmRadiusCm) ||
+			FMath::Abs(Offset.Z) > FrogObserverRearmHeightCm))
+			RatPresenceLatch.Reset();
+		if (!bAwake || RatPresenceLatch.Get() == Rat || !ShouldHopFromObserver(Distance, Offset.Z)) continue;
+		if (RespondToQuietObservation(RatPawn->GetActorLocation()))
+		{
+			RatPresenceLatch = Rat;
+			return;
+		}
+	}
+}
+
 bool AIslandCommonFrog::ShouldHopFromObserver(float DistanceCm, float VerticalOffsetCm)
 {
 	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= FrogObserverRadiusCm &&
 		FMath::IsFinite(VerticalOffsetCm) && FMath::Abs(VerticalOffsetCm) <= FrogObserverHeightCm;
+}
+
+bool AIslandCommonFrog::ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && FMath::IsFinite(RearmRadiusCm) &&
+		RearmRadiusCm > 0.f && DistanceCm > RearmRadiusCm;
 }
 
 float AIslandCommonFrog::AmbientActivityScale(float RainIntensity, float NightAmount)
@@ -188,7 +266,7 @@ bool AIslandCommonFrog::BeginHop(const FVector& RequestedDirection, float Prefer
 
 bool AIslandCommonFrog::RespondToQuietObservation(const FVector& ObserverLocation)
 {
-	if (StartleCooldownRemaining > 0.f || !FMath::IsFinite(ObserverLocation.X) ||
+	if (StartleCooldownRemaining > 0.f || HopRemaining > 0.f || !FMath::IsFinite(ObserverLocation.X) ||
 		!FMath::IsFinite(ObserverLocation.Y) || !FMath::IsFinite(ObserverLocation.Z)) return false;
 	const FVector Offset = ObserverLocation - GetActorLocation();
 	if (!ShouldHopFromObserver(Offset.Size2D(), Offset.Z)) return false;
@@ -208,10 +286,8 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 	if (ObserverCheckRemaining <= 0.f)
 	{
 		ObserverCheckRemaining = 0.30f;
-		if (const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
-		{
-			RespondToQuietObservation(Player->GetActorLocation());
-		}
+		CheckForPlayerDisturbance();
+		CheckForNearbyWildlife();
 	}
 
 	if (HopRemaining > 0.f)

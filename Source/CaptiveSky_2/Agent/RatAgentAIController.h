@@ -40,6 +40,8 @@ public:
 	/** An idle rat may briefly acknowledge the awake Innkeeper nearby, without interrupting either resident. */
 	static bool ShouldBeginInnkeeperNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
 		bool bRatResting, bool bInnkeeperResting, bool bAlreadyNoticing);
+	/** Whether the rat's current animation state is awake rather than resting. */
+	bool IsAwake() const { return CurrentMode != ERatLocomotionMode::Sleeping; }
 	static constexpr float RavenNoticeRadius = 800.f;
 	static constexpr float PeriwinkleNoticeRadius = 420.f;
 	static constexpr float InnkeeperNoticeRadius = 650.f;

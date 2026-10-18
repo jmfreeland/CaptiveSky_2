@@ -15,8 +15,11 @@ the silhouette. This is deliberately a fallback, not the final art review.
 
 ## Behavior
 
-- A nearby player (within 240 cm horizontally and 180 cm vertically) causes one
-  short hop away, with a seven-second cooldown.
+- A nearby player, settled Raven, or awake Rat (within 240 cm horizontally and
+  180 cm vertically) causes one short hop away per approach. The visitor must
+  retreat beyond 520 cm to rearm. A shared seven-second cooldown prevents
+  overlapping disturbances from chaining hops; flying Ravens and sleeping Rats
+  do not startle it.
 - Hop arcs last 0.48 seconds and stay within 420 cm of the animal's original
   habitat. Ground destinations must pass a static-world trace and slope/height
   bounds.
@@ -28,16 +31,21 @@ the silhouette. This is deliberately a fallback, not the final art review.
 ## Validation and limits
 
 `Source/CaptiveSky_2/Agent/Tests/IslandCommonFrogTests.cpp` covers observer
-limits, invalid inputs, activity ordering, and hop shape. C++ compilation,
-passed in UE 5.8.3 using the source-only `Saved/CompileScratch/`
-`Codex_CurrentSourceBuild_20261018` target. UHT generated the new actor header,
-and both the frog actor and automation translation unit compiled and linked.
+limits, rearming distance, invalid inputs, activity ordering, and hop shape.
+The source-only UE 5.8.3 target
+`Saved/CompileScratch/Codex_CurrentSourceBuild_20261018` rebuilt successfully
+after adding the Raven/Rat/player approach checks and Rat's read-only awake
+query. UHT completed, and the frog actor, Rat controller, and automation
+translation units compiled and linked. The automation cases themselves have
+not run in this pass.
 
 The targeted automation did not start: `UnrealEditor-Cmd.exe` crashed at
 `StartOfEnginePreInit` with a null-address access violation before test
 discovery. Its `PCallStackHash` is
 `F405610C114D120D4B6F5ABA901EC469AC9FAA26`, matching earlier scratch
-commandlet startup crashes already in `Saved/`. No local `UnrealEditor-Core.pdb`
+commandlet startup crashes already in `Saved/`. The user confirms the interactive
+editor is open and responsive, but the desktop bridge does not expose its window;
+the editor was left untouched. No local `UnrealEditor-Core.pdb`
 or `UnrealEditor-Cmd.pdb` is installed, so the raw Core offsets cannot be
 symbolized here. The report and log are in
 `Saved/CompileScratch/Codex_CurrentSourceBuild_20261018/Saved/Crashes/_0000/`

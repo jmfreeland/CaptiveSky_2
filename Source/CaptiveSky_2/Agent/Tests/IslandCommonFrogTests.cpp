@@ -14,6 +14,10 @@ bool FIslandCommonFrogTests::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Distant observers do not startle it"), Frog::ShouldHopFromObserver(241.f, 0.f));
 	TestFalse(TEXT("An observer above the local height band is ignored"), Frog::ShouldHopFromObserver(100.f, 181.f));
 	TestFalse(TEXT("Invalid distances are ignored"), Frog::ShouldHopFromObserver(std::numeric_limits<float>::infinity(), 0.f));
+	TestFalse(TEXT("A lingering visitor does not rearm at the boundary"), Frog::ShouldRearmFromObserver(520.f, 520.f));
+	TestTrue(TEXT("A visitor must retreat beyond the wider ring to rearm"), Frog::ShouldRearmFromObserver(521.f, 520.f));
+	TestFalse(TEXT("Invalid rearm distances are ignored"), Frog::ShouldRearmFromObserver(521.f,
+		std::numeric_limits<float>::quiet_NaN()));
 
 	const float DryDay = Frog::AmbientActivityScale(0.f, 0.f);
 	const float WetDay = Frog::AmbientActivityScale(1.f, 0.f);
