@@ -1,11 +1,14 @@
 #include "RatAgentAIController.h"
 
 #include "Animation/AnimSequence.h"
+#include "AgentMemoryComponent.h"
 #include "AgentConsolidationComponent.h"
+#include "AutonomousAgentCharacter.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "IslandInnkeeperSubsystem.h"
 #include "IslandListeningStonesChime.h"
 #include "IslandTidepoolPeriwinkle.h"
 #include "RavenAgentAIController.h"
@@ -23,6 +26,9 @@ namespace
 	constexpr float StoneChimeAttentionCooldown = 16.f;
 	constexpr float PeriwinkleAttentionDuration = 2.2f;
 	constexpr float PeriwinkleAttentionCooldown = 24.f;
+	constexpr float InnkeeperScanInterval = 1.4f;
+	constexpr float InnkeeperAttentionDuration = 1.8f;
+	constexpr float InnkeeperAttentionCooldown = 28.f;
 
 	UAnimSequence* LoadFoxAnimation(const TCHAR* AssetName)
 	{
@@ -66,6 +72,13 @@ bool ARatAgentAIController::ShouldBeginPeriwinkleNotice(float DistanceCm, bool b
 		bHasLineOfSight && !bRatBusy && !bRatResting && !bAlreadyNoticing;
 }
 
+bool ARatAgentAIController::ShouldBeginInnkeeperNotice(float DistanceCm, bool bHasLineOfSight,
+	bool bRatBusy, bool bRatResting, bool bInnkeeperResting, bool bAlreadyNoticing)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= InnkeeperNoticeRadius &&
+		bHasLineOfSight && !bRatBusy && !bRatResting && !bInnkeeperResting && !bAlreadyNoticing;
+}
+
 void ARatAgentAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -81,6 +94,10 @@ void ARatAgentAIController::OnPossess(APawn* InPawn)
 	PeriwinkleAttentionRemaining = 0.f;
 	PeriwinkleAttentionCooldownRemaining = 0.f;
 	PeriwinkleAttentionTarget = FVector::ZeroVector;
+	InnkeeperScanRemaining = 0.f;
+	InnkeeperAttentionRemaining = 0.f;
+	InnkeeperAttentionCooldownRemaining = 0.f;
+	InnkeeperAttentionTarget = FVector::ZeroVector;
 	CacheAnimations(InPawn);
 	UpdateAnimation(0.f);
 }
@@ -106,6 +123,10 @@ void ARatAgentAIController::OnUnPossess()
 	PeriwinkleAttentionRemaining = 0.f;
 	PeriwinkleAttentionCooldownRemaining = 0.f;
 	PeriwinkleAttentionTarget = FVector::ZeroVector;
+	InnkeeperScanRemaining = 0.f;
+	InnkeeperAttentionRemaining = 0.f;
+	InnkeeperAttentionCooldownRemaining = 0.f;
+	InnkeeperAttentionTarget = FVector::ZeroVector;
 	Super::OnUnPossess();
 }
 
@@ -115,7 +136,88 @@ void ARatAgentAIController::Tick(float DeltaSeconds)
 	UpdateRavenAttention(DeltaSeconds);
 	UpdateStoneChimeAttention(DeltaSeconds);
 	UpdatePeriwinkleAttention(DeltaSeconds);
+	UpdateInnkeeperAttention(DeltaSeconds);
 	UpdateAnimation(DeltaSeconds);
+}
+
+void ARatAgentAIController::UpdateInnkeeperAttention(float DeltaSeconds)
+{
+	APawn* Rat = GetPawn();
+	UWorld* World = GetWorld();
+	if (!Rat || !World) return;
+
+	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
+	InnkeeperAttentionCooldownRemaining = FMath::Max(0.f, InnkeeperAttentionCooldownRemaining - SafeDelta);
+	InnkeeperAttentionRemaining = FMath::Max(0.f, InnkeeperAttentionRemaining - SafeDelta);
+	if (InnkeeperAttentionRemaining > 0.f)
+	{
+		if (IsActionInProgress() || IsResting())
+		{
+			InnkeeperAttentionRemaining = 0.f;
+			return;
+		}
+
+		const FVector Direction = InnkeeperAttentionTarget - Rat->GetActorLocation();
+		if (!Direction.IsNearlyZero())
+		{
+			FRotator Facing = Direction.Rotation();
+			Facing.Pitch = 0.f;
+			Facing.Roll = 0.f;
+			Rat->SetActorRotation(FMath::RInterpTo(Rat->GetActorRotation(), Facing, SafeDelta, 2.f));
+		}
+		return;
+	}
+
+	if (RavenAttentionRemaining > 0.f || StoneChimeAttentionRemaining > 0.f ||
+		PeriwinkleAttentionRemaining > 0.f || InnkeeperAttentionCooldownRemaining > 0.f)
+	{
+		InnkeeperScanRemaining = FMath::Max(InnkeeperScanRemaining,
+			FMath::Max(FMath::Max(RavenAttentionRemaining, StoneChimeAttentionRemaining), PeriwinkleAttentionRemaining));
+		return;
+	}
+	InnkeeperScanRemaining -= SafeDelta;
+	if (InnkeeperScanRemaining > 0.f) return;
+	InnkeeperScanRemaining = InnkeeperScanInterval;
+	if (IsActionInProgress() || IsResting()) return;
+
+	const UIslandInnkeeperSubsystem* InnkeeperSubsystem = World->GetSubsystem<UIslandInnkeeperSubsystem>();
+	if (!InnkeeperSubsystem || InnkeeperSubsystem->AgentId.IsEmpty()) return;
+
+	AAutonomousAgentCharacter* BestInnkeeper = nullptr;
+	float BestDistanceSquared = FMath::Square(InnkeeperNoticeRadius);
+	for (TActorIterator<AAutonomousAgentCharacter> It(World); It; ++It)
+	{
+		AAutonomousAgentCharacter* Resident = *It;
+		if (!IsValid(Resident) || Resident == Rat || !Resident->Memory ||
+			Resident->Memory->GetResolvedAgentId() != InnkeeperSubsystem->AgentId)
+			continue;
+
+		const UAgentConsolidationComponent* ResidentRest = Resident->FindComponentByClass<UAgentConsolidationComponent>();
+		const bool bInnkeeperResting = ResidentRest && !ResidentRest->IsAwake();
+		const float DistanceSquared = FVector::DistSquared(Rat->GetActorLocation(), Resident->GetActorLocation());
+		if (DistanceSquared > BestDistanceSquared || !ShouldBeginInnkeeperNotice(
+			FMath::Sqrt(DistanceSquared), true, false, false, bInnkeeperResting, false))
+			continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(RatNoticesInnkeeper), false, Rat);
+		Query.AddIgnoredActor(Resident);
+		FHitResult Hit;
+		const FVector Start = Rat->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		const FVector End = Resident->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		const bool bHasLineOfSight = !World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Query);
+		if (!ShouldBeginInnkeeperNotice(FMath::Sqrt(DistanceSquared), bHasLineOfSight,
+			false, false, bInnkeeperResting, false))
+			continue;
+
+		BestDistanceSquared = DistanceSquared;
+		BestInnkeeper = Resident;
+	}
+
+	if (!BestInnkeeper) return;
+	InnkeeperAttentionTarget = BestInnkeeper->GetActorLocation();
+	InnkeeperAttentionRemaining = InnkeeperAttentionDuration;
+	InnkeeperAttentionCooldownRemaining = InnkeeperAttentionCooldown;
+	IdleLookTimer = 0.f;
 }
 
 void ARatAgentAIController::UpdatePeriwinkleAttention(float DeltaSeconds)
@@ -147,7 +249,7 @@ void ARatAgentAIController::UpdatePeriwinkleAttention(float DeltaSeconds)
 	}
 
 	if (RavenAttentionRemaining > 0.f || StoneChimeAttentionRemaining > 0.f ||
-		PeriwinkleAttentionCooldownRemaining > 0.f)
+		InnkeeperAttentionRemaining > 0.f || PeriwinkleAttentionCooldownRemaining > 0.f)
 	{
 		PeriwinkleScanRemaining = FMath::Max(PeriwinkleScanRemaining,
 			FMath::Max(RavenAttentionRemaining, StoneChimeAttentionRemaining));
@@ -196,7 +298,7 @@ void ARatAgentAIController::UpdateRavenAttention(float DeltaSeconds)
 	const float SafeDelta = FMath::Max(0.f, DeltaSeconds);
 	RavenAttentionCooldownRemaining = FMath::Max(0.f, RavenAttentionCooldownRemaining - SafeDelta);
 	RavenAttentionRemaining = FMath::Max(0.f, RavenAttentionRemaining - SafeDelta);
-	if (StoneChimeAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f)
+	if (StoneChimeAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f || InnkeeperAttentionRemaining > 0.f)
 	{
 		RavenScanRemaining = FMath::Max(RavenScanRemaining, SafeDelta);
 		return;
@@ -292,7 +394,7 @@ void ARatAgentAIController::UpdateStoneChimeAttention(float DeltaSeconds)
 		return;
 	}
 
-	if (RavenAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f ||
+	if (RavenAttentionRemaining > 0.f || PeriwinkleAttentionRemaining > 0.f || InnkeeperAttentionRemaining > 0.f ||
 		StoneChimeAttentionCooldownRemaining > 0.f)
 	{
 		StoneChimeScanRemaining = FMath::Max(RavenAttentionRemaining,

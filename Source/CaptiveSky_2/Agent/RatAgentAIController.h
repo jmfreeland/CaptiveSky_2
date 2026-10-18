@@ -37,8 +37,12 @@ public:
 	/** An idle rat may briefly look at a nearby, visible tidepool snail. */
 	static bool ShouldBeginPeriwinkleNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
 		bool bRatResting, bool bAlreadyNoticing);
+	/** An idle rat may briefly acknowledge the awake Innkeeper nearby, without interrupting either resident. */
+	static bool ShouldBeginInnkeeperNotice(float DistanceCm, bool bHasLineOfSight, bool bRatBusy,
+		bool bRatResting, bool bInnkeeperResting, bool bAlreadyNoticing);
 	static constexpr float RavenNoticeRadius = 800.f;
 	static constexpr float PeriwinkleNoticeRadius = 420.f;
+	static constexpr float InnkeeperNoticeRadius = 650.f;
 
 protected:
 	virtual void OnPossess(APawn* InPawn) override;
@@ -75,11 +79,16 @@ private:
 	float PeriwinkleAttentionRemaining = 0.f;
 	float PeriwinkleAttentionCooldownRemaining = 0.f;
 	FVector PeriwinkleAttentionTarget = FVector::ZeroVector;
+	float InnkeeperScanRemaining = 0.f;
+	float InnkeeperAttentionRemaining = 0.f;
+	float InnkeeperAttentionCooldownRemaining = 0.f;
+	FVector InnkeeperAttentionTarget = FVector::ZeroVector;
 
 	void CacheAnimations(APawn* Rat);
 	void UpdateAnimation(float DeltaSeconds);
 	void UpdateRavenAttention(float DeltaSeconds);
 	void UpdateStoneChimeAttention(float DeltaSeconds);
 	void UpdatePeriwinkleAttention(float DeltaSeconds);
+	void UpdateInnkeeperAttention(float DeltaSeconds);
 	void UpdateAnimationForMotion(float DeltaSeconds, float HorizontalSpeed, bool bSleeping);
 };

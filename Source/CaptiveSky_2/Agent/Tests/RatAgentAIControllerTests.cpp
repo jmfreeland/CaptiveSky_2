@@ -169,3 +169,30 @@ bool FRatPeriwinkleAttentionTest::RunTest(const FString& Parameters)
 		Rat::ShouldBeginPeriwinkleNotice(std::numeric_limits<float>::infinity(), true, false, false, false));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FRatInnkeeperAttentionTest, "CaptiveSky2.Agent.RatInnkeeperAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRatInnkeeperAttentionTest::RunTest(const FString& Parameters)
+{
+	using Rat = ARatAgentAIController;
+	TestTrue(TEXT("An idle rat may briefly acknowledge the nearby awake Innkeeper"),
+		Rat::ShouldBeginInnkeeperNotice(Rat::InnkeeperNoticeRadius, true, false, false, false, false));
+	TestFalse(TEXT("A wall or thick root screen hides the Innkeeper"),
+		Rat::ShouldBeginInnkeeperNotice(300.f, false, false, false, false, false));
+	TestFalse(TEXT("A rat already following a chosen action does not divert"),
+		Rat::ShouldBeginInnkeeperNotice(300.f, true, true, false, false, false));
+	TestFalse(TEXT("A resting rat remains asleep"),
+		Rat::ShouldBeginInnkeeperNotice(300.f, true, false, true, false, false));
+	TestFalse(TEXT("The rat does not disturb an Innkeeper who is asleep"),
+		Rat::ShouldBeginInnkeeperNotice(300.f, true, false, false, true, false));
+	TestFalse(TEXT("The cooldown prevents repetitive greetings"),
+		Rat::ShouldBeginInnkeeperNotice(300.f, true, false, false, false, true));
+	TestFalse(TEXT("An Innkeeper beyond conversational sight is ignored"),
+		Rat::ShouldBeginInnkeeperNotice(Rat::InnkeeperNoticeRadius + 1.f, true, false, false, false, false));
+	TestFalse(TEXT("Invalid distances never start an attention cue"),
+		Rat::ShouldBeginInnkeeperNotice(std::numeric_limits<float>::quiet_NaN(), true, false, false, false, false));
+	TestFalse(TEXT("Unbounded distances never start an attention cue"),
+		Rat::ShouldBeginInnkeeperNotice(std::numeric_limits<float>::infinity(), true, false, false, false, false));
+	return true;
+}
