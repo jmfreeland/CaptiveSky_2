@@ -109,6 +109,17 @@ FString AIslandDayNight::DescribeSunEdge(float IslandHour)
 	return FString();
 }
 
+FString AIslandDayNight::DescribeCalendar(int32 IslandDay, float LunarProgress)
+{
+	if (!FMath::IsFinite(LunarProgress)) return FString();
+	const float Progress = LunarProgress - FMath::FloorToFloat(LunarProgress);
+	const int32 ToFull = FMath::RoundToInt(FMath::Frac(0.5f - Progress + 1.f) * static_cast<float>(LunarCycleDays));
+	const int32 ToNew = FMath::RoundToInt((1.f - Progress) * static_cast<float>(LunarCycleDays));
+	const auto Days = [](int32 N) { return N <= 0 ? FString(TEXT("today")) : N == 1 ? FString(TEXT("tomorrow")) : FString::Printf(TEXT("in about %d days"), N); };
+	return FString::Printf(TEXT(" It is day %d of the Island; the moon will be full %s and new %s."),
+		FMath::Max(1, IslandDay), *Days(ToFull), *Days(ToNew));
+}
+
 bool AIslandDayNight::IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover)
 {
 	if (!FMath::IsFinite(MoonElevation) || !FMath::IsFinite(Night) || !FMath::IsFinite(CloudCover)) return false;
@@ -343,7 +354,7 @@ FString AIslandDayNight::DescribeTime() const
 			CloudNow = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
 			break;
 		}
-	const FString SunEdge = DescribeSunEdge(CurrentHour);
+	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeCalendar(DayNumber, LunarProgress);
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s"),

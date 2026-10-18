@@ -79,6 +79,8 @@ public:
 	static float MoonHeight(int32 IslandDay, float IslandHour);
 	/** A sentence about the sun touching the horizon within about half an hour of 06:00 or 18:00; empty otherwise. Pure. */
 	static FString DescribeSunEdge(float IslandHour);
+	/** Island day count plus whole days until the next full and new moon, so residents can reckon time across sessions. Pure. */
+	static FString DescribeCalendar(int32 IslandDay, float LunarProgress);
 	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
 	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */

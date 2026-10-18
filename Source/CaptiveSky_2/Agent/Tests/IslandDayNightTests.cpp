@@ -61,6 +61,14 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Midday and midnight say nothing about the sun's edge"),
 		AIslandDayNight::DescribeSunEdge(12.f).IsEmpty() && AIslandDayNight::DescribeSunEdge(0.f).IsEmpty());
 	TestTrue(TEXT("Non-finite hours are harmless"), AIslandDayNight::DescribeSunEdge(NAN).IsEmpty());
+	{
+		const FString Calendar = AIslandDayNight::DescribeCalendar(8, 0.25f);
+		TestTrue(TEXT("The calendar names the Island day"), Calendar.Contains(TEXT("day 8")));
+		TestTrue(TEXT("A quarter into the cycle the full moon is about a week off"), Calendar.Contains(TEXT("full in about 7 days")));
+		TestTrue(TEXT("A quarter into the cycle the new moon is about three weeks off"), Calendar.Contains(TEXT("new in about 22 days")));
+		TestTrue(TEXT("At full moon the calendar says today"), AIslandDayNight::DescribeCalendar(15, 0.5f).Contains(TEXT("full today")));
+		TestTrue(TEXT("Non-finite progress is harmless"), AIslandDayNight::DescribeCalendar(1, NAN).IsEmpty());
+	}
 	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
 	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
 	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));
