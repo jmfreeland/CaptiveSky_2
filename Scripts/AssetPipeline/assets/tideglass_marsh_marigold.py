@@ -20,17 +20,28 @@ ROSETTE_CENTRES_M = (
     (-0.14, 0.17, 0.012), (0.17, 0.15, 0.012),
 )
 LEAVES_PER_ROSETTE = 3
-LEAF_LENGTH_M = 0.205
-LEAF_WIDTH_M = 0.075
+LEAF_LENGTH_M = 0.185
+LEAF_WIDTH_M = 0.078
+LEAF_LONGITUDINAL_SEGMENTS = 12
+LEAF_LATERAL_SEGMENTS = 6
+LEAF_HALF_WIDTH_PROFILE = (
+    0.0, 0.43, 0.76, 0.94, 1.0, 1.035, 1.02,
+    0.96, 0.86, 0.72, 0.52, 0.29, 0.0,
+)
 FLOWER_BASES_M = (
     (-0.09, -0.04, 0.018), (0.055, -0.08, 0.018),
     (-0.045, 0.085, 0.018), (0.105, 0.065, 0.018),
     (0.0, 0.015, 0.018),
 )
 FLOWER_HEIGHTS_M = (0.30, 0.36, 0.33, 0.28, 0.32)
-SEPALS_PER_FLOWER = 6
-SEPAL_LENGTH_M = 0.044
-SEPAL_WIDTH_M = 0.018
+SEPALS_PER_FLOWER = 8
+SEPAL_LENGTH_M = 0.05
+SEPAL_WIDTH_M = 0.023
+SEPAL_LONGITUDINAL_SEGMENTS = 8
+SEPAL_LATERAL_SEGMENTS = 4
+SEPAL_HALF_WIDTH_PROFILE = (0.0, 0.56, 0.88, 0.99, 1.0, 0.96, 0.84, 0.62, 0.0)
+SEPAL_TIP_RISE_M = 0.016
+SEPAL_EDGE_CUP_M = 0.006
 
 
 def _tube(bm, points, radius, segments=6):
@@ -63,42 +74,55 @@ def _tube(bm, points, radius, segments=6):
 
 
 def _leaf(bm, start, direction, scale, phase):
-    """Create a broad, gently cupped, rounded marsh-marigold leaf blade."""
+    """Create a rounded, shallowly heart-notched and cupped leaf blade."""
     start = Vector(start)
     direction = Vector(direction).normalized()
     across = Vector((-direction.y, direction.x, 0.0)).normalized()
     rows = []
-    for row in range(9):
-        t = row / 8.0
+    for row in range(LEAF_LONGITUDINAL_SEGMENTS + 1):
+        t = row / LEAF_LONGITUDINAL_SEGMENTS
         centre = start + direction * (LEAF_LENGTH_M * scale * t)
-        centre.z += scale * (0.019 * math.sin(math.pi * t) + 0.009 * t)
-        half_width = LEAF_WIDTH_M * scale * (math.sin(math.pi * t) ** 0.66)
-        half_width *= 0.91 + 0.09 * math.sin(2.0 * math.pi * t + phase)
-        cup = 0.006 * scale * (half_width / (LEAF_WIDTH_M * scale)) ** 2
-        left = centre - across * half_width + Vector((0.0, 0.0, -cup))
-        middle = centre + Vector((0.0, 0.0, 0.004 * math.sin(math.pi * t)))
-        right = centre + across * half_width + Vector((0.0, 0.0, -cup))
-        rows.append((bm.verts.new(left), bm.verts.new(middle), bm.verts.new(right)))
+        centre.z += scale * (0.016 * math.sin(math.pi * t) + 0.007 * t)
+        half_width = LEAF_WIDTH_M * scale * LEAF_HALF_WIDTH_PROFILE[row]
+        half_width *= 0.96 + 0.04 * math.sin(2.0 * math.pi * t + phase)
+        # Split the first centimetre of the blade around its petiole, leaving a
+        # small heart-shaped cleft instead of a featureless pointed paddle.
+        base_notch = 0.018 * max(0.0, 1.0 - t / 0.2)
+        row_vertices = []
+        for column in range(LEAF_LATERAL_SEGMENTS + 1):
+            across_amount = -1.0 + 2.0 * column / LEAF_LATERAL_SEGMENTS
+            base_cleft = base_notch * (1.0 - abs(across_amount))
+            point = centre - direction * (base_cleft * scale) + across * (half_width * across_amount)
+            point.z += scale * (0.0018 * math.sin(math.pi * t) * (1.0 - abs(across_amount)))
+            point.z -= scale * (0.0045 * LEAF_HALF_WIDTH_PROFILE[row] * across_amount * across_amount)
+            row_vertices.append(bm.verts.new(point))
+        rows.append(row_vertices)
     for row in range(len(rows) - 1):
-        for side in range(2):
+        for side in range(LEAF_LATERAL_SEGMENTS):
             bm.faces.new((rows[row][side], rows[row + 1][side],
                           rows[row + 1][side + 1], rows[row][side + 1]))
 
 
 def _sepal(bm, centre, radial, side, index):
-    """Build one rounded yellow sepal with a slight outer droop and shallow cup."""
+    """Build one rounded yellow sepal with a raised tip and shallow cup."""
     rows = []
-    for row in range(7):
-        t = row / 6.0
-        along = SEPAL_LENGTH_M * t
-        half_width = SEPAL_WIDTH_M * (math.sin(math.pi * t) ** 0.72)
-        tip_wave = 0.0015 * math.sin(index * 1.7 + t * math.pi)
-        mid = centre + radial * along + Vector((0.0, 0.0, 0.002 + 0.003 * math.sin(math.pi * t) - 0.006 * t * t + tip_wave))
-        left = mid - side * half_width + Vector((0.0, 0.0, -0.002 * t))
-        right = mid + side * half_width + Vector((0.0, 0.0, -0.002 * t))
-        rows.append((bm.verts.new(left), bm.verts.new(mid), bm.verts.new(right)))
+    length_scale = 0.94 + 0.06 * math.sin(index * 1.73)
+    for row in range(SEPAL_LONGITUDINAL_SEGMENTS + 1):
+        t = row / SEPAL_LONGITUDINAL_SEGMENTS
+        along = SEPAL_LENGTH_M * length_scale * t
+        half_width = SEPAL_WIDTH_M * SEPAL_HALF_WIDTH_PROFILE[row]
+        tip_wave = 0.0007 * math.sin(index * 1.7 + t * math.pi)
+        centre_z = 0.002 + SEPAL_TIP_RISE_M * t + 0.004 * math.sin(math.pi * t) - 0.003 * t * t + tip_wave
+        mid = centre + radial * along + Vector((0.0, 0.0, centre_z))
+        row_vertices = []
+        for column in range(SEPAL_LATERAL_SEGMENTS + 1):
+            across_amount = -1.0 + 2.0 * column / SEPAL_LATERAL_SEGMENTS
+            point = mid - side * (half_width * across_amount)
+            point.z -= SEPAL_EDGE_CUP_M * SEPAL_HALF_WIDTH_PROFILE[row] * across_amount * across_amount
+            row_vertices.append(bm.verts.new(point))
+        rows.append(row_vertices)
     for row in range(len(rows) - 1):
-        for side_index in range(2):
+        for side_index in range(SEPAL_LATERAL_SEGMENTS):
             bm.faces.new((rows[row][side_index], rows[row + 1][side_index],
                           rows[row + 1][side_index + 1], rows[row][side_index + 1]))
 
@@ -106,7 +130,7 @@ def _sepal(bm, centre, radial, side, index):
 def build(A):
     lib.PLAIN["marigold_leaf"] = {"BaseColor": [0.19, 0.32, 0.12], "Roughness": 0.74}
     lib.PLAIN["marigold_stem"] = {"BaseColor": [0.25, 0.37, 0.15], "Roughness": 0.86}
-    lib.PLAIN["marigold_sepal"] = {"BaseColor": [0.96, 0.68, 0.055], "Roughness": 0.38}
+    lib.PLAIN["marigold_sepal"] = {"BaseColor": [0.98, 0.72, 0.065], "Roughness": 0.36}
     lib.PLAIN["marigold_centre"] = {"BaseColor": [0.79, 0.39, 0.035], "Roughness": 0.52}
 
     stems = bmesh.new()
@@ -139,7 +163,7 @@ def build(A):
             sepal_side = Vector((-sepal_radial.y, sepal_radial.x, 0.0))
             _sepal(flower_sepal_mesh, head, sepal_radial, sepal_side, sepal_index + flower_index)
         centre_sphere = bmesh.ops.create_uvsphere(
-            flower_centres, u_segments=8, v_segments=5, radius=0.006, calc_uvs=False)
+            flower_centres, u_segments=8, v_segments=5, radius=0.008, calc_uvs=False)
         for vert in centre_sphere["verts"]:
             vert.co += head + Vector((0.0, 0.0, 0.003))
 
