@@ -14,7 +14,7 @@ _BASE_INTERIOR_SHELL = _BASE._interior_shell
 
 NAME = "RatHollowRootArchBurrow"
 ASSET_ANCHORS_CM = {
-    "entrance_center": (-78.0, -1.0, 38.0),
+    "entrance_center": (-78.0, -1.0, 24.0),
     "entrance_threshold": (-78.0, -1.0, 3.0),
 }
 
@@ -22,15 +22,25 @@ RIM_SEGMENT_COUNT = 20
 ENTRANCE_RIM_GAP_SEGMENTS = (12, 13, 14, 15, 16, 17)
 ENTRANCE_FRONT_X_M = -0.78
 ENTRANCE_CENTER_Y_M = -0.01
-ENTRANCE_CENTER_Z_M = 0.47
+ENTRANCE_CENTER_Z_M = 0.24
+
+# Shape the interior mouth as a low, rat-sized root arch before it opens into
+# the broader shelter. Each row is (x, old center Y/Z, old radius Y/Z, new
+# center Y/Z, new radius Y/Z), in metres. Keeping the old geometry in the
+# recipe makes the deformation deterministic while preserving its ragged edge.
+ENTRANCE_MOUTH_RINGS = (
+    (-0.78, -0.01, 0.47, 0.275, 0.275, -0.01, 0.24, 0.18, 0.21),
+    (-0.60, -0.01, 0.47, 0.265, 0.260, -0.01, 0.31, 0.225, 0.235),
+    (-0.34,  0.00, 0.46, 0.245, 0.240,  0.00, 0.38, 0.235, 0.230),
+)
 
 # Match the original tunnel stations and lower only their underside into a
 # shallow, continuous floor ramp; the upper arch, outer bark, and overall size
 # remain unchanged.
 INTERIOR_FLOOR_STATIONS = (
-    (-0.78, 0.47, 0.275, 0.03),
-    (-0.60, 0.47, 0.260, 0.04),
-    (-0.34, 0.46, 0.240, 0.06),
+    (-0.78, 0.24, 0.210, 0.03),
+    (-0.60, 0.31, 0.235, 0.04),
+    (-0.34, 0.38, 0.230, 0.06),
     (-0.04, 0.44, 0.220, 0.09),
     (0.25, 0.42, 0.200, 0.12),
     (0.51, 0.40, 0.170, 0.16),
@@ -97,6 +107,21 @@ def _uv_trunk_axis(bm, tile):
 
 def _trunk_shell_with_broken_ground_entry():
     bm = _BASE_TRUNK_SHELL()
+    # The outer shell's front-inner ring defines the visible mouth. Compress
+    # that ring as well as the inner tunnel; otherwise the smaller tunnel only
+    # creates a dark annulus behind the original oversized circular opening.
+    (_, old_y, old_z, old_ry, old_rz,
+     new_y, new_z, new_ry, new_rz) = ENTRANCE_MOUTH_RINGS[0]
+    for vertex in bm.verts:
+        if abs(vertex.co.x - ENTRANCE_FRONT_X_M) > 0.03:
+            continue
+        normalized_y = (vertex.co.y - old_y) / old_ry
+        normalized_z = (vertex.co.z - old_z) / old_rz
+        if normalized_y * normalized_y + normalized_z * normalized_z > 1.25:
+            continue
+        vertex.co.y = new_y + normalized_y * new_ry
+        vertex.co.z = new_z + normalized_z * new_rz
+
     gap_segments = set(ENTRANCE_RIM_GAP_SEGMENTS)
     for face in list(bm.faces):
         # The source rim is deliberately irregular in X by up to 1.2 cm.
@@ -116,6 +141,14 @@ def _trunk_shell_with_broken_ground_entry():
 
 def _interior_shell_with_ground_ramp():
     bm = _BASE_INTERIOR_SHELL()
+    for vertex in bm.verts:
+        for (x, old_y, old_z, old_ry, old_rz,
+             new_y, new_z, new_ry, new_rz) in ENTRANCE_MOUTH_RINGS:
+            if abs(vertex.co.x - x) > 1e-3:
+                continue
+            vertex.co.y = new_y + (vertex.co.y - old_y) * (new_ry / old_ry)
+            vertex.co.z = new_z + (vertex.co.z - old_z) * (new_rz / old_rz)
+            break
     for vertex in bm.verts:
         station = min(INTERIOR_FLOOR_STATIONS, key=lambda item: abs(item[0] - vertex.co.x))
         x, center_z, radius_z, floor_z = station

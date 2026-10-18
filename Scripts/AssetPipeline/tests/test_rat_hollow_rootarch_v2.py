@@ -45,6 +45,39 @@ class RatHollowRootArchV2Tests(unittest.TestCase):
         self.assertEqual(floor_heights, sorted(floor_heights))
         self.assertLessEqual(max(b - a for a, b in zip(floor_heights, floor_heights[1:])), 0.14)
 
+    def test_mouth_is_rat_scale_and_transitions_into_the_shelter(self):
+        config = constants()
+        mouth = config["ENTRANCE_MOUTH_RINGS"][0]
+        _, _, _, _, _, center_y, center_z, radius_y, radius_z = mouth
+        width_cm = radius_y * 2 * 100
+        height_cm = radius_z * 2 * 100
+        self.assertAlmostEqual(width_cm, 36.0)
+        self.assertAlmostEqual(height_cm, 42.0)
+        self.assertAlmostEqual(config["ASSET_ANCHORS_CM"]["entrance_center"][2], center_z * 100)
+
+        # The aperture leaves 10 cm on each side and 18 cm over the 16 x 24 cm
+        # Rat capsule resting at the 3 cm threshold.
+        self.assertGreaterEqual((width_cm - 16.0) / 2, 10.0)
+        threshold_z = config["ASSET_ANCHORS_CM"]["entrance_threshold"][2]
+        overhead_clearance_cm = (center_z + radius_z) * 100 - threshold_z - 24.0
+        self.assertAlmostEqual(overhead_clearance_cm, 18.0)
+
+        # The inner tunnel grows after the narrow mouth, rather than staying a
+        # cramped 36 cm pipe through the whole fallen trunk.
+        self.assertGreater(config["ENTRANCE_MOUTH_RINGS"][1][7] * 2, radius_y * 2)
+        self.assertGreater(config["ENTRANCE_MOUTH_RINGS"][2][7] * 2, radius_y * 2)
+
+    def test_visible_outer_lip_is_deformed_to_match_the_rat_scale_mouth(self):
+        source = ASSET_SCRIPT.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(ASSET_SCRIPT))
+        functions = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        trunk_source = ast.get_source_segment(source, functions["_trunk_shell_with_broken_ground_entry"])
+        self.assertIn("ENTRANCE_MOUTH_RINGS[0]", trunk_source)
+        self.assertIn("normalized_y * normalized_y + normalized_z * normalized_z", trunk_source)
+
     def test_simple_collision_keeps_the_rat_capsule_clear_of_the_tunnel(self):
         config = constants()
         boxes = config["COLLISION_BOXES"]
