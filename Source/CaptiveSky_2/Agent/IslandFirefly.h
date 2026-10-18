@@ -38,6 +38,8 @@ public:
 	static float RainWingBeatScale(float RainIntensity);
 	/** Firefly contrast gently yields to moonlight without going dark. */
 	static float MoonlightGlowScale(float LunarIllumination);
+	/** Keep a small daytime hover, opening into a wider flight pattern after dusk. */
+	static float DaylightWanderScale(float CurrentHour);
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();

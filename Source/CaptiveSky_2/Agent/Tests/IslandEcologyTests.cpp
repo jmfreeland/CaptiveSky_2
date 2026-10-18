@@ -1161,6 +1161,16 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Firefly moonlight response changes smoothly through the phase"),
 		AIslandFirefly::MoonlightGlowScale(1.f) < AIslandFirefly::MoonlightGlowScale(0.5f) &&
 		AIslandFirefly::MoonlightGlowScale(0.5f) < AIslandFirefly::MoonlightGlowScale(0.f));
+	TestTrue(TEXT("A daytime firefly keeps a small home-centered hover"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(12.f), 0.22f));
+	TestTrue(TEXT("Nightfall opens the firefly's full wandering range"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(0.f), 1.f));
+	TestTrue(TEXT("Dusk gradually expands the wander range"),
+		AIslandFirefly::DaylightWanderScale(18.5f) > AIslandFirefly::DaylightWanderScale(12.f) &&
+		AIslandFirefly::DaylightWanderScale(18.5f) < AIslandFirefly::DaylightWanderScale(0.f));
+	TestTrue(TEXT("Wander activity wraps at a full day and safely handles invalid time"),
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(36.f), AIslandFirefly::DaylightWanderScale(12.f)) &&
+		FMath::IsNearlyEqual(AIslandFirefly::DaylightWanderScale(std::numeric_limits<float>::quiet_NaN()), 1.f));
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues()
 		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)

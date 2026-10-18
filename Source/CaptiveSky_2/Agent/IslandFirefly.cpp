@@ -217,6 +217,16 @@ float AIslandFirefly::MoonlightGlowScale(float LunarIllumination)
 	return FMath::Lerp(1.f, 0.72f, FMath::Clamp(LunarIllumination, 0.f, 1.f));
 }
 
+float AIslandFirefly::DaylightWanderScale(float CurrentHour)
+{
+	if (!FMath::IsFinite(CurrentHour)) return 1.f;
+
+	// During bright hours the firefly stays close to its home point; twilight
+	// gradually opens the larger, slow night-flight loop.
+	constexpr float DaytimeWander = 0.22f;
+	return DaytimeWander + (1.f - DaytimeWander) * AIslandDayNight::NightAmount(CurrentHour);
+}
+
 FVector AIslandFirefly::ResolveFlightPath(const FVector& Start, const FVector& Desired) const
 {
 	UWorld* World = GetWorld();
@@ -317,10 +327,14 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float RainActivityFactor = RainActivity(Rain);
 	const float MotionTime = T * MotionRate;
+	const float CircadianWander = DayNight.IsValid()
+		? DaylightWanderScale(DayNight->CurrentHour)
+		: 1.f;
+	const float WeatherWander = RainMovementScale(Rain);
 	const FVector Offset(
-		WanderRadius * RainMovementScale(Rain) * (0.72f * FMath::Sin(MotionTime * 0.31f + Phase) + 0.28f * FMath::Sin(MotionTime * 0.17f + Phase * 1.7f)),
-		WanderRadius * 0.65f * RainMovementScale(Rain) * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
-		FMath::Lerp(HoverHeight, 22.f, RainActivityFactor) + FMath::Lerp(34.f, 10.f, RainActivityFactor) * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
+		WanderRadius * WeatherWander * CircadianWander * (0.72f * FMath::Sin(MotionTime * 0.31f + Phase) + 0.28f * FMath::Sin(MotionTime * 0.17f + Phase * 1.7f)),
+		WanderRadius * 0.65f * WeatherWander * CircadianWander * (0.7f * FMath::Sin(MotionTime * 0.23f + Phase * 2.1f) + 0.3f * FMath::Sin(MotionTime * 0.41f + Phase)),
+		FMath::Lerp(HoverHeight, 22.f, RainActivityFactor) + CircadianWander * FMath::Lerp(34.f, 10.f, RainActivityFactor) * FMath::Sin(MotionTime * 0.73f + Phase * 1.3f));
 	const FVector Wind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	const FVector ChimeDisplacement = ChimeResponseRemaining > 0.f
 		? EvaluateChimeResponseDisplacement(ChimeResponseDirection, ChimeResponseElapsed)
