@@ -65,6 +65,25 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	if (Loaded.Leaves.Num() > 0) TestEqual(TEXT("A leaf keeps its author"), Loaded.Leaves.Last().AgentId, State.Leaves.Last().AgentId);
 	TestFalse(TEXT("Garbage is rejected"), Loaded.FromJson(TEXT("not json")));
 	TestFalse(TEXT("A future version is rejected"), Loaded.FromJson(TEXT("{\"version\":99}")));
+	const int32 LeavesBeforeInvalidVersion = Loaded.Leaves.Num();
+	TestFalse(TEXT("A fractional schema version is rejected"), Loaded.FromJson(TEXT("{\"version\":1.5}")));
+	TestEqual(TEXT("An invalid schema leaves the current basin memory untouched"), Loaded.Leaves.Num(), LeavesBeforeInvalidVersion);
+
+	FIslandBasinState LeafRecovery;
+	TestTrue(TEXT("A malformed offering does not discard readable basin state"), LeafRecovery.FromJson(
+		TEXT("{\"version\":1,\"placed\":true,\"location\":[0,0,0],\"water\":0.6,\"leaves\":["
+		"{\"agent\":\"fractional-day\",\"day\":2.5,\"seed\":7},"
+		"{\"agent\":\"overflow-seed\",\"day\":3,\"seed\":1e100},"
+		"{\"agent\":\"valid-offering\",\"day\":4,\"seed\":17}]}")));
+	TestTrue(TEXT("Readable placement and water survive malformed offerings"),
+		LeafRecovery.bPlaced && FMath::IsNearlyEqual(LeafRecovery.Water, 0.6f));
+	TestEqual(TEXT("Malformed day and seed records are skipped"), LeafRecovery.Leaves.Num(), 1);
+	if (LeafRecovery.Leaves.Num() == 1)
+	{
+		TestEqual(TEXT("The valid offering's author is retained"), LeafRecovery.Leaves[0].AgentId, FString(TEXT("valid-offering")));
+		TestEqual(TEXT("The valid offering's day is retained"), LeafRecovery.Leaves[0].Day, 4);
+		TestEqual(TEXT("The valid offering's seed is retained"), LeafRecovery.Leaves[0].Seed, 17);
+	}
 	TestTrue(TEXT("A malformed placement coordinate does not discard otherwise readable basin state"),
 		Loaded.FromJson(TEXT("{\"version\":1,\"placed\":true,\"location\":[12,\"west\",34],\"water\":0.6,\"leaves\":[]}")));
 	TestFalse(TEXT("A non-numeric saved position cannot materialize the basin at an invalid location"), Loaded.bPlaced);

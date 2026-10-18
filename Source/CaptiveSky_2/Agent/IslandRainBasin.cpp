@@ -24,6 +24,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UObject/ConstructorHelpers.h"
+#include <cmath>
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandRainBasin, Log, All);
 
@@ -101,7 +102,8 @@ bool FIslandBasinState::FromJson(const FString& Json)
 	TSharedPtr<FJsonObject> Root;
 	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid()) return false;
 	double Version = 0;
-	if (!Root->TryGetNumberField(TEXT("version"), Version) || static_cast<int32>(Version) != BasinVersion) return false;
+	if (!Root->TryGetNumberField(TEXT("version"), Version) || !FMath::IsFinite(Version) ||
+		Version != static_cast<double>(BasinVersion)) return false;
 	FIslandBasinState Loaded;
 	Root->TryGetBoolField(TEXT("placed"), Loaded.bPlaced);
 	const TArray<TSharedPtr<FJsonValue>>* Where = nullptr;
@@ -131,15 +133,22 @@ bool FIslandBasinState::FromJson(const FString& Json)
 	{
 		for (const TSharedPtr<FJsonValue>& Value : *LeafValues)
 		{
+			if (Loaded.Leaves.Num() >= MaxLeaves) break;
 			const TSharedPtr<FJsonObject>* Object = nullptr;
 			if (!Value.IsValid() || !Value->TryGetObject(Object) || !Object) continue;
 			FIslandBasinLeaf Leaf;
 			double Day = 0, Seed = 0;
-			if (!(*Object)->TryGetStringField(TEXT("agent"), Leaf.AgentId) || !(*Object)->TryGetNumberField(TEXT("day"), Day)) continue;
-			(*Object)->TryGetNumberField(TEXT("seed"), Seed);
+			if (!(*Object)->TryGetStringField(TEXT("agent"), Leaf.AgentId) ||
+				!(*Object)->TryGetNumberField(TEXT("day"), Day)) continue;
+			if ((*Object)->HasField(TEXT("seed")) && !(*Object)->TryGetNumberField(TEXT("seed"), Seed)) continue;
+			if (!FMath::IsFinite(Day) || Day < 0.0 || Day > TNumericLimits<int32>::Max() || std::floor(Day) != Day ||
+				!FMath::IsFinite(Seed) || Seed < TNumericLimits<int32>::Min() || Seed > TNumericLimits<int32>::Max() || std::floor(Seed) != Seed)
+			{
+				continue;
+			}
 			Leaf.Day = static_cast<int32>(Day);
 			Leaf.Seed = static_cast<int32>(Seed);
-			if (Loaded.Leaves.Num() < MaxLeaves) Loaded.Leaves.Add(Leaf);
+			Loaded.Leaves.Add(Leaf);
 		}
 	}
 	*this = Loaded;
