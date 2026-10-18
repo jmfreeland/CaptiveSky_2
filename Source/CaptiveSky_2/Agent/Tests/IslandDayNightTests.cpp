@@ -54,6 +54,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A clear sky shows the moon"), AIslandDayNight::IsMoonHiddenByCloud(0.7f, 1.f, 0.1f));
 	TestFalse(TEXT("A set moon is not described as hidden"), AIslandDayNight::IsMoonHiddenByCloud(-0.5f, 1.f, 0.95f));
 	TestFalse(TEXT("Daylight cloud does not mention the moon"), AIslandDayNight::IsMoonHiddenByCloud(0.7f, 0.f, 0.95f));
+	TestTrue(TEXT("Sunrise is announced just before and after 06:00"),
+		!AIslandDayNight::DescribeSunEdge(5.75f).IsEmpty() && !AIslandDayNight::DescribeSunEdge(6.25f).IsEmpty());
+	TestTrue(TEXT("Sunset is announced just before and after 18:00"),
+		!AIslandDayNight::DescribeSunEdge(17.75f).IsEmpty() && !AIslandDayNight::DescribeSunEdge(18.25f).IsEmpty());
+	TestTrue(TEXT("Midday and midnight say nothing about the sun's edge"),
+		AIslandDayNight::DescribeSunEdge(12.f).IsEmpty() && AIslandDayNight::DescribeSunEdge(0.f).IsEmpty());
+	TestTrue(TEXT("Non-finite hours are harmless"), AIslandDayNight::DescribeSunEdge(NAN).IsEmpty());
 	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
 	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
 	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));

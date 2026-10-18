@@ -98,6 +98,17 @@ float AIslandDayNight::MoonHeight(int32 IslandDay, float IslandHour)
 	return FMath::Sin(SunAngle - LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI);
 }
 
+FString AIslandDayNight::DescribeSunEdge(float IslandHour)
+{
+	if (!FMath::IsFinite(IslandHour)) return FString();
+	const float Hour = WrapHour(IslandHour);
+	if (Hour >= 5.5f && Hour < 6.f) return TEXT(" The sky is paling; the sun is about to rise.");
+	if (Hour >= 6.f && Hour < 6.5f) return TEXT(" The sun has just cleared the horizon and the light is low and gold.");
+	if (Hour >= 17.5f && Hour < 18.f) return TEXT(" The sun is nearly touching the horizon and the light is low and gold.");
+	if (Hour >= 18.f && Hour < 18.5f) return TEXT(" The sun has just set and the last colour is draining from the sky.");
+	return FString();
+}
+
 bool AIslandDayNight::IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover)
 {
 	if (!FMath::IsFinite(MoonElevation) || !FMath::IsFinite(Night) || !FMath::IsFinite(CloudCover)) return false;
@@ -332,10 +343,11 @@ FString AIslandDayNight::DescribeTime() const
 			CloudNow = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
 			break;
 		}
+	const FString SunEdge = DescribeSunEdge(CurrentHour);
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s"),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *Hidden);
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s"),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(
