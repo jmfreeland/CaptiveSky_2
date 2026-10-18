@@ -97,6 +97,11 @@ float AIslandDayNight::CloudSkylightTransmission(float CloudCover)
 	return FMath::Lerp(1.f, 0.70f, FMath::Clamp(CloudCover, 0.f, 1.f));
 }
 
+float AIslandDayNight::CloudMoonlightTransmission(float CloudCover)
+{
+	return FMath::Lerp(1.f, OvercastMoonlightFloor, FMath::Clamp(CloudCover, 0.f, 1.f));
+}
+
 void AIslandDayNight::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -254,7 +259,7 @@ void AIslandDayNight::UpdateLighting()
 	// Intermediate phases therefore shift the moon's rise and set through the night.
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
-		NightAmount(CurrentHour));
+		NightAmount(CurrentHour) * CloudMoonlightTransmission(CloudCover));
 	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
 	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
 	if (Sky) Sky->GetLightComponent()->SetIntensity(

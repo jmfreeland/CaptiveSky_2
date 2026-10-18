@@ -41,6 +41,8 @@ public:
 	static constexpr float NightSkylightFloor = 2.5f;
 	/** Share of full-moon light the moon keeps at new moon (starlit night) so the Island never goes pitch black. */
 	static constexpr float NewMoonLightFloor = 0.45f;
+	/** Share of clear-sky moonlight that reaches the ground under full cloud cover. */
+	static constexpr float OvercastMoonlightFloor = 0.35f;
 	/** Approximate synodic month used for the repeating Island moon-light cycle. */
 	static constexpr double LunarCycleDays = 29.53059;
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
@@ -75,6 +77,7 @@ public:
 	static float MoonlightScale(float LunarIlluminationAmount);
 	static float CloudSunlightTransmission(float CloudCover);
 	static float CloudSkylightTransmission(float CloudCover);
+	static float CloudMoonlightTransmission(float CloudCover);
 	FString DescribeTime() const;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnConstruction(const FTransform& Transform) override;

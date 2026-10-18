@@ -51,6 +51,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Clear weather leaves daylight unchanged"), FMath::IsNearlyEqual(AIslandDayNight::CloudSunlightTransmission(0.f), 1.f) && FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(0.f), 1.f));
 	TestTrue(TEXT("Overcast modestly softens direct sunlight"), FMath::IsNearlyEqual(AIslandDayNight::CloudSunlightTransmission(1.f), 0.76f));
 	TestTrue(TEXT("Overcast gently softens ambient skylight"), FMath::IsNearlyEqual(AIslandDayNight::CloudSkylightTransmission(1.f), 0.70f));
+	TestTrue(TEXT("Clear skies preserve full moonlight while overcast blocks most direct moonlight"),
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(0.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(1.f), AIslandDayNight::OvercastMoonlightFloor));
+	TestTrue(TEXT("Clouds attenuate moonlight smoothly and more strongly than daylight"),
+		AIslandDayNight::CloudMoonlightTransmission(0.75f) < AIslandDayNight::CloudMoonlightTransmission(0.25f) &&
+		AIslandDayNight::CloudMoonlightTransmission(0.75f) < AIslandDayNight::CloudSkylightTransmission(0.75f));
+	TestTrue(TEXT("Moonlight transmission clamps invalid cloud-cover bounds"),
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(-1.f), 1.f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::CloudMoonlightTransmission(2.f), AIslandDayNight::OvercastMoonlightFloor));
 	TestTrue(TEXT("Cloud illumination remains bounded for out-of-range input"), AIslandDayNight::CloudSunlightTransmission(2.f) == AIslandDayNight::CloudSunlightTransmission(1.f));
 
 	if (!TestNotNull(TEXT("Engine is available for the lighting fixture"), GEngine)) return false;
@@ -232,7 +241,14 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A dark full-moon midnight reveals every star group"), bAllStarGroupsVisible);
 	TestTrue(TEXT("Midnight extinguishes direct sunlight"), Sun->GetLightComponent()->Intensity <= 0.001f);
 	TestTrue(TEXT("A clear near-full-moon midnight keeps moonlight active"), FMath::IsNearlyEqual(Clock->Moon->Intensity,
-		Clock->MoonIntensity * AIslandDayNight::MoonlightScale(AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour)), 0.001f));
+		Clock->MoonIntensity * AIslandDayNight::MoonlightScale(AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour)) *
+		AIslandDayNight::CloudMoonlightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));
+	const float ClearMoonlight = Clock->Moon->Intensity;
+	Weather->WeatherSeed = OvercastSeed;
+	Clock->UpdateLighting();
+	TestTrue(TEXT("Overcast clouds attenuate the actual moonlight component"), Clock->Moon->Intensity < ClearMoonlight);
+	Weather->WeatherSeed = ClearSeed;
+	Clock->UpdateLighting();
 	TestTrue(TEXT("The ambient sky retains the tested low-light visibility floor"),
 		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,
 			AIslandDayNight::NightSkylightFloor * AIslandDayNight::CloudSkylightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));
