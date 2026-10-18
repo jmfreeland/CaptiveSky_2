@@ -74,6 +74,9 @@ a{color:var(--c)}
 <p class="lead">Developer console: <code>Island.Hour &lt;h&gt;</code> and <code>Island.Day &lt;n&gt;</code> jump the clock and calendar (day 1 is a new moon), <code>Island.Storm</code> forces a storm, <code>Island.Dew</code>, <code>Island.Sea</code> and <code>Island.Rainbow</code> force their effects.</p>
 <p class="lead">A cold build takes about seven minutes; incremental ones a few seconds. Tests run headless with no model requests.</p>
 
+<h2>Health check</h2>
+<p class="lead">Headless <code>CaptiveSky2.Agent</code> run on 2026-10-18 (<a href="../findings/2026-10-18-agent-suite-headless-baseline.md">baseline</a>): 79 passed, 8 failed, then two failures were fixed as test bugs (periwinkle wrapped hour, dew settling). Six remain, mostly tests that need a possessed player character or the real agent folders and may be artefacts of the headless scratch project: Innkeeper spawn, Ocean wake, Listening Stones, NightEcology, Minnows, Wind Arch. Rerun them in the main project before treating them as regressions.</p>
+
 <h2>Where to look</h2>
 <div class="grid">
 <div class="card"><h3><a href="../../README.md">README.md</a></h3><p>Vision and the dated design record.</p></div>
@@ -83,5 +86,5 @@ a{color:var(--c)}
 <div class="card"><h3><a href="../ecology/">ecology/</a></h3><p>One note per living system.</p></div>
 <div class="card"><h3><a href="../worldbuilding-ideas.md">worldbuilding-ideas.md</a></h3><p>Weekly idea branches.</p></div>
 </div>
-<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 12). Text companion: <code>docs/README.md</code>.</p>
+<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 16). Text companion: <code>docs/README.md</code>.</p>
 </main></body></html>
