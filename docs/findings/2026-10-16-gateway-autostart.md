@@ -47,3 +47,17 @@ TCP/443 connection. Its startup transcript reports readiness passed, with the
 Discord token and LLM key present (values not logged here). This confirms the
 current gateway is alive and connected, but does not prove a fresh logon-trigger
 start; no logout or restart was performed.
+
+## Current session recheck — 2026-10-18 03:03 UTC
+
+An elevated, read-only `schtasks /Query` still reports the task **Enabled** and
+**Running**, with the logon trigger and hidden launcher intact. `tasklist`
+returned the existing `dotnet.exe` PID 23140 and `CaptiveSky.Gateway.exe` PID
+27696. A read-only `Get-NetTCPConnection` query found one established TCP/443
+connection owned by PID 27696. This is consistent with the gateway's Discord
+socket being connected; it is not an end-to-end message-receipt test. No task
+was started, no process was duplicated, and no Discord message was sent.
+
+The newest gateway transcript remains from 2026-10-16, and the Raven memory
+file's latest entries remain dated 2026-10-12. Therefore the current process
+and socket are live, but there is no newer conversation evidence to review.
