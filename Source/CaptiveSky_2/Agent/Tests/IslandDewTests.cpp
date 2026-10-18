@@ -141,10 +141,12 @@ bool FIslandDewRuntimeTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("The instance pool is allocated once and bounded"), Glints->GetInstanceCount(), AIslandDewActor::MaxGlints);
 			TestTrue(TEXT("Initial seating uploads only a bounded batch"), Dew->GetLastTransformUploadCount() <= 48);
 
-			for (int32 SeatPass = 0; SeatPass < 3; ++SeatPass)
+			// Seating is rate-limited per tick, so let the pool settle (bounded) before checking it stays quiet.
+			for (int32 SeatPass = 0; SeatPass < 8 && Dew->GetLastTransformUploadCount() > 0; ++SeatPass)
 			{
 				Dew->Advance(FirstView, 0.5f);
 			}
+			Dew->Advance(FirstView, 0.5f);
 			TestEqual(TEXT("A stationary view does not re-upload unchanged glint transforms"), Dew->GetLastTransformUploadCount(), 0);
 
 			FTransform FirstTransform;

@@ -14,7 +14,7 @@ on the parent commit, so "pre-existing" is an inference from the failing asserti
 
 | Test | First failing assertion |
 |---|---|
-| `IslandDewRuntime` | A stationary view does not re-upload unchanged glint transforms (expected 0, was 36) |
+| `IslandDewRuntime` | **Fixed** (test assumed three settling passes; the 180-glint pool needs four at 48 seats per tick, so it now settles in a bounded loop) |
 | `IslandInnkeeperSpawn` | The independent identity / personality documents load from their own agent folder |
 | `IslandOcean` | Moving across the ocean leaves one short water wake (expected 1, was 0) |
 | `ListeningStonePresentation` | The staged visitor is player-controlled |
@@ -28,8 +28,7 @@ Patterns worth checking before treating these as regressions:
   player controller possessing a staged character; a headless `-NullRHI` run without Content/a game viewport may not
   provide one.
 - `IslandInnkeeperSpawn` reads `Agents/Agent_Innkeeper_01/`; the scratch project has its own `Agents/` folder.
-- The periwinkle wrapped-hour check compares floats with the default tolerance and may be a rounding issue like the
-  one fixed in the DayNight moonlight checks (`57d9800`).
+- The periwinkle failure turned out to be a test bug (see the table), not float rounding.
 
 Next step for whoever owns each area: rerun the failing test in the main project's own automation environment to
 separate environment artefacts from real regressions.
