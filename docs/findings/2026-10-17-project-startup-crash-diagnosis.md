@@ -16,6 +16,10 @@ This is separate from the managed `0xE0434352` UBT/Turnkey failures recorded in 
 
 Do not repeat the same project launch with the same command line. First obtain matching UE 5.8.3 symbols (or another usable dump debugger). Then reproduce once with a known-idle desktop, a bounded timeout, a unique log path, and the smallest meaningful change to tracing/metadata startup. Compare the resulting symbolized stack and whether the crash occurs before or after `StartOfEnginePreInit`. Keep the user's editor and unsaved work untouched.
 
+## Obtaining the matching editor symbols
+
+A fresh read-only inventory of `D:\Games\Epic\UE_5.8` found no `UnrealEditor-Core.pdb`, related editor PDBs, `cdb.exe`, or WinDbg executable anywhere under the engine installation. The installed build is UE 5.8.3, changelist 58210709 (`++UE5+Release-5.8`). Epic's [UE 5.8 installation guide](https://dev.epicgames.com/documentation/en-us/unreal-engine/install-unreal-engine) lists **Editor symbols for debugging** as an optional engine component and documents modifying an existing installation through **Epic Games Launcher → Unreal Engine → Library → engine tile menu → Options → Editor symbols for debugging → Apply**. This is now the next concrete diagnostic step: after that component is installed, verify the matching Core PDB exists, then symbolize the existing dump before attempting another project launch.
+
 ## Current desktop check — 2026-10-18
 
 The desktop inventory reports the UE 5.8 editor as running with both a
@@ -33,3 +37,20 @@ version check; the discrepancy does not identify the project-open crash's
 cause. Avoid repeating either launch until the engine-only startup or desktop
 capture path behaves reliably, or a usable debugger/symbol set becomes
 available.
+
+## Bounded Game recurrence — 2026-10-18 12:31
+
+A 45-second, zero-model-request `Start-Spectator.ps1` Game launch with agent
+thinking and Python disabled, isolated world data, and the Tideglass viewpoint
+probe exited before the Island reached world-ready. The crash artifact is
+`Saved/Crashes/_0000/CrashContext.runtime-xml`; its pre-init output is
+`Saved/Crashes/_0000/SpectatorStartup_20261018_123139_608.log`. The context again
+records a null-address access violation at `SecondsSinceStart=0` and the same
+`PCallStackHash` (`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`). The 311,718-byte
+`UEMinidump.dmp` has Core/Editor module offsets but no symbol names, and
+`IsWithDebugInfo=false`. The matching `UnrealEditor-Core.pdb` is still absent
+beside the installed 5.8.3 Core DLL; the log's trace-server warning is not
+evidence of cause. No screenshot or Island gameplay was produced. Keep the
+existing gate: obtain matching symbols or materially change the startup
+environment before another project-opening attempt. No Content asset or saved
+map was changed by this launch.
