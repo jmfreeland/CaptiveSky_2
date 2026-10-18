@@ -126,3 +126,23 @@ intertidal behavior. Do not repeat this launch unchanged. The periwinkle source
 change is compiled but remains runtime-unverified until the startup stack can
 be resolved or a meaningfully different known-good project-open path is
 established.
+
+## Live editor handle and linker lock — 2026-10-18
+
+The current Windows capture still returned Edge when targeting the listed
+`CaptiveSky_2 - Unreal Editor` window; one fresh `activate_window` attempt timed
+out after about 10 seconds. Although PowerShell did not enumerate an
+`UnrealEditor` process, an elevated UE 5.8.3 build gave authoritative evidence
+that `D:\Games\Epic\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe` is still
+holding the project module
+`Binaries\Win64\UnrealEditor-CaptiveSky_2.dll`. UBT waited 20 seconds for the
+DLL, then failed at the link step with Windows' file-in-use error. No source
+compilation or successful relink was reported, and the editor was not killed.
+
+Treat this as an inaccessible, likely unresponsive live editor—not a confirmed
+process exit. Do not retry the editor-target link or overwrite the loaded DLL
+until the editor has exited through a controlled route. The user previously
+asked to leave the unresponsive editor running, so wait for their direction
+before closing it; project-open preview attempts also remain gated on resolving
+the known Core startup crash. This does not explain that crash or establish
+whether the editor window itself is responsive.
