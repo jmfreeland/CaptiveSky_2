@@ -14,6 +14,9 @@ bool FIslandCommonFrogTests::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Distant observers do not startle it"), Frog::ShouldHopFromObserver(241.f, 0.f));
 	TestFalse(TEXT("An observer above the local height band is ignored"), Frog::ShouldHopFromObserver(100.f, 181.f));
 	TestFalse(TEXT("Invalid distances are ignored"), Frog::ShouldHopFromObserver(std::numeric_limits<float>::infinity(), 0.f));
+	TestTrue(TEXT("A nearby actively scurrying crab can startle the frog"), Frog::ShouldHopFromScurryingCrab(true, 180.f, 35.f));
+	TestFalse(TEXT("A settled crab is not a startle cue"), Frog::ShouldHopFromScurryingCrab(false, 180.f, 35.f));
+	TestFalse(TEXT("A scurrying crab outside the local band is ignored"), Frog::ShouldHopFromScurryingCrab(true, 241.f, 0.f));
 	TestFalse(TEXT("A lingering visitor does not rearm at the boundary"), Frog::ShouldRearmFromObserver(520.f, 520.f));
 	TestTrue(TEXT("A visitor must retreat beyond the wider ring to rearm"), Frog::ShouldRearmFromObserver(521.f, 520.f));
 	TestFalse(TEXT("Invalid rearm distances are ignored"), Frog::ShouldRearmFromObserver(521.f,

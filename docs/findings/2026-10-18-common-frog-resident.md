@@ -20,6 +20,9 @@ the silhouette. This is deliberately a fallback, not the final art review.
   retreat beyond 520 cm to rearm. A shared seven-second cooldown prevents
   overlapping disturbances from chaining hops; flying Ravens and sleeping Rats
   do not startle it.
+- A shore crab only startles the frog while actively scurrying inside the same
+  close, low observer band. A completed scurry rearms the response, so a
+  resting crab is not a cue and one event cannot repeatedly trigger hops.
 - Hop arcs last 0.48 seconds and stay within 420 cm of the animal's original
   habitat. Ground destinations must pass a static-world trace and slope/height
   bounds.
@@ -31,13 +34,14 @@ the silhouette. This is deliberately a fallback, not the final art review.
 ## Validation and limits
 
 `Source/CaptiveSky_2/Agent/Tests/IslandCommonFrogTests.cpp` covers observer
-limits, rearming distance, invalid inputs, activity ordering, and hop shape.
+limits, rearming distance, scurrying-crab state gating, invalid inputs,
+activity ordering, and hop shape.
 The source-only UE 5.8.3 target
 `Saved/CompileScratch/Codex_CurrentSourceBuild_20261018` rebuilt successfully
-after adding the Raven/Rat/player approach checks and Rat's read-only awake
-query. UHT completed, and the frog actor, Rat controller, and automation
-translation units compiled and linked. The automation cases themselves have
-not run in this pass.
+after adding the Raven/Rat/player approach checks, Rat's read-only awake query,
+and the scurrying-crab response. UHT completed, and the frog actor, Rat
+controller, and automation translation units compiled and linked. The
+automation cases themselves have not run in this pass.
 
 The targeted automation did not start: `UnrealEditor-Cmd.exe` crashed at
 `StartOfEnginePreInit` with a null-address access violation before test

@@ -5,6 +5,7 @@
 #include "IslandCommonFrog.generated.h"
 
 class AIslandDayNight;
+class AIslandTidepoolCrab;
 class AIslandWeather;
 class APawn;
 class ARatAgentAIController;
@@ -25,6 +26,7 @@ public:
 	/** A close, low approach can start one short hop away; distant/high observers are ignored. */
 	bool RespondToQuietObservation(const FVector& ObserverLocation);
 	static bool ShouldHopFromObserver(float DistanceCm, float VerticalOffsetCm);
+	static bool ShouldHopFromScurryingCrab(bool bCrabScurrying, float DistanceCm, float VerticalOffsetCm);
 	static bool ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm);
 	/** Rain and darkness encourage brief ambient movement; dry daylight remains restful. */
 	static float AmbientActivityScale(float RainIntensity, float NightAmount);
@@ -71,6 +73,7 @@ private:
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
+	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	FVector HomeLocation = FVector::ZeroVector;
 	FVector HopStartLocation = FVector::ZeroVector;
 	FVector HopTargetLocation = FVector::ZeroVector;

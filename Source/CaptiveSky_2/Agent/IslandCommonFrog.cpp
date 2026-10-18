@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "IslandDayNight.h"
+#include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
 #include "RatAgentAIController.h"
 #include "RavenAgentAIController.h"
@@ -152,6 +153,27 @@ void AIslandCommonFrog::CheckForNearbyWildlife()
 {
 	if (!GetWorld() || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
 
+	if (!CrabPresenceLatch.IsValid()) CrabPresenceLatch.Reset();
+	for (TActorIterator<AIslandTidepoolCrab> It(GetWorld()); It; ++It)
+	{
+		AIslandTidepoolCrab* Crab = *It;
+		if (!IsValid(Crab)) continue;
+		const bool bScurrying = Crab->IsScurrying();
+		const FVector Offset = Crab->GetActorLocation() - GetActorLocation();
+		const float Distance = Offset.Size2D();
+		if (CrabPresenceLatch.Get() == Crab && (!bScurrying ||
+			ShouldRearmFromObserver(Distance, FrogObserverRearmRadiusCm) ||
+			FMath::Abs(Offset.Z) > FrogObserverRearmHeightCm))
+			CrabPresenceLatch.Reset();
+		if (CrabPresenceLatch.Get() == Crab ||
+			!ShouldHopFromScurryingCrab(bScurrying, Distance, Offset.Z)) continue;
+		if (RespondToQuietObservation(Crab->GetActorLocation()))
+		{
+			CrabPresenceLatch = Crab;
+			return;
+		}
+	}
+
 	for (TActorIterator<ARavenAgentAIController> It(GetWorld()); It; ++It)
 	{
 		ARavenAgentAIController* Raven = *It;
@@ -199,6 +221,11 @@ bool AIslandCommonFrog::ShouldHopFromObserver(float DistanceCm, float VerticalOf
 {
 	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= FrogObserverRadiusCm &&
 		FMath::IsFinite(VerticalOffsetCm) && FMath::Abs(VerticalOffsetCm) <= FrogObserverHeightCm;
+}
+
+bool AIslandCommonFrog::ShouldHopFromScurryingCrab(bool bCrabScurrying, float DistanceCm, float VerticalOffsetCm)
+{
+	return bCrabScurrying && ShouldHopFromObserver(DistanceCm, VerticalOffsetCm);
 }
 
 bool AIslandCommonFrog::ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm)
