@@ -97,7 +97,7 @@ bool FIslandPeriwinkleNocturnalGrazingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Twilight activity transitions smoothly between day and night"),
 		DuskActivity > MiddayActivity && DuskActivity < NightActivity);
 	TestTrue(TEXT("Activity respects the clock's wrapped hour"),
-		FMath::IsNearlyEqual(Periwinkle::GrazingActivityForHour(24.f), MiddayActivity));
+		FMath::IsNearlyEqual(Periwinkle::GrazingActivityForHour(24.f), NightActivity));
 	TestTrue(TEXT("Invalid clock time safely preserves full grazing activity"),
 		FMath::IsNearlyEqual(Periwinkle::GrazingActivityForHour(std::numeric_limits<float>::quiet_NaN()), 1.f));
 	return true;

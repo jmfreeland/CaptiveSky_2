@@ -20,7 +20,7 @@ on the parent commit, so "pre-existing" is an inference from the failing asserti
 | `ListeningStonePresentation` | The staged visitor is player-controlled |
 | `NightEcology` | The periwinkle fully re-extends when the deterministic weather returns dry |
 | `TidepoolMinnows` | The school visibly widens rather than fleeing the pool (plus four later assertions) |
-| `TidepoolPeriwinkleNocturnalGrazing` | Activity respects the clock's wrapped hour (`GrazingActivityForHour(24)` vs `(12)`) |
+| `TidepoolPeriwinkleNocturnalGrazing` | **Fixed** (test bug: hour 24 wraps to hour 0, so it should equal night activity, not midday) |
 | `WindArchPresentation` | The test visitor is controlled by a player controller |
 
 Patterns worth checking before treating these as regressions:
