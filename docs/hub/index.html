@@ -74,6 +74,9 @@ a{color:var(--c)}
 <p class="lead">Developer console: <code>Island.Hour &lt;h&gt;</code> and <code>Island.Day &lt;n&gt;</code> jump the clock and calendar (day 1 is a new moon), <code>Island.SkyReport</code> logs the sky and sea text a resident would be told right now, <code>Island.Storm</code> forces a storm, <code>Island.Dew</code>, <code>Island.Sea</code> and <code>Island.Rainbow</code> force their effects.</p>
 <p class="lead">A cold build takes about seven minutes; incremental ones a few seconds. Tests run headless with no model requests.</p>
 
+<h2>Recent sky work</h2>
+<p class="lead">Commits <code>84b6442</code> to <code>5eacd9c</code>: named lunar phases, moon position, cloud-hidden moon, sunrise and sunset cues, an Island calendar, shooting stars and the sea state now reach residents through pure, tested functions. <code>Island.Day</code> and <code>Island.SkyReport</code> check them in game. The headless suite went from 8 failures to 4 along the way.</p>
+
 <h2>Health check</h2>
 <p class="lead">Headless <code>CaptiveSky2.Agent</code> run on 2026-10-18 (<a href="../findings/2026-10-18-agent-suite-headless-baseline.md">baseline</a>): 79 passed, 8 failed, then four failures were fixed as test bugs (periwinkle wrapped hour, dew settling, periwinkle wind tuck, minnow test drift). Four remain, mostly tests that need a possessed player character or the real agent folders and may be artefacts of the headless scratch project: Innkeeper spawn, Ocean wake, Listening Stones, Wind Arch. Rerun them in the main project before treating them as regressions.</p>
 
@@ -86,5 +89,5 @@ a{color:var(--c)}
 <div class="card"><h3><a href="../ecology/">ecology/</a></h3><p>One note per living system.</p></div>
 <div class="card"><h3><a href="../worldbuilding-ideas.md">worldbuilding-ideas.md</a></h3><p>Weekly idea branches.</p></div>
 </div>
-<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 20). Text companion: <code>docs/README.md</code>.</p>
+<p class="lead" style="margin-top:2em">Hub last updated 2026-10-18 (cycle 24). Text companion: <code>docs/README.md</code>.</p>
 </main></body></html>

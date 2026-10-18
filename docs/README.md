@@ -31,6 +31,7 @@ this file is the text version and the map of everything under `docs/`.
 - **Wildlife:** `IslandForestFox`, `IslandForestStag`, `IslandTideglassDragonfly`, `IslandWildlifeHome`, `IslandNest`.
 - **Lasting change:** `IslandWorldStateSubsystem` (persists to `WorldState/<Map>.json`), `IslandArrangement`, `IslandTrail`, `IslandChronicle`, `IslandGuestBook`, `IslandCurio`.
 - **Places:** `IslandInnHearthSubsystem`, `IslandInnkeeperSubsystem`, `IslandListeningStone*`, `IslandWindArch*`.
+- **Tooling and presentation:** `IslandSpectator` (camera for unattended captures), `IslandInstancedSkinnedFoliage` (skinned tree instances), `IslandMovementProbe` / `IslandNavProbe` (movement and navigation probes), `IslandAssetRequestQueue` (residents requesting art), `AgentDebugCommands`.
 - **Tests:** `Tests/` (`CaptiveSky2.Agent.*` automation, `CaptiveSky2.Visual.*` captures).
 
 ## What residents are told about the sky
@@ -50,6 +51,12 @@ UnrealEditor-Cmd.exe <scratch>\CaptiveSky_2.uproject -ExecCmds="Automation RunTe
 ```
 
 Cold build is about seven minutes. Tests are headless and make no model requests.
+
+## Recent sky work (commits `84b6442`..`5eacd9c`)
+
+Named lunar phases, the moon's position and cloud cover, sunrise and sunset cues, an Island calendar, shooting stars and
+the sea state all reach residents through pure, tested functions; `Island.Day` and `Island.SkyReport` were added for
+checking them in game. Along the way the headless suite went from 8 failures to 4 (see below).
 
 ## Test health
 
