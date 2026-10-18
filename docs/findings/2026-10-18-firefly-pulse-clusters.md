@@ -26,3 +26,17 @@ claimed. Once the project startup issue is meaningfully resolved and the editor
 releases the DLL, relink and run this focused test with model requests disabled,
 then inspect the effect in a real-RHI night view before judging its legibility
 or tuning the coupling.
+
+**Clean-project comparison (2026-10-18):** to avoid the main project's locked
+DLL and its copied scratch build history, a fresh scratch project was created
+from the current `.uproject`, `Config`, and `Source` only (no `Content`,
+`Binaries`, or `Intermediate`). UE 5.8.3 built and linked this independent
+target successfully in 637.23 seconds (176 actions), including the new actor
+and regression. Launching `CaptiveSky2.Agent.FireflyPulseClusters` with
+NullRHI, Python disabled, and zero model requests still crashed before the
+project log or test began: null access at `SecondsSinceStart=0`, with the same
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26` hash. Evidence is under
+`Saved/CompileScratch/Codex_FireflyPulseClean_20261018/Project/Saved/Crashes/_0000/`.
+This shows neither main `Content` nor copied build artifacts is needed to
+reproduce the startup failure; it does not distinguish among the project's
+startup modules/configuration. The automation assertions remain unexecuted.
