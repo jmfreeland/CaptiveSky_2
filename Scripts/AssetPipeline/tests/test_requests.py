@@ -186,6 +186,30 @@ class RequestInboxTests(unittest.TestCase):
         run.assert_not_called()
         self.assertEqual(asset_requests.read_records(self.inbox)[0]["pipeline"], "human_review")
 
+    def test_variation_upgrade_can_use_reviewed_asset_script(self):
+        request = {"id": "upgrade-variation", "requester": "Aster",
+                   "description": "Make a second, wind-bent variant of the existing perch",
+                   "request_type": "upgrade", "target": "WindArchPerch",
+                   "upgrade_kind": "variation", "pipeline": "human_review", "status": "accepted"}
+        self.inbox.write_text(json.dumps(request) + "\n", encoding="utf-8")
+        success_output = "[rathollow] build rc=0 exported=True\nPROBLEMS []\nVERIFY DONE\n"
+        with patch.object(asset_requests.subprocess, "run", return_value=subprocess.CompletedProcess(
+            [], 0, stdout=success_output, stderr=""
+        )) as run:
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "route", "upgrade-variation", "ComfyBlender"
+            ]), 0)
+            self.assertEqual(asset_requests.main([
+                "--inbox", str(self.inbox), "build", "upgrade-variation", "rathollow"
+            ]), 0)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][-1], "rathollow")
+        routed = asset_requests.read_records(self.inbox)[0]
+        self.assertEqual(routed["status"], "accepted")
+        self.assertEqual(routed["target"], "WindArchPerch")
+        self.assertEqual(routed["upgrade_kind"], "variation")
+        self.assertEqual(routed["pipeline"], "ComfyBlender")
+
     def test_invalid_or_missing_asset_script_never_launches_pipeline(self):
         accepted = {"id": "req-build", "requester": "Raven", "description": "A cover",
                     "status": "accepted", "request_type": "new_object", "pipeline": "ComfyBlender"}
