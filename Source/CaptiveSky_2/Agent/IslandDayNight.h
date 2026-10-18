@@ -77,6 +77,8 @@ public:
 	static const TCHAR* LunarPhaseName(float Progress);
 	/** Sine of the moon's elevation, -1..1, matching the direction UpdateLighting gives the Moon light. Pure. */
 	static float MoonHeight(int32 IslandDay, float IslandHour);
+	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
+	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
 	static float MoonlightScale(float LunarIlluminationAmount);
 	static float CloudSunlightTransmission(float CloudCover);

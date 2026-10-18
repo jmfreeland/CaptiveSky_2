@@ -98,6 +98,12 @@ float AIslandDayNight::MoonHeight(int32 IslandDay, float IslandHour)
 	return FMath::Sin(SunAngle - LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI);
 }
 
+bool AIslandDayNight::IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover)
+{
+	if (!FMath::IsFinite(MoonElevation) || !FMath::IsFinite(Night) || !FMath::IsFinite(CloudCover)) return false;
+	return MoonElevation > 0.1f && Night > 0.5f && CloudCover > 0.8f;
+}
+
 float AIslandDayNight::MoonlightScale(float LunarIlluminationAmount)
 {
 	return FMath::Lerp(NewMoonLightFloor, 1.f, FMath::Clamp(LunarIlluminationAmount, 0.f, 1.f));
@@ -319,8 +325,17 @@ FString AIslandDayNight::DescribeTime() const
 	const float MoonElevation = MoonHeight(DayNumber, CurrentHour);
 	const TCHAR* MoonPosition = MoonElevation > 0.6f ? TEXT("high in the sky") : MoonElevation > 0.1f ? TEXT("up in the sky") :
 		MoonElevation > -0.1f ? TEXT("at the horizon") : TEXT("below the horizon");
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight."),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition);
+	float CloudNow = 0.f;
+	if (GetWorld())
+		for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
+		{
+			CloudNow = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
+			break;
+		}
+	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
+		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s"),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *Hidden);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandHourCommand(

@@ -50,6 +50,10 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		AIslandDayNight::MoonHeight(1, 12.f) > 0.99f && AIslandDayNight::MoonHeight(1, 0.f) < -0.99f);
 	TestTrue(TEXT("A near-full moon is high at midnight and down at noon"),
 		AIslandDayNight::MoonHeight(15, 0.f) > 0.9f && AIslandDayNight::MoonHeight(15, 12.f) < -0.9f);
+	TestTrue(TEXT("Thick cloud hides a risen moon at night"), AIslandDayNight::IsMoonHiddenByCloud(0.7f, 1.f, 0.95f));
+	TestFalse(TEXT("A clear sky shows the moon"), AIslandDayNight::IsMoonHiddenByCloud(0.7f, 1.f, 0.1f));
+	TestFalse(TEXT("A set moon is not described as hidden"), AIslandDayNight::IsMoonHiddenByCloud(-0.5f, 1.f, 0.95f));
+	TestFalse(TEXT("Daylight cloud does not mention the moon"), AIslandDayNight::IsMoonHiddenByCloud(0.7f, 0.f, 0.95f));
 	TestEqual(TEXT("Cycle start is a new moon"), FString(AIslandDayNight::LunarPhaseName(0.f)), FString(TEXT("new moon")));
 	TestEqual(TEXT("A quarter of the way is first quarter"), FString(AIslandDayNight::LunarPhaseName(0.25f)), FString(TEXT("first quarter")));
 	TestEqual(TEXT("Half way is a full moon"), FString(AIslandDayNight::LunarPhaseName(0.5f)), FString(TEXT("full moon")));
