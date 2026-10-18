@@ -24,6 +24,9 @@ public:
 	static void Record(const UWorld* World, const FString& Type, const FString& Agent, const FString& Text,
 		const TMap<FString, FString>& Extra = TMap<FString, FString>());
 
+	/** The chronicle line for the moon moving to a new named phase; empty when the phase is unchanged or unknown. Pure. */
+	static FString MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase);
+
 	/** One JSON line (no trailing newline). Extra fields never replace the fixed ones. */
 	static FString FormatEntry(const FDateTime& Utc, int32 Day, const FString& Clock, const FString& Type,
 		const FString& Agent, const FString& Text, const TMap<FString, FString>& Extra);
@@ -53,6 +56,7 @@ private:
 	bool bClosing = false;
 	bool bSessionOpened = false;
 	int32 LastDay = 0;
+	FString LastMoonPhase;
 	FString LastClock;
 
 	void RefreshClock();

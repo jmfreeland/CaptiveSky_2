@@ -103,6 +103,12 @@ void UIslandChronicleSubsystem::Tick(float DeltaTime)
 	WatchSky();
 }
 
+FString UIslandChronicleSubsystem::MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase)
+{
+	if (PreviousPhase.IsEmpty() || CurrentPhase.IsEmpty() || PreviousPhase == CurrentPhase) return FString();
+	return FString::Printf(TEXT("The moon has moved on from the %s to the %s."), *PreviousPhase, *CurrentPhase);
+}
+
 void UIslandChronicleSubsystem::WatchSky()
 {
 	const UWorld* World = GetWorld();
@@ -113,10 +119,17 @@ void UIslandChronicleSubsystem::WatchSky()
 	{
 		if (LastDay <= 0) return;
 		bSessionOpened = true;
+		LastMoonPhase = AIslandDayNight::LunarPhaseName(AIslandDayNight::LunarPhaseProgress(LastDay, 0.f));
 		RecordEntry(TEXT("session"), FString(), TEXT("The Island wakes; a session begins."), { { TEXT("event"), TEXT("start") } });
 	}
 	else if (LastDay != PreviousDay)
+	{
 		RecordEntry(TEXT("day"), FString(), FString::Printf(TEXT("A new day begins on the Island: day %d."), LastDay), {});
+		const FString MoonNow = AIslandDayNight::LunarPhaseName(AIslandDayNight::LunarPhaseProgress(LastDay, 0.f));
+		const FString MoonText = MoonChangeText(LastMoonPhase, MoonNow);
+		if (!MoonText.IsEmpty()) RecordEntry(TEXT("sky"), FString(), MoonText, { { TEXT("event"), TEXT("moon_phase") } });
+		LastMoonPhase = MoonNow;
+	}
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
 		const float Storm = It->SampleStormIntensity(World->GetTimeSeconds());

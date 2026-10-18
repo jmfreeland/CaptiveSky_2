@@ -38,6 +38,10 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 	if (TestTrue(TEXT("An entry without an agent is valid"), Anonymous.IsValid()))
 		TestFalse(TEXT("It carries no agent field"), Anonymous->HasField(TEXT("agent")));
 
+	TestTrue(TEXT("A moon phase change is worded for the chronicle"),
+		UIslandChronicleSubsystem::MoonChangeText(TEXT("first quarter"), TEXT("waxing gibbous")).Contains(TEXT("waxing gibbous")));
+	TestTrue(TEXT("The same phase is not news"), UIslandChronicleSubsystem::MoonChangeText(TEXT("full moon"), TEXT("full moon")).IsEmpty());
+	TestTrue(TEXT("The first observation of a session is not a change"), UIslandChronicleSubsystem::MoonChangeText(FString(), TEXT("full moon")).IsEmpty());
 	UIslandChronicleSubsystem* Chronicle = NewObject<UIslandChronicleSubsystem>(GetTransientPackage());
 	TestTrue(TEXT("Without a world or a file there is nowhere to write"), Chronicle->GetChroniclePath().IsEmpty());
 	TestFalse(TEXT("So nothing is written"), Chronicle->AppendLine(TEXT("{}")));

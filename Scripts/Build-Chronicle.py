@@ -69,7 +69,7 @@ def describe(entry: dict) -> str | None:
         return f"{who} wrote in the guest book: {quote(text)}"
     if kind in LASTING:
         return f"{who} {text}" if entry.get("agent") else text[:1].upper() + text[1:]
-    if kind in ("weather", "day"):
+    if kind in ("weather", "day", "sky"):
         return text
     return None
 
