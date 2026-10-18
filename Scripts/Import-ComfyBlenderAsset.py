@@ -20,6 +20,9 @@ import unreal
 
 ASSET_NAME = os.environ.get("COMFYBLENDER_ASSET", "NoticeBoard")
 DESTINATION_NAME = os.environ.get("COMFYBLENDER_DESTINATION", ASSET_NAME)
+# Shared Library/Textures land in /Library by default; set this to a new simple folder name to keep a trial
+# import from replacing textures that other generated props already use.
+LIBRARY_NAME = os.environ.get("COMFYBLENDER_LIBRARY_DESTINATION", "Library")
 PROJECT_DIR = unreal.Paths.project_dir()
 SOURCE_ROOT = os.path.realpath(os.environ.get(
     "COMFYBLENDER_SOURCE_ROOT",
@@ -251,6 +254,8 @@ def verify_import(manifest, mesh, assignments, collisions):
 def run():
     if not re.fullmatch(r"[A-Za-z0-9_]+", ASSET_NAME):
         raise ValueError("COMFYBLENDER_ASSET must be a simple asset folder name")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", LIBRARY_NAME):
+        raise ValueError("COMFYBLENDER_LIBRARY_DESTINATION must be a simple asset folder name")
     if not re.fullmatch(r"[A-Za-z0-9_]+", DESTINATION_NAME):
         raise ValueError("COMFYBLENDER_DESTINATION must be a simple asset folder name")
     asset_dir = os.path.realpath(os.path.join(SOURCE_ROOT, ASSET_NAME))
@@ -281,7 +286,7 @@ def run():
     texture_folder = asset_path + "/Textures"
     unreal.EditorAssetLibrary.make_directory(texture_folder)
     shared_texture_root = os.path.realpath(os.path.join(SOURCE_ROOT, "Library", "Textures"))
-    shared_library_path = DEST_ROOT + "/Library"
+    shared_library_path = DEST_ROOT + "/" + LIBRARY_NAME
     unreal.EditorAssetLibrary.make_directory(shared_library_path)
     shared_textures = []
     asset_textures = []
