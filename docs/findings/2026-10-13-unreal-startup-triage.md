@@ -92,3 +92,28 @@ It is not installed in the current engine directory. After the component is
 added, verify that its symbols match the installed 5.8.3 binaries before
 opening the minidump; do not assume an engine update or a mismatched symbol set
 will resolve this stack.
+
+## Contentless project startup comparison — 2026-10-18
+
+To distinguish the project asset tree from project code/plugin startup, a
+disposable scratch copy was made from the current isolated UE 5.8.3 target. It
+used the same project descriptor (including its enabled plugins), `Config`, and
+`Source`, but had no project `Content` directory. UBT rebuilt and linked the
+editor target successfully (174 actions). `UnrealEditor-Cmd` then initialized
+the editor in 81.82 seconds and ran
+`CaptiveSky2.Agent.AssetRequestQueue` under NullRHI: `Result={Success}` and
+exit code 0. Missing `/Game/...` asset warnings were expected in this copy.
+The scratch test log is
+`Saved/CompileScratch/Codex_QueueNoContent_20261018/Project/Saved/Logs/QueueNoContent_Automation.log`.
+
+This comparison shows that the current source and enabled plugin set can
+initialize and run automation when the project's own asset tree is absent. It
+narrows the full-project startup fault toward the project `Content` tree or an
+interaction with it; it does not identify a single corrupt asset or prove that
+asset size is the cause. The current `Content` tree contains 3,836 `.uasset`
+files totalling about 4.42 GiB. The largest include a 171 MB foliage normal,
+167 MB 8K Megascans displacement and an equally large 4K trial duplicate, plus
+two 107 MB MetaHuman shell assets; these on-disk sizes are leads only, not
+measured startup memory. Next isolate selected Content subsets in disposable
+copies or obtain matching symbols and compare the full-project dump. Do not
+delete or rewrite user assets as a diagnostic shortcut.
