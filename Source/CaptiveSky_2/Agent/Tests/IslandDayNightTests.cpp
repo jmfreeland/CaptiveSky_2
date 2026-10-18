@@ -256,6 +256,10 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	const FString FullMoonDescription = Clock->DescribeTime();
 	TestTrue(TEXT("Time observations name the full moon with bright illumination"),
 		FullMoonDescription.Contains(TEXT("full moon")) && FullMoonDescription.Contains(TEXT("bright")));
+	TestTrue(TEXT("Time observations include the Island calendar"), FullMoonDescription.Contains(TEXT("day 15 of the Island")));
+	TestTrue(TEXT("Time observations say where the moon is"),
+		FullMoonDescription.Contains(TEXT("high in the sky")) || FullMoonDescription.Contains(TEXT("up in the sky")) ||
+		FullMoonDescription.Contains(TEXT("at the horizon")) || FullMoonDescription.Contains(TEXT("below the horizon")));
 	Clock->CurrentHour = 12.f;
 	Clock->MoonIntensity = 0.f;
 	float MinimumCover = 2.f;
