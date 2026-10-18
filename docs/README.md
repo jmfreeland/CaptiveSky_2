@@ -56,7 +56,7 @@ Cold build is about seven minutes. Tests are headless and make no model requests
 
 Named lunar phases, the moon's position and cloud cover, sunrise and sunset cues, an Island calendar, shooting stars and
 the sea state all reach residents through pure, tested functions; `Island.Day` and `Island.SkyReport` were added for
-checking them in game. Along the way the headless suite went from 8 failures to 4 (see below).
+checking them in game. The chronicle (`WorldState/chronicle.jsonl`, read with `Scripts/Build-Chronicle.py`) also records the moon changing phase. Along the way the headless suite went from 8 failures to 4 (see below); a full rerun in cycle 27 showed exactly those 4.
 
 ## Test health
 
