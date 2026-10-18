@@ -26,9 +26,10 @@ editor with about 2.9 GB free (user-approved); the editor stayed responsive.
 
 ## Not verified
 
-- **Appearance.** A thumbnail from the open editor renders grey: the imported materials had
-  not compiled shaders (the import used `-NullRHI`). Geometry and scale match the Blender
-  preview, but board, crumb, linen and crust colour are unjudged. Review under the inn's
-  lighting in a real-RHI session before any placement.
+- **Appearance under scene lighting.** A first thumbnail from the open editor was grey because the
+  `-NullRHI` import left the materials uncompiled. After the editor compiled them, a second asset
+  thumbnail shows the loaf, cut slice with crumb, folded linen and board with textures and the
+  expected silhouette. That is a default thumbnail light, not the inn: board tone, crust colour and
+  scale at the hearth still need a real-RHI look under the inn lighting before any placement.
 - No Island placement, no canonical recipe, no visible-batch rule; those stay separate.
 - The open editor may need an asset rescan to list the new folders.
