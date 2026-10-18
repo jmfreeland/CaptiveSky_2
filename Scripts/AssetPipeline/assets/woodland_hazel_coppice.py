@@ -8,6 +8,8 @@ import lib
 
 
 NAME = "WoodlandHazelCoppice"
+LEAF_ROWS = (0.0, 0.16, 0.32, 0.50, 0.68, 0.84, 1.0)
+LEAF_WIDTH_PROFILE = (0.015, 0.55, 0.88, 1.0, 0.84, 0.55, 0.015)
 
 
 def _leaf(bm, base, direction, width_axis, length, half_width, seed):
@@ -16,8 +18,8 @@ def _leaf(bm, base, direction, width_axis, length, half_width, seed):
     width_axis = Vector(width_axis).normalized()
     normal = direction.cross(width_axis).normalized()
     base = Vector(base)
-    rows = (0.0, 0.25, 0.5, 0.75, 1.0)
-    silhouette = (0.02, 0.62, 1.0, 0.70, 0.015)
+    rows = LEAF_ROWS
+    silhouette = LEAF_WIDTH_PROFILE
     jitter = 1.0 + 0.045 * math.sin(seed * 2.17)
     front = []
     for row, t in enumerate(rows):
@@ -25,8 +27,12 @@ def _leaf(bm, base, direction, width_axis, length, half_width, seed):
         for side in (-1.0, 0.0, 1.0):
             point = base + direction * (length * t)
             point += width_axis * (half_width * silhouette[row] * side * jitter)
-            point += normal * (0.025 * math.sin(math.pi * t) * (1.0 - abs(side)))
-            point.z += 0.018 * math.sin(math.pi * t) * abs(side)
+            # Tiny opposing edge teeth keep a hazel-like toothed outline, while
+            # a shallow central ridge gives each small leaf a readable face.
+            tooth = 0.035 * math.cos(seed * 1.37 + row * 2.41 + side * 0.7) * side
+            point += width_axis * (half_width * tooth)
+            point += normal * (0.035 * math.sin(math.pi * t) * (1.0 - abs(side)))
+            point.z += 0.010 * math.sin(math.pi * t) * abs(side)
             row_verts.append(bm.verts.new(point))
         front.append(row_verts)
 
