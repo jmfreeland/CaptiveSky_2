@@ -32,3 +32,17 @@ Patterns worth checking before treating these as regressions:
 
 Next step for whoever owns each area: rerun the failing test in the main project's own automation environment to
 separate environment artefacts from real regressions.
+
+## TidepoolMinnows: what I checked (cycle 21)
+
+Five assertions fail in `IslandMinnowTests.cpp` (lines 428, 530, 540, 545, 554), all after the visitor interaction
+step: the pulse-widened radius is not at least 1.4x the original, the surface-hop fish does not return to its resting
+transform, the ripple is not under the source fish, `SurfaceBreakRemaining` is not 19, and `SurfaceBreakContextRemaining`
+is not 305. Observations:
+- The constants the tests expect match the code (`SurfaceBreakContextLifetime = 305`, `Lerp(19, 60, NightRest)` with
+  `NightRest = 0` at the test's 12:00 clock), so this is not simple constant drift.
+- The failing group sits downstream of the pulse-widening step, so one upstream state difference (for example the
+  newer swimmer-wake or rat-scatter responses from `cbf4df9` / `0f4c6fb` changing the school's state before the
+  pulse) could explain all five. Not confirmed.
+- Next step: run the test with logging of `SurfacePulseRemaining`, `SurfaceBreakRemaining` and the measured radii
+  right after the interaction, and check whether the visitor in the fixture counts as a wake source or rat.
