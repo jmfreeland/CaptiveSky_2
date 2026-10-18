@@ -14,4 +14,22 @@ This is separate from the managed `0xE0434352` UBT/Turnkey failures recorded in 
 
 ## Next diagnostic gate
 
-Do not repeat the same launch with the same command line. First obtain matching UE 5.8.3 symbols (or another usable dump debugger). Then reproduce once with a known-idle desktop, a bounded timeout, a unique log path, and the smallest meaningful change to tracing/metadata startup. Compare the resulting symbolized stack and whether the crash occurs before or after `StartOfEnginePreInit`. Keep the user's editor and unsaved work untouched; the current desktop connection exposes no app windows, so this run was not attempted.
+Do not repeat the same project launch with the same command line. First obtain matching UE 5.8.3 symbols (or another usable dump debugger). Then reproduce once with a known-idle desktop, a bounded timeout, a unique log path, and the smallest meaningful change to tracing/metadata startup. Compare the resulting symbolized stack and whether the crash occurs before or after `StartOfEnginePreInit`. Keep the user's editor and unsaved work untouched.
+
+## Current desktop check — 2026-10-18
+
+The desktop inventory reports the UE 5.8 editor as running with both a
+`CaptiveSky_2 - Unreal Editor` window and a `Message Log` window. Two attempts
+to activate the project window timed out. A screenshot-backed state request for
+that window showed the Edge desktop instead of the editor, so it did not provide
+a trustworthy viewport capture. The editor was left untouched; this is evidence
+of failed UI access, not by itself proof that the editor process is frozen.
+
+A separate, no-project `UnrealEditor-Cmd.exe -version` invocation on this date
+produced no version text in the captured output and remained live after roughly
+20 seconds; no explicit log path was supplied. Only that newly started command
+was interrupted. This differs from the earlier recorded successful engine-only
+version check; the discrepancy does not identify the project-open crash's
+cause. Avoid repeating either launch until the engine-only startup or desktop
+capture path behaves reliably, or a usable debugger/symbol set becomes
+available.
