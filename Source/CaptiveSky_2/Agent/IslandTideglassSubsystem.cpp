@@ -1,7 +1,9 @@
 #include "IslandTideglassSubsystem.h"
 
 #include "IslandDayNight.h"
+#include "IslandCommonFrog.h"
 #include "Components/StaticMeshComponent.h"
+#include "CollisionQueryParams.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -369,16 +371,57 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		IslandClock = *It;
 		break;
 	}
-	bool bHasTideglassMarker = false;
+	AActor* PoolMarker = nullptr;
 	for (TActorIterator<AActor> It(&InWorld); It; ++It)
 	{
 		if (It->ActorHasTag(TEXT("TideglassPool")))
 		{
-			bHasTideglassMarker = true;
+			PoolMarker = *It;
 			break;
 		}
 	}
-	if (!bHasTideglassMarker) return;
+	if (!PoolMarker) return;
+
+	// A tiny, transient pair of frogs adds life to the damp margin without
+	// changing the saved map. Positions are derived from the pool footprint and
+	// accepted only when a nearby, upward-facing ground surface can be sampled.
+	bool bHasFrog = false;
+	for (TActorIterator<AIslandCommonFrog> It(&InWorld); It; ++It)
+	{
+		bHasFrog = true;
+		break;
+	}
+	if (!bHasFrog)
+	{
+		if (UStaticMeshComponent* PoolSurface = FindPoolSurface(&InWorld))
+		{
+			const FBoxSphereBounds Bounds = PoolSurface->Bounds;
+			const FVector2D Extents(Bounds.BoxExtent.X, Bounds.BoxExtent.Y);
+			const float Diagonal = 1.62f * 0.70710678f;
+			int32 SpawnedFrogs = 0;
+			for (const int32 Side : {-1, 1})
+			{
+				const FVector Site = Bounds.Origin + FVector(Side * Extents.X * Diagonal,
+					Side * Extents.Y * Diagonal, 0.f);
+				FHitResult GroundHit;
+				FCollisionQueryParams Query(SCENE_QUERY_STAT(TideglassFrogHabitat), false);
+				const FVector TraceStart(Site.X, Site.Y, Bounds.Origin.Z + 1200.f);
+				const FVector TraceEnd(Site.X, Site.Y, Bounds.Origin.Z - 1800.f);
+				if (!InWorld.LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, Query) ||
+					GroundHit.ImpactNormal.Z < 0.48f) continue;
+
+				FActorSpawnParameters Spawn;
+				Spawn.ObjectFlags |= RF_Transient;
+				Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				const FVector Home = GroundHit.ImpactPoint + FVector(0.f, 0.f, 1.f);
+				const FRotator Facing = (Bounds.Origin - Home).Rotation();
+				if (InWorld.SpawnActor<AIslandCommonFrog>(Home, FRotator(0.f, Facing.Yaw, 0.f), Spawn))
+					++SpawnedFrogs;
+			}
+			if (SpawnedFrogs > 0)
+				UE_LOG(LogIslandTideglass, Log, TEXT("Spawned %d transient Common Frog residents at the Tideglass margin."), SpawnedFrogs);
+		}
+	}
 
 	ApplyShoreStonePresentation();
 
