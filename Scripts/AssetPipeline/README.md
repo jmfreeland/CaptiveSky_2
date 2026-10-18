@@ -139,6 +139,17 @@ The well is now reproducible from `assets/well.py`, like the other current props
 
 ## Wetland species candidate (2026-10-18)
 
+`assets/wetland_meadowsweet.py` adds an airy mid-story wet-meadow candidate:
+upright wiry stems, pinnate toothed leaves, and staggered cream florets. The
+BSBI Fermanagh account places meadowsweet in damp meadows, stream banks and
+periodically wet margins, but not prolonged waterlogging. The deterministic
+geometry is collisionless and uses four plain material groups. Blender 5.2.2
+export/re-import verifies 13,010 triangles, `UVMap`, no colliders, and
+`PROBLEMS []`; the CPU preview is only a shape check. It has not been imported
+into Unreal or placed; see
+[`docs/findings/2026-10-18-wet-meadow-meadowsweet-candidate.md`](../../docs/findings/2026-10-18-wet-meadow-meadowsweet-candidate.md)
+for the intended habitat and validation gates.
+
 `assets/wetland_yellow_flag_iris.py` builds a deterministic, collisionless yellow-flag iris clump for a still freshwater margin. It has ten sword-shaped leaves arranged as three fans, three flower stalks, four blooms, and five plain material slots; Blender 5.2 exports about 7,500 triangles. The local FBX re-import check passes with a `UVMap`, no colliders, 1.2 cm ground clearance, and no verifier problems. This is an asset-pipeline candidate only: it has **not** been imported into Unreal or placed on the Island. Review at the intended waterline scale and lighting in Unreal before deciding whether it belongs in the scene. See [`docs/findings/2026-10-18-yellow-flag-iris-candidate.md`](../../docs/findings/2026-10-18-yellow-flag-iris-candidate.md) for validation and remaining review.
 
 `assets/tideglass_marsh_marigold.py` adds a different low wet-margin silhouette: broad rounded leaves and glossy yellow sepals above five modest flower stalks. It is a deterministic, collisionless *Caltha palustris*-inspired source candidate with no texture or runtime dependency. Blender 5.2.2 exported and re-imported the 79 x 81 x 38 cm, 1,968-triangle FBX with four material slots, `UVMap`, and no verifier problems; the CPU preview is an isolated shape check only. It has not been imported into Unreal or placed in the world; see [`docs/findings/2026-10-18-tideglass-marsh-marigold-candidate.md`](../../docs/findings/2026-10-18-tideglass-marsh-marigold-candidate.md) for the habitat basis, validation status, and isolated review gate.
