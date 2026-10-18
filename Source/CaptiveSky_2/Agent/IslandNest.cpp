@@ -46,14 +46,23 @@ AIslandNest::AIslandNest()
 	FallenTwigs->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FallenTwigs->SetCanEverAffectNavigation(false);
 	FallenTwigs->SetCastShadow(false);
+	MossPatches = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MossPatches"));
+	MossPatches->SetupAttachment(Twigs);
+	MossPatches->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MossPatches->SetCanEverAffectNavigation(false);
+	MossPatches->SetCastShadow(false);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> TwigTipMesh(TEXT("/Engine/BasicShapes/Cone.Cone"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> MossMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	if (TwigMesh.Succeeded())
 	{
 		Twigs->SetStaticMesh(TwigMesh.Object);
 		FallenTwigs->SetStaticMesh(TwigMesh.Object);
 	}
 	if (TwigTipMesh.Succeeded()) TwigTips->SetStaticMesh(TwigTipMesh.Object);
+	if (MossMesh.Succeeded()) MossPatches->SetStaticMesh(MossMesh.Object);
+	if (ShapeMaterial.Succeeded()) MossPatches->SetMaterial(0, ShapeMaterial.Object);
 	Tags.AddUnique(TEXT("IslandNest"));
 	Tags.AddUnique(TEXT("AgentMade"));
 }
@@ -73,6 +82,11 @@ int32 AIslandNest::GetVisibleFallenTwigCount() const
 	return FallenTwigs->GetInstanceCount();
 }
 
+int32 AIslandNest::GetVisibleMossPatchCount() const
+{
+	return MossPatches ? MossPatches->GetInstanceCount() : 0;
+}
+
 void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebris)
 {
 	SiteTag = InSiteTag;
@@ -85,6 +99,11 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 			Twigs->SetMaterial(0, Wood);
 		else if (UMaterialInstanceDynamic* Tint = Twigs->CreateAndSetMaterialInstanceDynamic(0))
 			Tint->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.22f, 0.13f, 0.06f));
+		if (MossPatches && MossPatches->GetMaterial(0))
+		{
+			MossMaterial = MossPatches->CreateAndSetMaterialInstanceDynamic(0);
+			if (MossMaterial) MossMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.16f, 0.24f, 0.075f));
+		}
 	}
 	if (TwigTips) TwigTips->SetMaterial(0, Twigs->GetMaterial(0));
 	FallenTwigs->SetMaterial(0, Twigs->GetMaterial(0));
@@ -94,8 +113,26 @@ void AIslandNest::SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebri
 	Twigs->ClearInstances();
 	if (TwigTips) TwigTips->ClearInstances();
 	FallenTwigs->ClearInstances();
+	if (MossPatches) MossPatches->ClearInstances();
 	if (WovenLayers > 0)
 	{
+		// A few overlapping flattened spheres form a soft green cup, kept in one
+		// collisionless instance batch so nest growth remains cheap and reversible.
+		if (MossPatches && MossPatches->GetStaticMesh())
+		{
+			FRandomStream MossWeave(static_cast<int32>(GetTypeHash(SiteTag.ToString()) ^ 0x63A9E2B1u));
+			for (int32 Index = 0; Index < MossPatchesPerNest; ++Index)
+			{
+				const float Angle = 2.f * PI * (Index + MossWeave.FRandRange(-0.22f, 0.22f)) / MossPatchesPerNest;
+				const float Radius = MossWeave.FRandRange(1.4f, 4.2f);
+				const FVector Position(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius,
+					2.8f + MossWeave.FRandRange(-0.2f, 0.8f));
+				const float Width = MossWeave.FRandRange(0.034f, 0.048f);
+				MossPatches->AddInstance(FTransform(FRotator(0.f, MossWeave.FRandRange(0.f, 360.f), 0.f),
+					Position, FVector(Width, Width * MossWeave.FRandRange(0.72f, 0.9f), MossWeave.FRandRange(0.014f, 0.02f))), false);
+			}
+		}
+
 		// Cross a small floor beneath the first hoop so a nest reads as a cup, not an open ring stack.
 		// These are still visual-only twigs; the nest does not gain collision or shelter semantics.
 		for (int32 Index = 0; Index < FoundationTwigCount; ++Index)

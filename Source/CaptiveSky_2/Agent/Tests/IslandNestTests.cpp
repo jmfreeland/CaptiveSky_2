@@ -202,8 +202,19 @@ bool FIslandNestTest::RunTest(const FString& Parameters)
 			AIslandNest::FoundationTwigCount + AIslandNest::TwigsPerLayer);
 		TestEqual(TEXT("Every woven twig has two visual-only tapered ends"), It->GetVisibleTwigTipCount(),
 			2 * It->GetVisibleTwigCount());
+		TestEqual(TEXT("A woven nest gains one small moss cup"), It->GetVisibleMossPatchCount(), AIslandNest::MossPatchesPerNest);
 		TestTrue(TEXT("Nest rests on the support surface, not the marker in the air"), FMath::IsNearlyEqual(It->GetActorLocation().Z, SupportTop, 4.f));
 		TestTrue(TEXT("Nest is visual only and cannot alter perch support"), It->GetActorEnableCollision() == false || It->GetRootComponent()->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+		TestTrue(TEXT("The moss lining is batched, collisionless, shadowless, and off navigation"),
+			It->MossPatches && It->MossPatches->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!It->MossPatches->CastShadow && !It->MossPatches->CanEverAffectNavigation());
+		TestTrue(TEXT("The nest lining reuses the engine sphere and a transient tint"),
+			It->MossPatches && It->MossPatches->GetStaticMesh() &&
+			It->MossPatches->GetStaticMesh()->GetName() == TEXT("Sphere") && It->MossMaterial);
+		const int32 InitialMossCount = It->GetVisibleMossPatchCount();
+		It->SetWoven(Site, Nest ? Nest->Layers : 1);
+		TestEqual(TEXT("Reapplying the same nest record does not accumulate moss instances"),
+			It->GetVisibleMossPatchCount(), InitialMossCount);
 
 		UInstancedStaticMeshComponent* TwigInstances = Cast<UInstancedStaticMeshComponent>(It->GetRootComponent());
 		TestNotNull(TEXT("The visible nest exposes its foundation instances for inspection"), TwigInstances);

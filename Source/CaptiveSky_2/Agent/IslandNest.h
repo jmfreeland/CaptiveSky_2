@@ -5,6 +5,7 @@
 #include "IslandNest.generated.h"
 
 class UInstancedStaticMeshComponent;
+class UMaterialInstanceDynamic;
 
 /**
  * Visible form of a persistent nest record. Low-poly engine primitives form a shallow woven
@@ -22,12 +23,14 @@ public:
 	static constexpr int32 TwigsPerLayer = 7;
 	static constexpr int32 FoundationTwigCount = 5;
 	static constexpr int32 StormDebrisTwigCount = 5;
+	static constexpr int32 MossPatchesPerNest = 7;
 
 	void SetWoven(FName InSiteTag, int32 InLayers, bool bShowStormDebris = false);
 	int32 GetWovenLayers() const { return WovenLayers; }
 	int32 GetVisibleTwigCount() const;
 	int32 GetVisibleTwigTipCount() const;
 	int32 GetVisibleFallenTwigCount() const;
+	int32 GetVisibleMossPatchCount() const;
 
 private:
 	friend class FIslandNestTest;
@@ -40,6 +43,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
 	TObjectPtr<UInstancedStaticMeshComponent> FallenTwigs;
+
+	UPROPERTY(VisibleAnywhere, Category = "Island|Nest")
+	TObjectPtr<UInstancedStaticMeshComponent> MossPatches;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> MossMaterial;
 
 	FName SiteTag;
 	int32 WovenLayers = 0;
