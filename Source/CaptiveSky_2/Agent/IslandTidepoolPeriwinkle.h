@@ -32,6 +32,8 @@ public:
 	static float LocalWaterlineOffsetCm(float TideOffsetCm, float GroundZCm, float SeaLevelZCm);
 	/** Heavy rain causes a smaller, temporary tuck; dry weather leaves the snail unchanged. */
 	static float RainRestAmount(float RainIntensity);
+	/** Stronger ambient winds cause a gentle temporary tuck, without a geometry trace. */
+	static float WindRestAmount(float HorizontalWindSpeed);
 	/** A nearby crab startles the snail only while actively scurrying, not while calmly foraging. */
 	static bool ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset);
 	/** A close rat approach can briefly startle the snail, but a lingering rat cannot repeat it. */

@@ -168,6 +168,15 @@ float AIslandTidepoolPeriwinkle::RainRestAmount(float RainIntensity)
 	return 0.42f * FMath::SmoothStep(0.45f, 0.9f, FMath::Clamp(RainIntensity, 0.f, 1.f));
 }
 
+float AIslandTidepoolPeriwinkle::WindRestAmount(float HorizontalWindSpeed)
+{
+	if (!FMath::IsFinite(HorizontalWindSpeed)) return 0.f;
+	// The Island's ordinary breeze only softens grazing; the maximum tuck is
+	// reserved for a hard storm gust. This is a broad weather sample, not a
+	// per-snail shelter trace, so a colony adds no extra collision queries.
+	return 0.38f * FMath::SmoothStep(90.f, 330.f, FMath::Max(0.f, HorizontalWindSpeed));
+}
+
 bool AIslandTidepoolPeriwinkle::ShouldTuckForCrab(bool bCrabScurrying, float Distance, float VerticalOffset)
 {
 	constexpr float ThreatRadius = 175.f;
@@ -473,13 +482,17 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float RainIntensity = IslandWeather.IsValid() && GetWorld()
 		? IslandWeather->SampleRainIntensity(GetWorld()->GetTimeSeconds())
 		: 0.f;
+	const float HorizontalWindSpeed = IslandWeather.IsValid() && GetWorld()
+		? IslandWeather->SampleWind(HomeLocation, GetWorld()->GetTimeSeconds()).Size2D()
+		: 0.f;
 	const float TargetShellWetness = WetShellAmount(LocalTideOffset, RainIntensity);
 	const float PreviousShellWetness = ShellWetness;
 	ShellWetness = FMath::FInterpTo(ShellWetness, TargetShellWetness, SafeDelta, 0.8f);
 	if (FMath::Abs(ShellWetness - PreviousShellWetness) > 0.001f)
 		ApplyPalette();
 	const float WeatherRest = RainRestAmount(RainIntensity);
-	const float ExposureRest = FMath::Max(TideRest, FMath::Max(ObservationRest, WeatherRest));
+	const float WindRest = WindRestAmount(HorizontalWindSpeed);
+	const float ExposureRest = FMath::Max(TideRest, FMath::Max(ObservationRest, FMath::Max(WeatherRest, WindRest)));
 	const float StalkExtension = FMath::Lerp(1.f, 0.46f, ExposureRest);
 	const float ApertureExtension = FMath::Lerp(1.f, 0.5f, ExposureRest);
 	const float AttentionScale = FMath::Lerp(1.f, 0.35f, ExposureRest);

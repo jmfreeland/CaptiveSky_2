@@ -131,3 +131,22 @@ bool FIslandPeriwinkleIntertidalZonationTest::RunTest(const FString& Parameters)
 			std::numeric_limits<float>::max())));
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleWindExposureTest,
+	"CaptiveSky2.Agent.TidepoolPeriwinkleWindExposure",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleWindExposureTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	TestEqual(TEXT("Still air leaves the snail fully open"), Periwinkle::WindRestAmount(0.f), 0.f);
+	TestEqual(TEXT("Negative wind samples cannot create an exposure response"), Periwinkle::WindRestAmount(-40.f), 0.f);
+	TestTrue(TEXT("An ordinary Island breeze only produces a subtle tuck"),
+		Periwinkle::WindRestAmount(180.f) > 0.f && Periwinkle::WindRestAmount(180.f) < 0.2f);
+	TestTrue(TEXT("Storm-strength wind causes a stronger but still partial tuck"),
+		Periwinkle::WindRestAmount(330.f) > 0.35f && Periwinkle::WindRestAmount(330.f) < 0.4f);
+	TestEqual(TEXT("The wind response saturates instead of over-tucking"), Periwinkle::WindRestAmount(1000.f), 0.38f);
+	TestEqual(TEXT("Non-finite wind cannot produce a non-finite pose"),
+		Periwinkle::WindRestAmount(std::numeric_limits<float>::infinity()), 0.f);
+	return true;
+}
