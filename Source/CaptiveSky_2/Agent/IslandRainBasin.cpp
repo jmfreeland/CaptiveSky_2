@@ -105,8 +105,22 @@ bool FIslandBasinState::FromJson(const FString& Json)
 	FIslandBasinState Loaded;
 	Root->TryGetBoolField(TEXT("placed"), Loaded.bPlaced);
 	const TArray<TSharedPtr<FJsonValue>>* Where = nullptr;
-	if (Root->TryGetArrayField(TEXT("location"), Where) && Where->Num() == 3)
-		Loaded.Location = FVector((*Where)[0]->AsNumber(), (*Where)[1]->AsNumber(), (*Where)[2]->AsNumber());
+	bool bValidLocation = Root->TryGetArrayField(TEXT("location"), Where) && Where->Num() == 3;
+	double Coordinates[3] = {};
+	if (bValidLocation)
+	{
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			if (!(*Where)[Index].IsValid() || !(*Where)[Index]->TryGetNumber(Coordinates[Index]) ||
+				!FMath::IsFinite(Coordinates[Index]) || !FMath::IsFinite(static_cast<float>(Coordinates[Index])))
+			{
+				bValidLocation = false;
+				break;
+			}
+		}
+	}
+	if (bValidLocation)
+		Loaded.Location = FVector(Coordinates[0], Coordinates[1], Coordinates[2]);
 	else
 		Loaded.bPlaced = false;
 	double WaterValue = 0;

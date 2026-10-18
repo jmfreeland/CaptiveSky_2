@@ -65,6 +65,13 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	if (Loaded.Leaves.Num() > 0) TestEqual(TEXT("A leaf keeps its author"), Loaded.Leaves.Last().AgentId, State.Leaves.Last().AgentId);
 	TestFalse(TEXT("Garbage is rejected"), Loaded.FromJson(TEXT("not json")));
 	TestFalse(TEXT("A future version is rejected"), Loaded.FromJson(TEXT("{\"version\":99}")));
+	TestTrue(TEXT("A malformed placement coordinate does not discard otherwise readable basin state"),
+		Loaded.FromJson(TEXT("{\"version\":1,\"placed\":true,\"location\":[12,\"west\",34],\"water\":0.6,\"leaves\":[]}")));
+	TestFalse(TEXT("A non-numeric saved position cannot materialize the basin at an invalid location"), Loaded.bPlaced);
+	TestEqual(TEXT("Readable water survives an invalid placement coordinate"), Loaded.Water, 0.6f);
+	TestTrue(TEXT("A coordinate that overflows Unreal's float transform range is accepted as data but not as a placement"),
+		Loaded.FromJson(TEXT("{\"version\":1,\"placed\":true,\"location\":[1e100,0,0],\"water\":0.2,\"leaves\":[]}")));
+	TestFalse(TEXT("A finite JSON double outside FVector's finite range clears placement"), Loaded.bPlaced);
 
 	TestTrue(TEXT("Water is deeper when fuller"), AIslandRainBasin::WaterDepth(0.9f) > AIslandRainBasin::WaterDepth(0.2f));
 	TestTrue(TEXT("Water stays below the rim"), AIslandRainBasin::WaterDepth(9.f) < AIslandRainBasin::RimHeight);
