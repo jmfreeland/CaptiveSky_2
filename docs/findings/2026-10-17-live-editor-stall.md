@@ -34,6 +34,21 @@ not independently prove that the process is frozen. The periodic log activity
 above is recent, but still carries frame counter `[148]` and is not evidence of
 a responsive editor loop.
 
+### Project-log recheck — 2026-10-18 02:57 UTC
+
+The log file's last-write time was 03:49:21 local (BST). Its final entry is
+Derived Data Cache maintenance at 02:49:21 UTC, still on editor frame `[148]`;
+the previous observed maintenance entry was 00:49:21 UTC, also at `[148]`.
+Hourly background maintenance therefore continued for two more cycles without
+any recorded frame advance. This strengthens the conclusion that the editor's
+main loop is stalled, but it is still not a direct Windows responsiveness
+measurement and does not reveal whether a Live Coding modal or another thread
+is holding the loop.
+
+No editor input, save, restart, or process termination was attempted. Continue
+to preserve the open process and its unsaved state until the user can inspect
+the Live Coding UI and explicitly choose recovery.
+
 The newest crash bundle at `Saved/Crashes/_0000/` belongs to a separate
 `-NullRHI -ExecutePythonScript` import invocation (PID is reported as zero in the
 context) and records a Core null-access startup crash. Do not conflate it with
