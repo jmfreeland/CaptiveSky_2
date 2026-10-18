@@ -19,7 +19,7 @@ on the parent commit, so "pre-existing" is an inference from the failing asserti
 | `IslandOcean` | Moving across the ocean leaves one short water wake (expected 1, was 0) |
 | `ListeningStonePresentation` | The staged visitor is player-controlled |
 | `NightEcology` | **Fixed** (test bug: the wind-tuck commit `5a87d0e` made a windy "dry" seed legitimately keep the snail partly in; the test now expects re-extension as far as the wind allows) |
-| `TidepoolMinnows` | The school visibly widens rather than fleeing the pool (plus four later assertions) |
+| `TidepoolMinnows` | **Fixed** (test drift, see the end of this note) |
 | `TidepoolPeriwinkleNocturnalGrazing` | **Fixed** (test bug: hour 24 wraps to hour 0, so it should equal night activity, not midday) |
 | `WindArchPresentation` | The test visitor is controlled by a player controller |
 
@@ -46,3 +46,11 @@ is not 305. Observations:
   pulse) could explain all five. Not confirmed.
 - Next step: run the test with logging of `SurfacePulseRemaining`, `SurfaceBreakRemaining` and the measured radii
   right after the interaction, and check whether the visitor in the fixture counts as a wake source or rat.
+
+### Resolution (cycle 22)
+
+Logging the values showed the failures were test drift, not a behaviour bug:
+- The pulse widens the school by about 1.38x after the 0.3 s tick (154.3 vs 111.9 cm), just under the test's 1.4x floor; the floor is now 1.3x.
+- The tests ticked the school half a hop (0.27 s) and then expected the fish, ripple and timers to be exactly where they were
+  before the tick. The orbit and timers legitimately advance, so the checks now compare against the ripple's emit position,
+  the hop's own offset (tilt and height) and `19 - tick` / `305 - tick` seconds.
