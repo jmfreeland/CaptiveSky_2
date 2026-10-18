@@ -81,6 +81,28 @@ bool FIslandPeriwinkleGrazingPathTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleNocturnalGrazingTest,
+	"CaptiveSky2.Agent.TidepoolPeriwinkleNocturnalGrazing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleNocturnalGrazingTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	const float MiddayActivity = Periwinkle::GrazingActivityForHour(12.f);
+	const float NightActivity = Periwinkle::GrazingActivityForHour(0.f);
+	const float DuskActivity = Periwinkle::GrazingActivityForHour(18.5f);
+
+	TestTrue(TEXT("The snail still grazes during daytime"), MiddayActivity > 0.f);
+	TestTrue(TEXT("Nighttime grazing is more active than midday"), NightActivity > MiddayActivity);
+	TestTrue(TEXT("Twilight activity transitions smoothly between day and night"),
+		DuskActivity > MiddayActivity && DuskActivity < NightActivity);
+	TestTrue(TEXT("Activity respects the clock's wrapped hour"),
+		FMath::IsNearlyEqual(Periwinkle::GrazingActivityForHour(24.f), MiddayActivity));
+	TestTrue(TEXT("Invalid clock time safely preserves full grazing activity"),
+		FMath::IsNearlyEqual(Periwinkle::GrazingActivityForHour(std::numeric_limits<float>::quiet_NaN()), 1.f));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleIntertidalZonationTest,
 	"CaptiveSky2.Agent.TidepoolPeriwinkleIntertidalZonation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

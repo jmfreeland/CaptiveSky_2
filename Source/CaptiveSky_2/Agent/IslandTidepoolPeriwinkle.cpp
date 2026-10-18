@@ -221,6 +221,17 @@ float AIslandTidepoolPeriwinkle::AdvanceGrazingTime(float ActiveSeconds, float D
 	return FMath::Max(0.f, ActiveSeconds) + FMath::Max(0.f, DeltaSeconds) * Activity;
 }
 
+float AIslandTidepoolPeriwinkle::GrazingActivityForHour(float CurrentHour)
+{
+	if (!FMath::IsFinite(CurrentHour)) return 1.f;
+
+	// Keep the snail quietly active by day, but let its grazing path progress
+	// more readily through the cool, dim hours without a hard dawn/dusk switch.
+	constexpr float DayActivity = 0.45f;
+	constexpr float AdditionalNightActivity = 1.f - DayActivity;
+	return DayActivity + AdditionalNightActivity * AIslandDayNight::NightAmount(CurrentHour);
+}
+
 bool AIslandTidepoolPeriwinkle::RespondToQuietObservation()
 {
 	if (ObservationCooldownRemaining > 0.f) return false;
@@ -485,7 +496,11 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	// extended. The closed two-minute path returns to its starting point and
 	// remains within a 16 cm radius of its home, so it cannot wander off its rock.
 	const float CrawlActivity = 1.f - FMath::Clamp(ExposureRest, 0.f, 1.f);
-	GrazingActiveSeconds = AdvanceGrazingTime(GrazingActiveSeconds, SafeDelta, ExposureRest);
+	const float CircadianActivity = IslandClock.IsValid()
+		? GrazingActivityForHour(IslandClock->CurrentHour)
+		: 1.f;
+	GrazingActiveSeconds = AdvanceGrazingTime(
+		GrazingActiveSeconds, SafeDelta * CircadianActivity, ExposureRest);
 	FVector CrawlGround(GetActorLocation().X, GetActorLocation().Y, HomeLocation.Z);
 	if (CrawlActivity > 0.01f)
 	{

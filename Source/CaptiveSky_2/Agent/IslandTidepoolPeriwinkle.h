@@ -42,6 +42,8 @@ public:
 	static FVector2D GrazingOffset(float ActiveSeconds, float InitialPhaseRadians);
 	/** Active grazing time advances with openness and stops completely while fully tucked. */
 	static float AdvanceGrazingTime(float ActiveSeconds, float DeltaSeconds, float ExposureRest);
+	/** Daytime grazing remains possible, with a gentle increase after dusk. */
+	static float GrazingActivityForHour(float CurrentHour);
 	static constexpr float GrazingMaxExcursionCm = 16.f;
 
 protected:
