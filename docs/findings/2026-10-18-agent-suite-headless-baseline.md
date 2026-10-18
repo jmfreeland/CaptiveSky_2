@@ -18,7 +18,7 @@ on the parent commit, so "pre-existing" is an inference from the failing asserti
 | `IslandInnkeeperSpawn` | The independent identity / personality documents load from their own agent folder |
 | `IslandOcean` | Moving across the ocean leaves one short water wake (expected 1, was 0) |
 | `ListeningStonePresentation` | The staged visitor is player-controlled |
-| `NightEcology` | The periwinkle fully re-extends when the deterministic weather returns dry |
+| `NightEcology` | **Fixed** (test bug: the wind-tuck commit `5a87d0e` made a windy "dry" seed legitimately keep the snail partly in; the test now expects re-extension as far as the wind allows) |
 | `TidepoolMinnows` | The school visibly widens rather than fleeing the pool (plus four later assertions) |
 | `TidepoolPeriwinkleNocturnalGrazing` | **Fixed** (test bug: hour 24 wraps to hour 0, so it should equal night activity, not midday) |
 | `WindArchPresentation` | The test visitor is controlled by a player controller |

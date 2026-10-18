@@ -54,8 +54,8 @@ Cold build is about seven minutes. Tests are headless and make no model requests
 ## Test health
 
 See [`findings/2026-10-18-agent-suite-headless-baseline.md`](findings/2026-10-18-agent-suite-headless-baseline.md):
-the headless `CaptiveSky2.Agent` suite had 79 passes and 8 failures; two were test bugs and are fixed. Six
-(Innkeeper spawn, Ocean wake, Listening Stones, NightEcology, Minnows, Wind Arch) await a run in the main
+the headless `CaptiveSky2.Agent` suite had 79 passes and 8 failures; three were test bugs and are fixed. Five
+(Innkeeper spawn, Ocean wake, Listening Stones, Minnows, Wind Arch) await a run in the main
 project's own automation environment.
 
 ## Conventions worth knowing

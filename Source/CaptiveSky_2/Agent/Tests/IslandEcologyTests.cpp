@@ -1590,8 +1590,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Heavy rain draws a Tideglass periwinkle's eyestalks in slightly"),
 			AIslandTidepoolPeriwinkle::RainRestAmount(StormRainIntensity) > 0.f &&
 			StormStalkScale < DryStalkScale - 0.001f);
-		TestTrue(TEXT("The periwinkle fully re-extends when the deterministic weather returns dry"),
-			DryRainIntensity < 0.01f && FMath::IsNearlyEqual(DryStalkScale, 0.10f, 0.001f));
+		// Strong wind also tucks the snail in, so "dry" re-extension is judged against whatever the seed's wind allows.
+		const float DryWindRest = AIslandTidepoolPeriwinkle::WindRestAmount(
+			Weather->SampleWind(RainResponsiveSnail->GetActorLocation(), World->GetTimeSeconds()).Size2D());
+		TestTrue(TEXT("The periwinkle re-extends as far as the wind allows when the deterministic weather returns dry"),
+			DryRainIntensity < 0.01f && FMath::IsNearlyEqual(DryStalkScale, 0.10f * FMath::Lerp(1.f, 0.46f, DryWindRest), 0.002f));
 		Weather->WeatherSeed = OriginalWeatherSeed;
 		Clock->CurrentHour = OriginalHour;
 		RainResponsiveSnail->Tick(0.f);
