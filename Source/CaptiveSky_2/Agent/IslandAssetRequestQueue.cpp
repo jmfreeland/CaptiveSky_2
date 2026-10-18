@@ -205,10 +205,18 @@ namespace IslandAssetRequestQueue
 			OutError = TEXT("The proposal type is not supported.");
 			return false;
 		}
-		if (Target.Len() > 96 || Target.Contains(TEXT("\n")) || Target.Contains(TEXT("\r")))
+		if (Target.Len() > 96)
 		{
 			OutError = TEXT("The target must be a short, single-line identifier.");
 			return false;
+		}
+		for (const TCHAR Character : Target)
+		{
+			if (FChar::IsControl(Character))
+			{
+				OutError = TEXT("The target must be a short, single-line identifier.");
+				return false;
+			}
 		}
 		if (RequestType == TEXT("upgrade") && UpgradeKind != TEXT("aesthetic") && UpgradeKind != TEXT("variation") && UpgradeKind != TEXT("functionality"))
 		{

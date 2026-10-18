@@ -48,6 +48,18 @@ bool FIslandAssetRequestQueueTest::RunTest(const FString& Parameters)
 		InboxContents.Contains(TEXT("\"target\":\"WindArch_UpperBeam\"")) &&
 		InboxContents.Contains(TEXT("\"upgrade_kind\":\"functionality\"")) &&
 		InboxContents.Contains(TEXT("\"pipeline\":\"human_review\"")));
+	const FString InboxBeforeMalformedTargets = InboxContents;
+	TestFalse(TEXT("A tab in a free-form target is rejected before it reaches the shared inbox"),
+		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Raven_01"), TEXT("Add shelter to a nearby beam"), RequestId, Error,
+			InboxPath, TEXT("upgrade"), TEXT("WindArch\tUpperBeam"), TEXT("functionality")));
+	TestTrue(TEXT("The tab rejection explains the single-line target requirement"), Error.Contains(TEXT("single-line")));
+	FString NonWhitespaceControlTarget(TEXT("WindArch_UpperBeam"));
+	NonWhitespaceControlTarget.AppendChar(0x0001);
+	TestFalse(TEXT("A non-whitespace control character is also rejected"),
+		IslandAssetRequestQueue::AppendRequest(TEXT("Agent_Raven_01"), TEXT("Add shelter to a nearby beam"), RequestId, Error,
+			InboxPath, TEXT("upgrade"), NonWhitespaceControlTarget, TEXT("functionality")));
+	TestTrue(TEXT("Rejected control targets never alter the request inbox"),
+		FFileHelper::LoadFileToString(InboxContents, *InboxPath) && InboxContents == InboxBeforeMalformedTargets);
 	TestFalse(TEXT("Unsupported upgrade categories are rejected"), IslandAssetRequestQueue::AppendRequest(
 		TEXT("Agent_Raven_01"), TEXT("Make the perch nicer"), RequestId, Error,
 		InboxPath, TEXT("upgrade"), TEXT("WindArch_UpperBeam"), TEXT("teleportation")));
