@@ -17,6 +17,10 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wind alone raises the sea"), Sea::TargetSea(0.f, 0.8f) > Sea::TargetSea(0.f, 0.2f));
 	TestEqual(TEXT("Out-of-range inputs are clamped"), Sea::TargetSea(5.f, 5.f), 1.f);
 
+	TestTrue(TEXT("A glassy sea needs no remark"), Sea::DescribeSea(0.f).IsEmpty() && Sea::DescribeSea(NAN).IsEmpty());
+	TestTrue(TEXT("A middling sea is described as running"), Sea::DescribeSea(0.5f).Contains(TEXT("white-tipped")));
+	TestTrue(TEXT("A storm sea is described as violent"), Sea::DescribeSea(1.f).Contains(TEXT("violent")));
+
 	TestEqual(TEXT("Calm amplitude is the calm scale"), Sea::AmplitudeScale(0.f), Sea::CalmAmplitudeScale);
 	TestEqual(TEXT("A full storm uses exactly the authored amplitude"), Sea::AmplitudeScale(1.f), 1.f);
 	TestTrue(TEXT("Amplitude never exceeds the authored ceiling"), Sea::AmplitudeScale(3.f) <= 1.f);

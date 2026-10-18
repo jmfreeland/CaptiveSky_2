@@ -34,6 +34,8 @@ public:
 	static float StepSea(float Current, float Target, float DeltaTime);
 	static float AmplitudeScale(float Sea);
 	static float SteepnessScale(float Sea);
+	/** What a resident on the shore sees of the sea at this level (0..1); empty when it is unremarkable. Pure. */
+	static FString DescribeSea(float Sea);
 
 	/** Remembers the authored generator values; false unless the waves use a simple Gerstner generator. */
 	bool BindWaves(UGerstnerWaterWaves* Waves);

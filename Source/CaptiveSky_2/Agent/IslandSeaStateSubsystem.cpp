@@ -33,6 +33,14 @@ float UIslandSeaStateSubsystem::AmplitudeScale(float Sea)
 	return FMath::Lerp(CalmAmplitudeScale, 1.f, FMath::Clamp(Sea, 0.f, 1.f));
 }
 
+FString UIslandSeaStateSubsystem::DescribeSea(float InSea)
+{
+	if (!FMath::IsFinite(InSea) || InSea < 0.15f) return FString();
+	if (InSea < 0.4f) return TEXT(" The sea has a low, steady swell.");
+	if (InSea < 0.7f) return TEXT(" The sea is running with white-tipped waves, loud against the shore.");
+	return TEXT(" The sea is heavy and violent, with steep breaking waves crashing on the shore.");
+}
+
 float UIslandSeaStateSubsystem::SteepnessScale(float Sea)
 {
 	return FMath::Lerp(CalmSteepnessScale, StormSteepnessScale, FMath::Clamp(Sea, 0.f, 1.f));
