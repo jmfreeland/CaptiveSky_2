@@ -99,7 +99,16 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	Garbage.AddStep(Here, FVector::UpVector);
 	TestFalse(TEXT("Unreadable text is refused"), Garbage.FromJson(TEXT("not json")));
 	TestFalse(TEXT("A future version is refused"), Garbage.FromJson(TEXT("{\"version\":99,\"cells\":[]}")));
+	TestFalse(TEXT("Fractional schema versions are refused"), Garbage.FromJson(TEXT("{\"version\":1.5,\"cells\":[]}")));
 	TestFalse(TEXT("A malformed row is refused"), Garbage.FromJson(TEXT("{\"version\":1,\"cells\":[[1,2,3]]}")));
+	TestFalse(TEXT("Fractional cell coordinates are refused"), Garbage.FromJson(
+		TEXT("{\"version\":1,\"cells\":[[1.5,2,3,225,300,0,0,0]]}")));
+	TestFalse(TEXT("Out-of-range world coordinates are refused before cell conversion"), Garbage.FromJson(
+		TEXT("{\"version\":1,\"cells\":[[1,2,3,1e100,300,0,0,0]]}")));
+	TestFalse(TEXT("Impossible ground normals are refused"), Garbage.FromJson(
+		TEXT("{\"version\":1,\"cells\":[[1,2,3,225,300,0,0.8,0.8]]}")));
+	TestFalse(TEXT("Out-of-range decay days are refused"), Garbage.FromJson(
+		TEXT("{\"version\":1,\"decay_day\":2147483648,\"cells\":[]}")));
 	TestEqual(TEXT("A refused load leaves the ledger alone"), Garbage.StepsAt(Here), 1);
 
 	FIslandTrailLedger Weathered;

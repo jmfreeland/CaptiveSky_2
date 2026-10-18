@@ -22,6 +22,7 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 #include "UObject/ConstructorHelpers.h"
+#include <cmath>
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandTrail, Log, All);
 
@@ -117,27 +118,60 @@ bool FIslandTrailLedger::FromJson(const FString& Json)
 {
 	TSharedPtr<FJsonObject> Root;
 	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid()) return false;
-	int32 Version = 0;
-	if (!Root->TryGetNumberField(TEXT("version"), Version) || Version != TrailVersion) return false;
+	const double MinInt = static_cast<double>(TNumericLimits<int32>::Min());
+	const double MaxInt = static_cast<double>(TNumericLimits<int32>::Max());
+	double Version = 0.0;
+	if (!Root->TryGetNumberField(TEXT("version"), Version) || !std::isfinite(Version) ||
+		Version != static_cast<double>(TrailVersion)) return false;
 	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
-	if (!Root->TryGetArrayField(TEXT("cells"), Rows)) return false;
+	if (!Root->TryGetArrayField(TEXT("cells"), Rows) || Rows->Num() > MaxCells) return false;
 	TMap<FIntPoint, FIslandTrailCell> Loaded;
 	for (const TSharedPtr<FJsonValue>& RowValue : *Rows)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
 		if (!RowValue.IsValid() || !RowValue->TryGetArray(Row) || Row->Num() != 8) return false;
 		double V[8];
-		for (int32 I = 0; I < 8; ++I) if (!(*Row)[I]->TryGetNumber(V[I])) return false;
+		for (int32 I = 0; I < 8; ++I)
+		{
+			if (!(*Row)[I].IsValid() || !(*Row)[I]->TryGetNumber(V[I]) || !std::isfinite(V[I])) return false;
+		}
+
+		if (V[0] < MinInt || V[0] > MaxInt || V[1] < MinInt || V[1] > MaxInt ||
+			V[2] < 0.0 || V[2] > MaxInt ||
+			std::floor(V[0]) != V[0] || std::floor(V[1]) != V[1] || std::floor(V[2]) != V[2])
+		{
+			return false;
+		}
+		if (V[3] / CellSize < MinInt || V[3] / CellSize > MaxInt ||
+			V[4] / CellSize < MinInt || V[4] / CellSize > MaxInt ||
+			V[6] < -1.0 || V[6] > 1.0 || V[7] < -1.0 || V[7] > 1.0 ||
+			FMath::Square(V[6]) + FMath::Square(V[7]) > 1.0001)
+		{
+			return false;
+		}
+
+		const FIntPoint Key(static_cast<int32>(V[0]), static_cast<int32>(V[1]));
 		FIslandTrailCell Cell;
-		Cell.Steps = FMath::Max(0, static_cast<int32>(V[2]));
+		Cell.Steps = static_cast<int32>(V[2]);
 		Cell.Position = FVector(V[3], V[4], V[5]);
 		Cell.NormalX = static_cast<float>(V[6]);
 		Cell.NormalY = static_cast<float>(V[7]);
-		if (Loaded.Num() < MaxCells) Loaded.Add(FIntPoint(static_cast<int32>(V[0]), static_cast<int32>(V[1])), Cell);
+		if (Cell.Steps == 0) continue;
+		if (CellFor(Cell.Position) != Key || Loaded.Contains(Key)) return false;
+		Loaded.Add(Key, Cell);
+	}
+	int32 Day = -1;
+	if (Root->HasField(TEXT("decay_day")))
+	{
+		double DayValue = 0.0;
+		if (!Root->TryGetNumberField(TEXT("decay_day"), DayValue) || !std::isfinite(DayValue) ||
+			DayValue < -1.0 || DayValue > MaxInt || std::floor(DayValue) != DayValue)
+		{
+			return false;
+		}
+		Day = static_cast<int32>(DayValue);
 	}
 	Cells = MoveTemp(Loaded);
-	int32 Day = -1;
-	Root->TryGetNumberField(TEXT("decay_day"), Day);
 	LastDecayDay = Day;
 	return true;
 }
