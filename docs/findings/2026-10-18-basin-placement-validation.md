@@ -18,9 +18,19 @@ project's `UnrealEditor.exe` (started 2026-10-16 10:04:33, main window
 the normal sandbox had missed it. Per the user's earlier direction to leave
 this editor running, it was not closed or terminated.
 
-The automation was not run, and the target DLL was not relinked. The compile
-results establish syntax and translation-unit compatibility, not a successful
-full build or runtime behavior. When the editor is intentionally closed, rebuild
-and run `CaptiveSky2.Agent.IslandRainBasin` under NullRHI with agent thinking
-disabled and a zero model-request cap. No Island map, Content asset, or
-persistent world-state file was changed.
+To get an independent link, the same source and test changes were mirrored into
+the source-only scratch project
+`Saved/CompileScratch/Codex_MegaplantCull_20261018` (separate `Binaries`, no
+Island `Content`). Its editor target compiled both basin units and linked
+successfully in five actions. A focused NullRHI run used agent thinking disabled
+and a zero model-request cap, but crashed at `StartOfEnginePreInit` before
+automation began: null-address access violation at `SecondsSinceStart=0`, with
+the already known stack hash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`. The crash-side log is
+`Saved/CompileScratch/Codex_MegaplantCull_20261018/Saved/Crashes/_0000/CaptiveSky_2.log`.
+This reproduces the project-opening crash without Island Content and is not a
+test result; do not repeat the same launch until its startup environment or
+configuration meaningfully changes.
+
+The main-tree target still did not relink because PID 22688 holds its DLL. No
+Island map, Content asset, or persistent world-state file was changed.
