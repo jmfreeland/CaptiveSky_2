@@ -83,35 +83,62 @@ bool FIslandInstancedSkinnedFoliageProviderTest::RunTest(const FString& Paramete
 	TestNull(TEXT("Rebuilding after clearing the provider removes the prior component provider"),
 		Host->Instances->GetTransformProvider());
 
-	USkeletalMesh* Beech = LoadObject<USkeletalMesh>(nullptr,
-		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"));
-	if (Beech)
+	struct FInstalledMegaplant
 	{
-		const UDynamicWindSkeletalData* WindData = Cast<UDynamicWindSkeletalData>(
-			Beech->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()));
-		TestNotNull(TEXT("Installed PVE Beech keeps its DynamicWind skeletal profile"), WindData);
-		if (WindData && WindData->bIsEnabled)
+		const TCHAR* Name;
+		const TCHAR* AssetPath;
+	};
+	const FInstalledMegaplant Megaplants[] = {
+		{ TEXT("Common Hazel"),
+			TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Tree_Common_Hazel_01/Tree_Common_Hazel_01_A.Tree_Common_Hazel_01_A") },
+		{ TEXT("European Aspen"),
+			TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A") },
+		{ TEXT("European Beech"),
+			TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A") },
+		{ TEXT("Norway Maple"),
+			TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A") },
+	};
+	int32 InstalledMegaplantCount = 0;
+	for (const FInstalledMegaplant& Megaplant : Megaplants)
+	{
+		USkeletalMesh* Tree = LoadObject<USkeletalMesh>(nullptr, Megaplant.AssetPath);
+		if (!Tree)
 		{
-			Host->SourceMesh = Beech;
-			Host->RebuildInstances();
-			TestTrue(TEXT("An enabled PVE wind profile automatically selects UE's DynamicWind transform provider"),
-				Host->TransformProvider && Host->TransformProvider->IsA<UDynamicWindData>() &&
-				Host->Instances->GetTransformProvider() == Host->TransformProvider);
+			AddInfo(FString::Printf(TEXT("Installed Megaplant %s is absent in this test project; it was skipped."),
+				Megaplant.Name));
+			continue;
+		}
+		++InstalledMegaplantCount;
 
-			Host->SourceMesh = nullptr;
-			Host->RebuildInstances();
-			TestNull(TEXT("Replacing a wind-enabled source mesh clears its auto-created provider"), Host->TransformProvider.Get());
-			TestNull(TEXT("The component does not retain a stale DynamicWind provider after the source mesh is removed"),
-				Host->Instances->GetTransformProvider());
-		}
-		else if (WindData)
+		const FString Label = FString::Printf(TEXT("Installed PVE %s"), Megaplant.Name);
+		const UDynamicWindSkeletalData* WindData = Cast<UDynamicWindSkeletalData>(
+			Tree->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()));
+		TestNotNull(*FString::Printf(TEXT("%s keeps its DynamicWind skeletal profile"), *Label), WindData);
+		if (!WindData)
 		{
-			AddInfo(TEXT("The installed Beech carries DynamicWind data, but it is disabled; the host correctly leaves it in ref pose."));
+			continue;
 		}
+		TestTrue(*FString::Printf(TEXT("%s DynamicWind profile is enabled"), *Label), WindData->bIsEnabled);
+		if (!WindData->bIsEnabled)
+		{
+			continue;
+		}
+
+		Host->SourceMesh = Tree;
+		Host->RebuildInstances();
+		TestTrue(*FString::Printf(TEXT("%s automatically selects UE's DynamicWind transform provider"), *Label),
+			Host->TransformProvider && Host->TransformProvider->IsA<UDynamicWindData>() &&
+			Host->Instances->GetTransformProvider() == Host->TransformProvider);
+
+		Host->SourceMesh = nullptr;
+		Host->RebuildInstances();
+		TestNull(*FString::Printf(TEXT("Replacing %s clears its auto-created provider"), *Label), Host->TransformProvider.Get());
+		TestNull(*FString::Printf(TEXT("The component does not retain a stale provider after removing %s"), *Label),
+			Host->Instances->GetTransformProvider());
 	}
-	else
+	if (InstalledMegaplantCount == 0)
 	{
-		AddInfo(TEXT("The installed Beech Megaplant is absent in this test project; the generic provider lifecycle checks still ran."));
+		AddInfo(TEXT("No installed Megaplant tree assets were available; the generic provider lifecycle checks still ran."));
 	}
 	return true;
 }
