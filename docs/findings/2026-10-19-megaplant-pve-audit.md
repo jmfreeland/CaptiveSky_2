@@ -79,3 +79,18 @@ pending call was stopped; the separate desktop capture worked. Next, after the
 modal is cleared, use the PVE editor UI for one disposable export and preview
 under Island lighting. Do not interpret editor visibility as visual approval
 or as evidence that Megaplant foliage is ready for Island placement.
+
+## UE 5.8 PVE export capability (2026-10-19)
+
+Epic's [UE 5.8 PVE documentation](https://dev.epicgames.com/documentation/unreal-engine/procedural-vegetation-editor-pve-in-unreal-engine?lang=en-US)
+confirms that its Export utility bakes graph output into renderable geometry
+and can produce either a standard Static Mesh or a Skeletal Mesh. The
+[export-parameter API](https://dev.epicgames.com/documentation/unreal-engine/API/Plugins/ProceduralVegetation/FPVExportParams)
+clarifies the relevant trade-off: a skeletal export carries bones and can use
+the Dynamic Wind simulation preset; a static export has no wind animation.
+This makes the existing Megaplant PVE graphs a direct path to testable,
+wind-enabled woodland trees, not merely an inventory source. The local Python
+audit still cannot export because graph execution/export is editor/plugin work;
+the next candidate remains Norway Maple Forest, exported into a disposable
+folder as Skeletal Mesh with a wind preset, then checked for rendered canopy,
+materials, and bounded instance cost before any Island placement.
