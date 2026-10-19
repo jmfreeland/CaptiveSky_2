@@ -69,9 +69,11 @@ public:
 	double WeatherTimeOffset = 0.0;
 	/** Storms add up to this fraction on top of the usual wind. */
 	static constexpr float StormWindBoost = 0.9f;
-	/** Number of locally available flower forms used for the capped meadow accents. */
-	static constexpr int32 MeadowFlowerSpeciesCount = 9;
+	/** Local HISM flower forms; Tideglass wetland forms are excluded from the general meadow picker. */
+	static constexpr int32 MeadowFlowerSpeciesCount = 11;
 	static constexpr int32 WoodlandBluebellSpeciesIndex = 8;
+	static constexpr int32 TideglassMarshMarigoldSpeciesIndex = 9;
+	static constexpr int32 TideglassYellowFlagIrisSpeciesIndex = 10;
 	static constexpr float WoodlandBluebellInnerRadius = 1200.f;
 	static constexpr float WoodlandBluebellOuterRadius = 3800.f;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
@@ -80,6 +82,8 @@ public:
 	static constexpr int32 TideglassPollinatorFlowerSiteCount = 8;
 	static constexpr float TideglassPollinatorFlowerInnerRadius = 700.f;
 	static constexpr float TideglassPollinatorFlowerOuterRadius = 850.f;
+	/** Keep wet-edge cattail clumps from occupying a reserved pollinator flower pocket. */
+	static constexpr float TideglassPollinatorFlowerCattailClearance = 375.f;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
@@ -265,6 +269,11 @@ private:
 	/** Stable member offset for a small flower pocket; member indices start at zero. */
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	static FVector SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex);
+	static bool IsWithinTideglassPollinatorFlowerCattailClearance(const FVector& Position, const FVector& FlowerAnchor);
+	/** Deterministically reserve three of eight Tideglass pockets for the marsh marigold. */
+	static bool IsTideglassMarshMarigoldSite(int32 Seed, int32 SiteIndex);
+	/** Reserve two of eight Tideglass pockets for the broad-leaf yellow-flag iris. */
+	static bool IsTideglassYellowFlagIrisSite(int32 Seed, int32 SiteIndex);
 	/** Compact a sorted index array in one pass, preserving sorted uniqueness. */
 	static void CompactSortedUniqueIndices(TArray<int32>& Indices);
 	/** Merge two sorted, unique index arrays without another sort or repeated shifting. */

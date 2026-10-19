@@ -79,7 +79,7 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 {
 	const AIslandWeather* WeatherDefaults = AIslandWeather::StaticClass()->GetDefaultObject<AIslandWeather>();
 	if (!TestNotNull(TEXT("Island weather class defaults are available"), WeatherDefaults)) return false;
-	TestEqual(TEXT("The capped meadow mix has nine deterministic species components"),
+	TestEqual(TEXT("The capped meadow mix has nine deterministic meadow species plus two Tideglass wet-margin species"),
 		WeatherDefaults->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
 	if (!WeatherDefaults->IslandMeadowFlowers.IsValidIndex(8)) return false;
 
@@ -93,6 +93,119 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("The bluebell HISM uses its imported mesh"), BluebellInstances->GetStaticMesh().Get(), Bluebells);
 		TestEqual(TEXT("Bluebells remain non-colliding"), BluebellInstances->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		TestFalse(TEXT("Bluebells do not alter navigation"), BluebellInstances->CanEverAffectNavigation());
+	}
+
+	UStaticMesh* MarshMarigold = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Generated/ComfyBlender/TideglassMarshMarigold_Review_20261018/SM_TideglassMarshMarigold_01.SM_TideglassMarshMarigold_01"));
+	TestNotNull(TEXT("The imported Tideglass marsh-marigold clump resolves"), MarshMarigold);
+	const UHierarchicalInstancedStaticMeshComponent* MarshMarigoldInstances =
+		WeatherDefaults->IslandMeadowFlowers.IsValidIndex(AIslandWeather::TideglassMarshMarigoldSpeciesIndex)
+		? WeatherDefaults->IslandMeadowFlowers[AIslandWeather::TideglassMarshMarigoldSpeciesIndex] : nullptr;
+	TestNotNull(TEXT("A dedicated HISM holds the Tideglass marsh-marigold variant"), MarshMarigoldInstances);
+	if (MarshMarigoldInstances)
+	{
+		TestEqual(TEXT("The wet-margin HISM uses the imported marsh-marigold mesh"),
+			MarshMarigoldInstances->GetStaticMesh().Get(), MarshMarigold);
+		TestEqual(TEXT("Marsh marigolds remain non-colliding"), MarshMarigoldInstances->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Marsh marigolds do not alter navigation"), MarshMarigoldInstances->CanEverAffectNavigation());
+	}
+
+	UStaticMesh* YellowFlagIris = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/Generated/ComfyBlender/WetlandYellowFlagIris_Review_20261018/SM_WetlandYellowFlagIris_01.SM_WetlandYellowFlagIris_01"));
+	TestNotNull(TEXT("The imported yellow-flag iris clump resolves"), YellowFlagIris);
+	const UHierarchicalInstancedStaticMeshComponent* YellowFlagIrisInstances =
+		WeatherDefaults->IslandMeadowFlowers.IsValidIndex(AIslandWeather::TideglassYellowFlagIrisSpeciesIndex)
+		? WeatherDefaults->IslandMeadowFlowers[AIslandWeather::TideglassYellowFlagIrisSpeciesIndex] : nullptr;
+	TestNotNull(TEXT("A dedicated HISM holds the Tideglass yellow-flag iris"), YellowFlagIrisInstances);
+	if (YellowFlagIrisInstances)
+	{
+		TestEqual(TEXT("The wet-margin iris HISM uses the imported yellow-flag iris mesh"),
+			YellowFlagIrisInstances->GetStaticMesh().Get(), YellowFlagIris);
+		TestEqual(TEXT("Yellow-flag irises remain non-colliding"), YellowFlagIrisInstances->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Yellow-flag irises do not alter navigation"), YellowFlagIrisInstances->CanEverAffectNavigation());
+	}
+
+	int32 MarshMarigoldSiteCount = 0;
+	int32 YellowFlagIrisSiteCount = 0;
+	for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+	{
+		const bool bIsMarshMarigold = AIslandWeather::IsTideglassMarshMarigoldSite(42, SiteIndex);
+		TestEqual(TEXT("Tideglass species selection is deterministic"),
+			AIslandWeather::IsTideglassMarshMarigoldSite(42, SiteIndex), bIsMarshMarigold);
+		const bool bIsYellowFlagIris = AIslandWeather::IsTideglassYellowFlagIrisSite(42, SiteIndex);
+		TestEqual(TEXT("Yellow-flag iris selection is deterministic"),
+			AIslandWeather::IsTideglassYellowFlagIrisSite(42, SiteIndex), bIsYellowFlagIris);
+		TestFalse(TEXT("A Tideglass pocket does not receive both specialist wetland species"),
+			bIsMarshMarigold && bIsYellowFlagIris);
+		MarshMarigoldSiteCount += bIsMarshMarigold ? 1 : 0;
+		YellowFlagIrisSiteCount += bIsYellowFlagIris ? 1 : 0;
+	}
+	TestEqual(TEXT("Three small Tideglass pockets use the low freshwater marsh-marigold clump"), MarshMarigoldSiteCount, 3);
+	TestEqual(TEXT("Two small Tideglass pockets use the broad-leaf yellow-flag iris"), YellowFlagIrisSiteCount, 2);
+	TestTrue(TEXT("Changing the world seed shifts the alternating Tideglass pattern"),
+		AIslandWeather::IsTideglassMarshMarigoldSite(42, 0) != AIslandWeather::IsTideglassMarshMarigoldSite(43, 0));
+	TestTrue(TEXT("Changing the world seed shifts the yellow-flag iris pockets"),
+		AIslandWeather::IsTideglassYellowFlagIrisSite(42, 7) != AIslandWeather::IsTideglassYellowFlagIrisSite(43, 7));
+	for (int32 Seed = -3; Seed <= 3; ++Seed)
+	{
+		for (const float WoodlandAffinity : {0.f, 0.5f, 1.f})
+		{
+			const int32 MeadowSpecies = AIslandWeather::SelectMeadowFlowerVariant(FVector(1234.f, -987.f, 0.f), Seed, WoodlandAffinity);
+			TestTrue(TEXT("Wetland marsh marigold stays out of the general meadow and woodland mix"),
+				MeadowSpecies >= 0 && MeadowSpecies < AIslandWeather::TideglassMarshMarigoldSpeciesIndex);
+		}
+	}
+
+	// Mirror the deterministic Tideglass offset chain without landscape traces or
+	// other scene clearances. Reserve the eight flower pockets before selecting
+	// cattails, and ensure the established ten-instance/80-candidate bounds hold.
+	const int32 TideglassWeatherSeeds[] = {-17, -1, 0, 1, 42, 71, 99, 2026};
+	for (const int32 TideglassWeatherSeed : TideglassWeatherSeeds)
+	{
+		const uint32 TideglassLandmarkSeed = static_cast<uint32>(TideglassWeatherSeed) ^ 0x2f6e2b1u;
+		const int32 TideglassCattailSeed = static_cast<int32>(TideglassLandmarkSeed ^ 0x7b352d91u);
+		TArray<FVector> ReservedPollinatorAnchors;
+		for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+			ReservedPollinatorAnchors.Add(AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(TideglassWeatherSeed, SiteIndex));
+		TArray<FTransform> CattailCandidates;
+		AIslandWeather::BuildGroundCoverOffsets(TideglassCattailSeed, 80, 556.f, 1406.f, CattailCandidates);
+		TArray<FVector> ReservedCattails;
+		int32 CandidatesConsumed = 0;
+		for (int32 CandidateIndex = 0; CandidateIndex < CattailCandidates.Num(); ++CandidateIndex)
+		{
+			const FVector Candidate = CattailCandidates[CandidateIndex].GetLocation();
+			bool bOverlapsPollinatorPocket = false;
+			for (const FVector& FlowerAnchor : ReservedPollinatorAnchors)
+				if (AIslandWeather::IsWithinTideglassPollinatorFlowerCattailClearance(Candidate, FlowerAnchor))
+				{
+					bOverlapsPollinatorPocket = true;
+					break;
+				}
+			if (bOverlapsPollinatorPocket) continue;
+			bool bTooCloseToCattail = false;
+			for (const FVector& ExistingCattail : ReservedCattails)
+				if (FVector::Dist2D(Candidate, ExistingCattail) < 300.f)
+				{
+					bTooCloseToCattail = true;
+					break;
+				}
+			if (bTooCloseToCattail) continue;
+			ReservedCattails.Add(Candidate);
+			if (ReservedCattails.Num() == 10)
+			{
+				CandidatesConsumed = CandidateIndex + 1;
+				break;
+			}
+		}
+		TestEqual(TEXT("Pollinator pocket reservation preserves all ten cattail slots across representative seeds"),
+			ReservedCattails.Num(), 10);
+		TestTrue(TEXT("Reserved cattails remain within the existing 80-candidate budget for every seed"),
+			CandidatesConsumed > 0 && CandidatesConsumed <= 80);
+		bool bEveryPollinatorPocketIsClear = true;
+		for (const FVector& FlowerAnchor : ReservedPollinatorAnchors)
+			for (const FVector& Cattail : ReservedCattails)
+				bEveryPollinatorPocketIsClear &= !AIslandWeather::IsWithinTideglassPollinatorFlowerCattailClearance(Cattail, FlowerAnchor);
+		TestTrue(TEXT("Selected cattails leave all deterministic pollinator pockets clear"), bEveryPollinatorPocketIsClear);
 	}
 
 	return true;
@@ -209,7 +322,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	}
 	TArray<UHierarchicalInstancedStaticMeshComponent*> WeatherFoliageComponents;
 	Weather->GetComponents(WeatherFoliageComponents);
-	TestEqual(TEXT("All current foliage component groups are covered by the rendering contract"), WeatherFoliageComponents.Num(), 23);
+	TestEqual(TEXT("All current foliage component groups, including both dedicated Tideglass wet-margin slots, are covered by the rendering contract"),
+		WeatherFoliageComponents.Num(), 25);
 	const bool bExpectedFoliageDistanceFields = FParse::Param(FCommandLine::Get(), TEXT("IslandFoliageDistanceFields"));
 	for (const UHierarchicalInstancedStaticMeshComponent* Component : WeatherFoliageComponents)
 	{
@@ -301,11 +415,11 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		Weather->GroundCoverPeriwinkleClearedInstanceCount > 0 && TideglassLandmarkCount == 1);
 	UHierarchicalInstancedStaticMeshComponent* GrassC = Weather->FindShoreGrassC();
 	TestNotNull(TEXT("Third grass component is present"), GrassC);
-	TestTrue(TEXT("PlantFactory Festuca mesh and all six imported materials resolve"),
+	TestTrue(TEXT("Imported Festuca mesh and all six materials resolve"),
 		Weather->IslandFestuca->GetStaticMesh() && Weather->IslandFestuca->GetStaticMesh()->GetStaticMaterials().Num() == 6);
-	TestTrue(TEXT("PlantFactory Phalaris mesh and all five imported materials resolve"),
+	TestTrue(TEXT("Imported Phalaris mesh and all five materials resolve"),
 		Weather->IslandPhalaris->GetStaticMesh() && Weather->IslandPhalaris->GetStaticMesh()->GetStaticMaterials().Num() == 5);
-	TestEqual(TEXT("Nine collisionless HISM components carry the meadow flower mix"),
+	TestEqual(TEXT("Eleven collisionless HISM components carry the meadow and Tideglass flower mix"),
 		Weather->IslandMeadowFlowers.Num(), AIslandWeather::MeadowFlowerSpeciesCount);
 	const TCHAR* MeadowFlowerPaths[AIslandWeather::MeadowFlowerSpeciesCount] = {
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"),
@@ -316,7 +430,9 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_20_01.flower_20_01"),
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_02_01.flower_02_01"),
 		TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_03_01.flower_03_01"),
-		TEXT("/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/SM_WoodlandBluebells_01.SM_WoodlandBluebells_01") };
+		TEXT("/Game/Generated/ComfyBlender/WoodlandBluebells_Review_20261012/SM_WoodlandBluebells_01.SM_WoodlandBluebells_01"),
+		TEXT("/Game/Generated/ComfyBlender/TideglassMarshMarigold_Review_20261018/SM_TideglassMarshMarigold_01.SM_TideglassMarshMarigold_01"),
+		TEXT("/Game/Generated/ComfyBlender/WetlandYellowFlagIris_Review_20261018/SM_WetlandYellowFlagIris_01.SM_WetlandYellowFlagIris_01") };
 	for (int32 SpeciesIndex = 0; SpeciesIndex < Weather->IslandMeadowFlowers.Num(); ++SpeciesIndex)
 	{
 		UStaticMesh* MeadowFlowerMesh = LoadObject<UStaticMesh>(nullptr, MeadowFlowerPaths[SpeciesIndex]);
@@ -554,7 +670,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		FVector::Dist2D(FlowerPocketA, FlowerPocketB) >= 475.f);
 	TestTrue(TEXT("Flower pockets have a strict three-instance-per-site ceiling"),
 		AIslandWeather::MeadowFlowersPerPocket == 3);
-	int32 MeadowFlowerSpeciesCounts[AIslandWeather::MeadowFlowerSpeciesCount] = {};
+	int32 MeadowFlowerSpeciesCounts[AIslandWeather::WoodlandBluebellSpeciesIndex + 1] = {};
 	for (int32 X = 0; X < 12; ++X)
 		for (int32 Y = 0; Y < 12; ++Y)
 			++MeadowFlowerSpeciesCounts[AIslandWeather::SelectMeadowFlowerVariant(FVector(X * 2000.f, Y * 2000.f, 0.f), 71)];
@@ -569,7 +685,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		MinimumFlowerPatches >= 8 && MaximumFlowerPatches <= 38);
 	int32 OpenMeadowBluebells = 0;
 	int32 WoodlandEdgeBluebells = 0;
-	int32 WoodlandEdgeOtherSpecies[AIslandWeather::MeadowFlowerSpeciesCount - 1] = {};
+	int32 WoodlandEdgeOtherSpecies[AIslandWeather::WoodlandBluebellSpeciesIndex] = {};
 	for (int32 X = 0; X < 24; ++X)
 		for (int32 Y = 0; Y < 24; ++Y)
 		{
