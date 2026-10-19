@@ -1,6 +1,8 @@
 #include "IslandTidepoolPeriwinkle.h"
 
+#include "IslandCommonFrog.h"
 #include "IslandDayNight.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandTideglassSubsystem.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
@@ -107,6 +109,7 @@ void AIslandTidepoolPeriwinkle::BeginPlay()
 	Super::BeginPlay();
 	HomeLocation = GetActorLocation();
 	Phase = FMath::Fmod(FMath::Abs(HomeLocation.X * 0.001f + HomeLocation.Y * 0.0017f), 2.f * PI);
+	RavenCheckRemaining = 0.4f * (Phase / (2.f * PI));
 	if (const UStaticMeshComponent* PoolSurface = UIslandTideglassSubsystem::FindPoolSurface(GetWorld()))
 	{
 		SeaLevelZ = PoolSurface->GetComponentLocation().Z;
@@ -472,6 +475,7 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.4f;
+		WildlifeAttentionTarget = FindNearbyWildlifeAttentionTarget();
 		CheckForNearbyRavenDisturbance();
 		CheckForNearbyRatDisturbance();
 		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
@@ -498,8 +502,18 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	const float AttentionScale = FMath::Lerp(1.f, 0.35f, ExposureRest);
 	// Close visitors draw a quiet glance; the animal stays planted on its rock.
 	float TargetAttentionYaw = 0.f;
+	bool bPlayerInAttentionRange = false;
 	if (const APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
-		TargetAttentionYaw = CalculateAttentionYaw(PlayerPawn->GetActorLocation());
+	{
+		const float PlayerDistance = FVector::Dist2D(GetActorLocation(), PlayerPawn->GetActorLocation());
+		if (FMath::IsFinite(PlayerDistance) && PlayerDistance <= 220.f)
+		{
+			bPlayerInAttentionRange = true;
+			TargetAttentionYaw = CalculateAttentionYaw(PlayerPawn->GetActorLocation());
+		}
+	}
+	if (!bPlayerInAttentionRange && WildlifeAttentionTarget.IsValid())
+		TargetAttentionYaw = CalculateAttentionYaw(WildlifeAttentionTarget->GetActorLocation());
 	UpdateAttentionYaw(TargetAttentionYaw, DeltaSeconds);
 	for (UStaticMeshComponent* EyeStalk : EyeStalks)
 		if (EyeStalk) EyeStalk->SetRelativeScale3D(FVector(0.018f, 0.018f, 0.10f * StalkExtension));
@@ -568,4 +582,45 @@ float AIslandTidepoolPeriwinkle::CalculateAttentionYaw(const FVector& TargetLoca
 	if (LocalDirection.X <= 0.f)
 		return 0.f;
 	return FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(LocalDirection.Y, LocalDirection.X)), -MaximumYaw, MaximumYaw);
+}
+
+bool AIslandTidepoolPeriwinkle::ShouldAttendWildlife(float Distance, float VerticalOffset)
+{
+	constexpr float AttentionRadius = 220.f;
+	constexpr float MinimumVerticalOffset = -80.f;
+	constexpr float MaximumVerticalOffset = 220.f;
+	return FMath::IsFinite(Distance) && Distance >= 0.f && Distance <= AttentionRadius &&
+		FMath::IsFinite(VerticalOffset) && VerticalOffset >= MinimumVerticalOffset &&
+		VerticalOffset <= MaximumVerticalOffset;
+}
+
+AActor* AIslandTidepoolPeriwinkle::FindNearbyWildlifeAttentionTarget() const
+{
+	UWorld* World = GetWorld();
+	if (!World) return nullptr;
+
+	AActor* BestTarget = nullptr;
+	float BestDistanceSquared = FMath::Square(220.f);
+	const FVector EyeBase = GetActorLocation();
+	const auto Consider = [this, &BestTarget, &BestDistanceSquared, &EyeBase](AActor* Candidate)
+	{
+		if (!IsValid(Candidate)) return;
+		const FVector Offset = Candidate->GetActorLocation() - EyeBase;
+		const float DistanceSquared = Offset.SizeSquared2D();
+		const float Distance = FMath::Sqrt(DistanceSquared);
+		if (!ShouldAttendWildlife(Distance, Offset.Z) || DistanceSquared > BestDistanceSquared) return;
+
+		// Eye stalks can follow a nearby animal in front of the shell without
+		// rotating the whole body or adding a visibility trace per snail.
+		const FVector LocalDirection = GetActorTransform().InverseTransformVectorNoScale(Offset);
+		if (LocalDirection.X <= 0.f) return;
+		BestTarget = Candidate;
+		BestDistanceSquared = DistanceSquared;
+	};
+
+	for (TActorIterator<AIslandCommonFrog> It(World); It; ++It)
+		Consider(*It);
+	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It)
+		Consider(*It);
+	return BestTarget;
 }

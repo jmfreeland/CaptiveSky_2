@@ -3,6 +3,40 @@
 #include "IslandTideglassSubsystem.h"
 #include <limits>
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleWildlifeAttentionTest,
+	"CaptiveSky2.Agent.TidepoolPeriwinkleWildlifeAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleWildlifeAttentionTest::RunTest(const FString& Parameters)
+{
+	using Periwinkle = AIslandTidepoolPeriwinkle;
+	TestTrue(TEXT("A nearby frog or dragonfly can attract a quiet glance"),
+		Periwinkle::ShouldAttendWildlife(180.f, 45.f));
+	TestTrue(TEXT("The attention radius boundary is inclusive"),
+		Periwinkle::ShouldAttendWildlife(220.f, 0.f));
+	TestFalse(TEXT("Distant wildlife does not draw the snail's gaze"),
+		Periwinkle::ShouldAttendWildlife(220.1f, 0.f));
+	TestFalse(TEXT("Wildlife far below the tidepool rock is ignored"),
+		Periwinkle::ShouldAttendWildlife(120.f, -80.1f));
+	TestTrue(TEXT("A low-flying dragonfly remains within the gaze band"),
+		Periwinkle::ShouldAttendWildlife(120.f, 220.f));
+	TestFalse(TEXT("Wildlife above the small gaze band is ignored"),
+		Periwinkle::ShouldAttendWildlife(120.f, 220.1f));
+	TestFalse(TEXT("Invalid distances cannot draw the gaze"),
+		Periwinkle::ShouldAttendWildlife(std::numeric_limits<float>::infinity(), 0.f));
+	TestFalse(TEXT("Invalid heights cannot draw the gaze"),
+		Periwinkle::ShouldAttendWildlife(120.f, std::numeric_limits<float>::quiet_NaN()));
+
+	Periwinkle* Snail = NewObject<Periwinkle>(GetTransientPackage());
+	if (!Snail) return false;
+	const FVector Origin = Snail->GetActorLocation();
+	const float FrontLeftYaw = Snail->CalculateAttentionYaw(Origin + FVector(120.f, -120.f, 0.f));
+	TestTrue(TEXT("The eye stalks turn toward a nearby animal to the left"), FrontLeftYaw < -20.f);
+	const float BehindYaw = Snail->CalculateAttentionYaw(Origin + FVector(-120.f, 30.f, 0.f));
+	TestEqual(TEXT("A nearby animal behind the shell does not cause an impossible backward gaze"), BehindYaw, 0.f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleCrabCueTest, "CaptiveSky2.Agent.TidepoolPeriwinkleCrabCue",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 

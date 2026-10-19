@@ -11,6 +11,8 @@ class UStaticMeshComponent;
 class AIslandDayNight;
 class AIslandWeather;
 class AIslandTidepoolCrab;
+class AIslandCommonFrog;
+class AIslandTideglassDragonfly;
 class ARatAgentAIController;
 class ARavenAgentAIController;
 class APawn;
@@ -54,6 +56,7 @@ protected:
 
 private:
 	friend class FIslandNightEcologyTest;
+	friend class FIslandPeriwinkleWildlifeAttentionTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Foot;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -93,7 +96,10 @@ private:
 	TWeakObjectPtr<AIslandWeather> IslandWeather;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
+	TWeakObjectPtr<AActor> WildlifeAttentionTarget;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
+	AActor* FindNearbyWildlifeAttentionTarget() const;
+	static bool ShouldAttendWildlife(float Distance, float VerticalOffset);
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void CheckForNearbyCrabDisturbance();
 	void CheckForNearbyRavenDisturbance();
