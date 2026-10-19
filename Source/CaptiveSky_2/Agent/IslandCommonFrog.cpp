@@ -11,6 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "IslandDayNight.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandWeather.h"
 #include "RatAgentAIController.h"
 #include "RavenAgentAIController.h"
@@ -104,6 +105,8 @@ void AIslandCommonFrog::BeginPlay()
 	const int32 Seed = FMath::FloorToInt(HomeLocation.X * 0.31f + HomeLocation.Y * 0.73f) ^ 0x51A7;
 	Random.Initialize(Seed);
 	AmbientHopRemaining = Random.FRandRange(22.f, 42.f);
+	DragonflyCheckRemaining = Random.FRandRange(0.35f, 0.9f);
+	RestingRotation = GetActorRotation();
 	FindEnvironment();
 
 	if (!BaseShapeMaterial) return;
@@ -217,6 +220,38 @@ void AIslandCommonFrog::CheckForNearbyWildlife()
 	}
 }
 
+void AIslandCommonFrog::CheckForNearbyDragonfly()
+{
+	if (!GetWorld()) return;
+	if (DragonflyPresenceLatch.IsValid())
+	{
+		const FVector Offset = DragonflyPresenceLatch->GetActorLocation() - GetActorLocation();
+		if (Offset.Size2D() > 430.f || Offset.Z < 0.f || Offset.Z > 300.f)
+			DragonflyPresenceLatch.Reset();
+	}
+	if (DragonflyPresenceLatch.IsValid() || DragonflyAttentionRemaining > 0.f ||
+		DragonflyAttentionCooldownRemaining > 0.f || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
+
+	const FVector EyeLocation = GetActorLocation() + FVector(0.f, 0.f, 8.f);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(CommonFrogDragonflySight), false, this);
+	for (TActorIterator<AIslandTideglassDragonfly> It(GetWorld()); It; ++It)
+	{
+		AIslandTideglassDragonfly* Dragonfly = *It;
+		if (!IsValid(Dragonfly)) continue;
+		const FVector DragonflyLocation = Dragonfly->GetActorLocation();
+		if (!ShouldWatchLowDragonfly(FVector::Dist2D(GetActorLocation(), DragonflyLocation),
+			DragonflyLocation.Z - GetActorLocation().Z)) continue;
+		FHitResult SightHit;
+		if (GetWorld()->LineTraceSingleByChannel(SightHit, EyeLocation, DragonflyLocation, ECC_Visibility, Query) &&
+			SightHit.GetActor() != Dragonfly) continue;
+		if (RespondToNearbyDragonfly(Dragonfly->GetActorLocation()))
+		{
+			DragonflyPresenceLatch = Dragonfly;
+			return;
+		}
+	}
+}
+
 bool AIslandCommonFrog::ShouldHopFromObserver(float DistanceCm, float VerticalOffsetCm)
 {
 	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= FrogObserverRadiusCm &&
@@ -239,6 +274,26 @@ float AIslandCommonFrog::AmbientActivityScale(float RainIntensity, float NightAm
 	if (!FMath::IsFinite(RainIntensity) || !FMath::IsFinite(NightAmount)) return 0.f;
 	return FMath::Clamp(0.18f + 0.50f * FMath::Clamp(RainIntensity, 0.f, 1.f) +
 		0.50f * FMath::Clamp(NightAmount, 0.f, 1.f), 0.f, 1.f);
+}
+
+bool AIslandCommonFrog::ShouldWatchLowDragonfly(float DistanceCm, float VerticalOffsetCm)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 35.f && DistanceCm <= 280.f &&
+		FMath::IsFinite(VerticalOffsetCm) && VerticalOffsetCm >= 45.f && VerticalOffsetCm <= 220.f;
+}
+
+bool AIslandCommonFrog::RespondToNearbyDragonfly(const FVector& DragonflyLocation)
+{
+	if (StartleCooldownRemaining > 0.f || HopRemaining > 0.f || DragonflyAttentionRemaining > 0.f ||
+		DragonflyAttentionCooldownRemaining > 0.f || !FMath::IsFinite(DragonflyLocation.X) ||
+		!FMath::IsFinite(DragonflyLocation.Y) || !FMath::IsFinite(DragonflyLocation.Z)) return false;
+	const FVector Offset = DragonflyLocation - GetActorLocation();
+	if (!ShouldWatchLowDragonfly(Offset.Size2D(), Offset.Z)) return false;
+	RestingRotation = GetActorRotation();
+	DragonflyLookLocation = DragonflyLocation;
+	DragonflyAttentionRemaining = 1.4f;
+	DragonflyAttentionCooldownRemaining = 16.f;
+	return true;
 }
 
 float AIslandCommonFrog::HopArcHeight(float Alpha, float MaximumHeightCm)
@@ -269,6 +324,8 @@ FVector AIslandCommonFrog::ResolveGroundLocation(const FVector& Desired) const
 
 bool AIslandCommonFrog::BeginHop(const FVector& RequestedDirection, float PreferredDistanceCm)
 {
+	DragonflyAttentionRemaining = 0.f;
+	DragonflyPresenceLatch.Reset();
 	FVector Direction(RequestedDirection.X, RequestedDirection.Y, 0.f);
 	if (!Direction.Normalize()) return false;
 	FVector Desired = GetActorLocation() + Direction * FMath::Clamp(PreferredDistanceCm, 45.f, 210.f);
@@ -309,12 +366,20 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Delta = FMath::Max(0.f, FMath::IsFinite(DeltaSeconds) ? DeltaSeconds : 0.f);
 	StartleCooldownRemaining = FMath::Max(0.f, StartleCooldownRemaining - Delta);
+	DragonflyAttentionCooldownRemaining = FMath::Max(0.f, DragonflyAttentionCooldownRemaining - Delta);
+	DragonflyAttentionRemaining = FMath::Max(0.f, DragonflyAttentionRemaining - Delta);
 	ObserverCheckRemaining -= Delta;
 	if (ObserverCheckRemaining <= 0.f)
 	{
 		ObserverCheckRemaining = 0.30f;
 		CheckForPlayerDisturbance();
 		CheckForNearbyWildlife();
+	}
+	DragonflyCheckRemaining -= Delta;
+	if (DragonflyCheckRemaining <= 0.f)
+	{
+		DragonflyCheckRemaining = Random.FRandRange(0.55f, 0.9f);
+		CheckForNearbyDragonfly();
 	}
 
 	if (HopRemaining > 0.f)
@@ -325,9 +390,26 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 			FVector(0.f, 0.f, HopArcHeight(Alpha, FrogHopHeightCm));
 		SetActorLocation(Position, false, nullptr, ETeleportType::TeleportPhysics);
 		HopRemaining = FMath::Max(0.f, HopDuration - HopElapsed);
-		if (HopRemaining <= 0.f) SetActorLocation(HopTargetLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		if (HopRemaining <= 0.f)
+		{
+			SetActorLocation(HopTargetLocation, false, nullptr, ETeleportType::TeleportPhysics);
+			RestingRotation = GetActorRotation();
+		}
 		return;
 	}
+
+	if (DragonflyAttentionRemaining > 0.f)
+	{
+		const FVector LookTarget = DragonflyPresenceLatch.IsValid()
+			? DragonflyPresenceLatch->GetActorLocation() : DragonflyLookLocation;
+		const FVector ToDragonfly = LookTarget - GetActorLocation();
+		FRotator LookRotation = ToDragonfly.Rotation();
+		LookRotation.Pitch = 0.f;
+		LookRotation.Roll = 0.f;
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), LookRotation, Delta, 5.f));
+		return;
+	}
+	SetActorRotation(FMath::RInterpTo(GetActorRotation(), RestingRotation, Delta, 2.5f));
 
 	AmbientHopRemaining -= Delta;
 	if (AmbientHopRemaining > 0.f) return;
