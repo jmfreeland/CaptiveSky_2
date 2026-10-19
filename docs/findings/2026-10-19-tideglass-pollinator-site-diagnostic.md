@@ -266,3 +266,19 @@ open asset editor; the prompt was left alone. No PIE, map/asset edit, or
 Live Coding request was made. The new flower-query regression is now linked in
 the scratch module but remains unrun; production flower-site counts and
 gameplay-distance visibility remain unverified.
+
+## Live-editor automation route recheck (2026-10-20)
+
+The Windows app inventory still exposes one `CaptiveSky_2 - Unreal Editor`
+window. Its screenshot shows the Island loaded with `TideglassPool` selected;
+the asset-reopen prompt remains visible. The window's accessibility provider
+returns no tree or focused-element information, so I did not type into the
+editor console or dismiss the prompt. A targeted read-only Unreal MCP
+`EditorToolset` schema request remained pending for 60 seconds and was stopped.
+The expected `UnrealEditor-Core.pdb` and Windows SDK `cdb.exe` are absent from
+their standard install paths, so the scratch pre-init dump was not symbolized.
+No Live Coding compile, automation run, map save, or asset change occurred.
+Next verification requires either a responsive editor bridge/focusable
+automation panel or explicit user direction to load the scratch-built module
+through Live Coding; then run `GroundCover` and `MeadowFlowerSpecies` and check
+the saved Island's production gate counts.
