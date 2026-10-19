@@ -1077,6 +1077,13 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Raven tracks the firefly body instead of looking above it"),
 				BlueprintController->WildlifeAttentionLocation.Equals(
 					NearbyNightFirefly->GetActorLocation() + FVector(0.f, 0.f, 12.f), 0.1f));
+			NearbyNightFirefly->SetActorLocation(NearbyNightFirefly->GetActorLocation() + FVector(0.f, 80.f, 6.f));
+			BlueprintController->Tick(0.25f);
+			TestTrue(TEXT("The Raven keeps the brief glance and follows the moving firefly"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyNightFirefly &&
+				BlueprintController->WildlifeAttentionRemaining > 0.9f &&
+				BlueprintController->WildlifeAttentionLocation.Equals(
+					NearbyNightFirefly->GetActorLocation() + FVector(0.f, 0.f, 12.f), 0.1f));
 		}
 		if (NearbyNightFirefly) NearbyNightFirefly->Destroy();
 		if (FoxGround) FoxGround->Destroy();
