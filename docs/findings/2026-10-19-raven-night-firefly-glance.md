@@ -8,4 +8,5 @@ The cue requires an Island clock, positive configured firefly glow, clear visibi
 
 - `git diff --check` passed.
 - UE 5.8.3 `CaptiveSky_2Editor` scratch-target build succeeded (29 actions; includes `RavenAgentAIController.cpp` and `RavenPerchTests.cpp`). The main editor and its loaded binaries were not modified.
-- Added deterministic Raven-perch assertions for night prominence, distance, height, and non-finite input. Unreal automation was not run in this turn; compile success is not a test-pass or in-world visual confirmation.
+- Deterministic Raven-perch assertions cover night prominence, distance, height, and non-finite input. The focused `CaptiveSky2.Agent.RavenPerch` automation subsequently passed in the isolated project with `-NullRHI`, thinking disabled, `-CaptiveSkyMaxRealtimeSeconds=60`, and a zero-model-request cap. Log: `Saved/CompileScratch/Codex_TideglassPollinator_20261019/Project/Saved/Logs/Codex_RavenNightFirefly_20261019.log`.
+- The test log warns that two skinned-asset compile estimates (4.5 GiB each) exceeded the commandlet's reported 2.1 GiB asset-compile memory limit, but the run completed with exit code 0; available physical memory afterward was 6.2 GiB. This remains deterministic automation evidence only, not an in-world/nighttime visual confirmation.
