@@ -11,6 +11,7 @@ class UMaterialInstanceDynamic;
 class AIslandWeather;
 class AIslandCommonFrog;
 class AIslandListeningStonesChime;
+class APawn;
 
 /** A small, untargetable dragonfly that patrols above the Tideglass shore by day. */
 UCLASS()
@@ -76,6 +77,9 @@ private:
 	float ScatterRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	TWeakObjectPtr<APawn> PlayerObservationLatch;
+	float PlayerObservationCooldownRemaining = 0.f;
+	float PlayerCheckRemaining = 0.f;
 	TWeakObjectPtr<AIslandCommonFrog> FrogPresenceLatch;
 	float FrogScatterCooldownRemaining = 0.f;
 	float FrogCheckRemaining = 0.f;
@@ -101,6 +105,7 @@ private:
 	void LogFlowerInterestTelemetry(const TCHAR* Event) const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
+	void CheckForQuietPlayerObservation();
 	void CheckForNearbyHoppingFrog();
 	void CheckForNearbySurfaceCue();
 	void CheckForNearbyMeadowFlower();

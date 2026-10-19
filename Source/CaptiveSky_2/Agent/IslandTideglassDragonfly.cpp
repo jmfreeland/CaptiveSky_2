@@ -10,6 +10,8 @@
 #include "CollisionShape.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Logging/LogMacros.h"
 #include "ProceduralMeshComponent.h"
@@ -421,6 +423,40 @@ void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
 	}
 }
 
+void AIslandTideglassDragonfly::CheckForQuietPlayerObservation()
+{
+	if (!GetWorld()) return;
+
+	constexpr float NoticeRadiusCm = 220.f;
+	constexpr float RearmRadiusCm = 480.f;
+	constexpr float MaximumVerticalSeparationCm = 220.f;
+	constexpr float QuietMovementSpeedCmPerSecond = 110.f;
+	for (TActorIterator<APlayerController> It(GetWorld()); It; ++It)
+	{
+		APawn* Player = It->GetPawn();
+		if (!IsValid(Player)) continue;
+
+		const FVector Offset = Player->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (PlayerObservationLatch.Get() == Player && DistanceSquared > FMath::Square(RearmRadiusCm))
+			PlayerObservationLatch.Reset();
+
+		if (DistanceSquared > FMath::Square(NoticeRadiusCm) || FMath::Abs(Offset.Z) > MaximumVerticalSeparationCm ||
+			Player->GetVelocity().SizeSquared2D() > FMath::Square(QuietMovementSpeedCmPerSecond))
+			continue;
+
+		// Only a close, unhurried visitor gets a brief flutter. Keep one response
+		// per approach so standing nearby does not continually interrupt local life.
+		if (PlayerObservationLatch.Get() == Player) continue;
+		PlayerObservationLatch = Player;
+		if (PlayerObservationCooldownRemaining > 0.f || ScatterRemaining > 0.f) return;
+
+		RespondToQuietObservation(Player->GetActorLocation());
+		PlayerObservationCooldownRemaining = 8.f;
+		return;
+	}
+}
+
 void AIslandTideglassDragonfly::CheckForNearbyHoppingFrog()
 {
 	if (!GetWorld() || FrogScatterCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
@@ -699,6 +735,7 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	const float Time = GetWorld()->GetTimeSeconds();
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	PlayerObservationCooldownRemaining = FMath::Max(0.f, PlayerObservationCooldownRemaining - SafeDelta);
 	FrogScatterCooldownRemaining = FMath::Max(0.f, FrogScatterCooldownRemaining - SafeDelta);
 	RippleInterestRemaining = FMath::Max(0.f, RippleInterestRemaining - SafeDelta);
 	RippleInterestCooldownRemaining = FMath::Max(0.f, RippleInterestCooldownRemaining - SafeDelta);
@@ -718,6 +755,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = 0.35f;
 		CheckForLowRavenFlyby();
+	}
+	PlayerCheckRemaining -= SafeDelta;
+	if (PlayerCheckRemaining <= 0.f)
+	{
+		PlayerCheckRemaining = 0.45f;
+		CheckForQuietPlayerObservation();
 	}
 	FrogCheckRemaining -= SafeDelta;
 	if (FrogCheckRemaining <= 0.f)

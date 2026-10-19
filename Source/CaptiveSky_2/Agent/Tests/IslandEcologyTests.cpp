@@ -2537,6 +2537,38 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		WatchableDragonfly->Tick(2.f);
 		TestTrue(TEXT("The dragonfly resumes its ordinary pool-side flight after the brief response"), FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
 
+		AIslandInteractionTestPlayerController* DragonflyVisitorController = World->SpawnActor<AIslandInteractionTestPlayerController>(Spawn);
+		ACharacter* DragonflyVisitor = World->SpawnActor<ACharacter>(WatchableDragonfly->GetActorLocation() + FVector(100.f, 0.f, -160.f), FRotator::ZeroRotator, Spawn);
+		TestNotNull(TEXT("A player-controlled quiet visitor is available for the dragonfly response"), DragonflyVisitorController);
+		TestNotNull(TEXT("A nearby visitor pawn is available for the dragonfly response"), DragonflyVisitor);
+		if (DragonflyVisitorController && DragonflyVisitor)
+		{
+			DragonflyVisitorController->Possess(DragonflyVisitor);
+			WatchableDragonfly->CheckForQuietPlayerObservation();
+			TestTrue(TEXT("A nearby, unhurried player briefly startles the wild dragonfly"),
+				WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
+			TestTrue(TEXT("The dragonfly flutters away from its quiet visitor"),
+				FVector::DotProduct(WatchableDragonfly->ScatterDirection,
+					(WatchableDragonfly->GetActorLocation() - DragonflyVisitor->GetActorLocation()).GetSafeNormal2D()) > 0.95f);
+			TestEqual(TEXT("One quiet approach starts an eight-second response cooldown"), WatchableDragonfly->PlayerObservationCooldownRemaining, 8.f);
+			WatchableDragonfly->ScatterRemaining = 0.f;
+			WatchableDragonfly->CheckForQuietPlayerObservation();
+			TestTrue(TEXT("A lingering visitor does not repeatedly interrupt the dragonfly"),
+				FMath::IsNearlyZero(WatchableDragonfly->ScatterRemaining));
+			DragonflyVisitor->SetActorLocation(WatchableDragonfly->GetActorLocation() + FVector(600.f, 0.f, -160.f));
+			WatchableDragonfly->CheckForQuietPlayerObservation();
+			WatchableDragonfly->PlayerObservationCooldownRemaining = 0.f;
+			DragonflyVisitor->SetActorLocation(WatchableDragonfly->GetActorLocation() + FVector(100.f, 0.f, -160.f));
+			WatchableDragonfly->CheckForQuietPlayerObservation();
+			TestTrue(TEXT("Leaving the wider ring and returning rearms one natural response"),
+				WatchableDragonfly->ScatterRemaining > 0.f && WatchableDragonfly->ScatterRemaining <= 1.6f);
+			DragonflyVisitorController->UnPossess();
+			DragonflyVisitorController->Destroy();
+			DragonflyVisitor->Destroy();
+			WatchableDragonfly->ScatterRemaining = 0.f;
+			WatchableDragonfly->PlayerObservationCooldownRemaining = 0.f;
+		}
+
 		if (Weather)
 		{
 			UIslandRainBasinSubsystem* Basin = World->GetSubsystem<UIslandRainBasinSubsystem>();
