@@ -20,6 +20,12 @@ had no project Content; it did not load the Island or exercise a natural
 encounter. The user's open Unreal editor was left untouched, and this session's
 desktop bridge exposes no app window.
 
+An additional `CaptiveSky2.Agent.Ecology.DragonflyFrogResponseWorld` test also
+passed in that scratch target. Its synthetic collision floor lets a real
+`AIslandCommonFrog` start a hop; it then verifies the dragonfly scatters away,
+latches the same hop against repeated startles, and preserves an active flower
+visit. This is actor-level behavior evidence, not a real-Island visual review.
+
 ## Next visual check
 
 Watch a daytime frog and one dragonfly together at normal player scale. Confirm
