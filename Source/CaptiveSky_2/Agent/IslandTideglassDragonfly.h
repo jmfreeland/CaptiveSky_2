@@ -9,6 +9,7 @@ class UProceduralMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class AIslandWeather;
+class AIslandCommonFrog;
 
 /** A small, untargetable dragonfly that patrols above the Tideglass shore by day. */
 UCLASS()
@@ -27,6 +28,8 @@ public:
 	static float RainMovementScale(float RainIntensity);
 	/** Strong local wind slows self-powered patrol and wingbeats without stopping flight. */
 	static float WindMovementScale(float WindSpeedCmPerSecond);
+	/** A nearby frog's hop can startle a dragonfly; distant, high, or settled frogs are ignored. */
+	static bool ShouldScatterFromHoppingFrog(bool bFrogHopping, float DistanceCm, float VerticalOffsetCm);
 
 protected:
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -70,6 +73,9 @@ private:
 	float ScatterRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
+	TWeakObjectPtr<AIslandCommonFrog> FrogPresenceLatch;
+	float FrogScatterCooldownRemaining = 0.f;
+	float FrogCheckRemaining = 0.f;
 	float RippleInterestRemaining = 0.f;
 	float RippleInterestCooldownRemaining = 0.f;
 	float RippleCheckRemaining = 0.f;
@@ -86,6 +92,7 @@ private:
 	void LogFlowerInterestTelemetry(const TCHAR* Event) const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
+	void CheckForNearbyHoppingFrog();
 	void CheckForNearbySurfaceCue();
 	void CheckForNearbyMeadowFlower();
 	void CheckForNearbyRainBasin();

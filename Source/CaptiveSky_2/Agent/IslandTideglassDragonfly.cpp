@@ -1,5 +1,6 @@
 #include "IslandTideglassDragonfly.h"
 
+#include "IslandCommonFrog.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
 #include "IslandWeather.h"
@@ -278,6 +279,7 @@ void AIslandTideglassDragonfly::BeginPlay()
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	MotionRate = FMath::FRandRange(0.8f, 1.2f);
 	WingPhase = FMath::FRandRange(0.f, 2.f * PI);
+	FrogCheckRemaining = FMath::FRandRange(0.25f, 0.8f);
 	FlowerCheckRemaining = FMath::FRandRange(0.8f, 2.2f);
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
@@ -373,6 +375,14 @@ float AIslandTideglassDragonfly::WindMovementScale(float WindSpeedCmPerSecond)
 	return FMath::Lerp(1.f, 0.55f, WindActivity);
 }
 
+bool AIslandTideglassDragonfly::ShouldScatterFromHoppingFrog(bool bFrogHopping, float DistanceCm, float VerticalOffsetCm)
+{
+	constexpr float StartleRadiusCm = 230.f;
+	constexpr float MaximumVerticalSeparationCm = 250.f;
+	return bFrogHopping && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= StartleRadiusCm &&
+		FMath::IsFinite(VerticalOffsetCm) && FMath::Abs(VerticalOffsetCm) <= MaximumVerticalSeparationCm;
+}
+
 void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& ObserverLocation)
 {
 	if (FlowerInterestRemaining > 0.f)
@@ -405,6 +415,36 @@ void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
 		// independent pool-side patrol without pursuing, attacking, or persisting a change.
 		RespondToQuietObservation(Raven->GetActorLocation());
 		RavenFlybyCooldownRemaining = 8.f;
+		return;
+	}
+}
+
+void AIslandTideglassDragonfly::CheckForNearbyHoppingFrog()
+{
+	if (!GetWorld() || FrogScatterCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
+		FlowerInterestRemaining > 0.f || BasinInterestRemaining > 0.f || RippleInterestRemaining > 0.f)
+		return;
+
+	constexpr float RearmRadiusCm = 360.f;
+	if (FrogPresenceLatch.IsValid())
+	{
+		const FVector Offset = FrogPresenceLatch->GetActorLocation() - GetActorLocation();
+		if (!FrogPresenceLatch->IsHopping() || Offset.Size2D() > RearmRadiusCm || FMath::Abs(Offset.Z) > 300.f)
+			FrogPresenceLatch.Reset();
+	}
+
+	for (TActorIterator<AIslandCommonFrog> It(GetWorld()); It; ++It)
+	{
+		AIslandCommonFrog* Frog = *It;
+		if (!IsValid(Frog) || FrogPresenceLatch.Get() == Frog) continue;
+		const FVector Offset = Frog->GetActorLocation() - GetActorLocation();
+		if (!ShouldScatterFromHoppingFrog(Frog->IsHopping(), Offset.Size2D(), Offset.Z)) continue;
+
+		// A near hop sends the dragonfly a short distance away. It never attacks,
+		// chases, writes world state, or interrupts a more deliberate local cue.
+		RespondToQuietObservation(Frog->GetActorLocation());
+		FrogPresenceLatch = Frog;
+		FrogScatterCooldownRemaining = 5.f;
 		return;
 	}
 }
@@ -606,6 +646,7 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	const float Time = GetWorld()->GetTimeSeconds();
 	ScatterRemaining = FMath::Max(0.f, ScatterRemaining - SafeDelta);
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
+	FrogScatterCooldownRemaining = FMath::Max(0.f, FrogScatterCooldownRemaining - SafeDelta);
 	RippleInterestRemaining = FMath::Max(0.f, RippleInterestRemaining - SafeDelta);
 	RippleInterestCooldownRemaining = FMath::Max(0.f, RippleInterestCooldownRemaining - SafeDelta);
 	if (FlowerInterestRemaining > 0.f)
@@ -622,6 +663,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	{
 		RavenCheckRemaining = 0.35f;
 		CheckForLowRavenFlyby();
+	}
+	FrogCheckRemaining -= SafeDelta;
+	if (FrogCheckRemaining <= 0.f)
+	{
+		FrogCheckRemaining = 0.45f;
+		CheckForNearbyHoppingFrog();
 	}
 	RippleCheckRemaining -= SafeDelta;
 	if (RippleCheckRemaining <= 0.f)
