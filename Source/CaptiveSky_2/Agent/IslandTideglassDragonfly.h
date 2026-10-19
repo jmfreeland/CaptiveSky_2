@@ -10,6 +10,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class AIslandWeather;
 class AIslandCommonFrog;
+class AIslandListeningStonesChime;
 
 /** A small, untargetable dragonfly that patrols above the Tideglass shore by day. */
 UCLASS()
@@ -39,6 +40,7 @@ protected:
 private:
 	friend class FIslandNightEcologyTest;
 	friend class FIslandTideglassDragonflyFrogResponseWorldTest;
+	friend class FIslandTideglassDragonflyListeningStonesTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Head;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -89,7 +91,13 @@ private:
 	float BasinInterestCooldownRemaining = 0.f;
 	float BasinCheckRemaining = 0.f;
 	FVector BasinInterestLocation = FVector::ZeroVector;
+	TWeakObjectPtr<AIslandListeningStonesChime> LastHeardListeningStonesChime;
+	float ListeningStonesInterestRemaining = 0.f;
+	float ListeningStonesInterestCooldownRemaining = 0.f;
+	float ListeningStonesCheckRemaining = 0.f;
+	FVector ListeningStonesInterestLocation = FVector::ZeroVector;
 	int32 ColorVariant = 0;
+	static constexpr float ListeningStonesInterestDurationSeconds = 2.6f;
 	void LogFlowerInterestTelemetry(const TCHAR* Event) const;
 	void ConfigureAppearance();
 	void CheckForLowRavenFlyby();
@@ -97,11 +105,14 @@ private:
 	void CheckForNearbySurfaceCue();
 	void CheckForNearbyMeadowFlower();
 	void CheckForNearbyRainBasin();
+	void CheckForNearbyListeningStonesChime();
+	bool RespondToListeningStonesChime(AIslandListeningStonesChime* Chime);
 	bool RespondToSurfaceRipple(const FVector& RippleLocation);
 	float GetRippleInterestAlpha() const;
 	bool RespondToMeadowFlower(const FVector& FlowerLocation);
 	float GetFlowerInterestAlpha() const;
 	bool RespondToRainBasin(const FVector& BasinLocation, float WaterLevel);
 	float GetBasinInterestAlpha() const;
+	float GetListeningStonesInterestAlpha() const;
 	FVector ResolveFlightPath(const FVector& Start, const FVector& Desired) const;
 };

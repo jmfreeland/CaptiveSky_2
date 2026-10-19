@@ -1,6 +1,7 @@
 #include "IslandTideglassDragonfly.h"
 
 #include "IslandCommonFrog.h"
+#include "IslandListeningStonesChime.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
 #include "IslandWeather.h"
@@ -392,6 +393,7 @@ void AIslandTideglassDragonfly::RespondToQuietObservation(const FVector& Observe
 	ScatterRemaining = 1.6f;
 	FlowerInterestRemaining = 0.f;
 	BasinInterestRemaining = 0.f;
+	ListeningStonesInterestRemaining = 0.f;
 }
 
 void AIslandTideglassDragonfly::CheckForLowRavenFlyby()
@@ -467,6 +469,7 @@ bool AIslandTideglassDragonfly::RespondToSurfaceRipple(const FVector& RippleLoca
 		110.f);
 	RippleInterestRemaining = 1.8f;
 	RippleInterestCooldownRemaining = 7.f;
+	ListeningStonesInterestRemaining = 0.f;
 	if (FlowerInterestRemaining > 0.f)
 		LogFlowerInterestTelemetry(TEXT("interrupted: water ripple"));
 	FlowerInterestRemaining = 0.f;
@@ -490,7 +493,7 @@ void AIslandTideglassDragonfly::CheckForNearbyMeadowFlower()
 	}
 
 	if (FlowerInterestCooldownRemaining > 0.f || BasinInterestRemaining > 0.f || BasinInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
-		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || RainIntensity > 0.45f)
+		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || ListeningStonesInterestRemaining > 0.f || RainIntensity > 0.45f)
 		return;
 
 	FVector FlowerLocation;
@@ -502,7 +505,7 @@ bool AIslandTideglassDragonfly::RespondToMeadowFlower(const FVector& FlowerLocat
 {
 	if (FlowerLocation.ContainsNaN() || FlowerInterestRemaining > 0.f || FlowerInterestCooldownRemaining > 0.f ||
 		BasinInterestRemaining > 0.f || BasinInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
-		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f ||
+		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || ListeningStonesInterestRemaining > 0.f ||
 		FVector::DistSquared(GetActorLocation(), FlowerLocation) > FMath::Square(900.f))
 		return false;
 
@@ -550,7 +553,7 @@ void AIslandTideglassDragonfly::CheckForNearbyRainBasin()
 		return;
 	}
 	if (BasinInterestCooldownRemaining > 0.f || FlowerInterestRemaining > 0.f ||
-		FlowerInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
+		FlowerInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f || ListeningStonesInterestRemaining > 0.f ||
 		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || RainIntensity > 0.45f)
 		return;
 
@@ -570,7 +573,7 @@ bool AIslandTideglassDragonfly::RespondToRainBasin(const FVector& BasinLocation,
 	if (BasinLocation.ContainsNaN() || WaterLevel < FIslandBasinState::FloatLevel ||
 		BasinInterestRemaining > 0.f || BasinInterestCooldownRemaining > 0.f ||
 		FlowerInterestRemaining > 0.f || FlowerInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
-		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f ||
+		RippleInterestRemaining > 0.f || RippleInterestCooldownRemaining > 0.f || ListeningStonesInterestRemaining > 0.f ||
 		FVector::DistSquared2D(GetActorLocation(), BasinLocation) > FMath::Square(1200.f) ||
 		FMath::Abs(GetActorLocation().Z - BasinLocation.Z) > 450.f)
 		return false;
@@ -598,6 +601,56 @@ float AIslandTideglassDragonfly::GetBasinInterestAlpha() const
 	const float Elapsed = BasinInterestDurationSeconds - BasinInterestRemaining;
 	return FMath::SmoothStep(0.f, 0.65f, Elapsed) *
 		(1.f - FMath::SmoothStep(BasinInterestFadeStartSeconds, BasinInterestDurationSeconds, Elapsed));
+}
+
+void AIslandTideglassDragonfly::CheckForNearbyListeningStonesChime()
+{
+	if (!GetWorld()) return;
+	if (!LastHeardListeningStonesChime.IsValid() ||
+		!LastHeardListeningStonesChime->IsAudibleAt(GetActorLocation()))
+	{
+		LastHeardListeningStonesChime.Reset();
+	}
+	if (ListeningStonesInterestRemaining > 0.f || ListeningStonesInterestCooldownRemaining > 0.f ||
+		ScatterRemaining > 0.f || FlowerInterestRemaining > 0.f || BasinInterestRemaining > 0.f ||
+		RippleInterestRemaining > 0.f || (Weather.IsValid() && Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) > 0.45f))
+		return;
+
+	for (TActorIterator<AIslandListeningStonesChime> It(GetWorld()); It; ++It)
+	{
+		if (RespondToListeningStonesChime(*It)) return;
+	}
+}
+
+bool AIslandTideglassDragonfly::RespondToListeningStonesChime(AIslandListeningStonesChime* Chime)
+{
+	if (!IsValid(Chime) || Chime->IsActorBeingDestroyed() || !Chime->IsAudibleAt(GetActorLocation()) ||
+		LastHeardListeningStonesChime.Get() == Chime || ListeningStonesInterestRemaining > 0.f ||
+		ListeningStonesInterestCooldownRemaining > 0.f || ScatterRemaining > 0.f ||
+		FlowerInterestRemaining > 0.f || BasinInterestRemaining > 0.f || RippleInterestRemaining > 0.f)
+		return false;
+
+	// Different color morphs take separate, quiet stations just above the stones.
+	// The dragonfly resumes its patrol when the short interest fades; no landmark
+	// state, memory, or persistent world data is changed.
+	const float StationAngle = 2.f * PI * static_cast<float>(FMath::Clamp(ColorVariant, 0, 2)) / 3.f;
+	constexpr float StationRadiusCm = 58.f;
+	ListeningStonesInterestLocation = Chime->GetActorLocation() + FVector(
+		FMath::Cos(StationAngle) * StationRadiusCm,
+		FMath::Sin(StationAngle) * StationRadiusCm,
+		125.f);
+	LastHeardListeningStonesChime = Chime;
+	ListeningStonesInterestRemaining = ListeningStonesInterestDurationSeconds;
+	ListeningStonesInterestCooldownRemaining = 18.f;
+	return true;
+}
+
+float AIslandTideglassDragonfly::GetListeningStonesInterestAlpha() const
+{
+	if (ListeningStonesInterestRemaining <= 0.f) return 0.f;
+	const float Elapsed = ListeningStonesInterestDurationSeconds - ListeningStonesInterestRemaining;
+	return FMath::SmoothStep(0.f, 0.55f, Elapsed) *
+		(1.f - FMath::SmoothStep(1.8f, ListeningStonesInterestDurationSeconds, Elapsed));
 }
 
 void AIslandTideglassDragonfly::CheckForNearbySurfaceCue()
@@ -658,6 +711,8 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 	FlowerInterestCooldownRemaining = FMath::Max(0.f, FlowerInterestCooldownRemaining - SafeDelta);
 	BasinInterestRemaining = FMath::Max(0.f, BasinInterestRemaining - SafeDelta);
 	BasinInterestCooldownRemaining = FMath::Max(0.f, BasinInterestCooldownRemaining - SafeDelta);
+	ListeningStonesInterestRemaining = FMath::Max(0.f, ListeningStonesInterestRemaining - SafeDelta);
+	ListeningStonesInterestCooldownRemaining = FMath::Max(0.f, ListeningStonesInterestCooldownRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
@@ -688,6 +743,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 		BasinCheckRemaining = 1.6f;
 		CheckForNearbyRainBasin();
 	}
+	ListeningStonesCheckRemaining -= SafeDelta;
+	if (ListeningStonesCheckRemaining <= 0.f)
+	{
+		ListeningStonesCheckRemaining = 1.1f;
+		CheckForNearbyListeningStonesChime();
+	}
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
 	const float MoveScale = RainMovementScale(Rain) * WindMovementScale(LocalWind.Size());
@@ -707,8 +768,12 @@ void AIslandTideglassDragonfly::Tick(float DeltaSeconds)
 			FMath::Lerp(PatrolLocation, FlowerInterestLocationWithOrbit, FlowerInterestAlpha),
 			BasinInterestLocation + Offset * 0.08f, BasinInterestAlpha),
 		RippleInterestLocationWithOrbit, GetRippleInterestAlpha());
+	const FVector DesiredWithListeningStones = FMath::Lerp(
+		Desired,
+		ListeningStonesInterestLocation + Offset * 0.08f,
+		ScatterRemaining > 0.f ? 0.f : GetListeningStonesInterestAlpha());
 	const FVector Previous = GetActorLocation();
-	const FVector Safe = ResolveFlightPath(Previous, Desired);
+	const FVector Safe = ResolveFlightPath(Previous, DesiredWithListeningStones);
 	SetActorLocation(Safe, false);
 	const FVector Facing = (Safe - Previous).GetSafeNormal2D();
 	if (!Facing.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Facing.Rotation(), SafeDelta, 2.5f));
