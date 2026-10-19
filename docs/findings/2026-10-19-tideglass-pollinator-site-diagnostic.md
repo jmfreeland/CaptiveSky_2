@@ -238,7 +238,9 @@ whether to reopen a previously open asset editor. The prompt was left untouched;
 no map save, PIE run, Live Coding request, or asset change was made. A fresh
 `GlobalMemoryStatusEx` sample reports 93% memory load, 2.10 GB available
 physical memory, and 4.62 GB available commit. This supports the user's
-responsiveness report but remains too little headroom for another isolated
-Unreal compile beside the editor. The wetland-flower query regression therefore
-remains uncompiled and unrun, and production flower-site counts remain
+responsiveness report. At that sample there was too little headroom for a full
+Unreal target build beside the editor. A later PCH-matched isolated compile
+successfully compiled both relevant translation units, but the scratch link
+failed because 164 of its 177 object inputs were absent. The regression is
+compiled but unlinked and unrun; production flower-site counts remain
 unverified.
