@@ -54,6 +54,13 @@ contains no smoothing-group metadata; the importer still succeeded. The
 imported `.uasset` lives under gitignored `Content/`, so this is a local project
 asset and does not travel with source commits.
 
+Because the mesh is optional and the existing primitive frog is a deliberate
+clean-checkout fallback, its constructor now uses UE's optional object finder
+with `LOAD_NoWarn | LOAD_Quiet`. A checkout without local `Content/` can use the
+fallback without emitting the misleading missing-asset CDO error. This only
+cleans up that optional-asset diagnostic; it is unrelated to and does not fix
+the separate recurring .NET/Unreal startup exception.
+
 The first scratch automation pass loaded the imported package without the old
 `IslandCommonFrog` missing-mesh constructor error, then found that
 `HopArcHeight(1.f, 13.f)` returned a tiny nonzero `sin(PI)` residue. The

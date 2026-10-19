@@ -41,7 +41,7 @@ AIslandCommonFrog::AIslandCommonFrog()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicInstance(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> Basic(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> DetailedMesh(FrogMeshPath);
+	static ConstructorHelpers::FObjectFinderOptional<UStaticMesh> DetailedMesh(FrogMeshPath, LOAD_NoWarn | LOAD_Quiet);
 	BaseShapeMaterial = BasicInstance.Succeeded() ? BasicInstance.Object : (Basic.Succeeded() ? Basic.Object : nullptr);
 
 	DetailedBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DetailedBody"));
@@ -50,10 +50,11 @@ AIslandCommonFrog::AIslandCommonFrog()
 	DetailedBody->SetCanEverAffectNavigation(false);
 	DetailedBody->SetGenerateOverlapEvents(false);
 	DetailedBody->SetCastShadow(false);
-	const bool bHasDetailedMesh = DetailedMesh.Succeeded();
+	UStaticMesh* FrogMesh = DetailedMesh.Get();
+	const bool bHasDetailedMesh = FrogMesh != nullptr;
 	if (bHasDetailedMesh)
 	{
-		DetailedBody->SetStaticMesh(DetailedMesh.Object);
+		DetailedBody->SetStaticMesh(FrogMesh);
 		DetailedBody->SetRelativeLocation(FVector(0.f, 0.f, 0.25f));
 	}
 	DetailedBody->SetVisibility(bHasDetailedMesh, true);
