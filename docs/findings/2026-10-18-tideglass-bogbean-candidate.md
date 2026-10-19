@@ -17,13 +17,26 @@ and [Kew Plants of the World Online](https://powo.science.kew.org/taxon/urn:lsid
 collisionless clump using simple leaf, petiole, pale flower, blush, and fringe
 materials. It uses no generated texture or runtime system and adds no model
 requests. The asset pipeline export is kept local at
-`Saved/CaptiveSky/ComfyBlender/Codex_TideglassBogbean_20261018/TideglassBogbean/`.
+`Saved/CaptiveSky/ComfyBlender/TideglassBogbean/`.
 
 The 74-test asset-pipeline suite passed. Blender 5.2.2 rebuilt, re-imported,
 and rendered the FBX on CPU: 41 x 39 x 44 cm, 5,360 triangles, seven material
-slots, no collision, `ZMIN 0.0161`, and `PROBLEMS []`. The entrance/flower
-preview demonstrates the mesh and material separation only; it does not show
-the asset in water or at its likely game-view scale.
+slots, no collision, `ZMIN 0.0161`, and `PROBLEMS []`. The original preview
+demonstrates the mesh and material separation only; it does not show the asset
+in water or at its likely game-view scale.
+
+## Raceme art pass (2026-10-19)
+
+The first preview made all 13 flowers read as almost uniformly spaced,
+same-sized discs. The source now applies deterministic per-flower spacing,
+orientation, and scale variation while keeping the same three stalks and
+five-lobed fringed flower construction. Blender 5.2.2 rebuilt and re-imported
+the export: 41 x 39 x 44 cm, 5,360 triangles, seven slots, no collision,
+`ZMIN 0.0161`, and `PROBLEMS []`; the three focused source-contract tests pass.
+The updated preview shows a small, not dramatic, reduction in regularity. This
+is still an offline shape review: Unreal material response, waterline fit,
+game-view readability, and in-world frame cost remain unverified. Keep it
+unplaced until the isolated Unreal review can be completed.
 
 This remains a review candidate, not an Island placement. Blender's exported
 FBX/preview check establishes mesh/export structure only. Import into a

@@ -19,6 +19,8 @@ FLOWER_STALKS = 3
 FLOWERS_PER_STALK = (4, 5, 4)
 FLOWER_RACEME_START_T = 0.56
 FLOWER_RACEME_END_T = 0.96
+FLOWER_RACEME_T_JITTER = 0.012
+FLOWER_SIZE_SCALE_RANGE = (0.68, 0.98)
 LEAFLET_COUNT_PER_CLUSTER = 3
 FLOWER_PETAL_COUNT = 5
 FLOWER_HEIGHTS_M = (0.39, 0.44, 0.41)
@@ -73,7 +75,7 @@ def _fringe_filament(bm, start, end, radius=0.00038):
     bm.faces.new(tuple(rings[1]))
 
 
-def _add_flower(petals, fringe, centre, heading, seed):
+def _add_flower(petals, fringe, centre, heading, seed, size_scale=1.0):
     """Build a five-lobed star flower with delicate, visible petal fringes."""
     centre = Vector(centre)
     heading = Vector(heading).normalized()
@@ -85,15 +87,20 @@ def _add_flower(petals, fringe, centre, heading, seed):
         petal_centre = centre + petal_axis * 0.006
         _oriented_ellipsoid(
             petals, petal_centre, petal_axis, side,
-            0.023, 0.011, 0.0035, segments=6)
+            0.023 * size_scale, 0.011 * size_scale,
+            0.0035 * size_scale, segments=6)
 
         # Two short filaments per lobe keep the bogbean's fringed flower
         # character visible at asset scale without turning it into a fuzzy ball.
         normal = petal_axis.cross(side).normalized()
         for edge in (-1.0, 1.0):
-            start = petal_centre + petal_axis * 0.006 + side * edge * 0.003
-            end = start + petal_axis * 0.005 + normal * 0.0012
-            _fringe_filament(fringe, start, end)
+            start = (
+                petal_centre
+                + petal_axis * (0.006 * size_scale)
+                + side * edge * (0.003 * size_scale)
+            )
+            end = start + petal_axis * (0.005 * size_scale) + normal * (0.0012 * size_scale)
+            _fringe_filament(fringe, start, end, radius=0.00038 * size_scale)
 
 
 def build(A):
@@ -161,13 +168,27 @@ def build(A):
         count = FLOWERS_PER_STALK[stalk_index]
         for flower_index in range(count):
             raceme_span = FLOWER_RACEME_END_T - FLOWER_RACEME_START_T
-            t = FLOWER_RACEME_START_T + raceme_span * flower_index / (count - 1)
-            flower_centre = base.lerp(top, t) + radial * (0.006 * (flower_index % 2))
-            heading = radial * 0.34 + Vector((0.0, 0.0, 0.94))
+            seed = flower_index + stalk_index * 7
+            phase = seed * 2.399963229728653
+            even_t = FLOWER_RACEME_START_T + raceme_span * flower_index / (count - 1)
+            t = even_t + FLOWER_RACEME_T_JITTER * math.sin(phase * 1.37)
+            along = Vector((-radial.y, radial.x, 0.0))
+            flower_centre = (
+                base.lerp(top, t)
+                + radial * (0.006 + 0.004 * math.sin(phase))
+                + along * (0.003 * math.cos(phase * 0.83))
+            )
+            heading = (
+                radial * (0.30 + 0.08 * math.sin(phase * 0.71))
+                + along * (0.1 * math.cos(phase))
+                + Vector((0.0, 0.0, 0.94))
+            )
+            size_low, size_high = FLOWER_SIZE_SCALE_RANGE
+            size_scale = size_low + (size_high - size_low) * (0.5 + 0.5 * math.sin(phase * 1.11 + 0.4))
             flower_mesh = blush if (flower_index + stalk_index) % 4 == 0 else petals
-            _add_flower(flower_mesh, fringe, flower_centre, heading, flower_index + stalk_index * 3)
+            _add_flower(flower_mesh, fringe, flower_centre, heading, seed, size_scale)
             centre_mesh = bmesh.ops.create_uvsphere(
-                centres, u_segments=6, v_segments=4, radius=0.0038, calc_uvs=False)
+                centres, u_segments=6, v_segments=4, radius=0.0038 * size_scale, calc_uvs=False)
             for vert in centre_mesh["verts"]:
                 vert.co += flower_centre + Vector((0.0, 0.0, 0.002))
 

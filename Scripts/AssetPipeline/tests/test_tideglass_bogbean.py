@@ -45,6 +45,8 @@ class TideglassBogbeanTests(unittest.TestCase):
         self.assertEqual(sum(values["FLOWERS_PER_STALK"]), 13)
         self.assertGreater(values["FLOWER_RACEME_START_T"], 0.5)
         self.assertLess(values["FLOWER_RACEME_END_T"], 1.0)
+        self.assertGreater(values["FLOWER_RACEME_T_JITTER"], 0.0)
+        self.assertEqual(values["FLOWER_SIZE_SCALE_RANGE"], (0.68, 0.98))
         self.assertAlmostEqual(values["FLOWER_DIAMETER_M"], 0.058)
         self.assertGreater(values["FLOWER_HEIGHTS_M"][1], values["LEAFLET_LENGTH_M"] * 3)
 
@@ -69,10 +71,13 @@ class TideglassBogbeanTests(unittest.TestCase):
         builder_source = ast.unparse(functions["build"])
         self.assertIn("range(FLOWER_PETAL_COUNT)", flower_source)
         self.assertIn("_fringe_filament(fringe", flower_source)
+        self.assertIn("size_scale", flower_source)
         self.assertIn("radial * 0.11", builder_source)
         self.assertIn("bogbeanFlowerScape", builder_source)
         self.assertIn("bogbeanPetiole", builder_source)
         self.assertIn("bogbeanPetalFringes", builder_source)
+        self.assertIn("math.sin(phase", builder_source)
+        self.assertIn("math.cos(phase", builder_source)
         self.assertIn("triangulate", builder_source)
 
 
