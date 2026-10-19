@@ -10,11 +10,13 @@ import sys
 
 PIPE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PIPE)
-from config import BLENDER, WORK  # noqa: E402
+from build_lock import BuildLockError, pipeline_build_lock  # noqa: E402
+from config import BLENDER, ROOT, WORK  # noqa: E402
 
 PY = sys.executable  # the venv python you launched make.py with (needs Pillow + numpy)
 LOGS = f"{WORK}/logs"
 os.makedirs(LOGS, exist_ok=True)
+PIPELINE_LOCK_PATH = os.path.join(ROOT, ".asset-pipeline.lock")
 
 
 def run(cmd, log):
@@ -23,7 +25,7 @@ def run(cmd, log):
     return r.returncode, open(log, errors="replace").read()
 
 
-for name in sys.argv[1:]:
+def build_one(name):
     src = open(f"{PIPE}/assets/{name}.py").read()
     folder = re.search(r'NAME\s*=\s*"(\w+)"', src).group(1)
     rc, out = run([BLENDER, "-b", "--factory-startup", "-P", f"{PIPE}/run_asset.py", "--", name], f"{LOGS}/{name}_build.txt")
@@ -33,10 +35,29 @@ for name in sys.argv[1:]:
         if re.search(r"EXPORT DONE|zmin|Traceback|Error|Assertion|baked", line) and "HIPEW" not in line:
             print("   ", line.strip())
     if not ok:
-        continue
+        return
     r = subprocess.run([PY, "-I", f"{PIPE}/pack_asset.py", folder], capture_output=True, text=True)
     print("   ", r.stdout.strip() or r.stderr.strip())
     rc, out = run([BLENDER, "-b", "--factory-startup", "-P", f"{PIPE}/verify_asset.py", "--", folder], f"{LOGS}/{name}_verify.txt")
     for line in out.splitlines():
         if re.search(r"IMPORTED|UV LAYERS|ZMIN|PROBLEMS|VERIFY DONE|Traceback|Error", line) and "HIPEW" not in line:
             print("   ", line.strip())
+
+
+def main(asset_names=None):
+    names = list(sys.argv[1:] if asset_names is None else asset_names)
+    if not names:
+        print("Usage: make.py <asset_script> [<asset_script> ...]", file=sys.stderr)
+        return 2
+    try:
+        with pipeline_build_lock(PIPELINE_LOCK_PATH):
+            for name in names:
+                build_one(name)
+    except BuildLockError as exc:
+        print(f"Asset pipeline busy: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
