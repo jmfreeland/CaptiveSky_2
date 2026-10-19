@@ -141,11 +141,11 @@ identities, and other residents' attempts are omitted. These remain speculative
 resident notes, not measured recipes or evidence that an item was made; this
 context does not create extra world/LLM calls.
 
-**AssetPipeline helper recheck (2026-10-19):** the bundled Python runtime ran
-`python -I -B -m unittest discover -s Scripts/AssetPipeline/tests` with 92 tests
-passing. The initial WindowsApps `python.exe` shim could not start; the bundled
-interpreter was used with temporary fixtures redirected under the ignored
-workspace `Saved/CompileScratch/` tree. These tests exercise source contracts,
+**AssetPipeline helper recheck (2026-10-19, refreshed):** the bundled Python
+runtime ran `python -I -B -m unittest discover -s Scripts/AssetPipeline/tests`
+with 94 tests passing. The request and build-lock fixtures used the ignored
+workspace directories `Saved/AssetPipelineTests/` and
+`Saved/Tests/AssetPipelineBuildLock/`. These tests exercise source contracts,
 deterministic helpers, request routing, and mocked generation; they do not launch
 Blender, ComfyUI, Unreal, or Discord, and do not validate any asset in the
 Island.
