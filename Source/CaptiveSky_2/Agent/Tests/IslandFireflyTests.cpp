@@ -5,6 +5,34 @@
 #include "Engine/World.h"
 #include <limits>
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFireflyGlowColorVariationTest,
+	"CaptiveSky2.Agent.FireflyGlowColorVariation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandFireflyGlowColorVariationTest::RunTest(const FString& Parameters)
+{
+	const FLinearColor First = AIslandFirefly::GlowColorVariationForSeed(42);
+	const FLinearColor SameSeed = AIslandFirefly::GlowColorVariationForSeed(42);
+	TestTrue(TEXT("A location seed produces a repeatable glow tint"), First.Equals(SameSeed));
+	TestTrue(TEXT("Hue multipliers stay subtle and within a safe light range"),
+		First.R >= 0.8f && First.R <= 1.f &&
+		First.G >= 0.8f && First.G <= 1.f &&
+		First.B >= 0.7f && First.B <= 1.f);
+
+	TArray<FLinearColor> DistinctTints;
+	for (int32 Seed = -32; Seed <= 32; ++Seed)
+	{
+		const FLinearColor Tint = AIslandFirefly::GlowColorVariationForSeed(Seed);
+		if (!DistinctTints.ContainsByPredicate([&Tint](const FLinearColor& Existing)
+			{ return Existing.Equals(Tint); }))
+		{
+			DistinctTints.Add(Tint);
+		}
+	}
+	TestTrue(TEXT("A small group of fireflies can receive more than one natural tint"), DistinctTints.Num() > 1);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFireflyPulseClustersTest,
 	"CaptiveSky2.Agent.FireflyPulseClusters",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

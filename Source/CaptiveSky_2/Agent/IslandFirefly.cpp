@@ -16,6 +16,7 @@
 namespace
 {
 const FLinearColor FireflyBodyEmissiveColor(0.07f, 0.16f, 0.045f);
+const FLinearColor FireflyLightColor(0.78f, 1.f, 0.52f);
 }
 
 AIslandFirefly::AIslandFirefly()
@@ -117,7 +118,7 @@ AIslandFirefly::AIslandFirefly()
 	Glow = CreateDefaultSubobject<UPointLightComponent>(TEXT("Glow"));
 	Glow->SetupAttachment(RootComponent);
 	Glow->SetMobility(EComponentMobility::Movable);
-	Glow->SetLightColor(FLinearColor(0.78f, 1.f, 0.52f));
+	Glow->SetLightColor(FireflyLightColor);
 	Glow->SetAttenuationRadius(420.f);
 	Glow->SetCastShadows(false);
 	Glow->SetIntensity(0.f);
@@ -166,6 +167,10 @@ void AIslandFirefly::BeginPlay()
 	Super::BeginPlay();
 	ConfigureBodyAppearance();
 	HomeLocation = GetActorLocation();
+	const int32 GlowSeed = FMath::FloorToInt(
+		HomeLocation.X * 0.31f + HomeLocation.Y * 0.73f + HomeLocation.Z * 1.13f);
+	GlowColorVariation = GlowColorVariationForSeed(GlowSeed);
+	if (Glow) Glow->SetLightColor(FireflyLightColor * GlowColorVariation);
 	EnsureGlowMaterial();
 	Phase = FMath::FRandRange(0.f, 2.f * PI);
 	// Derive a separate pulse phase without consuming another shared RNG sample,
@@ -193,6 +198,17 @@ void AIslandFirefly::BeginPlay()
 FVector AIslandFirefly::WindDisplacement(const FVector& LocalWind)
 {
 	return LocalWind.GetClampedToMaxSize(250.f) * 0.12f;
+}
+
+FLinearColor AIslandFirefly::GlowColorVariationForSeed(int32 Seed)
+{
+	static const FLinearColor Variations[] = {
+		FLinearColor(1.f, 1.f, 1.f),
+		FLinearColor(1.f, 0.9f, 0.76f),
+		FLinearColor(0.84f, 1.f, 0.91f)
+	};
+	FRandomStream Random(Seed);
+	return Variations[Random.RandRange(0, UE_ARRAY_COUNT(Variations) - 1)];
 }
 
 float AIslandFirefly::RainActivity(float RainIntensity)
@@ -462,6 +478,6 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	Glow->SetIntensity(GlowIntensity * GlowScale);
 	if (GlowMaterial)
 	{
-		GlowMaterial->SetVectorParameterValue(TEXT("Color"), FireflyBodyEmissiveColor * GlowScale);
+		GlowMaterial->SetVectorParameterValue(TEXT("Color"), FireflyBodyEmissiveColor * GlowColorVariation * GlowScale);
 	}
 }

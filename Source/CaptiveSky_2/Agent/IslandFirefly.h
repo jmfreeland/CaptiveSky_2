@@ -46,6 +46,8 @@ public:
 	static float PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount);
 	/** Bounded shortest-arc nudge toward a nearby cluster's mean pulse phase. */
 	static float EvaluatePulsePhaseNudge(float CurrentPhaseRadians, float NeighborPhaseRadians, float CouplingScale);
+	/** Small deterministic multiplier for natural variation between firefly glow hues. */
+	static FLinearColor GlowColorVariationForSeed(int32 Seed);
 
 	/** A nearby, non-contact observation briefly changes the natural glow pulse. */
 	void RespondToQuietObservation();
@@ -92,6 +94,7 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> GlowMaterial;
 
 	FVector HomeLocation = FVector::ZeroVector;
+	FLinearColor GlowColorVariation = FLinearColor::White;
 	float Phase = 0.f;
 	float GlowPhase = 0.f;
 	float MotionRate = 1.f;
