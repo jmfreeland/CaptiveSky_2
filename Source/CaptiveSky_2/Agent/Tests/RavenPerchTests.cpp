@@ -9,6 +9,8 @@
 #include "IslandInnkeeperSubsystem.h"
 #include "IslandArrangement.h"
 #include "IslandDew.h"
+#include "IslandDayNight.h"
+#include "IslandFirefly.h"
 #include "IslandForestFox.h"
 #include "IslandForestStag.h"
 #include "IslandListeningStonesChime.h"
@@ -71,6 +73,16 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, 500.f, 251.f));
 	TestFalse(TEXT("Invalid distances are ignored"),
 		ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(true, std::numeric_limits<float>::infinity(), 0.f));
+	TestTrue(TEXT("A close, prominent night-glowing firefly can attract a brief glance"),
+		ARavenAgentAIController::ShouldNoticeNightFirefly(true, 500.f, 100.f));
+	TestFalse(TEXT("A dim daytime firefly does not attract the Raven"),
+		ARavenAgentAIController::ShouldNoticeNightFirefly(false, 500.f, 100.f));
+	TestFalse(TEXT("A distant firefly is not noticed"),
+		ARavenAgentAIController::ShouldNoticeNightFirefly(true, 701.f, 0.f));
+	TestFalse(TEXT("A vertically distant firefly is not noticed"),
+		ARavenAgentAIController::ShouldNoticeNightFirefly(true, 500.f, 251.f));
+	TestFalse(TEXT("Non-finite firefly distances are ignored"),
+		ARavenAgentAIController::ShouldNoticeNightFirefly(true, std::numeric_limits<float>::infinity(), 0.f));
 	const TArray<int32> OpenPerches = { 0, 0 };
 	const TArray<int32> CoveredAlternative = { 0, 4 };
 	const TArray<int32> SlightCoverDifference = { 2, 3 };

@@ -9,6 +9,7 @@ class AIslandCommonFrog;
 class AIslandDewActor;
 class AIslandForestFox;
 class AIslandForestStag;
+class AIslandFirefly;
 class AIslandListeningStonesChime;
 class AIslandPoolRippleEffect;
 class AIslandRainBasin;
@@ -76,6 +77,8 @@ public:
 	static constexpr float GroundLandingVisibilityRange = 3500.f;
 	/** A settled Raven may notice a close, visible Common Frog hop without chasing it. */
 	static bool ShouldNoticeHoppingCommonFrog(bool bFrogIsHopping, float DistanceCm, float VerticalOffsetCm);
+	/** A settled Raven may briefly notice a close, visible firefly once its night glow is prominent. */
+	static bool ShouldNoticeNightFirefly(bool bNightGlowProminent, float DistanceCm, float VerticalOffsetCm);
 
 	/** Build options this body has right now (gathering twigs, weaving at the roost it is perched on). */
 	FString DescribeBuildOptions() const;

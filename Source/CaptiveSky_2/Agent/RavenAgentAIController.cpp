@@ -14,6 +14,8 @@
 #include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "IslandDew.h"
+#include "IslandDayNight.h"
+#include "IslandFirefly.h"
 #include "IslandCommonFrog.h"
 #include "IslandForestFox.h"
 #include "IslandForestStag.h"
@@ -423,6 +425,13 @@ bool ARavenAgentAIController::ShouldNoticeHoppingCommonFrog(bool bFrogIsHopping,
 	return bFrogIsHopping && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f &&
 		DistanceCm <= CommonFrogNoticeRadiusCm && FMath::IsFinite(VerticalOffsetCm) &&
 		FMath::Abs(VerticalOffsetCm) <= CommonFrogMaximumHeightDifferenceCm;
+}
+
+bool ARavenAgentAIController::ShouldNoticeNightFirefly(bool bNightGlowProminent, float DistanceCm,
+	float VerticalOffsetCm)
+{
+	return bNightGlowProminent && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= 700.f &&
+		FMath::IsFinite(VerticalOffsetCm) && FMath::Abs(VerticalOffsetCm) <= 250.f;
 }
 
 ARavenAgentAIController::ARavenAgentAIController()
@@ -1329,6 +1338,50 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 		ClosestEligibleWildlife = Frog;
 		ClosestDistanceSquared = DistanceSquared;
 		ClosestWildlifeAttentionLocation = FrogHead;
+	}
+
+	// Fireflies only become an interesting visual cue once their natural night
+	// glow is prominent. The Raven notices one briefly; it does not chase or
+	// interrupt the insect's flight.
+	AIslandDayNight* IslandClock = nullptr;
+	for (TActorIterator<AIslandDayNight> ClockIt(GetWorld()); ClockIt; ++ClockIt)
+	{
+		if (IsValid(*ClockIt))
+		{
+			IslandClock = *ClockIt;
+			break;
+		}
+	}
+	if (IslandClock)
+	{
+		const bool bNightGlowProminent = AIslandFirefly::DaylightGlowScale(IslandClock->CurrentHour) >= 0.82f;
+		for (TActorIterator<AIslandFirefly> It(GetWorld()); It; ++It)
+		{
+			AIslandFirefly* Firefly = *It;
+			if (!IsValid(Firefly) || Firefly->GlowIntensity <= 0.f) continue;
+			const FVector Offset = Firefly->GetActorLocation() - Raven->GetActorLocation();
+			const float DistanceSquared = Offset.SizeSquared2D();
+			const TWeakObjectPtr<AActor> FireflyWeak(Firefly);
+			if (DistanceSquared > FMath::Square(ForgetRadius) || FMath::Abs(Offset.Z) > MaximumHeightDifference)
+			{
+				NoticedWildlifeInNearbyGroup.Remove(FireflyWeak);
+				continue;
+			}
+			bWildlifeRemainsNearby = true;
+			const float Distance = FMath::Sqrt(DistanceSquared);
+			if (!ShouldNoticeNightFirefly(bNightGlowProminent, Distance, Offset.Z) ||
+				NoticedWildlifeInNearbyGroup.Contains(FireflyWeak) ||
+				(ClosestEligibleWildlife && DistanceSquared >= ClosestDistanceSquared))
+			{
+				continue;
+			}
+
+			const FVector FireflyBody = Firefly->GetActorLocation() + FVector(0.f, 0.f, 12.f);
+			if (!IsVisibleFromRaven(Firefly, FireflyBody)) continue;
+			ClosestEligibleWildlife = Firefly;
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestWildlifeAttentionLocation = FireflyBody;
+		}
 	}
 
 	if (!bWildlifeRemainsNearby) NoticedWildlifeInNearbyGroup.Reset();
