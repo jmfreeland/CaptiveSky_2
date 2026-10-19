@@ -458,6 +458,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		const FVector FlowerLocation(30000.f + WetlandSpeciesIndex * 5000.f, 0.f, 120.f);
 		const int32 InstanceIndex = WetlandFlowers->AddInstance(FTransform(FRotator::ZeroRotator, FlowerLocation, FVector::OneVector), true);
 		TestTrue(TEXT("A test bloom can be added to each dedicated wetland species"), InstanceIndex != INDEX_NONE);
+		if (InstanceIndex != INDEX_NONE) WetlandFlowers->SetVisibility(true, true);
 		FVector NearestFlower = FVector::ZeroVector;
 		const bool bFoundWetlandFlower = Weather->FindNearestMeadowFlower(FlowerLocation + FVector(0.f, 0.f, 20.f), 100.f, NearestFlower);
 		const TCHAR* QueryLabel = WetlandSpeciesIndex == AIslandWeather::TideglassMarshMarigoldSpeciesIndex

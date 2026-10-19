@@ -277,8 +277,31 @@ editor console or dismiss the prompt. A targeted read-only Unreal MCP
 `EditorToolset` schema request remained pending for 60 seconds and was stopped.
 The expected `UnrealEditor-Core.pdb` and Windows SDK `cdb.exe` are absent from
 their standard install paths, so the scratch pre-init dump was not symbolized.
-No Live Coding compile, automation run, map save, or asset change occurred.
-Next verification requires either a responsive editor bridge/focusable
-automation panel or explicit user direction to load the scratch-built module
-through Live Coding; then run `GroundCover` and `MeadowFlowerSpecies` and check
-the saved Island's production gate counts.
+No Live Coding compile, map save, or asset change occurred. Subsequent isolated
+scratch automation is recorded below.
+
+## Elevated scratch automation recheck (2026-10-20)
+
+The user confirmed the live editor is open and responsive; it was left untouched.
+An incremental scratch-project rebuild compiled the updated ecology test and
+linked the scratch module successfully. The first elevated
+`CaptiveSky2.Agent.GroundCover` run then exposed a fixture-only issue: the test
+added wetland-flower instances to components that production scatter normally
+makes visible when nonempty. Since `FindNearestMeadowFlower` correctly ignores
+hidden components, the fixture now mirrors production by making each populated
+test component visible.
+
+After that correction, both focused UE 5.8.3 NullRHI automations passed from the
+isolated scratch project with thinking disabled and zero model requests:
+
+- `CaptiveSky2.Agent.GroundCover`: `Result={Success}` in
+  `Saved/CompileScratch/Codex_TideglassPollinator_20261019/Project/Saved/Logs/Codex_TideglassGroundCover_Elevated_Fix1_20261020.log`.
+- `CaptiveSky2.Agent.MeadowFlowerSpecies`: `Result={Success}` in
+  `Saved/CompileScratch/Codex_TideglassPollinator_20261019/Project/Saved/Logs/Codex_TideglassMeadowFlowerSpecies_Elevated_20261020.log`.
+
+These results validate the C++ automation contracts and test fixture, not the
+saved Island's actual scatter. The commandlet also logged the known absent
+candidate Common Frog mesh and a localhost HTTP-listener bind failure; neither
+prevented either automation from completing successfully. No live editor DLL,
+map, or asset was modified. Production site/species counts and a gameplay-view
+confirmation remain outstanding.
