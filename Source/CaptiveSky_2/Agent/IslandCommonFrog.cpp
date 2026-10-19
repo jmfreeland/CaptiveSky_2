@@ -213,6 +213,15 @@ void AIslandCommonFrog::CheckForNearbyWildlife()
 			FMath::Abs(Offset.Z) > FrogObserverRearmHeightCm))
 			RatPresenceLatch.Reset();
 		if (!bAwake || RatPresenceLatch.Get() == Rat || !ShouldHopFromObserver(Distance, Offset.Z)) continue;
+
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(CommonFrogRatSight), false, this);
+		Query.AddIgnoredActor(RatPawn);
+		FHitResult SightHit;
+		const FVector EyeLocation = GetActorLocation() + FVector(0.f, 0.f, 12.f);
+		const FVector RatEyeLocation = RatPawn->GetActorLocation() + FVector(0.f, 0.f, 16.f);
+		const bool bHasLineOfSight = !GetWorld()->LineTraceSingleByChannel(
+			SightHit, EyeLocation, RatEyeLocation, ECC_Visibility, Query);
+		if (!ShouldHopFromRat(bAwake, bHasLineOfSight, Distance, Offset.Z)) continue;
 		if (RespondToQuietObservation(RatPawn->GetActorLocation()))
 		{
 			RatPresenceLatch = Rat;
@@ -262,6 +271,11 @@ bool AIslandCommonFrog::ShouldHopFromObserver(float DistanceCm, float VerticalOf
 bool AIslandCommonFrog::ShouldHopFromScurryingCrab(bool bCrabScurrying, float DistanceCm, float VerticalOffsetCm)
 {
 	return bCrabScurrying && ShouldHopFromObserver(DistanceCm, VerticalOffsetCm);
+}
+
+bool AIslandCommonFrog::ShouldHopFromRat(bool bRatAwake, bool bHasLineOfSight, float DistanceCm, float VerticalOffsetCm)
+{
+	return bRatAwake && bHasLineOfSight && ShouldHopFromObserver(DistanceCm, VerticalOffsetCm);
 }
 
 bool AIslandCommonFrog::ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm)

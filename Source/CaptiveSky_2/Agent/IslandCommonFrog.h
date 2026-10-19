@@ -28,6 +28,8 @@ public:
 	bool RespondToQuietObservation(const FVector& ObserverLocation);
 	static bool ShouldHopFromObserver(float DistanceCm, float VerticalOffsetCm);
 	static bool ShouldHopFromScurryingCrab(bool bCrabScurrying, float DistanceCm, float VerticalOffsetCm);
+	/** A resting frog startles only for an awake Rat that is close, low, and visible. */
+	static bool ShouldHopFromRat(bool bRatAwake, bool bHasLineOfSight, float DistanceCm, float VerticalOffsetCm);
 	static bool ShouldRearmFromObserver(float DistanceCm, float RearmRadiusCm);
 	/** Rain and darkness encourage brief ambient movement; dry daylight remains restful. */
 	static float AmbientActivityScale(float RainIntensity, float NightAmount);
