@@ -19,6 +19,7 @@
 #include "IslandCommonFrog.h"
 #include "IslandTidepoolMinnows.h"
 #include "IslandWeather.h"
+#include "IslandWildlifeHome.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWrack.h"
@@ -28,6 +29,7 @@ FName IslandInteractionUtility::GetTargetTag(const AActor* Target)
 	if (!Target) return NAME_None;
 	if (Target->IsA<AIslandGuestBook>()) return FName(TEXT("GuestBook"));
 	if (Target->IsA<AIslandArrangement>()) return FName(TEXT("IslandArrangement"));
+	if (Target->IsA<AIslandWildlifeHome>()) return FName(TEXT("WildlifeHome"));
 	if (Target->ActorHasTag(TEXT("IslandLife")))
 	{
 		if (Target->ActorHasTag(TEXT("WoodlandFox"))) return FName(TEXT("WoodlandFox"));
@@ -150,6 +152,41 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		}
 		const UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>();
 		Basin->Examine(Memory ? Memory->GetResolvedAgentId() : Observer->GetName(), UIslandWorldStateSubsystem::CurrentIslandDay(World), OutFact);
+		return true;
+	}
+
+	if (TargetTag == FName(TEXT("WildlifeHome")))
+	{
+		const AIslandWildlifeHome* HomeActor = Cast<AIslandWildlifeHome>(Target);
+		const UIslandWorldStateSubsystem* State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+		const FIslandWildlifeHomeRecord* Home = HomeActor && State ? State->FindWildlifeHome(HomeActor->GetHomeId()) : nullptr;
+		if (!Home)
+		{
+			OutFact = TEXT("You inspected a wildlife shelter, but its current condition cannot be verified here. Nothing changed.");
+			return false;
+		}
+
+		const TCHAR* Condition = TEXT("in an unknown condition");
+		switch (Home->ShelterState)
+		{
+		case EIslandWildlifeShelterState::Exposed:
+			Condition = TEXT("exposed, with little cover");
+			break;
+		case EIslandWildlifeShelterState::Temporary:
+			Condition = TEXT("provisional and still taking shape");
+			break;
+		case EIslandWildlifeShelterState::Settled:
+			Condition = TEXT("settled and in regular use");
+			break;
+		case EIslandWildlifeShelterState::Disturbed:
+			Condition = TEXT("disturbed, with any cached supplies tucked out of sight");
+			break;
+		default:
+			break;
+		}
+
+		const FString Species = Home->Species.IsNone() ? TEXT("wildlife") : Home->Species.ToString();
+		OutFact = FString::Printf(TEXT("You inspect a %s wildlife shelter. It is %s. You leave it undisturbed; nothing changed."), *Species, Condition);
 		return true;
 	}
 

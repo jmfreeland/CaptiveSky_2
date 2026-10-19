@@ -13,7 +13,7 @@ namespace IslandInteractionUtility
 	// path-following acceptance radius and capsule-overlap stopping are applied.
 	static constexpr float GroundedApproachRangeMargin = 100.f;
 
-	/** Resolve the stable interaction name for a visible landmark or nearby wild creature. */
+	/** Resolve the stable interaction name for a visible landmark, wildlife home, or nearby wild creature. */
 	CAPTIVESKY_2_API FName GetTargetTag(const AActor* Target);
 	/** Wildlife can be inspected when approached naturally, but should never become a chase destination. */
 	CAPTIVESKY_2_API bool IsMovementTargetAllowed(const AActor* Target);

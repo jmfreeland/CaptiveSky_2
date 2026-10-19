@@ -5,6 +5,7 @@
 #include "AgentMemoryComponent.h"
 #include "IslandArrangement.h"
 #include "IslandNest.h"
+#include "IslandInteractionUtility.h"
 #include "IslandRatSubsystem.h"
 #include "IslandWildlifeHome.h"
 #include "IslandWorldStateSubsystem.h"
@@ -636,6 +637,21 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The home can be found by stable place ID"), Stored && Stored->OccupantAgentId == TEXT("Agent_Rat_01"));
 	AIslandWildlifeHome* Materialized = State->FindWildlifeHomeActor(Home.Id);
 	TestNotNull(TEXT("A recorded supported Rat home gets a transient visual actor"), Materialized);
+	AActor* Observer = World->SpawnActor<AActor>(Home.EntranceLocation + FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator);
+	TestEqual(TEXT("A materialized wildlife home is a supported inspection target"), IslandInteractionUtility::GetTargetTag(Materialized), FName(TEXT("WildlifeHome")));
+	if (Observer && Materialized)
+	{
+		FString HomeFact;
+		TestTrue(TEXT("A visitor can inspect the wildlife shelter"), IslandInteractionUtility::Perform(Observer, Materialized, HomeFact));
+		TestTrue(TEXT("Inspection describes the Rat home and its provisional condition"),
+			HomeFact.Contains(TEXT("Rat wildlife shelter")) && HomeFact.Contains(TEXT("provisional")) && HomeFact.Contains(TEXT("nothing changed")));
+		TestFalse(TEXT("Inspection does not expose the occupant agent ID"), HomeFact.Contains(TEXT("Agent_Rat_01")));
+		TestFalse(TEXT("Inspection does not expose hidden cache contents"), HomeFact.Contains(TEXT("Hazelnut")));
+		const FIslandWildlifeHomeRecord* AfterInspection = State->FindWildlifeHome(Home.Id);
+		TestTrue(TEXT("Inspection is read-only for the canonical home and its tucked-away supplies"), AfterInspection &&
+			AfterInspection->ShelterState == Home.ShelterState && AfterInspection->RestVisitDays == Home.RestVisitDays &&
+			AfterInspection->CachedSupplies.Num() == 1 && AfterInspection->CachedSupplies[0].Quantity == 3);
+	}
 	if (Materialized)
 	{
 		TestTrue(TEXT("Materialization preserves the entrance anchor"), Materialized->GetActorLocation().Equals(Home.EntranceLocation, 0.01f));
