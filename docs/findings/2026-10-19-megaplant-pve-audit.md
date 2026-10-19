@@ -32,6 +32,30 @@ good Island composition. The current desktop window inventory did not expose
 Unreal, so no editor UI export was attempted. Do not place or scatter a
 Megaplant on the Island on the strength of this audit alone.
 
+## Mesh and wind follow-up (2026-10-19)
+
+The existing read-only `Scripts/Inspect-MegaplantAssets.py` inventory
+enumerated 296 library assets and loaded 16 A-D tree variants: four each for
+Common Hazel, European Aspen, European Beech, and Norway Maple. All 16 are
+`SkeletalMesh`; the inventory found zero StaticMesh tree variants. Their
+classes and bounds are asset metadata only, not proof of useful appearance.
+Log: `Saved/CompileScratch/Codex_DragonflyFrogResponse_20261019/Project/Saved/MegaplantMeshAudit_20261019.log`.
+
+The isolated UE 5.8.3 target was up to date, and
+`CaptiveSky2.Agent.InstancedSkinnedFoliageProvider` passed under NullRHI with
+the Megaplant library mounted, `-DDC-ForceMemoryCache`, agent thinking
+disabled, and the model-request cap set to zero. Its installed-mesh checks
+load the four representative trees, require enabled `UDynamicWindSkeletalData`,
+and verify the foliage host selects and clears the transient
+`UDynamicWindData` transform provider. Log:
+`Saved/CompileScratch/Codex_DragonflyFrogResponse_20261019/Project/Saved/InstancedSkinnedMegaplantProvider_20261019.log`.
+
+This verifies a viable UE 5.8 wind-provider path for the skeletal trees, not
+rendered wind, material quality, a batch frame-time budget, or Island
+composition. The separate Beech visual rejection still applies. In the latest
+UI check the editor reached its Home Panel, but a blank overlay obscured it, so
+no PVE export UI was used and no project was opened.
+
 ## Next step
 
 When the editor UI is available, export one complete PVE candidate (Norway
