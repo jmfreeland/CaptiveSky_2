@@ -185,8 +185,10 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 			break;
 		}
 
-		const FString Species = Home->Species.IsNone() ? TEXT("wildlife") : Home->Species.ToString();
-		OutFact = FString::Printf(TEXT("You inspect a %s wildlife shelter. It is %s. You leave it undisturbed; nothing changed."), *Species, Condition);
+		const FString HomeName = Home->Species == FName(TEXT("Rat"))
+			? FString(TEXT("the Rat's fallen-wood hollow"))
+			: (Home->Species.IsNone() ? FString(TEXT("a wildlife shelter")) : FString::Printf(TEXT("a %s shelter"), *Home->Species.ToString()));
+		OutFact = FString::Printf(TEXT("You inspect %s. It is %s. You leave it undisturbed; nothing changed."), *HomeName, Condition);
 		return true;
 	}
 

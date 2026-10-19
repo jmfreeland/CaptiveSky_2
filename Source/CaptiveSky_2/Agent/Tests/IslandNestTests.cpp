@@ -645,10 +645,13 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A materialized wildlife home is a supported inspection target"), IslandInteractionUtility::GetTargetTag(Materialized), FName(TEXT("WildlifeHome")));
 	if (Observer && Materialized)
 	{
+		TestTrue(TEXT("A nearby visitor can perceive the wildlife home"), IslandInteractionUtility::CanInteract(Observer, Materialized, 400.f));
+		TestTrue(TEXT("The shared nearest-visible-target search discovers the home"),
+			IslandInteractionUtility::FindNearestVisibleTarget(Observer, World, 400.f) == Materialized);
 		FString HomeFact;
 		TestTrue(TEXT("A visitor can inspect the wildlife shelter"), IslandInteractionUtility::Perform(Observer, Materialized, HomeFact));
 		TestTrue(TEXT("Inspection describes the Rat home and its provisional condition"),
-			HomeFact.Contains(TEXT("Rat wildlife shelter")) && HomeFact.Contains(TEXT("provisional")) && HomeFact.Contains(TEXT("nothing changed")));
+			HomeFact.Contains(TEXT("Rat's fallen-wood hollow")) && HomeFact.Contains(TEXT("provisional")) && HomeFact.Contains(TEXT("nothing changed")));
 		TestFalse(TEXT("Inspection does not expose the occupant agent ID"), HomeFact.Contains(TEXT("Agent_Rat_01")));
 		TestFalse(TEXT("Inspection does not expose hidden cache contents"), HomeFact.Contains(TEXT("Hazelnut")));
 		const FIslandWildlifeHomeRecord* AfterInspection = State->FindWildlifeHome(Home.Id);
