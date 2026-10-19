@@ -9,6 +9,7 @@ import sys
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "requests.py"
+TEST_TEMP_ROOT = Path(__file__).resolve().parents[3] / "Saved" / "AssetPipelineTests"
 SPEC = importlib.util.spec_from_file_location("asset_requests", SCRIPT_PATH)
 asset_requests = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(asset_requests)
@@ -16,7 +17,8 @@ SPEC.loader.exec_module(asset_requests)
 
 class RequestInboxTests(unittest.TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
+        TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+        self.directory = tempfile.TemporaryDirectory(prefix="requests-", dir=TEST_TEMP_ROOT)
         self.inbox = Path(self.directory.name) / "inbox.jsonl"
 
     def tearDown(self):
