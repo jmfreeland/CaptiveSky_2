@@ -223,8 +223,10 @@ counts still need runtime verification.
 A scratch-only manual link was then attempted using the cached DLL response.
 Its response lists 177 object inputs, but only 13 exist in this partially
 seeded scratch tree; `link.exe` stopped at the first missing module unity
-object with `LNK1181`. The existing scratch DLL timestamp remained unchanged,
-and no test was run. This confirms that finishing the scratch module would
+object with `LNK1181`; no updated DLL was produced. A post-failure check found
+no scratch DLL at the target path, so that disposable validation target is no
+longer runnable without rebuilding. The main project's DLL and live editor
+were untouched, and no test was run. Finishing this scratch module would
 require rebuilding most of the target, which is not justified at the current
 system memory headroom.
 
