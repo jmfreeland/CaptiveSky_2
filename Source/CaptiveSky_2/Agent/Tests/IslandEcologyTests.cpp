@@ -155,6 +155,27 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 				MeadowSpecies >= 0 && MeadowSpecies < AIslandWeather::TideglassMarshMarigoldSpeciesIndex);
 		}
 	}
+	const FVector TideglassReservationCenter(120.f, -85.f, 220.f);
+	for (const int32 Seed : {-17, 0, 42, 71, 2026})
+	{
+		for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+		{
+			const FVector SiteOffset = AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(Seed, SiteIndex);
+			const FVector Site = TideglassReservationCenter + SiteOffset;
+			TestTrue(TEXT("Every deterministic Tideglass specialist site is reserved from the general meadow scatter"),
+				AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(Site, TideglassReservationCenter, Seed));
+			const FVector Outward = SiteOffset.GetSafeNormal2D();
+			const FVector InsideClearance = Site + Outward * (AIslandWeather::TideglassPollinatorFlowerSiteClearance - 1.f);
+			const FVector BeyondClearance = Site + Outward * (AIslandWeather::TideglassPollinatorFlowerSiteClearance + 1.f);
+			TestTrue(TEXT("A general flower just inside the shared minimum spacing is rejected"),
+				AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(InsideClearance, TideglassReservationCenter, Seed));
+			TestFalse(TEXT("A general flower just beyond the shared minimum spacing is allowed"),
+				AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(BeyondClearance, TideglassReservationCenter, Seed));
+		}
+	}
+	TestFalse(TEXT("Invalid positions do not reserve unrelated meadow candidates"),
+		AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(
+			FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), TideglassReservationCenter, 71));
 
 	// Mirror the deterministic Tideglass offset chain without landscape traces or
 	// other scene clearances. Reserve the eight flower pockets before selecting

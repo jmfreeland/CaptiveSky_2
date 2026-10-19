@@ -84,6 +84,8 @@ public:
 	static constexpr float TideglassPollinatorFlowerOuterRadius = 850.f;
 	/** Keep wet-edge cattail clumps from occupying a reserved pollinator flower pocket. */
 	static constexpr float TideglassPollinatorFlowerCattailClearance = 375.f;
+	/** Keep the earlier general meadow scatter clear of later Tideglass specialist flower sites. */
+	static constexpr float TideglassPollinatorFlowerSiteClearance = 475.f;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
 	static constexpr int32 ListeningStonesFlowerSiteCount = 160;
 	static constexpr float ListeningStonesFlowerInnerRadius = 2750.f;
@@ -270,6 +272,7 @@ private:
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	static FVector SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex);
 	static bool IsWithinTideglassPollinatorFlowerCattailClearance(const FVector& Position, const FVector& FlowerAnchor);
+	static bool IsWithinTideglassPollinatorFlowerSiteClearance(const FVector& Position, const FVector& TideglassLocation, int32 Seed);
 	/** Deterministically reserve three of eight Tideglass pockets for the marsh marigold. */
 	static bool IsTideglassMarshMarigoldSite(int32 Seed, int32 SiteIndex);
 	/** Reserve two of eight Tideglass pockets for the broad-leaf yellow-flag iris. */

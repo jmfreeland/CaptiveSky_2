@@ -674,6 +674,18 @@ bool AIslandWeather::IsWithinTideglassPollinatorFlowerCattailClearance(const FVe
 	return FVector::DistSquared2D(Position, FlowerAnchor) < FMath::Square(TideglassPollinatorFlowerCattailClearance);
 }
 
+bool AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(const FVector& Position,
+	const FVector& TideglassLocation, int32 Seed)
+{
+	if (Position.ContainsNaN() || TideglassLocation.ContainsNaN()) return false;
+	for (int32 SiteIndex = 0; SiteIndex < TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+	{
+		const FVector FlowerSite = TideglassLocation + SelectTideglassPollinatorFlowerSiteOffset(Seed, SiteIndex);
+		if (FVector::DistSquared2D(Position, FlowerSite) < FMath::Square(TideglassPollinatorFlowerSiteClearance)) return true;
+	}
+	return false;
+}
+
 bool AIslandWeather::IsTideglassMarshMarigoldSite(int32 Seed, int32 SiteIndex)
 {
 	if (SiteIndex < 0 || SiteIndex >= TideglassPollinatorFlowerSiteCount) return false;
@@ -1548,7 +1560,7 @@ void AIslandWeather::InitializeGroundCover()
 					// reads as an intentional local meadow rather than isolated anonymous specks.
 					constexpr int32 MaxFlowerAttemptsPerSite = 3;
 					constexpr int32 MaxPocketMemberAttempts = 3;
-					constexpr float FlowerMinSpacing = 475.f;
+					constexpr float FlowerMinSpacing = AIslandWeather::TideglassPollinatorFlowerSiteClearance;
 					FRandomStream MeadowFlowerRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0xd671c2a5u));
 					// Each counter records a gate observed on the anchor attempts; a candidate can
 					// increment more than one spatial-clearance counter before the shared rejection.
@@ -1606,6 +1618,12 @@ void AIslandWeather::InitializeGroundCover()
 									if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.ExistingFlower;
 									break;
 								}
+						if (!bTooClose && !bTideglassPollinatorSite && bHasTideglassFlowerAnchor &&
+							IsWithinTideglassPollinatorFlowerSiteClearance(Candidate, TideglassFlowerAnchor, WeatherSeed))
+						{
+							bTooClose = true;
+							if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.ExistingFlower;
+						}
 						if (!bTooClose)
 							for (const FVector& ExistingTree : SpruceLocations)
 								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance)
