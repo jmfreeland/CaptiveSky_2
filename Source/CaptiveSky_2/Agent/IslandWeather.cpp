@@ -1522,6 +1522,8 @@ void AIslandWeather::InitializeGroundCover()
 							for (const FVector& ExistingFlower : RhododendronLocations)
 								if (FVector::Dist2D(Candidate, ExistingFlower) < RhododendronMinSpacing) { bTooClose = true; break; }
 							if (bTooClose) continue;
+							if (bHasTideglassFlowerAnchor && IsWithinTideglassPollinatorFlowerSiteClearance(
+								Candidate, TideglassFlowerAnchor, WeatherSeed)) continue;
 							for (const FVector& ExistingTree : SpruceLocations)
 								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
 							if (bTooClose) continue;

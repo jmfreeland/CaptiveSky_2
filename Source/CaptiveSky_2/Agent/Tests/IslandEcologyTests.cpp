@@ -162,7 +162,7 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 		{
 			const FVector SiteOffset = AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(Seed, SiteIndex);
 			const FVector Site = TideglassReservationCenter + SiteOffset;
-			TestTrue(TEXT("Every deterministic Tideglass specialist site is reserved from the general meadow scatter"),
+			TestTrue(TEXT("Every deterministic Tideglass specialist site is reserved from earlier non-specialist flowers"),
 				AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(Site, TideglassReservationCenter, Seed));
 			const FVector Outward = SiteOffset.GetSafeNormal2D();
 			const FVector InsideClearance = Site + Outward * (AIslandWeather::TideglassPollinatorFlowerSiteClearance - 1.f);
