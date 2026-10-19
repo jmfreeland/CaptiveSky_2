@@ -17,8 +17,9 @@ or cooldown. The gust, visitor, and inspection paths remain transient.
 - UE 5.8.3 Editor target built successfully from the isolated
   `Codex_CurrentSourceBuild_20261018` scratch project (18 actions, 93.24 s).
 - `IslandListeningStonePresentationTests.cpp` now checks that resident-facing
-  descriptions distinguish all three causes, alongside the existing transient
-  lifetime, distance, cooldown, and wildlife-response checks.
+  descriptions distinguish all three causes and that the natural-gust reason
+  reaches a resident's assembled situation summary, alongside the existing
+  transient lifetime, distance, cooldown, and wildlife-response checks.
 - The Unreal automation test was not run: the shared coordination note still
   forbids launching another project process while the unsymbolized pre-init
   crash is unresolved. The editor is open and responsive, but its MCP transport

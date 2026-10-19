@@ -369,6 +369,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			const FString NearbySituation = ResidentBrain->BuildSituationSummary(NoMessageContext);
 			TestTrue(TEXT("A nearby resident's situation includes the fading Listening Stones tone"),
 				NearbySituation.Contains(TEXT("soft, layered tone is fading from the ListeningStones")) && NearbySituation.Contains(TEXT("5 metres away")));
+			TestTrue(TEXT("The resident's situation includes why the natural tone sounded"),
+				NearbySituation.Contains(TEXT("natural gust stirred the stones")));
 			Resident->SetActorLocation(FVector(1200.f, 0.f, 0.f));
 			const FString DistantSituation = ResidentBrain->BuildSituationSummary(NoMessageContext);
 			TestFalse(TEXT("A resident outside the audible radius gets no tone in their situation"),
