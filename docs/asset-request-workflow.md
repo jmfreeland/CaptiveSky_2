@@ -105,3 +105,43 @@ asset through Blender and its FBX verifier (`PROBLEMS []`); no real inbox entry,
 Unreal import, or Island placement was involved. Scratch/temp data stayed under
 the ignored `Saved/CompileScratch/` directory. These checks establish pipeline
 and asset-source integrity, not in-game visual approval.
+
+**Gateway regression refresh (2026-10-18):** the current Gateway source and
+`CaptiveSky.Gateway.Checks` project were copied to the ignored
+`Saved/CompileScratch/Codex_GatewayChecks_20261018/Project/` tree and the
+checks were rebuilt and run there with the .NET 10.0.302 SDK (targeting
+`net8.0`). All checks passed, including explicit Discord object/upgrade
+parsing, descriptive landscape targets, functionality-upgrade human review,
+per-resident proposal quotas, duplicate delivery handling, status privacy,
+and shared-inbox locking. An initial in-place `dotnet run` compiled into the
+main project's ignored `obj/` tree but failed while staging the apphost because
+`bin/CaptiveSky.Gateway.exe` was locked by a running process. A timestamp check
+confirmed the main `bin/` DLL and EXE remained unchanged; no process was stopped.
+The current source was then rebuilt and run only in the isolated scratch copy.
+The production Discord channel and inbox were not contacted. This validates
+current gateway logic in isolation, not a live Discord conversation or an
+implemented in-world upgrade.
+
+The headless correspondent also receives its own saved craft lineage: an
+ASCII-filtered tradition name, whether it began or learned the practice, and
+up to two recent personal attempts with bounded intended settings. Inspiration text, teachers'
+identities, and other residents' attempts are omitted. These remain speculative
+resident notes, not measured recipes or evidence that an item was made; this
+context does not create extra world/LLM calls.
+
+**AssetPipeline helper recheck (2026-10-19):** the bundled Python runtime ran
+`python -I -B -m unittest discover -s Scripts/AssetPipeline/tests` with 92 tests
+passing. The initial WindowsApps `python.exe` shim could not start; the bundled
+interpreter was used with temporary fixtures redirected under the ignored
+workspace `Saved/CompileScratch/` tree. These tests exercise source contracts,
+deterministic helpers, request routing, and mocked generation; they do not launch
+Blender, ComfyUI, Unreal, or Discord, and do not validate any asset in the
+Island.
+
+**Gateway craft-lineage repeat (2026-10-19):** the current Gateway source and
+check program still match the isolated `Codex_GatewayChecks_20261018` copy by
+SHA-256. `dotnet run --no-build` passed all checks when
+`CAPTIVESKY_GATEWAY_CHECKS_ROOT` pointed into the ignored
+`Saved/CompileScratch/GatewayChecks_20261019/` tree. The initial repeat using
+the default Windows temp root hit access denied while writing the headless-turn
+marker; no Discord channel, production inbox, or model provider was contacted.

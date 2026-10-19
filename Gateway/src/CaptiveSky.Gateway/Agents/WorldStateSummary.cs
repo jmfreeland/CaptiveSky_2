@@ -120,6 +120,35 @@ public static class WorldStateSummary
                 facts.Add($"On {level}, you have added stones to the small cairn; it stood {Int(curio, "state")} stones high when last recorded.");
         }
 
+        foreach (var tradition in Items(root, "craft_traditions"))
+        {
+            var id = Text(tradition, "id");
+            var name = Text(tradition, "display_name");
+            if (!IsSafeIdentifier(id) || !IsSafeCraftName(name))
+                continue;
+
+            var beganTradition = Text(tradition, "origin") == agentId;
+            var learnedTradition = Items(tradition, "lessons").Any(lesson => Text(lesson, "learner") == agentId);
+            var ownAttempts = Items(tradition, "attempts")
+                .Where(attempt => Text(attempt, "practitioner") == agentId)
+                .Select(DescribeCraftAttempt)
+                .Where(summary => summary is not null)
+                .TakeLast(2)
+                .ToArray();
+
+            if (!beganTradition && !learnedTradition && ownAttempts.Length == 0)
+                continue;
+
+            var details = new List<string>();
+            if (beganTradition)
+                details.Add($"you began the craft tradition \"{name}\"");
+            else if (learnedTradition)
+                details.Add($"you learned the craft tradition \"{name}\"");
+            if (ownAttempts.Length > 0)
+                details.Add($"your latest recorded practice: {string.Join("; ", ownAttempts)}");
+            facts.Add($"On {level}, {string.Join("; ", details)}. These are resident notes, not verified recipes or crafted items.");
+        }
+
         foreach (var site in Items(root, "arrangement_sites"))
         {
             if (!site.TryGetProperty("work", out var work) || work.ValueKind != JsonValueKind.Object)
@@ -156,6 +185,35 @@ public static class WorldStateSummary
 
     private static bool IsSafeIdentifier(string value) =>
         value.Length is > 0 and <= 48 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
+
+    private static bool IsSafeCraftName(string value) =>
+        value.Length is > 0 and <= 80 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is ' ' or '_' or '-' or '\'');
+
+    private static string? DescribeCraftAttempt(JsonElement attempt)
+    {
+        if (!attempt.TryGetProperty("day", out var dayNode) || !dayNode.TryGetInt32(out var day) || day is < 1 or > 10_000_000)
+            return null;
+
+        var outcome = Text(attempt, "outcome") switch
+        {
+            "Unrated" => "unrated experiment",
+            "Promising" => "promising",
+            "Successful" => "successful",
+            "NeedsRevision" => "needs revision",
+            _ => null,
+        };
+        if (outcome is null)
+            return null;
+
+        var parameters = Items(attempt, "parameters")
+            .Select(parameter => (Name: Text(parameter, "id"), Value: Number(parameter, "value", out var value) ? value : double.NaN))
+            .Where(parameter => (parameter.Name is "hydration" or "rise" or "heat" or "salt") &&
+                                double.IsFinite(parameter.Value) && parameter.Value is >= 0 and <= 1)
+            .Select(parameter => $"{parameter.Name} {Percent(parameter.Value)}")
+            .ToArray();
+        var settings = parameters.Length == 0 ? string.Empty : $"; intended settings: {string.Join(", ", parameters)}";
+        return FormattableString.Invariant($"Island day {day}: {outcome}{settings}");
+    }
 
     private static int Int(JsonElement element, string name) =>
         element.TryGetProperty(name, out var node) && node.TryGetInt32(out var value) ? value : 0;
