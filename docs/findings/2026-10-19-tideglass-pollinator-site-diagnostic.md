@@ -244,3 +244,25 @@ successfully compiled both relevant translation units, but the scratch link
 failed because 164 of its 177 object inputs were absent. The regression is
 compiled but unlinked and unrun; production flower-site counts remain
 unverified.
+
+## Follow-up isolated UBT build and runtime attempt (2026-10-20)
+
+The editor remains open and responsive per the user. The UE 5.8.3 UBT build was
+rerun against the isolated Tideglass scratch project with
+`-MaxParallelActions=2 -NoHotReloadFromIDE`; all 168 actions completed and the
+scratch `UnrealEditor-CaptiveSky_2.dll` linked successfully. UBT reported
+65.26/69.77 GB committed at build start. The main project's DLL was not
+relinked or replaced.
+
+The first focused `CaptiveSky2.Agent.GroundCover` commandlet attempt exited in
+engine pre-init before registering/running the automation test. Its scratch
+crash context reports a null-address access violation, with no test result.
+A retry from the engine `Binaries/Win64` working directory produced no usable
+automation log or test result either. A fresh Unreal MCP tool-catalog request
+also remained pending for over 90 seconds; this is a bridge failure, not
+evidence of an unresponsive editor. The editor screenshot shows the Island
+loaded with `TideglassPool` selected and a prompt about reopening a previously
+open asset editor; the prompt was left alone. No PIE, map/asset edit, or
+Live Coding request was made. The new flower-query regression is now linked in
+the scratch module but remains unrun; production flower-site counts and
+gameplay-distance visibility remain unverified.
