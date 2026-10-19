@@ -24,13 +24,14 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	using Wrack = UIslandWrackSubsystem;
 	using Kind = EIslandWrackKind;
 
-	int32 Counts[4] = {0, 0, 0, 0};
+	int32 Counts[static_cast<int32>(Kind::Count)] = {};
 	for (int32 Seed = 0; Seed < 1000; ++Seed) ++Counts[static_cast<int32>(Wrack::PickKind(Seed))];
 	TestTrue(TEXT("Driftwood is common"), Counts[0] > Counts[3]);
 	TestTrue(TEXT("Floats are rare but exist"), Counts[3] > 0 && Counts[3] < Counts[1]);
-	TestTrue(TEXT("Every kind turns up"), Counts[0] > 0 && Counts[1] > 0 && Counts[2] > 0);
+	TestTrue(TEXT("Sea glass is rare but exists"), Counts[4] > 0 && Counts[4] < Counts[2]);
+	TestTrue(TEXT("Every kind turns up"), Counts[0] > 0 && Counts[1] > 0 && Counts[2] > 0 && Counts[3] > 0 && Counts[4] > 0);
 
-	for (int32 K = 0; K < 4; ++K)
+	for (int32 K = 0; K < static_cast<int32>(Kind::Count); ++K)
 	{
 		const Kind ThisKind = static_cast<Kind>(K);
 		TestFalse(TEXT("Every kind has something underneath"), Wrack::FindFor(ThisKind, 11).IsEmpty());
@@ -65,6 +66,9 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Only driftwood is long"), AIslandWrack::UsesLongPieces(Kind::Driftwood) && !AIslandWrack::UsesLongPieces(Kind::Kelp));
 	TestTrue(TEXT("Driftwood bleaches"), AIslandWrack::ItemColor(Kind::Driftwood, 14, false).R > AIslandWrack::ItemColor(Kind::Driftwood, 0, false).R);
+	TestTrue(TEXT("Sea glass carries a cool coastal hue"), AIslandWrack::ItemColor(Kind::SeaGlass, 0, false).G > AIslandWrack::ItemColor(Kind::SeaGlass, 0, false).R);
+	TestTrue(TEXT("Sea glass has a rounded shard scatter"), AIslandWrack::Layout(Kind::SeaGlass, 9).Num() >= 3 && AIslandWrack::Layout(Kind::SeaGlass, 9).Num() <= 5);
+	TestTrue(TEXT("Sea glass can shelter a tidepool periwinkle"), Wrack::FindFor(Kind::SeaGlass, 0).Contains(TEXT("periwinkle")));
 	TestTrue(TEXT("Seeds make different heaps"), AIslandWrack::Layout(Kind::Kelp, 1)[0].Transform.GetLocation() != AIslandWrack::Layout(Kind::Kelp, 2)[0].Transform.GetLocation());
 
 	const TArray<FString> Chronicle = {
@@ -124,6 +128,12 @@ bool FIslandWrackTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Position survives"), Reloaded->Position.Equals(FVector(100.f, 200.f, 30.f), 0.01f));
 		TestEqual(TEXT("Seed survives"), Reloaded->Seed, 123);
 	}
+	FIslandWrackLedger SeaGlassSave;
+	const int32 SeaGlassId = SeaGlassSave.Add(Kind::SeaGlass, FVector(2.f, 3.f, 4.f), 15.f, 19, 12).Id;
+	FIslandWrackLedger SeaGlassReloaded;
+	TestTrue(TEXT("Sea glass survives the existing ledger format"), SeaGlassReloaded.FromJson(SeaGlassSave.ToJson()));
+	const FIslandWrackItem* SavedSeaGlass = SeaGlassReloaded.Find(SeaGlassId);
+	TestTrue(TEXT("Sea glass keeps its kind after reload"), SavedSeaGlass && SavedSeaGlass->Kind == Kind::SeaGlass);
 	TestEqual(TEXT("New ids keep counting after a reload"), Loaded.Add(Kind::Shells, FVector::ZeroVector, 0.f, 1, 11).Id, B + 1);
 
 	FIslandWrackLedger Forage;

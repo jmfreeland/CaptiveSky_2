@@ -15,6 +15,7 @@ enum class EIslandWrackKind : uint8
 	Kelp,
 	Shells,
 	Float,
+	SeaGlass,
 	Count
 };
 
@@ -69,7 +70,7 @@ struct FIslandWrackPiece
 	FTransform Transform;
 };
 
-/** One heap of wrack on the sand: logs, a tangle of kelp, a scatter of shells or a glass float. */
+/** One deposit of storm wrack on the sand: logs, kelp, shells, a float or surf-rounded sea glass. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandWrack : public AActor
 {
@@ -107,7 +108,7 @@ private:
 };
 
 /**
- * Storms leave things on the shore. After one passes, driftwood, kelp, shells and the odd glass float
+ * Storms leave things on the shore. After one passes, driftwood, kelp, shells, sea glass and the odd float
  * lie along the tide line; residents can turn them over and find what was underneath, and the sea
  * gradually takes them back. The shore is saved beside the world state, so it persists across sessions.
  */
@@ -121,7 +122,7 @@ public:
 	/** A flying Raven may learn about fresh shorefall from up to 600 m away. */
 	static constexpr float RavenShoreAwarenessRadius = 60000.f;
 
-	/** The kind a seed picks: mostly driftwood and kelp, fewer shells, rarely a float. Pure. */
+	/** The kind a seed picks: mostly driftwood and kelp, fewer shells, rare floats and very rare sea glass. Pure. */
 	static EIslandWrackKind PickKind(int32 Seed);
 	/** What turning an item over reveals. Deterministic in kind and seed. Pure. */
 	static FString FindFor(EIslandWrackKind Kind, int32 Seed);

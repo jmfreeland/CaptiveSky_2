@@ -41,6 +41,7 @@ namespace
 		case EIslandWrackKind::Kelp: return TEXT("kelp");
 		case EIslandWrackKind::Shells: return TEXT("shells");
 		case EIslandWrackKind::Float: return TEXT("float");
+		case EIslandWrackKind::SeaGlass: return TEXT("sea_glass");
 		default: return TEXT("driftwood");
 		}
 	}
@@ -121,6 +122,7 @@ int32 FIslandWrackLedger::LifespanDays(EIslandWrackKind Kind)
 	case EIslandWrackKind::Kelp: return 5;
 	case EIslandWrackKind::Shells: return 9;
 	case EIslandWrackKind::Float: return 12;
+	case EIslandWrackKind::SeaGlass: return 18;
 	default: return 14;
 	}
 }
@@ -347,6 +349,20 @@ TArray<FIslandWrackPiece> AIslandWrack::Layout(EIslandWrackKind Kind, int32 Seed
 		}
 		break;
 	}
+	case EIslandWrackKind::SeaGlass:
+	{
+		// Surf-rounded chips catch a little colour without introducing a new asset or collision.
+		const int32 Count = 3 + Random.RandRange(0, 2);
+		for (int32 I = 0; I < Count; ++I)
+		{
+			FVector Offset = InDisc(48.f);
+			const float Size = Random.FRandRange(0.045f, 0.085f);
+			Offset.Z = Ground + Size * 18.f;
+			const FRotator Spin(Random.FRandRange(-25.f, 25.f), Random.FRandRange(0.f, 360.f), Random.FRandRange(-25.f, 25.f));
+			Out.Add({FTransform(Spin, Offset, FVector(Size, Size * Random.FRandRange(0.65f, 1.f), Size * Random.FRandRange(0.28f, 0.48f)))});
+		}
+		break;
+	}
 	default:
 	{
 		const FRotator Spin(0.f, Random.FRandRange(0.f, 360.f), 0.f);
@@ -371,6 +387,9 @@ FLinearColor AIslandWrack::ItemColor(EIslandWrackKind Kind, int32 AgeDays, bool 
 		break;
 	case EIslandWrackKind::Float:
 		Color = FMath::Lerp(FLinearColor(0.06f, 0.3f, 0.26f), FLinearColor(0.1f, 0.34f, 0.3f), Age);
+		break;
+	case EIslandWrackKind::SeaGlass:
+		Color = FMath::Lerp(FLinearColor(0.025f, 0.34f, 0.3f), FLinearColor(0.09f, 0.42f, 0.36f), FMath::SmoothStep(0.f, 0.85f, Age));
 		break;
 	default:
 		Color = FMath::Lerp(FLinearColor(0.09f, 0.06f, 0.04f), FLinearColor(0.42f, 0.37f, 0.3f), FMath::SmoothStep(0.f, 0.5f, Age));
@@ -408,7 +427,7 @@ void AIslandWrack::Show(int32 InItemId, EIslandWrackKind Kind, int32 Seed, int32
 	if (Slot)
 	{
 		Slot->SetVectorParameterValue(TEXT("Color"), ItemColor(Kind, AgeDays, bTurned));
-		Slot->SetScalarParameterValue(TEXT("Roughness"), Kind == EIslandWrackKind::Float ? 0.15f : 0.95f);
+		Slot->SetScalarParameterValue(TEXT("Roughness"), Kind == EIslandWrackKind::Float ? 0.15f : Kind == EIslandWrackKind::SeaGlass ? 0.28f : 0.95f);
 	}
 }
 
@@ -419,11 +438,12 @@ int32 AIslandWrack::GetPieceCount() const
 
 EIslandWrackKind UIslandWrackSubsystem::PickKind(int32 Seed)
 {
-	const int32 Roll = FMath::Abs(Seed) % 10;
-	if (Roll < 4) return EIslandWrackKind::Driftwood;
-	if (Roll < 7) return EIslandWrackKind::Kelp;
-	if (Roll < 9) return EIslandWrackKind::Shells;
-	return EIslandWrackKind::Float;
+	const int32 Roll = FMath::Abs(Seed) % 20;
+	if (Roll < 8) return EIslandWrackKind::Driftwood;
+	if (Roll < 13) return EIslandWrackKind::Kelp;
+	if (Roll < 17) return EIslandWrackKind::Shells;
+	if (Roll < 19) return EIslandWrackKind::Float;
+	return EIslandWrackKind::SeaGlass;
 }
 
 FString UIslandWrackSubsystem::FindFor(EIslandWrackKind Kind, int32 Seed)
@@ -452,12 +472,19 @@ FString UIslandWrackSubsystem::FindFor(EIslandWrackKind Kind, int32 Seed)
 		TEXT("a hairline crack along one side, with a trace of seawater inside"),
 		TEXT("a tiny bubble in the glass, a flaw from whoever made it, far away"),
 	};
+	static const TCHAR* SeaGlass[] = {
+		TEXT("a tiny tidepool periwinkle tucked between the rounded chips, its shell door sealed against the wind"),
+		TEXT("a sandhopper sheltering in the cool hollow beneath the largest green shard"),
+		TEXT("a neat crescent of pinprick tracks where a shore crab rested under the glass"),
+		TEXT("one shard with a faint maker's mark still visible beneath years of polish"),
+	};
 	const int32 Index = FMath::Abs(Seed / 7) % 4;
 	switch (Kind)
 	{
 	case EIslandWrackKind::Kelp: return Kelp[Index];
 	case EIslandWrackKind::Shells: return Shells[Index];
 	case EIslandWrackKind::Float: return Float[Index];
+	case EIslandWrackKind::SeaGlass: return SeaGlass[Index];
 	default: return Wood[Index];
 	}
 }
@@ -504,6 +531,9 @@ FString UIslandWrackSubsystem::DescribeItem(EIslandWrackKind Kind, int32 AgeDays
 		break;
 	case EIslandWrackKind::Float:
 		Out = AgeDays <= 3 ? TEXT("a round glass float, green-blue, rolled up out of the surf") : TEXT("a green-blue glass float settled in the sand");
+		break;
+	case EIslandWrackKind::SeaGlass:
+		Out = AgeDays <= 4 ? TEXT("a scatter of green-blue sea glass, smooth and bright with saltwater") : TEXT("a scatter of sea glass, dulled by salt and half-buried in the sand");
 		break;
 	default:
 		Out = AgeDays <= 1 ? TEXT("a length of driftwood, dark and dripping where the storm left it")
