@@ -1058,7 +1058,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			if (NightClock) NightClock->CurrentHour = 22.f;
 		}
 		AIslandFirefly* NearbyNightFirefly = World->SpawnActor<AIslandFirefly>(
-			RavenLocationBeforeWildlifeGlance + FVector(350.f, 0.f, 0.f), FRotator::ZeroRotator);
+			RavenLocationBeforeWildlifeGlance + FVector(0.f, 350.f, 0.f), FRotator::ZeroRotator);
 		TestNotNull(TEXT("A nearby night firefly can be staged for a sustained Raven glance"), NearbyNightFirefly);
 		if (NearbyNightFirefly && NightClock)
 		{
@@ -1066,6 +1066,15 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			BlueprintController->WildlifeAttentionTarget.Reset();
 			BlueprintController->WildlifeAttentionRemaining = 0.f;
 			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			USceneComponent* FireflyAttentionVisual = BlueprintHeadPivot
+				? static_cast<USceneComponent*>(BlueprintHeadPivot)
+				: static_cast<USceneComponent*>(BlueprintRiggedCrow);
+			TestNotNull(TEXT("The Raven has an active visual rig for the firefly glance"), FireflyAttentionVisual);
+			const FRotator FireflyAttentionRest = BlueprintHeadPivot
+				? BlueprintController->RavenHeadRestRotation
+				: BlueprintController->RiggedCrowRestRotation;
+			if (FireflyAttentionVisual)
+				FireflyAttentionVisual->SetRelativeRotation(FireflyAttentionRest);
 			BlueprintController->CheckForNearbyWildlifePresence();
 			TestTrue(TEXT("A close, glowing firefly catches the settled Raven's attention at night"),
 				BlueprintController->WildlifeAttentionTarget.Get() == NearbyNightFirefly &&
@@ -1074,6 +1083,13 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("The firefly glance lasts beyond the first controller tick"),
 				BlueprintController->WildlifeAttentionTarget.Get() == NearbyNightFirefly &&
 				BlueprintController->WildlifeAttentionRemaining > 1.2f);
+			if (FireflyAttentionVisual)
+			{
+				const float FireflyGlanceYaw = FMath::Abs(FMath::FindDeltaAngleDegrees(
+					FireflyAttentionRest.Yaw, FireflyAttentionVisual->GetRelativeRotation().Yaw));
+				TestTrue(TEXT("The Raven's actual head rig turns toward an off-axis firefly"),
+					FireflyGlanceYaw > 3.f && FireflyGlanceYaw <= 25.f);
+			}
 			TestTrue(TEXT("Raven tracks the firefly body instead of looking above it"),
 				BlueprintController->WildlifeAttentionLocation.Equals(
 					NearbyNightFirefly->GetActorLocation() + FVector(0.f, 0.f, 12.f), 0.1f));
