@@ -541,8 +541,10 @@ bool FIslandRatHomeSelectionTest::RunTest(const FString& Parameters)
 {
 	TArray<FIslandWildlifeHomeRecord> Homes;
 	FVector OutLocation(1.f, 2.f, 3.f);
-	TestFalse(TEXT("An empty record set does not invent a Rat home"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation));
+	FRotator OutRotation(11.f, 22.f, 33.f);
+	TestFalse(TEXT("An empty record set does not invent a Rat home"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation, &OutRotation));
 	TestTrue(TEXT("A missing home leaves the caller's fallback location untouched"), OutLocation.Equals(FVector(1.f, 2.f, 3.f)));
+	TestTrue(TEXT("A missing home leaves the caller's fallback facing untouched"), OutRotation.Equals(FRotator(11.f, 22.f, 33.f)));
 
 	FIslandWildlifeHomeRecord WrongSpecies;
 	WrongSpecies.Id = TEXT("FoxHome");
@@ -585,10 +587,12 @@ bool FIslandRatHomeSelectionTest::RunTest(const FString& Parameters)
 	BestSettled.Id = TEXT("BestSettledRatHome");
 	BestSettled.ShelterQuality = 4;
 	BestSettled.EntranceLocation = FVector(600.f, 0.f, 0.f);
+	BestSettled.EntranceRotation = FRotator(0.f, 137.f, 0.f);
 	Homes.Add(BestSettled);
 
-	TestTrue(TEXT("A supported canonical Rat home is found"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation));
+	TestTrue(TEXT("A supported canonical Rat home is found"), UIslandRatSubsystem::FindRatHomeLocation(Homes, OutLocation, &OutRotation));
 	TestTrue(TEXT("A settled home outranks a higher-quality temporary shelter"), OutLocation.Equals(BestSettled.EntranceLocation));
+	TestTrue(TEXT("The selected home supplies the Rat's normalized entrance facing"), OutRotation.Equals(BestSettled.EntranceRotation, 0.01f));
 	return true;
 }
 

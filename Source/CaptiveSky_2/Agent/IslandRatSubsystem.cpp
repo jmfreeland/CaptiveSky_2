@@ -11,14 +11,17 @@
 #include "EngineUtils.h"
 #include "NavigationSystem.h"
 
-bool UIslandRatSubsystem::FindRatHomeLocation(const TArray<FIslandWildlifeHomeRecord>& Homes, FVector& OutLocation)
+bool UIslandRatSubsystem::FindRatHomeLocation(const TArray<FIslandWildlifeHomeRecord>& Homes, FVector& OutLocation,
+	FRotator* OutEntranceRotation)
 {
 	const FIslandWildlifeHomeRecord* BestHome = nullptr;
 	for (const FIslandWildlifeHomeRecord& Home : Homes)
 	{
 		if (!Home.Species.ToString().Equals(TEXT("Rat"), ESearchCase::IgnoreCase) ||
 			Home.OccupantAgentId != GetAgentId() || Home.ShelterState == EIslandWildlifeShelterState::Disturbed ||
-			Home.EntranceLocation.ContainsNaN() || Home.EntranceLocation.GetAbsMax() > 10000000.f)
+			Home.EntranceLocation.ContainsNaN() || Home.EntranceLocation.GetAbsMax() > 10000000.f ||
+			!FMath::IsFinite(Home.EntranceRotation.Pitch) || !FMath::IsFinite(Home.EntranceRotation.Yaw) ||
+			!FMath::IsFinite(Home.EntranceRotation.Roll))
 		{
 			continue;
 		}
@@ -33,6 +36,7 @@ bool UIslandRatSubsystem::FindRatHomeLocation(const TArray<FIslandWildlifeHomeRe
 
 	if (!BestHome) return false;
 	OutLocation = BestHome->EntranceLocation;
+	if (OutEntranceRotation) *OutEntranceRotation = BestHome->EntranceRotation.GetNormalized();
 	return true;
 }
 
@@ -59,8 +63,9 @@ void UIslandRatSubsystem::SpawnRat(UWorld& World)
 	if (!BodyClass || !BodyClass->IsChildOf(AAutonomousAgentCharacter::StaticClass())) return;
 
 	FVector Centre = FVector::ZeroVector;
+	FRotator HomeFacing = FRotator::ZeroRotator;
 	const UIslandWorldStateSubsystem* WorldState = World.GetSubsystem<UIslandWorldStateSubsystem>();
-	bool bHasRatHome = WorldState && FindRatHomeLocation(WorldState->GetWildlifeHomes(), Centre);
+	bool bHasRatHome = WorldState && FindRatHomeLocation(WorldState->GetWildlifeHomes(), Centre, &HomeFacing);
 	const auto FindInnMarker = [&World]() -> const AActor*
 	{
 		for (TActorIterator<AActor> It(&World); It; ++It)
@@ -107,6 +112,7 @@ void UIslandRatSubsystem::SpawnRat(UWorld& World)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Island rat home has no nearby navigable point; using the Inn fallback."));
 		bHasRatHome = false;
+		HomeFacing = FRotator::ZeroRotator;
 		const AActor* InnMarker = FindInnMarker();
 		if (InnMarker)
 		{
@@ -122,7 +128,8 @@ void UIslandRatSubsystem::SpawnRat(UWorld& World)
 
 	const AAutonomousAgentCharacter* Defaults = Cast<AAutonomousAgentCharacter>(BodyClass->GetDefaultObject());
 	const float HalfHeight = Defaults && Defaults->GetCapsuleComponent() ? Defaults->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 14.f;
-	const FTransform SpawnTransform(FRotator::ZeroRotator, NavLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f));
+	const FRotator SpawnRotation(0.f, bHasRatHome ? HomeFacing.Yaw : 0.f, 0.f);
+	const FTransform SpawnTransform(SpawnRotation, NavLocation.Location + FVector(0.f, 0.f, HalfHeight + 2.f));
 	AAutonomousAgentCharacter* Rat = World.SpawnActorDeferred<AAutonomousAgentCharacter>(
 		BodyClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (!Rat) return;
