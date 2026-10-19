@@ -299,7 +299,9 @@ bool AIslandCommonFrog::RespondToNearbyDragonfly(const FVector& DragonflyLocatio
 float AIslandCommonFrog::HopArcHeight(float Alpha, float MaximumHeightCm)
 {
 	if (!FMath::IsFinite(Alpha) || !FMath::IsFinite(MaximumHeightCm)) return 0.f;
-	return FMath::Sin(PI * FMath::Clamp(Alpha, 0.f, 1.f)) * FMath::Clamp(MaximumHeightCm, 0.f, 80.f);
+	const float ClampedAlpha = FMath::Clamp(Alpha, 0.f, 1.f);
+	if (ClampedAlpha <= 0.f || ClampedAlpha >= 1.f) return 0.f;
+	return FMath::Sin(PI * ClampedAlpha) * FMath::Clamp(MaximumHeightCm, 0.f, 80.f);
 }
 
 void AIslandCommonFrog::SetColor(UMaterialInstanceDynamic* Material, const FLinearColor& Color)
