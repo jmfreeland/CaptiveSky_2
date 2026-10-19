@@ -122,6 +122,16 @@ The production Discord channel and inbox were not contacted. This validates
 current gateway logic in isolation, not a live Discord conversation or an
 implemented in-world upgrade.
 
+**Inbox permission failure check (2026-10-19):** the gateway now converts
+`UnauthorizedAccessException` during proposal append, status lookup, and recent
+history reads into clear, fail-closed responses. An isolated gateway check
+uses a directory at the expected inbox-file path to exercise the rejected
+append: the call returns “not writable” and confirms no proposal was added
+instead of allowing a filesystem exception to escape. This is a deterministic
+unwritable-path regression, not a test of Windows ACL configuration; if the
+real bot reports this message, inspect the gateway account's access to its
+configured `CaptiveSkyDataRoot` / project `Saved` directory.
+
 The headless correspondent also receives its own saved craft lineage: an
 ASCII-filtered tradition name, whether it began or learned the practice, and
 up to two recent personal attempts with bounded intended settings. Inspiration text, teachers'

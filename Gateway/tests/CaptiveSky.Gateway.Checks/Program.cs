@@ -371,6 +371,18 @@ try
     Assert(allowedAgentProposal.Contains("queued for human review", StringComparison.Ordinal),
         "allow-listed visitor can explicitly request an agent-authored proposal");
 
+    var unwritableProposalRoot = Path.Combine(root, "unwritable-proposals");
+    var unwritableInbox = Path.Combine(unwritableProposalRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    Directory.CreateDirectory(unwritableInbox);
+    var unwritableQueue = new AssetProposalQueue(unwritableProposalRoot);
+    var unwritableProposal = await unwritableQueue.AppendAsync(home.AgentId,
+        new AgentProposal("new_object", "A small sheltered observation perch"),
+        "42", "Visitor", "10", "unwritable-inbox", CancellationToken.None);
+    Assert(!unwritableProposal.Success &&
+           unwritableProposal.Message.Contains("not writable", StringComparison.Ordinal) &&
+           unwritableProposal.Message.Contains("no request was added", StringComparison.Ordinal),
+        "an inbox path that cannot be written returns a fail-closed result instead of escaping as a filesystem exception");
+
     var proposals = new AssetProposalQueue(root);
     var queuedObject = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "100", CancellationToken.None);
     Assert(queuedObject.Success, "Discord object proposal is appended");

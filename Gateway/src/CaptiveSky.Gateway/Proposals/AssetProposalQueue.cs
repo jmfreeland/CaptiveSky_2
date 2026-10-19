@@ -83,6 +83,10 @@ public sealed class AssetProposalQueue(string projectRoot)
         {
             return (false, "", "The proposal inbox could not be written; no request was added.");
         }
+        catch (UnauthorizedAccessException)
+        {
+            return (false, "", "The proposal inbox is not writable by the gateway; no request was added.");
+        }
         finally { Gate.Release(); }
     }
 
@@ -139,6 +143,10 @@ public sealed class AssetProposalQueue(string projectRoot)
         catch (IOException)
         {
             return "The proposal inbox could not be read; its status is unavailable.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "The proposal inbox is not readable by the gateway; its status is unavailable.";
         }
         finally { Gate.Release(); }
     }
@@ -200,6 +208,10 @@ public sealed class AssetProposalQueue(string projectRoot)
         catch (IOException)
         {
             return "(unavailable: proposal inbox could not be read)";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "(unavailable: proposal inbox is not readable by the gateway)";
         }
         finally { Gate.Release(); }
     }
