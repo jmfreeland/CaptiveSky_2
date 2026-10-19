@@ -65,3 +65,17 @@ its silhouette/material/wind appearance, then measure a small batch before
 considering any map placement. Keep the existing Beech's rejected dark/sparse
 comparison as a warning against assuming that PVE availability guarantees a
 usable canopy.
+
+## Live editor visibility recheck (2026-10-19)
+
+A read-only desktop capture confirms the Unreal Editor window is present with
+the Island loaded, `TideglassPool` selected, and 180 actors in the Outliner. The
+editor's Output Log still shows Live Coding reporting “No object changes
+detected,” so it does not prove the latest working-tree module is loaded. A
+modal asks whether to reopen an asset editor from the previous session; it was
+left untouched. No PVE graph was exported, no asset was edited, and the map was
+not saved. The Unreal MCP tool catalog did not return after 90 seconds and its
+pending call was stopped; the separate desktop capture worked. Next, after the
+modal is cleared, use the PVE editor UI for one disposable export and preview
+under Island lighting. Do not interpret editor visibility as visual approval
+or as evidence that Megaplant foliage is ready for Island placement.
