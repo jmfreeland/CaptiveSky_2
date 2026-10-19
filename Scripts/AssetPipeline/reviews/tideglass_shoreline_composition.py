@@ -20,6 +20,7 @@ EXPORT_ROOT = os.path.join(REPO, "Saved", "CaptiveSky", "ComfyBlender")
 
 SPECIES = {
     "samphire": "TideglassRockSamphire",
+    "glasswort": "Codex_TideglassGlasswort_20261017/TideglassGlasswort",
     "sea_thrift": "TideglassSeaThrift",
     "marram": "TideglassMarramGrass",
     "soft_rush": "TideglassSoftRush",
@@ -38,6 +39,14 @@ PLACEMENTS = (
     ("samphire", (0.52, 0.77), 1.14, 32.0),
     ("samphire", (1.63, 0.47), 1.30, -9.0),
     ("samphire", (1.96, 0.78), 1.16, 18.0),
+    # Glasswort occupies a few broken, sheltered pioneer-mud patches. Its
+    # jointed vertical stems contrast with the lower fleshy samphire rosettes.
+    ("glasswort", (-3.12, 0.68), 1.35, -12.0),
+    ("glasswort", (-2.72, 0.91), 1.22, 19.0),
+    ("glasswort", (-0.22, 0.68), 1.42, 8.0),
+    ("glasswort", (0.12, 1.03), 1.24, -26.0),
+    ("glasswort", (2.12, 0.71), 1.36, 22.0),
+    ("glasswort", (2.53, 1.02), 1.23, -8.0),
     ("sea_thrift", (-2.13, 1.18), 0.83, 12.0),
     ("sea_thrift", (-1.72, 1.54), 0.77, -18.0),
     ("sea_thrift", (0.40, 1.25), 0.88, 21.0),
@@ -185,24 +194,21 @@ def create_ground_and_water():
 
     # A broken, low stone rhythm follows the bend without forming a hard border.
     stone_layout = (
-        (-3.55, -0.03, 0.25, 0.18, 0.14, -12),
-        (-2.93, 0.13, 0.36, 0.24, 0.20, 18),
-        (-1.83, -0.08, 0.23, 0.18, 0.13, 31),
-        (-1.41, 0.18, 0.33, 0.23, 0.18, -24),
-        (-0.15, -0.04, 0.42, 0.29, 0.20, 11),
-        (0.96, 0.19, 0.28, 0.21, 0.17, -18),
-        (1.77, -0.07, 0.38, 0.25, 0.20, 23),
-        (2.73, 0.12, 0.27, 0.20, 0.15, -5),
-        (3.52, -0.05, 0.34, 0.24, 0.18, 8),
+        (-3.58, -0.10, 0.27, 0.20, 0.18, -12, -8, 13),
+        (-2.66, 0.18, 0.34, 0.26, 0.22, 21, 9, -6),
+        (-1.34, -0.16, 0.22, 0.17, 0.15, 31, 4, 17),
+        (-0.12, 0.24, 0.36, 0.25, 0.20, 11, -12, 8),
+        (1.79, -0.12, 0.31, 0.23, 0.20, 23, 10, -11),
+        (3.20, 0.14, 0.29, 0.21, 0.18, -5, -7, 15),
     )
-    for index, (x, edge_offset, sx, sy, sz, yaw) in enumerate(stone_layout):
+    for index, (x, edge_offset, sx, sy, sz, yaw, tilt_x, tilt_y) in enumerate(stone_layout):
         y = shoreline_y(x) + edge_offset
         z = ground_z(x, y) + sz * 0.42
         bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=1.0, location=(x, y, z))
         stone = bpy.context.object
         stone.name = f"ReviewOnly_ShoreStone_{index + 1:02d}"
         stone.scale = (sx, sy, sz * 0.5)
-        stone.rotation_euler[2] = math.radians(yaw)
+        stone.rotation_euler = tuple(math.radians(angle) for angle in (tilt_x, tilt_y, yaw))
         stone.data.materials.append(rock_mat)
 
     # Small, sparse shell flecks catch the eye at the transition but do not
@@ -307,8 +313,8 @@ def setup_lighting_and_camera():
     scene.collection.objects.link(camera)
     scene.camera = camera
     camera_data.type = "PERSP"
-    camera_data.lens = 35.0
-    camera.location = (5.0, -6.6, 2.9)
+    camera_data.lens = 50.0
+    camera.location = (4.4, -5.9, 2.7)
     target = Vector((0.0, 0.05, 0.57))
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
 
