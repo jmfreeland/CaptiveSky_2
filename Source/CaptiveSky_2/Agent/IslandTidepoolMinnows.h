@@ -6,6 +6,7 @@
 
 class AIslandWeather;
 class AIslandDayNight;
+class AIslandCommonFrog;
 class ARavenAgentAIController;
 class ARatAgentAIController;
 class APawn;
@@ -29,6 +30,8 @@ public:
 	FString DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const;
 	/** An awake rat close to the shore startles the school within bounded horizontal/vertical limits. */
 	static bool ShouldScatterForRat(bool bRatAwake, float DistanceCm, float VerticalOffsetCm);
+	/** A nearby frog hop briefly scatters the school; a settled frog is ignored. */
+	static bool ShouldScatterForFrog(bool bFrogHopping, float DistanceCm, float VerticalOffsetCm);
 	static float RainMovementScale(float RainIntensity);
 
 protected:
@@ -37,6 +40,7 @@ protected:
 
 private:
 	friend class FIslandMinnowTest;
+	friend class FIslandMinnowFrogCueTest;
 	friend class FIslandMinnowSwimmingVisitorTest;
 	friend class FIslandNightEcologyTest;
 	static constexpr int32 FishCount = 5;
@@ -57,6 +61,10 @@ private:
 	static constexpr float PlayerWaterHeightToleranceCm = 250.f;
 	static constexpr float PlayerWaterStartleCooldownSeconds = 8.f;
 	static constexpr float RatPresenceCooldownSeconds = 8.f;
+	static constexpr float FrogPresenceRadiusCm = 700.f;
+	static constexpr float FrogPresenceRearmRadiusCm = 900.f;
+	static constexpr float FrogPresenceHeightToleranceCm = 350.f;
+	static constexpr float FrogPresenceCooldownSeconds = 8.f;
 	static float NightRestAmount(float CurrentHour);
 	static float NightActivityScale(float RestAmount);
 	static float SwimRateForRest(float RestAmount);
@@ -90,11 +98,13 @@ private:
 	int32 SurfaceBreakHopFishIndex = INDEX_NONE;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
+	TWeakObjectPtr<AIslandCommonFrog> FrogPresenceLatch;
 	TWeakObjectPtr<APawn> PlayerWaterPresenceLatch;
 	float RavenCheckRemaining = 0.f;
 	float RavenFlybyCooldownRemaining = 0.f;
 	float RatCheckRemaining = 0.f;
 	float RatPresenceCooldownRemaining = 0.f;
+	float FrogPresenceCooldownRemaining = 0.f;
 	float PlayerWaterCheckRemaining = 0.f;
 	float PlayerWaterStartleCooldownRemaining = 0.f;
 	float Phase = 0.73f;
@@ -109,6 +119,7 @@ private:
 	void ConfigureAppearance();
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNearbyRatDisturbance();
+	void CheckForNearbyFrogDisturbance();
 	void CheckForPlayerWaterDisturbance();
 	void UpdatePlayerWaterPresence(APawn* PlayerPawn, bool bIsSurfaceSwimming);
 	void CheckForNearbySurfaceCue();

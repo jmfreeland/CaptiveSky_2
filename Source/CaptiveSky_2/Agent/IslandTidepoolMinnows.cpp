@@ -3,6 +3,7 @@
 #include "EngineUtils.h"
 #include "AgentConsolidationComponent.h"
 #include "IslandDayNight.h"
+#include "IslandCommonFrog.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandWeather.h"
 #include "IslandTideglassSubsystem.h"
@@ -503,6 +504,13 @@ bool AIslandTidepoolMinnows::ShouldScatterForRat(bool bRatAwake, float DistanceC
 		FMath::Abs(VerticalOffsetCm) <= RatPresenceHeightToleranceCm;
 }
 
+bool AIslandTidepoolMinnows::ShouldScatterForFrog(bool bFrogHopping, float DistanceCm, float VerticalOffsetCm)
+{
+	return bFrogHopping && FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f &&
+		DistanceCm <= FrogPresenceRadiusCm && FMath::IsFinite(VerticalOffsetCm) &&
+		FMath::Abs(VerticalOffsetCm) <= FrogPresenceHeightToleranceCm;
+}
+
 void AIslandTidepoolMinnows::CreateScatterSurfaceCue(const FVector& ObserverLocation)
 {
 	if (!GetWorld() || Fish.IsEmpty() || ScatterSurfaceCueCooldownRemaining > 0.f) return;
@@ -755,6 +763,40 @@ void AIslandTidepoolMinnows::CheckForNearbyRatDisturbance()
 	}
 }
 
+void AIslandTidepoolMinnows::CheckForNearbyFrogDisturbance()
+{
+	if (!GetWorld()) return;
+
+	for (TActorIterator<AIslandCommonFrog> It(GetWorld()); It; ++It)
+	{
+		AIslandCommonFrog* Frog = *It;
+		if (!IsValid(Frog)) continue;
+
+		const FVector Offset = Frog->GetActorLocation() - GetActorLocation();
+		const float DistanceSquared = Offset.SizeSquared2D();
+		if (FrogPresenceLatch.Get() == Frog)
+		{
+			if (!Frog->IsHopping() || DistanceSquared > FMath::Square(FrogPresenceRearmRadiusCm) ||
+				FMath::Abs(Offset.Z) > FrogPresenceHeightToleranceCm)
+				FrogPresenceLatch.Reset();
+			else
+				continue;
+		}
+
+		if (!ShouldScatterForFrog(Frog->IsHopping(), FMath::Sqrt(DistanceSquared), Offset.Z)) continue;
+		FrogPresenceLatch = Frog;
+		if (FrogPresenceCooldownRemaining > 0.f || ScatterRemaining > 0.f) continue;
+
+		// A hop at the bank gives the school one brief cue, without inventing
+		// a splash: the frog's feet need not actually enter the water.
+		ScatterDirection = (-Offset).GetSafeNormal2D();
+		if (ScatterDirection.IsNearlyZero()) ScatterDirection = GetActorForwardVector();
+		ScatterRemaining = 2.4f;
+		FrogPresenceCooldownRemaining = FrogPresenceCooldownSeconds;
+		return;
+	}
+}
+
 void AIslandTidepoolMinnows::CheckForPlayerWaterDisturbance()
 {
 	if (!GetWorld()) return;
@@ -887,11 +929,13 @@ void AIslandTidepoolMinnows::Tick(float DeltaSeconds)
 		CheckForNearbyRavenDisturbance();
 	}
 	RatPresenceCooldownRemaining = FMath::Max(0.f, RatPresenceCooldownRemaining - SafeDelta);
+	FrogPresenceCooldownRemaining = FMath::Max(0.f, FrogPresenceCooldownRemaining - SafeDelta);
 	RatCheckRemaining -= SafeDelta;
 	if (RatCheckRemaining <= 0.f)
 	{
 		RatCheckRemaining = RatCheckIntervalSeconds;
 		CheckForNearbyRatDisturbance();
+		CheckForNearbyFrogDisturbance();
 	}
 	PlayerWaterCheckRemaining -= SafeDelta;
 	if (PlayerWaterCheckRemaining <= 0.f)

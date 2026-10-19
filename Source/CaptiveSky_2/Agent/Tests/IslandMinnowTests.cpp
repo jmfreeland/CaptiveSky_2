@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "AutonomousAgentAIController.h"
 #include "IslandDayNight.h"
+#include "IslandCommonFrog.h"
 #include "IslandInteractionUtility.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTideglassSubsystem.h"
@@ -738,6 +739,61 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 	AIslandTidepoolMinnows* DawnSchool = Weather->TidepoolMinnowSchool.Get();
 	Weather->RefreshNightEcology();
 	TestTrue(TEXT("Dawn refresh preserves the same single school"), Weather->TidepoolMinnowSchool.Get() == DawnSchool);
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMinnowFrogCueTest, "CaptiveSky2.Agent.MinnowFrogCue",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandMinnowFrogCueTest::RunTest(const FString& Parameters)
+{
+	TestTrue(TEXT("A nearby shoreline hop can briefly scatter the school"),
+		AIslandTidepoolMinnows::ShouldScatterForFrog(true, AIslandTidepoolMinnows::FrogPresenceRadiusCm, AIslandTidepoolMinnows::FrogPresenceHeightToleranceCm));
+	TestFalse(TEXT("A settled frog is ignored"), AIslandTidepoolMinnows::ShouldScatterForFrog(false, 250.f, 0.f));
+	TestFalse(TEXT("A distant frog is ignored"),
+		AIslandTidepoolMinnows::ShouldScatterForFrog(true, AIslandTidepoolMinnows::FrogPresenceRadiusCm + 1.f, 0.f));
+	TestFalse(TEXT("A frog high above or below the school is ignored"),
+		AIslandTidepoolMinnows::ShouldScatterForFrog(true, 250.f, AIslandTidepoolMinnows::FrogPresenceHeightToleranceCm + 1.f));
+	TestFalse(TEXT("Non-finite distances are ignored"),
+		AIslandTidepoolMinnows::ShouldScatterForFrog(true, std::numeric_limits<float>::infinity(), 0.f));
+
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Minnow-frog cue fixture world created"), World) || !TestNotNull(TEXT("Engine is available for minnow-frog fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandTidepoolMinnows* School = World->SpawnActor<AIslandTidepoolMinnows>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	AIslandCommonFrog* Frog = World->SpawnActor<AIslandCommonFrog>(FVector(250.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Minnow school spawned"), School) || !TestNotNull(TEXT("Common frog spawned"), Frog))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	Frog->HopRemaining = 0.8f;
+	School->CheckForNearbyFrogDisturbance();
+	TestTrue(TEXT("A live nearby hop starts a short scatter"), FMath::IsNearlyEqual(School->ScatterRemaining, 2.4f));
+	TestTrue(TEXT("The school scatters away from the frog"), FVector::DotProduct(School->ScatterDirection, FVector(-1.f, 0.f, 0.f)) > 0.99f);
+	School->CheckForNearbyFrogDisturbance();
+	TestTrue(TEXT("The same hop is latched and does not restart the scatter"), FMath::IsNearlyEqual(School->ScatterRemaining, 2.4f));
+	int32 RippleCount = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It) ++RippleCount;
+	TestEqual(TEXT("A bank-side hop does not fabricate a splash ripple"), RippleCount, 0);
+
+	Frog->HopRemaining = 0.f;
+	School->CheckForNearbyFrogDisturbance();
+	TestFalse(TEXT("The settled frog releases its event latch"), School->FrogPresenceLatch.IsValid());
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

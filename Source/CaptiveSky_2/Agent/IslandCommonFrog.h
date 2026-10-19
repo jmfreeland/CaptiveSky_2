@@ -46,6 +46,7 @@ protected:
 private:
 	friend class FIslandCommonFrogTests;
 	friend class FIslandCommonFrogDragonflyTests;
+	friend class FIslandMinnowFrogCueTest;
 	void FindEnvironment();
 	void CheckForPlayerDisturbance();
 	void CheckForNearbyWildlife();
