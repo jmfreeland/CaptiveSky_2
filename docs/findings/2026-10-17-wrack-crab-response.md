@@ -50,3 +50,13 @@ rebuilt successfully after the clue wording and absent-crab regression were
 added (5 actions, including `IslandWrack.cpp` and `IslandWrackTests.cpp`). The
 automation still has not run; the pre-test Core startup failure above remains
 the validation boundary.
+
+**Isolated behavior verification (2026-10-19):** the focused
+`CaptiveSky2.Agent.IslandWrackCrabDisturbance` automation passed against the
+current source in an isolated scratch project using `UnrealEditor.exe`,
+NullRHI, `-DDC-ForceMemoryCache`, `-CaptiveSkyDisableAgentThinking`, and
+`-CaptiveSkyMaxModelRequests=0`. The log reports `Result={Success}` and exit
+code 0. This verifies the near/far/sheltered crab and absent-crab narration
+cases; it does not resolve the separate full-project startup crash, prove a
+live Island interaction, or provide visual evidence. Log:
+`Saved/CompileScratch/Codex_DragonflyFrogResponse_20261019/Project/Saved/WrackCrab_MemoryDDC_20261019.log`.
