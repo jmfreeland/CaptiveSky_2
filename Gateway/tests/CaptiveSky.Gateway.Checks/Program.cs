@@ -382,6 +382,12 @@ try
            unwritableProposal.Message.Contains("not writable", StringComparison.Ordinal) &&
            unwritableProposal.Message.Contains("no request was added", StringComparison.Ordinal),
         "an inbox path that cannot be written returns a fail-closed result instead of escaping as a filesystem exception");
+    var unreadableStatus = await unwritableQueue.GetStatusAsync(home.AgentId, "42", "deadbeef", CancellationToken.None);
+    Assert(unreadableStatus.Contains("not readable", StringComparison.Ordinal),
+        "an inbox path that cannot be read is not misreported as a missing proposal");
+    var unreadableHistory = await unwritableQueue.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
+    Assert(unreadableHistory.Contains("not readable", StringComparison.Ordinal),
+        "an inbox path that cannot be read is not misreported as empty history");
 
     var proposals = new AssetProposalQueue(root);
     var queuedObject = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "100", CancellationToken.None);

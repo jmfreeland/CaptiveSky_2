@@ -101,7 +101,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         await Gate.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(_path))
+            if (!PathExists(_path))
                 return "No proposal with that ID was found for this correspondent.";
             await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
 
@@ -160,7 +160,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         await Gate.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(_path)) return "(none recorded)";
+            if (!PathExists(_path)) return "(none recorded)";
             await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
 
             var entries = new List<string>();
@@ -218,6 +218,17 @@ public sealed class AssetProposalQueue(string projectRoot)
 
     private static string Get(JsonElement record, string property) =>
         record.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+
+    private static bool PathExists(string path)
+    {
+        try
+        {
+            File.GetAttributes(path);
+            return true;
+        }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+    }
 
     private async Task<FileStream> AcquireInboxLockAsync(CancellationToken cancellationToken)
     {
