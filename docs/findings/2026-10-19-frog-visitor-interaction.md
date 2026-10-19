@@ -20,7 +20,9 @@ world with collision ground and a visitor. It verifies target discovery,
 non-movement status, a real transient hop through the shared `Perform` path,
 and idempotent repeated observation. The UE 5.8.3 editor target built in an
 isolated no-content scratch project, and the focused automation test passed
-under NullRHI. The fixture checks visibility before adding its synthetic hop
-floor, so the floor cannot mask the target line-of-sight assertion. The scratch
-log contains expected missing-Content asset warnings and does not prove a
-natural Island encounter; a real-play camera review remains outstanding.
+under NullRHI. The test also checks that the player proximity hint says
+"quietly watch a wild common frog." The fixture checks visibility before
+adding its synthetic hop floor, so the floor cannot mask the target
+line-of-sight assertion. The scratch log contains expected missing-Content
+asset warnings and does not prove a natural Island encounter; a real-play
+camera review remains outstanding.

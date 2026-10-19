@@ -202,6 +202,7 @@ FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Targ
 	}
 	else if (Tag == FName(TEXT("Firefly"))) Action = TEXT("quietly watch a wild firefly");
 	else if (Tag == FName(TEXT("TidepoolCrab"))) Action = TEXT("quietly watch a wild shore crab");
+	else if (Tag == FName(TEXT("TideglassFrog"))) Action = TEXT("quietly watch a wild common frog");
 	else if (Tag == FName(TEXT("MinnowSchool"))) Action = TEXT("quietly watch the wild minnows");
 	else if (Tag == FName(TEXT("RainBasin")))
 	{

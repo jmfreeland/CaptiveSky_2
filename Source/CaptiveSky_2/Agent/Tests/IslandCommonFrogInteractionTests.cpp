@@ -1,5 +1,6 @@
 #include "Agent/IslandCommonFrog.h"
 #include "Agent/IslandInteractionUtility.h"
+#include "CaptiveSky_2PlayerController.h"
 #include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -28,6 +29,10 @@ bool FIslandCommonFrogInteractionTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("The frog has a visitor-facing interaction target"),
 		IslandInteractionUtility::GetTargetTag(Frog), FName(TEXT("TideglassFrog")));
+	const ACaptiveSky_2PlayerController* VisitorController =
+		ACaptiveSky_2PlayerController::StaticClass()->GetDefaultObject<ACaptiveSky_2PlayerController>();
+	TestTrue(TEXT("The player proximity hint describes quiet frog observation naturally"),
+		VisitorController && VisitorController->DescribeWorldInteractionHint(Frog).Contains(TEXT("quietly watch a wild common frog")));
 	TestFalse(TEXT("Wild frogs remain non-movement targets"), IslandInteractionUtility::IsMovementTargetAllowed(Frog));
 	TestTrue(TEXT("A nearby visitor has clear interaction range"), IslandInteractionUtility::CanInteract(Visitor, Frog));
 	TestTrue(TEXT("Nearest-visible interaction discovery can find the frog"),

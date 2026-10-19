@@ -37,6 +37,7 @@ public:
 	void CloseArrangement();
 	
 protected:
+	friend class FIslandCommonFrogInteractionTest;
 
 	/** Input Mapping Contexts */
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
