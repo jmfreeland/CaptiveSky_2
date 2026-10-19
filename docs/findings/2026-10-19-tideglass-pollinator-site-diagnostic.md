@@ -178,3 +178,65 @@ issued. The two existing scratch automation logs still show a successful
 `MeadowFlowerSpecies` test and a successful `GroundCover` test; the latter's
 transient fixture reports zero cattails, so neither log proves that the saved
 Island placed the new wet-margin flowers or its production cattails.
+
+The `GroundCover` fixture now also inserts one transient instance into each
+wetland-flower HISM and checks that `FindNearestMeadowFlower` returns it. This
+is the exact read-only query used by dragonflies, and closes the source-level
+integration gap between loading the new species and wildlife being able to
+notice them. This follow-up test has not yet been compiled or run: with the
+editor open, `GlobalMemoryStatusEx` reports only 6.22 GB available commit out
+of 69.77 GB, so no additional UBT or commandlet process was started. The live
+Island remains unmodified.
+
+## Follow-up single-translation-unit compile attempt (2026-10-20)
+
+The test input in the existing isolated Tideglass scratch project was brought
+into exact content parity with the working-tree test source; the scratch
+`IslandWeather.h` also matched the current header. The cached
+`IslandEcologyTests.cpp.obj.rsp` and UE 5.8 PCH were present, so I invoked only
+the MSVC compiler for this translation unit. It exited immediately with
+`C1853`: the cached PCH was created by a different compiler version. The
+working-tree test source was not compiled; no UBT, module link, Live Coding,
+commandlet, or PIE was run, and the live module/map remain untouched. The
+repository's prior compile notes identify `/Y-` as the workaround when using
+VS 18 with a mismatched cached PCH, but this workaround has not yet been tried
+for the current test file. Immediately after the failed attempt,
+`GlobalMemoryStatusEx` reported only 3.95 GB available commit and 1.29 GB
+available physical memory. I deferred the PCH-less retry at that headroom; the
+new wildlife-query regression remains uncompiled and unrun.
+
+## PCH-matched translation-unit compile recheck (2026-10-19)
+
+The cached Tideglass scratch response files target the UE 5.8.3 PCH built by
+MSVC 19.44. The installed VS 2022 14.44 compiler was used from
+`Engine/Source`; this avoids the prior VS 18 / PCH `C1853` mismatch. The
+working-tree `IslandEcologyTests.cpp` and `IslandWeather.h` hashes matched the
+scratch copies, and the current `IslandWeather.cpp` was copied into the
+isolated scratch project and hash-checked before compiling. Both
+`IslandWeather.cpp` and `IslandEcologyTests.cpp` compiled to scratch objects
+with no compiler diagnostics (`.sarif` results were empty). This verifies
+translation-unit compilation only: the module was not relinked and no
+automation, commandlet, Live Coding, PIE, or live-editor DLL replacement was
+run. The added wetland-flower lookup regression and production Island site
+counts still need runtime verification.
+
+A scratch-only manual link was then attempted using the cached DLL response.
+Its response lists 177 object inputs, but only 13 exist in this partially
+seeded scratch tree; `link.exe` stopped at the first missing module unity
+object with `LNK1181`. The existing scratch DLL timestamp remained unchanged,
+and no test was run. This confirms that finishing the scratch module would
+require rebuilding most of the target, which is not justified at the current
+system memory headroom.
+
+## Responsive-editor recheck (2026-10-19)
+
+The user confirms the open editor is responsive. A fresh desktop capture shows
+the Island loaded with `TideglassPool` selected and an Unreal prompt asking
+whether to reopen a previously open asset editor. The prompt was left untouched;
+no map save, PIE run, Live Coding request, or asset change was made. A fresh
+`GlobalMemoryStatusEx` sample reports 93% memory load, 2.10 GB available
+physical memory, and 4.62 GB available commit. This supports the user's
+responsiveness report but remains too little headroom for another isolated
+Unreal compile beside the editor. The wetland-flower query regression therefore
+remains uncompiled and unrun, and production flower-site counts remain
+unverified.

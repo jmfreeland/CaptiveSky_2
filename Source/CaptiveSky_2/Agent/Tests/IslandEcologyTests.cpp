@@ -447,6 +447,27 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 				Weather->IslandMeadowFlowers[SpeciesIndex]->GetStaticMesh().Get(), MeadowFlowerMesh);
 		}
 	}
+	for (const int32 WetlandSpeciesIndex : {AIslandWeather::TideglassMarshMarigoldSpeciesIndex,
+		AIslandWeather::TideglassYellowFlagIrisSpeciesIndex})
+	{
+		UHierarchicalInstancedStaticMeshComponent* WetlandFlowers =
+			Weather->IslandMeadowFlowers.IsValidIndex(WetlandSpeciesIndex)
+			? Weather->IslandMeadowFlowers[WetlandSpeciesIndex] : nullptr;
+		if (!TestNotNull(TEXT("Dedicated wetland flower HISM is available to the wildlife fixture"), WetlandFlowers)) continue;
+
+		const FVector FlowerLocation(30000.f + WetlandSpeciesIndex * 5000.f, 0.f, 120.f);
+		const int32 InstanceIndex = WetlandFlowers->AddInstance(FTransform(FRotator::ZeroRotator, FlowerLocation, FVector::OneVector), true);
+		TestTrue(TEXT("A test bloom can be added to each dedicated wetland species"), InstanceIndex != INDEX_NONE);
+		FVector NearestFlower = FVector::ZeroVector;
+		const bool bFoundWetlandFlower = Weather->FindNearestMeadowFlower(FlowerLocation + FVector(0.f, 0.f, 20.f), 100.f, NearestFlower);
+		const TCHAR* QueryLabel = WetlandSpeciesIndex == AIslandWeather::TideglassMarshMarigoldSpeciesIndex
+			? TEXT("The pollinator query discovers marsh marigold blooms")
+			: TEXT("The pollinator query discovers yellow-flag iris blooms");
+		TestTrue(FString(QueryLabel), bFoundWetlandFlower);
+		if (bFoundWetlandFlower)
+			TestTrue(TEXT("The nearest-bloom query returns the exact wetland instance rather than a distant meadow flower"),
+				NearestFlower.Equals(FlowerLocation, 1.f));
+	}
 	const FBox SpruceLocalBounds = Weather->IslandSpruce->GetStaticMesh()->GetBoundingBox();
 	const float SpruceMeshHeight = SpruceLocalBounds.GetSize().Z;
 	TestTrue(TEXT("The fixture can inspect the loaded spruce crown bounds"), SpruceMeshHeight > KINDA_SMALL_NUMBER);
