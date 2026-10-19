@@ -226,10 +226,12 @@ bool FIslandWrackCrabDisturbanceTest::RunTest(const FString& Parameters)
 	AIslandTidepoolCrab* DistantCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(800.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandTidepoolCrab* UnrelatedCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(3000.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	AIslandTidepoolCrab* ShelteredCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(4000.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	AIslandTidepoolCrab* SeaGlassCrab = World->SpawnActor<AIslandTidepoolCrab>(FVector(2075.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
 	if (!TestNotNull(TEXT("Nearby crab fixture exists"), NearbyCrab) ||
 		!TestNotNull(TEXT("Distant crab fixture exists"), DistantCrab) ||
 		!TestNotNull(TEXT("Unrelated crab fixture exists"), UnrelatedCrab) ||
-		!TestNotNull(TEXT("Sheltered crab fixture exists"), ShelteredCrab)) return false;
+		!TestNotNull(TEXT("Sheltered crab fixture exists"), ShelteredCrab) ||
+		!TestNotNull(TEXT("Sea-glass crab fixture exists"), SeaGlassCrab)) return false;
 
 	const int32 CrabWoodId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::Driftwood,
 		FVector::ZeroVector, 0.f, 28, 0).Id; // seed 28 deterministically hides a crab under driftwood
@@ -256,6 +258,12 @@ bool FIslandWrackCrabDisturbanceTest::RunTest(const FString& Parameters)
 		FVector(4000.f, 0.f, 0.f), 0.f, 28, 0).Id;
 	TestTrue(TEXT("Matching driftwood beside a shelter is examined"), Wrack->Examine(ShelteredWoodId, 0, TEXT("Visitor"), Fact));
 	TestTrue(TEXT("The crab remains sheltered and undisturbed"), ShelteredCrab->IsSheltered() && !ShelteredCrab->IsScurrying());
+
+	const int32 SeaGlassId = Wrack->GetLedgerMutable().Add(EIslandWrackKind::SeaGlass,
+		FVector(2000.f, 0.f, 0.f), 0.f, 14, 0).Id; // seed 14 reveals fresh shore-crab tracks
+	TestTrue(TEXT("Sea-glass tracks are examined"), Wrack->Examine(SeaGlassId, 0, TEXT("Visitor"), Fact));
+	TestTrue(TEXT("A nearby crab responds to its sea-glass shelter being disturbed"), SeaGlassCrab->IsScurrying());
+	TestTrue(TEXT("The sea-glass observation reports the brief response"), Fact.Contains(TEXT("darts sideways")));
 	return true;
 }
 

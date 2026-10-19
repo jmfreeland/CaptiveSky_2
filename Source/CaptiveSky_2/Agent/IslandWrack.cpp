@@ -790,7 +790,10 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 		return true;
 	}
 	bool bNearbyCrabScurried = false;
-	if (Item.Kind == EIslandWrackKind::Driftwood && Item.Find.StartsWith(TEXT("a small crab's hollow")) && GetWorld())
+	const bool bFindSuggestsNearbyCrab =
+		(Item.Kind == EIslandWrackKind::Driftwood && Item.Find.StartsWith(TEXT("a small crab's hollow"))) ||
+		(Item.Kind == EIslandWrackKind::SeaGlass && Item.Find.StartsWith(TEXT("a neat crescent of pinprick tracks")));
+	if (bFindSuggestsNearbyCrab && GetWorld())
 	{
 		AIslandTidepoolCrab* NearestCrab = nullptr;
 		float NearestDistanceSquared = FMath::Square(175.f);
