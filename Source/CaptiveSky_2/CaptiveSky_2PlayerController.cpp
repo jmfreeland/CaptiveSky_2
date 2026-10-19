@@ -201,7 +201,11 @@ FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Targ
 		Action = Site && Site->bHasWork ? TEXT("see or answer the stone work") : TEXT("arrange a few stones");
 	}
 	else if (Tag == FName(TEXT("Firefly"))) Action = TEXT("quietly watch a wild firefly");
+	else if (Tag == FName(TEXT("WoodlandFox"))) Action = TEXT("quietly watch a wild fox at the woodland edge");
+	else if (Tag == FName(TEXT("WoodlandDeer"))) Action = TEXT("quietly watch a wild stag grazing");
 	else if (Tag == FName(TEXT("TidepoolCrab"))) Action = TEXT("quietly watch a wild shore crab");
+	else if (Tag == FName(TEXT("TidepoolPeriwinkle"))) Action = TEXT("quietly watch a small wild periwinkle");
+	else if (Tag == FName(TEXT("TideglassDragonfly"))) Action = TEXT("quietly watch a Tideglass dragonfly");
 	else if (Tag == FName(TEXT("TideglassFrog"))) Action = TEXT("quietly watch a wild common frog");
 	else if (Tag == FName(TEXT("MinnowSchool"))) Action = TEXT("quietly watch the wild minnows");
 	else if (Tag == FName(TEXT("RainBasin")))
