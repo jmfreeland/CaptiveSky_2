@@ -22,23 +22,24 @@ AIslandListeningStonesChime::AIslandListeningStonesChime()
 	AudioComponent->VolumeMultiplier = 0.28f;
 }
 
-void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed)
+void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed, EIslandChimeCause InCause)
 {
 	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
-	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed));
+	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed), InCause);
 }
 
-void AIslandListeningStonesChime::BeginChime(const FVector& HorizontalWind)
+void AIslandListeningStonesChime::BeginChime(const FVector& HorizontalWind, EIslandChimeCause InCause)
 {
 	const float Speed = HorizontalWind.ContainsNaN() ? 0.f : FMath::Clamp(HorizontalWind.Size2D(), 0.f, 300.f);
 	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed) *
-		CalculateWindDirectionPitchRatio(HorizontalWind, GetActorForwardVector()));
+		CalculateWindDirectionPitchRatio(HorizontalWind, GetActorForwardVector()), InCause);
 }
 
-void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio)
+void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause)
 {
 	SampledWindSpeed = HorizontalWindSpeed;
 	AppliedPitchRatio = PitchRatio;
+	Cause = InCause;
 	if (GetWorld())
 	{
 		ContextExpiresAt = GetWorld()->GetTimeSeconds() + ResidentContextLifetimeSeconds;
@@ -57,12 +58,28 @@ FString AIslandListeningStonesChime::DescribeForListener(const FVector& Listener
 	const float Distance = FVector::Distance(GetActorLocation(), ListenerLocation);
 	const UWorld* World = GetWorld();
 	if (!World || ContextExpiresAt <= World->GetTimeSeconds() || Distance > AudibleRadius) return FString();
+	FString CauseDescription;
+	switch (Cause)
+	{
+	case EIslandChimeCause::NaturalGust:
+		CauseDescription = TEXT(" A rising natural gust stirred the stones.");
+		break;
+	case EIslandChimeCause::VisitorApproach:
+		CauseDescription = TEXT(" It sounded as a quiet visitor approached the stones.");
+		break;
+	case EIslandChimeCause::Inspection:
+		CauseDescription = TEXT(" It sounded during someone's close inspection of the stones.");
+		break;
+	default:
+		break;
+	}
 	if (ElapsedSeconds < DurationSeconds)
 	{
-		return FString::Printf(TEXT("A soft, layered tone is fading from the ListeningStones, about %.0f metres away. It will pass on its own; it is not a puzzle or promised discovery."),
-			Distance / 100.f);
+		return FString::Printf(TEXT("A soft, layered tone is fading from the ListeningStones, about %.0f metres away.%s It will pass on its own; it is not a puzzle or promised discovery."),
+			Distance / 100.f, *CauseDescription);
 	}
-	return TEXT("A brief, layered tone sounded from the ListeningStones within the last few minutes. It has faded; it was not a puzzle or promised discovery.");
+	return FString::Printf(TEXT("A brief, layered tone sounded from the ListeningStones within the last few minutes.%s It has faded; it was not a puzzle or promised discovery."),
+		*CauseDescription);
 }
 
 bool AIslandListeningStonesChime::IsAudibleAt(const FVector& ListenerLocation) const

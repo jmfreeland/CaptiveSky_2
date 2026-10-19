@@ -362,7 +362,7 @@ void AListeningStonePresentation::BeginVisitorResonance()
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
-		Chime->BeginChime(LocalWind);
+		Chime->BeginChime(LocalWind, EIslandChimeCause::VisitorApproach);
 }
 
 void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)
@@ -386,7 +386,7 @@ void AListeningStonePresentation::BeginNaturalResonance(float WindSpeed, const F
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
-		Chime->BeginChime(WindDirection);
+		Chime->BeginChime(WindDirection, EIslandChimeCause::NaturalGust);
 }
 
 void AListeningStonePresentation::Tick(float DeltaSeconds)

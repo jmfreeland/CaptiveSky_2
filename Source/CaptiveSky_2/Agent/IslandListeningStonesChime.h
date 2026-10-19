@@ -7,6 +7,14 @@
 class UAudioComponent;
 class USoundWaveProcedural;
 
+enum class EIslandChimeCause : uint8
+{
+	Unspecified,
+	NaturalGust,
+	VisitorApproach,
+	Inspection
+};
+
 /** A quiet, finite procedural resonance triggered by a natural gust or resident interaction at ListeningStones. */
 UCLASS()
 class CAPTIVESKY_2_API AIslandListeningStonesChime : public AActor
@@ -19,8 +27,8 @@ public:
 	static constexpr float AttenuationFalloffDistance = 750.f;
 	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
 	static constexpr float ResidentContextLifetimeSeconds = 305.f;
-	void BeginChime(float HorizontalWindSpeed = 0.f);
-	void BeginChime(const FVector& HorizontalWind);
+	void BeginChime(float HorizontalWindSpeed = 0.f, EIslandChimeCause Cause = EIslandChimeCause::Unspecified);
+	void BeginChime(const FVector& HorizontalWind, EIslandChimeCause Cause = EIslandChimeCause::Unspecified);
 	/** Whether a nearby animal can still physically hear the tone. */
 	bool IsAudibleAt(const FVector& ListenerLocation) const;
 	/** Fading or just-faded tone fact for nearby residents; no enduring discovery is implied. */
@@ -41,8 +49,9 @@ private:
 	double ContextExpiresAt = 0.0;
 	float SampledWindSpeed = 0.f;
 	float AppliedPitchRatio = 1.f;
+	EIslandChimeCause Cause = EIslandChimeCause::Unspecified;
 	static float CalculateWindPitchRatio(float HorizontalWindSpeed);
 	static float CalculateWindDirectionPitchRatio(const FVector& HorizontalWind, const FVector& LandmarkForward);
-	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio);
+	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause);
 	void BuildChimeWave(float PitchRatio);
 };

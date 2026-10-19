@@ -248,8 +248,15 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("A quiet visitor approaching within 3.25 m starts a brief stone resonance"),
 				Presentation->GetResonanceRemaining() > 2.7f);
 			int32 VisitorChimeCount = 0;
-			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It) ++VisitorChimeCount;
+			AIslandListeningStonesChime* VisitorChime = nullptr;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+			{
+				++VisitorChimeCount;
+				VisitorChime = *It;
+			}
 			TestEqual(TEXT("A quiet visitor approach creates one transient chime"), VisitorChimeCount, 1);
+			TestTrue(TEXT("Nearby residents can distinguish a visitor-approach tone from a weather chime"), VisitorChime &&
+				VisitorChime->DescribeForListener(FVector::ZeroVector).Contains(TEXT("quiet visitor approached")));
 
 			Presentation->CheckForVisitorPresence(0.25f);
 			VisitorPawn->SetActorLocation(FVector(700.f, 0.f, 0.f));
@@ -290,6 +297,8 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			NaturalChime = *It;
 		}
 		TestEqual(TEXT("A natural gust creates one finite chime actor"), NaturalChimeCount, 1);
+		TestTrue(TEXT("Nearby residents can identify the natural gust that stirred the stones"), NaturalChime &&
+			NaturalChime->DescribeForListener(FVector(500.f, 0.f, 0.f)).Contains(TEXT("natural gust stirred")));
 		TestTrue(TEXT("A natural gust's direction shapes its chime pitch"), NaturalChime &&
 			FMath::IsNearlyEqual(NaturalChime->AppliedPitchRatio,
 				AIslandListeningStonesChime::CalculateWindPitchRatio(GustDirection.Size2D()) *
@@ -376,6 +385,14 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("A resident beyond the sound radius gets no tone fact"), NaturalChime->DescribeForListener(FVector(1200.f, 0.f, 0.f)).IsEmpty());
 			TestTrue(TEXT("The resident context spans one full maximum decision interval"),
 				FMath::IsNearlyEqual(NaturalChime->GetLifeSpan(), AIslandListeningStonesChime::ResidentContextLifetimeSeconds));
+		}
+		AIslandListeningStonesChime* InspectionChime = World->SpawnActor<AIslandListeningStonesChime>(
+			FVector::ZeroVector, FRotator::ZeroRotator);
+		if (TestNotNull(TEXT("An inspection resonance actor can be staged"), InspectionChime))
+		{
+			InspectionChime->BeginChime(0.f, EIslandChimeCause::Inspection);
+			TestTrue(TEXT("Resident-facing context identifies a tone caused by close inspection"),
+				InspectionChime->DescribeForListener(FVector(100.f, 0.f, 0.f)).Contains(TEXT("close inspection")));
 		}
 		Presentation->ObserveAmbientWind(40.f);
 		Presentation->ObserveAmbientWind(120.f);

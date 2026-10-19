@@ -274,7 +274,7 @@ bool IslandInteractionUtility::Perform(AActor* Observer, AActor* Target, FString
 		bool bVisibleFireflyResponse = false;
 		if (Chime)
 		{
-			Chime->BeginChime(LocalWind);
+			Chime->BeginChime(LocalWind, EIslandChimeCause::Inspection);
 			if (UIslandListeningStonePresentationSubsystem* Presentation = World->GetSubsystem<UIslandListeningStonePresentationSubsystem>())
 				Presentation->NotifyChime(LocalWind.Size2D());
 			for (TActorIterator<AIslandFirefly> FireflyIt(World); FireflyIt; ++FireflyIt)
