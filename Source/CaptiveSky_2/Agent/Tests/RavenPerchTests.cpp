@@ -1046,6 +1046,39 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				BlueprintController->WildlifeAttentionTarget.Get() == NearbyDragonfly);
 			NearbyDragonfly->Destroy();
 		}
+		AIslandDayNight* NightClock = nullptr;
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+		{
+			NightClock = *It;
+			NightClock->CurrentHour = 22.f;
+		}
+		if (!NightClock)
+		{
+			NightClock = World->SpawnActor<AIslandDayNight>(FVector::ZeroVector, FRotator::ZeroRotator);
+			if (NightClock) NightClock->CurrentHour = 22.f;
+		}
+		AIslandFirefly* NearbyNightFirefly = World->SpawnActor<AIslandFirefly>(
+			RavenLocationBeforeWildlifeGlance + FVector(350.f, 0.f, 0.f), FRotator::ZeroRotator);
+		TestNotNull(TEXT("A nearby night firefly can be staged for a sustained Raven glance"), NearbyNightFirefly);
+		if (NearbyNightFirefly && NightClock)
+		{
+			NearbyNightFirefly->SetActorTickEnabled(false);
+			BlueprintController->WildlifeAttentionTarget.Reset();
+			BlueprintController->WildlifeAttentionRemaining = 0.f;
+			BlueprintController->NoticedWildlifeInNearbyGroup.Reset();
+			BlueprintController->CheckForNearbyWildlifePresence();
+			TestTrue(TEXT("A close, glowing firefly catches the settled Raven's attention at night"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyNightFirefly &&
+				BlueprintController->WildlifeAttentionRemaining > 1.5f);
+			BlueprintController->Tick(0.25f);
+			TestTrue(TEXT("The firefly glance lasts beyond the first controller tick"),
+				BlueprintController->WildlifeAttentionTarget.Get() == NearbyNightFirefly &&
+				BlueprintController->WildlifeAttentionRemaining > 1.2f);
+			TestTrue(TEXT("Raven tracks the firefly body instead of looking above it"),
+				BlueprintController->WildlifeAttentionLocation.Equals(
+					NearbyNightFirefly->GetActorLocation() + FVector(0.f, 0.f, 12.f), 0.1f));
+		}
+		if (NearbyNightFirefly) NearbyNightFirefly->Destroy();
 		if (FoxGround) FoxGround->Destroy();
 		BlueprintController->UnPossess();
 		BlueprintController->Destroy();

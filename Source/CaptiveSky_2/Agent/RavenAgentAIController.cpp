@@ -2276,6 +2276,9 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 			bWildlifeStillEligible = AttendedStag->IsQuietlyNoticingResident();
 		else if (AIslandForestFox* AttendedFox = Cast<AIslandForestFox>(AttendedWildlife))
 			bWildlifeStillEligible = AttendedFox->IsRespondingToQuietObserver();
+		else if (Cast<AIslandCommonFrog>(AttendedWildlife) || Cast<AIslandTideglassDragonfly>(AttendedWildlife) ||
+			Cast<AIslandFirefly>(AttendedWildlife))
+			bWildlifeStillEligible = IsValid(AttendedWildlife);
 		bWildlifeStillEligible = bWildlifeStillEligible && bSettled && !IsResting();
 		if (bWildlifeStillEligible)
 		{
@@ -2283,7 +2286,12 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 			bWildlifeStillEligible = FMath::Abs(Offset.Z) <= 250.f && Offset.SizeSquared2D() <= FMath::Square(700.f);
 			if (bWildlifeStillEligible)
 			{
-				WildlifeAttentionLocation = AttendedWildlife->GetActorLocation() + FVector(0.f, 0.f, 85.f);
+				float WildlifeLookHeight = 85.f;
+				if (Cast<AIslandTideglassDragonfly>(AttendedWildlife) || Cast<AIslandFirefly>(AttendedWildlife))
+					WildlifeLookHeight = 12.f;
+				else if (Cast<AIslandCommonFrog>(AttendedWildlife))
+					WildlifeLookHeight = 5.f;
+				WildlifeAttentionLocation = AttendedWildlife->GetActorLocation() + FVector(0.f, 0.f, WildlifeLookHeight);
 			}
 		}
 		if (!bWildlifeStillEligible)
