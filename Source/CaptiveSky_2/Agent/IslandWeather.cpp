@@ -73,13 +73,13 @@ namespace
 		return Hash;
 	}
 
-	float SampleGroundCoverField(const FVector& Position, int32 Seed)
+	float SampleGroundCoverFieldAtScale(const FVector& Position, int32 Seed, float FieldCellSize)
 	{
 		// Smooth value noise gives broad, irregular communities without the visible
 		// square edges of assigning one species to each world-grid cell.
-		constexpr float FieldCellSize = 4200.f;
-		const float GridX = Position.X / FieldCellSize;
-		const float GridY = Position.Y / FieldCellSize;
+		const float SafeFieldCellSize = FMath::Max(1.f, FieldCellSize);
+		const float GridX = Position.X / SafeFieldCellSize;
+		const float GridY = Position.Y / SafeFieldCellSize;
 		const int32 CellX = FMath::FloorToInt(GridX);
 		const int32 CellY = FMath::FloorToInt(GridY);
 		const float FracX = GridX - CellX;
@@ -93,6 +93,11 @@ namespace
 		const float South = FMath::Lerp(ValueAt(CellX, CellY), ValueAt(CellX + 1, CellY), SmoothX);
 		const float North = FMath::Lerp(ValueAt(CellX, CellY + 1), ValueAt(CellX + 1, CellY + 1), SmoothX);
 		return FMath::Lerp(South, North, SmoothY);
+	}
+
+	float SampleGroundCoverField(const FVector& Position, int32 Seed)
+	{
+		return SampleGroundCoverFieldAtScale(Position, Seed, 4200.f);
 	}
 
 	void SetFoliageCullRange(UHierarchicalInstancedStaticMeshComponent* Component, int32 FadeStartCm, int32 CullEndCm)
@@ -1412,9 +1417,14 @@ void AIslandWeather::InitializeGroundCover()
 			if (!GetWorld()->LineTraceSingleByChannel(CandidateHit,
 				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 				!Cast<ALandscapeProxy>(CandidateHit.GetActor()) || CandidateHit.ImpactNormal.Z < 0.72f || CandidateHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
-			// Keep broadland cover in irregular, roughly 40 m plant communities instead of
-			// filling every terrain cell uniformly. The local landmark verges above stay dense.
-			if (SampleGroundCoverField(CandidateHit.ImpactPoint, WeatherSeed ^ 0x7cb25431) > 0.55f) continue;
+			// Nest a fine meadow mosaic inside broad, seeded habitat communities. This
+			// keeps the same average acceptance as the former single 42 m field, but
+			// groups plants into coherent woodland-meadow regions instead of even specks.
+			const float HabitatCommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
+				WeatherSeed ^ 0x7cb25431, 18000.f);
+			const float MeadowSubcommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
+				WeatherSeed ^ 0x4cf5ad43, 2400.f);
+			if (HabitatCommunity > 0.62f || MeadowSubcommunity > 0.74f) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
 			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
