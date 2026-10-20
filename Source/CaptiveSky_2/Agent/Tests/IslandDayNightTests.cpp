@@ -61,6 +61,29 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Midday and midnight say nothing about the sun's edge"),
 		AIslandDayNight::DescribeSunEdge(12.f).IsEmpty() && AIslandDayNight::DescribeSunEdge(0.f).IsEmpty());
 	TestTrue(TEXT("Non-finite hours are harmless"), AIslandDayNight::DescribeSunEdge(NAN).IsEmpty());
+	{
+		bool bHigh = false, bLow = false, bRising = false, bFalling = false, bBounded = true;
+		for (float H = 0.f; H < 24.f; H += 0.25f)
+		{
+			const float L = AIslandDayNight::TideLevel(3, H);
+			bBounded &= FMath::Abs(L) <= 1.f;
+			bHigh |= L > 0.5f; bLow |= L < -0.5f;
+			const FString D = AIslandDayNight::DescribeTide(3, H);
+			bRising |= D.Contains(TEXT("rising")); bFalling |= D.Contains(TEXT("falling"));
+		}
+		TestTrue(TEXT("Tide stays within -1..1"), bBounded);
+		TestTrue(TEXT("A day sees both high and low water"), bHigh && bLow);
+		TestTrue(TEXT("The tide both rises and falls"), bRising && bFalling);
+		float BiggestDay = 0.f, SmallestDay = 1.f;
+		for (int32 Day = 1; Day <= 30; ++Day)
+		{
+			float DayMax = 0.f;
+			for (float H = 0.f; H < 24.f; H += 0.1f) DayMax = FMath::Max(DayMax, FMath::Abs(AIslandDayNight::TideLevel(Day, H)));
+			BiggestDay = FMath::Max(BiggestDay, DayMax); SmallestDay = FMath::Min(SmallestDay, DayMax);
+		}
+		TestTrue(TEXT("Spring tides near full range, neaps clearly smaller"), BiggestDay > 0.95f && SmallestDay < 0.85f);
+		TestTrue(TEXT("Non-finite hour is harmless"), AIslandDayNight::DescribeTide(1, NAN).IsEmpty() && AIslandDayNight::TideLevel(1, NAN) == 0.f);
+	}
 	TestTrue(TEXT("No stars text by day"), AIslandDayNight::DescribeStars(0.f, 0.f, 0.f, -1.f).IsEmpty());
 	TestTrue(TEXT("A clear moonless night is crowded with stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 0.f, -1.f).Contains(TEXT("Milky Way")));
 	TestTrue(TEXT("A bright moon up drowns the stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, 0.8f).Contains(TEXT("drowns")));

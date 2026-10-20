@@ -122,6 +122,38 @@ FString AIslandDayNight::DescribeStars(float Night, float CloudCover, float Luna
 	return TEXT(" Stars scatter across the dark sky.");
 }
 
+static constexpr float TidePeriodHours = 12.42f;
+
+static float TideRange(int32 IslandDay, float IslandHour)
+{
+	// Spring tides at new and full moon (progress 0 and 0.5), neaps at the quarters.
+	return 0.65f + 0.35f * FMath::Abs(FMath::Cos(AIslandDayNight::LunarPhaseProgress(IslandDay, IslandHour) * 4.f * UE_PI));
+}
+
+float AIslandDayNight::TideLevel(int32 IslandDay, float IslandHour)
+{
+	if (!FMath::IsFinite(IslandHour)) return 0.f;
+	const double Hours = double(FMath::Max(1, IslandDay) - 1) * 24.0 + double(WrapHour(IslandHour));
+	const float Angle = float(FMath::Fmod(Hours, double(TidePeriodHours)) / double(TidePeriodHours)) * 2.f * UE_PI;
+	return FMath::Clamp(TideRange(IslandDay, IslandHour) * FMath::Sin(Angle), -1.f, 1.f);
+}
+
+FString AIslandDayNight::DescribeTide(int32 IslandDay, float IslandHour)
+{
+	if (!FMath::IsFinite(IslandHour)) return FString();
+	const float Now = TideLevel(IslandDay, IslandHour);
+	const float Later = TideLevel(IslandDay, IslandHour + 0.25f);
+	const float Slope = Later - Now;
+	FString Out;
+	if (FMath::Abs(Slope) < 0.012f) Out = Now > 0.f ? TEXT(" The tide is at its height and slack.") : TEXT(" The tide is at its lowest ebb and slack.");
+	else Out = FString::Printf(TEXT(" The tide is %s and the water stands %s."), Slope > 0.f ? TEXT("rising") : TEXT("falling"),
+		Now > 0.5f ? TEXT("high on the shore") : Now < -0.5f ? TEXT("far down the shore") : TEXT("part way up the shore"));
+	const float Range = TideRange(IslandDay, IslandHour);
+	if (Range > 0.92f) Out += TEXT(" These are spring tides, the highest and lowest of the month.");
+	else if (Range < 0.72f) Out += TEXT(" These are neap tides, with little difference between high and low water.");
+	return Out;
+}
+
 FString AIslandDayNight::DescribeCalendar(int32 IslandDay, float LunarProgress)
 {
 	if (!FMath::IsFinite(LunarProgress)) return FString();
@@ -387,9 +419,10 @@ FString AIslandDayNight::DescribeTime() const
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
+	const FString Tide = DescribeTide(DayNumber, CurrentHour);
 	const FString Stars = DescribeStars(NightAmount(CurrentHour), CloudNow, LunarLight, MoonElevation);
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s"),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor);
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s%s"),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor, *Tide);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandSkyReportCommand(
