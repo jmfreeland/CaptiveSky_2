@@ -83,6 +83,8 @@ public:
 	static bool IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination);
 	/** Island day count plus whole days until the next full and new moon, so residents can reckon time across sessions. Pure. */
 	static FString DescribeCalendar(int32 IslandDay, float LunarProgress);
+	/** How the stars look: a crowded sky on a clear dark moonless night, only the brightest under a bright moon, none under thick cloud; empty by day. Pure. */
+	static FString DescribeStars(float Night, float CloudCover, float LunarIllumination, float MoonElevation);
 	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
 	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */

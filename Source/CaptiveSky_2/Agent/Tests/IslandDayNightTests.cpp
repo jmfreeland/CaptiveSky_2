@@ -61,6 +61,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Midday and midnight say nothing about the sun's edge"),
 		AIslandDayNight::DescribeSunEdge(12.f).IsEmpty() && AIslandDayNight::DescribeSunEdge(0.f).IsEmpty());
 	TestTrue(TEXT("Non-finite hours are harmless"), AIslandDayNight::DescribeSunEdge(NAN).IsEmpty());
+	TestTrue(TEXT("No stars text by day"), AIslandDayNight::DescribeStars(0.f, 0.f, 0.f, -1.f).IsEmpty());
+	TestTrue(TEXT("A clear moonless night is crowded with stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 0.f, -1.f).Contains(TEXT("Milky Way")));
+	TestTrue(TEXT("A bright moon up drowns the stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, 0.8f).Contains(TEXT("drowns")));
+	TestTrue(TEXT("A bright moon below the horizon does not"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, -0.5f).Contains(TEXT("Milky Way")));
+	TestTrue(TEXT("Partial cloud leaves a few stars"), AIslandDayNight::DescribeStars(1.f, 0.6f, 0.f, -1.f).Contains(TEXT("few stars")));
+	TestTrue(TEXT("Thick cloud hides every star"), AIslandDayNight::DescribeStars(1.f, 0.9f, 0.f, -1.f).Contains(TEXT("No stars")));
+	TestTrue(TEXT("Non-finite input is harmless"), AIslandDayNight::DescribeStars(NAN, 0.f, 0.f, 0.f).IsEmpty());
 	{
 		const FString Calendar = AIslandDayNight::DescribeCalendar(8, 0.25f);
 		TestTrue(TEXT("The calendar names the Island day"), Calendar.Contains(TEXT("day 8")));
