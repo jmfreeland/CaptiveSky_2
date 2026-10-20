@@ -6,6 +6,8 @@
 #include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/InstancedSkinnedMeshComponent.h"
+#include "DynamicWindData.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -142,6 +144,41 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	World->BeginPlay();
 	// This minimal fixture doesn't initialize actor components through the full gameplay start path.
 	WorldWeather->InitializeWeatherAmbience();
+	WorldWeather->InitializeGroundCover();
+	const TArray<UInstancedSkinnedMeshComponent*> MixedTreeComponents = {
+		WorldWeather->IslandNorwayMaples, WorldWeather->IslandEuropeanAspens, WorldWeather->IslandEuropeanBeeches };
+	const TCHAR* MixedTreeNames[] = { TEXT("Norway maple"), TEXT("European aspen"), TEXT("European beech") };
+	for (int32 TreeIndex = 0; TreeIndex < MixedTreeComponents.Num(); ++TreeIndex)
+	{
+		const UInstancedSkinnedMeshComponent* TreeComponent = MixedTreeComponents[TreeIndex];
+		const FString Label = FString::Printf(TEXT("%s foliage batch"), MixedTreeNames[TreeIndex]);
+		TestNotNull(*FString::Printf(TEXT("%s is created"), *Label), TreeComponent);
+		if (!TreeComponent) continue;
+		TestNotNull(*FString::Printf(TEXT("%s resolves its Megaplant mesh"), *Label), TreeComponent->GetSkinnedAsset());
+		TestTrue(*FString::Printf(TEXT("%s uses the UE DynamicWind transform provider"), *Label),
+			TreeComponent->GetTransformProvider() && TreeComponent->GetTransformProvider()->IsA<UDynamicWindData>());
+		TestEqual(*FString::Printf(TEXT("%s is non-colliding"), *Label), TreeComponent->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(*FString::Printf(TEXT("%s does not affect navigation"), *Label), TreeComponent->CanEverAffectNavigation());
+		int32 CullStart = 0;
+		int32 CullEnd = 0;
+		TreeComponent->GetCullDistances(CullStart, CullEnd);
+		TestEqual(*FString::Printf(TEXT("%s starts fading at 80 m"), *Label), CullStart, 8000);
+		TestEqual(*FString::Printf(TEXT("%s is culled at 125 m"), *Label), CullEnd, 12500);
+	}
+	const UHierarchicalInstancedStaticMeshComponent* BirchCoppices = WorldWeather->IslandBirchCoppices;
+	TestNotNull(TEXT("A separate birch-coppice understorey batch is created"), BirchCoppices);
+	if (BirchCoppices)
+	{
+		TestTrue(TEXT("Birch coppice resolves the generated low-poly mesh"), BirchCoppices->GetStaticMesh() &&
+			BirchCoppices->GetStaticMesh()->GetPathName().Contains(TEXT("SM_BirchCoppice_01")));
+		TestEqual(TEXT("Birch coppice is non-colliding"), BirchCoppices->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Birch coppice does not affect navigation"), BirchCoppices->CanEverAffectNavigation());
+		int32 BirchCullStart = 0;
+		int32 BirchCullEnd = 0;
+		BirchCoppices->GetCullDistances(BirchCullStart, BirchCullEnd);
+		TestEqual(TEXT("Birch coppice starts fading at 80 m"), BirchCullStart, 8000);
+		TestEqual(TEXT("Birch coppice is culled at 125 m"), BirchCullEnd, 12500);
+	}
 	constexpr int32 OneSecondStereoPcmBytes = 24000 * 2 * sizeof(int16);
 	TestEqual(TEXT("Wind ambience prepares exactly one second of procedural stereo PCM"), WorldWeather->WindAmbienceWave ? WorldWeather->WindAmbienceWave->GetAvailableAudioByteCount() : 0, OneSecondStereoPcmBytes);
 	TestEqual(TEXT("Rain ambience prepares exactly one second of procedural stereo PCM"), WorldWeather->RainAmbienceWave ? WorldWeather->RainAmbienceWave->GetAvailableAudioByteCount() : 0, OneSecondStereoPcmBytes);

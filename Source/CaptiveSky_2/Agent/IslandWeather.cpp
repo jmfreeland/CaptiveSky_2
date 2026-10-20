@@ -19,10 +19,14 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/InstancedSkinnedMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/AudioComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/SkeletalMesh.h"
+#include "DynamicWindData.h"
+#include "DynamicWindSkeletalData.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "LandscapeProxy.h"
@@ -48,8 +52,8 @@ static TAutoConsoleVariable<float> CVarIslandFoliageSwayUpdateIntervalSeconds(
 	TEXT("Seconds between CPU foliage and spruce instance-transform sway updates. Clamped to 0.1..2.0 seconds; material wind remains continuous."),
 	ECVF_Default);
 static TAutoConsoleVariable<float> CVarIslandGroundCoverLandscapeDensity(
-	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 1.f,
-	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. 1 preserves the authored density; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
+	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 0.12f,
+	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. Defaults to a lighter 12% of the former candidate budget; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
 	ECVF_Default);
 static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
 	TEXT("CaptiveSky.Island.FoliageSwayFocusTelemetry"), 0,
@@ -58,6 +62,39 @@ static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
 
 namespace
 {
+	uint32 HashGroundCoverFieldCell(int32 CellX, int32 CellY, int32 Seed)
+	{
+		uint32 Hash = static_cast<uint32>(CellX) * 0x8da6b343u ^ static_cast<uint32>(CellY) * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
+		Hash ^= Hash >> 16;
+		Hash *= 0x7feb352du;
+		Hash ^= Hash >> 15;
+		Hash *= 0x846ca68bu;
+		Hash ^= Hash >> 16;
+		return Hash;
+	}
+
+	float SampleGroundCoverField(const FVector& Position, int32 Seed)
+	{
+		// Smooth value noise gives broad, irregular communities without the visible
+		// square edges of assigning one species to each world-grid cell.
+		constexpr float FieldCellSize = 4200.f;
+		const float GridX = Position.X / FieldCellSize;
+		const float GridY = Position.Y / FieldCellSize;
+		const int32 CellX = FMath::FloorToInt(GridX);
+		const int32 CellY = FMath::FloorToInt(GridY);
+		const float FracX = GridX - CellX;
+		const float FracY = GridY - CellY;
+		const float SmoothX = FracX * FracX * (3.f - 2.f * FracX);
+		const float SmoothY = FracY * FracY * (3.f - 2.f * FracY);
+		auto ValueAt = [Seed](int32 X, int32 Y)
+		{
+			return static_cast<float>(HashGroundCoverFieldCell(X, Y, Seed) >> 8) / 16777215.f;
+		};
+		const float South = FMath::Lerp(ValueAt(CellX, CellY), ValueAt(CellX + 1, CellY), SmoothX);
+		const float North = FMath::Lerp(ValueAt(CellX, CellY + 1), ValueAt(CellX + 1, CellY + 1), SmoothX);
+		return FMath::Lerp(South, North, SmoothY);
+	}
+
 	void SetFoliageCullRange(UHierarchicalInstancedStaticMeshComponent* Component, int32 FadeStartCm, int32 CullEndCm)
 	{
 		if (!Component) return;
@@ -177,6 +214,38 @@ AIslandWeather::AIslandWeather()
 	IslandSpruce->SetCastShadow(false);
 	IslandSpruce->bReceivesDecals = false;
 	IslandSpruce->SetVisibility(false);
+	IslandBirchCoppices = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandBirchCoppices"));
+	IslandBirchCoppices->SetupAttachment(RootComponent);
+	IslandBirchCoppices->SetMobility(EComponentMobility::Movable);
+	IslandBirchCoppices->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandBirchCoppices->SetCanEverAffectNavigation(false);
+	IslandBirchCoppices->SetCastShadow(false);
+	IslandBirchCoppices->bReceivesDecals = false;
+	IslandBirchCoppices->SetVisibility(false);
+	IslandNorwayMaples = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandNorwayMaples"));
+	IslandNorwayMaples->SetupAttachment(RootComponent);
+	IslandNorwayMaples->SetMobility(EComponentMobility::Movable);
+	IslandNorwayMaples->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandNorwayMaples->SetCanEverAffectNavigation(false);
+	IslandNorwayMaples->SetCastShadow(false);
+	IslandNorwayMaples->bReceivesDecals = false;
+	IslandNorwayMaples->SetVisibility(false);
+	IslandEuropeanAspens = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandEuropeanAspens"));
+	IslandEuropeanAspens->SetupAttachment(RootComponent);
+	IslandEuropeanAspens->SetMobility(EComponentMobility::Movable);
+	IslandEuropeanAspens->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandEuropeanAspens->SetCanEverAffectNavigation(false);
+	IslandEuropeanAspens->SetCastShadow(false);
+	IslandEuropeanAspens->bReceivesDecals = false;
+	IslandEuropeanAspens->SetVisibility(false);
+	IslandEuropeanBeeches = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandEuropeanBeeches"));
+	IslandEuropeanBeeches->SetupAttachment(RootComponent);
+	IslandEuropeanBeeches->SetMobility(EComponentMobility::Movable);
+	IslandEuropeanBeeches->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandEuropeanBeeches->SetCanEverAffectNavigation(false);
+	IslandEuropeanBeeches->SetCastShadow(false);
+	IslandEuropeanBeeches->bReceivesDecals = false;
+	IslandEuropeanBeeches->SetVisibility(false);
 	IslandShrubs = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandShrubs"));
 	IslandShrubs->SetupAttachment(RootComponent);
 	IslandShrubs->SetMobility(EComponentMobility::Movable);
@@ -258,6 +327,10 @@ AIslandWeather::AIslandWeather()
 	SetFoliageCullRange(IslandFestuca, 6000, 9000);
 	SetFoliageCullRange(IslandPhalaris, 6000, 9000);
 	SetFoliageCullRange(IslandSpruce, 35000, 55000);
+	SetFoliageCullRange(IslandBirchCoppices, 8000, 12500);
+	IslandNorwayMaples->SetCullDistances(8000, 12500);
+	IslandEuropeanAspens->SetCullDistances(8000, 12500);
+	IslandEuropeanBeeches->SetCullDistances(8000, 12500);
 
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
@@ -282,6 +355,10 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowCMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_06_01.ground_06_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowDMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_12_01.ground_12_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> BirchCoppiceMesh(TEXT("/Game/Generated/ComfyBlender/BirchCoppice_Review/SM_BirchCoppice_01.SM_BirchCoppice_01"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> NorwayMapleMesh(TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanAspenMesh(TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanBeechMesh(TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerA(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerB(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"));
@@ -306,6 +383,10 @@ AIslandWeather::AIslandWeather()
 	if (GroundPlantLowCMesh.Succeeded()) ShoreGroundPlantLowC->SetStaticMesh(GroundPlantLowCMesh.Object);
 	if (GroundPlantLowDMesh.Succeeded()) ShoreGroundPlantLowD->SetStaticMesh(GroundPlantLowDMesh.Object);
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
+	if (BirchCoppiceMesh.Succeeded()) IslandBirchCoppices->SetStaticMesh(BirchCoppiceMesh.Object);
+	if (NorwayMapleMesh.Succeeded()) IslandNorwayMaples->SetSkinnedAssetAndUpdate(NorwayMapleMesh.Object);
+	if (EuropeanAspenMesh.Succeeded()) IslandEuropeanAspens->SetSkinnedAssetAndUpdate(EuropeanAspenMesh.Object);
+	if (EuropeanBeechMesh.Succeeded()) IslandEuropeanBeeches->SetSkinnedAssetAndUpdate(EuropeanBeechMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
 	if (MeadowFlowerA.Succeeded()) IslandMeadowFlowers[0]->SetStaticMesh(MeadowFlowerA.Object);
@@ -405,26 +486,20 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float
 
 int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure, float WetEdgeMoisture)
 {
-	// Stable, 14 m species patches make mixed cover read as plant communities at overlook distance
-	// rather than fine-grained noise. A 2D world grid keeps selection independent of trace order.
-	constexpr float SpeciesPatchSize = 1400.f;
-	const uint32 CellX = static_cast<uint32>(FMath::FloorToInt(Position.X / SpeciesPatchSize));
-	const uint32 CellY = static_cast<uint32>(FMath::FloorToInt(Position.Y / SpeciesPatchSize));
-	uint32 Hash = CellX * 0x8da6b343u ^ CellY * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
-	Hash ^= Hash >> 16;
-	Hash *= 0x7feb352du;
-	Hash ^= Hash >> 15;
-	Hash *= 0x846ca68bu;
-	Hash ^= Hash >> 16;
-	const int32 Variant = static_cast<int32>(Hash % 11u);
-	const float WetPatchThreshold = static_cast<float>((Hash >> 18) % 1024u) / 1024.f;
+	// Continuous seeded fields create meandering communities instead of square
+	// 14 m tiles; inputs remain world-space so trace order cannot affect placement.
+	const uint32 Hash = HashGroundCoverFieldCell(FMath::FloorToInt(Position.X / 1400.f),
+		FMath::FloorToInt(Position.Y / 1400.f), Seed);
+	const float SpeciesField = SampleGroundCoverField(Position, Seed);
+	const float WetPatchThreshold = SampleGroundCoverField(Position, Seed ^ 0x54f0e1a5);
+	const float PatchExposureThreshold = SampleGroundCoverField(Position, Seed ^ 0x2e7a4c31);
+	const int32 Variant = FMath::Min(10, FMath::FloorToInt(SpeciesField * 11.f));
 	// Let some existing grass candidates turn into broadleaf-rich patches along the pool.
 	// This changes the local plant community without adding instances or another mesh component.
 	if (FMath::Clamp(WetEdgeMoisture, 0.f, 1.f) * 0.52f > WetPatchThreshold)
 		return static_cast<int32>((Hash >> 8) % 5u);
 	// Five broadleaf forms share one slot each; the three grass meshes share two slots each.
 	// The resulting 5:6 broadleaf-to-grass balance adds understorey variety without adding instances.
-	const float PatchExposureThreshold = static_cast<float>((Hash >> 8) % 1024u) / 1024.f;
 	if (Variant < 5 && FMath::Clamp(Exposure, 0.f, 1.f) > PatchExposureThreshold)
 		return 5 + 2 * static_cast<int32>((Hash >> 18) % 3u);
 	return Variant;
@@ -745,7 +820,7 @@ FTransform AIslandWeather::CalculateSpruceSway(const FTransform& BaseTransform, 
 void AIslandWeather::InitializeGroundCover()
 {
 	UHierarchicalInstancedStaticMeshComponent* GrassC = FindShoreGrassC();
-	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB || !ShoreGroundPlantLowC || !ShoreGroundPlantLowD || !IslandShrubs ||
+	if (bGroundCoverInitialized || !GetWorld() || !ShoreGrassA || !ShoreGrassB || !GrassC || !ShoreGroundPlants || !ShoreGroundPlantLowA || !ShoreGroundPlantLowB || !ShoreGroundPlantLowC || !ShoreGroundPlantLowD || !IslandShrubs || !IslandBirchCoppices ||
 		!ShoreGrassA->GetStaticMesh() || !ShoreGrassB->GetStaticMesh() || !GrassC->GetStaticMesh() || !ShoreGroundPlants->GetStaticMesh() ||
 		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh() || !ShoreGroundPlantLowC->GetStaticMesh() ||
 		!ShoreGroundPlantLowD->GetStaticMesh() || !IslandShrubs->GetStaticMesh()) return;
@@ -759,6 +834,10 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowC->ClearInstances();
 	ShoreGroundPlantLowD->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
+	IslandBirchCoppices->ClearInstances();
+	if (IslandNorwayMaples) IslandNorwayMaples->ClearInstances();
+	if (IslandEuropeanAspens) IslandEuropeanAspens->ClearInstances();
+	if (IslandEuropeanBeeches) IslandEuropeanBeeches->ClearInstances();
 	IslandShrubs->ClearInstances();
 	if (IslandRhododendrons) IslandRhododendrons->ClearInstances();
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
@@ -767,6 +846,27 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandFestuca) IslandFestuca->ClearInstances();
 	if (IslandPhalaris) IslandPhalaris->ClearInstances();
 	IslandSpruceBaseTransforms.Reset();
+	GroundCoverMapleTreeCount = 0;
+	GroundCoverAspenTreeCount = 0;
+	GroundCoverBeechTreeCount = 0;
+	GroundCoverBirchCoppiceCount = 0;
+	auto ConfigureTreeWind = [this](UInstancedSkinnedMeshComponent* Component)
+	{
+		USkeletalMesh* Mesh = Component ? Cast<USkeletalMesh>(Component->GetSkinnedAsset()) : nullptr;
+		const UDynamicWindSkeletalData* WindData = Mesh
+			? Cast<UDynamicWindSkeletalData>(Mesh->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()))
+			: nullptr;
+		if (Component)
+		{
+			Component->SetAnimationMinScreenSize(0.015f);
+			Component->SetTransformProvider(WindData && WindData->bIsEnabled
+				? NewObject<UDynamicWindData>(this, NAME_None, RF_Transient)
+				: nullptr);
+		}
+	};
+	ConfigureTreeWind(IslandNorwayMaples);
+	ConfigureTreeWind(IslandEuropeanAspens);
+	ConfigureTreeWind(IslandEuropeanBeeches);
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
 	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();
@@ -1299,6 +1399,9 @@ void AIslandWeather::InitializeGroundCover()
 			if (!GetWorld()->LineTraceSingleByChannel(CandidateHit,
 				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 				!Cast<ALandscapeProxy>(CandidateHit.GetActor()) || CandidateHit.ImpactNormal.Z < 0.72f || CandidateHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
+			// Keep broadland cover in irregular, roughly 40 m plant communities instead of
+			// filling every terrain cell uniformly. The local landmark verges above stay dense.
+			if (SampleGroundCoverField(CandidateHit.ImpactPoint, WeatherSeed ^ 0x7cb25431) > 0.55f) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
 			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
@@ -1324,13 +1427,26 @@ void AIslandWeather::InitializeGroundCover()
 			constexpr float FlowerTreeClearance = 450.f;
 			constexpr float FlowerShrubClearance = 300.f;
 			const FBoxSphereBounds SpruceBounds = IslandSpruce->GetStaticMesh()->GetBounds();
+			const USkeletalMesh* MapleMesh = IslandNorwayMaples
+				? Cast<USkeletalMesh>(IslandNorwayMaples->GetSkinnedAsset()) : nullptr;
+			const FBoxSphereBounds MapleBounds = MapleMesh ? MapleMesh->GetBounds() : FBoxSphereBounds(ForceInit);
+			const USkeletalMesh* AspenMesh = IslandEuropeanAspens
+				? Cast<USkeletalMesh>(IslandEuropeanAspens->GetSkinnedAsset()) : nullptr;
+			const FBoxSphereBounds AspenBounds = AspenMesh ? AspenMesh->GetBounds() : FBoxSphereBounds(ForceInit);
+			const USkeletalMesh* BeechMesh = IslandEuropeanBeeches
+				? Cast<USkeletalMesh>(IslandEuropeanBeeches->GetSkinnedAsset()) : nullptr;
+			const FBoxSphereBounds BeechBounds = BeechMesh ? BeechMesh->GetBounds() : FBoxSphereBounds(ForceInit);
+			constexpr int32 MaxBroadleafTreesPerSpecies = 320;
+			constexpr int32 MaxBroadleafTreeCount = MaxBroadleafTreesPerSpecies * 3;
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
+				TArray<FVector> BirchCoppiceLocations;
 				TArray<FVector> ShrubLocations;
 				TArray<FVector> RhododendronLocations;
+			int32 BroadleafTreeCount = 0;
 				int32 SpruceTraceCount = 0;
 				int32 SpruceSaplingCount = 0;
 				auto TraceSpruceGround = [this, &Query, &TraceTop, &TraceBottom, SeaLevel, IslandLandscape, &SpruceTraceCount](const FVector& Candidate, FHitResult& Hit)
@@ -1377,6 +1493,13 @@ void AIslandWeather::InitializeGroundCover()
 					}
 					if (!bFoundGroveCenter) continue;
 
+					// Keep the new tree species in legible woodland communities instead of
+					// sprinkling a few isolated broadleaf trees uniformly through every grove.
+					const bool bBroadleafGrove = SampleGroundCoverField(GroveCenter,
+						WeatherSeed ^ 0x6a09e667) > 0.78f;
+					const int32 BroadleafGroveSpecies = FMath::Min(2, FMath::FloorToInt(
+						SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0x3b67ae85) * 3.f));
+
 					const int32 TreesBeforeGrove = GroundCoverTreeCount;
 					for (int32 Attempt = 0; Attempt < MaxSpruceTracesPerGrove && GroundCoverTreeCount - TreesBeforeGrove < SpruceTreesPerGrove; ++Attempt)
 					{
@@ -1405,7 +1528,37 @@ void AIslandWeather::InitializeGroundCover()
 						const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
 						const FVector MeshBottom(SpruceBounds.Origin.X, SpruceBounds.Origin.Y, SpruceBounds.Origin.Z - SpruceBounds.BoxExtent.Z);
 						const FVector Location = TreeHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
-						IslandSpruce->AddInstance(FTransform(Rotation, Location, Scale), true);
+						bool bUsedBroadleaf = false;
+						if (bBroadleafGrove && BroadleafTreeCount < MaxBroadleafTreeCount)
+						{
+							auto TryAddSpecies = [&](int32 SpeciesIndex)
+							{
+								UInstancedSkinnedMeshComponent* Component = nullptr;
+								const USkeletalMesh* Mesh = nullptr;
+								const FBoxSphereBounds* MeshBounds = nullptr;
+								int32* SpeciesCount = nullptr;
+								switch (SpeciesIndex)
+								{
+								case 0: Component = IslandNorwayMaples; Mesh = MapleMesh; MeshBounds = &MapleBounds; SpeciesCount = &GroundCoverMapleTreeCount; break;
+								case 1: Component = IslandEuropeanAspens; Mesh = AspenMesh; MeshBounds = &AspenBounds; SpeciesCount = &GroundCoverAspenTreeCount; break;
+								default: Component = IslandEuropeanBeeches; Mesh = BeechMesh; MeshBounds = &BeechBounds; SpeciesCount = &GroundCoverBeechTreeCount; break;
+								}
+								if (!Component || !Mesh || !MeshBounds || MeshBounds->BoxExtent.Z <= KINDA_SMALL_NUMBER ||
+									!SpeciesCount || *SpeciesCount >= MaxBroadleafTreesPerSpecies) return false;
+								const float SpeciesScale = TargetHeight / (2.f * MeshBounds->BoxExtent.Z);
+								const FVector MeshBottom(MeshBounds->Origin.X, MeshBounds->Origin.Y, MeshBounds->Origin.Z - MeshBounds->BoxExtent.Z);
+								const FVector SpeciesLocation = TreeHit.ImpactPoint - Rotation.RotateVector(MeshBottom * SpeciesScale);
+								Component->AddInstance(FTransform(Rotation, SpeciesLocation, FVector(SpeciesScale)), 0, true);
+								++(*SpeciesCount);
+								++BroadleafTreeCount;
+								return true;
+							};
+							const int32 FirstSpecies = BroadleafGroveSpecies;
+							for (int32 Offset = 0; Offset < 3 && !bUsedBroadleaf; ++Offset)
+								bUsedBroadleaf = TryAddSpecies((FirstSpecies + Offset) % 3);
+						}
+						if (!bUsedBroadleaf)
+							IslandSpruce->AddInstance(FTransform(Rotation, Location, Scale), true);
 						SpruceLocations.Add(TreeHit.ImpactPoint);
 						++GroundCoverTreeCount;
 					}
@@ -1546,6 +1699,60 @@ void AIslandWeather::InitializeGroundCover()
 							++GroundCoverFlowerCount;
 						}
 					}
+
+					// Add a small, capped birch-coppice layer to broadleaf communities. These
+					// pale trunks break up the spruce silhouette without adding actor overhead.
+					constexpr int32 BirchCoppicesPerBroadleafGrove = 2;
+					constexpr int32 MaxBirchCoppices = 96;
+					constexpr int32 MaxBirchCoppiceTracesPerGrove = 24;
+					constexpr float BirchCoppiceInnerRadius = 2300.f;
+					constexpr float BirchCoppiceOuterRadius = 3000.f;
+					constexpr float BirchCoppiceMinSpacing = 750.f;
+					const UStaticMesh* BirchMesh = IslandBirchCoppices ? IslandBirchCoppices->GetStaticMesh() : nullptr;
+					const FBoxSphereBounds BirchBounds = BirchMesh ? BirchMesh->GetBounds() : FBoxSphereBounds(ForceInit);
+					if (bBroadleafGrove && BirchMesh && BirchBounds.BoxExtent.Z > KINDA_SMALL_NUMBER &&
+					GroundCoverBirchCoppiceCount < MaxBirchCoppices)
+				{
+					const int32 CoppicesBeforeGrove = GroundCoverBirchCoppiceCount;
+					for (int32 Attempt = 0; Attempt < MaxBirchCoppiceTracesPerGrove &&
+						GroundCoverBirchCoppiceCount - CoppicesBeforeGrove < BirchCoppicesPerBroadleafGrove &&
+						GroundCoverBirchCoppiceCount < MaxBirchCoppices; ++Attempt)
+					{
+						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
+						const float Radius = SpruceRandom.FRandRange(BirchCoppiceInnerRadius, BirchCoppiceOuterRadius);
+						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+						bool bTooClose = false;
+						for (const FVector& Exclusion : ExclusionLocations)
+							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
+						if (bTooClose) continue;
+						for (const FVector& ExistingCoppice : BirchCoppiceLocations)
+							if (FVector::Dist2D(Candidate, ExistingCoppice) < BirchCoppiceMinSpacing) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingShrub : ShrubLocations)
+								if (FVector::Dist2D(Candidate, ExistingShrub) < 550.f) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingFlower : RhododendronLocations)
+								if (FVector::Dist2D(Candidate, ExistingFlower) < 850.f) { bTooClose = true; break; }
+						if (!bTooClose)
+							for (const FVector& ExistingTree : SpruceLocations)
+								if (FVector::Dist2D(Candidate, ExistingTree) < 650.f) { bTooClose = true; break; }
+						if (bTooClose) continue;
+
+						FHitResult BirchHit;
+						if (!TraceSpruceGround(Candidate, BirchHit)) continue;
+						const float TargetHeight = SpruceRandom.FRandRange(240.f, 340.f);
+						const FVector Scale(TargetHeight / (2.f * BirchBounds.BoxExtent.Z));
+						const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, BirchHit.ImpactNormal);
+						const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
+							FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
+						const FVector MeshBottom(BirchBounds.Origin.X, BirchBounds.Origin.Y,
+							BirchBounds.Origin.Z - BirchBounds.BoxExtent.Z);
+						const FVector Location = BirchHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+						IslandBirchCoppices->AddInstance(FTransform(Rotation, Location, Scale), true);
+						BirchCoppiceLocations.Add(BirchHit.ImpactPoint);
+						++GroundCoverBirchCoppiceCount;
+					}
+				}
 				}
 				const int32 GroveFlowerCount = GroundCoverFlowerCount;
 				int32 MeadowFlowerTraceCount = 0;
@@ -1811,6 +2018,8 @@ void AIslandWeather::InitializeGroundCover()
 				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, and %d birch coppice instances; total tree population unchanged."),
+					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBirchCoppiceCount);
 		}
 	}
 	}
@@ -1954,6 +2163,10 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowC->SetVisibility(bVisible, true);
 	ShoreGroundPlantLowD->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
+	if (IslandBirchCoppices) IslandBirchCoppices->SetVisibility(GroundCoverBirchCoppiceCount > 0, true);
+	if (IslandNorwayMaples) IslandNorwayMaples->SetVisibility(GroundCoverMapleTreeCount > 0, true);
+	if (IslandEuropeanAspens) IslandEuropeanAspens->SetVisibility(GroundCoverAspenTreeCount > 0, true);
+	if (IslandEuropeanBeeches) IslandEuropeanBeeches->SetVisibility(GroundCoverBeechTreeCount > 0, true);
 	if (IslandShrubs) IslandShrubs->SetVisibility(GroundCoverShrubCount > 0, true);
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
@@ -1982,6 +2195,10 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowC) { ShoreGroundPlantLowC->ClearInstances(); ShoreGroundPlantLowC->SetVisibility(false, true); }
 	if (ShoreGroundPlantLowD) { ShoreGroundPlantLowD->ClearInstances(); ShoreGroundPlantLowD->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
+	if (IslandBirchCoppices) { IslandBirchCoppices->ClearInstances(); IslandBirchCoppices->SetVisibility(false, true); }
+	if (IslandNorwayMaples) { IslandNorwayMaples->ClearInstances(); IslandNorwayMaples->SetVisibility(false, true); }
+	if (IslandEuropeanAspens) { IslandEuropeanAspens->ClearInstances(); IslandEuropeanAspens->SetVisibility(false, true); }
+	if (IslandEuropeanBeeches) { IslandEuropeanBeeches->ClearInstances(); IslandEuropeanBeeches->SetVisibility(false, true); }
 	if (IslandShrubs) { IslandShrubs->ClearInstances(); IslandShrubs->SetVisibility(false, true); }
 	if (IslandRhododendrons) { IslandRhododendrons->ClearInstances(); IslandRhododendrons->SetVisibility(false, true); }
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
@@ -1990,6 +2207,10 @@ void AIslandWeather::ClearGroundCover()
 	if (IslandFestuca) { IslandFestuca->ClearInstances(); IslandFestuca->SetVisibility(false, true); }
 	if (IslandPhalaris) { IslandPhalaris->ClearInstances(); IslandPhalaris->SetVisibility(false, true); }
 	IslandSpruceBaseTransforms.Reset();
+	GroundCoverMapleTreeCount = 0;
+	GroundCoverAspenTreeCount = 0;
+	GroundCoverBeechTreeCount = 0;
+	GroundCoverBirchCoppiceCount = 0;
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
 	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();

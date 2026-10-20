@@ -17,6 +17,7 @@ class AIslandForestFox;
 class AIslandPoolRippleEffect;
 class UInstancedStaticMeshComponent;
 class UHierarchicalInstancedStaticMeshComponent;
+class UInstancedSkinnedMeshComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
 class UAudioComponent;
@@ -158,6 +159,10 @@ private:
 	TArray<FTransform> ShoreGroundPlantLowABaseTransforms;
 	TArray<FTransform> ShoreGroundPlantLowBBaseTransforms;
 	TArray<FTransform> IslandSpruceBaseTransforms;
+	int32 GroundCoverMapleTreeCount = 0;
+	int32 GroundCoverAspenTreeCount = 0;
+	int32 GroundCoverBeechTreeCount = 0;
+	int32 GroundCoverBirchCoppiceCount = 0;
 	TArray<FTransform> IslandShrubBaseTransforms;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
@@ -179,6 +184,14 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowA;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ShoreGroundPlantLowB;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandSpruce;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandBirchCoppices;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandNorwayMaples;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanAspens;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanBeeches;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandShrubs;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
