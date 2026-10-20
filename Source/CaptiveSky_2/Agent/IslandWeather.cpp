@@ -222,6 +222,14 @@ AIslandWeather::AIslandWeather()
 	IslandBirchCoppices->SetCastShadow(false);
 	IslandBirchCoppices->bReceivesDecals = false;
 	IslandBirchCoppices->SetVisibility(false);
+	IslandHazelCoppices = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("IslandHazelCoppices"));
+	IslandHazelCoppices->SetupAttachment(RootComponent);
+	IslandHazelCoppices->SetMobility(EComponentMobility::Movable);
+	IslandHazelCoppices->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandHazelCoppices->SetCanEverAffectNavigation(false);
+	IslandHazelCoppices->SetCastShadow(false);
+	IslandHazelCoppices->bReceivesDecals = false;
+	IslandHazelCoppices->SetVisibility(false);
 	IslandNorwayMaples = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandNorwayMaples"));
 	IslandNorwayMaples->SetupAttachment(RootComponent);
 	IslandNorwayMaples->SetMobility(EComponentMobility::Movable);
@@ -328,6 +336,7 @@ AIslandWeather::AIslandWeather()
 	SetFoliageCullRange(IslandPhalaris, 6000, 9000);
 	SetFoliageCullRange(IslandSpruce, 35000, 55000);
 	SetFoliageCullRange(IslandBirchCoppices, 8000, 12500);
+	SetFoliageCullRange(IslandHazelCoppices, 8000, 12500);
 	IslandNorwayMaples->SetCullDistances(8000, 12500);
 	IslandEuropeanAspens->SetCullDistances(8000, 12500);
 	IslandEuropeanBeeches->SetCullDistances(8000, 12500);
@@ -356,6 +365,7 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> GroundPlantLowDMesh(TEXT("/Game/PN_FoliageCollection/Meshes/groundPlantMesh/ground_12_01.ground_12_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> BirchCoppiceMesh(TEXT("/Game/Generated/ComfyBlender/BirchCoppice_Review/SM_BirchCoppice_01.SM_BirchCoppice_01"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HazelCoppiceMesh(TEXT("/Game/Generated/ComfyBlender/Codex_WoodlandHazelCoppiceSmoothGroups_20261018/SM_WoodlandHazelCoppice_01.SM_WoodlandHazelCoppice_01"));
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> NorwayMapleMesh(TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A"));
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanAspenMesh(TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A"));
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanBeechMesh(TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"));
@@ -384,6 +394,7 @@ AIslandWeather::AIslandWeather()
 	if (GroundPlantLowDMesh.Succeeded()) ShoreGroundPlantLowD->SetStaticMesh(GroundPlantLowDMesh.Object);
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (BirchCoppiceMesh.Succeeded()) IslandBirchCoppices->SetStaticMesh(BirchCoppiceMesh.Object);
+	if (HazelCoppiceMesh.Succeeded()) IslandHazelCoppices->SetStaticMesh(HazelCoppiceMesh.Object);
 	if (NorwayMapleMesh.Succeeded()) IslandNorwayMaples->SetSkinnedAssetAndUpdate(NorwayMapleMesh.Object);
 	if (EuropeanAspenMesh.Succeeded()) IslandEuropeanAspens->SetSkinnedAssetAndUpdate(EuropeanAspenMesh.Object);
 	if (EuropeanBeechMesh.Succeeded()) IslandEuropeanBeeches->SetSkinnedAssetAndUpdate(EuropeanBeechMesh.Object);
@@ -835,6 +846,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowD->ClearInstances();
 	if (IslandSpruce) IslandSpruce->ClearInstances();
 	IslandBirchCoppices->ClearInstances();
+	if (IslandHazelCoppices) IslandHazelCoppices->ClearInstances();
 	if (IslandNorwayMaples) IslandNorwayMaples->ClearInstances();
 	if (IslandEuropeanAspens) IslandEuropeanAspens->ClearInstances();
 	if (IslandEuropeanBeeches) IslandEuropeanBeeches->ClearInstances();
@@ -850,6 +862,7 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverAspenTreeCount = 0;
 	GroundCoverBeechTreeCount = 0;
 	GroundCoverBirchCoppiceCount = 0;
+	GroundCoverHazelCoppiceCount = 0;
 	auto ConfigureTreeWind = [this](UInstancedSkinnedMeshComponent* Component)
 	{
 		USkeletalMesh* Mesh = Component ? Cast<USkeletalMesh>(Component->GetSkinnedAsset()) : nullptr;
@@ -1443,7 +1456,7 @@ void AIslandWeather::InitializeGroundCover()
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
 				TArray<FVector> SpruceGroveCenters;
 				TArray<FVector> SpruceLocations;
-				TArray<FVector> BirchCoppiceLocations;
+				TArray<FVector> WoodlandCoppiceLocations;
 				TArray<FVector> ShrubLocations;
 				TArray<FVector> RhododendronLocations;
 			int32 BroadleafTreeCount = 0;
@@ -1702,31 +1715,31 @@ void AIslandWeather::InitializeGroundCover()
 
 					// Add a small, capped birch-coppice layer to broadleaf communities. These
 					// pale trunks break up the spruce silhouette without adding actor overhead.
-					constexpr int32 BirchCoppicesPerBroadleafGrove = 2;
-					constexpr int32 MaxBirchCoppices = 96;
-					constexpr int32 MaxBirchCoppiceTracesPerGrove = 24;
-					constexpr float BirchCoppiceInnerRadius = 2300.f;
-					constexpr float BirchCoppiceOuterRadius = 3000.f;
-					constexpr float BirchCoppiceMinSpacing = 750.f;
+					constexpr int32 WoodlandCoppicesPerBroadleafGrove = 2;
+					constexpr int32 MaxWoodlandCoppices = 96;
+					constexpr int32 MaxWoodlandCoppiceTracesPerGrove = 24;
+					constexpr float WoodlandCoppiceInnerRadius = 2300.f;
+					constexpr float WoodlandCoppiceOuterRadius = 3000.f;
+					constexpr float WoodlandCoppiceMinSpacing = 750.f;
 					const UStaticMesh* BirchMesh = IslandBirchCoppices ? IslandBirchCoppices->GetStaticMesh() : nullptr;
-					const FBoxSphereBounds BirchBounds = BirchMesh ? BirchMesh->GetBounds() : FBoxSphereBounds(ForceInit);
-					if (bBroadleafGrove && BirchMesh && BirchBounds.BoxExtent.Z > KINDA_SMALL_NUMBER &&
-					GroundCoverBirchCoppiceCount < MaxBirchCoppices)
-				{
-					const int32 CoppicesBeforeGrove = GroundCoverBirchCoppiceCount;
-					for (int32 Attempt = 0; Attempt < MaxBirchCoppiceTracesPerGrove &&
-						GroundCoverBirchCoppiceCount - CoppicesBeforeGrove < BirchCoppicesPerBroadleafGrove &&
-						GroundCoverBirchCoppiceCount < MaxBirchCoppices; ++Attempt)
+					const UStaticMesh* HazelMesh = IslandHazelCoppices ? IslandHazelCoppices->GetStaticMesh() : nullptr;
+					if (bBroadleafGrove && (BirchMesh || HazelMesh) &&
+						GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount < MaxWoodlandCoppices)
+					{
+						const int32 CoppicesBeforeGrove = GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount;
+						for (int32 Attempt = 0; Attempt < MaxWoodlandCoppiceTracesPerGrove &&
+							GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount - CoppicesBeforeGrove < WoodlandCoppicesPerBroadleafGrove &&
+							GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount < MaxWoodlandCoppices; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SpruceRandom.FRandRange(BirchCoppiceInnerRadius, BirchCoppiceOuterRadius);
+						const float Radius = SpruceRandom.FRandRange(WoodlandCoppiceInnerRadius, WoodlandCoppiceOuterRadius);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)
 							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
-						for (const FVector& ExistingCoppice : BirchCoppiceLocations)
-							if (FVector::Dist2D(Candidate, ExistingCoppice) < BirchCoppiceMinSpacing) { bTooClose = true; break; }
+						for (const FVector& ExistingCoppice : WoodlandCoppiceLocations)
+							if (FVector::Dist2D(Candidate, ExistingCoppice) < WoodlandCoppiceMinSpacing) { bTooClose = true; break; }
 						if (!bTooClose)
 							for (const FVector& ExistingShrub : ShrubLocations)
 								if (FVector::Dist2D(Candidate, ExistingShrub) < 550.f) { bTooClose = true; break; }
@@ -1738,19 +1751,32 @@ void AIslandWeather::InitializeGroundCover()
 								if (FVector::Dist2D(Candidate, ExistingTree) < 650.f) { bTooClose = true; break; }
 						if (bTooClose) continue;
 
-						FHitResult BirchHit;
-						if (!TraceSpruceGround(Candidate, BirchHit)) continue;
-						const float TargetHeight = SpruceRandom.FRandRange(240.f, 340.f);
-						const FVector Scale(TargetHeight / (2.f * BirchBounds.BoxExtent.Z));
-						const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, BirchHit.ImpactNormal);
+						const bool bPreferHazel = HazelMesh && (!BirchMesh || SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0xa54ff53au) > 0.5f);
+						UHierarchicalInstancedStaticMeshComponent* CoppiceComponent = bPreferHazel ? IslandHazelCoppices : IslandBirchCoppices;
+						const UStaticMesh* CoppiceMesh = bPreferHazel ? HazelMesh : BirchMesh;
+						if (!CoppiceMesh || !CoppiceComponent)
+						{
+							CoppiceComponent = bPreferHazel ? IslandBirchCoppices : IslandHazelCoppices;
+							CoppiceMesh = bPreferHazel ? BirchMesh : HazelMesh;
+						}
+						if (!CoppiceMesh || !CoppiceComponent) continue;
+						const FBoxSphereBounds CoppiceBounds = CoppiceMesh->GetBounds();
+						if (CoppiceBounds.BoxExtent.Z <= KINDA_SMALL_NUMBER) continue;
+						FHitResult CoppiceHit;
+						if (!TraceSpruceGround(Candidate, CoppiceHit)) continue;
+						const bool bHazel = CoppiceComponent == IslandHazelCoppices;
+						const float TargetHeight = SpruceRandom.FRandRange(bHazel ? 210.f : 240.f, bHazel ? 290.f : 340.f);
+						const FVector Scale(TargetHeight / (2.f * CoppiceBounds.BoxExtent.Z));
+						const FQuat AlignToGround = FQuat::FindBetweenNormals(FVector::UpVector, CoppiceHit.ImpactNormal);
 						const FQuat Rotation = AlignToGround * FQuat(FVector::UpVector,
 							FMath::DegreesToRadians(SpruceRandom.FRandRange(0.f, 360.f)));
-						const FVector MeshBottom(BirchBounds.Origin.X, BirchBounds.Origin.Y,
-							BirchBounds.Origin.Z - BirchBounds.BoxExtent.Z);
-						const FVector Location = BirchHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
-						IslandBirchCoppices->AddInstance(FTransform(Rotation, Location, Scale), true);
-						BirchCoppiceLocations.Add(BirchHit.ImpactPoint);
-						++GroundCoverBirchCoppiceCount;
+						const FVector MeshBottom(CoppiceBounds.Origin.X, CoppiceBounds.Origin.Y,
+							CoppiceBounds.Origin.Z - CoppiceBounds.BoxExtent.Z);
+						const FVector Location = CoppiceHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
+						CoppiceComponent->AddInstance(FTransform(Rotation, Location, Scale), true);
+						WoodlandCoppiceLocations.Add(CoppiceHit.ImpactPoint);
+						if (bHazel) ++GroundCoverHazelCoppiceCount;
+						else ++GroundCoverBirchCoppiceCount;
 					}
 				}
 				}
@@ -2018,8 +2044,8 @@ void AIslandWeather::InitializeGroundCover()
 				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
-				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, and %d birch coppice instances; total tree population unchanged."),
-					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBirchCoppiceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d birch coppice, and %d hazel coppice instances; total tree population unchanged."),
+					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBirchCoppiceCount, GroundCoverHazelCoppiceCount);
 		}
 	}
 	}
@@ -2164,6 +2190,7 @@ void AIslandWeather::InitializeGroundCover()
 	ShoreGroundPlantLowD->SetVisibility(bVisible, true);
 	if (IslandSpruce) IslandSpruce->SetVisibility(GroundCoverTreeCount > 0, true);
 	if (IslandBirchCoppices) IslandBirchCoppices->SetVisibility(GroundCoverBirchCoppiceCount > 0, true);
+	if (IslandHazelCoppices) IslandHazelCoppices->SetVisibility(GroundCoverHazelCoppiceCount > 0, true);
 	if (IslandNorwayMaples) IslandNorwayMaples->SetVisibility(GroundCoverMapleTreeCount > 0, true);
 	if (IslandEuropeanAspens) IslandEuropeanAspens->SetVisibility(GroundCoverAspenTreeCount > 0, true);
 	if (IslandEuropeanBeeches) IslandEuropeanBeeches->SetVisibility(GroundCoverBeechTreeCount > 0, true);
@@ -2196,6 +2223,7 @@ void AIslandWeather::ClearGroundCover()
 	if (ShoreGroundPlantLowD) { ShoreGroundPlantLowD->ClearInstances(); ShoreGroundPlantLowD->SetVisibility(false, true); }
 	if (IslandSpruce) { IslandSpruce->ClearInstances(); IslandSpruce->SetVisibility(false, true); }
 	if (IslandBirchCoppices) { IslandBirchCoppices->ClearInstances(); IslandBirchCoppices->SetVisibility(false, true); }
+	if (IslandHazelCoppices) { IslandHazelCoppices->ClearInstances(); IslandHazelCoppices->SetVisibility(false, true); }
 	if (IslandNorwayMaples) { IslandNorwayMaples->ClearInstances(); IslandNorwayMaples->SetVisibility(false, true); }
 	if (IslandEuropeanAspens) { IslandEuropeanAspens->ClearInstances(); IslandEuropeanAspens->SetVisibility(false, true); }
 	if (IslandEuropeanBeeches) { IslandEuropeanBeeches->ClearInstances(); IslandEuropeanBeeches->SetVisibility(false, true); }
@@ -2211,6 +2239,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverAspenTreeCount = 0;
 	GroundCoverBeechTreeCount = 0;
 	GroundCoverBirchCoppiceCount = 0;
+	GroundCoverHazelCoppiceCount = 0;
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
 	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();

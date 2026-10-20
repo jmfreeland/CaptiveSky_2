@@ -163,6 +163,7 @@ private:
 	int32 GroundCoverAspenTreeCount = 0;
 	int32 GroundCoverBeechTreeCount = 0;
 	int32 GroundCoverBirchCoppiceCount = 0;
+	int32 GroundCoverHazelCoppiceCount = 0;
 	TArray<FTransform> IslandShrubBaseTransforms;
 	TWeakObjectPtr<AIslandPoolRippleEffect> RainPoolRipple;
 	TWeakObjectPtr<AIslandPoolRippleEffect> WindPoolRipple;
@@ -186,6 +187,8 @@ private:
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandSpruce;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandBirchCoppices;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandHazelCoppices;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandNorwayMaples;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
