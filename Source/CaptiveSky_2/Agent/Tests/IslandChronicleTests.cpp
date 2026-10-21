@@ -40,6 +40,12 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("A moon phase change is worded for the chronicle"),
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("first quarter"), TEXT("waxing gibbous")).Contains(TEXT("waxing gibbous")));
+	TestTrue(TEXT("A full moon announces spring tides"),
+		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing gibbous"), TEXT("full moon")).Contains(TEXT("Spring tides")));
+	TestTrue(TEXT("A quarter moon announces neap tides"),
+		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing crescent"), TEXT("first quarter")).Contains(TEXT("Neap tides")));
+	TestFalse(TEXT("A gibbous moon says nothing about tides"),
+		UIslandChronicleSubsystem::MoonChangeText(TEXT("first quarter"), TEXT("waxing gibbous")).Contains(TEXT("tides")));
 	TestTrue(TEXT("The same phase is not news"), UIslandChronicleSubsystem::MoonChangeText(TEXT("full moon"), TEXT("full moon")).IsEmpty());
 	TestTrue(TEXT("The first observation of a session is not a change"), UIslandChronicleSubsystem::MoonChangeText(FString(), TEXT("full moon")).IsEmpty());
 	UIslandChronicleSubsystem* Chronicle = NewObject<UIslandChronicleSubsystem>(GetTransientPackage());

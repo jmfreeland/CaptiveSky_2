@@ -106,7 +106,10 @@ void UIslandChronicleSubsystem::Tick(float DeltaTime)
 FString UIslandChronicleSubsystem::MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase)
 {
 	if (PreviousPhase.IsEmpty() || CurrentPhase.IsEmpty() || PreviousPhase == CurrentPhase) return FString();
-	return FString::Printf(TEXT("The moon has moved on from the %s to the %s."), *PreviousPhase, *CurrentPhase);
+	// New and full moons bring the spring tides; the quarters bring the neaps.
+	const TCHAR* Tides = CurrentPhase == TEXT("new moon") || CurrentPhase == TEXT("full moon") ? TEXT(" Spring tides are due: the sea will run highest and lowest.") :
+		CurrentPhase == TEXT("first quarter") || CurrentPhase == TEXT("last quarter") ? TEXT(" Neap tides are due: little will separate high water from low.") : TEXT("");
+	return FString::Printf(TEXT("The moon has moved on from the %s to the %s.%s"), *PreviousPhase, *CurrentPhase, Tides);
 }
 
 void UIslandChronicleSubsystem::WatchSky()
