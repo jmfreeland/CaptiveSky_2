@@ -38,7 +38,7 @@ this file is the text version and the map of everything under `docs/`.
 
 `AIslandDayNight::DescribeTime()` joins small pure functions (all covered by `CaptiveSky2.Agent.DayNight`):
 `LunarPhaseName` (eight named phases), `MoonHeight` (high / up / horizon / below), `IsMoonHiddenByCloud`,
-`DescribeSunEdge` (sunrise and sunset cues) and `DescribeCalendar` (Island day, days to full and new moon) and `IsShootingStarSlot` (rare meteors on clear dark nights), `DescribeStars` (crowded, drowned by a bright moon, or hidden by cloud) and `TideLevel` / `DescribeTide` (12.42 h tide, spring near new and full moon, neap at the quarters). The sea is described by `UIslandSeaStateSubsystem::DescribeSea`.
+`DescribeSunEdge` (sunrise and sunset cues) and `DescribeCalendar` (Island day, days to full and new moon) and `IsShootingStarSlot` (rare meteors on clear dark nights), `DescribeStars` (crowded, drowned by a bright moon, or hidden by cloud) and `TideLevel` / `DescribeTide` (12.42 h tide, spring near new and full moon, neap at the quarters). The sea is described by `UIslandSeaStateSubsystem::DescribeSea`, and a nearby lightning strike by `AIslandLightning::DescribeStrike` (the flash, the wait for thunder, then a crack or rumble by distance; test `CaptiveSky2.Agent.IslandLightningText`).
 Developer console: `Island.Hour <h>`, `Island.Day <n>` (day 1 is a new moon), `Island.SkyReport` (logs what a resident would be told about sky and sea), `Island.Storm`, `Island.Dew`, `Island.Sea`, `Island.Rainbow`.
 
 ## Building and testing with the editor open
@@ -50,13 +50,13 @@ Build.bat CaptiveSky_2Editor Win64 Development -Project=<scratch>\CaptiveSky_2.u
 UnrealEditor-Cmd.exe <scratch>\CaptiveSky_2.uproject -ExecCmds="Automation RunTests CaptiveSky2.Agent.DayNight; Quit" -NullRHI -NoSound -DisablePython -unattended
 ```
 
-Cold build is about seven minutes. Tests are headless and make no model requests.
+Cold build is about seven minutes. Tests are headless and make no model requests. If the headless editor dies at startup on `PCGModule::PCGModulePtr`, set the `PCG`, `PCGToolset`, `PCGWaterInterop` and `ProceduralVegetationEditor` plugins to disabled in the scratch `.uproject` (source never touches PCG; the crash comes from shared `Content/`).
 
 ## Recent sky work (commits `84b6442`..`5eacd9c`)
 
 Named lunar phases, the moon's position and cloud cover, sunrise and sunset cues, an Island calendar, shooting stars and
 the sea state all reach residents through pure, tested functions; `Island.Day` and `Island.SkyReport` were added for
-checking them in game. The chronicle (`WorldState/chronicle.jsonl`, read with `Scripts/Build-Chronicle.py`) also records the moon changing phase. Along the way the headless suite went from 8 failures to 4 (see below); a full rerun in cycle 27 showed exactly those 4.
+checking them in game. The chronicle (`WorldState/chronicle.jsonl`, read with `Scripts/Build-Chronicle.py`) also records the moon changing phase, with a note that spring tides (new and full moon) or neaps (quarters) are due. Along the way the headless suite went from 8 failures to 4 (see below); a full rerun in cycle 27 showed exactly those 4.
 
 ## Test health
 
