@@ -85,6 +85,10 @@ public:
 	static bool IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination);
 	/** Island day count plus whole days until the next full and new moon, so residents can reckon time across sessions. Pure. */
 	static FString DescribeCalendar(int32 IslandDay, float LunarProgress);
+	/** Island hours until the moon next crosses the horizon (rising if it is below, setting if above), in quarter-hour steps; negative if none within 26 hours. Pure. */
+	static float HoursUntilMoonHorizon(int32 IslandDay, float IslandHour);
+	/** A sentence giving the wait for moonrise or moonset; empty when unknown. Pure. */
+	static FString DescribeMoonHorizon(int32 IslandDay, float IslandHour);
 	/** How the stars look: a crowded sky on a clear dark moonless night, only the brightest under a bright moon, none under thick cloud; empty by day. Pure. */
 	static FString DescribeStars(float Night, float CloudCover, float LunarIllumination, float MoonElevation);
 	/** Tide height -1..1 for the Island moment: two highs a day (12.42 h apart), larger spring tides near new and full moon, smaller neaps near the quarters. Pure. */

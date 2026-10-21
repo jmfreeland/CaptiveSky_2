@@ -110,6 +110,29 @@ FString AIslandDayNight::DescribeSunEdge(float IslandHour)
 	return FString();
 }
 
+float AIslandDayNight::HoursUntilMoonHorizon(int32 IslandDay, float IslandHour)
+{
+	if (!FMath::IsFinite(IslandHour)) return -1.f;
+	const bool bUp = MoonHeight(IslandDay, IslandHour) > 0.f;
+	for (int32 Step = 1; Step <= 104; ++Step)
+	{
+		const float Ahead = float(Step) * 0.25f;
+		const double Hour = double(IslandHour) + double(Ahead);
+		const int32 Day = IslandDay + FMath::FloorToInt(Hour / 24.0);
+		if ((MoonHeight(Day, WrapHour(Hour)) > 0.f) != bUp) return Ahead;
+	}
+	return -1.f;
+}
+
+FString AIslandDayNight::DescribeMoonHorizon(int32 IslandDay, float IslandHour)
+{
+	const float Wait = HoursUntilMoonHorizon(IslandDay, IslandHour);
+	if (Wait < 0.f) return FString();
+	const bool bUp = MoonHeight(IslandDay, IslandHour) > 0.f;
+	const int32 Hours = FMath::Max(1, FMath::RoundToInt(Wait));
+	return FString::Printf(TEXT(" The moon will %s in about %d hour%s."), bUp ? TEXT("set") : TEXT("rise"), Hours, Hours == 1 ? TEXT("") : TEXT("s"));
+}
+
 FString AIslandDayNight::DescribeHorizonColour(float IslandHour, float CloudCover)
 {
 	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(CloudCover)) return FString();
@@ -428,7 +451,7 @@ FString AIslandDayNight::DescribeTime() const
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	const FString Tide = DescribeTide(DayNumber, CurrentHour);
+	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour);
 	const FString Stars = DescribeStars(NightAmount(CurrentHour), CloudNow, LunarLight, MoonElevation);
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s%s"),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor, *Tide);

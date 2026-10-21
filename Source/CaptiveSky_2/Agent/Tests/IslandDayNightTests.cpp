@@ -84,6 +84,24 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Spring tides near full range, neaps clearly smaller"), BiggestDay > 0.95f && SmallestDay < 0.85f);
 		TestTrue(TEXT("Non-finite hour is harmless"), AIslandDayNight::DescribeTide(1, NAN).IsEmpty() && AIslandDayNight::TideLevel(1, NAN) == 0.f);
 	}
+	{
+		bool bConsistent = true, bAnyRise = false, bAnySet = false;
+		for (int32 Day = 1; Day <= 6; ++Day)
+			for (float H = 0.f; H < 24.f; H += 1.5f)
+			{
+				const float Wait = AIslandDayNight::HoursUntilMoonHorizon(Day, H);
+				const FString Text = AIslandDayNight::DescribeMoonHorizon(Day, H);
+				bConsistent &= Wait > 0.f && Wait <= 26.f && !Text.IsEmpty();
+				const bool bUp = AIslandDayNight::MoonHeight(Day, H) > 0.f;
+				bConsistent &= Text.Contains(bUp ? TEXT("set") : TEXT("rise"));
+				const double Later = double(H) + double(Wait);
+				bConsistent &= (AIslandDayNight::MoonHeight(Day + FMath::FloorToInt(Later / 24.0), AIslandDayNight::WrapHour(Later)) > 0.f) != bUp;
+				bAnyRise |= Text.Contains(TEXT("rise")); bAnySet |= Text.Contains(TEXT("set"));
+			}
+		TestTrue(TEXT("The moon's wait for the horizon is consistent with its height"), bConsistent);
+		TestTrue(TEXT("Both moonrise and moonset get described"), bAnyRise && bAnySet);
+		TestTrue(TEXT("Non-finite hour gives no moon horizon text"), AIslandDayNight::DescribeMoonHorizon(1, NAN).IsEmpty());
+	}
 	TestTrue(TEXT("Clear sunrise glows"), AIslandDayNight::DescribeHorizonColour(6.1f, 0.1f).Contains(TEXT("clear and bright")));
 	TestTrue(TEXT("Broken cloud streaks the sunset"), AIslandDayNight::DescribeHorizonColour(17.75f, 0.5f).Contains(TEXT("streaks")));
 	TestTrue(TEXT("Thick cloud greys the dawn"), AIslandDayNight::DescribeHorizonColour(5.75f, 0.9f).Contains(TEXT("flat grey")));
