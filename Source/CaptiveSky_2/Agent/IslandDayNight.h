@@ -89,6 +89,8 @@ public:
 	static float HoursUntilMoonHorizon(int32 IslandDay, float IslandHour);
 	/** A sentence giving the wait for moonrise or moonset; empty when unknown. Pure. */
 	static FString DescribeMoonHorizon(int32 IslandDay, float IslandHour);
+	/** A one-line-per-day outlook from a starting Island day: lunar phase at noon and whether the tides are spring, neap or ordinary. Days is clamped to 1..30. Pure. */
+	static FString DescribeAlmanac(int32 StartDay, int32 Days);
 	/** How the stars look: a crowded sky on a clear dark moonless night, only the brightest under a bright moon, none under thick cloud; empty by day. Pure. */
 	static FString DescribeStars(float Night, float CloudCover, float LunarIllumination, float MoonElevation);
 	/** Tide height -1..1 for the Island moment: two highs a day (12.42 h apart), larger spring tides near new and full moon, smaller neaps near the quarters. Pure. */

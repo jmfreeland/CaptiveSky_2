@@ -102,6 +102,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Both moonrise and moonset get described"), bAnyRise && bAnySet);
 		TestTrue(TEXT("Non-finite hour gives no moon horizon text"), AIslandDayNight::DescribeMoonHorizon(1, NAN).IsEmpty());
 	}
+	{
+		const FString Almanac = AIslandDayNight::DescribeAlmanac(1, 30);
+		TArray<FString> Lines;
+		Almanac.ParseIntoArrayLines(Lines);
+		TestEqual(TEXT("The almanac has one line per day"), Lines.Num(), 30);
+		TestTrue(TEXT("It starts at the new moon"), Lines.Num() > 0 && Lines[0].StartsWith(TEXT("Day 1: new moon")));
+		TestTrue(TEXT("A month holds spring and neap tides"), Almanac.Contains(TEXT("spring tides")) && Almanac.Contains(TEXT("neap tides")));
+		TestEqual(TEXT("Days are clamped"), AIslandDayNight::DescribeAlmanac(0, 999).Len() > 0, true);
+	}
 	TestTrue(TEXT("Clear sunrise glows"), AIslandDayNight::DescribeHorizonColour(6.1f, 0.1f).Contains(TEXT("clear and bright")));
 	TestTrue(TEXT("Broken cloud streaks the sunset"), AIslandDayNight::DescribeHorizonColour(17.75f, 0.5f).Contains(TEXT("streaks")));
 	TestTrue(TEXT("Thick cloud greys the dawn"), AIslandDayNight::DescribeHorizonColour(5.75f, 0.9f).Contains(TEXT("flat grey")));

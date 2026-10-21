@@ -110,6 +110,22 @@ FString AIslandDayNight::DescribeSunEdge(float IslandHour)
 	return FString();
 }
 
+static float TideRange(int32 IslandDay, float IslandHour);
+
+FString AIslandDayNight::DescribeAlmanac(int32 StartDay, int32 Days)
+{
+	const int32 First = FMath::Max(1, StartDay);
+	FString Out;
+	for (int32 Offset = 0; Offset < FMath::Clamp(Days, 1, 30); ++Offset)
+	{
+		const int32 Day = First + Offset;
+		const float Range = TideRange(Day, 12.f);
+		const TCHAR* Tides = Range > 0.92f ? TEXT("spring tides") : Range < 0.72f ? TEXT("neap tides") : TEXT("ordinary tides");
+		Out += FString::Printf(TEXT("Day %d: %s, %s\n"), Day, LunarPhaseName(LunarPhaseProgress(Day, 12.f)), Tides);
+	}
+	return Out;
+}
+
 float AIslandDayNight::HoursUntilMoonHorizon(int32 IslandDay, float IslandHour)
 {
 	if (!FMath::IsFinite(IslandHour)) return -1.f;
@@ -472,6 +488,20 @@ static FAutoConsoleCommandWithWorldAndArgs GIslandSkyReportCommand(
 		{
 			const FString Sea = UIslandSeaStateSubsystem::DescribeSea(SeaState->GetSea());
 			UE_LOG(LogTemp, Display, TEXT("Island.SkyReport:%s"), Sea.IsEmpty() ? TEXT(" The sea is calm.") : *Sea);
+		}
+	}));
+
+static FAutoConsoleCommandWithWorldAndArgs GIslandAlmanacCommand(
+	TEXT("Island.Almanac"),
+	TEXT("Log the moon phase and tide outlook for the coming days. Usage: Island.Almanac [days=8]"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		if (!World) return;
+		const int32 Days = Args.Num() > 0 ? FCString::Atoi(*Args[0]) : 8;
+		for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+		{
+			UE_LOG(LogTemp, Display, TEXT("Island.Almanac:\n%s"), *AIslandDayNight::DescribeAlmanac(It->DayNumber, Days));
+			break;
 		}
 	}));
 
