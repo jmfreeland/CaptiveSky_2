@@ -110,6 +110,15 @@ FString AIslandDayNight::DescribeSunEdge(float IslandHour)
 	return FString();
 }
 
+FString AIslandDayNight::DescribeHorizonColour(float IslandHour, float CloudCover)
+{
+	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(CloudCover)) return FString();
+	if (DescribeSunEdge(IslandHour).IsEmpty()) return FString();
+	if (CloudCover < 0.3f) return TEXT(" With no cloud to catch it, the horizon glows clear and bright.");
+	if (CloudCover < 0.7f) return TEXT(" Broken cloud catches the colour in streaks of pink and gold.");
+	return TEXT(" Thick cloud mutes the light to a flat grey.");
+}
+
 FString AIslandDayNight::DescribeStars(float Night, float CloudCover, float LunarIllumination, float MoonElevation)
 {
 	if (!FMath::IsFinite(Night) || !FMath::IsFinite(CloudCover) || !FMath::IsFinite(LunarIllumination) || !FMath::IsFinite(MoonElevation)) return FString();
@@ -414,7 +423,7 @@ FString AIslandDayNight::DescribeTime() const
 			CloudNow = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
 			break;
 		}
-	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeCalendar(DayNumber, LunarProgress);
+	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeHorizonColour(CurrentHour, CloudNow) + DescribeCalendar(DayNumber, LunarProgress);
 	const FString Meteor = IsShootingStarSlot(DayNumber, CurrentHour, CloudNow, LunarLight)
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)

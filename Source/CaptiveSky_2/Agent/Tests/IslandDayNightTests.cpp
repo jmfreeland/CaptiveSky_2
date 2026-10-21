@@ -84,6 +84,11 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Spring tides near full range, neaps clearly smaller"), BiggestDay > 0.95f && SmallestDay < 0.85f);
 		TestTrue(TEXT("Non-finite hour is harmless"), AIslandDayNight::DescribeTide(1, NAN).IsEmpty() && AIslandDayNight::TideLevel(1, NAN) == 0.f);
 	}
+	TestTrue(TEXT("Clear sunrise glows"), AIslandDayNight::DescribeHorizonColour(6.1f, 0.1f).Contains(TEXT("clear and bright")));
+	TestTrue(TEXT("Broken cloud streaks the sunset"), AIslandDayNight::DescribeHorizonColour(17.75f, 0.5f).Contains(TEXT("streaks")));
+	TestTrue(TEXT("Thick cloud greys the dawn"), AIslandDayNight::DescribeHorizonColour(5.75f, 0.9f).Contains(TEXT("flat grey")));
+	TestTrue(TEXT("Nothing at noon or on bad input"),
+		AIslandDayNight::DescribeHorizonColour(12.f, 0.5f).IsEmpty() && AIslandDayNight::DescribeHorizonColour(NAN, 0.5f).IsEmpty());
 	TestTrue(TEXT("No stars text by day"), AIslandDayNight::DescribeStars(0.f, 0.f, 0.f, -1.f).IsEmpty());
 	TestTrue(TEXT("A clear moonless night is crowded with stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 0.f, -1.f).Contains(TEXT("Milky Way")));
 	TestTrue(TEXT("A bright moon up drowns the stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, 0.8f).Contains(TEXT("drowns")));
