@@ -43,6 +43,7 @@
 #include "IslandListeningStonesChime.h"
 #include "IslandForestFox.h"
 #include "IslandForestStag.h"
+#include "IslandLightning.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentBrain, Log, All);
 
@@ -306,6 +307,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			NearbyBeings += LocalClock->DescribeTime();
 			break;
 		}
+		for (TActorIterator<AIslandLightning> It(GetWorld()); It; ++It)
+			NearbyBeings += AIslandLightning::DescribeStrike(It->GetElapsedSeconds(), FVector::Dist2D(It->GetStrikeGroundLocation(), Location));
 		// The basin is a lasting landmark subsystem, so its prompt must not depend on a weather actor existing.
 		if (const UIslandRainBasinSubsystem* Basin = GetWorld()->GetSubsystem<UIslandRainBasinSubsystem>())
 			NearbyBeings += Basin->DescribeNearby(Location);

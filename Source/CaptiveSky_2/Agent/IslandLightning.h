@@ -42,6 +42,9 @@ public:
 	float GetThunderDelay() const { return ThunderDelay; }
 	bool HasBolt() const;
 	bool HasThundered() const { return bThundered; }
+	float GetElapsedSeconds() const { return Elapsed; }
+	/** What a being a given distance from the strike sees and hears this moment: the flash, the wait for thunder, then its crack or rumble by distance; empty once it has passed. Pure. */
+	static FString DescribeStrike(float SecondsSinceStrike, float ListenerDistanceCm);
 
 	virtual void Tick(float DeltaSeconds) override;
 

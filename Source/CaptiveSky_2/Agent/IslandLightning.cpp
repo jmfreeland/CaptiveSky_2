@@ -48,6 +48,18 @@ float AIslandLightning::FlashAt(float T)
 	return FMath::Clamp(Pulse(0.f, 0.06f, 0.35f) + Pulse(0.09f, 0.12f, 1.f) + Pulse(0.28f, 0.14f, 0.55f), 0.f, 1.f);
 }
 
+FString AIslandLightning::DescribeStrike(float SecondsSinceStrike, float ListenerDistanceCm)
+{
+	if (!FMath::IsFinite(SecondsSinceStrike) || !FMath::IsFinite(ListenerDistanceCm) || SecondsSinceStrike < 0.f) return FString();
+	const float Delay = FMath::Max(0.f, ListenerDistanceCm) / SoundSpeed;
+	if (SecondsSinceStrike < FlashSeconds) return TEXT(" Lightning flares across the sky.");
+	if (SecondsSinceStrike < Delay) return TEXT(" Lightning struck a moment ago; its thunder has not yet reached you.");
+	if (SecondsSinceStrike > Delay + 4.f) return FString();
+	if (Delay < 1.5f) return TEXT(" A crack of thunder splits the air directly overhead.");
+	if (Delay < 5.f) return TEXT(" Thunder cracks and rolls close by.");
+	return TEXT(" Thunder rumbles from far off.");
+}
+
 bool AIslandLightning::HasBolt() const
 {
 	return Bolt->GetInstanceCount() > 0;
