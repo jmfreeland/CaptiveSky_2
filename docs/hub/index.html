@@ -66,6 +66,7 @@ a{color:var(--c)}
 <div class="card"><div class="tag t2">Meteors</div><h3>IsShootingStarSlot</h3><p>Occasional shooting stars on clear dark nights; deterministic per day and ten-minute slot, rarer under a bright moon.</p></div>
 <div class="card"><div class="tag t2">Stars</div><h3>DescribeStars</h3><p>A crowded sky with the Milky Way on clear moonless nights, drowned by a bright moon, a few through broken cloud, none under thick cloud.</p></div>
 <div class="card"><div class="tag t3">Tide</div><h3>TideLevel / DescribeTide</h3><p>Two tides a day (12.42 h), rising or falling, with spring tides near new and full moon and neaps at the quarters.</p></div>
+<div class="card"><div class="tag t2">Moon horizon</div><h3>DescribeMoonHorizon</h3><p>"The moon will rise (or set) in about N hours", found by stepping the moon's height forward in quarter-hours. Sunrise and sunset lines are also dressed by cloud (<code>DescribeHorizonColour</code>).</p></div>
 <div class="card"><div class="tag t3">Lightning</div><h3>AIslandLightning::DescribeStrike</h3><p>The flash, the wait while sound crosses the distance, then a crack overhead, thunder close by or a far rumble.</p></div>
 <div class="card"><div class="tag t3">Sea</div><h3>UIslandSeaStateSubsystem::DescribeSea</h3><p>Low swell, white-tipped waves or a violent storm sea, from the same level that drives the ocean's wave size.</p></div>
 </div>
@@ -74,7 +75,7 @@ a{color:var(--c)}
 <p class="lead">With the editor open, build in a scratch project that junctions <code>Source/</code>, so Live Coding does not block you. From <code>Saved/CompileScratch/Claude_Props</code>:</p>
 <p><code>Build.bat CaptiveSky_2Editor Win64 Development -Project=&lt;scratch&gt;\CaptiveSky_2.uproject -WaitMutex -MaxParallelActions=3 -NoHotReloadFromIDE</code></p>
 <p><code>UnrealEditor-Cmd.exe &lt;scratch&gt;\CaptiveSky_2.uproject -ExecCmds="Automation RunTests CaptiveSky2.Agent.DayNight; Quit" -NullRHI -NoSound -DisablePython -unattended</code></p>
-<p class="lead">Developer console: <code>Island.Hour &lt;h&gt;</code> and <code>Island.Day &lt;n&gt;</code> jump the clock and calendar (day 1 is a new moon), <code>Island.SkyReport</code> logs the sky and sea text a resident would be told right now, <code>Island.Storm</code> forces a storm, <code>Island.Dew</code>, <code>Island.Sea</code> and <code>Island.Rainbow</code> force their effects.</p>
+<p class="lead">Developer console: <code>Island.Almanac [days]</code> lists the moon and tide outlook, <code>Island.Hour &lt;h&gt;</code> and <code>Island.Day &lt;n&gt;</code> jump the clock and calendar (day 1 is a new moon), <code>Island.SkyReport</code> logs the sky and sea text a resident would be told right now, <code>Island.Storm</code> forces a storm, <code>Island.Dew</code>, <code>Island.Sea</code> and <code>Island.Rainbow</code> force their effects.</p>
 <p class="lead">If the headless editor crashes at startup on <code>PCGModule::PCGModulePtr</code>, disable the PCG plugins in the scratch <code>.uproject</code> (the crash comes from shared Content, not source). A cold build takes about seven minutes; incremental ones a few seconds. Tests run headless with no model requests.</p>
 
 <h2>Recent sky work</h2>
