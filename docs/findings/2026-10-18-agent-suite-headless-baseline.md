@@ -64,3 +64,16 @@ tests fail first at a `Possess` followed by `IsPlayerControlled()` on a bare `AP
 headless `-NullRHI` game world rather than at project code; the installed engine here ships no `Pawn.cpp`, so I could not
 read `APawn::IsPlayerControlled` to confirm. The Innkeeper test reads `Agents/Agent_Innkeeper_01/`, which the scratch
 project does not mirror. Run these four in the main project's own automation environment.
+
+## Full rerun (2026-10-21, after the sky/tide/lightning work)
+
+Scratch project with the PCG plugins disabled (the headless editor otherwise crashed on `PCGModule::PCGModulePtr`; see `docs/README.md`).
+**97 tests, 91 passed, 6 failed.** All sky tests pass (`DayNight`, `IslandSeaState`, `IslandChronicle`, `IslandLightningText`).
+
+| Test | Status |
+|---|---|
+| `IslandInnkeeperSpawn`, `IslandOcean`, `ListeningStonePresentation`, `WindArchPresentation` | The same four as above; still unexplained in this environment. |
+| `GroundCover` | **New.** Expects 25 foliage component groups but finds 27, and several distribution checks fail (`IslandEcologyTests.cpp` lines 348, 437, 653, 683, 915). Consistent with the other agents' recent foliage commits (`cd3ff41`, `126f91f`, `03b7e2a`) adding groups without updating the contract; not touched by sky work. |
+| `WildlifeHomeRecord` | **New.** `CanInteract` from a visitor 2 m from the materialised home returns false (`IslandNestTests.cpp` line 649). Not examined further. |
+
+Neither new failure involves files this session changed, but the suite was not run on the parent commits, so that is an inference.
