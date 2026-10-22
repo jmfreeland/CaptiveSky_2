@@ -152,6 +152,10 @@ Prior broad-pass diagnostics showed nearly even coverage at 200 m resolution (me
 
 Live Coding compiled successfully. A short Simulate rebuilt 84,768 ground-cover instances from the same 96,000-candidate budget and 8,317 valid terrain cells. The captured near-ground nighttime view shows irregular patches and open gaps rather than a uniform carpet, but this is a single local composition check. Spatial tile diagnostics were not enabled for the post-change pass; a daytime, island-wide validation remains necessary. No OOM / texture-pool warning appeared in the bounded log check; no continuous VRAM peak or 30-FPS test was made. PIE was stopped afterward.
 
+### Broadleaf visibility check
+
+A matched near-ground nighttime editor view was captured before and after a temporary cull-range increase from 80–125 m to 120–220 m for Norway maple, European aspen, and European beech. The longer range exposed additional thin, bare-looking branches but did not produce the leafy medium-distance canopy needed to distinguish the grove mix; it is not an acceptable visual improvement, so the cull change was reverted without changing source state. The editor still reports `r.Nanite.Foliage=0`; the remaining hypothesis is that foliage visibility/material setup needs to be verified after an approved editor restart. The comparison used one nighttime view and did not measure frame rate or peak memory.
+
 ## Reload, species mix, and bark-material repair (2026-10-22)
 
 After the user approved reloading `/Game/Maps/Island`, a short Simulate pass rebuilt the runtime environment. The live log reports 84,736 ground-cover instances at density `0.05`, 14,430 trees (8,745 saplings), 15,036 broadleaf shrubs, and 1,491 flowering rhododendrons. The mature species mix again includes 1,200 Norway maple, 1,200 European aspen, and 1,200 European beech across 381/500 groves, plus 39 birch and 57 hazel coppices. This confirms the three Megaplant species are active in the rebuilt world; the single editor viewport still reads sparse at distance, so island-wide scatter/composition is not yet validated.
