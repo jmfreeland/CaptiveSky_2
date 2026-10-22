@@ -52,8 +52,8 @@ static TAutoConsoleVariable<float> CVarIslandFoliageSwayUpdateIntervalSeconds(
 	TEXT("Seconds between CPU foliage and spruce instance-transform sway updates. Clamped to 0.1..2.0 seconds; material wind remains continuous."),
 	ECVF_Default);
 static TAutoConsoleVariable<float> CVarIslandGroundCoverLandscapeDensity(
-	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 0.12f,
-	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. Defaults to a lighter 12% of the former candidate budget; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
+	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 0.05f,
+	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. Defaults to a lighter 5% of the former candidate budget; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
 	ECVF_Default);
 static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
 	TEXT("CaptiveSky.Island.FoliageSwayFocusTelemetry"), 0,
@@ -1525,7 +1525,7 @@ void AIslandWeather::InitializeGroundCover()
 					// Keep the new tree species in legible woodland communities instead of
 					// sprinkling a few isolated broadleaf trees uniformly through every grove.
 					const bool bBroadleafGrove = SampleGroundCoverField(GroveCenter,
-						WeatherSeed ^ 0x6a09e667) > 0.78f;
+						WeatherSeed ^ 0x6a09e667) > 0.25f;
 					const int32 BroadleafGroveSpecies = FMath::Min(2, FMath::FloorToInt(
 						SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0x3b67ae85) * 3.f));
 
