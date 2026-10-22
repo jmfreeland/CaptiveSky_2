@@ -30,6 +30,8 @@ public:
 	static FString StormEndText(int32 Strikes);
 	/** Rainbow visibility with hysteresis (shows from 0.3, clears below 0.1) so a flickering strength is noted once. Pure. */
 	static bool NextRainbowShowing(bool bShowing, float Strength);
+	/** Thick mist with hysteresis (settles from 0.65, lifts below 0.4). Pure. */
+	static bool NextThickMist(bool bThick, float Mist);
 	/** Whether a shooting star is worth a chronicle line: one is crossing the sky and none has been noted yet this Island day. Pure. */
 	static bool ShouldNoteMeteor(bool bMeteorNow, int32 IslandDay, int32 LastNotedDay);
 
@@ -62,6 +64,7 @@ private:
 	int32 StormStrikes = 0;
 	int32 LastMeteorDay = -1;
 	bool bRainbowShowing = false;
+	bool bThickMist = false;
 	float LastStrikeElapsed = TNumericLimits<float>::Max();
 	bool bClosing = false;
 	bool bSessionOpened = false;
