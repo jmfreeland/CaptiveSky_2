@@ -116,6 +116,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Thick cloud greys the dawn"), AIslandDayNight::DescribeHorizonColour(5.75f, 0.9f).Contains(TEXT("flat grey")));
 	TestTrue(TEXT("Nothing at noon or on bad input"),
 		AIslandDayNight::DescribeHorizonColour(12.f, 0.5f).IsEmpty() && AIslandDayNight::DescribeHorizonColour(NAN, 0.5f).IsEmpty());
+	TestTrue(TEXT("Dawn is coolest, mid-afternoon warmest"), AIslandDayNight::WarmthLevel(5.f, 0.f) < 0.01f && AIslandDayNight::WarmthLevel(17.f, 0.f) > 0.99f);
+	TestTrue(TEXT("Cloud pulls the extremes toward the middle"), AIslandDayNight::WarmthLevel(17.f, 1.f) < AIslandDayNight::WarmthLevel(17.f, 0.f) && AIslandDayNight::WarmthLevel(5.f, 1.f) > AIslandDayNight::WarmthLevel(5.f, 0.f));
+	TestTrue(TEXT("Cold before dawn"), AIslandDayNight::DescribeWarmth(5.f, 0.f).Contains(TEXT("cold")));
+	TestTrue(TEXT("Warm in the afternoon"), AIslandDayNight::DescribeWarmth(16.f, 0.f).Contains(TEXT("warm")));
+	TestTrue(TEXT("Evening cools"), AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("cooling")) || AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("losing")));
+	TestTrue(TEXT("Hour wraps and non-finite input stays safe"), FMath::IsNearlyEqual(AIslandDayNight::WarmthLevel(29.f, 0.f), AIslandDayNight::WarmthLevel(5.f, 0.f), 0.001f) && AIslandDayNight::WarmthLevel(NAN, 0.f) == 0.5f);
 	TestTrue(TEXT("No stars text by day"), AIslandDayNight::DescribeStars(0.f, 0.f, 0.f, -1.f).IsEmpty());
 	TestTrue(TEXT("A clear moonless night is crowded with stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 0.f, -1.f).Contains(TEXT("Milky Way")));
 	TestTrue(TEXT("A bright moon up drowns the stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, 0.8f).Contains(TEXT("drowns")));

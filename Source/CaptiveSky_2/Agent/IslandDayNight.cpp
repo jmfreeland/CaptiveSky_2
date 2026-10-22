@@ -442,6 +442,28 @@ void AIslandDayNight::UpdateLighting()
 		PrimaryLight->SetForwardShadingPriority(DirectionalLights.Num() - 1);
 }
 
+float AIslandDayNight::WarmthLevel(float IslandHour, float CloudCover)
+{
+	if (!FMath::IsFinite(IslandHour)) return 0.5f;
+	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
+	// Sinusoid: minimum at 05:00, maximum at 17:00 (mid-afternoon lag behind the noon sun).
+	const float Raw = 0.5f - 0.5f * FMath::Cos((Hour - 5.f) / 24.f * 2.f * PI);
+	// Cloud holds the day's heat down and the night's heat in: pull toward the middle.
+	const float Damp = 1.f - 0.5f * FMath::Clamp(FMath::IsFinite(CloudCover) ? CloudCover : 0.f, 0.f, 1.f);
+	return 0.5f + (Raw - 0.5f) * Damp;
+}
+
+FString AIslandDayNight::DescribeWarmth(float IslandHour, float CloudCover)
+{
+	const float Warmth = WarmthLevel(IslandHour, CloudCover);
+	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
+	const bool bWarming = Hour >= 5.f && Hour < 17.f;
+	if (Warmth < 0.2f) return TEXT(" The air is cold.");
+	if (Warmth < 0.4f) return bWarming ? TEXT(" The air is cool but beginning to warm.") : TEXT(" The air is cool and cooling.");
+	if (Warmth < 0.65f) return bWarming ? TEXT(" The air is mild and warming.") : TEXT(" The air is mild and losing its warmth.");
+	return TEXT(" The air is warm.");
+}
+
 FString AIslandDayNight::DescribeTime() const
 {
 	const TCHAR* Phase = CurrentHour < 5.f || CurrentHour >= 20.f ? TEXT("night") :
@@ -467,7 +489,7 @@ FString AIslandDayNight::DescribeTime() const
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour);
+	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour) + DescribeWarmth(CurrentHour, CloudNow);
 	const FString Stars = DescribeStars(NightAmount(CurrentHour), CloudNow, LunarLight, MoonElevation);
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s%s"),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor, *Tide);

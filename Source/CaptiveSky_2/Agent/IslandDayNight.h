@@ -97,6 +97,10 @@ public:
 	static float TideLevel(int32 IslandDay, float IslandHour);
 	/** Whether the tide is rising, falling or turning, with the next high water; spring or neap noted when pronounced. Pure. */
 	static FString DescribeTide(int32 IslandDay, float IslandHour);
+	/** Air warmth 0 (coldest) .. 1 (warmest): coolest just before dawn, warmest mid-afternoon, damped by cloud. Pure. */
+	static float WarmthLevel(float IslandHour, float CloudCover);
+	/** How the air feels on the skin: chilly before dawn, warming through the morning, warm in the afternoon, cooling at dusk. Pure. */
+	static FString DescribeWarmth(float IslandHour, float CloudCover);
 	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
 	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
