@@ -1468,10 +1468,13 @@ void AIslandWeather::InitializeGroundCover()
 			// Nest a fine meadow mosaic inside broad, seeded habitat communities. This
 			// keeps the same average acceptance as the former single 42 m field, but
 			// groups plants into coherent woodland-meadow regions instead of even specks.
+			// Use island-scale habitat bands plus neighborhood-sized meadow pockets. The prior
+			// 18 km / 2.4 km fields were too broad for this 4 km island and read nearly even
+			// across 200 m tiles; these scales let lush patches and glades alternate visibly.
 			const float HabitatCommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
-				WeatherSeed ^ 0x7cb25431, 18000.f);
+				WeatherSeed ^ 0x7cb25431, 6000.f);
 			const float MeadowSubcommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
-				WeatherSeed ^ 0x4cf5ad43, 2400.f);
+				WeatherSeed ^ 0x4cf5ad43, 900.f);
 			if (MeadowRandom.FRand() >= CalculateLandscapeMeadowAcceptanceChance(HabitatCommunity, MeadowSubcommunity)) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));

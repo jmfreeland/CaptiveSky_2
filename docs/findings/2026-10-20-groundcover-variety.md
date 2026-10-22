@@ -146,6 +146,12 @@ After reloading the clean Island map, two 30-second Simulate sessions ran with a
 
 GPU allocation samples were 7,443 MiB during the first Simulate, 7,330 MiB after the second, and 7,314 MiB after stopping (12,282 MiB total). No graphics-memory-exhausted or texture-pool-over-budget log entry was found in this run. These are point samples, not a continuous peak trace or a 30-FPS check. Because this was Simulate without a player, water traversal remains untested.
 
+## Seeded meadow-field scale adjustment (2026-10-22)
+
+Prior broad-pass diagnostics showed nearly even coverage at 200 m resolution (mean 0.98 placements per valid 20 m cell, P10 0.62, P50 0.96, P90 1.22; one of 143 tiles empty). The two world-space filter scales were reduced from 18,000 / 2,400 cm to 6,000 / 900 cm so this 4 km island can resolve broad habitat bands and neighborhood-sized meadow pockets. This changes spatial clustering only; candidate budget, configured density, acceptance function, species selection, and asset count remain unchanged.
+
+Live Coding compiled successfully. A short Simulate rebuilt 84,768 ground-cover instances from the same 96,000-candidate budget and 8,317 valid terrain cells. The captured near-ground nighttime view shows irregular patches and open gaps rather than a uniform carpet, but this is a single local composition check. Spatial tile diagnostics were not enabled for the post-change pass; a daytime, island-wide validation remains necessary. No OOM / texture-pool warning appeared in the bounded log check; no continuous VRAM peak or 30-FPS test was made. PIE was stopped afterward.
+
 ## Reload, species mix, and bark-material repair (2026-10-22)
 
 After the user approved reloading `/Game/Maps/Island`, a short Simulate pass rebuilt the runtime environment. The live log reports 84,736 ground-cover instances at density `0.05`, 14,430 trees (8,745 saplings), 15,036 broadleaf shrubs, and 1,491 flowering rhododendrons. The mature species mix again includes 1,200 Norway maple, 1,200 European aspen, and 1,200 European beech across 381/500 groves, plus 39 birch and 57 hazel coppices. This confirms the three Megaplant species are active in the rebuilt world; the single editor viewport still reads sparse at distance, so island-wide scatter/composition is not yet validated.
