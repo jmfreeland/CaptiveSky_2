@@ -34,3 +34,16 @@ Diagnose why this scratch project's command-line editor stops before opening
 its log, then run `CaptiveSky2.Agent.NightEcology` and inspect the response in
 bounded real-time play. Keep the Island map unchanged unless a later visual
 review explicitly requires an edit.
+
+## Focused live-editor automation (2026-10-22)
+
+In the open UE editor, these non-world-fixture tests all passed (3/3, 0.108 s
+total): `CaptiveSky2.Agent.Ecology.CommonFrogDragonflyAttention`,
+`CaptiveSky2.Agent.Ecology.DragonflyFrogResponse`, and
+`CaptiveSky2.Agent.Ecology.DragonflyListeningStonesResponse`. The direct frog
+response test had no warnings. The other two logged `UWorld::DestroyActor:
+World has no context!` warnings while cleaning up `IslandDewActor`,
+`IslandDrift`, `IslandGradeActor`, `IslandRainbowActor`, and `IslandTrailMarks`
+from transient `Untitled` worlds; they still had no test failures. No PIE or
+model requests were started. This resolves the earlier missing unit-test
+evidence, but not the separate in-world visual response check.

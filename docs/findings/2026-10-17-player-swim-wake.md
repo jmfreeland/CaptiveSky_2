@@ -182,3 +182,11 @@ Do not repeat this full-vegetation PIE probe solely to attempt movement while
 GPU headroom remains this low. First reduce or validate the Nanite/foliage
 memory footprint, then perform a short input-driven shore-return test and record
 the actual movement mode and position on both sides of the waterline.
+
+## Focused editor automation recheck (2026-10-22)
+
+The live editor's `CaptiveSky2.Agent.IslandOcean` automation test passed in
+0.096 s with no errors or warnings. This is regression evidence for the
+water/movement subsystem; it is not a repeat of the near-shore PIE test and
+does not establish horizontal input or shore-return behavior. No PIE session was
+started for this check.
