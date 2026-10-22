@@ -123,6 +123,25 @@ After the user approved another reload, the editor reopened `/Game/Maps/Island`;
 
 The exact shared bark parent is `/ProceduralVegetationEditor/SampleAssets/Materials/MasterMaterials/MA_Foliage_Trees`. Added `Scripts/Fix-MegaplantInstancedSkinnedMaterialUsage.py` to duplicate that parent to project-owned `/Game/Megaplant_Library/Materials/MA_Foliage_Trees_InstancedSkinned`, enable the UE 5.8 `InstancedSkinnedMesh` usage on the duplicate, and reparent/save only the Island's Norway maple, European aspen, and European beech bark instances. The plugin sample is not edited. Script syntax and `git diff --check` pass. The editor asset mutation and shader/material appearance check remain pending: a current `nvidia-smi` sample showed 9,975 / 12,282 MiB in use, so no material compile or PIE was started during this pass.
 
+## Latest source rebuild and GPU sample (2026-10-22)
+
+A fresh `nvidia-smi` sample reported 10,737 / 12,282 MiB allocated at 53% GPU
+utilization. The latest project log still contains no explicit
+out-of-video-memory or texture-pool-over-budget message; this single allocation
+sample does not identify which process or resource owns the memory. No PIE or
+material compilation was started. A UE 5.8 editor-target build compiled the
+changed swim character, but its final link could not replace the main project
+DLL because `UnrealEditor.exe` held it open. The loaded editor was not closed or
+terminated. Tree mix and reduced broadland counts are confirmed by the earlier
+bounded RHI run above; visual composition, texture-memory cause, current-build
+30-FPS performance, and player water traversal remain open validation gates.
+
 ## GPU headroom recheck (2026-10-22)
 
 After another 30-second idle, GPU allocation remained 9,976 / 12,282 MiB at 54% utilization. `nvidia-smi` returned five client PIDs but denied process names and per-process memory, so the source of the load could not be safely attributed. The second Unreal window returned by desktop inventory is a log console for the editor, not evidence of an expendable second project session. The live project log records `r.Streaming.PoolSize=4096`, `r.Streaming.LimitPoolSizeToVRAM=1`, and a later pool-size change to 4096 MiB; this is a capacity setting, not evidence that the pool is over budget. The earlier settled Tideglass Game capture measured about 993 MiB required against that 4096 MiB capacity. Whole-GPU memory exhaustion and runtime frame rate remain unmeasured for the current build, so do not lower texture quality or raise the pool based on allocation alone.
+
+## Fresh bounded editor Simulate check (2026-10-22)
+
+After reloading the clean Island map, two 30-second Simulate sessions ran with an in-memory safety override of 30 real seconds and zero model requests; the subsystem defaults were restored to 1,800 seconds / 120 requests after the checks. Both sessions ended normally with 0 requests in flight. Runtime logs again reported 87,465 ground-cover instances (8,317 valid terrain cells, 136,003 bounded traces, density 0.05), 14,430 trees (8,745 saplings) in 500 groves, 600 each of Norway maple, European aspen, and European beech, plus 39 birch and 57 hazel coppices; shrubs 15,036 and flowering rhododendrons 1,491. The near-ground Wind Arch view visibly distinguishes conifer and broadleaf silhouettes and shows clustered low plants, but it was at night and still has substantial dark/open areas; a daylight, multi-view natural-scatter review remains necessary.
+
+GPU allocation samples were 7,443 MiB during the first Simulate, 7,330 MiB after the second, and 7,314 MiB after stopping (12,282 MiB total). No graphics-memory-exhausted or texture-pool-over-budget log entry was found in this run. These are point samples, not a continuous peak trace or a 30-FPS check. Because this was Simulate without a player, water traversal remains untested.
