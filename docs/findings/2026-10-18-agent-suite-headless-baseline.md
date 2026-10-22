@@ -77,3 +77,7 @@ Scratch project with the PCG plugins disabled (the headless editor otherwise cra
 | `WildlifeHomeRecord` | **New.** `CanInteract` from a visitor 2 m from the materialised home returns false (`IslandNestTests.cpp` line 649). Not examined further. |
 
 Neither new failure involves files this session changed, but the suite was not run on the parent commits, so that is an inference.
+
+## Rerun after the warmth, chill, daylight and chronicle work (2026-10-22)
+
+Same scratch setup. The failing set is unchanged: `GroundCover`, `IslandInnkeeperSpawn`, `IslandOcean`, `ListeningStonePresentation`, `WildlifeHomeRecord`, `WindArchPresentation` (6 failures, none new). `DayNight`, `DayNightPersistence` and `IslandChronicle` pass with the new sky and chronicle code (storm bolt counts, meteor, rainbow, mist and sea notes).
