@@ -464,6 +464,20 @@ FString AIslandDayNight::DescribeWarmth(float IslandHour, float CloudCover)
 	return TEXT(" The air is warm.");
 }
 
+FString AIslandDayNight::DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed)
+{
+	if (!FMath::IsFinite(Rain) || !FMath::IsFinite(WindSpeed)) return FString();
+	const float Warmth = WarmthLevel(IslandHour, CloudCover);
+	const bool bWindy = WindSpeed >= 320.f;
+	const bool bRaining = Rain >= 0.3f;
+	if (Warmth < 0.4f && bWindy && bRaining) return TEXT(" Cold rain driven by the wind cuts through anything you wear.");
+	if (Warmth < 0.4f && bWindy) return TEXT(" The wind bites at the cool air.");
+	if (Warmth < 0.4f && bRaining) return TEXT(" The rain makes the cool air colder.");
+	if (Warmth >= 0.65f && bWindy && !bRaining) return TEXT(" A steady wind is welcome in the warmth.");
+	if (Warmth >= 0.65f && bRaining) return TEXT(" The rain is warm.");
+	return FString();
+}
+
 FString AIslandDayNight::DescribeTime() const
 {
 	const TCHAR* Phase = CurrentHour < 5.f || CurrentHour >= 20.f ? TEXT("night") :
