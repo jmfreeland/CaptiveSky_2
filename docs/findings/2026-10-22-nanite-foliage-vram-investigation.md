@@ -38,3 +38,22 @@ and [Nanite Assemblies]
 - Keep world playtests short until the assembly setting and GPU headroom are
   measured; the host-wide snapshot is not a substitute for a paired editor/PIE
   allocation sample.
+
+## Runtime tree follow-up
+
+A further short Simulate capture showed a much denser herbaceous layer than the
+pre-play editor viewport, with many tree silhouettes across the slope. While
+PIE was active, the maple, aspen, and beech instanced-skinned components each
+referenced their distinct Megaplant asset and a distinct `DynamicWindData`
+transform provider; all three were visible and used 8,000–12,500 cm cull
+distances. After PIE stopped, the editor-world components reported no skinned
+asset and zero instances, so the editor's non-PIE viewport is not a census of
+the generated gameplay forest.
+
+`CaptureAssetImage` thumbnails for all three Megaplant meshes showed bare
+branch silhouettes. The active editor still had `r.Nanite.Foliage=0` and the
+Assemblies-disabled notice. This is consistent with the warning that the assets
+may not appear as expected, but the thumbnail alone does not prove whether
+Nanite activation will restore their foliage. The editor was left open pending
+user confirmation that it is safe to restart; no player-input traversal test or
+memory comparison was performed in this Simulate pass.
