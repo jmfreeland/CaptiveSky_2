@@ -40,6 +40,7 @@ this file is the text version and the map of everything under `docs/`.
 `LunarPhaseName` (eight named phases), `MoonHeight` (high / up / horizon / below), `IsMoonHiddenByCloud`,
 `DescribeSunEdge` (sunrise and sunset cues) and `DescribeCalendar` (Island day, days to full and new moon) and `IsShootingStarSlot` (rare meteors on clear dark nights), `DescribeStars` (crowded, drowned by a bright moon, or hidden by cloud) and `TideLevel` / `DescribeTide` (12.42 h tide, spring near new and full moon, neap at the quarters). The sea is described by `UIslandSeaStateSubsystem::DescribeSea`, and a nearby lightning strike by `AIslandLightning::DescribeStrike` (the flash, the wait for thunder, then a crack or rumble by distance; test `CaptiveSky2.Agent.IslandLightningText`).
 `DescribeMoonHorizon` (hours to moonrise or moonset) and `DescribeHorizonColour` (cloud-dressed sunrise and sunset) round out the sky text.
+How the air feels: `WarmthLevel` / `DescribeWarmth` (coldest 05:00, warmest 17:00, damped by cloud), `DescribeChill` (wind and rain against that warmth, in the weather text of `AgentBrainComponent`) and `DescribeDaylightLeft` (hours of daylight or darkness remaining).
 Developer console: `Island.Almanac [days]` (moon phase and tide outlook), `Island.Hour <h>`, `Island.Day <n>` (day 1 is a new moon), `Island.SkyReport` (logs what a resident would be told about sky and sea), `Island.Storm`, `Island.Dew`, `Island.Sea`, `Island.Rainbow`.
 
 ## Building and testing with the editor open
@@ -57,7 +58,7 @@ Cold build is about seven minutes. Tests are headless and make no model requests
 
 Named lunar phases, the moon's position and cloud cover, sunrise and sunset cues, an Island calendar, shooting stars and
 the sea state all reach residents through pure, tested functions; `Island.Day` and `Island.SkyReport` were added for
-checking them in game. The chronicle (`WorldState/chronicle.jsonl`, read with `Scripts/Build-Chronicle.py`) also records the moon changing phase, with a note that spring tides (new and full moon) or neaps (quarters) are due. Along the way the headless suite went from 8 failures to 4 (see below); a full rerun in cycle 27 showed exactly those 4.
+checking them in game. The chronicle (`WorldState/chronicle.jsonl`, read with `Scripts/Build-Chronicle.py`) also records the moon changing phase, with a note that spring tides (new and full moon) or neaps (quarters) are due. It also notes the first shooting star each night, rainbows, thick mist settling or lifting, the sea turning heavy or settling, and how many lightning bolts a storm threw (`StormEndText`); conditions already present at session start are not logged. Along the way the headless suite went from 8 failures to 4 (see below); a full rerun in cycle 27 showed exactly those 4.
 
 ## Test health
 
