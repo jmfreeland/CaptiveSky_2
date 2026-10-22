@@ -26,6 +26,12 @@ The first live daylight capture still showed a sharp lush/bare transition. The b
 - The Maple/Aspen/Beech missing-material-usage warnings remain in the editor log; foliage/Nanite appearance still needs validation after the in-flight material fix.
 - The 30-second session ended automatically with zero requests. `MaxRealtimeSeconds`, `MaxModelRequests`, and `bContinuousPlay` were restored to 1,800, 120, and false.
 
+## Fresh editor reload and water-collision check
+
+After reloading `/Game/Maps/Island` in the editor, a new 30-second, zero-request Simulate pass rebuilt the runtime foliage. It again reported 84,801 ground-cover instances and 14,430 trees, with the 600/600/600 maple-aspen-beech mix spanning 363 of 500 groves, plus 39 birch and 57 hazel coppices. The Ocean subsystem logged that collision was disabled on the legacy `OceanPlane` and that the active plane uses `/Game/Materials/M_IslandOcean`.
+
+This confirms the saved map loads and the runtime generators run after reload; it does not prove player movement transitions correctly between swimming and walking. No GPU-memory telemetry was captured in this pass. The editor still emitted missing material-usage warnings for the three Megaplant tree meshes, so the species count is not yet visual proof that their intended foliage materials render correctly.
+
 ## Limits and next checks
 
 The runtime log proves broader spatial assignment, not that every tree's foliage material renders correctly or that the species read clearly from a visitor's view. The latest fixed-angle capture still shows patchiness; quantify per-cell cover next, then inspect additional visitor viewpoints. Measure steady-state frame time against the 30 FPS floor, repeat VRAM telemetry during a representative play session, and test movement across water with a possessed player before claiming those issues are resolved.
