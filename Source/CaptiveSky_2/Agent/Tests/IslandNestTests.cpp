@@ -641,8 +641,11 @@ bool FIslandWildlifeHomeRecordTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The home can be found by stable place ID"), Stored && Stored->OccupantAgentId == TEXT("Agent_Rat_01"));
 	AIslandWildlifeHome* Materialized = State->FindWildlifeHomeActor(Home.Id);
 	TestNotNull(TEXT("A recorded supported Rat home gets a transient visual actor"), Materialized);
-	AActor* Observer = World->SpawnActor<AActor>(Home.EntranceLocation + FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator);
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(Home.EntranceLocation + FVector(200.f, 0.f, 0.f), FRotator::ZeroRotator);
+	AActor* Observer = Visitor;
 	TestEqual(TEXT("A materialized wildlife home is a supported inspection target"), IslandInteractionUtility::GetTargetTag(Materialized), FName(TEXT("WildlifeHome")));
+	TestTrue(TEXT("The visitor fixture has a registered root component"), Visitor && Visitor->GetRootComponent() && Visitor->GetRootComponent()->IsRegistered());
+	TestTrue(TEXT("The visitor fixture reached its requested location"), Visitor && Visitor->GetActorLocation().Equals(Home.EntranceLocation + FVector(200.f, 0.f, 0.f), 1.f));
 	if (Observer && Materialized)
 	{
 		TestTrue(TEXT("A nearby visitor can perceive the wildlife home"), IslandInteractionUtility::CanInteract(Observer, Materialized, 400.f));
