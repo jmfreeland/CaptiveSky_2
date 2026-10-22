@@ -28,6 +28,8 @@ public:
 	static FString MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase);
 	/** The chronicle line for a storm ending, noting how many lightning strikes it threw. Pure. */
 	static FString StormEndText(int32 Strikes);
+	/** Rainbow visibility with hysteresis (shows from 0.3, clears below 0.1) so a flickering strength is noted once. Pure. */
+	static bool NextRainbowShowing(bool bShowing, float Strength);
 	/** Whether a shooting star is worth a chronicle line: one is crossing the sky and none has been noted yet this Island day. Pure. */
 	static bool ShouldNoteMeteor(bool bMeteorNow, int32 IslandDay, int32 LastNotedDay);
 
@@ -59,6 +61,7 @@ private:
 	bool bStormActive = false;
 	int32 StormStrikes = 0;
 	int32 LastMeteorDay = -1;
+	bool bRainbowShowing = false;
 	float LastStrikeElapsed = TNumericLimits<float>::Max();
 	bool bClosing = false;
 	bool bSessionOpened = false;

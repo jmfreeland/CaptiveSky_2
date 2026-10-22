@@ -2,6 +2,7 @@
 #include "AgentDataPaths.h"
 #include "IslandDayNight.h"
 #include "IslandLightning.h"
+#include "IslandRainbow.h"
 #include "IslandWeather.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -125,6 +126,13 @@ bool UIslandChronicleSubsystem::ShouldNoteMeteor(bool bMeteorNow, int32 IslandDa
 	return bMeteorNow && IslandDay > 0 && IslandDay != LastNotedDay;
 }
 
+bool UIslandChronicleSubsystem::NextRainbowShowing(bool bShowing, float Strength)
+{
+	if (!FMath::IsFinite(Strength)) return bShowing;
+	if (bShowing) return Strength >= 0.1f;
+	return Strength >= 0.3f;
+}
+
 void UIslandChronicleSubsystem::WatchSky()
 {
 	const UWorld* World = GetWorld();
@@ -153,6 +161,14 @@ void UIslandChronicleSubsystem::WatchSky()
 		if (Elapsed < LastStrikeElapsed && bStormActive) ++StormStrikes;
 		LastStrikeElapsed = Elapsed;
 		break;
+	}
+	if (const UIslandRainbowSubsystem* Rainbow = World->GetSubsystem<UIslandRainbowSubsystem>())
+	{
+		const bool bShowing = NextRainbowShowing(bRainbowShowing, Rainbow->GetStrength());
+		// Like the storm, a rainbow already arching when the session opens is not news.
+		if (bSessionOpened && bShowing && !bRainbowShowing)
+			RecordEntry(TEXT("weather"), FString(), TEXT("A rainbow arches over the Island."), { { TEXT("event"), TEXT("rainbow") } });
+		bRainbowShowing = bShowing;
 	}
 	// A shooting star is the Island's rarest sky event: note the first one each night.
 	for (TActorIterator<AIslandDayNight> It(World); It; ++It)

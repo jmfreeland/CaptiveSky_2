@@ -47,6 +47,11 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A first meteor of the day is noted"), UIslandChronicleSubsystem::ShouldNoteMeteor(true, 5, 4));
 	TestFalse(TEXT("A second meteor the same day is not"), UIslandChronicleSubsystem::ShouldNoteMeteor(true, 5, 5));
 	TestFalse(TEXT("No meteor, no note"), UIslandChronicleSubsystem::ShouldNoteMeteor(false, 5, 4));
+	TestTrue(TEXT("A strong rainbow shows"), UIslandChronicleSubsystem::NextRainbowShowing(false, 0.5f));
+	TestFalse(TEXT("A faint one does not appear yet"), UIslandChronicleSubsystem::NextRainbowShowing(false, 0.2f));
+	TestTrue(TEXT("A showing rainbow survives a dip to 0.2"), UIslandChronicleSubsystem::NextRainbowShowing(true, 0.2f));
+	TestFalse(TEXT("It clears below 0.1"), UIslandChronicleSubsystem::NextRainbowShowing(true, 0.05f));
+	TestTrue(TEXT("Non-finite strength keeps the state"), UIslandChronicleSubsystem::NextRainbowShowing(true, NAN) && !UIslandChronicleSubsystem::NextRainbowShowing(false, NAN));
 	TestEqual(TEXT("A quiet storm end is plain"), UIslandChronicleSubsystem::StormEndText(0), FString(TEXT("The storm passes.")));
 	TestTrue(TEXT("One bolt is singular"), UIslandChronicleSubsystem::StormEndText(1).Contains(TEXT("a single bolt")));
 	TestTrue(TEXT("Several bolts are counted"), UIslandChronicleSubsystem::StormEndText(7).Contains(TEXT("7 bolts")));
