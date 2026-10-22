@@ -142,8 +142,7 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	World->BeginPlay();
-	// This minimal fixture doesn't initialize actor components through the full gameplay start path.
-	WorldWeather->InitializeWeatherAmbience();
+	if (!WorldWeather->HasActorBegunPlay()) WorldWeather->DispatchBeginPlay();
 	WorldWeather->InitializeGroundCover();
 	const TArray<UInstancedSkinnedMeshComponent*> MixedTreeComponents = {
 		WorldWeather->IslandNorwayMaples, WorldWeather->IslandEuropeanAspens, WorldWeather->IslandEuropeanBeeches };
