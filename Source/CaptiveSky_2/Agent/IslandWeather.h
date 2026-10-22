@@ -83,6 +83,8 @@ public:
 	static constexpr int32 TideglassPollinatorFlowerSiteCount = 8;
 	static constexpr float TideglassPollinatorFlowerInnerRadius = 700.f;
 	static constexpr float TideglassPollinatorFlowerOuterRadius = 850.f;
+	/** Preserve a 12 m buffer from neighboring landmarks while allowing blooms in the Tideglass ring. */
+	static constexpr float TideglassPollinatorFlowerNearbyLandmarkClearance = 1200.f;
 	/** Keep wet-edge cattail clumps from occupying a reserved pollinator flower pocket. */
 	static constexpr float TideglassPollinatorFlowerCattailClearance = 375.f;
 	/** Keep the earlier general meadow scatter clear of later Tideglass specialist flower sites. */
@@ -289,6 +291,8 @@ private:
 	/** Stable member offset for a small flower pocket; member indices start at zero. */
 	static FVector SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex);
 	static FVector SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, int32 SiteIndex);
+	static float GetTideglassPollinatorFlowerLandmarkClearance(const FVector& LandmarkLocation,
+		const FVector& TideglassLocation, float PoolClearanceRadius, float DefaultClearance);
 	static bool IsWithinTideglassPollinatorFlowerCattailClearance(const FVector& Position, const FVector& FlowerAnchor);
 	static bool IsWithinTideglassPollinatorFlowerSiteClearance(const FVector& Position, const FVector& TideglassLocation, int32 Seed);
 	/** Deterministically reserve three of eight Tideglass pockets for the marsh marigold. */

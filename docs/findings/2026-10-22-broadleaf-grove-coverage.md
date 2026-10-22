@@ -42,6 +42,14 @@ The 2026-10-22 editor reload/rebuild confirmed the current runtime mix again: 84
 
 The saved legacy `StaticMeshActor_0` uses `/Water/Meshes/S_WaterPlane_256`, is hidden, and has `NoCollision` / `NoCollision` profile. A world trace through offshore water at X=300,000 cm returned no hit, so that plane is not a walkable collision surface. This is not a possessed-player movement test, and does not by itself prove the swimming-to-shore transition. The current editor still reports `r.Nanite.Foliage=0` even though the saved project setting is true; the required editor restart has not happened, and the Nanite Assembly warning remains visible.
 
+## Tideglass pollinator flowers (2026-10-22)
+
+The fresh runtime log repeatedly showed `exclusion=8 ... placed=0` for eight reserved pollinator-flower anchors, despite the pool-edge ring being 7–8.5 m from Tideglass. The pool center is about 21.5 m from Wind Arch, 25.1 m from Listening Stones, and 34.0 m from the inn lantern. Their ordinary 26 m landmark exclusion therefore covered every pool-edge attempt, even though those blooms are a deliberate, collisionless exception.
+
+Tideglass pollinator attempts now keep the existing pool-water clearance and use a 12 m buffer only for neighboring landmarks whose ordinary exclusion overlaps the reserved ring; distant landmarks retain the full 26 m clearance. The MeadowFlowerSpecies test checks that rule against the saved landmark layout across five deterministic seeds. UE 5.8 Live Coding succeeded and `CaptiveSky2.Agent.IslandWeather` passed (its fixture still emits the existing no-landscape scatter and world-context cleanup warnings).
+
+A bounded 8-second, zero-request Simulate then regenerated 84,798 ground-cover instances and 14,430 trees. Tideglass flowers increased from 0/8 to 5/8 sites: 2 marsh-marigold and 3 yellow-flag iris instances, bringing total meadow flowers to 299. Two anchors still fail exclusion and one is blocked by an existing bloom, so all eight sites are not yet guaranteed. The editor viewport was at night and too distant to judge flower readability. GPU telemetry after stopping showed 7,130/12,282 MiB used (4,868 MiB free); no video-memory-exhaustion text appeared in the sampled editor log. This is a short verification only, not a sustained performance guarantee.
+
 ## Nanite Assembly support (2026-10-22)
 
 The live editor displayed Unreal's warning that a Nanite Assembly had been encountered while Nanite Foliage support was disabled. Reading Project > Engine > Rendering confirmed `bNanite=true` but `bEnableNaniteFoliage=false` (`r.Nanite.Foliage=False` in `DefaultEngine.ini`). UE 5.8's [Nanite Foliage documentation](https://dev.epicgames.com/documentation/en-us/unreal-engine/nanite-foliage) calls the feature experimental, requires an editor restart after enabling it, and describes Nanite Assemblies as a way to reduce foliage streaming memory. Epic's examples are not a project-specific performance guarantee.

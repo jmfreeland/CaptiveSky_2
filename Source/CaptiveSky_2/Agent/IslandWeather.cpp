@@ -778,6 +778,23 @@ FVector AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(int32 Seed, in
 	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 }
 
+float AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(const FVector& LandmarkLocation,
+	const FVector& TideglassLocation, float PoolClearanceRadius, float DefaultClearance)
+{
+	if (LandmarkLocation.ContainsNaN() || TideglassLocation.ContainsNaN()) return DefaultClearance;
+	const float DistanceFromTideglass = FVector::Dist2D(LandmarkLocation, TideglassLocation);
+	if (DistanceFromTideglass <= 1.f)
+		return FMath::Max(PoolClearanceRadius + 175.f, TideglassPollinatorFlowerInnerRadius - 50.f);
+
+	// The pool's neighboring landmarks sit close enough that their ordinary 26 m
+	// clearing overlaps every 7–8.5 m pollinator site. Keep a clear 12 m buffer
+	// there, while preserving the normal landmark clearance outside this pocket.
+	if (DistanceFromTideglass <= TideglassPollinatorFlowerOuterRadius + DefaultClearance)
+		return FMath::Min(DefaultClearance, TideglassPollinatorFlowerNearbyLandmarkClearance);
+
+	return DefaultClearance;
+}
+
 bool AIslandWeather::IsWithinTideglassPollinatorFlowerCattailClearance(const FVector& Position, const FVector& FlowerAnchor)
 {
 	if (Position.ContainsNaN() || FlowerAnchor.ContainsNaN()) return false;
@@ -1911,11 +1928,10 @@ void AIslandWeather::InitializeGroundCover()
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)
 						{
-							float RequiredClearance = SpruceLandmarkClearance;
-							if (bTideglassPollinatorSite && bHasTideglassFlowerAnchor &&
-								FVector::DistSquared2D(Exclusion, TideglassFlowerAnchor) <= 1.f)
-								RequiredClearance = FMath::Max(TideglassPoolClearanceRadius + 175.f,
-									AIslandWeather::TideglassPollinatorFlowerInnerRadius - 50.f);
+				const float RequiredClearance = bTideglassPollinatorSite && bHasTideglassFlowerAnchor
+					? GetTideglassPollinatorFlowerLandmarkClearance(Exclusion, TideglassFlowerAnchor,
+						TideglassPoolClearanceRadius, SpruceLandmarkClearance)
+					: SpruceLandmarkClearance;
 							if (FVector::Dist2D(Candidate, Exclusion) < RequiredClearance)
 							{
 								bTooClose = true;

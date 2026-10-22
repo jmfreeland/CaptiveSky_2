@@ -35,6 +35,42 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Invalid meadow fields resolve to a bounded neutral density"),
 		FMath::IsFinite(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
 			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity())));
+	const FVector TideglassWorldCenter(-99500.f, 100300.f, 2890.f);
+	const FVector TideglassWindArch(-101650.f, 100200.f, 2950.f);
+	const FVector TideglassListeningStones(-101650.f, 101600.f, 2650.f);
+	const FVector TideglassInn(-100085.85f, 103179.61f, 2784.24f);
+	const FVector TideglassInnDoorLantern(-100232.05f, 103623.63f, 2929.24f);
+	const FVector DistantLandmark(-106000.f, 100300.f, 0.f);
+	TestEqual(TEXT("The Tideglass source mesh clearance still protects the waterline"),
+		AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
+			TideglassWorldCenter, TideglassWorldCenter, 306.f, 2600.f), 650.f);
+	for (const FVector& NearbyLandmark : {TideglassWindArch, TideglassListeningStones, TideglassInn, TideglassInnDoorLantern})
+	{
+		const float Clearance = AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
+			NearbyLandmark, TideglassWorldCenter, 306.f, 2600.f);
+		TestEqual(TEXT("The small Tideglass flower pocket uses a defined nearby-landmark buffer"),
+			Clearance, AIslandWeather::TideglassPollinatorFlowerNearbyLandmarkClearance);
+		TestTrue(TEXT("The nearest point of the Tideglass ring remains outside that landmark buffer"),
+			FVector::Dist2D(NearbyLandmark, TideglassWorldCenter) - AIslandWeather::TideglassPollinatorFlowerOuterRadius > Clearance);
+	}
+	TestEqual(TEXT("Distant landmarks retain the full meadow flower clearance"),
+		AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
+			DistantLandmark, TideglassWorldCenter, 306.f, 2600.f), 2600.f);
+	for (const int32 Seed : {-17, 0, 42, 71, 2026})
+	{
+		for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)
+		{
+			const FVector Candidate = TideglassWorldCenter +
+				AIslandWeather::SelectTideglassPollinatorFlowerSiteOffset(Seed, SiteIndex);
+			for (const FVector& NearbyLandmark : {TideglassWindArch, TideglassListeningStones, TideglassInn, TideglassInnDoorLantern})
+			{
+				const float Clearance = AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
+					NearbyLandmark, TideglassWorldCenter, 306.f, 2600.f);
+				TestTrue(TEXT("All deterministic pool-edge flower anchors clear nearby landmarks"),
+					FVector::Dist2D(Candidate, NearbyLandmark) >= Clearance);
+			}
+		}
+	}
 	float AverageMeadowAcceptance = 0.f;
 	constexpr int32 MeadowFieldSamples = 100;
 	for (int32 HabitatIndex = 0; HabitatIndex <= MeadowFieldSamples; ++HabitatIndex)
