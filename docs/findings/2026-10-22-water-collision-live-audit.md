@@ -34,6 +34,27 @@ started during this audit.
   This is worth tracking separately from the user's earlier graphics-memory
   warning and should be checked against the current material rebuild.
 
+## Follow-up verification
+
+- Reloaded `/Game/Maps/Island` again in the open editor. Four downward traces
+  from Z 2,000 to 0 at the cardinal points `(±250,000, 0)` and `(0, ±250,000)`
+  all returned no hit. These points are outside the landscape bounds and
+  inside the ocean's reported extents; this still does not substitute for a
+  player-capsule movement test.
+- `CaptiveSky2.Agent.IslandOcean` passed in the live editor (0.072 s, no
+  warnings). This confirms its automated swim-state rules, not that a player
+  can travel through water and return to shore in PIE.
+- `CaptiveSky2.Agent.IslandWeather` passed (0.039 s), but emitted
+  `No Island ground-cover instances placed`; therefore that fixture provides
+  no evidence about the live Island's scatter or species mix.
+- A post-reload viewport capture still looked sparse from the sampled camera
+  angle. It showed conifer and broadleaf silhouettes, but was not a population
+  audit and cannot establish how many tree species appear across the Island.
+- A read-only GPU snapshot showed 8,020 MiB used and 3,978 MiB free on the
+  RTX 4080 Laptop GPU while PIE was stopped. Given the earlier 10.9/12.3 GiB
+  PIE reading, no new PIE run was started from this snapshot; it is not enough
+  headroom to claim that the memory warning or 30 FPS target is resolved.
+
 ## Next diagnostic
 
 Reproduce once in a short, request-capped PIE session at a verified water
