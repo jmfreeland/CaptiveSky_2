@@ -120,6 +120,11 @@ FString UIslandChronicleSubsystem::StormEndText(int32 Strikes)
 	return FString::Printf(TEXT("The storm passes, having thrown %d bolts of lightning."), Strikes);
 }
 
+bool UIslandChronicleSubsystem::ShouldNoteMeteor(bool bMeteorNow, int32 IslandDay, int32 LastNotedDay)
+{
+	return bMeteorNow && IslandDay > 0 && IslandDay != LastNotedDay;
+}
+
 void UIslandChronicleSubsystem::WatchSky()
 {
 	const UWorld* World = GetWorld();
@@ -147,6 +152,23 @@ void UIslandChronicleSubsystem::WatchSky()
 		const float Elapsed = It->GetElapsedSeconds();
 		if (Elapsed < LastStrikeElapsed && bStormActive) ++StormStrikes;
 		LastStrikeElapsed = Elapsed;
+		break;
+	}
+	// A shooting star is the Island's rarest sky event: note the first one each night.
+	for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+	{
+		float Cloud = 0.f;
+		for (TActorIterator<AIslandWeather> Weather(World); Weather; ++Weather)
+		{
+			Cloud = Weather->SampleCloudCover(World->GetTimeSeconds());
+			break;
+		}
+		const bool bMeteor = AIslandDayNight::IsShootingStarSlot(It->DayNumber, It->CurrentHour, Cloud, AIslandDayNight::LunarIllumination(It->DayNumber, It->CurrentHour));
+		if (bSessionOpened && ShouldNoteMeteor(bMeteor, It->DayNumber, LastMeteorDay))
+		{
+			LastMeteorDay = It->DayNumber;
+			RecordEntry(TEXT("sky"), FString(), TEXT("A shooting star streaks across the night sky."), { { TEXT("event"), TEXT("meteor") } });
+		}
 		break;
 	}
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)

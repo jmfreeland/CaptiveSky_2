@@ -28,6 +28,8 @@ public:
 	static FString MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase);
 	/** The chronicle line for a storm ending, noting how many lightning strikes it threw. Pure. */
 	static FString StormEndText(int32 Strikes);
+	/** Whether a shooting star is worth a chronicle line: one is crossing the sky and none has been noted yet this Island day. Pure. */
+	static bool ShouldNoteMeteor(bool bMeteorNow, int32 IslandDay, int32 LastNotedDay);
 
 	/** One JSON line (no trailing newline). Extra fields never replace the fixed ones. */
 	static FString FormatEntry(const FDateTime& Utc, int32 Day, const FString& Clock, const FString& Type,
@@ -56,6 +58,7 @@ private:
 	bool bStormSeen = false;
 	bool bStormActive = false;
 	int32 StormStrikes = 0;
+	int32 LastMeteorDay = -1;
 	float LastStrikeElapsed = TNumericLimits<float>::Max();
 	bool bClosing = false;
 	bool bSessionOpened = false;

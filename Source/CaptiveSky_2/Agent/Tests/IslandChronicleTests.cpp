@@ -44,6 +44,9 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing gibbous"), TEXT("full moon")).Contains(TEXT("Spring tides")));
 	TestTrue(TEXT("A quarter moon announces neap tides"),
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing crescent"), TEXT("first quarter")).Contains(TEXT("Neap tides")));
+	TestTrue(TEXT("A first meteor of the day is noted"), UIslandChronicleSubsystem::ShouldNoteMeteor(true, 5, 4));
+	TestFalse(TEXT("A second meteor the same day is not"), UIslandChronicleSubsystem::ShouldNoteMeteor(true, 5, 5));
+	TestFalse(TEXT("No meteor, no note"), UIslandChronicleSubsystem::ShouldNoteMeteor(false, 5, 4));
 	TestEqual(TEXT("A quiet storm end is plain"), UIslandChronicleSubsystem::StormEndText(0), FString(TEXT("The storm passes.")));
 	TestTrue(TEXT("One bolt is singular"), UIslandChronicleSubsystem::StormEndText(1).Contains(TEXT("a single bolt")));
 	TestTrue(TEXT("Several bolts are counted"), UIslandChronicleSubsystem::StormEndText(7).Contains(TEXT("7 bolts")));
