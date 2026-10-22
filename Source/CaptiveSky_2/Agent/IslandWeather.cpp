@@ -1467,6 +1467,10 @@ void AIslandWeather::InitializeGroundCover()
 			const FBoxSphereBounds BeechBounds = BeechMesh ? BeechMesh->GetBounds() : FBoxSphereBounds(ForceInit);
 			constexpr int32 MaxBroadleafTreesPerSpecies = 600;
 			constexpr int32 MaxBroadleafTreeCount = MaxBroadleafTreesPerSpecies * 3;
+			// Spread the capped species through many more woodland communities. Without this
+			// per-grove share, early groves consume the 1,800-tree quota in large blocks and
+			// most of the Island still reads as a single-species spruce forest.
+			constexpr int32 BroadleafTreesPerGrove = 5;
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
@@ -1476,6 +1480,7 @@ void AIslandWeather::InitializeGroundCover()
 				TArray<FVector> ShrubLocations;
 				TArray<FVector> RhododendronLocations;
 			int32 BroadleafTreeCount = 0;
+				int32 BroadleafGrovesWithTrees = 0;
 				int32 SpruceTraceCount = 0;
 				int32 SpruceSaplingCount = 0;
 				auto TraceSpruceGround = [this, &Query, &TraceTop, &TraceBottom, SeaLevel, IslandLandscape, &SpruceTraceCount](const FVector& Candidate, FHitResult& Hit)
@@ -1530,6 +1535,7 @@ void AIslandWeather::InitializeGroundCover()
 						SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0x3b67ae85) * 3.f));
 
 					const int32 TreesBeforeGrove = GroundCoverTreeCount;
+					const int32 BroadleafTreesBeforeGrove = BroadleafTreeCount;
 					for (int32 Attempt = 0; Attempt < MaxSpruceTracesPerGrove && GroundCoverTreeCount - TreesBeforeGrove < SpruceTreesPerGrove; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
@@ -1558,7 +1564,8 @@ void AIslandWeather::InitializeGroundCover()
 						const FVector MeshBottom(SpruceBounds.Origin.X, SpruceBounds.Origin.Y, SpruceBounds.Origin.Z - SpruceBounds.BoxExtent.Z);
 						const FVector Location = TreeHit.ImpactPoint - Rotation.RotateVector(MeshBottom * Scale);
 						bool bUsedBroadleaf = false;
-						if (bBroadleafGrove && BroadleafTreeCount < MaxBroadleafTreeCount)
+						if (bBroadleafGrove && BroadleafTreeCount < MaxBroadleafTreeCount &&
+							BroadleafTreeCount - BroadleafTreesBeforeGrove < BroadleafTreesPerGrove)
 						{
 							auto TryAddSpecies = [&](int32 SpeciesIndex)
 							{
@@ -1591,6 +1598,7 @@ void AIslandWeather::InitializeGroundCover()
 						SpruceLocations.Add(TreeHit.ImpactPoint);
 						++GroundCoverTreeCount;
 					}
+					if (BroadleafTreeCount > BroadleafTreesBeforeGrove) ++BroadleafGrovesWithTrees;
 
 					// Seed the grove edges with small, nonblocking spruce saplings. They use the same
 					// native mesh, but a distinct scale band and spacing so they read as younger growth.
@@ -2060,8 +2068,9 @@ void AIslandWeather::InitializeGroundCover()
 				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
-				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d birch coppice, and %d hazel coppice instances; total tree population unchanged."),
-					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBirchCoppiceCount, GroundCoverHazelCoppiceCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d birch coppice, and %d hazel coppice instances; broadleaf trees span %d/%d groves and total tree population is unchanged."),
+					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBirchCoppiceCount,
+					GroundCoverHazelCoppiceCount, BroadleafGrovesWithTrees, SpruceGroveCenters.Num());
 		}
 	}
 	}
