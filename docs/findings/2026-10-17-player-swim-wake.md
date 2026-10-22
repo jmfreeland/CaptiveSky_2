@@ -42,3 +42,94 @@ different, safe editor-driven validation route is available. Next: resolve the
 matching engine dump, then run `CaptiveSky2.Agent.IslandOcean` and visually
 check the wake in open-water play before treating the interaction as verified
 or shipping it.
+
+## Live-editor follow-up (2026-10-22)
+
+After reloading the clean `/Game/Maps/Island`, `CaptiveSky2.Agent.IslandWeather`
+passed. `CaptiveSky2.Agent.IslandOcean` still failed only the moving-wake count.
+The current editor log shows the open-water test character entering surface
+swimming and then leaving during the movement tick, before a wake is spawned;
+the exact shore-trace hit is not logged. Two assertions were added immediately
+after that tick to report whether the swimmer remains in surface mode and keeps
+at least the 80 cm/s wake threshold. Live Coding compiled successfully.
+
+The next automation run then terminated the editor with an Unreal class-type
+assertion in `UWorld::GetSubsystem<UIslandOceanSubsystem>` at
+`IslandOceanTests.cpp:29` (`Ret->IsA(T::StaticClass())`), following Live Coding
+re-instancing. The map had been clean before reload. The editor/MCP connection
+is currently unavailable, and no fresh post-crash project log was produced by
+the restart attempts. Treat the diagnostic assertions and the swim-wake path
+as unverified; resume with a clean editor process before changing gameplay
+logic based on the stale-class crash.
+
+## UE 5.8 relaunch follow-up (2026-10-22)
+
+The main `CaptiveSky_2Editor` target rebuilt successfully from the current
+working tree (14 actions, including `IslandOceanTests.cpp`). The editor then
+opened to the UE 5.8 Project Browser, where `CaptiveSky_2` appeared as the
+current recent project; it did not automatically reopen `/Game/Maps/Island`.
+The Project Browser window became unavailable to computer-use input when the
+project tile was selected, and a fresh window inventory no longer listed
+Unreal. No new project log or crash report was produced. This corrects the
+earlier inference that the relaunch itself had crashed: the project editor was
+not yet reached, so the Island reload, ocean test, species scatter, graphics
+memory, and walking-on-water checks remain unverified.
+
+## Reloaded-editor check (2026-10-22)
+
+The main project reopened `/Game/Maps/Island`. A short Simulate pass logged
+`IslandOcean: disabled collision on legacy OceanPlane` before world startup, so
+the hidden plane guard is active in this editor build. This does not prove the
+player can enter and remain in surface-swim mode. The focused
+`CaptiveSky2.Agent.IslandOcean` run still fails two checks after the open-water
+test character moves: it is no longer in surface-swim mode and no wake is
+spawned. The transient test log shows the character entering and then leaving
+swimming, but does not record which query or trace caused the exit. Do not
+interpret the plane-collision guard as resolving the user's water-walking report.
+
+No player-controlled PIE run was attempted after the short Simulate pass reached
+11,419 / 12,282 MiB GPU memory. The next diagnosis should instrument the actual
+open-water query/shore-exit branch (with the editor on a clean, low-memory run),
+then verify on the Island with player input. The current C++ source changes and
+map remain separate from that unverified gameplay behavior.
+
+## Transition diagnostics (2026-10-22)
+
+Added transition-only logs in `ACaptiveSky_2Character::Tick` for the three
+possible swim exits: missing ocean component, failed ocean-surface query, and
+successful shallow-shore exit (including hit actor/component, depth, and
+location). This is diagnostic instrumentation only; it does not change the
+swimming decision. Unreal MCP could not connect at `127.0.0.1:8000`, and the
+computer-use surface returned no native apps. The approved UE 5.8 editor-target
+build compiled `CaptiveSky_2Character.cpp`, but linking the main project DLL
+failed because the open `UnrealEditor.exe` process holds it. No process was
+terminated. The instrumentation passed `git diff --check` and compiled, but the
+full target is not linked and the runtime behavior is not verified.
+
+## Rebuilt player-water regression (2026-10-22)
+
+After the user approved a reload/rebuild, the current UE 5.8 editor target
+linked successfully and reopened `/Game/Maps/Island`. The focused
+`CaptiveSky2.Agent.IslandWeather` test passed (2.74 s); its temporary world has
+no Island landscape, so its “no ground-cover instances placed” warning does
+not validate scatter.
+
+The freshly rebuilt `CaptiveSky2.Agent.IslandOcean` test first reproduced two
+failures: the open-water swimmer left swim mode while moving, and no wake was
+spawned. The log identified the cause: the shore-depth line trace hit another
+test character's `CollisionCylinder` 4 cm below the surface and treated that
+pawn as shallow ground. `ACaptiveSky_2Character::Tick` now ignores pawn actors
+for this ground-only query while retaining the walkable-floor and capsule
+clearance checks. After a clean rebuild/relaunch, the same focused ocean test
+passed (0.039 s, no warnings).
+
+Read-only checks on the reloaded Island confirm both `WaterZone_1.WaterMesh`
+and the legacy `OceanPlane` have `NoCollision`; the plane also has
+`bUseDefaultCollision=false`. `/Game/Maps/Island` reports clean. The editor
+viewport remains a wide editor-only view; no PIE was started because the
+project has a reported graphics-memory exhaustion issue and the available
+current-session log only reports the configured 4096 MiB texture pool, not an
+actual over-budget event. Consequently, the passing test verifies swim-state
+retention and wake creation in its transient fixture, but player-controlled
+shore-to-open-water traversal, the 30-FPS target, current GPU headroom, and
+runtime vegetation appearance remain unverified.

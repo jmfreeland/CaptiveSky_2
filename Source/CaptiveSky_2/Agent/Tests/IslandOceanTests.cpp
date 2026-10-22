@@ -54,6 +54,10 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		Ocean->RestoreOceanMaterial();
 		TestTrue(TEXT("The authored material comes back"), Plane->GetStaticMeshComponent()->GetMaterial(0) == Flat);
 		TestFalse(TEXT("Nothing stays applied after a restore"), Ocean->IsApplied());
+		Plane->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Ocean->OnWorldBeginPlay(*World);
+		TestEqual(TEXT("World startup disables stale collision on the hidden legacy ocean plane"),
+			Plane->GetStaticMeshComponent()->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 
 	AIslandOceanTestCharacter* Player = World->SpawnActor<AIslandOceanTestCharacter>();
@@ -172,6 +176,10 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 				WaterPlayer->GetCharacterMovement()->Velocity = FVector(120.f, 0.f, 0.f);
 				WaterPlayer->Tick(1.f / 60.f);
+				TestTrue(TEXT("The open-water swimmer remains in surface-swim mode while moving"),
+					WaterPlayer->IsSurfaceSwimming());
+				TestTrue(TEXT("The open-water swim speed remains above the wake threshold"),
+					WaterPlayer->GetCharacterMovement()->Velocity.Size2D() >= 80.f);
 				for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
 					if (It->ActorHasTag(TEXT("PlayerSwimImpact"))) SwimWakes.AddUnique(*It);
 				TestEqual(TEXT("Moving across the ocean leaves one short water wake"), SwimWakes.Num(), 1);
@@ -210,6 +218,27 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 				GroundedWaterPlayer->Tick(1.f / 60.f);
 				TestTrue(TEXT("A swimmer without shallow ground remains swimming in open water"),
 					GroundedWaterPlayer->IsSurfaceSwimming());
+			}
+
+			AActor* WadingGround = World->SpawnActor<AActor>(FVector(3000.f, 0.f, SurfaceLocation.Z - 60.f), FRotator::ZeroRotator);
+			UBoxComponent* WadingFloor = NewObject<UBoxComponent>(WadingGround, TEXT("WadingFloor"));
+			WadingGround->SetRootComponent(WadingFloor);
+			WadingFloor->SetBoxExtent(FVector(250.f, 250.f, 10.f));
+			WadingFloor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			WadingFloor->SetCollisionObjectType(ECC_WorldStatic);
+			WadingFloor->SetCollisionResponseToAllChannels(ECR_Block);
+			WadingFloor->RegisterComponent();
+			WadingFloor->SetWorldLocation(FVector(3000.f, 0.f, SurfaceLocation.Z - 60.f));
+			AIslandOceanTestCharacter* WadingPlayer = World->SpawnActor<AIslandOceanTestCharacter>(
+				FVector(3000.f, 0.f, SurfaceLocation.Z + 46.f), FRotator::ZeroRotator);
+			if (TestNotNull(TEXT("The player for the shallow-water walking check spawns"), WadingPlayer))
+			{
+				WadingPlayer->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+				WadingPlayer->Tick(1.f / 60.f);
+				TestFalse(TEXT("A grounded player on shallow submerged terrain does not oscillate into surface swimming"),
+					WadingPlayer->IsSurfaceSwimming());
+				TestEqual(TEXT("Shallow submerged terrain keeps normal walking movement"),
+					WadingPlayer->GetCharacterMovement()->MovementMode, MOVE_Walking);
 			}
 		}
 	}

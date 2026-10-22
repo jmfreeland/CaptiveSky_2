@@ -47,6 +47,16 @@ void UIslandOceanSubsystem::RestoreOceanMaterial()
 void UIslandOceanSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	if (AStaticMeshActor* Plane = FindOceanPlane(&InWorld))
+	{
+		if (UStaticMeshComponent* Mesh = Plane->GetStaticMeshComponent())
+		{
+			// The legacy plane is hidden but may retain stale QueryAndPhysics state
+			// in an already-open editor/map. Never let it become a walkable sea floor.
+			Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			UE_LOG(LogTemp, Log, TEXT("IslandOcean: disabled collision on legacy OceanPlane"));
+		}
+	}
 	UMaterialInterface* Material = MaterialOverride ? MaterialOverride.Get() : LoadObject<UMaterialInterface>(nullptr, MaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 	if (Material && ApplyOceanMaterial(Material))
 		UE_LOG(LogTemp, Log, TEXT("IslandOcean: ocean plane now uses %s"), *Material->GetPathName());

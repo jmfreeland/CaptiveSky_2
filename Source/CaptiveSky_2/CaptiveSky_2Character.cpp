@@ -4,9 +4,11 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "EngineUtils.h"
 #include "Engine/StaticMeshActor.h"
 #include "CollisionShape.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
 #include "WaterBodyComponent.h"
@@ -71,7 +73,12 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 	UWaterBodyComponent* Ocean = WaterSubsystem ? WaterSubsystem->GetOceanBodyComponent().Get() : nullptr;
 	if (!Ocean)
 	{
-		if (bSurfaceSwimming) LeaveSurfaceSwimming(MOVE_Falling);
+		if (bSurfaceSwimming)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PlayerWater] %s leaving swim: ocean component unavailable at %s (subsystem=%s)"),
+				*GetName(), *GetActorLocation().ToCompactString(), *GetNameSafe(WaterSubsystem));
+			LeaveSurfaceSwimming(MOVE_Falling);
+		}
 		return;
 	}
 
@@ -83,7 +90,12 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 		GetActorLocation(), WaterSurfaceLocation, WaterSurfaceNormal, WaterVelocity, WaterDepth, false);
 	if (!bHasWaterSurface)
 	{
-		if (bSurfaceSwimming) LeaveSurfaceSwimming(MOVE_Falling);
+		if (bSurfaceSwimming)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[PlayerWater] %s leaving swim: ocean surface query failed at %s (ocean=%s)"),
+				*GetName(), *GetActorLocation().ToCompactString(), *GetNameSafe(Ocean->GetOwner()));
+			LeaveSurfaceSwimming(MOVE_Falling);
+		}
 		return;
 	}
 
@@ -99,6 +111,10 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 		const FVector TraceEnd(TraceStart.X, TraceStart.Y, WaterSurfaceLocation.Z - MaxWadingDepth);
 		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(SurfaceSwimShoreExit), false, this);
 		if (AActor* WaterOwner = Ocean->GetOwner()) TraceParams.AddIgnoredActor(WaterOwner);
+		// Nearby swimmers and residents are not shoreline. Their capsules can sit
+		// just below the water plane and otherwise look like walkable submerged ground.
+		for (TActorIterator<APawn> PawnIt(GetWorld()); PawnIt; ++PawnIt)
+			TraceParams.AddIgnoredActor(*PawnIt);
 		if (AStaticMeshActor* OceanPlane = UIslandOceanSubsystem::FindOceanPlane(GetWorld()))
 		{
 			TraceParams.AddIgnoredActor(OceanPlane);
@@ -122,6 +138,9 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 				GetCapsuleComponent()->GetScaledCapsuleRadius(), CapsuleHalfHeight);
 			if (!GetWorld()->OverlapBlockingTestByChannel(ShoreLocation, GetActorQuat(), ECC_Pawn, Capsule, OverlapParams))
 			{
+				UE_LOG(LogTemp, Log, TEXT("[PlayerWater] %s leaving swim for shore: hit %s/%s at %s (normal Z=%.2f, depth %.1f cm)"),
+					*GetName(), *GetNameSafe(GroundHit.GetActor()), *GetNameSafe(GroundHit.GetComponent()),
+					*GroundHit.ImpactPoint.ToCompactString(), GroundHit.ImpactNormal.Z, WaterSurfaceLocation.Z - GroundHit.ImpactPoint.Z);
 				SetActorLocation(ShoreLocation, false, nullptr, ETeleportType::TeleportPhysics);
 				LeaveSurfaceSwimming(MOVE_Walking);
 				return;
@@ -133,10 +152,10 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 	{
 		const float CapsuleHalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 		const float CapsuleBottomZ = GetActorLocation().Z - CapsuleHalfHeight;
-		// A leftover/duplicate ocean-plane collider can keep the player grounded
-		// exactly at sea level. Treat that contact as water entry too, instead of
-		// allowing the grounded walk mode to continue across the ocean.
-		constexpr float GroundedWaterEntryTolerance = 75.f;
+		// A stale ocean-plane collider can keep the player grounded exactly at sea
+		// level. Catch that contact, but do not re-enter swimming while the player
+		// is standing on legitimate shallow ground beneath the water surface.
+		constexpr float GroundedWaterEntryTolerance = 5.f;
 		const bool bFallingIntoWater = Movement->IsFalling() && CapsuleBottomZ <= WaterSurfaceLocation.Z;
 		const bool bGroundedOnWaterSurface = bWalkingAtGroundLevel &&
 			FMath::Abs(CapsuleBottomZ - WaterSurfaceLocation.Z) <= GroundedWaterEntryTolerance;
