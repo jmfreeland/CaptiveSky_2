@@ -44,6 +44,9 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing gibbous"), TEXT("full moon")).Contains(TEXT("Spring tides")));
 	TestTrue(TEXT("A quarter moon announces neap tides"),
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("waxing crescent"), TEXT("first quarter")).Contains(TEXT("Neap tides")));
+	TestEqual(TEXT("A quiet storm end is plain"), UIslandChronicleSubsystem::StormEndText(0), FString(TEXT("The storm passes.")));
+	TestTrue(TEXT("One bolt is singular"), UIslandChronicleSubsystem::StormEndText(1).Contains(TEXT("a single bolt")));
+	TestTrue(TEXT("Several bolts are counted"), UIslandChronicleSubsystem::StormEndText(7).Contains(TEXT("7 bolts")));
 	TestFalse(TEXT("A gibbous moon says nothing about tides"),
 		UIslandChronicleSubsystem::MoonChangeText(TEXT("first quarter"), TEXT("waxing gibbous")).Contains(TEXT("tides")));
 	TestTrue(TEXT("The same phase is not news"), UIslandChronicleSubsystem::MoonChangeText(TEXT("full moon"), TEXT("full moon")).IsEmpty());

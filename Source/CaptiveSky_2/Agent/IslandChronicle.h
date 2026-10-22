@@ -26,6 +26,8 @@ public:
 
 	/** The chronicle line for the moon moving to a new named phase; empty when the phase is unchanged or unknown. Pure. */
 	static FString MoonChangeText(const FString& PreviousPhase, const FString& CurrentPhase);
+	/** The chronicle line for a storm ending, noting how many lightning strikes it threw. Pure. */
+	static FString StormEndText(int32 Strikes);
 
 	/** One JSON line (no trailing newline). Extra fields never replace the fixed ones. */
 	static FString FormatEntry(const FDateTime& Utc, int32 Day, const FString& Clock, const FString& Type,
@@ -53,6 +55,8 @@ private:
 	float SinceCheck = 0.f;
 	bool bStormSeen = false;
 	bool bStormActive = false;
+	int32 StormStrikes = 0;
+	float LastStrikeElapsed = TNumericLimits<float>::Max();
 	bool bClosing = false;
 	bool bSessionOpened = false;
 	int32 LastDay = 0;

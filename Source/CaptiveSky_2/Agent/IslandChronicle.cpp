@@ -1,6 +1,7 @@
 #include "IslandChronicle.h"
 #include "AgentDataPaths.h"
 #include "IslandDayNight.h"
+#include "IslandLightning.h"
 #include "IslandWeather.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -112,6 +113,13 @@ FString UIslandChronicleSubsystem::MoonChangeText(const FString& PreviousPhase, 
 	return FString::Printf(TEXT("The moon has moved on from the %s to the %s.%s"), *PreviousPhase, *CurrentPhase, Tides);
 }
 
+FString UIslandChronicleSubsystem::StormEndText(int32 Strikes)
+{
+	if (Strikes <= 0) return TEXT("The storm passes.");
+	if (Strikes == 1) return TEXT("The storm passes, having thrown a single bolt of lightning.");
+	return FString::Printf(TEXT("The storm passes, having thrown %d bolts of lightning."), Strikes);
+}
+
 void UIslandChronicleSubsystem::WatchSky()
 {
 	const UWorld* World = GetWorld();
@@ -133,6 +141,14 @@ void UIslandChronicleSubsystem::WatchSky()
 		if (!MoonText.IsEmpty()) RecordEntry(TEXT("sky"), FString(), MoonText, { { TEXT("event"), TEXT("moon_phase") } });
 		LastMoonPhase = MoonNow;
 	}
+	// A strike restarts the lightning actor's clock, so the elapsed time dropping means a new bolt since the last look.
+	for (TActorIterator<AIslandLightning> It(World); It; ++It)
+	{
+		const float Elapsed = It->GetElapsedSeconds();
+		if (Elapsed < LastStrikeElapsed && bStormActive) ++StormStrikes;
+		LastStrikeElapsed = Elapsed;
+		break;
+	}
 	for (TActorIterator<AIslandWeather> It(World); It; ++It)
 	{
 		const float Storm = It->SampleStormIntensity(World->GetTimeSeconds());
@@ -141,8 +157,11 @@ void UIslandChronicleSubsystem::WatchSky()
 		else if (Storm < StormPasses) bStormActive = false;
 		// A storm already raging when the session opens is not news; only changes after that are.
 		if (bStormSeen && bStormActive != bWasActive)
-			RecordEntry(TEXT("weather"), FString(), bStormActive ? TEXT("A storm arrives over the Island.") : TEXT("The storm passes."),
+		{
+			RecordEntry(TEXT("weather"), FString(), bStormActive ? TEXT("A storm arrives over the Island.") : StormEndText(StormStrikes),
 				{ { TEXT("event"), bStormActive ? TEXT("storm_start") : TEXT("storm_end") } });
+			StormStrikes = 0;
+		}
 		bStormSeen = true;
 		return;
 	}
