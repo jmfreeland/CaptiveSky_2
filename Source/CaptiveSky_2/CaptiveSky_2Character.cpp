@@ -15,12 +15,14 @@
 #include "WaterSubsystem.h"
 #include "IslandOceanSubsystem.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandSurfaceSwimMovementComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "CaptiveSky_2.h"
 
-ACaptiveSky_2Character::ACaptiveSky_2Character()
+ACaptiveSky_2Character::ACaptiveSky_2Character(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UIslandSurfaceSwimMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
@@ -169,8 +171,8 @@ void ACaptiveSky_2Character::Tick(float DeltaSeconds)
 		}
 	}
 
-	// Flying movement keeps horizontal input responsive without requiring a
-	// PhysicsVolume. The water plugin supplies the moving surface height.
+	// The custom swimming movement component keeps horizontal input responsive
+	// without requiring a PhysicsVolume. The water plugin supplies surface height.
 	FVector TargetLocation = GetActorLocation();
 	TargetLocation.Z = FMath::FInterpTo(
 		TargetLocation.Z, WaterSurfaceLocation.Z + SurfaceSwimOffset, DeltaSeconds, 7.f);
@@ -216,10 +218,10 @@ void ACaptiveSky_2Character::EnterSurfaceSwimming(float WaterSurfaceZ)
 
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
-		PreviousMaxFlySpeed = Movement->MaxFlySpeed;
-		Movement->MaxFlySpeed = SurfaceSwimSpeed;
+		PreviousMaxSwimSpeed = Movement->MaxSwimSpeed;
+		Movement->MaxSwimSpeed = SurfaceSwimSpeed;
 		Movement->Velocity.Z = 0.f;
-		Movement->SetMovementMode(MOVE_Flying);
+		Movement->SetMovementMode(MOVE_Swimming);
 	}
 
 	bSurfaceSwimming = true;
@@ -238,7 +240,7 @@ void ACaptiveSky_2Character::LeaveSurfaceSwimming(EMovementMode NextMovementMode
 	bSurfaceSwimming = false;
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
-		Movement->MaxFlySpeed = PreviousMaxFlySpeed;
+		Movement->MaxSwimSpeed = PreviousMaxSwimSpeed;
 		Movement->SetMovementMode(NextMovementMode);
 	}
 	UE_LOG(LogTemp, Log, TEXT("[PlayerWater] %s left surface swimming; next mode=%d"), *GetName(), static_cast<int32>(NextMovementMode));

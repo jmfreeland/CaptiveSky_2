@@ -13,6 +13,7 @@
 #include "CaptiveSky_2Character.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandOceanTestCharacter.h"
+#include "IslandSurfaceSwimMovementComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "WaterBodyComponent.h"
@@ -64,7 +65,7 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("The player character spawns for water-movement checks"), Player))
 	{
 		UCharacterMovementComponent* Movement = Player->GetCharacterMovement();
-		const float OriginalFlySpeed = Movement->MaxFlySpeed;
+		const float OriginalSwimSpeed = Movement->MaxSwimSpeed;
 		APlayerController* SwimController = World->SpawnActor<APlayerController>();
 		if (TestNotNull(TEXT("The water-movement test controller spawns"), SwimController))
 		{
@@ -74,9 +75,25 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 		Player->EnterSurfaceSwimming(100.f);
 		TestTrue(TEXT("Entering surface water enables the player-only swim state"), Player->IsSurfaceSwimming());
-		TestEqual(TEXT("Surface swimming uses gravity-free movement"), Movement->MovementMode, MOVE_Flying);
-		TestEqual(TEXT("Surface swimming applies its tuned speed"), Movement->MaxFlySpeed, 260.f);
-		TestEqual(TEXT("The tuned speed is active in flying swim mode"), Movement->GetMaxSpeed(), 260.f);
+		TestTrue(TEXT("The player uses the surface-swim physics component"),
+			Cast<UIslandSurfaceSwimMovementComponent>(Movement) != nullptr);
+		TestEqual(TEXT("Surface swimming exposes the engine swimming mode to gameplay and animation"),
+			Movement->MovementMode, MOVE_Swimming);
+		TestTrue(TEXT("The character movement component reports swimming without a physics-volume transition"),
+			Movement->IsSwimming());
+		TestEqual(TEXT("Surface swimming applies its tuned speed"), Movement->MaxSwimSpeed, 260.f);
+		TestEqual(TEXT("The tuned speed is active in swimming mode"), Movement->GetMaxSpeed(), 260.f);
+		if (UIslandSurfaceSwimMovementComponent* SurfaceMovement = Cast<UIslandSurfaceSwimMovementComponent>(Movement))
+		{
+			Player->SetActorLocation(FVector(0.f, 0.f, 300.f));
+			Movement->Velocity = FVector(120.f, 0.f, 25.f);
+			const FVector BeforeSurfacePhysics = Player->GetActorLocation();
+			SurfaceMovement->PhysSwimming(1.f / 60.f, 0);
+			TestTrue(TEXT("Surface swim physics preserves swept horizontal travel without a PhysicsVolume"),
+				Player->GetActorLocation().X > BeforeSurfacePhysics.X);
+			TestTrue(TEXT("Surface swim physics clears vertical velocity for the water-height follow"),
+				FMath::IsNearlyZero(Movement->Velocity.Z));
+		}
 
 		if (SwimController)
 		{
@@ -98,7 +115,7 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 		Player->LeaveSurfaceSwimming(MOVE_Falling);
 		TestFalse(TEXT("Leaving water clears the swim state"), Player->IsSurfaceSwimming());
-		TestEqual(TEXT("Leaving water restores the prior flight speed"), Movement->MaxFlySpeed, OriginalFlySpeed);
+		TestEqual(TEXT("Leaving water restores the prior swim speed"), Movement->MaxSwimSpeed, OriginalSwimSpeed);
 		TestEqual(TEXT("Leaving water resumes falling"), Movement->MovementMode, MOVE_Falling);
 
 		Player->EnterSurfaceSwimming(100.f);

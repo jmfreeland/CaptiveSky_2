@@ -190,3 +190,49 @@ The live editor's `CaptiveSky2.Agent.IslandOcean` automation test passed in
 water/movement subsystem; it is not a repeat of the near-shore PIE test and
 does not establish horizontal input or shore-return behavior. No PIE session was
 started for this check.
+
+## Water-walking report follow-up (2026-10-22)
+
+The user's latest play report still says the character can walk on the water.
+The current C++ path does detect the ocean surface and logs the real player
+entering `bSurfaceSwimming`, but `EnterSurfaceSwimming` deliberately switches
+the movement component to `MOVE_Flying` so surface-following works without a
+physics volume. That custom movement state is not the engine's `MOVE_Swimming`
+mode and does not by itself select a swim animation. The log entry therefore
+proves only that the custom state was entered; it does not prove the character
+stopped using a walking pose or that input-driven traversal works. Do not treat
+the water-walking issue as fixed based on the automation test or entry log.
+
+Next validation should capture the actual player movement mode and animation
+while applying a short, controlled input offshore. If the capsule stays on the
+queried surface but the pose still walks, the missing work is a swim animation
+state (the content tree contains no swim-named animation asset); if the actor
+remains grounded or fails to move, investigate the water-surface transition and
+collision separately. Avoid switching to `MOVE_Swimming` blindly: the current
+implementation intentionally avoids depending on a physics volume, so that
+change needs a controlled regression test and a shore-return check.
+
+## Water-body swimming mode (2026-10-22)
+
+Replaced surface swimming's use of `MOVE_Flying` with the engine's
+`MOVE_Swimming` state. The Water plugin's ocean provides a wave-height query,
+not the PhysicsVolume expected by stock `PhysSwimming`, so the new
+`UIslandSurfaceSwimMovementComponent::PhysSwimming` reuses CharacterMovement's
+swept, gravity-free flying solver for horizontal travel and leaves surface-height
+correction to the character's existing ocean query. Swim speed now uses
+`MaxSwimSpeed`; shore exits and jump exits still restore their previous modes.
+
+UE Live Coding succeeded, and the focused `CaptiveSky2.Agent.IslandOcean`
+automation test passed (0.103 s, no warnings). Its new assertions verify the
+custom component, `MOVE_Swimming`/`IsSwimming()`, the swimming speed, and swept
+horizontal movement with vertical velocity cleared in a transient world without
+a PhysicsVolume. Read-only inspection confirmed
+`BP_ThirdPersonCharacter` resolves to the new movement component.
+
+This does not yet prove player-controlled travel in the saved Island or a swim
+pose. The current `ABP_Unarmed` graph only has idle, walk/run, jump, and fall
+states, and the project asset registry has no swim-named assets. A compatible
+swim animation/state is still needed for the visual behavior; the editor's
+near-limit GPU use makes another full Island PIE run a poor verification step
+until texture/foliage memory is reduced or budgeted. Keep those behavior and
+visual checks open.

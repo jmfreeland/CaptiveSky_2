@@ -49,7 +49,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
 
-	/** Top speed while floating at the ocean surface. */
+	/** Top speed while swimming at the queried ocean surface. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Water", meta=(ClampMin="0", ForceUnits="cm/s"))
 	float SurfaceSwimSpeed = 260.f;
 
@@ -60,7 +60,7 @@ protected:
 public:
 
 	/** Constructor */
-	ACaptiveSky_2Character();	
+	ACaptiveSky_2Character(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void Jump() override;
@@ -109,7 +109,7 @@ private:
 	void LeaveSurfaceSwimming(EMovementMode NextMovementMode);
 
 	bool bSurfaceSwimming = false;
-	float PreviousMaxFlySpeed = 0.f;
+	float PreviousMaxSwimSpeed = 0.f;
 	double NextSurfaceSwimWakeTime = 0.0;
 	void TrySpawnSurfaceSwimWake(const FVector& WaterSurfaceLocation);
 
