@@ -103,6 +103,10 @@ public:
 	static FString DescribeWarmth(float IslandHour, float CloudCover);
 	/** How wind and rain change the felt warmth: a biting wind on cool air, a chilling rain, a welcome breeze on a warm day; empty when they change nothing. WindSpeed in cm/s. Pure. */
 	static FString DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed);
+	/** Hours until the sun next crosses the horizon (sunrise at 06:00, sunset at 18:00), 0..24. Pure. */
+	static float HoursUntilSunEdge(float IslandHour);
+	/** How long until sunset by day or sunrise by night, in whole hours; empty within the half hour of the edge (DescribeSunEdge speaks then). Pure. */
+	static FString DescribeDaylightLeft(float IslandHour);
 	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
 	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
