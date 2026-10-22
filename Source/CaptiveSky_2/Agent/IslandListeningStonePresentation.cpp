@@ -75,6 +75,21 @@ bool AListeningStonePresentation::ShouldResonateForWind(float PreviousSpeed, flo
 		CurrentSpeed >= 90.f && CurrentSpeed - PreviousSpeed >= 45.f;
 }
 
+bool AListeningStonePresentation::IsEligibleVisitor(bool bPlayerControlled, const FVector& Offset, const FVector& Velocity)
+{
+	return bPlayerControlled && !Offset.ContainsNaN() && !Velocity.ContainsNaN() &&
+		Offset.SizeSquared2D() <= FMath::Square(VisitorNoticeRadius) &&
+		FMath::Abs(Offset.Z) <= VisitorMaximumHeightDifference &&
+		Velocity.SizeSquared2D() <= FMath::Square(VisitorMaximumApproachSpeed);
+}
+
+bool AListeningStonePresentation::CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating,
+	float SecondsSinceLastChime)
+{
+	return !bAlreadyLatched && !bAlreadyResonating && FMath::IsFinite(SecondsSinceLastChime) &&
+		SecondsSinceLastChime >= ChimeCooldownSeconds;
+}
+
 bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransform,
 	const TArray<AStaticMeshActor*>& Proxies)
 {
@@ -328,21 +343,18 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 	for (TActorIterator<APawn> It(World); It; ++It)
 	{
 		APawn* Visitor = *It;
-		if (!IsValid(Visitor) || !Visitor->IsPlayerControlled()) continue;
+		if (!IsValid(Visitor)) continue;
 
 		const FVector Offset = Visitor->GetActorLocation() - GetActorLocation();
-		if (Offset.SizeSquared2D() > FMath::Square(VisitorNoticeRadius) ||
-			FMath::Abs(Offset.Z) > VisitorMaximumHeightDifference ||
-			Visitor->GetVelocity().SizeSquared2D() > FMath::Square(VisitorMaximumApproachSpeed))
-		{
-			continue;
-		}
+		if (!IsEligibleVisitor(Visitor->IsPlayerControlled(), Offset, Visitor->GetVelocity())) continue;
 
 		// One quiet approach earns one brief response. A wider exit ring prevents
 		// repeated activation while a visitor lingers near the stones.
-		if (VisitorPresenceLatch.Get() == Visitor) return;
+		const bool bAlreadyLatched = VisitorPresenceLatch.Get() == Visitor;
+		if (bAlreadyLatched) return;
 		VisitorPresenceLatch = Visitor;
-		if (GetResonanceRemaining() > 0.f || World->GetTimeSeconds() - LastAmbientChimeAt < ChimeCooldownSeconds)
+		const float SecondsSinceLastChime = static_cast<float>(World->GetTimeSeconds() - LastAmbientChimeAt);
+		if (!CanBeginVisitorResonance(bAlreadyLatched, GetResonanceRemaining() > 0.f, SecondsSinceLastChime))
 			return;
 
 		BeginVisitorResonance();

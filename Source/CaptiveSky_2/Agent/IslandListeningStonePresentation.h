@@ -25,6 +25,10 @@ public:
 	float GetResonanceRemaining() const { return bIsResonating ? FMath::Max(0.f, ResonanceDuration - ResonanceElapsed) : 0.f; }
 	/** Natural resonance is reserved for a meaningful, rising outdoor gust, not steady background wind. */
 	static bool ShouldResonateForWind(float PreviousSpeed, float CurrentSpeed);
+	/** Pure approach gate shared by runtime visitor detection and deterministic automation. */
+	static bool IsEligibleVisitor(bool bPlayerControlled, const FVector& Offset, const FVector& Velocity);
+	/** Shared latch/resonance/cooldown gate, kept pure so it can be tested without a PIE LocalPlayer. */
+	static bool CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating, float SecondsSinceLastChime);
 
 private:
 	friend class UIslandListeningStonePresentationSubsystem;
