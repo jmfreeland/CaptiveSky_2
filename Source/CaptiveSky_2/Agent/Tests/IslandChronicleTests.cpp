@@ -54,6 +54,8 @@ bool FIslandChronicleTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Non-finite strength keeps the state"), UIslandChronicleSubsystem::NextRainbowShowing(true, NAN) && !UIslandChronicleSubsystem::NextRainbowShowing(false, NAN));
 	TestTrue(TEXT("Thick mist settles above 0.65"), UIslandChronicleSubsystem::NextThickMist(false, 0.8f) && !UIslandChronicleSubsystem::NextThickMist(false, 0.5f));
 	TestTrue(TEXT("Mist lingers until it thins below 0.4"), UIslandChronicleSubsystem::NextThickMist(true, 0.5f) && !UIslandChronicleSubsystem::NextThickMist(true, 0.3f));
+	TestTrue(TEXT("The sea turns heavy from 0.7"), UIslandChronicleSubsystem::NextHeavySea(false, 0.8f) && !UIslandChronicleSubsystem::NextHeavySea(false, 0.6f));
+	TestTrue(TEXT("It stays heavy until below 0.5"), UIslandChronicleSubsystem::NextHeavySea(true, 0.6f) && !UIslandChronicleSubsystem::NextHeavySea(true, 0.4f));
 	TestEqual(TEXT("A quiet storm end is plain"), UIslandChronicleSubsystem::StormEndText(0), FString(TEXT("The storm passes.")));
 	TestTrue(TEXT("One bolt is singular"), UIslandChronicleSubsystem::StormEndText(1).Contains(TEXT("a single bolt")));
 	TestTrue(TEXT("Several bolts are counted"), UIslandChronicleSubsystem::StormEndText(7).Contains(TEXT("7 bolts")));

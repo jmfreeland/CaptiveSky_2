@@ -4,6 +4,7 @@
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandLightning.h"
 #include "IslandRainbow.h"
+#include "IslandSeaStateSubsystem.h"
 #include "IslandWeather.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -140,6 +141,12 @@ bool UIslandChronicleSubsystem::NextThickMist(bool bThick, float Mist)
 	return bThick ? Mist >= 0.4f : Mist > 0.65f;
 }
 
+bool UIslandChronicleSubsystem::NextHeavySea(bool bHeavy, float Sea)
+{
+	if (!FMath::IsFinite(Sea)) return bHeavy;
+	return bHeavy ? Sea >= 0.5f : Sea >= 0.7f;
+}
+
 void UIslandChronicleSubsystem::WatchSky()
 {
 	const UWorld* World = GetWorld();
@@ -184,6 +191,14 @@ void UIslandChronicleSubsystem::WatchSky()
 			RecordEntry(TEXT("weather"), FString(), bThick ? TEXT("A thick mist settles over the Island.") : TEXT("The mist lifts."),
 				{ { TEXT("event"), bThick ? TEXT("mist_start") : TEXT("mist_end") } });
 		bThickMist = bThick;
+	}
+	if (const UIslandSeaStateSubsystem* SeaState = World->GetSubsystem<UIslandSeaStateSubsystem>())
+	{
+		const bool bHeavy = NextHeavySea(bHeavySea, SeaState->GetSea());
+		if (bSessionOpened && bHeavySea != bHeavy)
+			RecordEntry(TEXT("weather"), FString(), bHeavy ? TEXT("The sea turns heavy, breaking steeply on the shore.") : TEXT("The sea settles."),
+				{ { TEXT("event"), bHeavy ? TEXT("sea_heavy") : TEXT("sea_settled") } });
+		bHeavySea = bHeavy;
 	}
 	// A shooting star is the Island's rarest sky event: note the first one each night.
 	for (TActorIterator<AIslandDayNight> It(World); It; ++It)

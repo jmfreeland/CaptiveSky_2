@@ -32,6 +32,8 @@ public:
 	static bool NextRainbowShowing(bool bShowing, float Strength);
 	/** Thick mist with hysteresis (settles from 0.65, lifts below 0.4). Pure. */
 	static bool NextThickMist(bool bThick, float Mist);
+	/** Heavy sea with hysteresis (rises from 0.7, settles below 0.5). Pure. */
+	static bool NextHeavySea(bool bHeavy, float Sea);
 	/** Whether a shooting star is worth a chronicle line: one is crossing the sky and none has been noted yet this Island day. Pure. */
 	static bool ShouldNoteMeteor(bool bMeteorNow, int32 IslandDay, int32 LastNotedDay);
 
@@ -65,6 +67,7 @@ private:
 	int32 LastMeteorDay = -1;
 	bool bRainbowShowing = false;
 	bool bThickMist = false;
+	bool bHeavySea = false;
 	float LastStrikeElapsed = TNumericLimits<float>::Max();
 	bool bClosing = false;
 	bool bSessionOpened = false;
