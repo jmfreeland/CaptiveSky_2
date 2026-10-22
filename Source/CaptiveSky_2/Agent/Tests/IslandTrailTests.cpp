@@ -5,6 +5,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTrailTest, "CaptiveSky2.Agent.IslandTrail",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -84,6 +85,13 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Footfalls in one cell add up"), Ledger.StepsAt(Here), 5);
 	TestEqual(TEXT("A neighbouring cell is separate"), Ledger.StepsAt(Here + FVector(FIslandTrailLedger::CellSize * 2.f, 0.f, 0.f)), 0);
 	TestEqual(TEXT("Negative coordinates have their own cells"), FIslandTrailLedger::CellFor(FVector(-1.f, -1.f, 0.f)), FIntPoint(-1, -1));
+	const float NaN = std::numeric_limits<float>::quiet_NaN();
+	const float Infinity = std::numeric_limits<float>::infinity();
+	TestFalse(TEXT("A non-finite position cannot enter persistent path memory"), Ledger.AddStep(FVector(NaN, 0.f, 0.f), FVector::UpVector));
+	TestFalse(TEXT("A non-finite ground normal cannot enter persistent path memory"), Ledger.AddStep(Here, FVector(0.f, Infinity, 0.f)));
+	TestFalse(TEXT("A finite position outside the ledger's cell-key range is rejected"),
+		Ledger.AddStep(FVector((static_cast<double>(TNumericLimits<int32>::Max()) + 1.0) * FIslandTrailLedger::CellSize, 0.f, 0.f), FVector::UpVector));
+	TestEqual(TEXT("Rejected footfalls leave the existing trail unchanged"), Ledger.StepsAt(Here), 5);
 
 	const FString Json = Ledger.ToJson();
 	FIslandTrailLedger Loaded;

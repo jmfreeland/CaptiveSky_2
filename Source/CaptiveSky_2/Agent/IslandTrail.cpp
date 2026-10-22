@@ -46,6 +46,16 @@ FIntPoint FIslandTrailLedger::CellFor(const FVector& Position)
 
 bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundNormal)
 {
+	const double CellX = static_cast<double>(Position.X) / CellSize;
+	const double CellY = static_cast<double>(Position.Y) / CellSize;
+	if (!FMath::IsFinite(Position.X) || !FMath::IsFinite(Position.Y) || !FMath::IsFinite(Position.Z) ||
+		!FMath::IsFinite(GroundNormal.X) || !FMath::IsFinite(GroundNormal.Y) || !FMath::IsFinite(GroundNormal.Z) ||
+		CellX < TNumericLimits<int32>::Min() || CellX > TNumericLimits<int32>::Max() ||
+		CellY < TNumericLimits<int32>::Min() || CellY > TNumericLimits<int32>::Max())
+	{
+		return false;
+	}
+
 	const FIntPoint Key = CellFor(Position);
 	FIslandTrailCell* Cell = Cells.Find(Key);
 	if (!Cell)
