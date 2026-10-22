@@ -1465,7 +1465,7 @@ void AIslandWeather::InitializeGroundCover()
 			const USkeletalMesh* BeechMesh = IslandEuropeanBeeches
 				? Cast<USkeletalMesh>(IslandEuropeanBeeches->GetSkinnedAsset()) : nullptr;
 			const FBoxSphereBounds BeechBounds = BeechMesh ? BeechMesh->GetBounds() : FBoxSphereBounds(ForceInit);
-			constexpr int32 MaxBroadleafTreesPerSpecies = 320;
+			constexpr int32 MaxBroadleafTreesPerSpecies = 600;
 			constexpr int32 MaxBroadleafTreeCount = MaxBroadleafTreesPerSpecies * 3;
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
