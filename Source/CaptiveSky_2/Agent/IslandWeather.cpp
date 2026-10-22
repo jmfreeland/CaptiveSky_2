@@ -371,9 +371,6 @@ AIslandWeather::AIslandWeather()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SpruceMesh(TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> BirchCoppiceMesh(TEXT("/Game/Generated/ComfyBlender/BirchCoppice_Review/SM_BirchCoppice_01.SM_BirchCoppice_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> HazelCoppiceMesh(TEXT("/Game/Generated/ComfyBlender/Codex_WoodlandHazelCoppiceSmoothGroups_20261018/SM_WoodlandHazelCoppice_01.SM_WoodlandHazelCoppice_01"));
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> NorwayMapleMesh(TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A"));
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanAspenMesh(TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A"));
-	static ConstructorHelpers::FObjectFinder<USkeletalMesh> EuropeanBeechMesh(TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> RhododendronMesh(TEXT("/Game/Plants/Meshes/Rhododendron__Everestianum__HD.Rhododendron__Everestianum__HD"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerA(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_01_01.flower_01_01"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> MeadowFlowerB(TEXT("/Game/PN_FoliageCollection/Meshes/flowerMesh/flower_04_01.flower_04_01"));
@@ -400,9 +397,6 @@ AIslandWeather::AIslandWeather()
 	if (SpruceMesh.Succeeded()) IslandSpruce->SetStaticMesh(SpruceMesh.Object);
 	if (BirchCoppiceMesh.Succeeded()) IslandBirchCoppices->SetStaticMesh(BirchCoppiceMesh.Object);
 	if (HazelCoppiceMesh.Succeeded()) IslandHazelCoppices->SetStaticMesh(HazelCoppiceMesh.Object);
-	if (NorwayMapleMesh.Succeeded()) IslandNorwayMaples->SetSkinnedAssetAndUpdate(NorwayMapleMesh.Object);
-	if (EuropeanAspenMesh.Succeeded()) IslandEuropeanAspens->SetSkinnedAssetAndUpdate(EuropeanAspenMesh.Object);
-	if (EuropeanBeechMesh.Succeeded()) IslandEuropeanBeeches->SetSkinnedAssetAndUpdate(EuropeanBeechMesh.Object);
 	if (GroundPlantMesh.Succeeded()) IslandShrubs->SetStaticMesh(GroundPlantMesh.Object);
 	if (RhododendronMesh.Succeeded()) IslandRhododendrons->SetStaticMesh(RhododendronMesh.Object);
 	if (MeadowFlowerA.Succeeded()) IslandMeadowFlowers[0]->SetStaticMesh(MeadowFlowerA.Object);
@@ -437,6 +431,18 @@ UHierarchicalInstancedStaticMeshComponent* AIslandWeather::FindShoreGrassC() con
 void AIslandWeather::BeginPlay()
 {
 	Super::BeginPlay();
+	// PVE Megaplant skeletal meshes can call into PCG during deserialization.
+	// Resolve them after engine/plugin startup instead of from the actor constructor,
+	// where PCGModule may not have initialized yet.
+	if (USkeletalMesh* NorwayMapleMesh = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A")))
+		IslandNorwayMaples->SetSkinnedAssetAndUpdate(NorwayMapleMesh);
+	if (USkeletalMesh* EuropeanAspenMesh = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A")))
+		IslandEuropeanAspens->SetSkinnedAssetAndUpdate(EuropeanAspenMesh);
+	if (USkeletalMesh* EuropeanBeechMesh = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A")))
+		IslandEuropeanBeeches->SetSkinnedAssetAndUpdate(EuropeanBeechMesh);
 	// Carry on from the weather the Island was having when it was last left.
 	if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
 		WeatherTimeOffset = WorldState->GetSavedWeatherSeconds().Get(0.0);
