@@ -160,3 +160,25 @@ gameplay capture. The near-limit GPU allocation during PIE is direct evidence
 that longer RHI sessions need a memory guard even though the engine emitted no
 explicit exhaustion warning. The editor-only viewport still shows an unscattered
 surface and is not evidence for runtime plant distribution.
+
+## Near-shore player probe (2026-10-22)
+
+After reloading `/Game/Maps/Island`, a 30-second, zero-request PIE session spawned
+the real player at `(202000, 0, 940)`, facing toward the Island from just beyond
+the saved landscape's eastern bound. The log confirmed entry into surface
+swimming at `Z=940.0`. Before any landward movement input was issued, the session
+reached its real-time cap and ended; therefore shore return and the reported
+water-walking behavior remain unverified.
+
+The in-editor profiling HUD during that run showed about `10.03 / 10.97 GiB`
+VRAM and a `21.3 ms` frame sample. That is near the reported GPU budget; it is
+not a sustained performance measurement, and no explicit RHI out-of-memory
+message appeared in the sampled log. The editor also surfaced a Nanite Assembly
+warning that Nanite Foliage support is disabled, so the imported foliage's
+appearance is still not established. The temporary session cap was restored to
+1,800 seconds / 120 requests with continuous play disabled.
+
+Do not repeat this full-vegetation PIE probe solely to attempt movement while
+GPU headroom remains this low. First reduce or validate the Nanite/foliage
+memory footprint, then perform a short input-driven shore-return test and record
+the actual movement mode and position on both sides of the waterline.
