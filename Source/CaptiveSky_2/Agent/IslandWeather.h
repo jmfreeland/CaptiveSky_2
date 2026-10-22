@@ -279,6 +279,8 @@ private:
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);
 	/** Select one stable flower species per world-space patch, with an optional woodland niche bias. */
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity = 0.f);
+	/** Softly modulate broad meadow cover between open patches and lush communities without a hard habitat edge. */
+	static float CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity);
 	static float CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance);
 	static float CalculateMeadowFlowerWoodlandAffinity(const FVector& Position, TConstArrayView<FVector> SpruceGroveCenters);
 	/** Prefer a grounded fox spawn candidate near mature spruce and a sparse grass pocket; preserve a valid fallback. */

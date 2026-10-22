@@ -28,6 +28,23 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, true));
 	TestFalse(TEXT("An offscreen non-player resident does not create an invisible plant-sway neighborhood"),
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, false));
+	TestTrue(TEXT("Meadow habitat retains lush-community coverage"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f), 0.64f));
+	TestTrue(TEXT("Meadow habitat keeps a light baseline in open communities"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f), 0.40f));
+	TestTrue(TEXT("Invalid meadow fields resolve to a bounded neutral density"),
+		FMath::IsFinite(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
+			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity())));
+	float AverageMeadowAcceptance = 0.f;
+	constexpr int32 MeadowFieldSamples = 100;
+	for (int32 HabitatIndex = 0; HabitatIndex <= MeadowFieldSamples; ++HabitatIndex)
+		for (int32 CommunityIndex = 0; CommunityIndex <= MeadowFieldSamples; ++CommunityIndex)
+			AverageMeadowAcceptance += AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
+				static_cast<float>(HabitatIndex) / MeadowFieldSamples,
+				static_cast<float>(CommunityIndex) / MeadowFieldSamples);
+	AverageMeadowAcceptance /= FMath::Square(MeadowFieldSamples + 1);
+	TestTrue(TEXT("Soft habitat gradients preserve the former approximate 46% candidate acceptance"),
+		FMath::IsNearlyEqual(AverageMeadowAcceptance, 0.46f, 0.001f));
 	float MinimumRain = 2.f;
 	float MaximumRain = -1.f;
 	double MinimumRainTime = 0.0;

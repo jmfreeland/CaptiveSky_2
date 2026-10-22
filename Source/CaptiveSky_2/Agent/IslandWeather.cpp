@@ -668,6 +668,15 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	return static_cast<int32>(Hash % TideglassMarshMarigoldSpeciesIndex);
 }
 
+float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity)
+{
+	const float BroadHabitat = FMath::IsFinite(HabitatCommunity) ? FMath::Clamp(HabitatCommunity, 0.f, 1.f) : 0.5f;
+	const float FineCommunity = FMath::IsFinite(MeadowSubcommunity) ? FMath::Clamp(MeadowSubcommunity, 0.f, 1.f) : 0.5f;
+	// Keep the former two cutoffs' ~46% mean acceptance. A narrow 40..64% range
+	// keeps habitat character while avoiding an abrupt bare/covered boundary.
+	return 0.40f + 0.24f * (1.f - BroadHabitat) * (1.f - FineCommunity);
+}
+
 float AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance)
 {
 	if (!FMath::IsFinite(NearestSpruceGroveCenterDistance) || NearestSpruceGroveCenterDistance < 0.f) return 0.f;
@@ -1430,7 +1439,7 @@ void AIslandWeather::InitializeGroundCover()
 				WeatherSeed ^ 0x7cb25431, 18000.f);
 			const float MeadowSubcommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
 				WeatherSeed ^ 0x4cf5ad43, 2400.f);
-			if (HabitatCommunity > 0.62f || MeadowSubcommunity > 0.74f) continue;
+			if (MeadowRandom.FRand() >= CalculateLandscapeMeadowAcceptanceChance(HabitatCommunity, MeadowSubcommunity)) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
 			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
