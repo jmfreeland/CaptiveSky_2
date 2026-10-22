@@ -676,9 +676,10 @@ float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatComm
 {
 	const float BroadHabitat = FMath::IsFinite(HabitatCommunity) ? FMath::Clamp(HabitatCommunity, 0.f, 1.f) : 0.5f;
 	const float FineCommunity = FMath::IsFinite(MeadowSubcommunity) ? FMath::Clamp(MeadowSubcommunity, 0.f, 1.f) : 0.5f;
-	// Keep the former two cutoffs' ~46% mean acceptance. A narrow 40..64% range
-	// keeps habitat character while avoiding an abrupt bare/covered boundary.
-	return 0.40f + 0.24f * (1.f - BroadHabitat) * (1.f - FineCommunity);
+	// Preserve the former two cutoffs' 46% mean while giving lush low-noise
+	// communities a visibly denser cover and leaving open ground as readable glades.
+	// The correlated field, not per-instance species alternation, forms the patches.
+	return 0.28f + 0.72f * (1.f - BroadHabitat) * (1.f - FineCommunity);
 }
 
 float AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance)
@@ -1546,12 +1547,13 @@ void AIslandWeather::InitializeGroundCover()
 			const USkeletalMesh* BeechMesh = IslandEuropeanBeeches
 				? Cast<USkeletalMesh>(IslandEuropeanBeeches->GetSkinnedAsset()) : nullptr;
 			const FBoxSphereBounds BeechBounds = BeechMesh ? BeechMesh->GetBounds() : FBoxSphereBounds(ForceInit);
-			constexpr int32 MaxBroadleafTreesPerSpecies = 600;
+			constexpr int32 MaxBroadleafTreesPerSpecies = 1200;
 			constexpr int32 MaxBroadleafTreeCount = MaxBroadleafTreesPerSpecies * 3;
-			// Spread the capped species through many more woodland communities. Without this
-			// per-grove share, early groves consume the 1,800-tree quota in large blocks and
-			// most of the Island still reads as a single-species spruce forest.
-			constexpr int32 BroadleafTreesPerGrove = 5;
+			// Replace spruce placements with broadleaf trees in mixed groves. Keep the
+			// total tree budget fixed, but raise the species share enough to read at a glance.
+			// The 3,600-instance cap is spread over nearly all eligible groves rather than
+			// being consumed by a few early groves.
+			constexpr int32 BroadleafTreesPerGrove = 10;
 			if (SpruceBounds.BoxExtent.Z > KINDA_SMALL_NUMBER)
 			{
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
@@ -1928,10 +1930,10 @@ void AIslandWeather::InitializeGroundCover()
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)
 						{
-				const float RequiredClearance = bTideglassPollinatorSite && bHasTideglassFlowerAnchor
-					? GetTideglassPollinatorFlowerLandmarkClearance(Exclusion, TideglassFlowerAnchor,
-						TideglassPoolClearanceRadius, SpruceLandmarkClearance)
-					: SpruceLandmarkClearance;
+							const float RequiredClearance = bTideglassPollinatorSite && bHasTideglassFlowerAnchor
+								? GetTideglassPollinatorFlowerLandmarkClearance(Exclusion, TideglassFlowerAnchor,
+									TideglassPoolClearanceRadius, SpruceLandmarkClearance)
+								: SpruceLandmarkClearance;
 							if (FVector::Dist2D(Candidate, Exclusion) < RequiredClearance)
 							{
 								bTooClose = true;
