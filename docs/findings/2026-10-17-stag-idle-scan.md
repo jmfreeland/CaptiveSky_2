@@ -21,13 +21,24 @@ with its own `Binaries`, linked to the current `Source`, `Content`, and
 173-action editor target succeeded, including both `IslandForestStag.cpp` and
 `IslandForestStagTests.cpp` compilation and the scratch module link.
 
-The focused `CaptiveSky2.Agent.WoodlandDeer` run is **not verified**. The
+At the time of the scratch-build attempt, the focused
+`CaptiveSky2.Agent.WoodlandDeer` run was **not verified**. The
 headless process exited 0 immediately without creating the requested Unreal
 log, automation transcript, stdout, or stderr, so there is no evidence it
 reached engine startup or ran the test. No PIE or visual capture was run. Do
 not treat the immediate exit as a pass; retry the automation only after the
 known Unreal commandlet startup issue is diagnosed or launch conditions
 meaningfully change. No runtime appearance or pacing claim is made yet.
+
+## Live editor automation recheck (2026-10-22)
+
+The current UE editor's focused `CaptiveSky2.Agent.WoodlandDeer` automation
+test passed in 0.056 s with no errors or warnings. Its assertions cover the
+existing animation assets and skeleton compatibility, the temporary ambient
+look-around and return to grazing, bounded movement, and the animal's other
+perception responses. This resolves the missing automation evidence from the
+headless attempt, but it is not a live Island PIE or visual confirmation that
+visitors see the deer perform the cue.
 
 Scratch build output: `Saved/CompileScratch/Codex_StagIdleScan_20261017`.
 The failed main-tree build transcript is `%LOCALAPPDATA%\\UnrealBuildTool\\Log.txt`
