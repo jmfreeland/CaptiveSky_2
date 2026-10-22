@@ -133,3 +133,30 @@ actual over-budget event. Consequently, the passing test verifies swim-state
 retention and wake creation in its transient fixture, but player-controlled
 shore-to-open-water traversal, the 30-FPS target, current GPU headroom, and
 runtime vegetation appearance remain unverified.
+
+## Capped editor-PIE traversal probe (2026-10-22)
+
+The current editor remains responsive, but a standalone `-game` launch hit the
+same pre-engine null access violation recorded in prior failed project starts:
+`SecondsSinceStart=0`, `PCallStackHash=4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`.
+Do not repeat that standalone launch without a meaningful environment change.
+
+Instead, a short in-editor PIE probe temporarily changed only the
+`AgentPlaySessionSubsystem` class defaults in editor memory to a 90-second,
+zero-model-request cap, then spawned the normal player at `(500000, 500000,
+5940)` in open water. The live log confirmed the cap and reported
+`BP_ThirdPersonCharacter_C_0 entered surface swimming at Z=940.0`. PIE was
+stopped after 32.8 real seconds with zero requests/in-flight work when `nvidia-smi`
+showed 10,932 / 12,282 MiB allocated. No `LogRHI` out-of-memory message or
+texture-pool-over-budget event appeared; the streaming log only reported the
+configured 4096 MiB pool. After PIE stopped, GPU allocation fell to 5,802 MiB,
+`/Game/Maps/Island` remained clean, and the session defaults were restored to
+1800 seconds / 120 requests.
+
+This confirms that the actual Island player enters the custom swim mode offshore
+in the current editor build, in addition to the passing transient regression.
+It does not yet show input-driven horizontal travel, shore return, or a rendered
+gameplay capture. The near-limit GPU allocation during PIE is direct evidence
+that longer RHI sessions need a memory guard even though the engine emitted no
+explicit exhaustion warning. The editor-only viewport still shows an unscattered
+surface and is not evidence for runtime plant distribution.
