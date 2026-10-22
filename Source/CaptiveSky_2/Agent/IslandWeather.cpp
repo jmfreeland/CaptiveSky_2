@@ -55,6 +55,10 @@ static TAutoConsoleVariable<float> CVarIslandGroundCoverLandscapeDensity(
 	TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity"), 0.05f,
 	TEXT("Scale for broad landscape meadow candidates outside landmark clearings. Defaults to a lighter 5% of the former candidate budget; lower values open the distant landscape while keeping local landmark verges intact. Clamped to 0..1; also accepts a startup command-line override."),
 	ECVF_Default);
+static TAutoConsoleVariable<int32> CVarIslandGroundCoverSpatialDiagnostics(
+	TEXT("CaptiveSky.Island.GroundCoverSpatialDiagnostics"), 0,
+	TEXT("When non-zero, logs broad meadow placements per 200 m terrain tile. Does not change scatter density."),
+	ECVF_Default);
 static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
 	TEXT("CaptiveSky.Island.FoliageSwayFocusTelemetry"), 0,
 	TEXT("When non-zero, logs rendered resident focus counts and foliage transforms updated by each periodic sway pass."),
@@ -1398,6 +1402,11 @@ void AIslandWeather::InitializeGroundCover()
 		const float TerrainCellHeight = LandscapeHeight / TerrainCellRows;
 		TArray<FVector> ValidMeadowTerrainCells;
 		ValidMeadowTerrainCells.Reserve(FMath::Min(MaxMeadowTerrainCells, TerrainCellColumns * TerrainCellRows));
+		constexpr float MeadowSpatialDiagnosticTileSizeCm = 20000.f;
+		const bool bGatherMeadowSpatialDiagnostics = CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread() > 0;
+		TMap<FIntPoint, FIntPoint> MeadowSpatialTileCounts;
+		if (bGatherMeadowSpatialDiagnostics)
+			MeadowSpatialTileCounts.Reserve(512);
 		// Build a coarse, seeded-friendly land mask so broad scatter is distributed over eligible ground,
 		// rather than repeatedly painting dense islands around randomly chosen centers.
 		for (int32 CellY = 0; CellY < TerrainCellRows; ++CellY)
@@ -1415,6 +1424,12 @@ void AIslandWeather::InitializeGroundCover()
 					FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 					!Cast<ALandscapeProxy>(CellHit.GetActor()) || CellHit.ImpactNormal.Z < 0.72f || CellHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
 				ValidMeadowTerrainCells.Add(FVector(Candidate.X, Candidate.Y, CellHit.ImpactPoint.Z));
+				if (bGatherMeadowSpatialDiagnostics)
+				{
+					const FIntPoint Tile(FMath::FloorToInt(CellHit.ImpactPoint.X / MeadowSpatialDiagnosticTileSizeCm),
+						FMath::FloorToInt(CellHit.ImpactPoint.Y / MeadowSpatialDiagnosticTileSizeCm));
+					++MeadowSpatialTileCounts.FindOrAdd(Tile).X;
+				}
 			}
 		const float HalfTerrainCellWidth = TerrainCellWidth * 0.5f;
 		const float HalfTerrainCellHeight = TerrainCellHeight * 0.5f;
@@ -1442,11 +1457,51 @@ void AIslandWeather::InitializeGroundCover()
 			if (MeadowRandom.FRand() >= CalculateLandscapeMeadowAcceptanceChance(HabitatCommunity, MeadowSubcommunity)) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
+			const int32 InstanceCountBefore = GroundCoverInstanceCount;
 			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
+			if (bGatherMeadowSpatialDiagnostics && GroundCoverInstanceCount > InstanceCountBefore)
+			{
+				const FIntPoint Tile(FMath::FloorToInt(CandidateHit.ImpactPoint.X / MeadowSpatialDiagnosticTileSizeCm),
+					FMath::FloorToInt(CandidateHit.ImpactPoint.Y / MeadowSpatialDiagnosticTileSizeCm));
+				MeadowSpatialTileCounts.FindOrAdd(Tile).Y += GroundCoverInstanceCount - InstanceCountBefore;
+			}
 		}
 		GroundCoverMeadowInstanceCount = GroundCoverInstanceCount - GroundCoverBeforeMeadowPatches;
 		UE_LOG(LogIslandWeather, Log, TEXT("Landscape meadow scatter sampled %d valid terrain cells and placed %d ground-cover instances after %d bounded traces (budget %d, density %.2f)."),
 			ValidMeadowTerrainCells.Num(), GroundCoverMeadowInstanceCount, MeadowTraceCount, ScaledMeadowCandidateBudget, LandscapeDensity);
+		if (bGatherMeadowSpatialDiagnostics)
+		{
+			TArray<float> InstancesPerValidCell;
+			int32 ValidTileCount = 0;
+			int32 EmptyBroadPassTileCount = 0;
+			int32 SpatialSampleCellCount = 0;
+			int32 BroadPassInstanceCount = 0;
+			for (const TPair<FIntPoint, FIntPoint>& TileEntry : MeadowSpatialTileCounts)
+			{
+				const int32 ValidCells = TileEntry.Value.X;
+				if (ValidCells <= 0) continue;
+				++ValidTileCount;
+				SpatialSampleCellCount += ValidCells;
+				BroadPassInstanceCount += TileEntry.Value.Y;
+				if (TileEntry.Value.Y == 0) ++EmptyBroadPassTileCount;
+				InstancesPerValidCell.Add(static_cast<float>(TileEntry.Value.Y) / ValidCells);
+			}
+			InstancesPerValidCell.Sort();
+			auto GetTilePercentile = [&InstancesPerValidCell](float Fraction)
+			{
+				if (InstancesPerValidCell.IsEmpty()) return 0.f;
+				const int32 Index = FMath::Clamp(FMath::FloorToInt((InstancesPerValidCell.Num() - 1) * Fraction),
+					0, InstancesPerValidCell.Num() - 1);
+				return InstancesPerValidCell[Index];
+			};
+			const float MeanPerCell = SpatialSampleCellCount > 0
+				? static_cast<float>(BroadPassInstanceCount) / SpatialSampleCellCount : 0.f;
+			UE_LOG(LogIslandWeather, Display, TEXT("Meadow spatial diagnostics: 200 m tiles=%d, valid cells=%d, broad-pass placements=%d, zero-cover tiles=%d (%.1f%%), placements/valid-cell mean=%.2f p10=%.2f p50=%.2f p90=%.2f max=%.2f."),
+				ValidTileCount, SpatialSampleCellCount, BroadPassInstanceCount, EmptyBroadPassTileCount,
+				ValidTileCount > 0 ? 100.f * EmptyBroadPassTileCount / ValidTileCount : 0.f,
+				MeanPerCell, GetTilePercentile(0.10f), GetTilePercentile(0.50f), GetTilePercentile(0.90f),
+				InstancesPerValidCell.IsEmpty() ? 0.f : InstancesPerValidCell.Last());
+		}
 
 		// Group distant spruce groves into a continuous but irregular woodland edge. Their
 		// HISM instances remain outside landmark clearances and never collide or affect navigation.
