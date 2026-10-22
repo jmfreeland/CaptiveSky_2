@@ -5,9 +5,10 @@
 After reloading `/Game/Maps/Island`, neither the hidden water plane nor the
 `WaterBodyOcean` component is configured as a blocking collider in the editor.
 The current live state therefore does not support the earlier simple diagnosis
-that the hidden plane is what lets the player walk across the sea. The reported
-gameplay symptom still needs a bounded PIE reproduction; no PIE session was
-started during this audit.
+that the hidden plane is what lets the player walk across the sea. A later
+offshore PIE spawn did log the player entering surface swimming at Z=940 cm,
+but no movement input or shore-return check was performed, so the reported
+walking symptom is not yet fully reproduced or cleared.
 
 ## Live evidence
 
@@ -51,20 +52,33 @@ started during this audit.
   angle. It showed conifer and broadleaf silhouettes, but was not a population
   audit and cannot establish how many tree species appear across the Island.
 - A read-only GPU snapshot showed 8,020 MiB used and 3,978 MiB free on the
-  RTX 4080 Laptop GPU while PIE was stopped. Given the earlier 10.9/12.3 GiB
-  PIE reading, no new PIE run was started from this snapshot; it is not enough
-  headroom to claim that the memory warning or 30 FPS target is resolved.
+  RTX 4080 Laptop GPU while PIE was stopped. This stopped-state snapshot is not
+  enough to claim that the memory warning or 30 FPS target is resolved.
+- A later, deliberately brief in-editor PIE spawn at `(210,000, 0, 1,300) cm`
+  produced `[PlayerWater] ... entered surface swimming at Z=940.0`. The session
+  ran 45.9 real seconds because editor/tool latency exceeded the intended
+  sub-30-second window; the play-safety log records 5 model requests, all
+  completed, with no in-flight requests at shutdown. No movement input,
+  capsule mode sampling, or shore-return check was performed.
+- During that PIE sample, a GPU snapshot showed 11,006 MiB used / 992 MiB free
+  (adapter reports about 11,997 MiB dedicated). PIE was stopped immediately;
+  afterward it recovered to 6,080 MiB used / 5,918 MiB free. The session log
+  has no video-memory exhaustion warning or D3D12 crash, but 992 MiB free is
+  dangerously close to the earlier reported exhaustion condition. FPS was not
+  measured, so this does not validate the 30 FPS target.
 
 ## Next diagnostic
 
-Reproduce once in a short, request-capped PIE session at a verified water
-coordinate. Record the player capsule location, movement mode, floor-hit
-component, and WaterBody overlap at the moment walking persists. If the capsule
-is actually supported, identify that blocking component/landscape collision;
-if it is not, inspect the swim-entry/shoreline transition and visual height
-perception. Avoid changing the WaterBody or plane collision again unless the
-runtime capture identifies one as the blocker. Keep the existing play/request
-limits and stop the run promptly if GPU memory approaches the known ceiling.
+The remaining water check is an input-driven trip back toward shore, with the
+player capsule location, movement mode, floor-hit component, and WaterBody
+overlap captured if walking persists. Prefer a zero-request diagnostic path:
+the in-editor PIE sample used 5 model requests and briefly left under 1 GiB of
+dedicated VRAM. First lower the foliage/texture residency or provide a session
+cap that can be applied before PIE initialization. If the capsule is actually
+supported, identify that blocking component/landscape collision; if it is not,
+inspect the swim-entry/shoreline transition and visual height perception.
+Avoid changing the WaterBody or plane collision again unless runtime evidence
+identifies one as the blocker.
 
 ## Limits
 
