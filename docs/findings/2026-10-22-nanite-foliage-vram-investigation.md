@@ -67,9 +67,10 @@ reopened on the Island map. The reopened editor showed `All Saved`. Querying
 ProjectSetting`, confirming the restart applied the project setting. This
 confirms CVar activation only: it does not yet establish that the Nanite
 assemblies render correctly, improve frame time, or reduce peak VRAM. No paired
-memory/frame-time capture or gameplay traversal was performed. A brief runtime
-view showed a populated herbaceous layer and several tree silhouettes at night;
-it was stopped immediately after the visual check. That single view does not
+memory/frame-time capture or player traversal was performed. The runtime view
+showed a populated herbaceous layer and several tree silhouettes at night. The
+editor log reports the preview ran for 31.0 real seconds and made 4 model
+requests, with none still in flight when it ended. That single view does not
 identify species count or prove a Nanite visual/performance change, and no
 memory/frame-time reading was collected. The landscape edit-layer resolution
 warning remains visible in the editor log and is unrelated to Nanite activation.
