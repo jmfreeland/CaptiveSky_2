@@ -18,24 +18,23 @@ placements fall back to spruce as before.
 
 ## Verification
 
-- UE 5.8 Editor target built and linked successfully in the isolated
-  `Saved/CompileScratch/Codex_CurrentSourceBuild_20261018` project. The first
-  build found a test-only `TNumericLimits::QuietNaN` API mismatch; after changing
-  the fixture to `std::numeric_limits<float>::quiet_NaN()`, the follow-up build
-  completed all four incremental actions.
-- `IslandWeatherBroadleafTests.cpp` compiled into the scratch module. Its
-  automation test covers four-way field mapping, endpoint/invalid-field bounds,
-  fair-share budgets for one through four available species, Black Alder
-  component settings, and the local mesh path.
-- The automation itself did **not** run: `UnrealEditor-Cmd` returned without
-  creating a log from the existing content-free scratch project, matching the
-  known scratch-startup behavior recorded in the October 18 findings. Compile
-  success is not a test pass.
-- The main editor remains open on the Island with the prior module loaded; no
-  map or asset was saved. Live mesh assignment, Nanite appearance, wind response,
-  grove distribution, and frame-time/VRAM cost are still unverified. The
-  existing in-flight `IslandViewpointCapture.cpp` diagnostic enumerates only the
-  three earlier broadleaf components and was deliberately left untouched.
+- The actual main UE 5.8 Editor target built and linked successfully (16 UBT
+  actions), compiling the current working-tree changes and the new test.
+- `CaptiveSky2.Agent.IslandWeather.BroadleafDiversity` then passed in the live
+  editor at 2026-10-28 21:49:20. It covers four-way field mapping,
+  endpoint/invalid-field bounds, fair-share budgets for one through four
+  available species, Black Alder component settings, and the local mesh path.
+  Evidence: `Saved/Logs/CaptiveSky_2.log` and the Editor Message Log.
+- A separate `UnrealEditor-Cmd -NullRHI` attempt crashed at process startup
+  before test discovery with the known null-read signature
+  `F405610C114D120D4B6F5ABA901EC469AC9FAA26`; the in-editor run above is the
+  successful behavior-test evidence.
+- The main editor is open on the Island with the new module loaded and reports
+  `All Saved`; no map or asset was saved. Live mesh assignment, Nanite
+  appearance, wind response, grove distribution, and frame-time/VRAM cost are
+  still unverified. The existing in-flight `IslandViewpointCapture.cpp`
+  diagnostic enumerates only the three earlier broadleaf components and was
+  deliberately left untouched.
 
 ## Next validation gate
 
