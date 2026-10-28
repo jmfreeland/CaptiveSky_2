@@ -95,3 +95,20 @@ edit its authored asset here. Diagnose the parameter/texture indexing with its
 owner before changing material quality or landscape batch settings. The editor
 remains open on the Island map with no map save or material/config changes from
 this check.
+
+**Post-restart preview (2026-10-29):** the user-approved restart reopened the
+main `D:\Projects - Athena\Unreal\CaptiveSky_2` project on the saved Island.
+The fresh log set `r.Nanite.Foliage:1` from `ProjectSetting`; map check reported
+0 errors and 0 warnings, and landscape texture streaming completed. A bounded
+Standalone preview ran for 80.5 real seconds and ended with 0 model requests
+and 0 in flight. The night view showed a dense herbaceous foreground and
+several tree silhouettes. This remains visual-only evidence: the standalone
+console could not be opened, so no gameplay FPS/VRAM sample or player traversal
+was captured. The editor viewport's transient `stat unit` readings are not a
+substitute for PIE measurements. The preview reproduced
+`M_Island_Textured_Wet: Requesting an invalid TextureIndex! (21 / 20)` and the
+landscape edit-layer merge batch warning. After stopping PIE, Unreal raised a
+Windows memory-pressure toast; no process-specific attribution was available.
+`CaptiveSky.Agent.DisableThinking` was restored to `0` and the temporary stat
+overlay was turned off. Nanite assembly appearance/performance, the 30-FPS
+floor, peak VRAM, and water traversal remain unverified.
