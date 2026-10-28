@@ -74,3 +74,24 @@ requests, with none still in flight when it ended. That single view does not
 identify species count or prove a Nanite visual/performance change, and no
 memory/frame-time reading was collected. The landscape edit-layer resolution
 warning remains visible in the editor log and is unrelated to Nanite activation.
+
+**Second bounded runtime check (2026-10-28):** after the restart, the editor
+opened the saved Island and finished landscape texture streaming. The live log
+again records `r.Nanite.Foliage=1` (`LastSetBy: ProjectSetting`). Before
+Standalone play, `CaptiveSky.Agent.DisableThinking=1` was set for a zero-request
+visual check. The play-session watchdog reported a 1,800-second / 120-request
+ceiling; the session was stopped after 95.6 seconds and logged 0 model requests
+and 0 in flight. Its night-time view showed a densely vegetated foreground and
+several distinct tree silhouettes, but it is not a matched daytime composition
+or a species census. No FPS, peak VRAM, or water traversal measurement was
+collected, so neither the 30-FPS target nor the earlier memory-exhaustion
+warning is resolved by this run.
+
+Two asset/landscape warnings are now directly recorded during startup/runtime:
+the landscape edit-layer merge needs a 4033×4033 batch while the current maximum
+is 1024×1024, and `/Game/Materials/M_Island_Textured_Wet` requested texture index
+21 of 20. The latter belongs to the in-flight landscape material work; do not
+edit its authored asset here. Diagnose the parameter/texture indexing with its
+owner before changing material quality or landscape batch settings. The editor
+remains open on the Island map with no map save or material/config changes from
+this check.
