@@ -1522,6 +1522,20 @@ void AIslandWeather::InitializeGroundCover()
 				ValidTileCount > 0 ? 100.f * EmptyBroadPassTileCount / ValidTileCount : 0.f,
 				MeanPerCell, GetTilePercentile(0.10f), GetTilePercentile(0.50f), GetTilePercentile(0.90f),
 				InstancesPerValidCell.IsEmpty() ? 0.f : InstancesPerValidCell.Last());
+
+			TArray<FIntPoint> SortedTileCoordinates;
+			MeadowSpatialTileCounts.GetKeys(SortedTileCoordinates);
+			SortedTileCoordinates.Sort([](const FIntPoint& A, const FIntPoint& B)
+			{
+				return A.Y == B.Y ? A.X < B.X : A.Y < B.Y;
+			});
+			for (const FIntPoint& Tile : SortedTileCoordinates)
+			{
+				const FIntPoint* Counts = MeadowSpatialTileCounts.Find(Tile);
+				if (!Counts || Counts->X <= 0) continue;
+				UE_LOG(LogIslandWeather, Display, TEXT("Meadow tile [%d,%d]: valid cells=%d, broad-pass placements=%d, placements/valid-cell=%.2f."),
+					Tile.X, Tile.Y, Counts->X, Counts->Y, static_cast<float>(Counts->Y) / Counts->X);
+			}
 		}
 
 		// Group distant spruce groves into a continuous but irregular woodland edge. Their
