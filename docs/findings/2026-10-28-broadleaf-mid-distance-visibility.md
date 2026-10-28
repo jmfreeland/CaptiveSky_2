@@ -28,7 +28,10 @@ values if either guard regresses; do not compensate by increasing or decreasing
 the fixed tree budget during that comparison.
 
 An unattended `UnrealEditor-Cmd` attempt to run `CaptiveSky2.Agent.IslandWeather`
-returned exit code 1 during the pre-project AutoSDK validation (the log named
-missing optional LinuxArm64/VisionOS SDK versions). It did not create a fresh
-project log or report a test result, so that attempt is inconclusive about the
-IslandWeather automation and the new Alder cull value.
+returned exit code 1 before creating a fresh project log or reporting a test
+result. The captured output ended after an all-platform AutoSDK report that
+listed Win64 as valid and missing LinuxArm64/VisionOS SDK versions. The local
+`ValidatePlatformsMode` source returns success even when some platforms are
+invalid, so the output does not establish that those optional SDKs caused the
+exit. Treat the startup failure's cause as unknown; it is inconclusive about
+the IslandWeather automation and the new Alder cull value.
