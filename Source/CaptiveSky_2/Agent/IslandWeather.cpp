@@ -357,7 +357,9 @@ AIslandWeather::AIslandWeather()
 	IslandNorwayMaples->SetCullDistances(8000, 12500);
 	IslandEuropeanAspens->SetCullDistances(8000, 12500);
 	IslandEuropeanBeeches->SetCullDistances(8000, 12500);
-	IslandBlackAlders->SetCullDistances(8000, 12500);
+	// Let the newly added alder provide a distinct broadleaf silhouette beyond
+	// 125 m, without extending the other species or matching the spruce horizon.
+	IslandBlackAlders->SetCullDistances(12000, 22000);
 
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
