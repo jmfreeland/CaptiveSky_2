@@ -146,3 +146,33 @@ asked to leave the unresponsive editor running, so wait for their direction
 before closing it; project-open preview attempts also remain gated on resolving
 the known Core startup crash. This does not explain that crash or establish
 whether the editor window itself is responsive.
+
+## Interactive editor restart recheck — 2026-10-28
+
+With the user's explicit approval and the editor visibly reporting `All Saved`,
+the editor was closed normally. A direct UE 5.8.3 `UnrealEditor.exe` launch of
+`CaptiveSky_2.uproject` then terminated during startup. The crash bundle under
+`Saved/Crashes/_0000/` was updated at 21:52:15 local and contains a 311,781-byte
+minidump and a crash-side `CaptiveSky_2.log`. The context reports
+`EXCEPTION_ACCESS_VIOLATION` reading address zero at `SecondsSinceStart=0`,
+with `PCallStackHash 4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. This exactly
+matches the prior Game/editor pre-initialization signature documented above;
+it is not a symbolized root cause. The log ends during startup metadata, before
+the normal `Saved/Logs/CaptiveSky_2.log` is recreated.
+
+The launch inherited the project directory as its working directory. Its log
+also reports that the relative `UnrealTraceServer.exe` path could not resolve
+and tracing fell back to memory; the earlier working-directory investigation
+established this warning is not evidence of the null dereference's cause. A
+read-only recheck found neither `UnrealEditor-Core.pdb` / `UnrealEditor.pdb`
+beside the installed UE 5.8.3 binaries nor `cdb.exe`, `windbg.exe`, or
+`llvm-symbolizer.exe` on the available command path. Therefore the existing
+next diagnostic remains installing/locating matching editor symbols or a local
+minidump debugger, then symbolizing this crash before another equivalent
+project launch.
+
+The current `Config/DefaultEngine.ini` contains both
+`bEnableNaniteFoliage=True` and `r.Nanite.Foliage=True`; the project's Nanite
+setting is enabled in source configuration. This failed restart cannot verify
+the live CVar or Nanite rendering, so no visual/performance conclusion follows.
+No project source, asset, or map was changed in this recheck.
