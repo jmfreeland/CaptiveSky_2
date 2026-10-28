@@ -57,3 +57,19 @@ may not appear as expected, but the thumbnail alone does not prove whether
 Nanite activation will restore their foliage. The editor was left open pending
 user confirmation that it is safe to restart; no player-input traversal test or
 memory comparison was performed in this Simulate pass.
+
+## Restart verification (2026-10-28)
+
+After the user confirmed the editor was saved and approved a restart, the
+standalone preview was stopped and the `CaptiveSky_2` editor was closed and
+reopened on the Island map. The reopened editor showed `All Saved`. Querying
+`r.Nanite.Foliage` in the live console returned `1` with `LastSetBy:
+ProjectSetting`, confirming the restart applied the project setting. This
+confirms CVar activation only: it does not yet establish that the Nanite
+assemblies render correctly, improve frame time, or reduce peak VRAM. No paired
+memory/frame-time capture or gameplay traversal was performed. A brief runtime
+view showed a populated herbaceous layer and several tree silhouettes at night;
+it was stopped immediately after the visual check. That single view does not
+identify species count or prove a Nanite visual/performance change, and no
+memory/frame-time reading was collected. The landscape edit-layer resolution
+warning remains visible in the editor log and is unrelated to Nanite activation.
