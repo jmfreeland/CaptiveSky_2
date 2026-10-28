@@ -87,6 +87,9 @@ public:
 	static constexpr float TideglassPollinatorFlowerNearbyLandmarkClearance = 1200.f;
 	/** Keep wet-edge cattail clumps from occupying a reserved pollinator flower pocket. */
 	static constexpr float TideglassPollinatorFlowerCattailClearance = 375.f;
+	/** Preserve a fixed mixed-tree population while spreading it across available Megaplant species. */
+	static constexpr int32 BroadleafTreePopulationBudget = 3600;
+	static constexpr int32 BroadleafTreeSpeciesCount = 4;
 	/** Keep the earlier general meadow scatter clear of later Tideglass specialist flower sites. */
 	static constexpr float TideglassPollinatorFlowerSiteClearance = 475.f;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
@@ -132,6 +135,10 @@ public:
 	static FVector EvaluateTransientGust(const FIslandTransientGust& Gust, const FVector& Position, double CurrentTime);
 	/** Keep nearby plant bending around controlled or visibly rendered residents, not offscreen actors. */
 	static bool ShouldIncludeResidentInSwayFocus(bool bIsPlayerControlled, bool bWasRecentlyRendered);
+	/** Map a stable [0, 1] grove field to a broadleaf species without favoring any one type. */
+	static int32 GetBroadleafSpeciesIndex(float SpeciesField);
+	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */
+	static int32 GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount);
 
 protected:
 	virtual void BeginPlay() override;
@@ -140,6 +147,7 @@ protected:
 
 private:
 	friend class FIslandWeatherTest;
+	friend class FIslandWeatherBroadleafDiversityTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandGroundCoverTest;
 	friend class FIslandMeadowFlowerSpeciesTest;
@@ -164,6 +172,7 @@ private:
 	int32 GroundCoverMapleTreeCount = 0;
 	int32 GroundCoverAspenTreeCount = 0;
 	int32 GroundCoverBeechTreeCount = 0;
+	int32 GroundCoverBlackAlderTreeCount = 0;
 	int32 GroundCoverBirchCoppiceCount = 0;
 	int32 GroundCoverHazelCoppiceCount = 0;
 	TArray<FTransform> IslandShrubBaseTransforms;
@@ -197,6 +206,8 @@ private:
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanAspens;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanBeeches;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandBlackAlders;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandShrubs;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;
