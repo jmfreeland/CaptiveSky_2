@@ -30,37 +30,42 @@ class RatHollowMicrohabitatV1Tests(unittest.TestCase):
         self.assertEqual(config["ASSET_ANCHORS_CM"]["entrance_threshold"], (-78.0, -1.0, 3.0))
         self.assertEqual(config["ASSET_ANCHORS_CM"]["entrance_center"], (-78.0, -1.0, 24.0))
 
-    def test_sparse_fern_reach_leaves_a_clear_approach_to_the_mouth(self):
+    def test_mixed_understory_reach_leaves_a_clear_approach_to_the_mouth(self):
         config, _ = constants()
-        self.assertGreaterEqual(len(config["FERN_PLACEMENTS"]), 3)
+        placements = config["VEGETATION_PLACEMENTS"]
+        self.assertGreaterEqual(len(placements), 2)
+        self.assertEqual({item[0] for item in placements}, {"fern", "strawberry"})
         entrance = (-0.78, -0.01)
-        for x, y, _z, scale, _yaw in config["FERN_PLACEMENTS"]:
+        for _species, x, y, _z, scale, _yaw, reach in placements:
             distance = math.hypot(x - entrance[0], y - entrance[1])
-            clearance = distance - config["MAX_FERN_REACH_M"] * scale
+            clearance = distance - reach * scale
             self.assertGreaterEqual(
                 clearance,
                 config["MIN_ENTRANCE_CLEARANCE_M"],
-                f"fern at {(x, y)} crowds the entrance by only {clearance:.2f} m",
+                f"{_species} at {(x, y)} crowds the entrance by only {clearance:.2f} m",
             )
             self.assertGreater(scale, 0.0)
-            self.assertLessEqual(scale, 0.75)
+            self.assertLessEqual(scale, 1.0)
 
     def test_visual_ground_cover_is_sparse_and_keeps_collision_source_separate(self):
-        config, tree = constants()
+        _, tree = constants()
         functions = {
             node.name: node for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         build_source = ast.get_source_segment(ASSET.read_text(encoding="utf-8"), functions["build"])
         self.assertIn("_HOLLOW.build(A)", build_source)
-        self.assertIn("_add_fern(A", build_source)
+        self.assertIn("_add_vegetation(A", build_source)
         self.assertNotIn("A.collide_box", build_source)
-        self.assertNotIn("MOSS_SHOULDERS", config)
+        self.assertIn('"entryBedding"', build_source)
+        source = ASSET.read_text(encoding="utf-8")
+        self.assertIn('lib.PLAIN["hollowwood"]', source)
 
     def test_asset_uses_existing_reproducible_hollow_and_fern_sources(self):
         source = ASSET.read_text(encoding="utf-8")
         self.assertIn('"rat_hollow_rootarch_v2.py"', source)
         self.assertIn('"woodland_fern.py"', source)
+        self.assertIn('"woodland_wildstrawberry.py"', source)
         self.assertIn('NAME = "RatHollowMicrohabitatV1"', source)
 
 

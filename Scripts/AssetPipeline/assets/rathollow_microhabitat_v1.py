@@ -21,6 +21,11 @@ def _load(name, filename):
 
 _HOLLOW = _load("rathollow_rootarch_v2_microhabitat", "rat_hollow_rootarch_v2.py")
 _FERN = _load("woodland_fern_microhabitat", "woodland_fern.py")
+_STRAWBERRY = _load("woodland_wildstrawberry_microhabitat", "woodland_wildstrawberry.py")
+
+# The enclosed surface should read as sheltered timber instead of an unlit void.
+# Keep the colour earthy; the straw bed remains the brightest interior detail.
+lib.PLAIN["hollowwood"] = {"BaseColor": [0.38, 0.24, 0.13], "Roughness": 0.96}
 
 NAME = "RatHollowMicrohabitatV1"
 ASSET_ANCHORS_CM = {
@@ -28,21 +33,19 @@ ASSET_ANCHORS_CM = {
     "entrance_threshold": (-78.0, -1.0, 3.0),
 }
 
-# Each fern is a modest, collisionless patch. The closest frond tip remains
-# clear of the rat-sized opening, while the asymmetric placements break the
-# bare log silhouette without building an opaque ring around the entrance.
-FERN_PLACEMENTS = (
-    (-0.55, -0.74, 0.0, 0.70, -0.35),
-    (-0.38, 0.76, 0.0, 0.58, 0.90),
-    (0.92, -0.60, 0.0, 0.62, 2.15),
+# Species, position, ground height, scale, yaw, and conservative plant reach.
+# Low strawberries break up the log-to-ground edge; one fern adds a taller,
+# asymmetric screen. The nearest rendered leaves remain outside the doorway.
+VEGETATION_PLACEMENTS = (
+    ("strawberry", -0.25, -0.52, 0.0, 0.80, -0.30, 0.42),
+    ("fern", -0.50, 0.64, 0.0, 0.68, 1.30, 0.64),
 )
-MAX_FERN_REACH_M = 0.64
 MIN_ENTRANCE_CLEARANCE_M = 0.25
 
 
-def _add_fern(A, x, y, z, scale, yaw):
+def _add_vegetation(A, module, x, y, z, scale, yaw):
     first_part = len(A.parts)
-    _FERN.build(A)
+    module.build(A)
     rotation = math.radians(yaw)
     for obj, _material in A.parts[first_part:]:
         obj.scale *= scale
@@ -55,5 +58,9 @@ def build(A):
 
     # Keep the opening anchor and all eight shelter collision boxes unchanged.
     # Understory meshes are visual-only and never enter A.coll.
-    for x, y, z, scale, yaw in FERN_PLACEMENTS:
-        _add_fern(A, x, y, z, scale, yaw)
+    A.rock("straw", (0.18, 0.125, 0.018), loc=(-0.60, -0.01, 0.05),
+           seed=89, sub=1, rough=0.05, flat_bottom=0.92, tile=0.4,
+           name="entryBedding")
+    for species, x, y, z, scale, yaw, _reach in VEGETATION_PLACEMENTS:
+        module = _STRAWBERRY if species == "strawberry" else _FERN
+        _add_vegetation(A, module, x, y, z, scale, yaw)

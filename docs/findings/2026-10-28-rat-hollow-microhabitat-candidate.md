@@ -13,26 +13,31 @@ the entrance/traversal requirements.
 ## Candidate and checks
 
 `Scripts/AssetPipeline/assets/rathollow_microhabitat_v1.py` composes the
-existing Rat-scale RootArch V2 shelter with three collisionless Woodland Fern
-clumps. It preserves the shelter's eight collision boxes and entrance anchors;
-each fern placement keeps a measured 25 cm radial clearance beyond the
-generator's conservative frond reach estimate. The resulting FBX is
-219 × 219 × 90 cm, about 18,664 triangles, seven material slots, one `UVMap`,
-and eight `UBX` collision pieces. Blender 5.2.2 re-import verification reports
-`PROBLEMS []`; all 98 asset-pipeline source tests pass, including the four
-focused composition/clearance tests.
+existing Rat-scale RootArch V2 shelter with one collisionless Woodland Fern,
+one Wild Strawberry groundcover patch, and a shallow straw threshold mat. The
+inner timber material is warmer, and the two plant species are deliberately
+asymmetric rather than arranged in a ring. It preserves the shelter's eight
+collision boxes and entrance anchors; each plant placement keeps at least
+25 cm of radial clearance beyond its conservative reach estimate. The
+resulting FBX is 193 × 190 × 90 cm, about 11,700 triangles, twelve material
+slots, one `UVMap`, and eight `UBX` collision pieces. Blender 5.2.2 re-import
+verification reports `PROBLEMS []`; all 98 asset-pipeline source tests pass,
+including the four focused composition/clearance tests.
 
-The local FBX and preview are under the ignored path
-`Saved/CaptiveSky/ComfyBlender/RatHollowMicrohabitatV1/`. The preview is a
-shape/material check under simple lighting, not a placement or Unreal review.
+The local FBX and entrance/approach previews are under the ignored path
+`Saved/CaptiveSky/ComfyBlender/RatHollowMicrohabitatV1/`. These are
+shape/material checks under simple lighting, not a placement or Unreal review.
 
 ## Decision and next gate
 
-This is **not yet approved for import or placement**. In the entrance-facing
-preview the ferns add a little habitat context, but they remain distinct
-sprays, the trunk still dominates, and the tunnel reads dark. The composition
-does not yet prove that a human-height approach will miss the home or that a
-Rat can traverse the entrance in Unreal.
+This is **not yet approved for import or placement**. The oblique preview now
+shows a coherent low strawberry patch against the log, one fern peeking around
+the opposite side, and straw inside the threshold; this is more habitat-like
+than the first symmetric fern pass. The entrance-facing preview still shows a
+stark cut end and dark tunnel, and neither preview proves that a
+human-height approach will miss the home or that a Rat can traverse the
+entrance in Unreal. Twelve material slots and the absence of LODs also need a
+bounded in-engine cost check before placement.
 
 Next, if an Unreal session becomes available, import this FBX into a disposable
 review folder only. Compare true Rat-eye and human-height views at the two
