@@ -306,7 +306,8 @@ bool AIslandCommonFrog::RespondToNearbyDragonfly(const FVector& DragonflyLocatio
 	if (!ShouldWatchLowDragonfly(Offset.Size2D(), Offset.Z)) return false;
 	RestingRotation = GetActorRotation();
 	DragonflyLookLocation = DragonflyLocation;
-	DragonflyAttentionRemaining = 1.4f;
+	// Give nearby players enough time to notice the frog tracking the passing insect.
+	DragonflyAttentionRemaining = 2.4f;
 	DragonflyAttentionCooldownRemaining = 16.f;
 	return true;
 }

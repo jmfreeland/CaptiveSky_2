@@ -54,10 +54,13 @@ bool FIslandCommonFrogDragonflyTests::RunTest(const FString& Parameters)
 
 	FrogActor->DragonflyCheckRemaining = 0.f;
 	FrogActor->Tick(0.25f);
-	TestTrue(TEXT("A nearby low-hovering dragonfly triggers one brief attention cue"),
-		FrogActor->DragonflyAttentionRemaining > 1.f && FrogActor->DragonflyPresenceLatch.Get() == Dragonfly);
+	TestTrue(TEXT("A nearby low-hovering dragonfly triggers a readable attention cue"),
+		FrogActor->DragonflyAttentionRemaining > 2.3f && FrogActor->DragonflyPresenceLatch.Get() == Dragonfly);
 	TestTrue(TEXT("The frog turns toward the passing dragonfly"), FrogActor->GetActorRotation().Yaw > 30.f);
 	FrogActor->Tick(1.5f);
+	TestTrue(TEXT("The frog keeps tracking long enough for the cue to read"),
+		FrogActor->DragonflyAttentionRemaining > 0.8f && FrogActor->GetActorRotation().Yaw > 30.f);
+	FrogActor->Tick(1.f);
 	TestTrue(TEXT("The frog returns to its resting orientation after the cue"),
 		FMath::IsNearlyZero(FMath::FindDeltaAngleDegrees(FrogActor->GetActorRotation().Yaw, 0.f)));
 	TestTrue(TEXT("The same pass cannot trigger another attention cue"),
