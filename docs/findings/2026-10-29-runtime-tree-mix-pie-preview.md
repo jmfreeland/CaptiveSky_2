@@ -54,3 +54,13 @@ state and the Rhododendron master has known graph defects, inspect the exact
 affected roots and agree on scope before saving asset changes. Then capture a
 daylight runtime view and measure frame time and graphics memory in the same
 repeatable play route.
+
+## Daylight PIE overlay observation
+
+On a later observation of the open daylight PIE viewport, Unreal displayed
+55.76 FPS and 17.93 ms/frame with the streaming-stat overlay visible. This is
+above the project's 30-FPS target for that instant, but the screen also showed
+`PROFILING WITH ALL LOGGING ON!`, and no timed sample or peak graphics-memory
+reading was collected. Treat it as a useful indication, not a controlled
+performance pass; repeat with logging/profiling overhead understood and a
+recorded frame-time/VRAM interval.
