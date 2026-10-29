@@ -168,3 +168,15 @@ per-resident limits, and the resident's durable “pending review” memory with
 calling a model or touching the production inbox. They do not establish a live
 Discord conversation, an actual LLM choosing the action, or any requested
 upgrade being implemented in the world.
+
+**Live-editor object-affordance follow-up (2026-10-29):**
+`CaptiveSky2.Agent.IslandArrangement` and
+`CaptiveSky2.Agent.IslandArrangementInspection` also passed (2 passed, 0
+failed; 0.224 seconds total). The arrangement perception fixture confirms that
+nearby untagged objects such as a “Mossy Stone Tower” can be proposed by name,
+while remaining unavailable as `move_to` or `interact` targets. Both tests
+emitted the fixture's existing transient-world teardown warnings; the
+arrangement test also notes that its synthetic Listening Stones world has no
+three cube proxies, so presentation is skipped there. This validates the
+general request affordance, not the newly placed fungus actors specifically,
+nor a character actually choosing a request in PIE.
