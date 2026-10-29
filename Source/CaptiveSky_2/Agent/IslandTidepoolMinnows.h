@@ -28,6 +28,10 @@ public:
 	bool RespondToSurfaceRipple();
 	/** Describes a recent surface break to a nearby observer for the next already-scheduled decision. */
 	FString DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const;
+	/** True only during the brief visible fish hop that produces a surface break. */
+	bool IsMakingSurfaceBreak() const;
+	/** World position of the currently breaking fish, or the school origin if none is active. */
+	FVector GetSurfaceBreakWorldLocation() const;
 	/** An awake rat close to the shore startles the school within bounded horizontal/vertical limits. */
 	static bool ShouldScatterForRat(bool bRatAwake, float DistanceCm, float VerticalOffsetCm);
 	/** A nearby frog hop briefly scatters the school; a settled frog is ignored. */
@@ -43,6 +47,7 @@ private:
 	friend class FIslandMinnowFrogCueTest;
 	friend class FIslandMinnowSwimmingVisitorTest;
 	friend class FIslandNightEcologyTest;
+	friend class FIslandCommonFrogMinnowTests;
 	static constexpr int32 FishCount = 5;
 	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
 	static constexpr float StartleRippleEdgeClearanceCm = 120.f;

@@ -6,6 +6,7 @@
 
 class AIslandDayNight;
 class AIslandTidepoolCrab;
+class AIslandTidepoolMinnows;
 class AIslandTideglassDragonfly;
 class AIslandWeather;
 class APawn;
@@ -37,6 +38,9 @@ public:
 	static bool ShouldWatchLowDragonfly(float DistanceCm, float VerticalOffsetCm);
 	/** Briefly turn toward a nearby low dragonfly without moving or calling an LLM. */
 	bool RespondToNearbyDragonfly(const FVector& DragonflyLocation);
+	/** Watch a real nearby minnow surface break; this is attention only, not a hop or splash. */
+	static bool ShouldWatchMinnowSurfaceBreak(float DistanceCm, float VerticalOffsetCm);
+	bool RespondToMinnowSurfaceBreak(const FVector& SurfaceBreakLocation);
 	static float HopArcHeight(float Alpha, float MaximumHeightCm);
 	FVector GetHabitatHome() const { return HomeLocation; }
 	bool IsHopping() const { return HopRemaining > 0.f; }
@@ -48,11 +52,13 @@ protected:
 private:
 	friend class FIslandCommonFrogTests;
 	friend class FIslandCommonFrogDragonflyTests;
+	friend class FIslandCommonFrogMinnowTests;
 	friend class FIslandMinnowFrogCueTest;
 	void FindEnvironment();
 	void CheckForPlayerDisturbance();
 	void CheckForNearbyWildlife();
 	void CheckForNearbyDragonfly();
+	void CheckForNearbyMinnowSurfaceBreak();
 	bool BeginHop(const FVector& Direction, float PreferredDistanceCm);
 	FVector ResolveGroundLocation(const FVector& Desired) const;
 	void SetColor(UMaterialInstanceDynamic* Material, const FLinearColor& Color);
@@ -85,8 +91,9 @@ private:
 	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
 	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	TWeakObjectPtr<AIslandTideglassDragonfly> DragonflyPresenceLatch;
+	TWeakObjectPtr<AIslandTidepoolMinnows> MinnowPresenceLatch;
 	FVector HomeLocation = FVector::ZeroVector;
-	FVector DragonflyLookLocation = FVector::ZeroVector;
+	FVector WildlifeAttentionLocation = FVector::ZeroVector;
 	FVector HopStartLocation = FVector::ZeroVector;
 	FVector HopTargetLocation = FVector::ZeroVector;
 	FRotator RestingRotation = FRotator::ZeroRotator;
@@ -97,8 +104,8 @@ private:
 	float AmbientHopRemaining = 25.f;
 	float ObserverCheckRemaining = 0.f;
 	float DragonflyCheckRemaining = 0.f;
-	float DragonflyAttentionRemaining = 0.f;
-	float DragonflyAttentionCooldownRemaining = 0.f;
+	float WildlifeAttentionRemaining = 0.f;
+	float WildlifeAttentionCooldownRemaining = 0.f;
 	float StartleCooldownRemaining = 0.f;
 	float MaximumHomeRadiusCm = 420.f;
 };

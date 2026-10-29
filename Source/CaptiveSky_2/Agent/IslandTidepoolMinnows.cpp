@@ -568,6 +568,17 @@ FString AIslandTidepoolMinnows::DescribeRecentSurfaceBreak(const FVector& Observ
 	return TEXT("A minnow made a brief surface break in the Tideglass shallows within the last few minutes. The ripple has faded; the school remains wild and nothing lasting changed.");
 }
 
+bool AIslandTidepoolMinnows::IsMakingSurfaceBreak() const
+{
+	return SurfaceBreakHopRemaining > 0.f && Fish.IsValidIndex(SurfaceBreakHopFishIndex) &&
+		IsValid(Fish[SurfaceBreakHopFishIndex]);
+}
+
+FVector AIslandTidepoolMinnows::GetSurfaceBreakWorldLocation() const
+{
+	return IsMakingSurfaceBreak() ? Fish[SurfaceBreakHopFishIndex]->GetComponentLocation() : GetActorLocation();
+}
+
 void AIslandTidepoolMinnows::CheckForNearbySurfaceCue()
 {
 	if (!GetWorld() || SurfacePulseRemaining > 0.f || SurfacePulseCooldownRemaining > 0.f) return;

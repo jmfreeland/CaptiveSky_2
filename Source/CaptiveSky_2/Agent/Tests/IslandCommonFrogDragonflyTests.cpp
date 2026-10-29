@@ -55,16 +55,16 @@ bool FIslandCommonFrogDragonflyTests::RunTest(const FString& Parameters)
 	FrogActor->DragonflyCheckRemaining = 0.f;
 	FrogActor->Tick(0.25f);
 	TestTrue(TEXT("A nearby low-hovering dragonfly triggers a readable attention cue"),
-		FrogActor->DragonflyAttentionRemaining > 2.3f && FrogActor->DragonflyPresenceLatch.Get() == Dragonfly);
+		FrogActor->WildlifeAttentionRemaining > 2.3f && FrogActor->DragonflyPresenceLatch.Get() == Dragonfly);
 	TestTrue(TEXT("The frog turns toward the passing dragonfly"), FrogActor->GetActorRotation().Yaw > 30.f);
 	FrogActor->Tick(1.5f);
 	TestTrue(TEXT("The frog keeps tracking long enough for the cue to read"),
-		FrogActor->DragonflyAttentionRemaining > 0.8f && FrogActor->GetActorRotation().Yaw > 30.f);
+		FrogActor->WildlifeAttentionRemaining > 0.8f && FrogActor->GetActorRotation().Yaw > 30.f);
 	FrogActor->Tick(1.f);
 	TestTrue(TEXT("The frog returns to its resting orientation after the cue"),
 		FMath::IsNearlyZero(FMath::FindDeltaAngleDegrees(FrogActor->GetActorRotation().Yaw, 0.f)));
 	TestTrue(TEXT("The same pass cannot trigger another attention cue"),
-		FMath::IsNearlyZero(FrogActor->DragonflyAttentionRemaining) && FrogActor->DragonflyAttentionCooldownRemaining > 0.f);
+		FMath::IsNearlyZero(FrogActor->WildlifeAttentionRemaining) && FrogActor->WildlifeAttentionCooldownRemaining > 0.f);
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

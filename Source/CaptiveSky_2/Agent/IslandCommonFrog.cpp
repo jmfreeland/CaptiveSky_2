@@ -11,6 +11,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "IslandDayNight.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandWeather.h"
 #include "RatAgentAIController.h"
@@ -228,6 +229,8 @@ void AIslandCommonFrog::CheckForNearbyWildlife()
 			return;
 		}
 	}
+
+	CheckForNearbyMinnowSurfaceBreak();
 }
 
 void AIslandCommonFrog::CheckForNearbyDragonfly()
@@ -239,8 +242,8 @@ void AIslandCommonFrog::CheckForNearbyDragonfly()
 		if (Offset.Size2D() > 430.f || Offset.Z < 0.f || Offset.Z > 300.f)
 			DragonflyPresenceLatch.Reset();
 	}
-	if (DragonflyPresenceLatch.IsValid() || DragonflyAttentionRemaining > 0.f ||
-		DragonflyAttentionCooldownRemaining > 0.f || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
+	if (DragonflyPresenceLatch.IsValid() || WildlifeAttentionRemaining > 0.f ||
+		WildlifeAttentionCooldownRemaining > 0.f || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
 
 	const FVector EyeLocation = GetActorLocation() + FVector(0.f, 0.f, 8.f);
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(CommonFrogDragonflySight), false, this);
@@ -257,6 +260,40 @@ void AIslandCommonFrog::CheckForNearbyDragonfly()
 		if (RespondToNearbyDragonfly(Dragonfly->GetActorLocation()))
 		{
 			DragonflyPresenceLatch = Dragonfly;
+			return;
+		}
+	}
+}
+
+void AIslandCommonFrog::CheckForNearbyMinnowSurfaceBreak()
+{
+	if (!GetWorld()) return;
+	if (MinnowPresenceLatch.IsValid())
+	{
+		const FVector Offset = MinnowPresenceLatch->GetActorLocation() - GetActorLocation();
+		if ((!MinnowPresenceLatch->IsMakingSurfaceBreak() && WildlifeAttentionRemaining <= 0.f) ||
+			!ShouldWatchMinnowSurfaceBreak(Offset.Size2D(), Offset.Z))
+			MinnowPresenceLatch.Reset();
+	}
+	if (MinnowPresenceLatch.IsValid() || DragonflyPresenceLatch.IsValid() || WildlifeAttentionRemaining > 0.f ||
+		WildlifeAttentionCooldownRemaining > 0.f || StartleCooldownRemaining > 0.f || HopRemaining > 0.f) return;
+
+	for (TActorIterator<AIslandTidepoolMinnows> It(GetWorld()); It; ++It)
+	{
+		AIslandTidepoolMinnows* School = *It;
+		if (!IsValid(School) || !School->IsMakingSurfaceBreak()) continue;
+		const FVector SurfaceLocation = School->GetSurfaceBreakWorldLocation();
+		const FVector Offset = SurfaceLocation - GetActorLocation();
+		if (!ShouldWatchMinnowSurfaceBreak(Offset.Size2D(), Offset.Z)) continue;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(CommonFrogMinnowSight), false, this);
+		Query.AddIgnoredActor(School);
+		FHitResult SightHit;
+		const FVector EyeLocation = GetActorLocation() + FVector(0.f, 0.f, 8.f);
+		if (GetWorld()->LineTraceSingleByChannel(SightHit, EyeLocation, SurfaceLocation, ECC_Visibility, Query) &&
+			SightHit.GetActor() != School) continue;
+		if (RespondToMinnowSurfaceBreak(SurfaceLocation))
+		{
+			MinnowPresenceLatch = School;
 			return;
 		}
 	}
@@ -299,16 +336,36 @@ bool AIslandCommonFrog::ShouldWatchLowDragonfly(float DistanceCm, float Vertical
 
 bool AIslandCommonFrog::RespondToNearbyDragonfly(const FVector& DragonflyLocation)
 {
-	if (StartleCooldownRemaining > 0.f || HopRemaining > 0.f || DragonflyAttentionRemaining > 0.f ||
-		DragonflyAttentionCooldownRemaining > 0.f || !FMath::IsFinite(DragonflyLocation.X) ||
+	if (StartleCooldownRemaining > 0.f || HopRemaining > 0.f || WildlifeAttentionRemaining > 0.f ||
+		WildlifeAttentionCooldownRemaining > 0.f || !FMath::IsFinite(DragonflyLocation.X) ||
 		!FMath::IsFinite(DragonflyLocation.Y) || !FMath::IsFinite(DragonflyLocation.Z)) return false;
 	const FVector Offset = DragonflyLocation - GetActorLocation();
 	if (!ShouldWatchLowDragonfly(Offset.Size2D(), Offset.Z)) return false;
 	RestingRotation = GetActorRotation();
-	DragonflyLookLocation = DragonflyLocation;
+	WildlifeAttentionLocation = DragonflyLocation;
 	// Give nearby players enough time to notice the frog tracking the passing insect.
-	DragonflyAttentionRemaining = 2.4f;
-	DragonflyAttentionCooldownRemaining = 16.f;
+	WildlifeAttentionRemaining = 2.4f;
+	WildlifeAttentionCooldownRemaining = 16.f;
+	return true;
+}
+
+bool AIslandCommonFrog::ShouldWatchMinnowSurfaceBreak(float DistanceCm, float VerticalOffsetCm)
+{
+	return FMath::IsFinite(DistanceCm) && DistanceCm >= 0.f && DistanceCm <= 1100.f &&
+		FMath::IsFinite(VerticalOffsetCm) && FMath::Abs(VerticalOffsetCm) <= 500.f;
+}
+
+bool AIslandCommonFrog::RespondToMinnowSurfaceBreak(const FVector& SurfaceBreakLocation)
+{
+	if (StartleCooldownRemaining > 0.f || HopRemaining > 0.f || WildlifeAttentionRemaining > 0.f ||
+		WildlifeAttentionCooldownRemaining > 0.f || !FMath::IsFinite(SurfaceBreakLocation.X) ||
+		!FMath::IsFinite(SurfaceBreakLocation.Y) || !FMath::IsFinite(SurfaceBreakLocation.Z)) return false;
+	const FVector Offset = SurfaceBreakLocation - GetActorLocation();
+	if (!ShouldWatchMinnowSurfaceBreak(Offset.Size2D(), Offset.Z)) return false;
+	RestingRotation = GetActorRotation();
+	WildlifeAttentionLocation = SurfaceBreakLocation;
+	WildlifeAttentionRemaining = 1.8f;
+	WildlifeAttentionCooldownRemaining = 12.f;
 	return true;
 }
 
@@ -342,8 +399,9 @@ FVector AIslandCommonFrog::ResolveGroundLocation(const FVector& Desired) const
 
 bool AIslandCommonFrog::BeginHop(const FVector& RequestedDirection, float PreferredDistanceCm)
 {
-	DragonflyAttentionRemaining = 0.f;
+	WildlifeAttentionRemaining = 0.f;
 	DragonflyPresenceLatch.Reset();
+	MinnowPresenceLatch.Reset();
 	FVector Direction(RequestedDirection.X, RequestedDirection.Y, 0.f);
 	if (!Direction.Normalize()) return false;
 	FVector Desired = GetActorLocation() + Direction * FMath::Clamp(PreferredDistanceCm, 45.f, 210.f);
@@ -384,8 +442,8 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Delta = FMath::Max(0.f, FMath::IsFinite(DeltaSeconds) ? DeltaSeconds : 0.f);
 	StartleCooldownRemaining = FMath::Max(0.f, StartleCooldownRemaining - Delta);
-	DragonflyAttentionCooldownRemaining = FMath::Max(0.f, DragonflyAttentionCooldownRemaining - Delta);
-	DragonflyAttentionRemaining = FMath::Max(0.f, DragonflyAttentionRemaining - Delta);
+	WildlifeAttentionCooldownRemaining = FMath::Max(0.f, WildlifeAttentionCooldownRemaining - Delta);
+	WildlifeAttentionRemaining = FMath::Max(0.f, WildlifeAttentionRemaining - Delta);
 	ObserverCheckRemaining -= Delta;
 	if (ObserverCheckRemaining <= 0.f)
 	{
@@ -416,10 +474,10 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 		return;
 	}
 
-	if (DragonflyAttentionRemaining > 0.f)
+	if (WildlifeAttentionRemaining > 0.f)
 	{
 		const FVector LookTarget = DragonflyPresenceLatch.IsValid()
-			? DragonflyPresenceLatch->GetActorLocation() : DragonflyLookLocation;
+			? DragonflyPresenceLatch->GetActorLocation() : WildlifeAttentionLocation;
 		const FVector ToDragonfly = LookTarget - GetActorLocation();
 		FRotator LookRotation = ToDragonfly.Rotation();
 		LookRotation.Pitch = 0.f;
