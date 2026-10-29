@@ -14,6 +14,7 @@
 #include "IslandForestFox.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandTrail.h"
+#include "IslandSpatialPointIndex.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -1633,10 +1634,10 @@ void AIslandWeather::InitializeGroundCover()
 			{
 				FRandomStream SpruceRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x1f83d9abu));
 				TArray<FVector> SpruceGroveCenters;
-				TArray<FVector> SpruceLocations;
-				TArray<FVector> WoodlandCoppiceLocations;
-				TArray<FVector> ShrubLocations;
-				TArray<FVector> RhododendronLocations;
+				FIslandSpatialPointIndex SpruceLocations;
+				FIslandSpatialPointIndex WoodlandCoppiceLocations;
+				FIslandSpatialPointIndex ShrubLocations;
+				FIslandSpatialPointIndex RhododendronLocations;
 			int32 BroadleafTreeCount = 0;
 				int32 BroadleafGrovesWithTrees = 0;
 				int32 SpruceTraceCount = 0;
@@ -1702,14 +1703,9 @@ void AIslandWeather::InitializeGroundCover()
 							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
 						if (bNearLandmark) continue;
 						bool bTooClose = false;
-						for (const FVector& ExistingTree : SpruceLocations)
-							if (FVector::Dist2D(Candidate, ExistingTree) < SpruceTreeMinSpacing) { bTooClose = true; break; }
-						if (!bTooClose)
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
-						if (!bTooClose)
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerTreeClearance) { bTooClose = true; break; }
+						if (SpruceLocations.IsWithinDistance(Candidate, SpruceTreeMinSpacing)) bTooClose = true;
+						if (!bTooClose && ShrubLocations.IsWithinDistance(Candidate, ShrubTreeClearance)) bTooClose = true;
+						if (!bTooClose && RhododendronLocations.IsWithinDistance(Candidate, FlowerTreeClearance)) bTooClose = true;
 						if (bTooClose) continue;
 
 						FHitResult TreeHit;
@@ -1780,14 +1776,9 @@ void AIslandWeather::InitializeGroundCover()
 							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
 						if (bNearLandmark) continue;
 						bool bTooClose = false;
-						for (const FVector& ExistingTree : SpruceLocations)
-							if (FVector::Dist2D(Candidate, ExistingTree) < SaplingMinSpacing) { bTooClose = true; break; }
-						if (!bTooClose)
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubTreeClearance) { bTooClose = true; break; }
-						if (!bTooClose)
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerTreeClearance) { bTooClose = true; break; }
+						if (SpruceLocations.IsWithinDistance(Candidate, SaplingMinSpacing)) bTooClose = true;
+						if (!bTooClose && ShrubLocations.IsWithinDistance(Candidate, ShrubTreeClearance)) bTooClose = true;
+						if (!bTooClose && RhododendronLocations.IsWithinDistance(Candidate, FlowerTreeClearance)) bTooClose = true;
 						if (bTooClose) continue;
 
 						FHitResult SaplingHit;
@@ -1824,14 +1815,10 @@ void AIslandWeather::InitializeGroundCover()
 								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
 							if (bNearLandmark) continue;
 							bool bTooClose = false;
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < ShrubMinSpacing) { bTooClose = true; break; }
+							if (ShrubLocations.IsWithinDistance(Candidate, ShrubMinSpacing)) bTooClose = true;
 							if (bTooClose) continue;
-							for (const FVector& ExistingTree : SpruceLocations)
-								if (FVector::Dist2D(Candidate, ExistingTree) < ShrubTreeClearance) { bTooClose = true; break; }
-							if (!bTooClose)
-								for (const FVector& ExistingFlower : RhododendronLocations)
-									if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerShrubClearance) { bTooClose = true; break; }
+							if (SpruceLocations.IsWithinDistance(Candidate, ShrubTreeClearance)) bTooClose = true;
+							if (!bTooClose && RhododendronLocations.IsWithinDistance(Candidate, FlowerShrubClearance)) bTooClose = true;
 							if (bTooClose) continue;
 
 							FHitResult ShrubHit;
@@ -1871,16 +1858,13 @@ void AIslandWeather::InitializeGroundCover()
 								if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bNearLandmark = true; break; }
 							if (bNearLandmark) continue;
 							bool bTooClose = false;
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < RhododendronMinSpacing) { bTooClose = true; break; }
+							if (RhododendronLocations.IsWithinDistance(Candidate, RhododendronMinSpacing)) bTooClose = true;
 							if (bTooClose) continue;
 							if (bHasTideglassFlowerAnchor && IsWithinTideglassPollinatorFlowerSiteClearance(
 								Candidate, TideglassFlowerAnchor, WeatherSeed)) continue;
-							for (const FVector& ExistingTree : SpruceLocations)
-								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance) { bTooClose = true; break; }
+							if (SpruceLocations.IsWithinDistance(Candidate, FlowerTreeClearance)) bTooClose = true;
 							if (bTooClose) continue;
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance) { bTooClose = true; break; }
+							if (ShrubLocations.IsWithinDistance(Candidate, FlowerShrubClearance)) bTooClose = true;
 							if (bTooClose) continue;
 
 							FHitResult FlowerHit;
@@ -1924,17 +1908,13 @@ void AIslandWeather::InitializeGroundCover()
 						for (const FVector& Exclusion : ExclusionLocations)
 							if (FVector::Dist2D(Candidate, Exclusion) < SpruceLandmarkClearance) { bTooClose = true; break; }
 						if (bTooClose) continue;
-						for (const FVector& ExistingCoppice : WoodlandCoppiceLocations)
-							if (FVector::Dist2D(Candidate, ExistingCoppice) < WoodlandCoppiceMinSpacing) { bTooClose = true; break; }
+						if (WoodlandCoppiceLocations.IsWithinDistance(Candidate, WoodlandCoppiceMinSpacing)) bTooClose = true;
 						if (!bTooClose)
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < 550.f) { bTooClose = true; break; }
+							if (ShrubLocations.IsWithinDistance(Candidate, 550.f)) bTooClose = true;
 						if (!bTooClose)
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < 850.f) { bTooClose = true; break; }
+							if (RhododendronLocations.IsWithinDistance(Candidate, 850.f)) bTooClose = true;
 						if (!bTooClose)
-							for (const FVector& ExistingTree : SpruceLocations)
-								if (FVector::Dist2D(Candidate, ExistingTree) < 650.f) { bTooClose = true; break; }
+							if (SpruceLocations.IsWithinDistance(Candidate, 650.f)) bTooClose = true;
 						if (bTooClose) continue;
 
 						const bool bPreferHazel = HazelMesh && (!BirchMesh || SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0xa54ff53au) > 0.5f);
@@ -2031,13 +2011,11 @@ void AIslandWeather::InitializeGroundCover()
 								}
 						}
 						if (!bTooClose)
-							for (const FVector& ExistingFlower : RhododendronLocations)
-								if (FVector::Dist2D(Candidate, ExistingFlower) < FlowerMinSpacing)
-								{
-									bTooClose = true;
-									if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.ExistingFlower;
-									break;
-								}
+							if (RhododendronLocations.IsWithinDistance(Candidate, FlowerMinSpacing))
+							{
+								bTooClose = true;
+								if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.ExistingFlower;
+							}
 						if (!bTooClose && !bTideglassPollinatorSite && bHasTideglassFlowerAnchor &&
 							IsWithinTideglassPollinatorFlowerSiteClearance(Candidate, TideglassFlowerAnchor, WeatherSeed))
 						{
@@ -2045,21 +2023,17 @@ void AIslandWeather::InitializeGroundCover()
 							if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.ExistingFlower;
 						}
 						if (!bTooClose)
-							for (const FVector& ExistingTree : SpruceLocations)
-								if (FVector::Dist2D(Candidate, ExistingTree) < FlowerTreeClearance)
-								{
-									bTooClose = true;
-									if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.Tree;
-									break;
-								}
+							if (SpruceLocations.IsWithinDistance(Candidate, FlowerTreeClearance))
+							{
+								bTooClose = true;
+								if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.Tree;
+							}
 						if (!bTooClose)
-							for (const FVector& ExistingShrub : ShrubLocations)
-								if (FVector::Dist2D(Candidate, ExistingShrub) < FlowerShrubClearance)
-								{
-									bTooClose = true;
-									if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.Shrub;
-									break;
-								}
+							if (ShrubLocations.IsWithinDistance(Candidate, FlowerShrubClearance))
+							{
+								bTooClose = true;
+								if (bDiagnoseTideglassFlowerAnchor) ++TideglassFlowerAnchorDiagnostics.Shrub;
+							}
 						if (bTooClose) return false;
 						if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, Candidate))
 						{
