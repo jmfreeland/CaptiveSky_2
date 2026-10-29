@@ -48,6 +48,24 @@ contains a `ProceduralVegetation` asset plus skeletal-mesh variants for
 Aleppo Pine under `/Game/Megaplant_Library/Tree_Aleppo_Pine/`. This is a
 potential new evergreen silhouette, but it is a Mediterranean species and
 should not be scattered across the temperate Island indiscriminately. Before
-integration, inspect its PVE preset, material texture footprint, and LODs; if
-it remains desirable, consider a small, clearly introduced sheltered grove
-within the existing tree-count budget.
+integration, inspect the PVE preset itself and establish a lower-cost far
+representation; if it remains desirable, consider a small, clearly introduced
+sheltered grove within the existing tree-count budget.
+
+## Live-project foliage preflight follow-up
+
+Read-only Unreal asset queries found that each of the four currently used
+Megaplant skeletal trees has exactly one LOD: Norway Maple 4,203 vertices,
+European Aspen 6,231, European Beech 6,005, and Black Alder 11,781. Aleppo
+Pine A also has one LOD and 9,189 vertices. Its two material slots depend on
+the Procedural Vegetation sample foliage master; its four referenced species
+textures are Bark Color 4096², Bark NAH 4096², Foliage Opacity 2048², and
+Foliage Normal 4096². The mesh depends on `DynamicWind` and a PVE asset, so it
+is not just a low-cost static-tree substitute. These dimensions are source
+texture sizes, not measured resident VRAM.
+
+This rules out adding Aleppo Pine as a broad scatter under the current memory
+uncertainty. The stronger next step is a repeatable foliage LOD/texture-budget
+path for the already-used tree family; then compare a low-cost far representation
+before considering any additional species. No asset was edited and no runtime
+memory claim is made from registry metadata.
