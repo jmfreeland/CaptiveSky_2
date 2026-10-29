@@ -147,6 +147,43 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Repeated queries return the same first sample"), DenseRegion.SampleCells[0], RepeatedDenseRegion.SampleCells[0]);
 	TestEqual(TEXT("Repeated queries return the same last sample"), DenseRegion.SampleCells.Last(), RepeatedDenseRegion.SampleCells.Last());
 
+	FIslandTrailLedger HorizontalLedger;
+	FIslandTrailLedger VerticalLedger;
+	FIslandTrailLedger DiagonalLedger;
+	FIslandTrailLedger BranchLedger;
+	FIslandTrailLedger SparseLedger;
+	for (int32 I = 0; I < 4; ++I)
+	{
+		AddRegionCell(HorizontalLedger, FIntPoint(I, 2), 5 + I, 20);
+		AddRegionCell(VerticalLedger, FIntPoint(2, I), 5 + I, 20);
+		AddRegionCell(DiagonalLedger, FIntPoint(I, I), 5 + I, 20);
+		if (I < 3) AddRegionCell(SparseLedger, FIntPoint(I, 2), 5 + I, 20);
+	}
+	AddRegionCell(BranchLedger, FIntPoint(3, 3), 10, 20);
+	AddRegionCell(BranchLedger, FIntPoint(2, 3), 10, 20);
+	AddRegionCell(BranchLedger, FIntPoint(4, 3), 10, 20);
+	AddRegionCell(BranchLedger, FIntPoint(3, 2), 10, 20);
+	AddRegionCell(BranchLedger, FIntPoint(3, 4), 10, 20);
+
+	const FIslandTrailRegionSummary Horizontal = HorizontalLedger.SummarizeRegionForCell(FIntPoint(0, 0), 20);
+	TestTrue(TEXT("Four clear horizontal worn cells reveal a high-confidence axis"), Horizontal.WornAxisLinearity >= 0.99f);
+	TestTrue(TEXT("The derived east-west axis has a stable positive sign"), Horizontal.WornAxis.X > 0.99f && FMath::Abs(Horizontal.WornAxis.Y) < 0.01f);
+	TestTrue(TEXT("Visitors can read an east-west alignment without claiming a route"),
+		UIslandTrailSubsystem::DescribeWornAlignment(Horizontal).Contains(TEXT("east-west line")));
+
+	const FIslandTrailRegionSummary Vertical = VerticalLedger.SummarizeRegionForCell(FIntPoint(0, 0), 20);
+	TestTrue(TEXT("A north-south cluster is described with the appropriate compass axis"),
+		UIslandTrailSubsystem::DescribeWornAlignment(Vertical).Contains(TEXT("north-south line")));
+	const FIslandTrailRegionSummary Diagonal = DiagonalLedger.SummarizeRegionForCell(FIntPoint(0, 0), 20);
+	TestTrue(TEXT("A diagonal cluster uses a stable undirected compass label"),
+		UIslandTrailSubsystem::DescribeWornAlignment(Diagonal).Contains(TEXT("northeast-southwest line")));
+	const FIslandTrailRegionSummary Branch = BranchLedger.SummarizeRegionForCell(FIntPoint(0, 0), 20);
+	TestTrue(TEXT("A cross-shaped cluster does not invent one dominant direction"),
+		UIslandTrailSubsystem::DescribeWornAlignment(Branch).IsEmpty());
+	const FIslandTrailRegionSummary Sparse = SparseLedger.SummarizeRegionForCell(FIntPoint(0, 0), 20);
+	TestTrue(TEXT("Three cells are too sparse for an alignment claim"),
+		UIslandTrailSubsystem::DescribeWornAlignment(Sparse).IsEmpty());
+
 	AddRegionCell(RegionLedger, FIntPoint(16, 0), 1, 20);
 	const TArray<FIslandTrailRegionSummary> WornRegions = RegionLedger.SummarizeWornRegions(20);
 	TestEqual(TEXT("A world-level snapshot includes each worn 12 m region once"), WornRegions.Num(), 2);

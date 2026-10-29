@@ -126,6 +126,56 @@ FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntP
 			: static_cast<int32>((static_cast<int64>(I) * (ContributingCells.Num() - 1)) / (SampleCount - 1));
 		Summary.SampleCells.Add(ContributingCells[Index]);
 	}
+
+	// A compass cue is useful only when the worn patches collectively read as a line.
+	// Keep it derived from the existing bounded region; never persist or bridge gaps.
+	constexpr int32 MinAlignmentCells = 4;
+	if (ContributingCells.Num() >= MinAlignmentCells)
+	{
+		double WeightSum = 0.0;
+		double WeightedX = 0.0;
+		double WeightedY = 0.0;
+		for (const FIntPoint& Key : ContributingCells)
+		{
+			const double Weight = static_cast<double>(FMath::Max(1, Cells.FindChecked(Key).Steps));
+			WeightSum += Weight;
+			WeightedX += Weight * static_cast<double>(Key.X - static_cast<int64>(StartX));
+			WeightedY += Weight * static_cast<double>(Key.Y - static_cast<int64>(StartY));
+		}
+
+		if (WeightSum > UE_DOUBLE_SMALL_NUMBER)
+		{
+			const double MeanX = WeightedX / WeightSum;
+			const double MeanY = WeightedY / WeightSum;
+			double XX = 0.0;
+			double YY = 0.0;
+			double XY = 0.0;
+			for (const FIntPoint& Key : ContributingCells)
+			{
+				const double Weight = static_cast<double>(FMath::Max(1, Cells.FindChecked(Key).Steps));
+				const double X = static_cast<double>(Key.X - static_cast<int64>(StartX)) - MeanX;
+				const double Y = static_cast<double>(Key.Y - static_cast<int64>(StartY)) - MeanY;
+				XX += Weight * X * X;
+				YY += Weight * Y * Y;
+				XY += Weight * X * Y;
+			}
+
+			const double Trace = XX + YY;
+			if (Trace > UE_DOUBLE_SMALL_NUMBER)
+			{
+				const double Linearity = FMath::Sqrt(FMath::Square(XX - YY) + 4.0 * FMath::Square(XY)) / Trace;
+				Summary.WornAxisLinearity = static_cast<float>(Linearity);
+				if (Linearity >= 0.45)
+				{
+					const double Angle = 0.5 * FMath::Atan2(2.0 * XY, XX - YY);
+					FVector2D Axis(static_cast<float>(FMath::Cos(Angle)), static_cast<float>(FMath::Sin(Angle)));
+					// Give the undirected axis a stable sign for consumers and tests.
+					if (Axis.Y < -UE_SMALL_NUMBER || (FMath::Abs(Axis.Y) <= UE_SMALL_NUMBER && Axis.X < 0.f)) Axis *= -1.f;
+					Summary.WornAxis = Axis;
+				}
+			}
+		}
+	}
 	return Summary;
 }
 
@@ -468,6 +518,30 @@ FString UIslandTrailSubsystem::DescribeTrail(int32 Steps, int32 NearbyPrints, fl
 	return Out;
 }
 
+FString UIslandTrailSubsystem::DescribeWornAlignment(const FIslandTrailRegionSummary& Region)
+{
+	if (Region.WornCellCount < 4 || Region.WornAxisLinearity < 0.45f || Region.WornAxis.IsNearlyZero()) return FString();
+
+	const float AbsX = FMath::Abs(Region.WornAxis.X);
+	const float AbsY = FMath::Abs(Region.WornAxis.Y);
+	const TCHAR* Alignment = nullptr;
+	if (AbsX >= AbsY * 2.f)
+	{
+		Alignment = TEXT("east-west");
+	}
+	else if (AbsY >= AbsX * 2.f)
+	{
+		Alignment = TEXT("north-south");
+	}
+	else
+	{
+		Alignment = Region.WornAxis.X * Region.WornAxis.Y >= 0.f
+			? TEXT("northeast-southwest")
+			: TEXT("northwest-southeast");
+	}
+	return FString::Printf(TEXT(" The worn patches here follow a mostly %s line."), Alignment);
+}
+
 FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float Wetness) const
 {
 	int32 Steps = 0;
@@ -501,6 +575,7 @@ FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float 
 			Description += TEXT(" The age of some worn patches is no longer known.");
 			break;
 		}
+		Description += DescribeWornAlignment(Region);
 	}
 	return Description;
 }

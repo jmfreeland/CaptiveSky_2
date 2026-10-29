@@ -37,6 +37,10 @@ struct FIslandTrailRegionSummary
 	int64 CurrentWearSteps = 0;
 	int32 LastUseDay = -1;
 	EIslandTrailRegionState State = EIslandTrailRegionState::Unknown;
+	/** Undirected principal axis of worn cells, in world XY; zero when the cluster is too sparse or isotropic. */
+	FVector2D WornAxis = FVector2D::ZeroVector;
+	/** Weighted covariance anisotropy in [0,1]; higher values indicate a clearer line. */
+	float WornAxisLinearity = 0.f;
 	/** Deterministic, bounded examples of the cell keys that contribute to the summary. */
 	TArray<FIntPoint> SampleCells;
 };
@@ -140,6 +144,8 @@ public:
 	int32 GetActivePrintCount() const;
 	/** What a resident notices of the ground itself: worn tracks and wet prints. Pure; counts come from the ledger. */
 	static FString DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness, int32 LastUseDay = -1, int32 Today = -1);
+	/** Describe only high-confidence, undirected alignment; never claim a continuous route from sparse cells. */
+	static FString DescribeWornAlignment(const FIslandTrailRegionSummary& Region);
 	/** The same, for a point on the island. */
 	FString DescribeUnderfoot(const FVector& Position, float Wetness) const;
 	/** Tests set this to redirect or suppress saving; empty means derive from the map. */
