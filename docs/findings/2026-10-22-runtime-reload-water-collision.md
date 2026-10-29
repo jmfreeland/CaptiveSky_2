@@ -67,3 +67,8 @@ than the earlier trace-only evidence, but it is still a transient automation
 fixture—not a real player crossing at the Island shore. Keep that bounded,
 zero-request runtime crossing as the remaining confirmation before calling the
 reported walk-on-water issue fully resolved.
+
+The follow-up PIE crossing was not started: `nvidia-smi` at 2026-10-29 17:52
+UTC reported 8,781/12,282 MiB allocated, 57% GPU utilization, and 80°C. Avoid
+adding runtime rendering load until the GPU has cooled and the memory warning
+has been reassessed.
