@@ -127,6 +127,34 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Repeated queries return the same first sample"), DenseRegion.SampleCells[0], RepeatedDenseRegion.SampleCells[0]);
 	TestEqual(TEXT("Repeated queries return the same last sample"), DenseRegion.SampleCells.Last(), RepeatedDenseRegion.SampleCells.Last());
 
+	AddRegionCell(RegionLedger, FIntPoint(16, 0), 1, 20);
+	const TArray<FIslandTrailRegionSummary> WornRegions = RegionLedger.SummarizeWornRegions(20);
+	TestEqual(TEXT("A world-level snapshot includes each worn 12 m region once"), WornRegions.Num(), 2);
+	if (WornRegions.Num() == 2)
+	{
+		TestEqual(TEXT("World-level path records use stable coordinate order"), WornRegions[0].RegionKey, FIntPoint(0, 0));
+		TestEqual(TEXT("World-level path records retain stable place IDs"), WornRegions[0].StableId, FString(TEXT("trail-region:0:0")));
+		TestEqual(TEXT("A region record aggregates worn cells into accumulated use"), WornRegions[0].CurrentWearSteps, static_cast<int64>(24));
+		TestEqual(TEXT("A region record preserves its most recent use day"), WornRegions[0].LastUseDay, 19);
+		TestEqual(TEXT("The next region follows in coordinate order"), WornRegions[1].RegionKey, FIntPoint(1, 0));
+		TestEqual(TEXT("A second region keeps its own stable ID"), WornRegions[1].StableId, FString(TEXT("trail-region:1:0")));
+		TestTrue(TEXT("A world-level record carries the derived active/recovering state"),
+			WornRegions[0].State == EIslandTrailRegionState::Active && WornRegions[1].State == EIslandTrailRegionState::Active);
+		TestEqual(TEXT("A faint single-step patch does not create an extra place record"), WornRegions.Num(), 2);
+		TestEqual(TEXT("The second place record keeps its accumulated use distinct"), WornRegions[1].CurrentWearSteps, static_cast<int64>(100));
+	}
+	const TArray<FIslandTrailRegionSummary> RepeatedWornRegions = RegionLedger.SummarizeWornRegions(20);
+	TestEqual(TEXT("Repeated world snapshots remain deterministic"), RepeatedWornRegions.Num(), WornRegions.Num());
+	if (WornRegions.Num() == RepeatedWornRegions.Num() && !WornRegions.IsEmpty())
+	{
+		TestEqual(TEXT("The first path ID remains stable across snapshots"), RepeatedWornRegions[0].StableId, WornRegions[0].StableId);
+		TestEqual(TEXT("Representative-cell sample counts remain stable"), RepeatedWornRegions[0].SampleCells.Num(), WornRegions[0].SampleCells.Num());
+		for (int32 I = 0; I < WornRegions[0].SampleCells.Num(); ++I)
+		{
+			TestEqual(TEXT("Representative cells remain stable across snapshots"), RepeatedWornRegions[0].SampleCells[I], WornRegions[0].SampleCells[I]);
+		}
+	}
+
 	const float NaN = std::numeric_limits<float>::quiet_NaN();
 	const float Infinity = std::numeric_limits<float>::infinity();
 	TestFalse(TEXT("A non-finite position cannot enter persistent path memory"), Ledger.AddStep(FVector(NaN, 0.f, 0.f), FVector::UpVector));

@@ -66,6 +66,8 @@ struct CAPTIVESKY_2_API FIslandTrailLedger
 	static FString RegionId(const FIntPoint& RegionKey);
 	/** Derive a bounded summary by inspecting only the cells inside this 12 m region. */
 	FIslandTrailRegionSummary SummarizeRegionForCell(const FIntPoint& CellKey, int32 Today) const;
+	/** Derive every worn 12 m region in stable coordinate order. At most MaxCells records can be returned. */
+	TArray<FIslandTrailRegionSummary> SummarizeWornRegions(int32 Today) const;
 	/** Count one footfall on the ground at Position. Returns false when the ledger is full and the cell is new. */
 	bool AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay = -1);
 	int32 StepsAt(const FVector& Position) const;

@@ -128,6 +128,38 @@ FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntP
 	return Summary;
 }
 
+TArray<FIslandTrailRegionSummary> FIslandTrailLedger::SummarizeWornRegions(int32 Today) const
+{
+	TSet<FIntPoint> UniqueRegionKeys;
+	UniqueRegionKeys.Reserve(Cells.Num());
+	for (const TPair<FIntPoint, FIslandTrailCell>& Pair : Cells)
+	{
+		if (Pair.Value.Steps >= MinRegionCellSteps)
+		{
+			UniqueRegionKeys.Add(RegionForCell(Pair.Key));
+		}
+	}
+
+	TArray<FIntPoint> RegionKeys = UniqueRegionKeys.Array();
+	RegionKeys.Sort([](const FIntPoint& A, const FIntPoint& B)
+	{
+		return A.X == B.X ? A.Y < B.Y : A.X < B.X;
+	});
+
+	TArray<FIslandTrailRegionSummary> Summaries;
+	Summaries.Reserve(RegionKeys.Num());
+	for (const FIntPoint& RegionKey : RegionKeys)
+	{
+		const FIntPoint FirstCell(RegionKey.X * RegionCellSpan, RegionKey.Y * RegionCellSpan);
+		FIslandTrailRegionSummary Summary = SummarizeRegionForCell(FirstCell, Today);
+		if (Summary.WornCellCount > 0)
+		{
+			Summaries.Add(MoveTemp(Summary));
+		}
+	}
+	return Summaries;
+}
+
 bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay)
 {
 	const double CellX = static_cast<double>(Position.X) / CellSize;

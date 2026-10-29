@@ -462,3 +462,25 @@ tuning change passed the current-source UE 5.8.3 build and focused `IslandTrail`
 and `GroundCover` automations with zero model requests. A matched visual capture
 is still needed before its appearance can be called verified. Automation log:
 [Codex_TrailWearTune_Automation_20261010.log](../../Saved/Logs/Codex_TrailWearTune_Automation_20261010.log).
+
+## World-level desire-path evidence (2026-10-29)
+
+`FIslandTrailLedger::SummarizeWornRegions(Today)` exposes a renderer-independent
+snapshot of every region with repeated footfall evidence. Each record reuses
+the stable `trail-region:X:Y` identity and derived summary already used for
+local trail descriptions: worn-cell count, accumulated current wear, most
+recent known use day, active/recovering/unknown state, and at most eight
+deterministic representative cells. Regions are returned in coordinate order;
+patches below the two-step wear threshold do not become records. The 6,000-cell
+ledger cap also bounds the maximum result size.
+
+These are derived records, not a second persisted source of truth: saving and
+weathering continue to operate on the existing trail ledger, and summaries can
+be rebuilt from it. A region is place-scale evidence, not a reconstructed path
+spline; a later materializer should join neighboring evidence into a narrow
+route only when repeat use supports it. This gives residents and future shared
+world-state tooling a stable, bounded way to refer to paths without having an
+LLM author raw landscape geometry. The focused automation test was compiled in
+the 2026-10-29 editor-target build, but its execution remains unverified because
+`UnrealEditor-Cmd` crashed at process startup; see
+[`editor restart crash`](../findings/2026-10-29-editor-restart-crash.md).

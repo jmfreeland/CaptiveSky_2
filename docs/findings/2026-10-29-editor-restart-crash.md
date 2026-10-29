@@ -14,8 +14,12 @@ The project configuration still contains `bEnableNaniteFoliage=True` and `r.Nani
 - `Saved/Logs/CaptiveSky_2.log` remained timestamped 03:54:01.314 UTC, ending with the prior session's orderly shutdown. No fresh project startup log was created.
 - The latest project `Saved/Crashes` directory remained `_0000`, timestamped 03:55:29 UTC. No new project crash context was created by these editor attempts.
 
+## Command-line automation attempt
+
+The 5.8.3 `CaptiveSky_2Editor` target subsequently built successfully in 71.91 seconds, compiling and linking the changed `IslandTrail.cpp` and `IslandTrailTests.cpp`. A focused `UnrealEditor-Cmd.exe -NullRHI` run for `CaptiveSky2.Agent.IslandTrail` exited before the test could start. Its log ended immediately after “Running engine for game: CaptiveSky_2”; the new crash context at 04:15:06 records `EXCEPTION_ACCESS_VIOLATION` reading address zero, `ProcessId=0`, `SecondsSinceStart=0`, and hash `F405610C114D120D4B6F5ABA901EC469AC9FAA26`. Its Core stack offsets match the earlier 03:55 standalone pre-init null access violation through the first eight frames. This is useful evidence of a repeated engine-startup boundary, but not a test result or proof of an identical root cause.
+
 ## Interpretation and next step
 
-The failure occurs before a fresh project log or project-local crash context is available, so it cannot yet be attributed to Nanite Foliage, the Island map, or VRAM. This evidence is separate from the 03:55 standalone Game attempt's recorded pre-initialization null access violation; the editor attempts did not generate a new crash context proving the same cause.
+The editor failure occurs before a fresh project log or project-local crash context is available, so it cannot yet be attributed to Nanite Foliage, the Island map, or VRAM. The command-line test failure does produce a project-local crash context and repeats the earlier standalone Game's zero-address pre-init stack pattern, though its hash differs slightly. Neither failure yielded runtime validation.
 
-Do not repeat the same editor launch. Next diagnostic should capture the Windows Application Error/WER event for the 04:01–04:05 UTC attempts (or obtain a fresh CrashReportClient report) and compare its faulting module/exception before changing rendering settings or project content.
+Do not repeat the same editor or command-line launch. Next diagnostic should capture the Windows Application Error/WER event for the 04:01–04:15 UTC attempts (or obtain a fresh CrashReportClient report) and compare its faulting module/exception before changing rendering settings or project content. The editor-target build proves compilation only; the `IslandTrail` automation and Nanite post-restart check remain pending.
