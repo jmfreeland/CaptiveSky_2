@@ -63,7 +63,7 @@ private:
 	void CheckForVisitorPresence(float DeltaSeconds);
 	void CheckForQuietResidentPresence(float DeltaSeconds);
 	void BeginVisitorResonance(bool bResidentApproach);
-	void BeginQuietListeningResonance();
+	void BeginQuietListeningResonance(APawn* QuietResident);
 	void ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection = FVector::ZeroVector);
 	void BeginNaturalResonance(float WindSpeed, const FVector& WindDirection);
 	virtual void Tick(float DeltaSeconds) override;

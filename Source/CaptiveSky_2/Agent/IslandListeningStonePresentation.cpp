@@ -420,7 +420,7 @@ void AListeningStonePresentation::CheckForQuietResidentPresence(float DeltaSecon
 			bQuietVisitHandled = true;
 			const float SecondsSinceLastChime = static_cast<float>(World->GetTimeSeconds() - LastAmbientChimeAt);
 			if (CanBeginVisitorResonance(false, GetResonanceRemaining() > 0.f, SecondsSinceLastChime))
-				BeginQuietListeningResonance();
+				BeginQuietListeningResonance(QuietResident);
 			return;
 		}
 		else
@@ -467,7 +467,7 @@ void AListeningStonePresentation::BeginVisitorResonance(bool bResidentApproach)
 		Chime->BeginChime(LocalWind, bResidentApproach ? EIslandChimeCause::ResidentApproach : EIslandChimeCause::VisitorApproach);
 }
 
-void AListeningStonePresentation::BeginQuietListeningResonance()
+void AListeningStonePresentation::BeginQuietListeningResonance(APawn* QuietResident)
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
@@ -479,7 +479,7 @@ void AListeningStonePresentation::BeginQuietListeningResonance()
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
-		Chime->BeginChime(LocalWind, EIslandChimeCause::ResidentListening);
+		Chime->BeginChime(LocalWind, EIslandChimeCause::ResidentListening, QuietResident);
 }
 
 void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)

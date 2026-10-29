@@ -6,6 +6,7 @@
 
 class UAudioComponent;
 class USoundWaveProcedural;
+class APawn;
 
 enum class EIslandChimeCause : uint8
 {
@@ -29,8 +30,10 @@ public:
 	static constexpr float AttenuationFalloffDistance = 750.f;
 	static constexpr float AudibleRadius = AttenuationInnerRadius + AttenuationFalloffDistance;
 	static constexpr float ResidentContextLifetimeSeconds = 305.f;
-	void BeginChime(float HorizontalWindSpeed = 0.f, EIslandChimeCause Cause = EIslandChimeCause::Unspecified);
-	void BeginChime(const FVector& HorizontalWind, EIslandChimeCause Cause = EIslandChimeCause::Unspecified);
+	void BeginChime(float HorizontalWindSpeed = 0.f, EIslandChimeCause Cause = EIslandChimeCause::Unspecified,
+		const APawn* QuietResident = nullptr);
+	void BeginChime(const FVector& HorizontalWind, EIslandChimeCause Cause = EIslandChimeCause::Unspecified,
+		const APawn* QuietResident = nullptr);
 	/** Whether a nearby animal can still physically hear the tone. */
 	bool IsAudibleAt(const FVector& ListenerLocation) const;
 	/** Fading or just-faded tone fact for nearby residents; no enduring discovery is implied. */
@@ -38,6 +41,10 @@ public:
 	/** Sparse private memory policy: only nearby autonomous residents who can hear a tone retain it. */
 	static bool ShouldRecordResidentObservation(bool bPlayerControlled, bool bHasMemory, bool bAudible, bool bHasRecentSimilarMemory);
 	static FString ResidentObservationText(EIslandChimeCause Cause);
+	/** A quiet-listening practice is remembered only by a distinct autonomous resident with clear, nearby sight of the listener. */
+	static bool ShouldRecordQuietPractice(bool bPlayerControlled, bool bHasMemory, bool bIsSubject, bool bWithinWitnessRange,
+		bool bHasLineOfSight, bool bFacingSubject, bool bHasRecentSimilarMemory, bool bHasSubjectIdentity);
+	static FString QuietPracticeObservationText(const FString& SubjectAgentId);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -58,7 +65,9 @@ private:
 	EIslandChimeCause Cause = EIslandChimeCause::Unspecified;
 	static float CalculateWindPitchRatio(float HorizontalWindSpeed);
 	static float CalculateWindDirectionPitchRatio(const FVector& HorizontalWind, const FVector& LandmarkForward);
-	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause);
-	void RecordNearbyResidentObservations();
+	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause,
+		const APawn* QuietResident);
+	void RecordNearbyResidentObservations(const APawn* QuietResident);
+	void RecordQuietPracticeWitnesses(const APawn* QuietResident);
 	void BuildChimeWave(float PitchRatio);
 };

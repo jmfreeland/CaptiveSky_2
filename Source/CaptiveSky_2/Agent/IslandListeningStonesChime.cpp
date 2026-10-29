@@ -2,10 +2,12 @@
 
 #include "AgentMemoryComponent.h"
 #include "AgentMemoryTypes.h"
+#include "CollisionQueryParams.h"
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Pawn.h"
+#include "IslandWorldStateSubsystem.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundWaveProcedural.h"
 
@@ -27,20 +29,23 @@ AIslandListeningStonesChime::AIslandListeningStonesChime()
 	AudioComponent->VolumeMultiplier = 0.28f;
 }
 
-void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed, EIslandChimeCause InCause)
+void AIslandListeningStonesChime::BeginChime(float HorizontalWindSpeed, EIslandChimeCause InCause,
+	const APawn* QuietResident)
 {
 	const float Speed = FMath::IsFinite(HorizontalWindSpeed) ? FMath::Clamp(HorizontalWindSpeed, 0.f, 300.f) : 0.f;
-	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed), InCause);
+	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed), InCause, QuietResident);
 }
 
-void AIslandListeningStonesChime::BeginChime(const FVector& HorizontalWind, EIslandChimeCause InCause)
+void AIslandListeningStonesChime::BeginChime(const FVector& HorizontalWind, EIslandChimeCause InCause,
+	const APawn* QuietResident)
 {
 	const float Speed = HorizontalWind.ContainsNaN() ? 0.f : FMath::Clamp(HorizontalWind.Size2D(), 0.f, 300.f);
 	BeginChimeWithPitch(Speed, CalculateWindPitchRatio(Speed) *
-		CalculateWindDirectionPitchRatio(HorizontalWind, GetActorForwardVector()), InCause);
+		CalculateWindDirectionPitchRatio(HorizontalWind, GetActorForwardVector()), InCause, QuietResident);
 }
 
-void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause)
+void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause,
+	const APawn* QuietResident)
 {
 	SampledWindSpeed = HorizontalWindSpeed;
 	AppliedPitchRatio = PitchRatio;
@@ -50,7 +55,7 @@ void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed,
 		ContextExpiresAt = GetWorld()->GetTimeSeconds() + ResidentContextLifetimeSeconds;
 		SetLifeSpan(ResidentContextLifetimeSeconds);
 	}
-	RecordNearbyResidentObservations();
+	RecordNearbyResidentObservations(QuietResident);
 	BuildChimeWave(AppliedPitchRatio);
 	if (ChimeWave && AudioComponent)
 	{
@@ -84,7 +89,22 @@ FString AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause I
 	}
 }
 
-void AIslandListeningStonesChime::RecordNearbyResidentObservations()
+bool AIslandListeningStonesChime::ShouldRecordQuietPractice(bool bPlayerControlled, bool bHasMemory, bool bIsSubject,
+	bool bWithinWitnessRange, bool bHasLineOfSight, bool bFacingSubject, bool bHasRecentSimilarMemory,
+	bool bHasSubjectIdentity)
+{
+	return !bPlayerControlled && bHasMemory && !bIsSubject && bWithinWitnessRange && bHasLineOfSight &&
+		bFacingSubject && !bHasRecentSimilarMemory && bHasSubjectIdentity;
+}
+
+FString AIslandListeningStonesChime::QuietPracticeObservationText(const FString& SubjectAgentId)
+{
+	if (SubjectAgentId.IsEmpty()) return FString();
+	return FString::Printf(TEXT("I saw %s take a quiet moment at the Listening Stones. When someone listens here, I can leave them room."),
+		*SubjectAgentId);
+}
+
+void AIslandListeningStonesChime::RecordNearbyResidentObservations(const APawn* QuietResident)
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
@@ -103,6 +123,57 @@ void AIslandListeningStonesChime::RecordNearbyResidentObservations()
 
 		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Observation, 0.45f,
 			{ TEXT("listening_stones"), TEXT("place:ListeningStones"), TEXT("heard"), TEXT("landmark") }));
+	}
+	RecordQuietPracticeWitnesses(QuietResident);
+}
+
+void AIslandListeningStonesChime::RecordQuietPracticeWitnesses(const APawn* QuietResident)
+{
+	if (Cause != EIslandChimeCause::ResidentListening || !IsValid(QuietResident)) return;
+	UWorld* World = GetWorld();
+	UAgentMemoryComponent* SubjectMemory = QuietResident->FindComponentByClass<UAgentMemoryComponent>();
+	const FString SubjectAgentId = SubjectMemory ? SubjectMemory->GetResolvedAgentId() : FString();
+	if (!World || SubjectAgentId.IsEmpty()) return;
+
+	constexpr float MaximumWitnessDistance = 900.f;
+	const FVector SubjectEye = QuietResident->GetActorLocation() + FVector(0.f, 0.f, 45.f);
+	const FDateTime RecentMemoryCutoff = FDateTime::UtcNow() - FTimespan::FromHours(12.0);
+	const int32 IslandDay = UIslandWorldStateSubsystem::CurrentIslandDay(World);
+	const FString PracticeText = QuietPracticeObservationText(SubjectAgentId);
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		APawn* Witness = *It;
+		if (!IsValid(Witness)) continue;
+		UAgentMemoryComponent* Memory = Witness->FindComponentByClass<UAgentMemoryComponent>();
+		const bool bIsSubject = Witness == QuietResident;
+		const FString WitnessAgentId = Memory ? Memory->GetResolvedAgentId() : FString();
+		const bool bHasSubjectIdentity = !SubjectAgentId.IsEmpty() && SubjectAgentId != WitnessAgentId;
+		const bool bWithinWitnessRange = FVector::DistSquared(Witness->GetActorLocation(), SubjectEye) <= FMath::Square(MaximumWitnessDistance);
+		const FVector DirectionToSubject = (QuietResident->GetActorLocation() - Witness->GetActorLocation()).GetSafeNormal2D();
+		const bool bFacingSubject = !DirectionToSubject.IsNearlyZero() &&
+			FVector::DotProduct(Witness->GetActorForwardVector().GetSafeNormal2D(), DirectionToSubject) >= 0.5f;
+		bool bHasLineOfSight = false;
+		if (bWithinWitnessRange && bFacingSubject && !bIsSubject)
+		{
+			FCollisionQueryParams Query(SCENE_QUERY_STAT(ListeningStonePracticeWitness), true, Witness);
+			Query.AddIgnoredActor(const_cast<APawn*>(QuietResident));
+			Query.AddIgnoredActor(this);
+			FHitResult Hit;
+			bHasLineOfSight = !World->LineTraceSingleByChannel(Hit, Witness->GetPawnViewLocation(), SubjectEye,
+				ECC_Visibility, Query);
+		}
+		const bool bHasRecentSimilarMemory = Memory && Memory->HasSimilarMemorySince(
+			EAgentMemoryType::Observation, PracticeText, RecentMemoryCutoff, 0.75f);
+		if (!ShouldRecordQuietPractice(Witness->IsPlayerControlled(), Memory != nullptr, bIsSubject,
+			bWithinWitnessRange, bHasLineOfSight, bFacingSubject, bHasRecentSimilarMemory, bHasSubjectIdentity)) continue;
+
+		const FString DayTag = FString::Printf(TEXT("day:%d"), IslandDay);
+		FAgentMemoryRecord Record = Memory->MakeMemory(EAgentMemoryType::Observation, PracticeText, 0.72f,
+			{ TEXT("place-practice"), TEXT("place:ListeningStones"), TEXT("practice:quiet-listening"),
+				FString::Printf(TEXT("observer:%s"), *WitnessAgentId), FString::Printf(TEXT("actor:%s"), *SubjectAgentId),
+				DayTag, TEXT("confidence:direct-visual") });
+		Record.Location = GetActorLocation();
+		Memory->AppendMemory(Record);
 	}
 }
 

@@ -64,6 +64,22 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, false, false));
 	TestFalse(TEXT("A similar chime within twelve hours is not added again"),
 		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, true, true));
+	TestTrue(TEXT("A distinct, nearby autonomous resident with clear sight can remember quiet-listening etiquette"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, false, true, true, true, false, true));
+	TestFalse(TEXT("The resident who is listening is not treated as their own witness"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, true, true, true, true, false, true));
+	TestFalse(TEXT("Audibility alone does not make an occluded resident a practice witness"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, false, true, false, true, false, true));
+	TestFalse(TEXT("A nearby resident facing away has not directly witnessed the quiet practice"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, false, true, true, false, false, true));
+	TestFalse(TEXT("A player does not receive resident-only place-practice memory"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(true, true, false, true, true, true, false, true));
+	TestFalse(TEXT("A repeated practice within twelve hours does not add duplicate memory"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, false, true, true, true, true, true));
+	TestFalse(TEXT("An unidentified subject cannot seed an attributed practice memory"),
+		AIslandListeningStonesChime::ShouldRecordQuietPractice(false, true, false, true, true, true, false, false));
+	TestTrue(TEXT("Practice memory names the directly witnessed resident"),
+		AIslandListeningStonesChime::QuietPracticeObservationText(TEXT("Aster")).Contains(TEXT("saw Aster")));
 	TestTrue(TEXT("Gust memories retain the directly witnessed cause"),
 		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::NaturalGust).Contains(TEXT("rising gust")));
 	TestTrue(TEXT("Visitor memories retain the directly witnessed cause"),
@@ -140,6 +156,8 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		QuietResident->AddInstanceComponent(QuietMemory);
 		QuietMemory->AgentId = QuietAgentId;
 		QuietMemory->RegisterComponent();
+		NearbyResident->SetActorLocation(FVector(500.f, 0.f, 0.f));
+		NearbyResident->SetActorRotation(FRotator(0.f, 180.f, 0.f));
 		AListeningStonePresentation* QuietPresentation = World->SpawnActor<AListeningStonePresentation>(FVector::ZeroVector, FRotator::ZeroRotator);
 		if (TestNotNull(TEXT("A fresh transient presentation can observe a quiet visit"), QuietPresentation))
 		{
@@ -149,6 +167,17 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 				if (It->Cause == EIslandChimeCause::ResidentListening) { ListeningChime = *It; break; }
 			TestNotNull(TEXT("Eight seconds of stillness creates one brief resident-listening response"), ListeningChime);
 			TestEqual(TEXT("The quiet resident remembers the locally heard response once"), QuietMemory->GetMemoryCount(), 1);
+			TestTrue(TEXT("A separate resident with clear sight stores a tagged place-practice observation"),
+				Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
+			TestFalse(TEXT("The listening resident is not recorded as witnessing their own practice"),
+				QuietMemory->HasMemoryTag(TEXT("practice:quiet-listening")));
+			TestFalse(TEXT("A resident beyond the witness range gains no place-practice memory"),
+				DistantMemory->HasMemoryTag(TEXT("practice:quiet-listening")));
+			const int32 WitnessMemoryCountAfterPractice = Memory->GetMemoryCount();
+			AIslandListeningStonesChime* RepeatedPracticeChime = World->SpawnActor<AIslandListeningStonesChime>(FVector::ZeroVector, FRotator::ZeroRotator);
+			if (RepeatedPracticeChime) RepeatedPracticeChime->BeginChime(100.f, EIslandChimeCause::ResidentListening, QuietResident);
+			TestTrue(TEXT("A repeated tone does not duplicate the same witness memory within twelve hours"),
+				Memory->HasMemoryTag(TEXT("practice:quiet-listening")) && Memory->GetMemoryCount() == WitnessMemoryCountAfterPractice);
 			TestTrue(TEXT("Nearby context describes the directly witnessed quiet visit"), ListeningChime &&
 				ListeningChime->DescribeForListener(FVector(100.f, 0.f, 0.f)).Contains(TEXT("quiet pause beside the stones")));
 			for (int32 Check = 0; Check < 24; ++Check) QuietPresentation->CheckForVisitorPresence(0.25f);
