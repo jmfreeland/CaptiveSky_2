@@ -209,9 +209,13 @@ bool FAgentWanderPathTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::WanderPathTrailAffinityScore(UntroddenRoute, WornRouteLedger), 0.f);
 	TestEqual(TEXT("A path with no traversable segment has no trail affinity"),
 		AAutonomousAgentAIController::WanderPathTrailAffinityScore({ FVector::ZeroVector, FVector::ZeroVector }, WornRouteLedger), 0.f);
-	TestTrue(TEXT("Worn paths only make a small tie-breaking difference to an existing curiosity score"),
+	TestTrue(TEXT("Worn paths make a bounded tie-breaking difference to an existing curiosity score"),
 		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, WornRouteAffinity) > 1000.f &&
-		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, WornRouteAffinity) <= 1030.f);
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, WornRouteAffinity) <= 1150.f);
+	TestEqual(TEXT("An equally curious untrodden route keeps its original score"),
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, 0.f), 1000.f);
+	TestEqual(TEXT("A half-worn route adds only half of the bounded path preference"),
+		AAutonomousAgentAIController::WanderTrailAdjustedScore(1000.f, 0.5f), 1075.f);
 	TestEqual(TEXT("A trail cannot make a resident wander when there is no curiosity score"),
 		AAutonomousAgentAIController::WanderTrailAdjustedScore(0.f, WornRouteAffinity), 0.f);
 	const TArray<FVector> FrontierRecentDestinations = { FVector::ZeroVector, FVector(200.f, 0.f, 0.f), FVector(0.f, 500.f, 0.f) };
