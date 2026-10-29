@@ -54,3 +54,16 @@ to ocean and back while recording pawn Z/velocity and swim-state transitions.
 Keep the existing swim/movement work isolated until its coordination claim is
 cleared; avoid saving a water-component change into the gitignored Island map
 without explicit user confirmation.
+
+## Live automation follow-up — 2026-10-29
+
+The currently connected UE editor was confirmed on `/Game/Maps/Island` with
+PIE stopped. Its registered `CaptiveSky2.Agent.IslandOcean` automation test ran
+in the live editor and passed (1 test, 0 failures, 0 warnings, 0.097 seconds).
+The fixture checks that world startup disables collision on the legacy
+`OceanPlane`, and that a grounded player at the queried open-ocean surface
+enters surface swimming rather than remaining in walking mode. This is stronger
+than the earlier trace-only evidence, but it is still a transient automation
+fixture—not a real player crossing at the Island shore. Keep that bounded,
+zero-request runtime crossing as the remaining confirmation before calling the
+reported walk-on-water issue fully resolved.
