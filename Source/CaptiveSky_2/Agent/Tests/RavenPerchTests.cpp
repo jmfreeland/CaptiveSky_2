@@ -17,6 +17,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandRainBasin.h"
 #include "IslandTidepoolCrab.h"
+#include "IslandWrack.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandWeather.h"
@@ -614,7 +615,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			BlueprintController->MinnowRippleAttentionRemaining = 0.f;
 			BlueprintController->CrabScurryAttentionRemaining = 0.f;
 			BlueprintController->ResidentAttentionRemaining = 0.f;
-			BlueprintController->LastNoticedScurryingCrab.Reset();
+			BlueprintController->LastNoticedCrabActivity.Reset();
 			BlueprintController->LocomotionState = ERavenLocomotionState::Grounded;
 			const FVector RavenPositionBeforeCrab = BlueprintRaven->GetActorLocation();
 			AIslandTidepoolCrab* ScurryingCrab = World->SpawnActor<AIslandTidepoolCrab>(
@@ -624,7 +625,7 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 			{
 				ScurryingCrab->RespondToQuietObservation(RavenPositionBeforeCrab);
 				TestTrue(TEXT("A crab exposes its brief disturbance state to nearby wildlife"), ScurryingCrab->IsScurrying());
-				BlueprintController->CheckForNearbyCrabScurry();
+				BlueprintController->CheckForNearbyCrabActivity();
 				BlueprintController->Tick(0.25f);
 				TestTrue(TEXT("A grounded raven briefly looks toward a nearby scurrying crab"),
 					BlueprintController->CrabScurryAttentionRemaining > 0.f &&
@@ -637,17 +638,52 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 				TestTrue(TEXT("Crab attention fades on a short timer"),
 					BlueprintController->CrabScurryAttentionRemaining < CrabAttentionAfterNotice);
 				BlueprintController->CrabScurryAttentionRemaining = 0.f;
-				BlueprintController->CheckForNearbyCrabScurry();
+				BlueprintController->CheckForNearbyCrabActivity();
 				TestTrue(TEXT("One scurry cannot repeatedly restart the same glance"),
 					FMath::IsNearlyZero(BlueprintController->CrabScurryAttentionRemaining));
 				ScurryingCrab->ScurryRemaining = 0.f;
 				TestFalse(TEXT("A crab's brief scurry naturally ends"), ScurryingCrab->IsScurrying());
-				BlueprintController->CheckForNearbyCrabScurry();
+				BlueprintController->CheckForNearbyCrabActivity();
 				ScurryingCrab->RespondToQuietObservation(RavenPositionBeforeCrab);
-				BlueprintController->CheckForNearbyCrabScurry();
+				BlueprintController->CheckForNearbyCrabActivity();
 				TestTrue(TEXT("A later scurry can draw the raven's attention again"),
 					BlueprintController->CrabScurryAttentionRemaining > 0.f);
 				ScurryingCrab->Destroy();
+			}
+
+			AIslandTidepoolCrab* ForagingCrab = World->SpawnActor<AIslandTidepoolCrab>(
+				RavenPositionBeforeCrab + FVector(0.f, 460.f, 0.f), FRotator::ZeroRotator);
+			AIslandWrack* ShoreFind = World->SpawnActor<AIslandWrack>(
+				RavenPositionBeforeCrab + FVector(0.f, 535.f, 0.f), FRotator::ZeroRotator);
+			TestNotNull(TEXT("A second shore crab can be spawned for a forage observation"), ForagingCrab);
+			TestNotNull(TEXT("A local shore find can anchor the crab's forage state"), ShoreFind);
+			if (ForagingCrab && ShoreFind)
+			{
+				ForagingCrab->SetActorTickEnabled(false);
+				ForagingCrab->ScurryRemaining = 0.f;
+				ForagingCrab->WrackInterestRemaining = 2.5f;
+				ForagingCrab->LastInvestigatedWrack = ShoreFind;
+				BlueprintController->CrabScurryAttentionRemaining = 0.f;
+				BlueprintController->LastNoticedCrabActivity.Reset();
+				TestTrue(TEXT("The crab is in its short storm-wrack investigation state"),
+					ForagingCrab->IsInvestigatingShoreFind());
+				BlueprintController->CheckForNearbyCrabActivity();
+				TestTrue(TEXT("A grounded raven briefly looks toward a nearby crab investigating storm wrack"),
+					BlueprintController->CrabScurryAttentionRemaining > 0.f);
+				TestTrue(TEXT("Noticing a forage detour does not move the raven"),
+					BlueprintRaven->GetActorLocation().Equals(RavenPositionBeforeCrab, 0.1f));
+				BlueprintController->CrabScurryAttentionRemaining = 0.f;
+				BlueprintController->CheckForNearbyCrabActivity();
+				TestTrue(TEXT("One forage detour cannot repeatedly restart the same glance"),
+					FMath::IsNearlyZero(BlueprintController->CrabScurryAttentionRemaining));
+				ForagingCrab->WrackInterestRemaining = 0.f;
+				BlueprintController->CheckForNearbyCrabActivity();
+				ForagingCrab->WrackInterestRemaining = 2.f;
+				BlueprintController->CheckForNearbyCrabActivity();
+				TestTrue(TEXT("A later, separate wrack investigation can draw the raven's attention again"),
+					BlueprintController->CrabScurryAttentionRemaining > 0.f);
+				ForagingCrab->Destroy();
+				ShoreFind->Destroy();
 			}
 
 			UClass* ConsciousResidentClass = LoadClass<AAutonomousAgentCharacter>(nullptr,

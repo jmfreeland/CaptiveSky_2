@@ -1091,7 +1091,7 @@ void ARavenAgentAIController::CheckForNearbyListeningStoneChime()
 	}
 }
 
-void ARavenAgentAIController::CheckForNearbyCrabScurry()
+void ARavenAgentAIController::CheckForNearbyCrabActivity()
 {
 	const APawn* Raven = GetPawn();
 	if (!GetWorld() || !Raven || IsResting() || ListeningStoneAttentionRemaining > 0.f ||
@@ -1109,22 +1109,23 @@ void ARavenAgentAIController::CheckForNearbyCrabScurry()
 	{
 		AIslandTidepoolCrab* Crab = *It;
 		if (!IsValid(Crab)) continue;
-		if (!Crab->IsScurrying())
+		const bool bCrabIsActive = Crab->IsScurrying() || Crab->IsInvestigatingShoreFind();
+		if (!bCrabIsActive)
 		{
-			if (LastNoticedScurryingCrab.Get() == Crab) LastNoticedScurryingCrab.Reset();
+			if (LastNoticedCrabActivity.Get() == Crab) LastNoticedCrabActivity.Reset();
 			continue;
 		}
 
 		const FVector Offset = Crab->GetActorLocation() - Raven->GetActorLocation();
-		if (LastNoticedScurryingCrab.Get() == Crab || FMath::Abs(Offset.Z) > MaximumHeightDifference ||
+		if (LastNoticedCrabActivity.Get() == Crab || FMath::Abs(Offset.Z) > MaximumHeightDifference ||
 			Offset.SizeSquared2D() > FMath::Square(NoticeRadius))
 		{
 			continue;
 		}
 
-		// One quick look makes the crab's startled movement legible without turning
-		// the raven's curiosity into a chase or another resident decision.
-		LastNoticedScurryingCrab = Crab;
+		// One quick look makes a crab's scurry or tiny forage detour legible
+		// without turning the raven's curiosity into a chase or model request.
+		LastNoticedCrabActivity = Crab;
 		CrabScurryLocation = Crab->GetActorLocation() + FVector(0.f, 0.f, 24.f);
 		CrabScurryAttentionRemaining = CrabScurryAttentionDuration;
 		return;
@@ -2341,7 +2342,7 @@ void ARavenAgentAIController::Tick(float DeltaSeconds)
 		CheckForNearbyRainBasin();
 		CheckForNearbyDewGlint();
 		CheckForNearbyWindMote();
-		CheckForNearbyCrabScurry();
+		CheckForNearbyCrabActivity();
 		CheckForNearbyResidentPresence();
 		CheckForNearbyWildlifePresence();
 	}

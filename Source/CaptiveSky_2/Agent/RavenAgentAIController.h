@@ -156,7 +156,7 @@ private:
 	TWeakObjectPtr<AIslandWindMoteEffect> LastNoticedWindMote;
 	TWeakObjectPtr<AIslandPoolRippleEffect> LastNoticedMinnowRipple;
 	TWeakObjectPtr<AIslandRainBasin> LastNoticedRainBasin;
-	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedScurryingCrab;
+	TWeakObjectPtr<AIslandTidepoolCrab> LastNoticedCrabActivity;
 	TWeakObjectPtr<AActor> WildlifeAttentionTarget;
 	TWeakObjectPtr<AAutonomousAgentCharacter> ResidentAttentionTarget;
 	TSet<TWeakObjectPtr<AActor>> NoticedWildlifeInNearbyGroup;
@@ -222,7 +222,7 @@ private:
 	void CheckForNearbyWindMote();
 	void CheckForNearbyMinnowSurfaceBreak();
 	void CheckForNearbyRainBasin();
-	void CheckForNearbyCrabScurry();
+	void CheckForNearbyCrabActivity();
 	void CheckForNearbyResidentPresence();
 	void CheckForNearbyWildlifePresence();
 	void UpdateCarriedTwigVisual();
