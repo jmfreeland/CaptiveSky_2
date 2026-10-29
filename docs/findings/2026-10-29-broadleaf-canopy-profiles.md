@@ -69,3 +69,16 @@ uncertainty. The stronger next step is a repeatable foliage LOD/texture-budget
 path for the already-used tree family; then compare a low-cost far representation
 before considering any additional species. No asset was edited and no runtime
 memory claim is made from registry metadata.
+
+The PVE preset is a `ProceduralVegetationGrowerPreset` with a separate
+`ProceduralVegetationGrowthDataAsset`. Its reflected settings are 40 growth
+cycles, a 16 m trunk target, three branch generations, and foliage density 3.
+The enabled `ProceduralVegetationEditor` plugin describes its generated
+vegetation as Nanite-Foliage-ready, while its preset schema says simulation cost
+grows roughly linearly with growth-cycle count. This is a promising editor-time
+authoring route for making a lighter, lower-cycle variant with a different
+silhouette; it is not evidence that the current Aleppo skeletal output has
+Nanite, additional LODs, or lower runtime memory. Next, generate one isolated
+variant only after the open GPU has cooled, inspect its output class/LOD/texture
+dependencies, and keep it outside the Island population until that preflight
+passes.
