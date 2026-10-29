@@ -29,15 +29,19 @@ Unreal Header Tool completed, and UnrealBuildTool compiled the changed
 controller, presentation dependency, and new test translation unit. The main
 project module could not be linked: the editor process holds
 `Binaries/Win64/UnrealEditor-CaptiveSky_2.dll` open. Therefore the automation
-test and in-world arrival have **not yet been run**. Do not terminate the open
-editor to release the file; retry the incremental link and focused test after
-the editor is closed or use a separate-output worktree build.
+test was not run against the main project. A separate-output UE 5.8.3 editor
+target build succeeded and linked. Its focused NullRHI automation launch then
+crashed at process startup with an access violation (`SecondsSinceStart=0`),
+before the test harness initialized; this is not a test assertion failure.
+The deterministic automation result and in-world arrival therefore remain
+unverified.
 
 ## Follow-up
 
-After the focused test passes, run one short, thinking-disabled PIE scenario
-with two residents: the witness chooses ListeningStones while the other stays
-quiet there. Confirm the witness reaches the far edge, no approach chime is
-triggered for the learner's arrival, and the quiet resident remains in place.
-Keep the existing bounded play/request limits enabled and verify zero
-additional model requests from the etiquette behavior.
+After the focused test can run in a stable editor session, run one short,
+thinking-disabled PIE scenario with two residents: the witness chooses
+ListeningStones while the other stays quiet there. Confirm the witness reaches
+the far edge, no approach chime is triggered for the learner's arrival, and
+the quiet resident remains in place. Keep the existing bounded play/request
+limits enabled and verify zero additional model requests from the etiquette
+behavior.
