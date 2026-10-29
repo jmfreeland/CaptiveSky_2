@@ -42,3 +42,12 @@ short daylight capture with resident thinking disabled. Compare maple/aspen/
 beech/alder silhouettes and record FPS and whole-device VRAM separately from
 the existing texture-pool measurements. Preserve the fixed tree budget and
 30-FPS target while judging the result.
+
+The live project also has the `ProceduralVegetationEditor` plugin enabled and
+contains a `ProceduralVegetation` asset plus skeletal-mesh variants for
+Aleppo Pine under `/Game/Megaplant_Library/Tree_Aleppo_Pine/`. This is a
+potential new evergreen silhouette, but it is a Mediterranean species and
+should not be scattered across the temperate Island indiscriminately. Before
+integration, inspect its PVE preset, material texture footprint, and LODs; if
+it remains desirable, consider a small, clearly introduced sheltered grove
+within the existing tree-count budget.
