@@ -11,6 +11,7 @@
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
 #include "IslandPoolRippleEffect.h"
+#include "IslandWrack.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/ConstructorHelpers.h"
@@ -170,6 +171,7 @@ void AIslandTidepoolCrab::BeginPlay()
 void AIslandTidepoolCrab::RespondToQuietObservation(const FVector& ObserverLocation)
 {
 	if (bIsSheltered) return;
+	WrackInterestRemaining = 0.f;
 	ScurryDirection = (GetActorLocation() - ObserverLocation).GetSafeNormal2D();
 	if (ScurryDirection.IsNearlyZero()) ScurryDirection = GetActorRightVector();
 	ScurryRemaining = 2.4f;
@@ -251,6 +253,44 @@ void AIslandTidepoolCrab::CheckForNearbySurfaceCue()
 	}
 }
 
+void AIslandTidepoolCrab::CheckForNearbyWrack()
+{
+	if (!GetWorld() || bIsSheltered || ScurryRemaining > 0.f || WrackInterestRemaining > 0.f ||
+		WrackInterestCooldownRemaining > 0.f) return;
+
+	constexpr float NoticeRadius = 240.f;
+	constexpr float RearmRadius = 500.f;
+	constexpr float MaximumHeightDifference = 100.f;
+	if (AIslandWrack* Previous = LastInvestigatedWrack.Get())
+	{
+		if (FVector::DistSquared2D(GetActorLocation(), Previous->GetActorLocation()) > FMath::Square(RearmRadius))
+			LastInvestigatedWrack.Reset();
+	}
+	else
+	{
+		LastInvestigatedWrack.Reset();
+	}
+
+	for (TActorIterator<AIslandWrack> It(GetWorld()); It; ++It)
+	{
+		AIslandWrack* Wrack = *It;
+		if (!IsValid(Wrack) || Wrack->GetItemId() <= 0) continue;
+		const FVector Offset = Wrack->GetActorLocation() - GetActorLocation();
+		if (FVector::DistSquared2D(GetActorLocation(), Wrack->GetActorLocation()) > FMath::Square(NoticeRadius) ||
+			FMath::Abs(Offset.Z) > MaximumHeightDifference) continue;
+		if (LastInvestigatedWrack.Get() == Wrack) continue;
+
+		// A crab makes one short, bounded forage detour toward each nearby find.
+		// The object and world state are untouched; a wider exit ring prevents jitter
+		// from repeatedly pulling the crab back to the same piece of wrack.
+		LastInvestigatedWrack = Wrack;
+		WrackInterestLocation = Wrack->GetActorLocation();
+		WrackInterestRemaining = 3.f;
+		WrackInterestCooldownRemaining = 14.f;
+		return;
+	}
+}
+
 void AIslandTidepoolCrab::CheckForNearbyPlayerPresence()
 {
 	if (!GetWorld() || bIsSheltered) return;
@@ -287,6 +327,7 @@ void AIslandTidepoolCrab::SetSheltered(bool bSheltered)
 {
 	if (bIsSheltered == bSheltered) return;
 	bIsSheltered = bSheltered;
+	if (bIsSheltered) WrackInterestRemaining = 0.f;
 	SetActorLocation(bIsSheltered ? HomeLocation - FVector(0.f, 0.f, 55.f) : HomeLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	SetActorHiddenInGame(bIsSheltered);
 	SetActorTickEnabled(!bIsSheltered);
@@ -336,6 +377,8 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	RavenFlybyCooldownRemaining = FMath::Max(0.f, RavenFlybyCooldownRemaining - SafeDelta);
 	PlayerPresenceCooldownRemaining = FMath::Max(0.f, PlayerPresenceCooldownRemaining - SafeDelta);
 	RippleResponseCooldownRemaining = FMath::Max(0.f, RippleResponseCooldownRemaining - SafeDelta);
+	WrackInterestCooldownRemaining = FMath::Max(0.f, WrackInterestCooldownRemaining - SafeDelta);
+	WrackInterestRemaining = FMath::Max(0.f, WrackInterestRemaining - SafeDelta);
 	RavenCheckRemaining -= SafeDelta;
 	if (RavenCheckRemaining <= 0.f)
 	{
@@ -349,6 +392,12 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 		RippleCheckRemaining = 0.35f;
 		CheckForNearbySurfaceCue();
 	}
+	WrackCheckRemaining -= SafeDelta;
+	if (WrackCheckRemaining <= 0.f)
+	{
+		WrackCheckRemaining = 0.8f;
+		CheckForNearbyWrack();
+	}
 	const float Angle = Time * 0.12f + Phase;
 	const float Rain = Weather.IsValid() ? Weather->SampleRainIntensity(Time) : 0.f;
 	const float RainScale = RainMovementScale(Rain);
@@ -358,10 +407,22 @@ void AIslandTidepoolCrab::Tick(float DeltaSeconds)
 	const float TideScale = TideMovementScale(TideOffset);
 	const FVector IdleDrift(FMath::Sin(Angle) * 90.f * RainScale * TideScale,
 		FMath::Cos(Angle * 0.73f) * 80.f * RainScale * TideScale, 0.f);
+	FVector WrackInterestOffset = FVector::ZeroVector;
+	if (IsInvestigatingShoreFind())
+	{
+		const FVector Direction = (WrackInterestLocation - HomeLocation).GetSafeNormal2D();
+		const float Distance = FVector::Dist2D(WrackInterestLocation, HomeLocation);
+		const float BoundedStep = FMath::Min(75.f, FMath::Max(0.f, Distance - 45.f));
+		const float FadeIn = FMath::SmoothStep(0.f, 0.8f, 3.f - WrackInterestRemaining);
+		const float FadeOut = FMath::SmoothStep(0.f, 1.7f, WrackInterestRemaining);
+		const float InterestAlpha = WrackInterestRemaining > 2.2f ? FadeIn
+			: WrackInterestRemaining < 1.7f ? FadeOut : 1.f;
+		WrackInterestOffset = Direction * BoundedStep * InterestAlpha;
+	}
 	const float ScurryAlpha = ScurryRemaining > 1.7f
 		? FMath::SmoothStep(0.f, 0.7f, 2.4f - ScurryRemaining)
 		: FMath::SmoothStep(0.f, 1.7f, ScurryRemaining);
-	const FVector Desired = HomeLocation + IdleDrift + ScurryDirection * (95.f * ScurryAlpha);
+	const FVector Desired = HomeLocation + IdleDrift + ScurryDirection * (95.f * ScurryAlpha) + WrackInterestOffset;
 	const FVector PreviousLocation = GetActorLocation();
 	const FVector SafeLocation = ResolveGroundPath(PreviousLocation, Desired);
 	SetActorLocation(SafeLocation, false);

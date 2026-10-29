@@ -9,6 +9,7 @@ class UMaterialInterface;
 class AIslandWeather;
 class AIslandDayNight;
 class AIslandPoolRippleEffect;
+class AIslandWrack;
 class ARavenAgentAIController;
 class APawn;
 
@@ -25,6 +26,8 @@ public:
 	void RespondToQuietObservation(const FVector& ObserverLocation);
 	/** True only while the crab is actively moving away from a recent disturbance. */
 	bool IsScurrying() const { return ScurryRemaining > 0.f && !bIsSheltered; }
+	/** True during a short, local forage detour toward a nearby piece of storm wrack. */
+	bool IsInvestigatingShoreFind() const { return WrackInterestRemaining > 0.f && LastInvestigatedWrack.IsValid() && !bIsSheltered; }
 	/** Conceal at night without destroying this resident; restores its visible local routine at dawn. */
 	void SetSheltered(bool bSheltered);
 	bool IsSheltered() const { return bIsSheltered; }
@@ -40,6 +43,7 @@ protected:
 private:
 	friend class FIslandNightEcologyTest;
 	friend class FRavenPerchTest;
+	friend class FIslandTidepoolCrabWrackTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> DetailedBody;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -63,12 +67,18 @@ private:
 	float RavenCheckRemaining = 0.f;
 	float PlayerPresenceCooldownRemaining = 0.f;
 	float RippleResponseCooldownRemaining = 0.f;
+	float WrackCheckRemaining = 0.f;
+	float WrackInterestRemaining = 0.f;
+	float WrackInterestCooldownRemaining = 0.f;
+	FVector WrackInterestLocation = FVector::ZeroVector;
 	float RippleCheckRemaining = 0.f;
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
+	TWeakObjectPtr<AIslandWrack> LastInvestigatedWrack;
 	bool bIsSheltered = false;
 	void CheckForNearbyRavenDisturbance();
 	void CheckForNearbyPlayerPresence();
 	void CheckForNearbySurfaceCue();
+	void CheckForNearbyWrack();
 	FVector ResolveGroundPath(const FVector& Start, const FVector& Desired) const;
 };
