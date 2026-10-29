@@ -35,3 +35,20 @@ The main editor was cleanly restarted after the user confirmed all changes were 
 ## Limits and next step
 
 The standalone pre-initialization crash remains unexplained; compare that launch's arguments and crash context with a prior successful start before repeating it. The editor-only render-target residency and un-attributed WDDM GPU use remain separate open questions. For future profiling, compare `stat streaming` with total RHI/GPU memory rather than conflating them, and record matched frame-time and peak-memory samples only when sufficient GPU headroom is available. Investigate the repeated `M_Island_Textured_Wet` sampler/index warning with the landscape-material owner before changing that authored graph. Keep real-time and model-request caps explicit and low.
+
+## Fresh editor-only view and capacity check — 17:10 UTC
+
+Unreal MCP confirmed PIE is stopped. The editor viewport is an open grassy
+hillside with three similarly narrow conifer silhouettes, scattered low cover,
+and a small timber landmark. This is an editor-world view, not a runtime
+vegetation census; it does, however, reinforce that the visible foreground
+composition currently reads as a few isolated conifers rather than a woodland
+edge. The broadleaf canopy-profile change is still only in the pushed worktree
+branch and cannot affect this separate editor checkout yet.
+
+At 17:10 UTC, `nvidia-smi` reported 8,677 / 12,282 MiB in use, 56% utilization,
+and 80°C. WDDM process attribution was unavailable. `CaptiveSky.Agent.DisableThinking`
+is currently 0, so do not start PIE without first disabling resident thinking;
+given the current device temperature and memory use, defer another runtime
+session until the GPU has cooled and has more headroom. No test or asset was
+modified during this observation.
