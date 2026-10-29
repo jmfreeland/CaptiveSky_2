@@ -17,6 +17,7 @@
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandTidepoolMinnows.h"
+#include "IslandListeningStonePresentation.h"
 #include "IslandTrail.h"
 #include "IslandWorldStateSubsystem.h"
 #include "IslandInnHearthSubsystem.h"
@@ -170,6 +171,30 @@ TArray<FVector> AAutonomousAgentAIController::BuildGroundedResidentApproachCandi
 	}
 	return Candidates;
 }
+
+bool AAutonomousAgentAIController::ShouldUseListeningStonesEtiquette(bool bHasLearnedPractice,
+	bool bQuietListenerPresent, bool bIsQuietListener)
+{
+	return bHasLearnedPractice && bQuietListenerPresent && !bIsQuietListener;
+}
+
+FVector AAutonomousAgentAIController::BuildListeningStonesWaitPoint(const FVector& StonesLocation,
+	const FVector& QuietResidentLocation, const FVector& VisitorLocation, float StandOffDistance)
+{
+	if (!FMath::IsFinite(StonesLocation.X) || !FMath::IsFinite(StonesLocation.Y) || !FMath::IsFinite(StonesLocation.Z))
+		return FVector::ZeroVector;
+	if (!FMath::IsFinite(StandOffDistance) || StandOffDistance <= 0.f) return StonesLocation;
+	const float Distance = FMath::Clamp(StandOffDistance, 250.f, 1500.f);
+	FVector ToQuietResident = QuietResidentLocation - StonesLocation;
+	ToQuietResident.Z = 0.f;
+	if (ToQuietResident.Normalize()) return StonesLocation - ToQuietResident * Distance;
+
+	FVector ToVisitor = VisitorLocation - StonesLocation;
+	ToVisitor.Z = 0.f;
+	if (!ToVisitor.Normalize()) ToVisitor = FVector::ForwardVector;
+	return StonesLocation + ToVisitor * Distance;
+}
+
 bool AAutonomousAgentAIController::IsElevatedResidentForApproach(const ACharacter* TargetCharacter)
 {
 	if (!TargetCharacter) return false;
@@ -1179,6 +1204,49 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 						? TEXT("Already near the other resident. Speaking remains optional; wait, observe, or choose another activity.")
 						: TEXT("Approach started toward the other resident's conversational space; arriving does not begin a conversation."));
 				break;
+			}
+
+			// A resident who witnessed quiet-listening etiquette leaves room rather
+			// than approaching the occupied center of the landmark.
+			ACharacter* EtiquetteMover = Cast<ACharacter>(ControlledPawn);
+			UAgentMemoryComponent* MoverMemory = ControlledPawn->FindComponentByClass<UAgentMemoryComponent>();
+			if (TargetTag == FName(TEXT("ListeningStones")) && EtiquetteMover && MoverMemory &&
+				MoverMemory->HasMemoryTag(TEXT("practice:quiet-listening")))
+			{
+				APawn* QuietResident = nullptr;
+				for (TActorIterator<AListeningStonePresentation> It(GetWorld()); It; ++It)
+				{
+					QuietResident = It->GetQuietResident();
+					if (IsValid(QuietResident)) break;
+				}
+				if (IsValid(QuietResident) && ShouldUseListeningStonesEtiquette(true, true, QuietResident == ControlledPawn))
+				{
+					UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+					const FVector WaitPoint = BuildListeningStonesWaitPoint(TargetActor->GetActorLocation(),
+						QuietResident->GetActorLocation(), ControlledPawn->GetActorLocation(), ListeningStonesWaitStandOffDistance);
+					FNavLocation WaitGoal;
+					const UNavigationPath* Route = nullptr;
+					if (ProjectGroundedTarget(NavSys, WaitPoint, EtiquetteMover->GetNavAgentPropertiesRef(), WaitGoal))
+					{
+						Route = NavSys->FindPathToLocationSynchronously(GetWorld(), ControlledPawn->GetActorLocation(),
+							WaitGoal.Location, ControlledPawn);
+					}
+					if (!Route || !Route->IsValid() || Route->IsPartial() ||
+						!IsCapsulePathPhysicallyClear(GetWorld(), Route, EtiquetteMover->GetCapsuleComponent(), ControlledPawn))
+					{
+						ReportAction(TEXT("You remember to leave room when someone listens at the Stones, but no clear route to the quiet outer edge is available. Wait or choose another activity; nothing was interrupted."));
+						break;
+					}
+
+					const EPathFollowingRequestResult::Type WaitResult = MoveToLocation(WaitGoal.Location,
+						WanderAcceptanceRadius, true, true, false, false, nullptr, false);
+					ReportAction(WaitResult == EPathFollowingRequestResult::Failed
+						? TEXT("You remember to leave room at the ListeningStones, but could not begin the move to its quiet outer edge.")
+						: WaitResult == EPathFollowingRequestResult::AlreadyAtGoal
+							? TEXT("You are already at the quiet outer edge of the ListeningStones; the other resident has room to listen.")
+							: TEXT("You remember to leave room while another resident listens, and are moving to the quiet outer edge of the ListeningStones. You will not interrupt them."));
+					break;
+				}
 			}
 
 			// Grounded residents should approach a landmark from clear ground rather than

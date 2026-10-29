@@ -61,6 +61,13 @@ public:
 	static bool FindGroundedLandmarkApproachGoal(UNavigationSystemV1* Navigation, UWorld* World, APawn* Pawn,
 		const FVector& MoverLocation, const AActor* Target, const FNavAgentProperties& AgentProperties,
 		FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
+	/** Learned quiet-listening practice yields space for another resident at the Stones. */
+	static bool ShouldUseListeningStonesEtiquette(bool bHasLearnedPractice, bool bQuietListenerPresent,
+		bool bIsQuietListener);
+	/** Place a waiting resident beyond the Stones' opposite edge, rather than between the listener and the landmark. */
+	static FVector BuildListeningStonesWaitPoint(const FVector& StonesLocation, const FVector& QuietResidentLocation,
+		const FVector& VisitorLocation, float StandOffDistance);
+	static constexpr float ListeningStonesWaitStandOffDistance = 850.f;
 	/** Sweeps a resident capsule along a nav route, allowing walkable landscape contact but rejecting obstacles. */
 	static bool IsCapsulePathPhysicallyClear(const UWorld* World, const UNavigationPath* Path,
 		const UCapsuleComponent* Capsule, const AActor* IgnoredActor, int32* OutBlockingSegment = nullptr,
