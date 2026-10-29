@@ -4,6 +4,7 @@
 #include "IslandDayNight.h"
 #include "IslandTideglassDragonfly.h"
 #include "IslandTideglassSubsystem.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandWeather.h"
 #include "RatAgentAIController.h"
@@ -472,10 +473,25 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 	ObservationRestRemaining = FMath::Max(0.f, ObservationRestRemaining - SafeDelta);
 	ObservationCooldownRemaining = FMath::Max(0.f, ObservationCooldownRemaining - SafeDelta);
 	RavenCheckRemaining = FMath::Max(0.f, RavenCheckRemaining - SafeDelta);
+	MinnowAttentionRemaining = FMath::Max(0.f, MinnowAttentionRemaining - SafeDelta);
 	if (RavenCheckRemaining <= 0.f)
 	{
 		RavenCheckRemaining = 0.4f;
-		WildlifeAttentionTarget = FindNearbyWildlifeAttentionTarget();
+		FVector TargetLocation = FVector::ZeroVector;
+		WildlifeAttentionTarget = FindNearbyWildlifeAttentionTarget(TargetLocation);
+		if (Cast<AIslandTidepoolMinnows>(WildlifeAttentionTarget.Get()))
+		{
+			MinnowAttentionLocation = TargetLocation;
+			MinnowAttentionRemaining = MinnowAttentionHoldSeconds;
+		}
+		else if (WildlifeAttentionTarget.IsValid())
+		{
+			MinnowAttentionRemaining = 0.f;
+		}
+		if (WildlifeAttentionTarget.IsValid())
+			WildlifeAttentionLocation = TargetLocation;
+		else if (MinnowAttentionRemaining <= 0.f)
+			WildlifeAttentionLocation = FVector::ZeroVector;
 		CheckForNearbyRavenDisturbance();
 		CheckForNearbyRatDisturbance();
 		CheckForNearbyPlayerDisturbance(UGameplayStatics::GetPlayerPawn(this, 0));
@@ -512,8 +528,13 @@ void AIslandTidepoolPeriwinkle::Tick(float DeltaSeconds)
 			TargetAttentionYaw = CalculateAttentionYaw(PlayerPawn->GetActorLocation());
 		}
 	}
-	if (!bPlayerInAttentionRange && WildlifeAttentionTarget.IsValid())
-		TargetAttentionYaw = CalculateAttentionYaw(WildlifeAttentionTarget->GetActorLocation());
+	if (!bPlayerInAttentionRange)
+	{
+		if (WildlifeAttentionTarget.IsValid())
+			TargetAttentionYaw = CalculateAttentionYaw(WildlifeAttentionLocation);
+		else if (MinnowAttentionRemaining > 0.f)
+			TargetAttentionYaw = CalculateAttentionYaw(MinnowAttentionLocation);
+	}
 	UpdateAttentionYaw(TargetAttentionYaw, DeltaSeconds);
 	for (UStaticMeshComponent* EyeStalk : EyeStalks)
 		if (EyeStalk) EyeStalk->SetRelativeScale3D(FVector(0.018f, 0.018f, 0.10f * StalkExtension));
@@ -594,18 +615,21 @@ bool AIslandTidepoolPeriwinkle::ShouldAttendWildlife(float Distance, float Verti
 		VerticalOffset <= MaximumVerticalOffset;
 }
 
-AActor* AIslandTidepoolPeriwinkle::FindNearbyWildlifeAttentionTarget() const
+AActor* AIslandTidepoolPeriwinkle::FindNearbyWildlifeAttentionTarget(FVector& OutTargetLocation) const
 {
 	UWorld* World = GetWorld();
+	OutTargetLocation = FVector::ZeroVector;
 	if (!World) return nullptr;
 
 	AActor* BestTarget = nullptr;
+	FVector BestTargetLocation = FVector::ZeroVector;
 	float BestDistanceSquared = FMath::Square(220.f);
 	const FVector EyeBase = GetActorLocation();
-	const auto Consider = [this, &BestTarget, &BestDistanceSquared, &EyeBase](AActor* Candidate)
+	const auto Consider = [this, &BestTarget, &BestTargetLocation, &BestDistanceSquared, &EyeBase](AActor* Candidate,
+		const FVector& CandidateLocation)
 	{
 		if (!IsValid(Candidate)) return;
-		const FVector Offset = Candidate->GetActorLocation() - EyeBase;
+		const FVector Offset = CandidateLocation - EyeBase;
 		const float DistanceSquared = Offset.SizeSquared2D();
 		const float Distance = FMath::Sqrt(DistanceSquared);
 		if (!ShouldAttendWildlife(Distance, Offset.Z) || DistanceSquared > BestDistanceSquared) return;
@@ -615,12 +639,22 @@ AActor* AIslandTidepoolPeriwinkle::FindNearbyWildlifeAttentionTarget() const
 		const FVector LocalDirection = GetActorTransform().InverseTransformVectorNoScale(Offset);
 		if (LocalDirection.X <= 0.f) return;
 		BestTarget = Candidate;
+		BestTargetLocation = CandidateLocation;
 		BestDistanceSquared = DistanceSquared;
 	};
 
 	for (TActorIterator<AIslandCommonFrog> It(World); It; ++It)
-		Consider(*It);
+		Consider(*It, It->GetActorLocation());
 	for (TActorIterator<AIslandTideglassDragonfly> It(World); It; ++It)
-		Consider(*It);
+		Consider(*It, It->GetActorLocation());
+	for (TActorIterator<AIslandTidepoolMinnows> It(World); It; ++It)
+	{
+		AIslandTidepoolMinnows* Minnows = *It;
+		if (Minnows && Minnows->IsMakingSurfaceBreak())
+			Consider(Minnows, Minnows->GetSurfaceBreakWorldLocation());
+	}
+
+	if (BestTarget)
+		OutTargetLocation = BestTargetLocation;
 	return BestTarget;
 }

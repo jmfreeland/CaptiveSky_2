@@ -1,6 +1,10 @@
 #include "Misc/AutomationTest.h"
 #include "IslandTidepoolPeriwinkle.h"
+#include "IslandTidepoolMinnows.h"
 #include "IslandTideglassSubsystem.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "ProceduralMeshComponent.h"
 #include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleWildlifeAttentionTest,
@@ -34,6 +38,70 @@ bool FIslandPeriwinkleWildlifeAttentionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The eye stalks turn toward a nearby animal to the left"), FrontLeftYaw < -20.f);
 	const float BehindYaw = Snail->CalculateAttentionYaw(Origin + FVector(-120.f, 30.f, 0.f));
 	TestEqual(TEXT("A nearby animal behind the shell does not cause an impossible backward gaze"), BehindYaw, 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandPeriwinkleMinnowAttentionTest,
+	"CaptiveSky2.Agent.TidepoolPeriwinkleMinnowAttention",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandPeriwinkleMinnowAttentionTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Periwinkle-minnow attention fixture world created"), World) ||
+		!TestNotNull(TEXT("Engine is available for the attention fixture"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandTidepoolPeriwinkle* Snail = World->SpawnActor<AIslandTidepoolPeriwinkle>(
+		FVector(0.f, 0.f, 40.f), FRotator::ZeroRotator, Spawn);
+	AIslandTidepoolMinnows* Minnows = World->SpawnActor<AIslandTidepoolMinnows>(
+		FVector(120.f, -120.f, 40.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Periwinkle spawned beside the tidepool"), Snail) ||
+		!TestNotNull(TEXT("Minnow school spawned in the tidepool"), Minnows) || Minnows->Fish.IsEmpty())
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->BeginPlay();
+	Minnows->Fish[0]->SetWorldLocation(FVector(120.f, -120.f, 48.f));
+	Snail->RavenCheckRemaining = 0.f;
+	Snail->Tick(0.2f);
+	TestFalse(TEXT("A calm, submerged minnow school does not attract an arbitrary gaze"),
+		Snail->WildlifeAttentionTarget.IsValid());
+
+	Minnows->SurfaceBreakHopFishIndex = 0;
+	Minnows->SurfaceBreakHopRemaining = 0.54f;
+	Snail->RavenCheckRemaining = 0.f;
+	Snail->Tick(0.2f);
+	TestTrue(TEXT("A real active surface break attracts the snail's eye stalks"), Snail->AttentionYaw < 0.f);
+	TestTrue(TEXT("The glance is aimed at the breaking fish, not the school actor's center"),
+		Snail->WildlifeAttentionLocation.Equals(Minnows->GetSurfaceBreakWorldLocation(), 0.01f));
+	TestTrue(TEXT("The glance lingers briefly after the hop ends"),
+		Snail->MinnowAttentionRemaining > 0.f && Snail->MinnowAttentionRemaining <= Snail->MinnowAttentionHoldSeconds);
+
+	Minnows->SurfaceBreakHopRemaining = 0.f;
+	Minnows->SurfaceBreakHopFishIndex = INDEX_NONE;
+	Snail->RavenCheckRemaining = 0.f;
+	Snail->Tick(0.2f);
+	TestTrue(TEXT("An ended hop receives only the bounded attention linger"), Snail->MinnowAttentionRemaining > 0.f);
+	Snail->RavenCheckRemaining = 0.f;
+	Snail->Tick(Snail->MinnowAttentionHoldSeconds + 0.2f);
+	TestEqual(TEXT("The minnow glance expires without lingering as stale attention"), Snail->MinnowAttentionRemaining, 0.f);
+	TestTrue(TEXT("Watching the school never carries the snail off its small home patch"),
+		FVector::Dist2D(Snail->GetActorLocation(), Snail->HomeLocation) <= Snail->GrazingMaxExcursionCm + 0.1f);
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }
 

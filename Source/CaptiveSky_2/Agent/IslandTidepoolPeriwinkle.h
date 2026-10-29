@@ -13,6 +13,7 @@ class AIslandWeather;
 class AIslandTidepoolCrab;
 class AIslandCommonFrog;
 class AIslandTideglassDragonfly;
+class AIslandTidepoolMinnows;
 class ARatAgentAIController;
 class ARavenAgentAIController;
 class APawn;
@@ -49,6 +50,7 @@ public:
 	/** Daytime grazing remains possible, with a gentle increase after dusk. */
 	static float GrazingActivityForHour(float CurrentHour);
 	static constexpr float GrazingMaxExcursionCm = 16.f;
+	static constexpr float MinnowAttentionHoldSeconds = 0.9f;
 
 protected:
 	virtual void BeginPlay() override;
@@ -57,6 +59,7 @@ protected:
 private:
 	friend class FIslandNightEcologyTest;
 	friend class FIslandPeriwinkleWildlifeAttentionTest;
+	friend class FIslandPeriwinkleMinnowAttentionTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Foot;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
@@ -85,6 +88,8 @@ private:
 	float ObservationCooldownRemaining = 0.f;
 	float RavenCheckRemaining = 0.f;
 	float GrazingActiveSeconds = 0.f;
+	float MinnowAttentionRemaining = 0.f;
+	FVector MinnowAttentionLocation = FVector::ZeroVector;
 	TWeakObjectPtr<APawn> PlayerPresenceLatch;
 	TWeakObjectPtr<AIslandTidepoolCrab> CrabPresenceLatch;
 	float ShellWetness = 0.f;
@@ -97,8 +102,9 @@ private:
 	TWeakObjectPtr<ARavenAgentAIController> RavenPresenceLatch;
 	TWeakObjectPtr<ARatAgentAIController> RatPresenceLatch;
 	TWeakObjectPtr<AActor> WildlifeAttentionTarget;
+	FVector WildlifeAttentionLocation = FVector::ZeroVector;
 	float CalculateAttentionYaw(const FVector& TargetLocation) const;
-	AActor* FindNearbyWildlifeAttentionTarget() const;
+	AActor* FindNearbyWildlifeAttentionTarget(FVector& OutTargetLocation) const;
 	static bool ShouldAttendWildlife(float Distance, float VerticalOffset);
 	void UpdateAttentionYaw(float TargetYaw, float DeltaSeconds);
 	void CheckForNearbyCrabDisturbance();

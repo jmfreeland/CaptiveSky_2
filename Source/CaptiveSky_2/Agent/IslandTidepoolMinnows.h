@@ -48,6 +48,7 @@ private:
 	friend class FIslandMinnowSwimmingVisitorTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandCommonFrogMinnowTests;
+	friend class FIslandPeriwinkleMinnowAttentionTest;
 	static constexpr int32 FishCount = 5;
 	static constexpr float PoolSwimmingFootprintFraction = 0.85f;
 	static constexpr float StartleRippleEdgeClearanceCm = 120.f;
