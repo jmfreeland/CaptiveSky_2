@@ -12,6 +12,7 @@
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandChronicle.h"
 #include "IslandWorldStateSubsystem.h"
 #include "LandscapeProxy.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -381,6 +382,19 @@ FLinearColor UIslandTrailSubsystem::WearColor(float Wetness)
 	return FMath::Lerp(FLinearColor(0.2f, 0.15f, 0.09f), FLinearColor(0.055f, 0.04f, 0.028f), FMath::SmoothStep(0.1f, 0.8f, Wetness));
 }
 
+bool UIslandTrailSubsystem::ShouldChronicleTrailEmergence(const FIslandTrailRegionSummary& Before,
+	const FIslandTrailRegionSummary& After, int32 EntriesToday, int32 IslandDay)
+{
+	if (IslandDay <= 0 || EntriesToday >= MaxTrailChronicleEntriesPerDay) return false;
+	auto IsEstablishedActivePath = [](const FIslandTrailRegionSummary& Summary)
+	{
+		return Summary.State == EIslandTrailRegionState::Active &&
+			Summary.WornCellCount >= TrailChronicleCellThreshold &&
+			Summary.CurrentWearSteps >= TrailChronicleUseThreshold;
+	};
+	return !IsEstablishedActivePath(Before) && IsEstablishedActivePath(After);
+}
+
 FQuat UIslandTrailSubsystem::CalculateWearRotation(const FIntPoint& Key,
 	const TMap<FIntPoint, FIslandTrailCell>& Cells, const FVector& GroundNormal, float& OutAspectRatio)
 {
@@ -534,6 +548,7 @@ void UIslandTrailSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	PrintRing.SetNum(MaxPrints);
 	Load();
 	WeatherLedger();
+	TrailChronicleDay = UIslandWorldStateSubsystem::CurrentIslandDay(&InWorld);
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -578,7 +593,31 @@ void UIslandTrailSubsystem::Footfall(const APawn& Pawn, FWalker& Walker, double 
 	Walker.LastPrint = Ground;
 	Walker.bRight = !Walker.bRight;
 
-	if (Ledger.AddStep(Ground, Normal, IslandDay)) bLedgerDirty = true;
+	if (IslandDay > 0 && TrailChronicleDay != IslandDay)
+	{
+		TrailChronicleDay = IslandDay;
+		TrailChronicleEntriesToday = 0;
+	}
+	const FIntPoint CellKey = FIslandTrailLedger::CellFor(Ground);
+	const FIslandTrailRegionSummary BeforeRegion = Ledger.SummarizeRegionForCell(CellKey, IslandDay);
+	if (Ledger.AddStep(Ground, Normal, IslandDay))
+	{
+		bLedgerDirty = true;
+		const FIslandTrailRegionSummary AfterRegion = Ledger.SummarizeRegionForCell(CellKey, IslandDay);
+		if (ShouldChronicleTrailEmergence(BeforeRegion, AfterRegion, TrailChronicleEntriesToday, IslandDay))
+		{
+			++TrailChronicleEntriesToday;
+			TMap<FString, FString> Extra;
+			Extra.Add(TEXT("event"), TEXT("trail_emerged"));
+			Extra.Add(TEXT("region_id"), AfterRegion.StableId);
+			Extra.Add(TEXT("region_x"), FString::FromInt(AfterRegion.RegionKey.X));
+			Extra.Add(TEXT("region_y"), FString::FromInt(AfterRegion.RegionKey.Y));
+			Extra.Add(TEXT("worn_cells"), FString::FromInt(AfterRegion.WornCellCount));
+			Extra.Add(TEXT("use_steps"), FString::Printf(TEXT("%lld"), AfterRegion.CurrentWearSteps));
+			UIslandChronicleSubsystem::Record(GetWorld(), TEXT("trail"), FString(),
+				TEXT("Repeated footfalls have begun to wear a familiar path into the ground."), Extra);
+		}
+	}
 
 	const float Life = PrintLifetime(Wetness);
 	if (Life <= 0.f || PrintRing.IsEmpty()) return;

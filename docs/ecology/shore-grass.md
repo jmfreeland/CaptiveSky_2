@@ -484,3 +484,13 @@ LLM author raw landscape geometry. The focused automation test was compiled in
 the 2026-10-29 editor-target build, but its execution remains unverified because
 `UnrealEditor-Cmd` crashed at process startup; see
 [`editor restart crash`](../findings/2026-10-29-editor-restart-crash.md).
+
+When a region crosses from not-yet-established to an active path (at least three
+worn cells and twelve accumulated steps), the trail subsystem writes one
+anonymous `trail_emerged` line to the human-facing Island Chronicle. This records
+the physical consequence without attributing it to a character from proximity
+alone. The subsystem caps these notes at four per Island day; residents still
+learn only from their local underfoot observations, not from the Chronicle.
+The UE 5.8.3 editor target compiled this policy and its focused regression test
+successfully. Automation execution remains pending because the command-line
+editor has repeatedly crashed before tests start; see the startup finding above.

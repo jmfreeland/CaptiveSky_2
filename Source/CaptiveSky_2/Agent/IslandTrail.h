@@ -113,6 +113,9 @@ public:
 	static constexpr int32 WearFullSteps = 40;
 	static constexpr int32 RecoveryNoticeAfterDays = FIslandTrailLedger::RegionRecoveryDays;
 	static constexpr float WearDrawRadius = 5500.f;
+	static constexpr int32 TrailChronicleCellThreshold = 3;
+	static constexpr int64 TrailChronicleUseThreshold = 12;
+	static constexpr int32 MaxTrailChronicleEntriesPerDay = 4;
 
 	/** Seconds a print lasts on ground of this wetness; zero when too dry to leave one. */
 	static float PrintLifetime(float Wetness);
@@ -124,6 +127,9 @@ public:
 	static float WearAmount(int32 Steps);
 	/** Dusty when dry, dark mud when the ground is wet. */
 	static FLinearColor WearColor(float Wetness);
+	/** A bounded chronicle note is due only when a region newly becomes an active, repeatedly worn path. */
+	static bool ShouldChronicleTrailEmergence(const FIslandTrailRegionSummary& Before,
+		const FIslandTrailRegionSummary& After, int32 EntriesToday, int32 IslandDay);
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
@@ -167,6 +173,8 @@ private:
 	TArray<FPrint> PrintRing;
 	int32 NextPrint = 0;
 	FIslandTrailLedger Ledger;
+	int32 TrailChronicleDay = -1;
+	int32 TrailChronicleEntriesToday = 0;
 	double NextRefresh = 0.0;
 	double NextWearRefresh = 0.0;
 	double NextSave = 0.0;

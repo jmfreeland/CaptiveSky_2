@@ -42,6 +42,26 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	const FLinearColor Wet = Trail::WearColor(1.f);
 	TestTrue(TEXT("Wet worn earth is darker"), Wet.R < Dry.R && Wet.G < Dry.G);
 
+	FIslandTrailRegionSummary PathBefore;
+	PathBefore.State = EIslandTrailRegionState::Active;
+	PathBefore.WornCellCount = Trail::TrailChronicleCellThreshold - 1;
+	PathBefore.CurrentWearSteps = Trail::TrailChronicleUseThreshold - 4;
+	FIslandTrailRegionSummary PathAfter;
+	PathAfter.State = EIslandTrailRegionState::Active;
+	PathAfter.WornCellCount = Trail::TrailChronicleCellThreshold;
+	PathAfter.CurrentWearSteps = Trail::TrailChronicleUseThreshold;
+	TestTrue(TEXT("An active path is chronicled only when repeated wear establishes it"),
+		Trail::ShouldChronicleTrailEmergence(PathBefore, PathAfter, 0, 2));
+	TestFalse(TEXT("An already active established path is not narrated on every later step"),
+		Trail::ShouldChronicleTrailEmergence(PathAfter, PathAfter, 0, 2));
+	TestFalse(TEXT("An undated path cannot be chronicled"),
+		Trail::ShouldChronicleTrailEmergence(PathBefore, PathAfter, 0, 0));
+	TestFalse(TEXT("Daily chronicle path notes remain capped"),
+		Trail::ShouldChronicleTrailEmergence(PathBefore, PathAfter, Trail::MaxTrailChronicleEntriesPerDay, 2));
+	PathAfter.CurrentWearSteps = Trail::TrailChronicleUseThreshold - 1;
+	TestFalse(TEXT("A region without enough accumulated use is not chronicled"),
+		Trail::ShouldChronicleTrailEmergence(PathBefore, PathAfter, 0, 2));
+
 	const FIntPoint WearCenter(4, -2);
 	auto AddWearCell = [](TMap<FIntPoint, FIslandTrailCell>& Cells, const FIntPoint& Key)
 	{
