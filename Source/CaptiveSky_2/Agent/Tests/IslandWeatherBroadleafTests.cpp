@@ -59,8 +59,8 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		int32 CullStart = 0;
 		int32 CullEnd = 0;
 		BlackAlders->GetCullDistances(CullStart, CullEnd);
-		TestEqual(TEXT("Black Alder uses the same bounded 80 m fade start"), CullStart, 8000);
-		TestEqual(TEXT("Black Alder uses the same bounded 125 m cull end"), CullEnd, 12500);
+		TestEqual(TEXT("Black Alder begins its distinct mid-distance fade at 120 m"), CullStart, 12000);
+		TestEqual(TEXT("Black Alder stays inside the spruce horizon with a 220 m cull end"), CullEnd, 22000);
 	}
 
 	const TCHAR* BlackAlderAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A");
