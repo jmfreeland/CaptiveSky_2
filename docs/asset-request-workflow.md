@@ -157,3 +157,14 @@ SHA-256. `dotnet run --no-build` passed all checks when
 `Saved/CompileScratch/GatewayChecks_20261019/` tree. The initial repeat using
 the default Windows temp root hit access denied while writing the headless-turn
 marker; no Discord channel, production inbox, or model provider was contacted.
+
+**Live-editor request/upgrade behavior check (2026-10-29):** the connected UE
+editor passed `CaptiveSky2.Agent.AssetRequestQueue` and
+`CaptiveSky2.Agent.IslandProposalMemory` (2 passed, 0 failed, 0 warnings;
+0.177 seconds total). The fixtures use unique temporary inbox/data roots under
+`Saved/Automation` and clean them up. Together these confirm proposal
+validation, exact upgrade target/kind preservation, human-review routing,
+per-resident limits, and the resident's durable “pending review” memory without
+calling a model or touching the production inbox. They do not establish a live
+Discord conversation, an actual LLM choosing the action, or any requested
+upgrade being implemented in the world.
