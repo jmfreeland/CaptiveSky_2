@@ -64,3 +64,21 @@ needed to apply it. Closing the editor raised a `Save Content` dialog listing
 pending material edit without saving or discarding it. The editor remains open.
 This material prompt is separate from the Nanite Foliage setting and needs
 review before another restart. No PIE session or asset save was performed.
+
+## Runtime-scatter visibility check — 17:32 UTC
+
+Unreal MCP confirmed `/Game/Maps/Island` is loaded and PIE is stopped. The
+viewport shows an open, low-cover meadow with only a few tall tree silhouettes
+near the right edge; this single editor angle is not an island-wide inventory.
+The live `IslandWeather` actor's maple, aspen, beech, and black-alder
+`InstancedSkinnedMeshComponent`s each report no assigned mesh and zero
+instance-data entries outside play. The runtime generator therefore cannot be
+judged from this editor-only screenshot, and the four broadleaf profiles in
+the pushed worktree branch still have not been loaded into this separate
+project checkout.
+
+At 17:32 UTC, `nvidia-smi` reported 8,736 / 12,282 MiB allocated, 53%
+utilization, and 80°C. WDDM exposed no per-process rows, so attribution to
+Unreal is unavailable. PIE remains stopped; defer the runtime scatter check
+until GPU headroom improves and the main project's source checkout can safely
+receive the branch changes. No editor asset or level was modified.
