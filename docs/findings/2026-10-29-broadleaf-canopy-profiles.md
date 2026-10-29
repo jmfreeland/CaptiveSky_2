@@ -82,3 +82,17 @@ Nanite, additional LODs, or lower runtime memory. Next, generate one isolated
 variant only after the open GPU has cooled, inspect its output class/LOD/texture
 dependencies, and keep it outside the Island population until that preflight
 passes.
+
+## PVE export trade-off
+
+The installed UE 5.8 `ProceduralVegetation` export settings expose both
+`StaticMesh` and `SkeletalMesh` output. `bCreateNaniteFoliage` defaults to true.
+The plugin's setting description explicitly states that static output has no
+skeletal wind animation, while skeletal output includes bones and can receive a
+Dynamic Wind preset. This offers a plausible two-distance strategy: retain a
+wind-responsive skeletal form near the player and test a Nanite static form for
+far silhouettes. It is not yet verified that the Aleppo graph can export both
+representations from the same generated data or that the transition would read
+well. The next PVE experiment should use an isolated copy, preserve the source
+asset, test `Append` rather than `Replace`, and compare geometry, wind response,
+texture dependencies, and in-game frame/VRAM cost before any Island placement.
