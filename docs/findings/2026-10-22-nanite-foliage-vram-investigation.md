@@ -112,3 +112,15 @@ Windows memory-pressure toast; no process-specific attribution was available.
 `CaptiveSky.Agent.DisableThinking` was restored to `0` and the temporary stat
 overlay was turned off. Nanite assembly appearance/performance, the 30-FPS
 floor, peak VRAM, and water traversal remain unverified.
+
+**Editor restart confirmation (2026-10-29 12:47 local):** after the user's
+approval, the editor reopened the exact main project from
+`D:\Projects - Athena\Unreal\CaptiveSky_2` on the `Island` map. The live console
+query at 12:51 returned `r.Nanite.Foliage = "1"` with
+`LastSetBy: ProjectSetting`; the status bar showed `All Saved`. The visible
+editor viewport is the sparse authored editor scene and is not evidence about
+the runtime-generated tree/ground-cover population. No runtime play, FPS/VRAM
+sample, or traversal test was performed during this restart. The startup log
+again emitted the 4033×4033 landscape edit-layer merge warning against a
+1024×1024 configured batch maximum. This confirms the setting survived restart,
+not a visual or performance benefit from Nanite Foliage.
