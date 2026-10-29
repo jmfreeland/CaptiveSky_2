@@ -73,8 +73,14 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("The test controller possesses the swimming character"), Player->GetController() == SwimController);
 		}
 
+		const FRotator OriginalMeshRelativeRotation = Player->GetMesh()->GetRelativeRotation();
 		Player->EnterSurfaceSwimming(100.f);
 		TestTrue(TEXT("Entering surface water enables the player-only swim state"), Player->IsSurfaceSwimming());
+		const FRotator SwimMeshRelativeRotation = Player->GetMesh()->GetRelativeRotation();
+		TestTrue(TEXT("Surface swimming turns the upright mannequin into a horizontal swim presentation"),
+			FMath::IsNearlyEqual(SwimMeshRelativeRotation.Pitch, 90.f) &&
+			FMath::IsNearlyEqual(SwimMeshRelativeRotation.Yaw, OriginalMeshRelativeRotation.Yaw) &&
+			FMath::IsNearlyEqual(SwimMeshRelativeRotation.Roll, OriginalMeshRelativeRotation.Roll));
 		TestTrue(TEXT("The player uses the surface-swim physics component"),
 			Cast<UIslandSurfaceSwimMovementComponent>(Movement) != nullptr);
 		TestEqual(TEXT("Surface swimming exposes the engine swimming mode to gameplay and animation"),
@@ -115,6 +121,8 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 		Player->LeaveSurfaceSwimming(MOVE_Falling);
 		TestFalse(TEXT("Leaving water clears the swim state"), Player->IsSurfaceSwimming());
+		TestTrue(TEXT("Leaving water restores the authored mesh orientation"),
+			Player->GetMesh()->GetRelativeRotation().Equals(OriginalMeshRelativeRotation));
 		TestEqual(TEXT("Leaving water restores the prior swim speed"), Movement->MaxSwimSpeed, OriginalSwimSpeed);
 		TestEqual(TEXT("Leaving water resumes falling"), Movement->MovementMode, MOVE_Falling);
 

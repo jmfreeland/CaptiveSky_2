@@ -86,3 +86,52 @@ This is editor-state evidence, not a gameplay reproduction. `trace_world` is a
 single line trace, and no player capsule, swimming transition, or actual water
 surface contact was observed. The landscape material warning is log evidence;
 this audit did not rebuild or modify the material.
+
+## Restart and short default-spawn PIE check (2026-10-29)
+
+After the user-approved editor restart, the main `CaptiveSky_2` project reopened
+at `D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject`. The Island
+loaded and the live editor reported `r.Nanite.Foliage=1`. A short PIE session
+then started at the default inland PlayerStart. Runtime logs confirmed that
+`IslandOceanSubsystem` disables collision on the legacy `OceanPlane`; live
+inspection of both that plane and `WaterBodyOcean_1.WaterBodyOceanComponent`
+reported `BodyInstance.collisionEnabled=NoCollision`. The player blueprint
+inherits `ACaptiveSky_2Character` and uses `/Game/Characters/Mannequins/Anims/Unarmed/ABP_Unarmed`.
+
+The session ended after 155.8 real seconds with 11 agent requests and zero
+requests still in flight. This remained below the existing 1,800-second and
+120-request safeguards. No player input toward the sea, offshore spawn, water
+crossing, or return-to-shore was tested; the screenshot showed the default
+inland start. Therefore this neither reproduces nor clears the reported
+water-walking symptom. The animation blueprint dependencies are idle/walk/run,
+jump, fall, and land assets; there is no dedicated swim animation dependency,
+so the upright surface-swim presentation is a plausible visual contributor,
+not a verified cause. No map or asset was saved or changed by this check.
+
+For the next water reproduction, disable agent thinking before PIE, use an
+explicit offshore `startTransform`, and inspect the player capsule's floor-hit
+actor and movement mode while moving to land. Stop once the shoreline return
+is observed or after a tightly bounded sample; retain the existing session
+duration and request caps.
+
+## Swim-pose correction and focused verification (2026-10-29)
+
+The first post-restart PIE ran 155.8 seconds at the default inland spawn and
+ended with 11 requests, all below the existing session caps. It did not test
+the sea. A separate guarded PIE used the explicit offshore spawn `(203000, 0,
+1300)` with agent thinking disabled. At the water surface, the character was
+in `MOVE_Swimming`, had no blocking floor hit, and logged entry at Z=940 cm.
+The captured mannequin nevertheless remained perfectly upright, visibly
+reading as if it were standing on the sea. A transient PIE-only mesh rotation
+to 90° pitch made it lie horizontally at the surface. This confirms the
+presentation, not collision, as the source of the reported visual symptom in
+that test.
+
+The native character now applies that horizontal mesh pitch during surface
+swimming and restores the authored mesh rotation on shore exit or jump. The
+pitch is an editable character default so a dedicated swim animation can later
+replace this fallback cleanly. UE 5.8 built the isolated worktree target, and
+`CaptiveSky2.Agent.IslandOcean` passed under NullRHI; the test covers applying
+the pose and restoring it. Log: `Saved/Logs/WaterPoseAudit.log`. This headless
+test verifies state changes, not the compiled mesh's final in-game appearance;
+the open editor still has its previous module loaded and was not hot-reloaded.

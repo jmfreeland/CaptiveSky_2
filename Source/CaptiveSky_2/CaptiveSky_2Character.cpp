@@ -4,6 +4,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMeshActor.h"
 #include "CollisionShape.h"
@@ -216,6 +217,14 @@ void ACaptiveSky_2Character::EnterSurfaceSwimming(float WaterSurfaceZ)
 {
 	if (bSurfaceSwimming) return;
 
+	if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+	{
+		PreviousMeshRelativeRotation = CharacterMesh->GetRelativeRotation();
+		FRotator SwimPresentationRotation = PreviousMeshRelativeRotation;
+		SwimPresentationRotation.Pitch = SurfaceSwimMeshPitch;
+		CharacterMesh->SetRelativeRotation(SwimPresentationRotation);
+	}
+
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		PreviousMaxSwimSpeed = Movement->MaxSwimSpeed;
@@ -238,6 +247,10 @@ void ACaptiveSky_2Character::LeaveSurfaceSwimming(EMovementMode NextMovementMode
 	if (!bSurfaceSwimming) return;
 
 	bSurfaceSwimming = false;
+	if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+	{
+		CharacterMesh->SetRelativeRotation(PreviousMeshRelativeRotation);
+	}
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		Movement->MaxSwimSpeed = PreviousMaxSwimSpeed;

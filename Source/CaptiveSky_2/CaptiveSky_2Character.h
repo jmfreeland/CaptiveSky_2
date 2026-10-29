@@ -57,6 +57,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Water", meta=(ForceUnits="cm"))
 	float SurfaceSwimOffset = 12.f;
 
+	/** Mesh pitch while surface swimming, used until a dedicated swim animation is assigned. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement|Water", meta=(ClampMin="-180", ClampMax="180", ForceUnits="deg"))
+	float SurfaceSwimMeshPitch = 90.f;
+
 public:
 
 	/** Constructor */
@@ -110,6 +114,7 @@ private:
 
 	bool bSurfaceSwimming = false;
 	float PreviousMaxSwimSpeed = 0.f;
+	FRotator PreviousMeshRelativeRotation = FRotator::ZeroRotator;
 	double NextSurfaceSwimWakeTime = 0.0;
 	void TrySpawnSurfaceSwimWake(const FVector& WaterSurfaceLocation);
 
