@@ -13,6 +13,8 @@ class APawn;
 struct FIslandTrailCell
 {
 	int32 Steps = 0;
+	/** Island day this ground was last crossed, or -1 when loaded from a legacy/unknown record. */
+	int32 LastUseDay = -1;
 	FVector Position = FVector::ZeroVector;
 	float NormalX = 0.f;
 	float NormalY = 0.f;
@@ -35,7 +37,7 @@ struct CAPTIVESKY_2_API FIslandTrailLedger
 
 	static FIntPoint CellFor(const FVector& Position);
 	/** Count one footfall on the ground at Position. Returns false when the ledger is full and the cell is new. */
-	bool AddStep(const FVector& Position, const FVector& GroundNormal);
+	bool AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay = -1);
 	int32 StepsAt(const FVector& Position) const;
 	FString ToJson() const;
 	bool FromJson(const FString& Json);
@@ -77,6 +79,7 @@ public:
 	static constexpr float PrintWetness = 0.15f;
 	static constexpr int32 WearStartSteps = 4;
 	static constexpr int32 WearFullSteps = 40;
+	static constexpr int32 RecoveryNoticeAfterDays = 3;
 	static constexpr float WearDrawRadius = 5500.f;
 
 	/** Seconds a print lasts on ground of this wetness; zero when too dry to leave one. */
@@ -98,7 +101,7 @@ public:
 	FIslandTrailLedger& GetLedgerMutable() { return Ledger; }
 	int32 GetActivePrintCount() const;
 	/** What a resident notices of the ground itself: worn tracks and wet prints. Pure; counts come from the ledger. */
-	static FString DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness);
+	static FString DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness, int32 LastUseDay = -1, int32 Today = -1);
 	/** The same, for a point on the island. */
 	FString DescribeUnderfoot(const FVector& Position, float Wetness) const;
 	/** Tests set this to redirect or suppress saving; empty means derive from the map. */
@@ -142,7 +145,7 @@ private:
 	void Load();
 	void Save();
 	void WeatherLedger();
-	void Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness);
+	void Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness, int32 IslandDay);
 	void RefreshPrints(double Now, float Wetness);
 	void RefreshWear(const FVector& Viewer, float Wetness);
 	/** Align adjacent wear patches to repeated travel while keeping junctions nearly round. */

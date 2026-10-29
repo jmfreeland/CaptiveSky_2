@@ -89,6 +89,8 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	const float Infinity = std::numeric_limits<float>::infinity();
 	TestFalse(TEXT("A non-finite position cannot enter persistent path memory"), Ledger.AddStep(FVector(NaN, 0.f, 0.f), FVector::UpVector));
 	TestFalse(TEXT("A non-finite ground normal cannot enter persistent path memory"), Ledger.AddStep(Here, FVector(0.f, Infinity, 0.f)));
+	TestFalse(TEXT("An invalid negative island day cannot enter persistent path memory"),
+		Ledger.AddStep(Here, FVector::UpVector, -2));
 	TestFalse(TEXT("A finite position outside the ledger's cell-key range is rejected"),
 		Ledger.AddStep(FVector((static_cast<double>(TNumericLimits<int32>::Max()) + 1.0) * FIslandTrailLedger::CellSize, 0.f, 0.f), FVector::UpVector));
 	TestEqual(TEXT("Rejected footfalls leave the existing trail unchanged"), Ledger.StepsAt(Here), 5);
@@ -102,7 +104,25 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("Position survives"), Cell->Position.Equals(Here + FVector(16.f, 0.f, 0.f), 0.01f));
 		TestTrue(TEXT("Slope survives"), FMath::IsNearlyEqual(Cell->NormalX, 0.1f, 0.001f));
+		TestEqual(TEXT("Undated footfalls remain explicitly unknown"), Cell->LastUseDay, -1);
 	}
+	FIslandTrailLedger Dated;
+	Dated.AddStep(Here, FVector::UpVector, 10);
+	Dated.AddStep(Here + FVector(12.f, 0.f, 0.f), FVector::UpVector, 12);
+	const FIslandTrailCell* DatedCell = Dated.Cells.Find(FIslandTrailLedger::CellFor(Here));
+	if (TestNotNull(TEXT("Dated trail cell present"), DatedCell))
+		TestEqual(TEXT("The last-use day advances with each valid footfall"), DatedCell->LastUseDay, 12);
+	FIslandTrailLedger DatedReloaded;
+	TestTrue(TEXT("A dated trail ledger reloads"), DatedReloaded.FromJson(Dated.ToJson()));
+	const FIslandTrailCell* ReloadedDatedCell = DatedReloaded.Cells.Find(FIslandTrailLedger::CellFor(Here));
+	if (TestNotNull(TEXT("Dated trail cell survives reload"), ReloadedDatedCell))
+		TestEqual(TEXT("Last-use day survives save and load"), ReloadedDatedCell->LastUseDay, 12);
+	FIslandTrailLedger Legacy;
+	TestTrue(TEXT("Version-one trail ledgers remain readable"), Legacy.FromJson(
+		TEXT("{\"version\":1,\"decay_day\":10,\"cells\":[[1,2,5,225,300,0,0,0]]}")));
+	const FIslandTrailCell* LegacyCell = Legacy.Cells.Find(FIntPoint(1, 2));
+	if (TestNotNull(TEXT("Legacy trail cell loads"), LegacyCell))
+		TestEqual(TEXT("A legacy trail's unknown last-use day is preserved as unknown"), LegacyCell->LastUseDay, -1);
 	FIslandTrailLedger Garbage;
 	Garbage.AddStep(Here, FVector::UpVector);
 	TestFalse(TEXT("Unreadable text is refused"), Garbage.FromJson(TEXT("not json")));
@@ -115,6 +135,8 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 		TEXT("{\"version\":1,\"cells\":[[1,2,3,1e100,300,0,0,0]]}")));
 	TestFalse(TEXT("Impossible ground normals are refused"), Garbage.FromJson(
 		TEXT("{\"version\":1,\"cells\":[[1,2,3,225,300,0,0.8,0.8]]}")));
+	TestFalse(TEXT("Fractional last-use days are refused"), Garbage.FromJson(
+		TEXT("{\"version\":2,\"cells\":[[1,2,3,4.5,225,300,0,0,0]]}")));
 	TestFalse(TEXT("Out-of-range decay days are refused"), Garbage.FromJson(
 		TEXT("{\"version\":1,\"decay_day\":2147483648,\"cells\":[]}")));
 	TestEqual(TEXT("A refused load leaves the ledger alone"), Garbage.StepsAt(Here), 1);
@@ -141,6 +163,14 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A faint track is noticed"), Trail::DescribeTrail(Trail::WearStartSteps / 2, 0, 0.f).Contains(TEXT("faintly")));
 	TestTrue(TEXT("A worn track is noticed"), Trail::DescribeTrail(Trail::WearStartSteps, 0, 0.f).Contains(TEXT("worn thin")));
 	TestTrue(TEXT("A bare track is noticed"), Trail::DescribeTrail(Trail::WearFullSteps, 0, 0.f).Contains(TEXT("trodden bare")));
+	TestFalse(TEXT("A path used within three days is not described as recovering"),
+		Trail::DescribeTrail(Trail::WearStartSteps, 0, 0.f, 10, 12).Contains(TEXT("softening")));
+	TestTrue(TEXT("A quiet, older path is described as naturally recovering"),
+		Trail::DescribeTrail(Trail::WearStartSteps, 0, 0.f, 10, 13).Contains(TEXT("softening")));
+	TestFalse(TEXT("Legacy paths without use dates are not assigned invented recovery history"),
+		Trail::DescribeTrail(Trail::WearStartSteps, 0, 0.f, -1, 13).Contains(TEXT("softening")));
+	TestTrue(TEXT("Unused ground without a visible track stays undescribed"),
+		Trail::DescribeTrail(0, 0, 0.f, 1, 30).IsEmpty());
 	TestTrue(TEXT("Wet prints are noticed"), Trail::DescribeTrail(0, 5, 0.9f).Contains(TEXT("Fresh footprints")));
 	TestTrue(TEXT("Drying prints are noticed"), Trail::DescribeTrail(0, 5, 0.2f).Contains(TEXT("shrinking")));
 	TestTrue(TEXT("One print is not a trail"), Trail::DescribeTrail(0, 1, 0.9f).IsEmpty());

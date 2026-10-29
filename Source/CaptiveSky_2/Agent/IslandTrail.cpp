@@ -28,7 +28,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogIslandTrail, Log, All);
 
 namespace
 {
-	constexpr int32 TrailVersion = 1;
+	constexpr int32 TrailVersion = 2;
+	constexpr int32 LegacyTrailVersion = 1;
 	constexpr float PrintHalfStance = 10.f;
 
 	float HashUnit(const FIntPoint& Cell, int32 Salt)
@@ -44,11 +45,11 @@ FIntPoint FIslandTrailLedger::CellFor(const FVector& Position)
 	return FIntPoint(FMath::FloorToInt(Position.X / CellSize), FMath::FloorToInt(Position.Y / CellSize));
 }
 
-bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundNormal)
+bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay)
 {
 	const double CellX = static_cast<double>(Position.X) / CellSize;
 	const double CellY = static_cast<double>(Position.Y) / CellSize;
-	if (!FMath::IsFinite(Position.X) || !FMath::IsFinite(Position.Y) || !FMath::IsFinite(Position.Z) ||
+	if (IslandDay < -1 || !FMath::IsFinite(Position.X) || !FMath::IsFinite(Position.Y) || !FMath::IsFinite(Position.Z) ||
 		!FMath::IsFinite(GroundNormal.X) || !FMath::IsFinite(GroundNormal.Y) || !FMath::IsFinite(GroundNormal.Z) ||
 		CellX < TNumericLimits<int32>::Min() || CellX > TNumericLimits<int32>::Max() ||
 		CellY < TNumericLimits<int32>::Min() || CellY > TNumericLimits<int32>::Max())
@@ -64,6 +65,7 @@ bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundN
 		Cell = &Cells.Add(Key);
 	}
 	++Cell->Steps;
+	if (IslandDay >= 0) Cell->LastUseDay = FMath::Max(Cell->LastUseDay, IslandDay);
 	Cell->Position = Position;
 	Cell->NormalX = GroundNormal.X;
 	Cell->NormalY = GroundNormal.Y;
@@ -111,8 +113,9 @@ FString FIslandTrailLedger::ToJson() const
 	for (const TPair<FIntPoint, FIslandTrailCell>& Pair : Cells)
 	{
 		const FIslandTrailCell& C = Pair.Value;
-		const double Values[8] = {static_cast<double>(Pair.Key.X), static_cast<double>(Pair.Key.Y), static_cast<double>(C.Steps),
-			C.Position.X, C.Position.Y, C.Position.Z, static_cast<double>(C.NormalX), static_cast<double>(C.NormalY)};
+		const double Values[9] = {static_cast<double>(Pair.Key.X), static_cast<double>(Pair.Key.Y), static_cast<double>(C.Steps),
+			static_cast<double>(C.LastUseDay), C.Position.X, C.Position.Y, C.Position.Z,
+			static_cast<double>(C.NormalX), static_cast<double>(C.NormalY)};
 		TArray<TSharedPtr<FJsonValue>> Row;
 		for (double V : Values) Row.Add(MakeShared<FJsonValueNumber>(V));
 		Rows.Add(MakeShared<FJsonValueArray>(Row));
@@ -132,16 +135,18 @@ bool FIslandTrailLedger::FromJson(const FString& Json)
 	const double MaxInt = static_cast<double>(TNumericLimits<int32>::Max());
 	double Version = 0.0;
 	if (!Root->TryGetNumberField(TEXT("version"), Version) || !std::isfinite(Version) ||
-		Version != static_cast<double>(TrailVersion)) return false;
+		(Version != static_cast<double>(LegacyTrailVersion) && Version != static_cast<double>(TrailVersion))) return false;
+	const bool bHasLastUseDay = Version >= static_cast<double>(TrailVersion);
+	const int32 ExpectedRowSize = bHasLastUseDay ? 9 : 8;
 	const TArray<TSharedPtr<FJsonValue>>* Rows = nullptr;
 	if (!Root->TryGetArrayField(TEXT("cells"), Rows) || Rows->Num() > MaxCells) return false;
 	TMap<FIntPoint, FIslandTrailCell> Loaded;
 	for (const TSharedPtr<FJsonValue>& RowValue : *Rows)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Row = nullptr;
-		if (!RowValue.IsValid() || !RowValue->TryGetArray(Row) || Row->Num() != 8) return false;
-		double V[8];
-		for (int32 I = 0; I < 8; ++I)
+		if (!RowValue.IsValid() || !RowValue->TryGetArray(Row) || Row->Num() != ExpectedRowSize) return false;
+		double V[9] = {};
+		for (int32 I = 0; I < ExpectedRowSize; ++I)
 		{
 			if (!(*Row)[I].IsValid() || !(*Row)[I]->TryGetNumber(V[I]) || !std::isfinite(V[I])) return false;
 		}
@@ -152,10 +157,13 @@ bool FIslandTrailLedger::FromJson(const FString& Json)
 		{
 			return false;
 		}
-		if (V[3] / CellSize < MinInt || V[3] / CellSize > MaxInt ||
-			V[4] / CellSize < MinInt || V[4] / CellSize > MaxInt ||
-			V[6] < -1.0 || V[6] > 1.0 || V[7] < -1.0 || V[7] > 1.0 ||
-			FMath::Square(V[6]) + FMath::Square(V[7]) > 1.0001)
+		if (bHasLastUseDay && (V[3] < -1.0 || V[3] > MaxInt || std::floor(V[3]) != V[3])) return false;
+		const int32 PositionIndex = bHasLastUseDay ? 4 : 3;
+		const int32 NormalIndex = PositionIndex + 3;
+		if (V[PositionIndex] / CellSize < MinInt || V[PositionIndex] / CellSize > MaxInt ||
+			V[PositionIndex + 1] / CellSize < MinInt || V[PositionIndex + 1] / CellSize > MaxInt ||
+			V[NormalIndex] < -1.0 || V[NormalIndex] > 1.0 || V[NormalIndex + 1] < -1.0 || V[NormalIndex + 1] > 1.0 ||
+			FMath::Square(V[NormalIndex]) + FMath::Square(V[NormalIndex + 1]) > 1.0001)
 		{
 			return false;
 		}
@@ -163,9 +171,10 @@ bool FIslandTrailLedger::FromJson(const FString& Json)
 		const FIntPoint Key(static_cast<int32>(V[0]), static_cast<int32>(V[1]));
 		FIslandTrailCell Cell;
 		Cell.Steps = static_cast<int32>(V[2]);
-		Cell.Position = FVector(V[3], V[4], V[5]);
-		Cell.NormalX = static_cast<float>(V[6]);
-		Cell.NormalY = static_cast<float>(V[7]);
+		Cell.LastUseDay = bHasLastUseDay ? static_cast<int32>(V[3]) : -1;
+		Cell.Position = FVector(V[PositionIndex], V[PositionIndex + 1], V[PositionIndex + 2]);
+		Cell.NormalX = static_cast<float>(V[NormalIndex]);
+		Cell.NormalY = static_cast<float>(V[NormalIndex + 1]);
 		if (Cell.Steps == 0) continue;
 		if (CellFor(Cell.Position) != Key || Loaded.Contains(Key)) return false;
 		Loaded.Add(Key, Cell);
@@ -316,12 +325,15 @@ int32 UIslandTrailSubsystem::GetActivePrintCount() const
 	return Count;
 }
 
-FString UIslandTrailSubsystem::DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness)
+FString UIslandTrailSubsystem::DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness, int32 LastUseDay, int32 Today)
 {
 	FString Out;
 	if (Steps >= WearFullSteps) Out += TEXT(" The ground underfoot is trodden bare along a track that many feet have worn.");
 	else if (Steps >= WearStartSteps) Out += TEXT(" The grass here is worn thin along a track where feet often pass.");
 	else if (Steps >= WearStartSteps / 2) Out += TEXT(" The grass is faintly flattened here, as if others have passed this way before.");
+	if (Steps >= WearStartSteps / 2 && LastUseDay >= 0 && Today >= LastUseDay &&
+		Today - LastUseDay >= RecoveryNoticeAfterDays)
+		Out += TEXT(" The old track is softening as grass slowly creeps back over ground left unused.");
 	if (NearbyPrints >= 3)
 		Out += Wetness < 0.3f ? TEXT(" Dark footprints still mark the ground nearby, shrinking as it dries.") : TEXT(" Fresh footprints are pressed into the wet ground nearby.");
 	return Out;
@@ -330,14 +342,19 @@ FString UIslandTrailSubsystem::DescribeTrail(int32 Steps, int32 NearbyPrints, fl
 FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float Wetness) const
 {
 	int32 Steps = 0;
+	int32 LastUseDay = -1;
 	const FIntPoint Here = FIslandTrailLedger::CellFor(Position);
 	for (int32 DX = -1; DX <= 1; ++DX)
 		for (int32 DY = -1; DY <= 1; ++DY)
-			if (const FIslandTrailCell* Cell = Ledger.Cells.Find(Here + FIntPoint(DX, DY))) Steps = FMath::Max(Steps, Cell->Steps);
+			if (const FIslandTrailCell* Cell = Ledger.Cells.Find(Here + FIntPoint(DX, DY)))
+			{
+				Steps = FMath::Max(Steps, Cell->Steps);
+				if (Cell->Steps >= WearStartSteps / 2) LastUseDay = FMath::Max(LastUseDay, Cell->LastUseDay);
+			}
 	int32 Prints = 0;
 	for (const FPrint& Print : PrintRing)
 		if (Print.bActive && FVector::DistSquared2D(Print.Position, Position) < FMath::Square(600.f)) ++Prints;
-	return DescribeTrail(Steps, Prints, Wetness);
+	return DescribeTrail(Steps, Prints, Wetness, LastUseDay, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
 }
 
 FString UIslandTrailSubsystem::GetStorageFilePath() const
@@ -397,7 +414,7 @@ void UIslandTrailSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UIslandTrailSubsystem::Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness)
+void UIslandTrailSubsystem::Footfall(const APawn& Pawn, FWalker& Walker, double Now, float Wetness, int32 IslandDay)
 {
 	const ACharacter* Character = Cast<ACharacter>(&Pawn);
 	const UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
@@ -427,7 +444,7 @@ void UIslandTrailSubsystem::Footfall(const APawn& Pawn, FWalker& Walker, double 
 	Walker.LastPrint = Ground;
 	Walker.bRight = !Walker.bRight;
 
-	if (Ledger.AddStep(Ground, Normal)) bLedgerDirty = true;
+	if (Ledger.AddStep(Ground, Normal, IslandDay)) bLedgerDirty = true;
 
 	const float Life = PrintLifetime(Wetness);
 	if (Life <= 0.f || PrintRing.IsEmpty()) return;
@@ -533,8 +550,9 @@ void UIslandTrailSubsystem::Tick(float DeltaTime)
 	if (Now >= NextRefresh)
 	{
 		NextRefresh = Now + 0.1;
+		const int32 IslandDay = UIslandWorldStateSubsystem::CurrentIslandDay(World);
 		for (TActorIterator<ACharacter> It(World); It; ++It)
-			Footfall(**It, Walkers.FindOrAdd(*It), Now, Wetness);
+			Footfall(**It, Walkers.FindOrAdd(*It), Now, Wetness, IslandDay);
 		for (auto It = Walkers.CreateIterator(); It; ++It)
 			if (!It.Key().IsValid()) It.RemoveCurrent();
 		RefreshPrints(Now, Wetness);
