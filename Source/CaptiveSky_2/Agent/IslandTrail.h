@@ -20,11 +20,36 @@ struct FIslandTrailCell
 	float NormalY = 0.f;
 };
 
+enum class EIslandTrailRegionState : uint8
+{
+	Unknown,
+	Active,
+	Recovering
+};
+
+/** A bounded, derived summary of one stable 12 m trail region. Never persisted separately from its cells. */
+struct FIslandTrailRegionSummary
+{
+	FIntPoint RegionKey = FIntPoint::ZeroValue;
+	FString StableId;
+	int32 WornCellCount = 0;
+	/** Sum of current per-cell step weights, which weathering can reduce over time. */
+	int64 CurrentWearSteps = 0;
+	int32 LastUseDay = -1;
+	EIslandTrailRegionState State = EIslandTrailRegionState::Unknown;
+	/** Deterministic, bounded examples of the cell keys that contribute to the summary. */
+	TArray<FIntPoint> SampleCells;
+};
+
 /** The island's memory of where people walk. Pure data, saved as JSON. */
 struct CAPTIVESKY_2_API FIslandTrailLedger
 {
 	static constexpr int32 MaxCells = 6000;
 	static constexpr float CellSize = 150.f;
+	static constexpr int32 RegionCellSpan = 8;
+	static constexpr int32 MaxRegionSamples = 8;
+	static constexpr int32 MinRegionCellSteps = 2;
+	static constexpr int32 RegionRecoveryDays = 3;
 
 	TMap<FIntPoint, FIslandTrailCell> Cells;
 	/** Island day the ledger was last weathered, or -1 before the first day is known. */
@@ -36,6 +61,11 @@ struct CAPTIVESKY_2_API FIslandTrailLedger
 	bool WeatherTo(int32 Today);
 
 	static FIntPoint CellFor(const FVector& Position);
+	/** Stable tile identity; negative cell coordinates use mathematical floor division. */
+	static FIntPoint RegionForCell(const FIntPoint& CellKey);
+	static FString RegionId(const FIntPoint& RegionKey);
+	/** Derive a bounded summary by inspecting only the cells inside this 12 m region. */
+	FIslandTrailRegionSummary SummarizeRegionForCell(const FIntPoint& CellKey, int32 Today) const;
 	/** Count one footfall on the ground at Position. Returns false when the ledger is full and the cell is new. */
 	bool AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay = -1);
 	int32 StepsAt(const FVector& Position) const;
@@ -79,7 +109,7 @@ public:
 	static constexpr float PrintWetness = 0.15f;
 	static constexpr int32 WearStartSteps = 4;
 	static constexpr int32 WearFullSteps = 40;
-	static constexpr int32 RecoveryNoticeAfterDays = 3;
+	static constexpr int32 RecoveryNoticeAfterDays = FIslandTrailLedger::RegionRecoveryDays;
 	static constexpr float WearDrawRadius = 5500.f;
 
 	/** Seconds a print lasts on ground of this wetness; zero when too dry to leave one. */

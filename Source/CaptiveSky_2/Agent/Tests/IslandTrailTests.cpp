@@ -85,6 +85,48 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Footfalls in one cell add up"), Ledger.StepsAt(Here), 5);
 	TestEqual(TEXT("A neighbouring cell is separate"), Ledger.StepsAt(Here + FVector(FIslandTrailLedger::CellSize * 2.f, 0.f, 0.f)), 0);
 	TestEqual(TEXT("Negative coordinates have their own cells"), FIslandTrailLedger::CellFor(FVector(-1.f, -1.f, 0.f)), FIntPoint(-1, -1));
+	TestEqual(TEXT("Negative cells use floor division for stable region assignment"), FIslandTrailLedger::RegionForCell(FIntPoint(-1, -1)), FIntPoint(-1, -1));
+	TestEqual(TEXT("The negative region boundary is inclusive"), FIslandTrailLedger::RegionForCell(FIntPoint(-8, -8)), FIntPoint(-1, -1));
+	TestEqual(TEXT("Cells beyond that boundary enter the next region"), FIslandTrailLedger::RegionForCell(FIntPoint(-9, -9)), FIntPoint(-2, -2));
+	TestEqual(TEXT("Positive region boundary follows the fixed cell span"), FIslandTrailLedger::RegionForCell(FIntPoint(8, 8)), FIntPoint(1, 1));
+
+	FIslandTrailLedger RegionLedger;
+	auto AddRegionCell = [](FIslandTrailLedger& TargetLedger, const FIntPoint& Key, int32 Steps, int32 Day)
+	{
+		FIslandTrailCell& Cell = TargetLedger.Cells.Add(Key);
+		Cell.Steps = Steps;
+		Cell.LastUseDay = Day;
+	};
+	AddRegionCell(RegionLedger, FIntPoint(0, 0), 4, 10);
+	AddRegionCell(RegionLedger, FIntPoint(1, 0), 8, 19);
+	AddRegionCell(RegionLedger, FIntPoint(7, 7), 12, -1);
+	AddRegionCell(RegionLedger, FIntPoint(8, 0), 100, 20);
+	const FIslandTrailRegionSummary ActiveRegion = RegionLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
+	TestEqual(TEXT("A region summary has a coordinate-derived stable ID"), ActiveRegion.StableId, FString(TEXT("trail-region:0:0")));
+	TestEqual(TEXT("A region counts only worn cells inside its 12 m tile"), ActiveRegion.WornCellCount, 3);
+	TestEqual(TEXT("Region use sums the current weather-decayed step weights"), ActiveRegion.CurrentWearSteps, static_cast<int64>(24));
+	TestEqual(TEXT("Region summary carries the most recent known use"), ActiveRegion.LastUseDay, 19);
+	TestTrue(TEXT("Recent dated use proves an active region despite older unknown cells"), ActiveRegion.State == EIslandTrailRegionState::Active);
+	TestEqual(TEXT("Small regions return every contributing cell as a sample"), ActiveRegion.SampleCells.Num(), 3);
+	RegionLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = 14;
+	const FIslandTrailRegionSummary RecoveringRegion = RegionLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
+	TestTrue(TEXT("Fully dated quiet regions are marked recovering"), RecoveringRegion.State == EIslandTrailRegionState::Recovering);
+	RegionLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = -1;
+	const FIslandTrailRegionSummary UnknownRegion = RegionLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
+	TestTrue(TEXT("Undated legacy wear stays explicitly unknown"), UnknownRegion.State == EIslandTrailRegionState::Unknown);
+
+	FIslandTrailLedger DenseRegionLedger;
+	for (int32 X = 0; X < FIslandTrailLedger::RegionCellSpan; ++X)
+		for (int32 Y = 0; Y < FIslandTrailLedger::RegionCellSpan; ++Y)
+			AddRegionCell(DenseRegionLedger, FIntPoint(X, Y), 2, 1);
+	const FIslandTrailRegionSummary DenseRegion = DenseRegionLedger.SummarizeRegionForCell(FIntPoint(0, 0), 10);
+	const FIslandTrailRegionSummary RepeatedDenseRegion = DenseRegionLedger.SummarizeRegionForCell(FIntPoint(7, 7), 10);
+	TestEqual(TEXT("Dense region summaries remain bounded to the tile's 64 cells"), DenseRegion.WornCellCount, 64);
+	TestEqual(TEXT("Dense region step weights sum without overflow"), DenseRegion.CurrentWearSteps, static_cast<int64>(128));
+	TestEqual(TEXT("A dense summary caps its representative cell keys"), DenseRegion.SampleCells.Num(), FIslandTrailLedger::MaxRegionSamples);
+	TestEqual(TEXT("Repeated queries return the same first sample"), DenseRegion.SampleCells[0], RepeatedDenseRegion.SampleCells[0]);
+	TestEqual(TEXT("Repeated queries return the same last sample"), DenseRegion.SampleCells.Last(), RepeatedDenseRegion.SampleCells.Last());
+
 	const float NaN = std::numeric_limits<float>::quiet_NaN();
 	const float Infinity = std::numeric_limits<float>::infinity();
 	TestFalse(TEXT("A non-finite position cannot enter persistent path memory"), Ledger.AddStep(FVector(NaN, 0.f, 0.f), FVector::UpVector));
@@ -216,6 +258,11 @@ bool FIslandTrailVisitorTest::RunTest(const FString& Parameters)
 		Cell.Position = Visitor->GetActorLocation();
 		Cell.NormalX = 0.f;
 		Cell.NormalY = 0.f;
+		for (int32 X = 1; X <= 2; ++X)
+		{
+			FIslandTrailCell& NearbyCell = Trail->GetLedgerMutable().Cells.Add(FIntPoint(X, 0));
+			NearbyCell.Steps = UIslandTrailSubsystem::WearStartSteps;
+		}
 		Controller->SetFixturePawn(Visitor);
 		Controller->SetCaptionWidget(Caption);
 		Controller->BindFixtureInput();
@@ -225,6 +272,10 @@ bool FIslandTrailVisitorTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("E is bound to the visitor's interaction handler"), Controller->PressBoundE());
 		TestTrue(TEXT("The visitor learns that repeated feet wore this track"),
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("trodden bare along a track")));
+		TestTrue(TEXT("The visitor can place nearby wear in a broader island stretch"),
+			Caption->GetDisplayedCaption().ToString().Contains(TEXT("Across this stretch, worn ground touches 3 patches")));
+		TestTrue(TEXT("The visitor is told when the age of neighboring marks is unknown"),
+			Caption->GetDisplayedCaption().ToString().Contains(TEXT("age of some worn patches is no longer known")));
 		TestEqual(TEXT("Reading the trail does not add footfalls"), Trail->GetLedger().StepsAt(Visitor->GetActorLocation()), UIslandTrailSubsystem::WearFullSteps);
 	}
 

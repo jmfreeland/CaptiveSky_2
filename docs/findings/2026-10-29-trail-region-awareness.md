@@ -1,0 +1,9 @@
+# Trail region awareness
+
+The trail ledger already remembers individual 1.5 m cells. This step derives a compact summary for the stable 12 m tile around a resident: a coordinate-derived ID, count of worn cells, current weather-decayed step-weight sum, latest known use day, recovery state, and at most eight deterministic cell-key samples. The summary is computed from the existing cell map and is not saved separately, so the ledger's v2 format and legacy loading behavior remain unchanged.
+
+Negative cell coordinates use floor division, keeping region IDs consistent on both sides of the world origin. A region is active when a dated crossing is recent; it is recovering only when all contributing worn cells have known, sufficiently old use dates; otherwise its age remains explicitly unknown. The resident-facing underfoot description now adds a broader-stretch observation once at least three cells show wear. It does not invent a continuous polyline: worn cells may form branches, gaps, or separate paths.
+
+Validation coverage in `IslandTrailTests.cpp` checks coordinate boundaries, deterministic IDs and sample bounds, step totals, active/recovering/unknown states, and the resulting visitor caption. The UE 5.8.3 isolated editor target compiled and linked with the changed ledger and test files. A subsequent NullRHI automation launch crashed at process startup with an access violation reading null (0 seconds since start; the crash context contains no command line), so neither automation result was produced and runtime behavior remains unverified.
+
+Next useful step: let the request/gateway layer expose this same read-only bounded summary when a resident or human asks where paths lead. Keep path geometry derived or explicitly sampled; don't let a model fabricate a spline or rewrite the persistent ledger.

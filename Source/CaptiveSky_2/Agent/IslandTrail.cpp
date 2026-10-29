@@ -45,6 +45,89 @@ FIntPoint FIslandTrailLedger::CellFor(const FVector& Position)
 	return FIntPoint(FMath::FloorToInt(Position.X / CellSize), FMath::FloorToInt(Position.Y / CellSize));
 }
 
+FIntPoint FIslandTrailLedger::RegionForCell(const FIntPoint& CellKey)
+{
+	auto FloorDivide = [](int32 Value)
+	{
+		int32 Quotient = Value / RegionCellSpan;
+		if (Value < 0 && Value % RegionCellSpan != 0) --Quotient;
+		return Quotient;
+	};
+	return FIntPoint(FloorDivide(CellKey.X), FloorDivide(CellKey.Y));
+}
+
+FString FIslandTrailLedger::RegionId(const FIntPoint& RegionKey)
+{
+	return FString::Printf(TEXT("trail-region:%d:%d"), RegionKey.X, RegionKey.Y);
+}
+
+FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntPoint& CellKey, int32 Today) const
+{
+	FIslandTrailRegionSummary Summary;
+	Summary.RegionKey = RegionForCell(CellKey);
+	Summary.StableId = RegionId(Summary.RegionKey);
+	TArray<FIntPoint, TInlineAllocator<RegionCellSpan * RegionCellSpan>> ContributingCells;
+	bool bHasUnknownAge = false;
+	bool bHasFutureAge = false;
+
+	const int64 StartX = static_cast<int64>(Summary.RegionKey.X) * RegionCellSpan;
+	const int64 StartY = static_cast<int64>(Summary.RegionKey.Y) * RegionCellSpan;
+	for (int32 DX = 0; DX < RegionCellSpan; ++DX)
+	{
+		for (int32 DY = 0; DY < RegionCellSpan; ++DY)
+		{
+			const FIntPoint Key(static_cast<int32>(StartX + DX), static_cast<int32>(StartY + DY));
+			const FIslandTrailCell* Cell = Cells.Find(Key);
+			if (!Cell || Cell->Steps < MinRegionCellSteps) continue;
+
+			++Summary.WornCellCount;
+			Summary.CurrentWearSteps += Cell->Steps;
+			ContributingCells.Add(Key);
+			if (Cell->LastUseDay < 0)
+			{
+				bHasUnknownAge = true;
+			}
+			else
+			{
+				Summary.LastUseDay = FMath::Max(Summary.LastUseDay, Cell->LastUseDay);
+				bHasFutureAge |= Today < 0 || Cell->LastUseDay > Today;
+			}
+		}
+	}
+
+	if (Summary.WornCellCount == 0)
+	{
+		return Summary;
+	}
+
+	if (Today >= 0 && Summary.LastUseDay >= 0 && Summary.LastUseDay <= Today &&
+		Today - Summary.LastUseDay < RegionRecoveryDays)
+	{
+		// A single dated recent crossing is enough to prove this region is active, even if older cells are undated.
+		Summary.State = EIslandTrailRegionState::Active;
+	}
+	else if (!bHasUnknownAge && !bHasFutureAge && Summary.LastUseDay >= 0 && Today >= Summary.LastUseDay &&
+		Today - Summary.LastUseDay >= RegionRecoveryDays)
+	{
+		Summary.State = EIslandTrailRegionState::Recovering;
+	}
+	else
+	{
+		Summary.State = EIslandTrailRegionState::Unknown;
+	}
+
+	const int32 SampleCount = FMath::Min(ContributingCells.Num(), MaxRegionSamples);
+	Summary.SampleCells.Reserve(SampleCount);
+	for (int32 I = 0; I < SampleCount; ++I)
+	{
+		const int32 Index = SampleCount == 1
+			? 0
+			: static_cast<int32>((static_cast<int64>(I) * (ContributingCells.Num() - 1)) / (SampleCount - 1));
+		Summary.SampleCells.Add(ContributingCells[Index]);
+	}
+	return Summary;
+}
+
 bool FIslandTrailLedger::AddStep(const FVector& Position, const FVector& GroundNormal, int32 IslandDay)
 {
 	const double CellX = static_cast<double>(Position.X) / CellSize;
@@ -354,7 +437,26 @@ FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float 
 	int32 Prints = 0;
 	for (const FPrint& Print : PrintRing)
 		if (Print.bActive && FVector::DistSquared2D(Print.Position, Position) < FMath::Square(600.f)) ++Prints;
-	return DescribeTrail(Steps, Prints, Wetness, LastUseDay, UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+	const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+	FString Description = DescribeTrail(Steps, Prints, Wetness, LastUseDay, Today);
+	const FIslandTrailRegionSummary Region = Ledger.SummarizeRegionForCell(Here, Today);
+	if (Region.WornCellCount >= 3)
+	{
+		Description += FString::Printf(TEXT(" Across this stretch, worn ground touches %d patches."), Region.WornCellCount);
+		switch (Region.State)
+		{
+		case EIslandTrailRegionState::Active:
+			Description += TEXT(" Footsteps have crossed here recently.");
+			break;
+		case EIslandTrailRegionState::Recovering:
+			Description += TEXT(" The older worn patches are slowly softening as grass returns.");
+			break;
+		default:
+			Description += TEXT(" The age of some worn patches is no longer known.");
+			break;
+		}
+	}
+	return Description;
 }
 
 FString UIslandTrailSubsystem::GetStorageFilePath() const
