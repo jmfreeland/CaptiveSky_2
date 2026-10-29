@@ -149,6 +149,7 @@ protected:
 
 private:
 	friend class FIslandWeatherTest;
+	friend class FIslandMeadowBudgetTest;
 	friend class FIslandWeatherBroadleafDiversityTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandGroundCoverTest;
@@ -296,6 +297,10 @@ private:
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity = 0.f);
 	/** Softly modulate broad meadow cover between open patches and lush communities without a hard habitat edge. */
 	static float CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity);
+	/** Reserve a bounded share of the total meadow-candidate budget for landmark-centered patches. */
+	static int32 CalculateLandmarkMeadowPatchLimit(int32 TotalCandidateBudget, int32 CandidatesPerPatch, float LandmarkBudgetShare);
+	/** Give unused candidate capacity back to broad terrain scatter. */
+	static int32 CalculateBroadLandscapeCandidateBudget(int32 TotalCandidateBudget, int32 UsedLandmarkCandidates);
 	static float CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance);
 	static float CalculateMeadowFlowerWoodlandAffinity(const FVector& Position, TConstArrayView<FVector> SpruceGroveCenters);
 	/** Prefer a grounded fox spawn candidate near mature spruce and a sparse grass pocket; preserve a valid fallback. */

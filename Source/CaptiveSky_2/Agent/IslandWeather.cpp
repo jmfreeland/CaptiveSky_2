@@ -696,6 +696,19 @@ float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatComm
 	return 0.28f + 0.72f * (1.f - BroadHabitat) * (1.f - FineCommunity);
 }
 
+int32 AIslandWeather::CalculateLandmarkMeadowPatchLimit(int32 TotalCandidateBudget,
+	int32 CandidatesPerPatch, float LandmarkBudgetShare)
+{
+	if (TotalCandidateBudget <= 0 || CandidatesPerPatch <= 0 || !FMath::IsFinite(LandmarkBudgetShare)) return 0;
+	const float SafeShare = FMath::Clamp(LandmarkBudgetShare, 0.f, 1.f);
+	return FMath::Max(0, FMath::FloorToInt(static_cast<float>(TotalCandidateBudget) * SafeShare / CandidatesPerPatch));
+}
+
+int32 AIslandWeather::CalculateBroadLandscapeCandidateBudget(int32 TotalCandidateBudget, int32 UsedLandmarkCandidates)
+{
+	return FMath::Max(0, TotalCandidateBudget - FMath::Max(0, UsedLandmarkCandidates));
+}
+
 float AIslandWeather::CalculateMeadowFlowerWoodlandAffinity(float NearestSpruceGroveCenterDistance)
 {
 	if (!FMath::IsFinite(NearestSpruceGroveCenterDistance) || NearestSpruceGroveCenterDistance < 0.f) return 0.f;
@@ -1355,9 +1368,12 @@ void AIslandWeather::InitializeGroundCover()
 		FRandomStream MeadowRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x7ac4e291u));
 		constexpr int32 AnchorPatchesPerLandmark = 12;
 		constexpr int32 MeadowCandidatesPerAnchorPatch = 1875;
-		// Keep the established bounded budget, but sample broad landscape cover over a terrain-cell mask
-		// rather than clustering it inside visible 30 m circles.
+		// The existing 5% setting yields a 96k candidate cap. Previous runtime diagnostics showed
+		// landmark patches consumed about 88k of those candidates, leaving only 8k for the broad
+		// terrain pass. Reserve at most 40% for landmark-centered patches and release unused slots
+		// to the broad pass; the total candidate cap and close landmark verges stay unchanged.
 		constexpr int32 MeadowCandidateBudget = 1920000;
+		constexpr float LandmarkMeadowCandidateShare = 0.4f;
 		constexpr int32 MaxMeadowTerrainCells = 40000;
 		constexpr float MinimumMeadowTerrainCellSize = 1000.f;
 		constexpr float MeadowPatchInnerRadius = 250.f;
@@ -1366,6 +1382,12 @@ void AIslandWeather::InitializeGroundCover()
 		constexpr float LandmarkPatchMinRadius = 1500.f;
 		constexpr float LandmarkPatchMaxRadius = 4400.f;
 		constexpr float LandmarkPatchMinSpacing = 1200.f;
+		float RequestedLandscapeDensity = CVarIslandGroundCoverLandscapeDensity.GetValueOnGameThread();
+		FParse::Value(FCommandLine::Get(), TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity="), RequestedLandscapeDensity);
+		const float LandscapeDensity = FMath::Clamp(RequestedLandscapeDensity, 0.f, 1.f);
+		const int32 ScaledMeadowCandidateBudget = FMath::RoundToInt(MeadowCandidateBudget * LandscapeDensity);
+		const int32 MaximumLandmarkPatchCount = CalculateLandmarkMeadowPatchLimit(
+			ScaledMeadowCandidateBudget, MeadowCandidatesPerAnchorPatch, LandmarkMeadowCandidateShare);
 		int32 MeadowTraceCount = 0;
 		const float TraceTop = BoundsOrigin.Z + BoundsExtent.Z + 2500.f;
 		const float TraceBottom = BoundsOrigin.Z - BoundsExtent.Z - 2500.f;
@@ -1398,35 +1420,49 @@ void AIslandWeather::InitializeGroundCover()
 			return true;
 		};
 
-		// Keep the close landmark verges and their established ring scatter unchanged.
+		// The close landmark verges above remain intact. Spread the bounded medium-distance patches
+		// across anchors in seeded round-robin order so early Outliner order cannot consume the budget.
+		TArray<int32> LandmarkAnchorOrder;
+		LandmarkAnchorOrder.Reserve(ExclusionLocations.Num());
 		for (int32 AnchorIndex = 0; AnchorIndex < ExclusionLocations.Num(); ++AnchorIndex)
+			LandmarkAnchorOrder.Add(AnchorIndex);
+		FRandomStream AnchorOrderRandom(static_cast<int32>(static_cast<uint32>(WeatherSeed) ^ 0x62b9d3e7u));
+		for (int32 Index = LandmarkAnchorOrder.Num() - 1; Index > 0; --Index)
+			LandmarkAnchorOrder.Swap(Index, AnchorOrderRandom.RandRange(0, Index));
+		int32 LandmarkPatchesAdded = 0;
+		for (int32 PatchRound = 0; PatchRound < AnchorPatchesPerLandmark && LandmarkPatchesAdded < MaximumLandmarkPatchCount; ++PatchRound)
 		{
-			int32 AddedForAnchor = 0;
-			for (int32 Attempt = 0; Attempt < AnchorPatchesPerLandmark * 24 && AddedForAnchor < AnchorPatchesPerLandmark; ++Attempt)
+			for (const int32 AnchorIndex : LandmarkAnchorOrder)
 			{
-				const float Angle = MeadowRandom.FRandRange(0.f, 2.f * PI);
-				const float Radius = MeadowRandom.FRandRange(LandmarkPatchMinRadius, LandmarkPatchMaxRadius);
-				const FVector Candidate = ExclusionLocations[AnchorIndex] + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
-				bool bTooCloseToOtherAnchor = false;
-				for (int32 OtherAnchorIndex = 0; OtherAnchorIndex < ExclusionLocations.Num(); ++OtherAnchorIndex)
-					if (OtherAnchorIndex != AnchorIndex && FVector::Dist2D(Candidate, ExclusionLocations[OtherAnchorIndex]) < 1600.f)
-						{ bTooCloseToOtherAnchor = true; break; }
-				if (bTooCloseToOtherAnchor) continue;
-				bool bTooCloseToPatch = false;
-				for (const FVector& ExistingCenter : MeadowCenters)
-					if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
-				FVector MeadowCenter;
-				if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
-				AddMeadowPatch(MeadowCenter);
-				++AddedForAnchor;
+				if (LandmarkPatchesAdded >= MaximumLandmarkPatchCount) break;
+				bool bAddedForAnchor = false;
+				for (int32 Attempt = 0; Attempt < 24 && !bAddedForAnchor; ++Attempt)
+				{
+					const float Angle = MeadowRandom.FRandRange(0.f, 2.f * PI);
+					const float Radius = MeadowRandom.FRandRange(LandmarkPatchMinRadius, LandmarkPatchMaxRadius);
+					const FVector Candidate = ExclusionLocations[AnchorIndex] + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
+					bool bTooCloseToOtherAnchor = false;
+					for (int32 OtherAnchorIndex = 0; OtherAnchorIndex < ExclusionLocations.Num(); ++OtherAnchorIndex)
+						if (OtherAnchorIndex != AnchorIndex && FVector::Dist2D(Candidate, ExclusionLocations[OtherAnchorIndex]) < 1600.f)
+							{ bTooCloseToOtherAnchor = true; break; }
+					if (bTooCloseToOtherAnchor) continue;
+					bool bTooCloseToPatch = false;
+					for (const FVector& ExistingCenter : MeadowCenters)
+						if (FVector::Dist2D(Candidate, ExistingCenter) < LandmarkPatchMinSpacing) { bTooCloseToPatch = true; break; }
+					FVector MeadowCenter;
+					if (bTooCloseToPatch || !TryAddMeadowCenter(Candidate, MeadowCenter)) continue;
+					AddMeadowPatch(MeadowCenter);
+					++LandmarkPatchesAdded;
+					bAddedForAnchor = true;
+				}
 			}
 		}
-		float RequestedLandscapeDensity = CVarIslandGroundCoverLandscapeDensity.GetValueOnGameThread();
-		FParse::Value(FCommandLine::Get(), TEXT("CaptiveSky.Island.GroundCoverLandscapeDensity="), RequestedLandscapeDensity);
-		const float LandscapeDensity = FMath::Clamp(RequestedLandscapeDensity, 0.f, 1.f);
-		const int32 ScaledMeadowCandidateBudget = FMath::RoundToInt(MeadowCandidateBudget * LandscapeDensity);
-		const int32 LandscapeCandidateCount = FMath::Max(0,
-			ScaledMeadowCandidateBudget - MeadowCenters.Num() * MeadowCandidatesPerAnchorPatch);
+		const int32 LandmarkCandidateCount = MeadowCenters.Num() * MeadowCandidatesPerAnchorPatch;
+		const int32 LandscapeCandidateCount = CalculateBroadLandscapeCandidateBudget(
+			ScaledMeadowCandidateBudget, LandmarkCandidateCount);
+		UE_LOG(LogIslandWeather, Display, TEXT("Meadow candidate budget split: total=%d, landmark patches=%d (%d candidates), broad landscape=%d (density %.2f, landmark share cap %.2f)."),
+			ScaledMeadowCandidateBudget, MeadowCenters.Num(), LandmarkCandidateCount, LandscapeCandidateCount,
+			LandscapeDensity, LandmarkMeadowCandidateShare);
 		const float LandscapeWidth = FMath::Max(1.f, BoundsExtent.X * 2.f);
 		const float LandscapeHeight = FMath::Max(1.f, BoundsExtent.Y * 2.f);
 		const float TerrainCellSize = FMath::Max(MinimumMeadowTerrainCellSize,
