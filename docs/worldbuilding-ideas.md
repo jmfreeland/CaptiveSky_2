@@ -1,5 +1,54 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-25 — From scattered systems to legible world structure
+
+The latest repository work changes the recommendation set: broadland cover is reduced and clustered; maple/aspen/beech communities now substitute into the existing grove/tree budget; Nanite foliage is enabled but VRAM remains constrained; surface swimming/wake logic has focused regression coverage after fixing a false shore hit against another pawn; Listening Stones gained visitor rules; and the old floating PCG forest is not active in the current Island.
+
+### 1. Turn the trail ledger into the first canonical desire path
+
+**Player experience:** repeated travel slowly becomes visible: vegetation thins, ground compacts, and a narrow path emerges. If traffic stops, recovery can later begin. The path is evidence of behavior rather than an authored spline pretending history happened.
+
+**Why it matters:** this directly connects agency to physical history and gives later settlement/construction a precursor: circulation appears before infrastructure.
+
+**Why it fits now:** the repo already has an Island trail ledger with finite-input validation, runtime scatter, habitat clustering, clearance logic, and repeatable visual/performance review.
+
+**Smallest practical step:** aggregate valid footfall/trail evidence into one canonical-friendly desire-path record: stable path/region ID, bounded polyline or cells, accumulated use, last-use day, recovery state. Initially materialize only presentation: suppress ground-cover candidates inside a narrow falloff and blend compacted-ground/wetness. Do not deform base geology or let an LLM author raw splines.
+
+**First visual milestone:** the same 20–30 m corridor at low, medium and high use: intact meadow → faint broken line → unmistakable narrow path with soft vegetation edges, reversible by resetting the record. A strong compacted-soil/stone/leaf-litter material blend would have disproportionate impact.
+
+### 2. Make one storm-quality coastal slice instead of another foliage-density pass
+
+**Player experience:** Tideglass/open coast finally demonstrates why Unreal is the premier lens: wind-driven vegetation, wet materials, cloud-softened light, rain over water, spray/mist, readable broadleaf/conifer masses, and the player entering the ocean with a restrained wake.
+
+**Why it matters:** this is the primary visible payoff. Recent repo evidence shows that large tree/ground-cover populations can still read sparse, while PIE has approached the GPU's VRAM ceiling. More instances are not the answer; composition, material response, culling/streaming and atmospheric depth are.
+
+**Why it fits now:** mixed spruce/maple/aspen/beech groves, clustered cover, rain/cloud/moon/wind ecology, ocean water, surface swimming and procedural wake already exist. The PCG audit says the old floating forest is not active, so current runtime scatter is the right thing to art-direct.
+
+**Smallest practical step:** choose one coastal traversal from sheltered land into open water as a bounded beauty/performance slice. Author silhouette hierarchy first; aggressively cap/stream expensive single-LOD Megaplants; repair the current wet-landscape texture-index warning; then tune storm sky, wetness, water and near-camera vegetation. Capture GPU allocation/streaming and p95 in the same session.
+
+**First visual milestone:** a 20–30 second player-controlled sequence under a clearing storm: mixed woodland edge → desire-path opening → wet rock descent → clean ocean entry → swimming with subtle wake, with no VRAM warning and p95 above the existing 30-FPS floor. Excellent wet-rock surfaces, one low-cost broadleaf canopy family and convincing rain/spray VFX would matter more than more species.
+
+### 3. Let the Listening Stones become a place with remembered etiquette
+
+**Player experience:** residents learn how others use the Stones: sit quietly, leave an arrangement, avoid interrupting somebody already listening, or later tell another resident that people treat the place carefully. Repeated behavior can become convention without a global CultureScore or hard-coded sacred-site flag.
+
+**Why it matters:** culture becomes shared expectation. Existing art/arrangements and visitor behavior can become a precursor to institutions: residents recognize, imitate, teach and preserve a norm tied to a place.
+
+**Why it fits now:** persistent Listening Stone presentation/weathering, resident-made arrangements, memory/conversation machinery and fresh visitor rules already provide the substrate.
+
+**Smallest practical step:** persist one renderer-independent place-practice evidence record when a resident directly witnesses meaningful Stone behavior: observer, place, observed action/motif, actor if known, day and confidence. Let existing scheduled decisions optionally reference learned practice; no background model calls and no omniscient attribution.
+
+**First visual milestone:** blue hour after rain: one resident occupies the Stones while another approaches but chooses a respectful edge position; an older weathered arrangement and a newer derivative are visible. The scene communicates that people have learned how to behave here without UI text.
+
+## Concept art — Wild card: The storm elevator
+
+This week deliberately leaves the recurring golden-hour Tideglass terrace composition. This is a long-horizon possibility-space target: a high, rain-lashed cliff refuge reached by the cross-world elevator. It is not a proposal to build this location next week.
+
+**Direction / reproducible prompt:** Wide cinematic 16:9, eye-level from a wet exterior landing cut into a sheer coastal cliff during a violent clearing storm near sunset. The left two-thirds open onto enormous geography: black-blue sea hundreds of metres below, fractured islands and sea arches, waterfalls blown sideways from forested shelves, low cloud and mist racing through ravines, a narrow break in the storm revealing cold gold light on the horizon. Foreground rain strikes dark local stone and runs through engineered drainage channels; restrained path lights reflect in puddles. At center-right, an elevator shaft is integrated vertically into the cliff with precise glass/metal doors and exposed rock kept visible. The elevator has just opened from another Captive Sky world. One rain-soaked resident and a dog stand at the threshold looking outward; they carry practical contemporary gear appropriate to the weather, not costumes. Behind the doors is a warm, compact social refuge/bar carved partly into the rock: timber where tactile, metal/glass where structurally useful, stone left natural, plants only where the microclimate supports them. A few residents inside talk quietly; one wall holds small objects/artifacts brought from other worlds, making cross-world cultural exchange visible without screens or exposition. No neon cyberpunk, medieval fantasy, luxury-resort excess or generic spaceship language. Technology feels maintainable and purposeful. Strong warm/cool contrast: amber interior/elevator light against slate storm, cyan-gray water and wet rock. Volumetric rain/mist, spray, moving foliage, waterfall turbulence and reflective surfaces provide spectacle. Mood: sublime, slightly dangerous, humane, exploratory. Signature detail: through the open elevator, a sliver of impossible bright white from the previous destination remains visible behind the warm cabin, quietly implying that the doors connect realities rather than floors.
+
+**Generated concept image:** generated during this weekly run and delivered in ChatGPT. The connected GitHub content writer accepts UTF-8 text rather than generated binary image bytes, so no repository image path is claimed.
+
+
 ## Concept-art exploration rule — 2026-10-18
 
 Weekly concept art should explore Captive Sky's possibility space rather than converge on a recurring house style. Avoid repeatedly defaulting to golden-hour Tideglass/coastal overlooks, terraces, craft tables, and idyllic vegetation compositions even when those are attractive.
