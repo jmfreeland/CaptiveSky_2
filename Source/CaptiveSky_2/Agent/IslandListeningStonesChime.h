@@ -12,6 +12,7 @@ enum class EIslandChimeCause : uint8
 	Unspecified,
 	NaturalGust,
 	VisitorApproach,
+	ResidentApproach,
 	Inspection
 };
 
@@ -43,6 +44,7 @@ protected:
 private:
 	friend class FIslandNightEcologyTest;
 	friend class FIslandListeningStonePresentationTest;
+	friend class FIslandListeningStoneResidentMemoryTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Interaction")
 	TObjectPtr<UAudioComponent> AudioComponent;
 	UPROPERTY(Transient)

@@ -14,6 +14,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "HAL/FileManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -25,6 +26,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStoneResidentMemoryTest, "Capti
 
 bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 {
+	TestTrue(TEXT("A controlled visitor can pause beside the Stones without movement"),
+		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
+	TestTrue(TEXT("A conscious resident approaching the Stones slowly may be answered"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
+	TestFalse(TEXT("An ordinary wild pawn cannot trigger the resident response"),
+		AListeningStonePresentation::IsEligibleVisitor(false, false, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
+	TestFalse(TEXT("A resident walking away does not trigger the approach response"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(100.f, 0.f, 0.f)));
+	TestFalse(TEXT("A resident crossing the Stones does not trigger an approach response"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(0.f, 100.f, 0.f)));
+	TestTrue(TEXT("Resident approach has a quiet, grounded memory description"),
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::ResidentApproach).Contains(TEXT("quiet approach")));
 	TestTrue(TEXT("An audible chime becomes a private observation for a nearby resident"),
 		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, true, false));
 	TestFalse(TEXT("A player does not receive a private resident memory from the same tone"),
@@ -38,7 +51,7 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Gust memories retain the directly witnessed cause"),
 		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::NaturalGust).Contains(TEXT("rising gust")));
 	TestTrue(TEXT("Visitor memories retain the directly witnessed cause"),
-		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::VisitorApproach).Contains(TEXT("visitor's approach")));
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::VisitorApproach).Contains(TEXT("quiet approach")));
 
 	const FString TestAgentId = TEXT("Automation_StoneWitness_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	const FString TestDirectory = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / TestAgentId);
@@ -85,6 +98,22 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 	AIslandListeningStonesChime* RepeatedChime = World->SpawnActor<AIslandListeningStonesChime>(FVector::ZeroVector, FRotator::ZeroRotator);
 	if (RepeatedChime) RepeatedChime->BeginChime(100.f, EIslandChimeCause::NaturalGust);
 	TestEqual(TEXT("A similar tone inside twelve hours does not create repetitive memory"), Memory->GetMemoryCount(), 1);
+	AListeningStonePresentation* Presentation = World->SpawnActor<AListeningStonePresentation>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (TestNotNull(TEXT("A transient Listening Stones presentation can be staged"), Presentation))
+	{
+		NearbyResident->SetActorLocation(FVector(300.f, 0.f, 0.f));
+		NearbyResident->GetCharacterMovement()->Velocity = FVector(-100.f, 0.f, 0.f);
+		Presentation->CheckForVisitorPresence(0.25f);
+		AIslandListeningStonesChime* ResidentChime = nullptr;
+		for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+			if (It->Cause == EIslandChimeCause::ResidentApproach) { ResidentChime = *It; break; }
+		TestNotNull(TEXT("A conscious resident's quiet, directed approach creates a brief response"), ResidentChime);
+		TestTrue(TEXT("The response identifies a resident's approach to nearby listeners"), ResidentChime &&
+			ResidentChime->DescribeForListener(FVector(300.f, 0.f, 0.f)).Contains(TEXT("resident's quiet approach")));
+		TestEqual(TEXT("The approaching resident remembers the distinct response once"), Memory->GetMemoryCount(), 2);
+		Presentation->CheckForVisitorPresence(0.25f);
+		TestEqual(TEXT("A latched approach does not chime or record again"), Memory->GetMemoryCount(), 2);
+	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
@@ -102,15 +131,25 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("A falling wind does not trigger a new resonance"), AListeningStonePresentation::ShouldResonateForWind(160.f, 100.f));
 	TestFalse(TEXT("Non-finite wind samples cannot trigger ambience"), AListeningStonePresentation::ShouldResonateForWind(std::numeric_limits<float>::quiet_NaN(), 150.f));
 	TestTrue(TEXT("A slow, controlled visitor inside the approach envelope is eligible"),
-		AListeningStonePresentation::IsEligibleVisitor(true, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
+		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
 	TestFalse(TEXT("Ambient wildlife cannot qualify as a visitor"),
-		AListeningStonePresentation::IsEligibleVisitor(false, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
+		AListeningStonePresentation::IsEligibleVisitor(false, false, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
+	TestTrue(TEXT("A conscious resident approaching the Stones slowly may be answered"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
+	TestFalse(TEXT("A resident walking away does not trigger an approach response"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(100.f, 0.f, 0.f)));
+	TestFalse(TEXT("A resident merely crossing past the Stones does not trigger an approach response"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(0.f, 100.f, 0.f)));
+	TestFalse(TEXT("A resident without a directed approach stays unremarked while resting"),
+		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
 	TestFalse(TEXT("Visitors outside the notice radius do not qualify"),
-		AListeningStonePresentation::IsEligibleVisitor(true, FVector(326.f, 0.f, 0.f), FVector::ZeroVector));
+		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(326.f, 0.f, 0.f), FVector::ZeroVector));
 	TestFalse(TEXT("Visitors at a different height do not qualify"),
-		AListeningStonePresentation::IsEligibleVisitor(true, FVector(100.f, 0.f, 241.f), FVector::ZeroVector));
+		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(100.f, 0.f, 241.f), FVector::ZeroVector));
 	TestFalse(TEXT("Fast passers-by do not trigger a quiet approach response"),
-		AListeningStonePresentation::IsEligibleVisitor(true, FVector(100.f, 0.f, 0.f), FVector(261.f, 0.f, 0.f)));
+		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(100.f, 0.f, 0.f), FVector(261.f, 0.f, 0.f)));
+	TestTrue(TEXT("Resident-approach chimes remain distinct in memory and listener context"),
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::ResidentApproach).Contains(TEXT("quiet approach")));
 	TestFalse(TEXT("A repeated approach, active resonance, or recent tone is cooldown-gated"),
 		AListeningStonePresentation::CanBeginVisitorResonance(false, false, 44.f));
 	TestFalse(TEXT("An already latched visitor cannot immediately retrigger"),
@@ -317,7 +356,7 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		// This synthetic Game world has no ULocalPlayer; possession-based integration is reserved
 		// for PIE. Keep this test deterministic by exercising the same pure eligibility/cooldown
 		// gates above, then verify the visitor response effect directly.
-		Presentation->BeginVisitorResonance();
+		Presentation->BeginVisitorResonance(false);
 		TestTrue(TEXT("The visitor response starts a finite stone resonance"), Presentation->GetResonanceRemaining() > 2.7f);
 		int32 VisitorChimeCount = 0;
 		AIslandListeningStonesChime* VisitorChime = nullptr;

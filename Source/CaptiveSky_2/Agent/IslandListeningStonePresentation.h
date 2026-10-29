@@ -26,13 +26,14 @@ public:
 	/** Natural resonance is reserved for a meaningful, rising outdoor gust, not steady background wind. */
 	static bool ShouldResonateForWind(float PreviousSpeed, float CurrentSpeed);
 	/** Pure approach gate shared by runtime visitor detection and deterministic automation. */
-	static bool IsEligibleVisitor(bool bPlayerControlled, const FVector& Offset, const FVector& Velocity);
+	static bool IsEligibleVisitor(bool bPlayerControlled, bool bAutonomousResident, const FVector& Offset, const FVector& Velocity);
 	/** Shared latch/resonance/cooldown gate, kept pure so it can be tested without a PIE LocalPlayer. */
 	static bool CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating, float SecondsSinceLastChime);
 
 private:
 	friend class UIslandListeningStonePresentationSubsystem;
 	friend class FIslandListeningStonePresentationTest;
+	friend class FIslandListeningStoneResidentMemoryTest;
 	static constexpr float StoneHeightRatio = 0.58f;
 	UPROPERTY(VisibleAnywhere, Category="Island|Landmark")
 	TArray<TObjectPtr<UProceduralMeshComponent>> Stones;
@@ -53,7 +54,7 @@ private:
 	virtual void BeginPlay() override;
 	void CheckForNaturalGust(float DeltaSeconds);
 	void CheckForVisitorPresence(float DeltaSeconds);
-	void BeginVisitorResonance();
+	void BeginVisitorResonance(bool bResidentApproach);
 	void ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection = FVector::ZeroVector);
 	void BeginNaturalResonance(float WindSpeed, const FVector& WindDirection);
 	virtual void Tick(float DeltaSeconds) override;

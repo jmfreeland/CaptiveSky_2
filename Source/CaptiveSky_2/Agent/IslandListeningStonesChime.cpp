@@ -72,7 +72,9 @@ FString AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause I
 	case EIslandChimeCause::NaturalGust:
 		return TEXT("I heard a rising gust awaken the Listening Stones; a layered tone carried on the wind and then faded.");
 	case EIslandChimeCause::VisitorApproach:
-		return TEXT("I heard the Listening Stones answer a quiet visitor's approach with a brief layered tone.");
+		return TEXT("I heard the Listening Stones answer a quiet approach with a brief layered tone.");
+	case EIslandChimeCause::ResidentApproach:
+		return TEXT("I heard the Listening Stones answer a quiet approach with a brief layered tone.");
 	case EIslandChimeCause::Inspection:
 		return TEXT("I heard a brief layered tone from the Listening Stones during a close inspection.");
 	default:
@@ -114,7 +116,10 @@ FString AIslandListeningStonesChime::DescribeForListener(const FVector& Listener
 		CauseDescription = TEXT(" A rising natural gust stirred the stones.");
 		break;
 	case EIslandChimeCause::VisitorApproach:
-		CauseDescription = TEXT(" It sounded as a quiet visitor approached the stones.");
+		CauseDescription = TEXT(" It sounded as someone approached the stones quietly.");
+		break;
+	case EIslandChimeCause::ResidentApproach:
+		CauseDescription = TEXT(" It answered a resident's quiet approach to the stones.");
 		break;
 	case EIslandChimeCause::Inspection:
 		CauseDescription = TEXT(" It sounded during someone's close inspection of the stones.");

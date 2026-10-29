@@ -1,6 +1,7 @@
 #include "IslandListeningStonePresentation.h"
 
 #include "IslandListeningStonesChime.h"
+#include "AgentMemoryComponent.h"
 #include "IslandWeather.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SceneComponent.h"
@@ -26,6 +27,8 @@ namespace
 	constexpr float VisitorRearmRadius = 575.f;
 	constexpr float VisitorMaximumHeightDifference = 240.f;
 	constexpr float VisitorMaximumApproachSpeed = 260.f;
+	constexpr float MinQuietResidentApproachSpeed = 35.f;
+	constexpr float ResidentApproachDirectionThreshold = 0.55f;
 	constexpr int32 StoneRingCount = 6;
 	constexpr int32 StoneSideCount = 9;
 	constexpr int32 StoneRingVertexCount = StoneSideCount + 1;
@@ -75,12 +78,18 @@ bool AListeningStonePresentation::ShouldResonateForWind(float PreviousSpeed, flo
 		CurrentSpeed >= 90.f && CurrentSpeed - PreviousSpeed >= 45.f;
 }
 
-bool AListeningStonePresentation::IsEligibleVisitor(bool bPlayerControlled, const FVector& Offset, const FVector& Velocity)
+bool AListeningStonePresentation::IsEligibleVisitor(bool bPlayerControlled, bool bAutonomousResident,
+	const FVector& Offset, const FVector& Velocity)
 {
-	return bPlayerControlled && !Offset.ContainsNaN() && !Velocity.ContainsNaN() &&
-		Offset.SizeSquared2D() <= FMath::Square(VisitorNoticeRadius) &&
-		FMath::Abs(Offset.Z) <= VisitorMaximumHeightDifference &&
-		Velocity.SizeSquared2D() <= FMath::Square(VisitorMaximumApproachSpeed);
+	if ((!bPlayerControlled && !bAutonomousResident) || Offset.ContainsNaN() || Velocity.ContainsNaN() ||
+		Offset.SizeSquared2D() > FMath::Square(VisitorNoticeRadius) ||
+		FMath::Abs(Offset.Z) > VisitorMaximumHeightDifference ||
+		Velocity.SizeSquared2D() > FMath::Square(VisitorMaximumApproachSpeed)) return false;
+	if (bPlayerControlled) return true;
+	const FVector TowardStones = (-Offset).GetSafeNormal2D();
+	const FVector TravelDirection = Velocity.GetSafeNormal2D();
+	return Velocity.SizeSquared2D() >= FMath::Square(MinQuietResidentApproachSpeed) &&
+		!TowardStones.IsNearlyZero() && FVector::DotProduct(TowardStones, TravelDirection) >= ResidentApproachDirectionThreshold;
 }
 
 bool AListeningStonePresentation::CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating,
@@ -327,7 +336,8 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 
 	if (APawn* LatchedVisitor = VisitorPresenceLatch.Get())
 	{
-		if (!IsValid(LatchedVisitor) || !LatchedVisitor->IsPlayerControlled())
+		if (!IsValid(LatchedVisitor) || (!LatchedVisitor->IsPlayerControlled() &&
+			!LatchedVisitor->FindComponentByClass<UAgentMemoryComponent>()))
 		{
 			VisitorPresenceLatch.Reset();
 		}
@@ -346,7 +356,9 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 		if (!IsValid(Visitor)) continue;
 
 		const FVector Offset = Visitor->GetActorLocation() - GetActorLocation();
-		if (!IsEligibleVisitor(Visitor->IsPlayerControlled(), Offset, Visitor->GetVelocity())) continue;
+		const bool bPlayerControlled = Visitor->IsPlayerControlled();
+		const bool bAutonomousResident = !bPlayerControlled && Visitor->FindComponentByClass<UAgentMemoryComponent>() != nullptr;
+		if (!IsEligibleVisitor(bPlayerControlled, bAutonomousResident, Offset, Visitor->GetVelocity())) continue;
 
 		// One quiet approach earns one brief response. A wider exit ring prevents
 		// repeated activation while a visitor lingers near the stones.
@@ -357,12 +369,12 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 		if (!CanBeginVisitorResonance(bAlreadyLatched, GetResonanceRemaining() > 0.f, SecondsSinceLastChime))
 			return;
 
-		BeginVisitorResonance();
+		BeginVisitorResonance(bAutonomousResident);
 		return;
 	}
 }
 
-void AListeningStonePresentation::BeginVisitorResonance()
+void AListeningStonePresentation::BeginVisitorResonance(bool bResidentApproach)
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
@@ -374,7 +386,7 @@ void AListeningStonePresentation::BeginVisitorResonance()
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
-		Chime->BeginChime(LocalWind, EIslandChimeCause::VisitorApproach);
+		Chime->BeginChime(LocalWind, bResidentApproach ? EIslandChimeCause::ResidentApproach : EIslandChimeCause::VisitorApproach);
 }
 
 void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)
