@@ -334,7 +334,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					NearbyBeings += UIslandSeaStateSubsystem::DescribeSea(SeaState->GetSea());
 				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
+				{
+					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
 					NearbyBeings += Trail->DescribeUnderfoot(Location, Environment->GetWetness());
+					NearbyBeings += UIslandTrailSubsystem::DescribeNearbyWornRegions(Trail->GetLedger(), Location, Today);
+				}
 				if (const UIslandWrackSubsystem* Wrack = GetWorld()->GetSubsystem<UIslandWrackSubsystem>())
 				{
 					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());

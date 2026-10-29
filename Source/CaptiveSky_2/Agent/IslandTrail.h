@@ -41,6 +41,8 @@ struct FIslandTrailRegionSummary
 	FVector2D WornAxis = FVector2D::ZeroVector;
 	/** Weighted covariance anisotropy in [0,1]; higher values indicate a clearer line. */
 	float WornAxisLinearity = 0.f;
+	/** Step-weighted centre of the worn cells, in world XY; derived from cell coordinates. */
+	FVector2D WornCenter = FVector2D::ZeroVector;
 	/** Deterministic, bounded examples of the cell keys that contribute to the summary. */
 	TArray<FIntPoint> SampleCells;
 };
@@ -120,6 +122,8 @@ public:
 	static constexpr int32 TrailChronicleCellThreshold = 3;
 	static constexpr int64 TrailChronicleUseThreshold = 12;
 	static constexpr int32 MaxTrailChronicleEntriesPerDay = 4;
+	static constexpr float NearbyWornRegionRadius = 4500.f;
+	static constexpr int32 MaxNearbyWornRegions = 2;
 
 	/** Seconds a print lasts on ground of this wetness; zero when too dry to leave one. */
 	static float PrintLifetime(float Wetness);
@@ -146,6 +150,8 @@ public:
 	static FString DescribeTrail(int32 Steps, int32 NearbyPrints, float Wetness, int32 LastUseDay = -1, int32 Today = -1);
 	/** Describe only high-confidence, undirected alignment; never claim a continuous route from sparse cells. */
 	static FString DescribeWornAlignment(const FIslandTrailRegionSummary& Region);
+	/** Read nearby worn regions as bounded local clues, never as routes or destinations. */
+	static FString DescribeNearbyWornRegions(const FIslandTrailLedger& TrailLedger, const FVector& Position, int32 Today);
 	/** The same, for a point on the island. */
 	FString DescribeUnderfoot(const FVector& Position, float Wetness) const;
 	/** Tests set this to redirect or suppress saving; empty means derive from the map. */

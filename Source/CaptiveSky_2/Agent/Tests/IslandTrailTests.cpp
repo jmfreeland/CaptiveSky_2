@@ -184,6 +184,45 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Three cells are too sparse for an alignment claim"),
 		UIslandTrailSubsystem::DescribeWornAlignment(Sparse).IsEmpty());
 
+	FIslandTrailLedger NearbyLedger;
+	for (int32 I = 1; I <= 3; ++I) AddRegionCell(NearbyLedger, FIntPoint(I, 1), 12, 20); // Current region: underfoot handles it.
+	for (int32 I = 8; I <= 11; ++I) AddRegionCell(NearbyLedger, FIntPoint(I, 7), 12, 20); // Nearby east-west region.
+	for (int32 I = 8; I <= 11; ++I) AddRegionCell(NearbyLedger, FIntPoint(I, 15), 12, 20); // Nearby second region.
+	for (int32 I = 8; I <= 11; ++I) AddRegionCell(NearbyLedger, FIntPoint(I, 23), 12, 20); // Third region is beyond the two-region cue cap.
+	for (int32 I = 40; I <= 43; ++I) AddRegionCell(NearbyLedger, FIntPoint(I, 7), 12, 20); // Farther than the perception radius.
+	const int32 NearbyLedgerCellCount = NearbyLedger.Cells.Num();
+	const FString NearbyTrailDescription = UIslandTrailSubsystem::DescribeNearbyWornRegions(NearbyLedger, FVector::ZeroVector, 20);
+	TestTrue(TEXT("Residents can notice a nearby worn stretch by compass direction"),
+		NearbyTrailDescription.Contains(TEXT("to the northeast")));
+	TestTrue(TEXT("A nearby path clue carries its weighted shape rather than inventing an endpoint"),
+		NearbyTrailDescription.Contains(TEXT("east-west line")));
+	TestTrue(TEXT("Trail perception explicitly avoids claiming a route or destination"),
+		NearbyTrailDescription.Contains(TEXT("not a verified route or destination")));
+	TestFalse(TEXT("The underfoot region is not redundantly repeated as a nearby patch"),
+		NearbyTrailDescription.Contains(TEXT("3 patches")));
+	int32 NearbyMentionCount = 0;
+	int32 SearchFrom = 0;
+	while ((SearchFrom = NearbyTrailDescription.Find(TEXT("Nearby,"), ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchFrom)) != INDEX_NONE)
+	{
+		++NearbyMentionCount;
+		SearchFrom += UE_ARRAY_COUNT(TEXT("Nearby,")) - 1;
+	}
+	TestEqual(TEXT("Local trail perception returns no more than two additional regions"),
+		NearbyMentionCount, UIslandTrailSubsystem::MaxNearbyWornRegions);
+	TestEqual(TEXT("Read-only path awareness leaves the saved trail ledger unchanged"), NearbyLedger.Cells.Num(), NearbyLedgerCellCount);
+	FIslandTrailLedger FarTrailLedger;
+	for (int32 I = 40; I <= 43; ++I) AddRegionCell(FarTrailLedger, FIntPoint(I, 7), 12, 20);
+	TestTrue(TEXT("Worn regions beyond the bounded perception radius stay unseen"),
+		UIslandTrailSubsystem::DescribeNearbyWornRegions(FarTrailLedger, FVector::ZeroVector, 20).IsEmpty());
+	TestTrue(TEXT("No nearby-worn summary is returned for an untouched ledger"),
+		UIslandTrailSubsystem::DescribeNearbyWornRegions(FIslandTrailLedger(), FVector::ZeroVector, 20).IsEmpty());
+	TestTrue(TEXT("Non-finite observer coordinates do not enter the spatial query"),
+		UIslandTrailSubsystem::DescribeNearbyWornRegions(NearbyLedger,
+			FVector(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0), 20).IsEmpty());
+	TestTrue(TEXT("Out-of-range observer coordinates do not overflow the region search"),
+		UIslandTrailSubsystem::DescribeNearbyWornRegions(NearbyLedger,
+			FVector(static_cast<double>(TNumericLimits<int32>::Max()) * FIslandTrailLedger::CellSize * 2.0, 0.0, 0.0), 20).IsEmpty());
+
 	AddRegionCell(RegionLedger, FIntPoint(16, 0), 1, 20);
 	const TArray<FIslandTrailRegionSummary> WornRegions = RegionLedger.SummarizeWornRegions(20);
 	TestEqual(TEXT("A world-level snapshot includes each worn 12 m region once"), WornRegions.Num(), 2);

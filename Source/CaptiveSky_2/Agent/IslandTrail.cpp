@@ -70,6 +70,9 @@ FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntP
 	TArray<FIntPoint, TInlineAllocator<RegionCellSpan * RegionCellSpan>> ContributingCells;
 	bool bHasUnknownAge = false;
 	bool bHasFutureAge = false;
+	double CenterWeightSum = 0.0;
+	double WeightedCenterX = 0.0;
+	double WeightedCenterY = 0.0;
 
 	const int64 StartX = static_cast<int64>(Summary.RegionKey.X) * RegionCellSpan;
 	const int64 StartY = static_cast<int64>(Summary.RegionKey.Y) * RegionCellSpan;
@@ -84,6 +87,10 @@ FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntP
 			++Summary.WornCellCount;
 			Summary.CurrentWearSteps += Cell->Steps;
 			ContributingCells.Add(Key);
+			const double CenterWeight = static_cast<double>(FMath::Max(1, Cell->Steps));
+			CenterWeightSum += CenterWeight;
+			WeightedCenterX += CenterWeight * (static_cast<double>(Key.X) + 0.5) * CellSize;
+			WeightedCenterY += CenterWeight * (static_cast<double>(Key.Y) + 0.5) * CellSize;
 			if (Cell->LastUseDay < 0)
 			{
 				bHasUnknownAge = true;
@@ -99,6 +106,12 @@ FIslandTrailRegionSummary FIslandTrailLedger::SummarizeRegionForCell(const FIntP
 	if (Summary.WornCellCount == 0)
 	{
 		return Summary;
+	}
+	if (CenterWeightSum > UE_DOUBLE_SMALL_NUMBER)
+	{
+		Summary.WornCenter = FVector2D(
+			static_cast<float>(WeightedCenterX / CenterWeightSum),
+			static_cast<float>(WeightedCenterY / CenterWeightSum));
 	}
 
 	if (Today >= 0 && Summary.LastUseDay >= 0 && Summary.LastUseDay <= Today &&
@@ -540,6 +553,93 @@ FString UIslandTrailSubsystem::DescribeWornAlignment(const FIslandTrailRegionSum
 			: TEXT("northwest-southeast");
 	}
 	return FString::Printf(TEXT(" The worn patches here follow a mostly %s line."), Alignment);
+}
+
+FString UIslandTrailSubsystem::DescribeNearbyWornRegions(const FIslandTrailLedger& TrailLedger, const FVector& Position, int32 Today)
+{
+	if (!FMath::IsFinite(Position.X) || !FMath::IsFinite(Position.Y)) return FString();
+	const double CellX = Position.X / FIslandTrailLedger::CellSize;
+	const double CellY = Position.Y / FIslandTrailLedger::CellSize;
+	if (CellX < TNumericLimits<int32>::Min() || CellX > TNumericLimits<int32>::Max() ||
+		CellY < TNumericLimits<int32>::Min() || CellY > TNumericLimits<int32>::Max()) return FString();
+
+	struct FNearbyRegion
+	{
+		FIslandTrailRegionSummary Summary;
+		float DistanceSquared = 0.f;
+	};
+	TArray<FNearbyRegion, TInlineAllocator<MaxNearbyWornRegions * 4>> NearbyRegions;
+	const FIntPoint CurrentRegion = FIslandTrailLedger::RegionForCell(FIslandTrailLedger::CellFor(Position));
+	constexpr int32 SearchRegionRadius = 4; // 4 * 12 m gives a bounded neighbourhood around the observer.
+	constexpr int32 SearchCellSpan = FIslandTrailLedger::RegionCellSpan;
+
+	for (int32 OffsetX = -SearchRegionRadius; OffsetX <= SearchRegionRadius; ++OffsetX)
+	{
+		for (int32 OffsetY = -SearchRegionRadius; OffsetY <= SearchRegionRadius; ++OffsetY)
+		{
+			if (OffsetX == 0 && OffsetY == 0) continue; // DescribeUnderfoot covers the observer's own region.
+
+			const int64 RegionX = static_cast<int64>(CurrentRegion.X) + OffsetX;
+			const int64 RegionY = static_cast<int64>(CurrentRegion.Y) + OffsetY;
+			const int64 StartX = RegionX * SearchCellSpan;
+			const int64 StartY = RegionY * SearchCellSpan;
+			if (StartX < TNumericLimits<int32>::Min() || StartY < TNumericLimits<int32>::Min() ||
+				StartX + SearchCellSpan - 1 > TNumericLimits<int32>::Max() ||
+				StartY + SearchCellSpan - 1 > TNumericLimits<int32>::Max()) continue;
+
+			const FIslandTrailRegionSummary Summary = TrailLedger.SummarizeRegionForCell(
+				FIntPoint(static_cast<int32>(StartX), static_cast<int32>(StartY)), Today);
+			if (Summary.WornCellCount < 3) continue;
+
+			const float DistanceSquared = FVector2D::DistSquared(
+				FVector2D(Position.X, Position.Y), Summary.WornCenter);
+			if (DistanceSquared > FMath::Square(NearbyWornRegionRadius)) continue;
+			NearbyRegions.Add({ Summary, DistanceSquared });
+		}
+	}
+
+	NearbyRegions.Sort([](const FNearbyRegion& A, const FNearbyRegion& B)
+	{
+		if (!FMath::IsNearlyEqual(A.DistanceSquared, B.DistanceSquared)) return A.DistanceSquared < B.DistanceSquared;
+		return A.Summary.StableId < B.Summary.StableId;
+	});
+
+	FString Description;
+	for (int32 Index = 0; Index < FMath::Min(MaxNearbyWornRegions, NearbyRegions.Num()); ++Index)
+	{
+		const FIslandTrailRegionSummary& Region = NearbyRegions[Index].Summary;
+		const FVector2D Offset = Region.WornCenter - FVector2D(Position.X, Position.Y);
+		float AngleDegrees = FMath::RadiansToDegrees(FMath::Atan2(Offset.Y, Offset.X));
+		if (AngleDegrees < 0.f) AngleDegrees += 360.f;
+		static const TCHAR* const CompassDirections[8] =
+		{
+			TEXT("east"), TEXT("northeast"), TEXT("north"), TEXT("northwest"),
+			TEXT("west"), TEXT("southwest"), TEXT("south"), TEXT("southeast")
+		};
+		const int32 CompassIndex = FMath::FloorToInt((AngleDegrees + 22.5f) / 45.f) % 8;
+		const int32 DistanceMetres = FMath::Max(0, FMath::RoundToInt(FMath::Sqrt(NearbyRegions[Index].DistanceSquared) / 100.f));
+		Description += FString::Printf(TEXT(" Nearby, about %d metres to the %s, a worn stretch includes %d patches."),
+			DistanceMetres, CompassDirections[CompassIndex], Region.WornCellCount);
+
+		switch (Region.State)
+		{
+		case EIslandTrailRegionState::Active:
+			Description += TEXT(" Footsteps crossed there recently.");
+			break;
+		case EIslandTrailRegionState::Recovering:
+			Description += TEXT(" Its older patches are softening as grass returns.");
+			break;
+		default:
+			Description += TEXT(" The age of some patches is unknown.");
+			break;
+		}
+		Description += DescribeWornAlignment(Region);
+	}
+	if (!Description.IsEmpty())
+	{
+		Description += TEXT(" These are clues to past foot traffic, not a verified route or destination.");
+	}
+	return Description;
 }
 
 FString UIslandTrailSubsystem::DescribeUnderfoot(const FVector& Position, float Wetness) const
