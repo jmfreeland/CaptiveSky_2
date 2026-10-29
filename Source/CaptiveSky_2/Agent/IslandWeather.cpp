@@ -1738,7 +1738,8 @@ void AIslandWeather::InitializeGroundCover()
 								}
 								if (!Component || !Mesh || !MeshBounds || MeshBounds->BoxExtent.Z <= KINDA_SMALL_NUMBER ||
 									!SpeciesCount || *SpeciesCount >= MaxBroadleafTreesPerSpecies) return false;
-								const float SpeciesScale = TargetHeight / (2.f * MeshBounds->BoxExtent.Z);
+								const float SpeciesTargetHeight = GetBroadleafTreeHeight(SpeciesIndex, SpruceRandom.FRand());
+								const float SpeciesScale = SpeciesTargetHeight / (2.f * MeshBounds->BoxExtent.Z);
 								const FVector MeshBottom(MeshBounds->Origin.X, MeshBounds->Origin.Y, MeshBounds->Origin.Z - MeshBounds->BoxExtent.Z);
 								const FVector SpeciesLocation = TreeHit.ImpactPoint - Rotation.RotateVector(MeshBottom * SpeciesScale);
 								Component->AddInstance(FTransform(Rotation, SpeciesLocation, FVector(SpeciesScale)), 0, true);
@@ -3790,6 +3791,15 @@ int32 AIslandWeather::GetBroadleafSpeciesIndex(float SpeciesField)
 int32 AIslandWeather::GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed)
 {
 	return GetBroadleafSpeciesIndex(SampleGroundCoverField(Position, Seed));
+}
+
+float AIslandWeather::GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample)
+{
+	static constexpr float MinimumHeights[] = { 1000.f, 1250.f, 1050.f, 900.f };
+	static constexpr float MaximumHeights[] = { 1500.f, 1800.f, 1600.f, 1400.f };
+	if (SpeciesIndex < 0 || SpeciesIndex >= UE_ARRAY_COUNT(MinimumHeights)) return 0.f;
+	const float ClampedSample = FMath::IsFinite(HeightSample) ? FMath::Clamp(HeightSample, 0.f, 1.f) : 0.5f;
+	return FMath::Lerp(MinimumHeights[SpeciesIndex], MaximumHeights[SpeciesIndex], ClampedSample);
 }
 
 int32 AIslandWeather::GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount)

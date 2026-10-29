@@ -24,7 +24,6 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		AIslandWeather::GetBroadleafSpeciesIndex(-0.1f), 0);
 	TestEqual(TEXT("A non-finite habitat field resolves deterministically"),
 		AIslandWeather::GetBroadleafSpeciesIndex(std::numeric_limits<float>::quiet_NaN()), 0);
-
 	TestEqual(TEXT("Four resolved species share the 3,600-tree budget evenly"),
 		AIslandWeather::GetBroadleafSpeciesLimit(4), 900);
 	TestEqual(TEXT("Three resolved species preserve the former 1,200-tree shares"),
@@ -52,6 +51,29 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	const TCHAR* BlackAlderAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A");
 	TestNotNull(TEXT("The approved Black Alder A skeletal mesh is available"),
 		LoadObject<USkeletalMesh>(nullptr, BlackAlderAssetPath));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafHeightProfilesTest,
+	"CaptiveSky2.Agent.IslandWeather.BroadleafHeightProfiles",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWeatherBroadleafHeightProfilesTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Norway maple occupies the shorter lower-canopy height band"),
+		AIslandWeather::GetBroadleafTreeHeight(0, 0.f), 1000.f);
+	TestEqual(TEXT("European aspen reaches the taller upper-canopy height band"),
+		AIslandWeather::GetBroadleafTreeHeight(1, 1.f), 1800.f);
+	TestEqual(TEXT("European beech retains an overlapping mid-canopy profile"),
+		AIslandWeather::GetBroadleafTreeHeight(2, 0.5f), 1325.f);
+	TestEqual(TEXT("Black alder retains a lower moisture-edge canopy profile"),
+		AIslandWeather::GetBroadleafTreeHeight(3, 1.f), 1400.f);
+	TestEqual(TEXT("Height samples below range clamp to the species minimum"),
+		AIslandWeather::GetBroadleafTreeHeight(3, -1.f), 900.f);
+	TestEqual(TEXT("Non-finite height samples resolve to the profile midpoint"),
+		AIslandWeather::GetBroadleafTreeHeight(0, std::numeric_limits<float>::quiet_NaN()), 1250.f);
+	TestEqual(TEXT("Invalid species indices do not produce a tree height"),
+		AIslandWeather::GetBroadleafTreeHeight(4, 0.5f), 0.f);
 	return true;
 }
 

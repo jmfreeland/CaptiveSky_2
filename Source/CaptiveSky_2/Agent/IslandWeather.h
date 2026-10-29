@@ -139,6 +139,8 @@ public:
 	static int32 GetBroadleafSpeciesIndex(float SpeciesField);
 	/** Resolve the seeded, smoothed habitat field at a tree position to its local broadleaf species. */
 	static int32 GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed);
+	/** Species-specific mature-tree height envelope, interpolated by a seeded 0..1 sample (cm). */
+	static float GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample);
 	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */
 	static int32 GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount);
 
