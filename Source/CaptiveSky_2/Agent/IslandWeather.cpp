@@ -1712,7 +1712,8 @@ void AIslandWeather::InitializeGroundCover()
 								++BroadleafTreeCount;
 								return true;
 							};
-							const int32 FirstSpecies = BroadleafGroveSpecies;
+							const int32 TreeOrdinalInGrove = BroadleafTreeCount - BroadleafTreesBeforeGrove;
+							const int32 FirstSpecies = GetBroadleafSpeciesIndexInGrove(BroadleafGroveSpecies, TreeOrdinalInGrove);
 							for (int32 Offset = 0; Offset < BroadleafTreeSpeciesCount && !bUsedBroadleaf; ++Offset)
 								bUsedBroadleaf = TryAddSpecies((FirstSpecies + Offset) % BroadleafTreeSpeciesCount);
 						}
@@ -3747,6 +3748,12 @@ int32 AIslandWeather::GetBroadleafSpeciesIndex(float SpeciesField)
 	const float ClampedField = FMath::Clamp(SpeciesField, 0.f, 1.f);
 	return FMath::Min(BroadleafTreeSpeciesCount - 1,
 		FMath::FloorToInt(ClampedField * BroadleafTreeSpeciesCount));
+}
+
+int32 AIslandWeather::GetBroadleafSpeciesIndexInGrove(int32 GroveSpeciesIndex, int32 TreeOrdinal)
+{
+	const int32 GroveSpecies = FMath::Clamp(GroveSpeciesIndex, 0, BroadleafTreeSpeciesCount - 1);
+	return (GroveSpecies + FMath::Max(0, TreeOrdinal) % BroadleafTreeSpeciesCount) % BroadleafTreeSpeciesCount;
 }
 
 int32 AIslandWeather::GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount)

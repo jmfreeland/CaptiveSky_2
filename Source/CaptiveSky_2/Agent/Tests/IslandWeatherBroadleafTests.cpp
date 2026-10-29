@@ -24,6 +24,20 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		AIslandWeather::GetBroadleafSpeciesIndex(-0.1f), 0);
 	TestEqual(TEXT("A non-finite grove field resolves deterministically"),
 		AIslandWeather::GetBroadleafSpeciesIndex(std::numeric_limits<float>::quiet_NaN()), 0);
+	TestEqual(TEXT("The first broadleaf in a maple grove starts with maple"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 0), 0);
+	TestEqual(TEXT("The second broadleaf in a grove rotates to aspen"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 1), 1);
+	TestEqual(TEXT("The third broadleaf in a grove rotates to beech"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 2), 2);
+	TestEqual(TEXT("The fourth broadleaf in a grove rotates to alder"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 3), 3);
+	TestEqual(TEXT("Species rotation wraps deterministically for larger groves"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 4), 0);
+	TestEqual(TEXT("Rotation begins with the grove's selected species"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(3, 1), 0);
+	TestEqual(TEXT("Negative tree ordinals do not rotate before the grove's selected species"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(2, -1), 2);
 
 	TestEqual(TEXT("Four resolved species share the 3,600-tree budget evenly"),
 		AIslandWeather::GetBroadleafSpeciesLimit(4), 900);
@@ -52,5 +66,36 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	const TCHAR* BlackAlderAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A");
 	TestNotNull(TEXT("The approved Black Alder A skeletal mesh is available"),
 		LoadObject<USkeletalMesh>(nullptr, BlackAlderAssetPath));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafMixingTest,
+	"CaptiveSky2.Agent.IslandWeather.BroadleafMixing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWeatherBroadleafMixingTest::RunTest(const FString& Parameters)
+{
+	for (int32 GroveSpecies = 0; GroveSpecies < 4; ++GroveSpecies)
+	{
+		int32 SpeciesCounts[4] = {};
+		for (int32 TreeOrdinal = 0; TreeOrdinal < 8; ++TreeOrdinal)
+		{
+			const int32 SelectedSpecies = AIslandWeather::GetBroadleafSpeciesIndexInGrove(GroveSpecies, TreeOrdinal);
+			TestTrue(TEXT("Within-grove species rotation stays inside the four-species range"),
+				SelectedSpecies >= 0 && SelectedSpecies < 4);
+			if (SelectedSpecies >= 0 && SelectedSpecies < 4) ++SpeciesCounts[SelectedSpecies];
+		}
+
+		for (int32 SpeciesIndex = 0; SpeciesIndex < 4; ++SpeciesIndex)
+			TestEqual(TEXT("An eight-tree mixed-grove sample contains two of each resolved species"),
+				SpeciesCounts[SpeciesIndex], 2);
+	}
+
+	TestEqual(TEXT("An invalid low grove species clamps to the first resolved species"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(-1, 0), 0);
+	TestEqual(TEXT("An invalid high grove species clamps to the last resolved species"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(4, 0), 3);
+	TestEqual(TEXT("Negative tree ordinals do not rotate before the grove's selected species"),
+		AIslandWeather::GetBroadleafSpeciesIndexInGrove(2, -1), 2);
 	return true;
 }

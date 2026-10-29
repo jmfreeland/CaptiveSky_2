@@ -137,6 +137,8 @@ public:
 	static bool ShouldIncludeResidentInSwayFocus(bool bIsPlayerControlled, bool bWasRecentlyRendered);
 	/** Map a stable [0, 1] grove field to a broadleaf species without favoring any one type. */
 	static int32 GetBroadleafSpeciesIndex(float SpeciesField);
+	/** Rotate broadleaf species within a grove so nearby trees can show the resolved mix. */
+	static int32 GetBroadleafSpeciesIndexInGrove(int32 GroveSpeciesIndex, int32 TreeOrdinal);
 	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */
 	static int32 GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount);
 
