@@ -16,6 +16,8 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Storm alone raises the sea"), Sea::TargetSea(1.f, 0.f) > Sea::TargetSea(0.f, 0.f));
 	TestTrue(TEXT("Wind alone raises the sea"), Sea::TargetSea(0.f, 0.8f) > Sea::TargetSea(0.f, 0.2f));
 	TestEqual(TEXT("Out-of-range inputs are clamped"), Sea::TargetSea(5.f, 5.f), 1.f);
+	TestEqual(TEXT("A non-finite storm sample is treated as calm"), Sea::TargetSea(NAN, 0.f), 0.f);
+	TestEqual(TEXT("A non-finite wind sample is treated as calm"), Sea::TargetSea(0.f, INFINITY), 0.f);
 
 	TestTrue(TEXT("A glassy sea needs no remark"), Sea::DescribeSea(0.f).IsEmpty() && Sea::DescribeSea(NAN).IsEmpty());
 	TestTrue(TEXT("A middling sea is described as running"), Sea::DescribeSea(0.5f).Contains(TEXT("white-tipped")));
@@ -31,6 +33,13 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The sea moves toward its target"), Rising > 0.f && Rising < 1.f);
 	TestTrue(TEXT("Seas build faster than they settle"), Rising > Falling);
 	TestEqual(TEXT("No time passing changes nothing"), Sea::StepSea(0.3f, 1.f, 0.f), 0.3f);
+	TestEqual(TEXT("A non-finite current sea safely recovers from calm"), Sea::StepSea(NAN, 1.f, 10.f), 0.f);
+	TestEqual(TEXT("A non-finite target preserves the finite current sea"), Sea::StepSea(0.4f, NAN, 10.f), 0.4f);
+	TestEqual(TEXT("A non-finite timestep cannot poison the sea"), Sea::StepSea(0.4f, 1.f, INFINITY), 0.4f);
+	TestEqual(TEXT("Negative current sea is clamped before transition"), Sea::StepSea(-1.f, 0.f, 10.f), 0.f);
+	TestTrue(TEXT("Out-of-range sea targets remain bounded"), Sea::StepSea(0.2f, 4.f, 10.f) <= 1.f);
+	TestEqual(TEXT("Invalid amplitude input resolves to the calm scale"), Sea::AmplitudeScale(NAN), Sea::CalmAmplitudeScale);
+	TestEqual(TEXT("Invalid steepness input resolves to the calm scale"), Sea::SteepnessScale(INFINITY), Sea::CalmSteepnessScale);
 
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);

@@ -19,18 +19,25 @@ static TAutoConsoleVariable<float> CVarIslandSea(
 
 float UIslandSeaStateSubsystem::TargetSea(float Storm, float Wind01)
 {
-	return FMath::Clamp(0.6f * FMath::Clamp(Wind01, 0.f, 1.f) + 0.5f * FMath::Clamp(Storm, 0.f, 1.f), 0.f, 1.f);
+	const float SafeStorm = FMath::IsFinite(Storm) ? FMath::Clamp(Storm, 0.f, 1.f) : 0.f;
+	const float SafeWind = FMath::IsFinite(Wind01) ? FMath::Clamp(Wind01, 0.f, 1.f) : 0.f;
+	return FMath::Clamp(0.6f * SafeWind + 0.5f * SafeStorm, 0.f, 1.f);
 }
 
 float UIslandSeaStateSubsystem::StepSea(float Current, float Target, float DeltaTime)
 {
+	Current = FMath::IsFinite(Current) ? FMath::Clamp(Current, 0.f, 1.f) : 0.f;
+	if (!FMath::IsFinite(Target)) Target = Current;
+	else Target = FMath::Clamp(Target, 0.f, 1.f);
+	if (!FMath::IsFinite(DeltaTime) || DeltaTime <= 0.f) return Current;
 	const float Seconds = Target > Current ? RiseSeconds : FallSeconds;
-	return FMath::Lerp(Current, Target, 1.f - FMath::Exp(-FMath::Max(DeltaTime, 0.f) / Seconds));
+	return FMath::Clamp(FMath::Lerp(Current, Target, 1.f - FMath::Exp(-DeltaTime / Seconds)), 0.f, 1.f);
 }
 
 float UIslandSeaStateSubsystem::AmplitudeScale(float Sea)
 {
-	return FMath::Lerp(CalmAmplitudeScale, 1.f, FMath::Clamp(Sea, 0.f, 1.f));
+	const float SafeSea = FMath::IsFinite(Sea) ? FMath::Clamp(Sea, 0.f, 1.f) : 0.f;
+	return FMath::Lerp(CalmAmplitudeScale, 1.f, SafeSea);
 }
 
 FString UIslandSeaStateSubsystem::DescribeSea(float InSea)
@@ -43,7 +50,8 @@ FString UIslandSeaStateSubsystem::DescribeSea(float InSea)
 
 float UIslandSeaStateSubsystem::SteepnessScale(float Sea)
 {
-	return FMath::Lerp(CalmSteepnessScale, StormSteepnessScale, FMath::Clamp(Sea, 0.f, 1.f));
+	const float SafeSea = FMath::IsFinite(Sea) ? FMath::Clamp(Sea, 0.f, 1.f) : 0.f;
+	return FMath::Lerp(CalmSteepnessScale, StormSteepnessScale, SafeSea);
 }
 
 bool UIslandSeaStateSubsystem::BindWaves(UGerstnerWaterWaves* InWaves)
