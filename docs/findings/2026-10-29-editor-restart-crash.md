@@ -27,3 +27,9 @@ A read-only query for Application Error (1000), Windows Error Reporting (1001), 
 The editor failure occurs before a fresh project log or project-local crash context is available, so it cannot yet be attributed to Nanite Foliage, the Island map, or VRAM. The command-line test failure does produce a project-local crash context and repeats the earlier standalone Game's zero-address pre-init stack pattern, though its hash differs slightly. Neither failure yielded runtime validation.
 
 Do not repeat the same editor or command-line launch. The Windows Application log has no event for those attempts, so it cannot identify them. Next diagnostic needs symbolized analysis of the 04:15 minidump (with matching engine symbols) or a fresh CrashReportClient report. The editor-target builds prove compilation only; the `IslandTrail` automation and Nanite post-restart check remain pending.
+
+## Additional restart attempts (04:31 UTC onward)
+
+After the user again confirmed the project was saved and authorized restarting, the editor process was absent. A direct launch returned PID 33904, but the process exited before creating a new project log. The project log remains at 03:54:01, and `Saved/Crashes/_0000` remains at 04:15:06, so no new project crash context was produced. A read-only query of the Windows Application log for 04:31–04:34 was denied by the current environment; no cause can be inferred from that denial.
+
+The current working-tree `CaptiveSky_2Editor` target then compiled and linked successfully in 14.27 seconds (5 UBT actions). A single post-build project launch was attempted; no editor process remained afterward and the project log still had not advanced. This separates successful C++ compilation from the unresolved pre-log editor startup failure, but does not validate Nanite at runtime. Avoid another identical launch; continue with symbolized dump analysis or obtain a fresh CrashReportClient/WER record with appropriate access.
