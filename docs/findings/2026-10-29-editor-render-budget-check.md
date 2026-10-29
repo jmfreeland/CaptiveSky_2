@@ -52,3 +52,15 @@ is currently 0, so do not start PIE without first disabling resident thinking;
 given the current device temperature and memory use, defer another runtime
 session until the GPU has cooled and has more headroom. No test or asset was
 modified during this observation.
+
+## Restart recheck — 17:30 UTC
+
+The user authorized a restart on the understanding that Unreal changes were
+saved. Before proceeding, the live editor's `r.Nanite.Foliage` CVar returned
+`1`, matching `Config/DefaultEngine.ini` (`r.Nanite.Foliage=True`), so the
+setting is already active in the current editor session and a restart is not
+needed to apply it. Closing the editor raised a `Save Content` dialog listing
+`/Game/Materials/M_Island_Textured_Wet`; shutdown was cancelled to preserve that
+pending material edit without saving or discarding it. The editor remains open.
+This material prompt is separate from the Nanite Foliage setting and needs
+review before another restart. No PIE session or asset save was performed.
