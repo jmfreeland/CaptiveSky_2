@@ -35,3 +35,18 @@ After the UE startup crash has a symbolized diagnosis, run
 `CaptiveSky2.Agent.IslandTrail` and inspect a route with intersecting resident
 and visitor traffic. The current tests validate the orientation calculation,
 not the final material appearance on varied terrain.
+
+## Saved Island trail snapshot (2026-10-29)
+
+The project-root `WorldState/Island.trails.json` was last written at 00:58
+workstation time. Its Island-day-6 ledger has 81 occupied 1.5 m cells across
+four 200 m tiles: 47 have one recorded step, 34 have at least two, 20 meet the
+rendered-wear threshold of four, and one has reached full wear (40 steps).
+The 20 rendered-wear cells form three 8-neighbor components; the largest has
+13 cells and two components have at least three. This confirms the saved
+behavior has produced at least one connected corridor-shaped cluster without
+adding data or actors beyond the existing bounds. It is a ledger analysis,
+not proof that the cylinder marks read as a path in the live view, nor a
+performance measurement. Use the largest existing cluster for the next
+bounded visual review rather than adding synthetic foot traffic to the
+canonical world.
