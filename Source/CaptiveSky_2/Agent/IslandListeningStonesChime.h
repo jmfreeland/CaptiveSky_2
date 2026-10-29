@@ -33,6 +33,9 @@ public:
 	bool IsAudibleAt(const FVector& ListenerLocation) const;
 	/** Fading or just-faded tone fact for nearby residents; no enduring discovery is implied. */
 	FString DescribeForListener(const FVector& ListenerLocation) const;
+	/** Sparse private memory policy: only nearby autonomous residents who can hear a tone retain it. */
+	static bool ShouldRecordResidentObservation(bool bPlayerControlled, bool bHasMemory, bool bAudible, bool bHasRecentSimilarMemory);
+	static FString ResidentObservationText(EIslandChimeCause Cause);
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -53,5 +56,6 @@ private:
 	static float CalculateWindPitchRatio(float HorizontalWindSpeed);
 	static float CalculateWindDirectionPitchRatio(const FVector& HorizontalWind, const FVector& LandmarkForward);
 	void BeginChimeWithPitch(float HorizontalWindSpeed, float PitchRatio, EIslandChimeCause InCause);
+	void RecordNearbyResidentObservations();
 	void BuildChimeWave(float PitchRatio);
 };

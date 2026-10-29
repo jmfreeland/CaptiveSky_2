@@ -1,4 +1,6 @@
 #include "Misc/AutomationTest.h"
+#include "Agent/AgentDataPaths.h"
+#include "Agent/AgentMemoryComponent.h"
 #include "Agent/AgentBrainComponent.h"
 #include "Agent/IslandFirefly.h"
 #include "Agent/IslandListeningStonePresentation.h"
@@ -11,10 +13,83 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Character.h"
+#include "HAL/FileManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
 #include <limits>
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStoneResidentMemoryTest, "CaptiveSky2.Agent.ListeningStoneResidentMemory",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
+{
+	TestTrue(TEXT("An audible chime becomes a private observation for a nearby resident"),
+		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, true, false));
+	TestFalse(TEXT("A player does not receive a private resident memory from the same tone"),
+		AIslandListeningStonesChime::ShouldRecordResidentObservation(true, true, true, false));
+	TestFalse(TEXT("A resident without an agent memory store is not written to"),
+		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, false, true, false));
+	TestFalse(TEXT("Residents outside the chime's acoustic radius do not remember it"),
+		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, false, false));
+	TestFalse(TEXT("A similar chime within twelve hours is not added again"),
+		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, true, true));
+	TestTrue(TEXT("Gust memories retain the directly witnessed cause"),
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::NaturalGust).Contains(TEXT("rising gust")));
+	TestTrue(TEXT("Visitor memories retain the directly witnessed cause"),
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::VisitorApproach).Contains(TEXT("visitor's approach")));
+
+	const FString TestAgentId = TEXT("Automation_StoneWitness_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+	const FString TestDirectory = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / TestAgentId);
+	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Resident-memory fixture world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	ACharacter* NearbyResident = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator);
+	ACharacter* DistantResident = World->SpawnActor<ACharacter>(FVector(AIslandListeningStonesChime::AudibleRadius + 100.f, 0.f, 0.f), FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("Nearby autonomous resident fixture spawned"), NearbyResident) ||
+		!TestNotNull(TEXT("Distant autonomous resident fixture spawned"), DistantResident))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
+		return false;
+	}
+	UAgentMemoryComponent* Memory = NewObject<UAgentMemoryComponent>(NearbyResident);
+	NearbyResident->AddInstanceComponent(Memory);
+	Memory->AgentId = TestAgentId;
+	Memory->RegisterComponent();
+	UAgentMemoryComponent* DistantMemory = NewObject<UAgentMemoryComponent>(DistantResident);
+	DistantResident->AddInstanceComponent(DistantMemory);
+	DistantMemory->AgentId = TestAgentId + TEXT("_Distant");
+	DistantMemory->RegisterComponent();
+	AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (!TestNotNull(TEXT("A test chime can be spawned"), Chime))
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
+		return false;
+	}
+	Chime->BeginChime(100.f, EIslandChimeCause::NaturalGust);
+	TestEqual(TEXT("A nearby autonomous resident keeps one directly heard chime as private memory"), Memory->GetMemoryCount(), 1);
+	TestEqual(TEXT("A resident outside the acoustic radius keeps no chime memory"), DistantMemory->GetMemoryCount(), 0);
+	AIslandListeningStonesChime* RepeatedChime = World->SpawnActor<AIslandListeningStonesChime>(FVector::ZeroVector, FRotator::ZeroRotator);
+	if (RepeatedChime) RepeatedChime->BeginChime(100.f, EIslandChimeCause::NaturalGust);
+	TestEqual(TEXT("A similar tone inside twelve hours does not create repetitive memory"), Memory->GetMemoryCount(), 1);
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandListeningStonePresentationTest, "CaptiveSky2.Agent.ListeningStonePresentation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

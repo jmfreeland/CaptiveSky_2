@@ -1,6 +1,11 @@
 #include "IslandListeningStonesChime.h"
 
+#include "AgentMemoryComponent.h"
+#include "AgentMemoryTypes.h"
 #include "Components/AudioComponent.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundWaveProcedural.h"
 
@@ -45,11 +50,55 @@ void AIslandListeningStonesChime::BeginChimeWithPitch(float HorizontalWindSpeed,
 		ContextExpiresAt = GetWorld()->GetTimeSeconds() + ResidentContextLifetimeSeconds;
 		SetLifeSpan(ResidentContextLifetimeSeconds);
 	}
+	RecordNearbyResidentObservations();
 	BuildChimeWave(AppliedPitchRatio);
 	if (ChimeWave && AudioComponent)
 	{
 		AudioComponent->SetSound(ChimeWave);
 		AudioComponent->Play();
+	}
+}
+
+bool AIslandListeningStonesChime::ShouldRecordResidentObservation(bool bPlayerControlled, bool bHasMemory,
+	bool bAudible, bool bHasRecentSimilarMemory)
+{
+	return !bPlayerControlled && bHasMemory && bAudible && !bHasRecentSimilarMemory;
+}
+
+FString AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause InCause)
+{
+	switch (InCause)
+	{
+	case EIslandChimeCause::NaturalGust:
+		return TEXT("I heard a rising gust awaken the Listening Stones; a layered tone carried on the wind and then faded.");
+	case EIslandChimeCause::VisitorApproach:
+		return TEXT("I heard the Listening Stones answer a quiet visitor's approach with a brief layered tone.");
+	case EIslandChimeCause::Inspection:
+		return TEXT("I heard a brief layered tone from the Listening Stones during a close inspection.");
+	default:
+		return TEXT("I heard a brief layered tone from the Listening Stones, and then it faded.");
+	}
+}
+
+void AIslandListeningStonesChime::RecordNearbyResidentObservations()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+	const FString Observation = ResidentObservationText(Cause);
+	const FDateTime RecentMemoryCutoff = FDateTime::UtcNow() - FTimespan::FromHours(12.0);
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		APawn* Resident = *It;
+		if (!IsValid(Resident)) continue;
+		UAgentMemoryComponent* Memory = Resident->FindComponentByClass<UAgentMemoryComponent>();
+		const bool bAudible = IsAudibleAt(Resident->GetActorLocation());
+		const bool bHasRecentSimilarMemory = Memory && Memory->HasSimilarMemorySince(
+			EAgentMemoryType::Observation, Observation, RecentMemoryCutoff, 0.75f);
+		if (!ShouldRecordResidentObservation(Resident->IsPlayerControlled(), Memory != nullptr, bAudible,
+			bHasRecentSimilarMemory)) continue;
+
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Observation, 0.45f,
+			{ TEXT("listening_stones"), TEXT("place:ListeningStones"), TEXT("heard"), TEXT("landmark") }));
 	}
 }
 

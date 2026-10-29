@@ -1,0 +1,7 @@
+# Listening Stones: sparse resident memory
+
+When the Listening Stones emit a natural-gust, visitor-approach, or inspection chime, each nearby autonomous pawn with an `UAgentMemoryComponent` now keeps a private observation of what it directly heard. Player-controlled pawns, pawns without agent memory, and residents outside the chime's audible radius are excluded. Similar observations are suppressed for 12 real-world hours per resident, preventing ordinary gusts from becoming repetitive memory or model traffic.
+
+The record uses the existing portable observation-memory store and is available to the resident's normal future memory retrieval. The chime still fades normally; this adds no puzzle, reward, shared knowledge, or model request. A bystander may remember the audible tone and its known cause without claiming to understand the stones.
+
+Validation: a fresh UE 5.8 scratch project built all 186 actions successfully. `CaptiveSky2.Agent.ListeningStoneResidentMemory` passed in NullRHI with agent thinking disabled, zero model requests, and `-CaptiveSkyDataRoot` pointed inside the scratch project. The test verifies a nearby resident records one private memory, a resident beyond the acoustic radius records none, and an immediately repeated similar tone is deduplicated. The separate map-dependent presentation test was not used for this check because the scratch project intentionally contains no Island content assets. The open editor and saved Island were not modified.
