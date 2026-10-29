@@ -111,6 +111,12 @@ bool AListeningStonePresentation::CanBeginVisitorResonance(bool bAlreadyLatched,
 		SecondsSinceLastChime >= ChimeCooldownSeconds;
 }
 
+bool AListeningStonePresentation::ShouldSuppressVisitorResonanceForQuietListener(bool bQuietListenerPresent,
+	bool bVisitorIsQuietListener)
+{
+	return bQuietListenerPresent && !bVisitorIsQuietListener;
+}
+
 bool AListeningStonePresentation::BuildStoneForms(const FTransform& MarkerTransform,
 	const TArray<AStaticMeshActor*>& Proxies)
 {
@@ -379,6 +385,8 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 		const bool bAlreadyLatched = VisitorPresenceLatch.Get() == Visitor;
 		if (bAlreadyLatched) return;
 		VisitorPresenceLatch = Visitor;
+		if (ShouldSuppressVisitorResonanceForQuietListener(QuietResidentLatch.IsValid(),
+			QuietResidentLatch.Get() == Visitor)) return;
 		const float SecondsSinceLastChime = static_cast<float>(World->GetTimeSeconds() - LastAmbientChimeAt);
 		if (!CanBeginVisitorResonance(bAlreadyLatched, GetResonanceRemaining() > 0.f, SecondsSinceLastChime))
 			return;

@@ -30,6 +30,8 @@ public:
 	/** A quiet visit belongs to an autonomous resident who remains still inside the close landmark ring. */
 	static bool IsEligibleQuietResident(bool bPlayerControlled, bool bAutonomousResident,
 		const FVector& Offset, const FVector& Velocity);
+	/** An approach chime should not interrupt a different resident's quiet visit. */
+	static bool ShouldSuppressVisitorResonanceForQuietListener(bool bQuietListenerPresent, bool bVisitorIsQuietListener);
 	static constexpr float QuietVisitDurationSeconds = 8.f;
 	/** Shared latch/resonance/cooldown gate, kept pure so it can be tested without a PIE LocalPlayer. */
 	static bool CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating, float SecondsSinceLastChime);

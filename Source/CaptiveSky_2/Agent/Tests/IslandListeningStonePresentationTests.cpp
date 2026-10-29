@@ -156,12 +156,22 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		QuietResident->AddInstanceComponent(QuietMemory);
 		QuietMemory->AgentId = QuietAgentId;
 		QuietMemory->RegisterComponent();
-		NearbyResident->SetActorLocation(FVector(500.f, 0.f, 0.f));
+		NearbyResident->SetActorLocation(FVector(300.f, 0.f, 0.f));
 		NearbyResident->SetActorRotation(FRotator(0.f, 180.f, 0.f));
+		NearbyResident->GetCharacterMovement()->Velocity = FVector(-100.f, 0.f, 0.f);
 		AListeningStonePresentation* QuietPresentation = World->SpawnActor<AListeningStonePresentation>(FVector::ZeroVector, FRotator::ZeroRotator);
 		if (TestNotNull(TEXT("A fresh transient presentation can observe a quiet visit"), QuietPresentation))
 		{
-			for (int32 Check = 0; Check < 32; ++Check) QuietPresentation->CheckForVisitorPresence(0.25f);
+			int32 ApproachChimesBeforeQuietVisit = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+				if (It->Cause == EIslandChimeCause::ResidentApproach) ++ApproachChimesBeforeQuietVisit;
+			QuietPresentation->CheckForVisitorPresence(0.25f);
+			int32 ApproachChimesDuringQuietVisit = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+				if (It->Cause == EIslandChimeCause::ResidentApproach) ++ApproachChimesDuringQuietVisit;
+			TestEqual(TEXT("An approaching resident does not chime over an already quiet listener"),
+				ApproachChimesDuringQuietVisit, ApproachChimesBeforeQuietVisit);
+			for (int32 Check = 1; Check < 32; ++Check) QuietPresentation->CheckForVisitorPresence(0.25f);
 			AIslandListeningStonesChime* ListeningChime = nullptr;
 			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
 				if (It->Cause == EIslandChimeCause::ResidentListening) { ListeningChime = *It; break; }
@@ -240,6 +250,12 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		AListeningStonePresentation::CanBeginVisitorResonance(false, true, 100.f));
 	TestTrue(TEXT("A fresh eligible visitor may trigger after cooldown"),
 		AListeningStonePresentation::CanBeginVisitorResonance(false, false, 45.f));
+	TestTrue(TEXT("A visitor's approach chime is deferred while a different resident listens quietly"),
+		AListeningStonePresentation::ShouldSuppressVisitorResonanceForQuietListener(true, false));
+	TestFalse(TEXT("A quiet listener is not suppressed from their own cue"),
+		AListeningStonePresentation::ShouldSuppressVisitorResonanceForQuietListener(true, true));
+	TestFalse(TEXT("Ordinary approaches are unchanged when nobody is listening"),
+		AListeningStonePresentation::ShouldSuppressVisitorResonanceForQuietListener(false, false));
 
 	UWorld* Island = nullptr;
 	for (const FWorldContext& Context : GEngine->GetWorldContexts())
