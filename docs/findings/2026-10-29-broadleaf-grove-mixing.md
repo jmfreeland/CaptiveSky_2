@@ -22,8 +22,12 @@ size or foliage-memory demand.
 - `CaptiveSky2.Agent.IslandWeather.BroadleafHabitatSelection` covers local-field
   species selection, nearby patch consistency, repeatability, and a species
   transition across the landscape. It passed under UE 5.8 NullRHI with PCG/PVE
-  disabled for the isolated test invocation; no Island map or resident agents
-  were loaded. Log:
+  disabled for the isolated test invocation. The contentless worktree still
+  logged missing Island asset references, and its MCP plugin could not bind
+  `127.0.0.1:8000` because the main editor already owns that endpoint; the
+  pure test completed successfully and a follow-up MCP query confirmed the
+  main editor remained connected. No Island map or resident agents were
+  loaded. Log:
   `Saved/Logs/Codex_BroadleafHabitatSelection_20261029_retry.log`.
 - The earlier `CaptiveSky2.Agent.IslandWeather.BroadleafMixing` pass validates
   the retired strict-rotation behavior only. Earlier log:
