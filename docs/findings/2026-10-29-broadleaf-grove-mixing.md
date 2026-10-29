@@ -1,12 +1,12 @@
-# Mixed broadleaf trees within each grove
+# Seeded broadleaf habitat patches
 
 ## Change
 
-Each mixed grove already selected a stable starting broadleaf species from its
-seeded habitat field, but every broadleaf substitution in that grove reused
-that same species. The generator now rotates from that starting species for
-each broadleaf tree, so a nearby grove can show its resolved maple, aspen,
-beech, and Black Alder mix rather than a single broadleaf silhouette.
+Each mixed grove previously rotated through all four broadleaf species in a
+strict sequence. That guaranteed variety in counts but made each small stand a
+perfectly balanced mixture. Trees now select from the existing smooth, seeded
+habitat field at their ground-trace location, producing loose local species
+patches and more gradual transitions between stands.
 
 Placement order remains deterministic. Missing assets and exhausted
 per-species quotas still use the existing fallback search, and all existing
@@ -16,11 +16,17 @@ size or foliage-memory demand.
 
 ## Validation
 
-- The UE 5.8 scratch Editor target linked successfully (46 actions initially;
-  the focused test update rebuilt and linked in 4 actions).
-- `CaptiveSky2.Agent.IslandWeather.BroadleafMixing` passed under NullRHI with
-  zero model requests. It covers all four starting species, two full cycles,
-  and invalid input bounds. Log:
+- The UE 5.8 `CaptiveSky_2Editor` target compiled and linked successfully from
+  this isolated worktree, including `IslandWeather.cpp` and the updated test
+  source (4 incremental actions).
+- `CaptiveSky2.Agent.IslandWeather.BroadleafHabitatSelection` covers local-field
+  species selection, nearby patch consistency, repeatability, and a species
+  transition across the landscape. It passed under UE 5.8 NullRHI with PCG/PVE
+  disabled for the isolated test invocation; no Island map or resident agents
+  were loaded. Log:
+  `Saved/Logs/Codex_BroadleafHabitatSelection_20261029_retry.log`.
+- The earlier `CaptiveSky2.Agent.IslandWeather.BroadleafMixing` pass validates
+  the retired strict-rotation behavior only. Earlier log:
   `Saved/CompileScratch/Claude_Props/Saved/Logs/Codex_BroadleafMixing_20261029.log`.
 - The pre-existing composite `BroadleafDiversity` test is currently red on two
   Black Alder cull expectations (80/125 m expected, 120/220 m configured),
@@ -34,7 +40,8 @@ size or foliage-memory demand.
 
 ## Next
 
-After the in-flight Megaplant material/PVE setup is available in the editor,
-use a bounded zero-request daylight view near a broadleaf grove to confirm the
-species render distinctly. Record the same run's frame time and VRAM, while
-keeping the established 30 FPS floor and current population cap.
+After this source change is integrated into the runtime project, use a bounded
+zero-request daylight view near several broadleaf patches to confirm that the
+spatial variation reads naturally and the species render distinctly. Record
+the same run's frame time and VRAM, while keeping the established 30 FPS floor
+and current population cap.

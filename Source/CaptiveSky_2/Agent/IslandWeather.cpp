@@ -1689,8 +1689,6 @@ void AIslandWeather::InitializeGroundCover()
 					// sprinkling a few isolated broadleaf trees uniformly through every grove.
 					const bool bBroadleafGrove = SampleGroundCoverField(GroveCenter,
 						WeatherSeed ^ 0x6a09e667) > 0.25f;
-					const int32 BroadleafGroveSpecies = GetBroadleafSpeciesIndex(
-						SampleGroundCoverField(GroveCenter, WeatherSeed ^ 0x3b67ae85));
 
 					const int32 TreesBeforeGrove = GroundCoverTreeCount;
 					const int32 BroadleafTreesBeforeGrove = BroadleafTreeCount;
@@ -1748,8 +1746,11 @@ void AIslandWeather::InitializeGroundCover()
 								++BroadleafTreeCount;
 								return true;
 							};
-							const int32 TreeOrdinalInGrove = BroadleafTreeCount - BroadleafTreesBeforeGrove;
-							const int32 FirstSpecies = GetBroadleafSpeciesIndexInGrove(BroadleafGroveSpecies, TreeOrdinalInGrove);
+							// Choose species from the same smooth, seeded habitat field used by the
+							// meadow. Nearby trees therefore form loose species patches instead of
+							// every grove repeating a strict four-species rotation.
+							const int32 FirstSpecies = GetBroadleafSpeciesIndexAt(
+								TreeHit.ImpactPoint, WeatherSeed ^ 0x3b67ae85);
 							for (int32 Offset = 0; Offset < BroadleafTreeSpeciesCount && !bUsedBroadleaf; ++Offset)
 								bUsedBroadleaf = TryAddSpecies((FirstSpecies + Offset) % BroadleafTreeSpeciesCount);
 						}
@@ -3786,10 +3787,9 @@ int32 AIslandWeather::GetBroadleafSpeciesIndex(float SpeciesField)
 		FMath::FloorToInt(ClampedField * BroadleafTreeSpeciesCount));
 }
 
-int32 AIslandWeather::GetBroadleafSpeciesIndexInGrove(int32 GroveSpeciesIndex, int32 TreeOrdinal)
+int32 AIslandWeather::GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed)
 {
-	const int32 GroveSpecies = FMath::Clamp(GroveSpeciesIndex, 0, BroadleafTreeSpeciesCount - 1);
-	return (GroveSpecies + FMath::Max(0, TreeOrdinal) % BroadleafTreeSpeciesCount) % BroadleafTreeSpeciesCount;
+	return GetBroadleafSpeciesIndex(SampleGroundCoverField(Position, Seed));
 }
 
 int32 AIslandWeather::GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount)

@@ -10,34 +10,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafDiversityTest,
 
 bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("The first grove-field quarter selects Norway maple"),
+	TestEqual(TEXT("The first habitat-field quarter selects Norway maple"),
 		AIslandWeather::GetBroadleafSpeciesIndex(0.125f), 0);
-	TestEqual(TEXT("The second grove-field quarter selects European aspen"),
+	TestEqual(TEXT("The second habitat-field quarter selects European aspen"),
 		AIslandWeather::GetBroadleafSpeciesIndex(0.375f), 1);
-	TestEqual(TEXT("The third grove-field quarter selects European beech"),
+	TestEqual(TEXT("The third habitat-field quarter selects European beech"),
 		AIslandWeather::GetBroadleafSpeciesIndex(0.625f), 2);
-	TestEqual(TEXT("The final grove-field quarter selects black alder"),
+	TestEqual(TEXT("The final habitat-field quarter selects black alder"),
 		AIslandWeather::GetBroadleafSpeciesIndex(0.875f), 3);
 	TestEqual(TEXT("A field at the upper endpoint stays within the last species"),
 		AIslandWeather::GetBroadleafSpeciesIndex(1.f), 3);
 	TestEqual(TEXT("A field below zero stays within the first species"),
 		AIslandWeather::GetBroadleafSpeciesIndex(-0.1f), 0);
-	TestEqual(TEXT("A non-finite grove field resolves deterministically"),
+	TestEqual(TEXT("A non-finite habitat field resolves deterministically"),
 		AIslandWeather::GetBroadleafSpeciesIndex(std::numeric_limits<float>::quiet_NaN()), 0);
-	TestEqual(TEXT("The first broadleaf in a maple grove starts with maple"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 0), 0);
-	TestEqual(TEXT("The second broadleaf in a grove rotates to aspen"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 1), 1);
-	TestEqual(TEXT("The third broadleaf in a grove rotates to beech"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 2), 2);
-	TestEqual(TEXT("The fourth broadleaf in a grove rotates to alder"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 3), 3);
-	TestEqual(TEXT("Species rotation wraps deterministically for larger groves"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(0, 4), 0);
-	TestEqual(TEXT("Rotation begins with the grove's selected species"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(3, 1), 0);
-	TestEqual(TEXT("Negative tree ordinals do not rotate before the grove's selected species"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(2, -1), 2);
 
 	TestEqual(TEXT("Four resolved species share the 3,600-tree budget evenly"),
 		AIslandWeather::GetBroadleafSpeciesLimit(4), 900);
@@ -69,33 +55,27 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafMixingTest,
-	"CaptiveSky2.Agent.IslandWeather.BroadleafMixing",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafHabitatSelectionTest,
+	"CaptiveSky2.Agent.IslandWeather.BroadleafHabitatSelection",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FIslandWeatherBroadleafMixingTest::RunTest(const FString& Parameters)
+bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Parameters)
 {
-	for (int32 GroveSpecies = 0; GroveSpecies < 4; ++GroveSpecies)
-	{
-		int32 SpeciesCounts[4] = {};
-		for (int32 TreeOrdinal = 0; TreeOrdinal < 8; ++TreeOrdinal)
-		{
-			const int32 SelectedSpecies = AIslandWeather::GetBroadleafSpeciesIndexInGrove(GroveSpecies, TreeOrdinal);
-			TestTrue(TEXT("Within-grove species rotation stays inside the four-species range"),
-				SelectedSpecies >= 0 && SelectedSpecies < 4);
-			if (SelectedSpecies >= 0 && SelectedSpecies < 4) ++SpeciesCounts[SelectedSpecies];
-		}
-
-		for (int32 SpeciesIndex = 0; SpeciesIndex < 4; ++SpeciesIndex)
-			TestEqual(TEXT("An eight-tree mixed-grove sample contains two of each resolved species"),
-				SpeciesCounts[SpeciesIndex], 2);
-	}
-
-	TestEqual(TEXT("An invalid low grove species clamps to the first resolved species"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(-1, 0), 0);
-	TestEqual(TEXT("An invalid high grove species clamps to the last resolved species"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(4, 0), 3);
-	TestEqual(TEXT("Negative tree ordinals do not rotate before the grove's selected species"),
-		AIslandWeather::GetBroadleafSpeciesIndexInGrove(2, -1), 2);
+	constexpr int32 HabitatSeed = 12345;
+	const FVector PatchOrigin(0.f, 0.f, 0.f);
+	const int32 PatchSpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(PatchOrigin, HabitatSeed);
+	TestTrue(TEXT("A sampled habitat field resolves to one of the four broadleaf species"),
+		PatchSpecies >= 0 && PatchSpecies < 4);
+	TestEqual(TEXT("Nearby trees remain in the same smoothed habitat patch"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(500.f, 700.f, 0.f), HabitatSeed), PatchSpecies);
+	TestEqual(TEXT("A second nearby tree remains in that habitat patch"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(1000.f, 1000.f, 0.f), HabitatSeed), PatchSpecies);
+	TestEqual(TEXT("Repeated position and seed resolve deterministically"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(PatchOrigin, HabitatSeed), PatchSpecies);
+	int32 DistantSpecies = PatchSpecies;
+	for (int32 Step = 1; Step <= 200 && DistantSpecies == PatchSpecies; ++Step)
+		DistantSpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(Step * 5000.f, 0.f, 0.f), HabitatSeed);
+	TestTrue(TEXT("The smooth habitat field forms different broadleaf communities across the landscape"),
+		DistantSpecies >= 0 && DistantSpecies < 4 && DistantSpecies != PatchSpecies);
 	return true;
 }
