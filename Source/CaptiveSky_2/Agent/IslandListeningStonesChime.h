@@ -13,6 +13,7 @@ enum class EIslandChimeCause : uint8
 	NaturalGust,
 	VisitorApproach,
 	ResidentApproach,
+	ResidentListening,
 	Inspection
 };
 

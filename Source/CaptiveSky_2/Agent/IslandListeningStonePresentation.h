@@ -27,6 +27,10 @@ public:
 	static bool ShouldResonateForWind(float PreviousSpeed, float CurrentSpeed);
 	/** Pure approach gate shared by runtime visitor detection and deterministic automation. */
 	static bool IsEligibleVisitor(bool bPlayerControlled, bool bAutonomousResident, const FVector& Offset, const FVector& Velocity);
+	/** A quiet visit belongs to an autonomous resident who remains still inside the close landmark ring. */
+	static bool IsEligibleQuietResident(bool bPlayerControlled, bool bAutonomousResident,
+		const FVector& Offset, const FVector& Velocity);
+	static constexpr float QuietVisitDurationSeconds = 8.f;
 	/** Shared latch/resonance/cooldown gate, kept pure so it can be tested without a PIE LocalPlayer. */
 	static bool CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating, float SecondsSinceLastChime);
 
@@ -49,12 +53,17 @@ private:
 	bool bHasAmbientWindSample = false;
 	float VisitorCheckAccumulator = 0.f;
 	TWeakObjectPtr<APawn> VisitorPresenceLatch;
+	TWeakObjectPtr<APawn> QuietResidentLatch;
+	float QuietResidentDwellSeconds = 0.f;
+	bool bQuietVisitHandled = false;
 	TWeakObjectPtr<AIslandWeather> Weather;
 	bool BuildStoneForms(const FTransform& MarkerTransform, const TArray<AStaticMeshActor*>& Proxies);
 	virtual void BeginPlay() override;
 	void CheckForNaturalGust(float DeltaSeconds);
 	void CheckForVisitorPresence(float DeltaSeconds);
+	void CheckForQuietResidentPresence(float DeltaSeconds);
 	void BeginVisitorResonance(bool bResidentApproach);
+	void BeginQuietListeningResonance();
 	void ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection = FVector::ZeroVector);
 	void BeginNaturalResonance(float WindSpeed, const FVector& WindDirection);
 	virtual void Tick(float DeltaSeconds) override;

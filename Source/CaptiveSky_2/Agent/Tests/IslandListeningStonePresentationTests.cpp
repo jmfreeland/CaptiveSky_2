@@ -30,6 +30,20 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		AListeningStonePresentation::IsEligibleVisitor(true, false, FVector(300.f, 0.f, 0.f), FVector::ZeroVector));
 	TestTrue(TEXT("A conscious resident approaching the Stones slowly may be answered"),
 		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
+	TestTrue(TEXT("An autonomous resident lingering close to the Stones may become a quiet visit"),
+		AListeningStonePresentation::IsEligibleQuietResident(false, true, FVector(120.f, 0.f, 0.f), FVector::ZeroVector));
+	TestFalse(TEXT("A player pause is not mislabeled as resident etiquette"),
+		AListeningStonePresentation::IsEligibleQuietResident(true, false, FVector(120.f, 0.f, 0.f), FVector::ZeroVector));
+	TestFalse(TEXT("An ambient wildlife pawn without resident memory cannot trigger a quiet-visit response"),
+		AListeningStonePresentation::IsEligibleQuietResident(false, false, FVector(120.f, 0.f, 0.f), FVector::ZeroVector));
+	TestFalse(TEXT("A moving resident is not mistaken for someone listening quietly"),
+		AListeningStonePresentation::IsEligibleQuietResident(false, true, FVector(120.f, 0.f, 0.f), FVector(21.f, 0.f, 0.f)));
+	TestFalse(TEXT("A falling resident is not mistaken for someone listening quietly"),
+		AListeningStonePresentation::IsEligibleQuietResident(false, true, FVector(120.f, 0.f, 0.f), FVector(0.f, 0.f, -21.f)));
+	TestFalse(TEXT("A nearby resident must be within the close landmark ring"),
+		AListeningStonePresentation::IsEligibleQuietResident(false, true, FVector(191.f, 0.f, 0.f), FVector::ZeroVector));
+	TestTrue(TEXT("A quiet visit takes long enough to distinguish lingering from passing"),
+		AListeningStonePresentation::QuietVisitDurationSeconds >= 6.f);
 	TestFalse(TEXT("An ordinary wild pawn cannot trigger the resident response"),
 		AListeningStonePresentation::IsEligibleVisitor(false, false, FVector(300.f, 0.f, 0.f), FVector(-100.f, 0.f, 0.f)));
 	TestFalse(TEXT("A resident walking away does not trigger the approach response"),
@@ -38,6 +52,8 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		AListeningStonePresentation::IsEligibleVisitor(false, true, FVector(300.f, 0.f, 0.f), FVector(0.f, 100.f, 0.f)));
 	TestTrue(TEXT("Resident approach has a quiet, grounded memory description"),
 		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::ResidentApproach).Contains(TEXT("quiet approach")));
+	TestTrue(TEXT("A quiet visit is described as something directly heard, not a world change"),
+		AIslandListeningStonesChime::ResidentObservationText(EIslandChimeCause::ResidentListening).Contains(TEXT("quiet pause")));
 	TestTrue(TEXT("An audible chime becomes a private observation for a nearby resident"),
 		AIslandListeningStonesChime::ShouldRecordResidentObservation(false, true, true, false));
 	TestFalse(TEXT("A player does not receive a private resident memory from the same tone"),
@@ -114,8 +130,45 @@ bool FIslandListeningStoneResidentMemoryTest::RunTest(const FString& Parameters)
 		Presentation->CheckForVisitorPresence(0.25f);
 		TestEqual(TEXT("A latched approach does not chime or record again"), Memory->GetMemoryCount(), 2);
 	}
+	const FString QuietAgentId = TestAgentId + TEXT("_Quiet");
+	const FString QuietDirectory = CaptiveSkyDataPaths::ResolveProjectDataPath(TEXT("Agents") / QuietAgentId);
+	IFileManager::Get().DeleteDirectory(*QuietDirectory, false, true);
+	ACharacter* QuietResident = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 0.f), FRotator::ZeroRotator);
+	if (TestNotNull(TEXT("A second autonomous resident can quietly visit the Stones"), QuietResident))
+	{
+		UAgentMemoryComponent* QuietMemory = NewObject<UAgentMemoryComponent>(QuietResident);
+		QuietResident->AddInstanceComponent(QuietMemory);
+		QuietMemory->AgentId = QuietAgentId;
+		QuietMemory->RegisterComponent();
+		AListeningStonePresentation* QuietPresentation = World->SpawnActor<AListeningStonePresentation>(FVector::ZeroVector, FRotator::ZeroRotator);
+		if (TestNotNull(TEXT("A fresh transient presentation can observe a quiet visit"), QuietPresentation))
+		{
+			for (int32 Check = 0; Check < 32; ++Check) QuietPresentation->CheckForVisitorPresence(0.25f);
+			AIslandListeningStonesChime* ListeningChime = nullptr;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+				if (It->Cause == EIslandChimeCause::ResidentListening) { ListeningChime = *It; break; }
+			TestNotNull(TEXT("Eight seconds of stillness creates one brief resident-listening response"), ListeningChime);
+			TestEqual(TEXT("The quiet resident remembers the locally heard response once"), QuietMemory->GetMemoryCount(), 1);
+			TestTrue(TEXT("Nearby context describes the directly witnessed quiet visit"), ListeningChime &&
+				ListeningChime->DescribeForListener(FVector(100.f, 0.f, 0.f)).Contains(TEXT("quiet pause beside the stones")));
+			for (int32 Check = 0; Check < 24; ++Check) QuietPresentation->CheckForVisitorPresence(0.25f);
+			int32 ListeningChimeCount = 0;
+			for (TActorIterator<AIslandListeningStonesChime> It(World); It; ++It)
+				if (It->Cause == EIslandChimeCause::ResidentListening) ++ListeningChimeCount;
+			TestEqual(TEXT("A resident who continues sitting nearby does not repeatedly chime"), ListeningChimeCount, 1);
+			TestEqual(TEXT("Remaining nearby does not create repetitive memory"), QuietMemory->GetMemoryCount(), 1);
+			QuietResident->SetActorLocation(FVector(600.f, 0.f, 0.f));
+			QuietPresentation->CheckForVisitorPresence(0.25f);
+			TestFalse(TEXT("Leaving beyond the wide ring rearms the next quiet visit"), QuietPresentation->bQuietVisitHandled);
+			TestFalse(TEXT("The rearmed visit no longer holds its prior resident latch"), QuietPresentation->QuietResidentLatch.IsValid());
+			QuietResident->SetActorLocation(FVector(100.f, 0.f, 0.f));
+			QuietPresentation->CheckForVisitorPresence(0.25f);
+			TestTrue(TEXT("Returning starts a new quiet-visit dwell"), QuietPresentation->QuietResidentLatch.Get() == QuietResident);
+		}
+	}
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	IFileManager::Get().DeleteDirectory(*QuietDirectory, false, true);
 	IFileManager::Get().DeleteDirectory(*TestDirectory, false, true);
 	return true;
 }

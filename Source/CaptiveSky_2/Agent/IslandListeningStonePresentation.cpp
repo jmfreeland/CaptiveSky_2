@@ -92,6 +92,18 @@ bool AListeningStonePresentation::IsEligibleVisitor(bool bPlayerControlled, bool
 		!TowardStones.IsNearlyZero() && FVector::DotProduct(TowardStones, TravelDirection) >= ResidentApproachDirectionThreshold;
 }
 
+bool AListeningStonePresentation::IsEligibleQuietResident(bool bPlayerControlled, bool bAutonomousResident,
+	const FVector& Offset, const FVector& Velocity)
+{
+	constexpr float QuietRadius = 190.f;
+	constexpr float MaximumQuietSpeed = 20.f;
+	return !bPlayerControlled && bAutonomousResident && !Offset.ContainsNaN() && !Velocity.ContainsNaN() &&
+		Offset.SizeSquared2D() <= FMath::Square(QuietRadius) &&
+		FMath::Abs(Offset.Z) <= VisitorMaximumHeightDifference &&
+		Velocity.SizeSquared2D() <= FMath::Square(MaximumQuietSpeed) &&
+		FMath::Abs(Velocity.Z) <= MaximumQuietSpeed;
+}
+
 bool AListeningStonePresentation::CanBeginVisitorResonance(bool bAlreadyLatched, bool bAlreadyResonating,
 	float SecondsSinceLastChime)
 {
@@ -330,9 +342,11 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 {
 	VisitorCheckAccumulator += FMath::Max(0.f, DeltaSeconds);
 	if (VisitorCheckAccumulator < VisitorCheckIntervalSeconds) return;
+	const float CheckDeltaSeconds = FMath::Clamp(VisitorCheckAccumulator, 0.f, 0.5f);
 	VisitorCheckAccumulator = FMath::Fmod(VisitorCheckAccumulator, VisitorCheckIntervalSeconds);
 	UWorld* World = GetWorld();
 	if (!World) return;
+	CheckForQuietResidentPresence(CheckDeltaSeconds);
 
 	if (APawn* LatchedVisitor = VisitorPresenceLatch.Get())
 	{
@@ -374,6 +388,70 @@ void AListeningStonePresentation::CheckForVisitorPresence(float DeltaSeconds)
 	}
 }
 
+void AListeningStonePresentation::CheckForQuietResidentPresence(float DeltaSeconds)
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	if (APawn* QuietResident = QuietResidentLatch.Get())
+	{
+		const FVector Offset = QuietResident->GetActorLocation() - GetActorLocation();
+		if (Offset.SizeSquared2D() > FMath::Square(VisitorRearmRadius) ||
+			FMath::Abs(Offset.Z) > VisitorMaximumHeightDifference)
+		{
+			QuietResidentLatch.Reset();
+			QuietResidentDwellSeconds = 0.f;
+			bQuietVisitHandled = false;
+		}
+		else if (bQuietVisitHandled)
+		{
+			return;
+		}
+		else if (IsEligibleQuietResident(QuietResident->IsPlayerControlled(),
+			!QuietResident->IsPlayerControlled() && QuietResident->FindComponentByClass<UAgentMemoryComponent>() != nullptr,
+			Offset, QuietResident->GetVelocity()))
+		{
+			QuietResidentDwellSeconds = FMath::Min(QuietVisitDurationSeconds,
+				QuietResidentDwellSeconds + FMath::Clamp(DeltaSeconds, 0.f, 0.5f));
+			if (QuietResidentDwellSeconds < QuietVisitDurationSeconds) return;
+
+			// Whether or not the shared landmark cooldown allows a tone, this resident's
+			// continuous visit counts once. Leaving the wider ring rearms the cue.
+			bQuietVisitHandled = true;
+			const float SecondsSinceLastChime = static_cast<float>(World->GetTimeSeconds() - LastAmbientChimeAt);
+			if (CanBeginVisitorResonance(false, GetResonanceRemaining() > 0.f, SecondsSinceLastChime))
+				BeginQuietListeningResonance();
+			return;
+		}
+		else
+		{
+			QuietResidentLatch.Reset();
+			QuietResidentDwellSeconds = 0.f;
+		}
+	}
+	else
+	{
+		QuietResidentLatch.Reset();
+		QuietResidentDwellSeconds = 0.f;
+		bQuietVisitHandled = false;
+	}
+
+	for (TActorIterator<APawn> It(World); It; ++It)
+	{
+		APawn* Resident = *It;
+		if (!IsValid(Resident) || Resident->IsPlayerControlled() ||
+			!Resident->FindComponentByClass<UAgentMemoryComponent>()) continue;
+
+		const FVector Offset = Resident->GetActorLocation() - GetActorLocation();
+		if (!IsEligibleQuietResident(false, true, Offset, Resident->GetVelocity())) continue;
+
+		QuietResidentLatch = Resident;
+		QuietResidentDwellSeconds = FMath::Clamp(DeltaSeconds, 0.f, 0.5f);
+		bQuietVisitHandled = false;
+		return;
+	}
+}
+
 void AListeningStonePresentation::BeginVisitorResonance(bool bResidentApproach)
 {
 	UWorld* World = GetWorld();
@@ -387,6 +465,21 @@ void AListeningStonePresentation::BeginVisitorResonance(bool bResidentApproach)
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
 		Chime->BeginChime(LocalWind, bResidentApproach ? EIslandChimeCause::ResidentApproach : EIslandChimeCause::VisitorApproach);
+}
+
+void AListeningStonePresentation::BeginQuietListeningResonance()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	const FVector LocalWind = Weather.IsValid() ? Weather->GetLocalWind(GetActorLocation(), this) : FVector::ZeroVector;
+	BeginResonance(LocalWind.Size2D());
+
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (AIslandListeningStonesChime* Chime = World->SpawnActor<AIslandListeningStonesChime>(GetActorLocation(), GetActorRotation(), Spawn))
+		Chime->BeginChime(LocalWind, EIslandChimeCause::ResidentListening);
 }
 
 void AListeningStonePresentation::ObserveAmbientWind(float CurrentSpeed, const FVector& WindDirection)
