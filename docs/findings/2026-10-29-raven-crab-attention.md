@@ -20,8 +20,9 @@ Raven behavior.
 
 - UE 5.8 editor-target scratch build succeeded (66 actions, including
   `RavenAgentAIController.cpp` and `RavenPerchTests.cpp`).
-- Automation result is pending: a commandlet invocation returned without a dedicated
-  test log, so no pass is claimed.
+- `CaptiveSky2.Agent.RavenPerch` passed in the isolated UE 5.8 commandlet run
+  (`Result={Success}`, exit code 0). It ran with `-NullRHI`, agent thinking disabled,
+  and a scratch-only data root; the live editor was not disturbed.
 - In-editor visual confirmation is pending because the current editor window is at a
   higher Windows integrity level than the available screen-control helper.
 
