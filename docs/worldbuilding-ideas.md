@@ -1,5 +1,56 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-29 — Make the existing diversity visible before adding more
+
+The current generator already places a fixed 3,600-tree broadleaf mix across
+hundreds of groves, uses seeded species communities and varied canopy heights,
+and spreads the low-cover budget beyond landmark rings. The latest runtime
+preview still read as a few similar dark silhouettes at night; plant-material
+fallback warnings and very short tree cull distances can conceal variety that
+the counts prove exists. Several graph-valid coppice materials have since had
+their instanced usage repaired, but the daylight effect and graphics-memory
+cost remain unmeasured. Do not raise global vegetation counts to solve a
+readability problem.
+
+### 1. Finish one daylight coastal-to-woodland visitor route
+
+Use the current fixed-budget meadow and mixed-grove placement as the baseline.
+Capture one short daylight traversal from the Tideglass edge into a broadleaf
+grove, with resident thinking disabled and the existing realtime/request caps
+left active. Record the same route's species visibility, frame-time p95 and
+whole-device graphics memory; preserve the 30-FPS floor and stop if memory
+pressure appears. Compare the distinctive tree silhouettes at close, middle
+and far distance instead of inferring naturalness from instance totals.
+
+The map/runtime review is currently gated: the most recent editor-startup
+attempts crashed before project logging, and the editor is not open in the
+current desktop session. Do not repeat an identical launch. Reconnect only
+after the startup environment changes or the minidump can be symbolized. Keep
+the water-walking concern open too: collision checks and the custom
+`MOVE_Swimming` path pass focused regressions, but the player's animation graph
+has no swim state, so collision correctness does not yet establish a convincing
+surface-swim experience.
+
+### 2. Repair presentation dependencies in bounded groups
+
+Resolve the `M_Island_Textured_Wet` texture-collection index warning separately
+from GPU-memory measurements. Audit remaining instanced-plant material roots
+before enabling usage; the Rhododendron master has unresolved material-function
+calls and must not be toggled or reconstructed blindly. After safe material
+repairs, verify that authored foliage materials render in the same daylight
+route. Treat texture-pool size, transient render targets, whole-device VRAM and
+frame time as different measurements.
+
+### 3. Evaluate a two-distance canopy only after the baseline
+
+UE 5.8 Procedural Vegetation Editor can emit Nanite-ready static meshes as well
+as wind-capable skeletal meshes. A paired near-wind / far-static representation
+could add readable middle-distance canopy without multiplying instance count,
+but the current Megaplants are single-LOD and the representation swap has not
+been proven. First make an isolated PVE copy, compare its outputs and texture
+dependencies, and review the visual transition and memory cost before changing
+the Island population.
+
 ## 2026-10-25 — From scattered systems to legible world structure
 
 The latest repository work changes the recommendation set: broadland cover is reduced and clustered; maple/aspen/beech communities now substitute into the existing grove/tree budget; Nanite foliage is enabled but VRAM remains constrained; surface swimming/wake logic has focused regression coverage after fixing a false shore hit against another pawn; Listening Stones gained visitor rules; and the old floating PCG forest is not active in the current Island.
