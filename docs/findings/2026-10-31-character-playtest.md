@@ -114,5 +114,34 @@ that ordinary turn to the full model so speaking is available, and does not
 make a proposal or alter the world. A resident may ignore it or continue any
 other activity. The one-time gate is covered by `CaptiveSky2.Agent.ModelTier`,
 and the selected response (spoken feedback or another choice) is logged and
-included in session reports. Actual resident responses and request-cap cost
-still need confirmation in a later guarded 15–30 minute run.
+included in session reports.
+
+## Character-feedback run with the full request ceiling — 2026-10-31
+
+To get an in-world response without using the constrained GPU, the worktree
+editor module was rebuilt into `Saved/CS58/`, whose Source is junctioned to this
+worktree and whose Content is a read-only junction to the main D: project. The
+new launcher mode uses `-NullRHI`, a unique isolated `DataRoot`, situation
+logging, Python disabled, a 900-second deadline, and the existing 64-request
+hard ceiling. The renderless session makes no FPS/VRAM or visual claims and
+does not change the active editor, map, or shared world state.
+
+The initial 32-request experiment ended cleanly after 776 real seconds when
+the request cap drained, with zero requests in flight. Only Rat and the
+Innkeeper reached their check-in at 774 seconds; both chose no spoken response.
+This demonstrates why 32 requests were insufficient at the observed pace.
+
+The follow-up reached its full 900-second deadline with 30 requests and none
+in flight. All four residents received the check-in after 771–892 real seconds.
+The Innkeeper, Raven, and Aster chose to continue without speech. Rat shared:
+“Good evening. The rainbow over the water is a lovely sight after the rain.”
+This confirms that the prompt reaches every resident under the current request
+rate while keeping silence optional; it is not a request to alter the world.
+
+The special launcher is protected by five passing tests and rejects a
+65-request cap; the PowerShell parser check passed. Logs and isolated states
+are local under `Saved/CS58/Saved/Logs/` and
+`Saved/CS58/Saved/Playtests/`. The launcher change is pushed as `53a0906`.
+The separate main D: project still has not received the worktree source; a
+deliberate sync/rebuild and a rendered feedback run remain pending approval and
+sufficient GPU headroom.

@@ -23,6 +23,32 @@ and `Saved/Logs/Codex_CaptiveSky2_Agent_IslandWeather_BroadleafHabitatSelection_
 These are source-level checks, not a rendered Island or character-response
 playtest.
 
+## 2026-10-31 — Collect resident reflections without adding render load
+
+The spectator launcher now has an explicit `-NullRHICharacterFeedback` mode
+for isolated, hidden character sessions. It requires situation logging, Python
+disabled, a separate `-DataRoot`, and explicit caps; it is limited to 900 real
+seconds and the existing 64-request hard ceiling. Ordinary NullRHI diagnostics
+still require thinking disabled. This lets the check-in be observed while
+rendered play is below the 4 GiB GPU-headroom threshold.
+
+The first run used a 32-request cap and ended safely after 776 seconds once the
+budget drained. Only Rat and the Innkeeper received the check-in; both chose
+silence. A second run with the unchanged 64 hard cap reached its full 900
+seconds, used 30 requests, and ended with none in flight. All four residents
+received the optional check-in: Rat shared, “Good evening. The rainbow over
+the water is a lovely sight after the rain.” Aster, Raven, and the Innkeeper
+chose no spoken response and continued their own activities. This validates
+the bounded feedback path and preserves resident choice; it is not a rendered
+visual, FPS, VRAM, or shoreline-collision test. Both logs and isolated world
+states are under `Saved/CS58/Saved/`.
+
+The editor target built against the scratch project using worktree source and
+a junction to the main project's Content. The main map/assets were not edited.
+The new launcher guard tests passed (five tests), the PowerShell script parsed,
+and a 65-request attempt was rejected by the 64 limit. The implementation is
+pushed; main-project sync still awaits explicit authorization.
+
 ## 2026-10-31 — Make optional world feedback actionable without making it a duty
 
 The delayed resident check-in now names the existing `request_upgrade` action
