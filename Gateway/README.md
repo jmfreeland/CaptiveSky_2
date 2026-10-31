@@ -27,7 +27,7 @@ When no embodiment heartbeat is present, the gateway answers headlessly and publ
 
 Untouched turns fall back to the headless responder if a body disappears before claiming them. A graceful Unreal shutdown returns a claimed turn to the inbox, and a new authoritative embodiment recovers orphaned processing files left by a crash. Discord redelivery IDs remain deduplicated across either route.
 
-Unreal play now ends automatically after at most 30 real minutes or 120 shared embodied model requests. This ends the simulation, not the Discord gateway: headless correspondence remains reactive to incoming permitted messages, with no autonomous overnight play loop. Pending correspondence uses the same graceful handoff described above. The Unreal cap is not a gateway-wide spending quota.
+In the current tracked Unreal source, play ends automatically after at most 30 real minutes or 64 shared embodied model requests. This ends the simulation, not the Discord gateway: headless correspondence remains reactive to incoming permitted messages, with no autonomous overnight play loop. Pending correspondence uses the same graceful handoff described above. The live D: project audit on 2026-10-31 still found an older 120-request build; rebuild and verify its startup log before relying on the tracked-source cap. Neither limit is a gateway-wide spending quota.
 
 ## Discord setup
 
