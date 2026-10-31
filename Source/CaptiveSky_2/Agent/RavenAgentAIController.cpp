@@ -1800,9 +1800,13 @@ FString ARavenAgentAIController::AssessRoostSite(const AActor* Site) const
 
 	const int32 OverheadBlockCount = CountOverheadCoverProbes(Site);
 
-	return FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry or crossed a conservative mature-spruce upper-crown envelope; this is only a local rain-cover clue, not proof of waterproof shelter. The canopy envelope is approximate and does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
+	FString Assessment = FString::Printf(TEXT("Read-only site check: %s. %d of 5 short vertical visibility probes above the raven's head found solid overhead geometry or crossed a conservative mature-spruce upper-crown envelope; this is only a local rain-cover clue, not proof of waterproof shelter. The canopy envelope is approximate and does not establish branch strength, nest suitability, ownership, or a home. A physical perch approach must still confirm upward-facing support at arrival."),
 		bHasSuitableSupport ? TEXT("an upward-facing support surface is currently beneath the marker") : TEXT("suitable upward-facing support was not confirmed beneath the marker"),
 		OverheadBlockCount);
+	if (OverheadBlockCount == 0 && Site->Tags.Num() > 0)
+		Assessment += FString::Printf(TEXT(" None of the five short local probes found overhead cover at this named site. If shelter matters to you, you may occasionally use request_upgrade with kind functionality and target %s to propose a sheltered nest or perch improvement. This records only a proposal for human review; it builds nothing, and the probe does not prove a canopy would be waterproof or safe. Do not repeat the suggestion as a duty."),
+			*Site->Tags[0].ToString());
+	return Assessment;
 }
 
 int32 ARavenAgentAIController::CountOverheadCoverProbes(const AActor* Site) const

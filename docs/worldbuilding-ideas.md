@@ -1,5 +1,22 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Let an exposed roost become a character-led proposal
+
+Raven's latest isolated playtest again found the west roost exposed to weather,
+then chose to rest there. When the existing five-point overhead-cover check
+finds no hits, Raven's read-only roost assessment now offers an optional,
+exact-target `request_upgrade` suggestion for a sheltered nest/perch. It is
+explicitly a human-reviewed proposal: it changes nothing, does not promise a
+weatherproof result, and is not a duty. This connects a lived observation to
+the existing resident-request pipeline without adding another model call or
+automatic construction.
+
+The UE 5.8.3 worktree editor target built successfully. The new assertion in
+`CaptiveSky2.Agent.RavenPerch` passed in a NullRHI run, but the full automation
+still fails later because this sparse worktree lacks the Raven placeholder
+Blueprint and several referenced Content assets. Rerun the complete test when
+the project Content is available; the open D: editor and map were not changed.
+
 ## 2026-10-29 — Make the existing diversity visible before adding more
 
 The current generator already places a fixed 3,600-tree broadleaf mix across

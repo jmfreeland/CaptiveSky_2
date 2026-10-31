@@ -1167,6 +1167,10 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Read-only roost assessment confirms the same upward-facing support used at arrival"), SiteAssessment.Contains(TEXT("an upward-facing support surface is currently beneath the marker")));
 	TestTrue(TEXT("Open fixture has no nearby overhead collision in the sampled probes"), SiteAssessment.Contains(TEXT("0 of 5 short vertical visibility probes")));
 	TestTrue(TEXT("Site assessment disclaims branch strength, waterproofing, and ownership"), SiteAssessment.Contains(TEXT("not proof of waterproof shelter")) && SiteAssessment.Contains(TEXT("does not establish branch strength")));
+	const FString ExactUpgradeTarget = FString::Printf(TEXT("target %s"), *Perch->Tags[0].ToString());
+	TestTrue(TEXT("An exposed roost offers an optional, exact-target human-reviewed upgrade proposal"),
+		SiteAssessment.Contains(TEXT("request_upgrade")) && SiteAssessment.Contains(ExactUpgradeTarget) &&
+		SiteAssessment.Contains(TEXT("proposal for human review")) && SiteAssessment.Contains(TEXT("Do not repeat the suggestion as a duty")));
 	TestTrue(TEXT("Read-only assessment does not move the perched raven"), Raven->GetActorLocation().Equals(BeforeReadOnlyAssessment) && Controller->LocomotionState == ERavenLocomotionState::Perched);
 	AActor* OverheadCover = World->SpawnActor<AActor>();
 	if (TestNotNull(TEXT("Overhead cover fixture actor spawned"), OverheadCover))
