@@ -89,6 +89,24 @@ separate questionnaire or extra model call. Historic totals for action indices
 7 and above must be re-read from raw logs or regenerated with the updated
 script; older speech entries may still carry generic controller names.
 
+## Background-turn pacing follow-up
+
+The 15m52s preview's 45 resident decisions across 49 model requests motivated
+a slower floor for autonomous background thinking. In the tracked worktree,
+the default and minimum background interval are now 120 seconds; repeated
+no-progress choices still back off, capped at five minutes. This does not delay
+visitor or resident-to-resident conversation, and it does not change the shared
+64-request safety cap. The editor target built successfully and
+`CaptiveSky2.Agent.SessionSafety` passed under NullRHI with thinking disabled
+and zero model requests (exit code 0; `Saved/Logs/Codex_BackgroundPacing_20261031.log`).
+
+No rendered playtest was started: GPU free memory was about 2.6 GiB, below the
+project's 4 GiB preflight threshold, and this worktree does not contain
+`Content/Maps/Island.umap`. This is source-worktree verification only; the
+separate D: project copy has not received these changes. Measure the actual
+request rate in a later guarded Island run after that project is deliberately
+updated and rebuilt.
+
 The next bounded-session iteration now offers each resident one optional
 reflection during their first autonomous decision after twelve real minutes.
 The invitation does not interrupt a visitor or resident conversation, upgrades

@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Give the Island's quiet turns more room to breathe
+
+The 15m52s standalone preview recorded 45 resident decisions and 49 model
+requests. The controller previously allowed each resident's autonomous
+background turn every 60 seconds, which makes a 30-minute session likely to
+reach the existing 64-request ceiling early. The background interval now has a
+120-second minimum, including legacy Blueprint values; repeated no-progress
+choices still back off to at most five minutes. Visitor and resident-to-resident
+conversations are not delayed by this pacing rule. The existing request ceiling
+is unchanged. The focused `CaptiveSky2.Agent.SessionSafety` automation now
+passes with the new timings. This is not yet a measured 30-minute runtime
+result; a later guarded session must confirm the real request rate.
+
 ## 2026-10-31 — Make optional world feedback actionable without making it a duty
 
 The delayed resident check-in now names the existing `request_upgrade` action

@@ -5,6 +5,7 @@
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentSafetyTest, "CaptiveSky2.Agent.SessionSafety", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAgentSafetyTest::RunTest(const FString& Parameters)
@@ -42,9 +43,17 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	SessionRequests = 64;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=12"), SessionSeconds, SessionRequests);
 	TestEqual(TEXT("Omitting the request override preserves the configured request cap"), SessionRequests, 64);
-	TestEqual(TEXT("Legacy 15-second Blueprint interval is bounded"), AAutonomousAgentAIController::BackgroundDelay(0, 15), 60.0);
-	TestEqual(TEXT("Repeats back off"), AAutonomousAgentAIController::BackgroundDelay(3, 60), 240.0);
-	TestEqual(TEXT("Backoff capped at five minutes"), AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
+	TestEqual(TEXT("Legacy Blueprint intervals are raised to the patient two-minute minimum"),
+		AAutonomousAgentAIController::BackgroundDelay(0, 15), AAutonomousAgentAIController::MinimumBackgroundThinkIntervalSeconds);
+	TestEqual(TEXT("A slower designer-authored background interval is preserved"),
+		AAutonomousAgentAIController::BackgroundDelay(0, 180), 180.0);
+	TestEqual(TEXT("Repeated background choices back off from the new minimum"),
+		AAutonomousAgentAIController::BackgroundDelay(2, 120), 240.0);
+	TestEqual(TEXT("Background backoff remains capped at five minutes"),
+		AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
+	TestEqual(TEXT("Invalid designer timing uses the safe minimum"),
+		AAutonomousAgentAIController::BackgroundDelay(0, std::numeric_limits<double>::quiet_NaN()),
+		AAutonomousAgentAIController::MinimumBackgroundThinkIntervalSeconds);
 	TestTrue(TEXT("Bounded play keeps the per-resident fallback limit"),
 		AAutonomousAgentAIController::IsAutonomousRequestLimitReached(AAutonomousAgentAIController::BoundedAutonomousRequestLimit, false));
 	TestFalse(TEXT("Continuous play does not exhaust a resident's thinking turns at the bounded fallback limit"),

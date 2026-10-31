@@ -143,7 +143,11 @@ void AAutonomousAgentAIController::Think()
 
 double AAutonomousAgentAIController::BackgroundDelay(int32 Repeats, double BaseSeconds)
 {
-	return FMath::Clamp(FMath::Max(60.0, BaseSeconds) * FMath::Pow(2.0, FMath::Clamp(Repeats - 1, 0, 3)), 60.0, 300.0);
+	const double SafeBaseSeconds = FMath::IsFinite(BaseSeconds)
+		? FMath::Max(MinimumBackgroundThinkIntervalSeconds, BaseSeconds)
+		: MinimumBackgroundThinkIntervalSeconds;
+	return FMath::Clamp(SafeBaseSeconds * FMath::Pow(2.0, FMath::Clamp(Repeats - 1, 0, 3)),
+		MinimumBackgroundThinkIntervalSeconds, 300.0);
 }
 
 bool AAutonomousAgentAIController::IsActionInProgress() const { return GetMoveStatus() == EPathFollowingStatus::Moving; }
