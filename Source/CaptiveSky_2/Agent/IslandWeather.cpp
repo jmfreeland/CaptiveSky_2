@@ -67,6 +67,16 @@ static TAutoConsoleVariable<int32> CVarIslandFoliageSwayFocusTelemetry(
 
 namespace
 {
+	struct FTreeSpatialDiagnosticCounts
+	{
+		int32 Species[5] = {};
+
+		void Add(int32 SpeciesIndex)
+		{
+			if (SpeciesIndex >= 0 && SpeciesIndex < 5) ++Species[SpeciesIndex];
+		}
+	};
+
 	uint32 HashGroundCoverFieldCell(int32 CellX, int32 CellY, int32 Seed)
 	{
 		uint32 Hash = static_cast<uint32>(CellX) * 0x8da6b343u ^ static_cast<uint32>(CellY) * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
@@ -1485,8 +1495,19 @@ void AIslandWeather::InitializeGroundCover()
 		const bool bGatherMeadowSpatialDiagnostics = ShouldGatherMeadowSpatialDiagnostics(
 			CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread(), FCommandLine::Get());
 		TMap<FIntPoint, FIntPoint> MeadowSpatialTileCounts;
+		TMap<FIntPoint, FTreeSpatialDiagnosticCounts> TreeSpatialTileCounts;
 		if (bGatherMeadowSpatialDiagnostics)
+		{
 			MeadowSpatialTileCounts.Reserve(512);
+			TreeSpatialTileCounts.Reserve(512);
+		}
+		auto RecordMatureTreeTile = [bGatherMeadowSpatialDiagnostics, &TreeSpatialTileCounts](const FVector& Position, int32 SpeciesIndex)
+		{
+			if (!bGatherMeadowSpatialDiagnostics) return;
+			constexpr float TileSizeCm = 20000.f;
+			const FIntPoint Tile(FMath::FloorToInt(Position.X / TileSizeCm), FMath::FloorToInt(Position.Y / TileSizeCm));
+			TreeSpatialTileCounts.FindOrAdd(Tile).Add(SpeciesIndex);
+		};
 		// Build a coarse, seeded-friendly land mask so broad scatter is distributed over eligible ground,
 		// rather than repeatedly painting dense islands around randomly chosen centers.
 		for (int32 CellY = 0; CellY < TerrainCellRows; ++CellY)
@@ -1749,6 +1770,7 @@ void AIslandWeather::InitializeGroundCover()
 								Component->AddInstance(FTransform(Rotation, SpeciesLocation, FVector(SpeciesScale)), 0, true);
 								++(*SpeciesCount);
 								++BroadleafTreeCount;
+								RecordMatureTreeTile(TreeHit.ImpactPoint, SpeciesIndex + 1);
 								return true;
 							};
 							// Choose species from the same smooth, seeded habitat field used by the
@@ -1760,7 +1782,10 @@ void AIslandWeather::InitializeGroundCover()
 								bUsedBroadleaf = TryAddSpecies((FirstSpecies + Offset) % BroadleafTreeSpeciesCount);
 						}
 						if (!bUsedBroadleaf)
+						{
 							IslandSpruce->AddInstance(FTransform(Rotation, Location, Scale), true);
+							RecordMatureTreeTile(TreeHit.ImpactPoint, 0);
+						}
 						SpruceLocations.Add(TreeHit.ImpactPoint);
 						++GroundCoverTreeCount;
 					}
@@ -2214,6 +2239,21 @@ void AIslandWeather::InitializeGroundCover()
 				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d black alder, %d birch coppice, and %d hazel coppice instances; broadleaf trees span %d/%d groves under the fixed %d-tree budget."),
 					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBlackAlderTreeCount,
 					GroundCoverBirchCoppiceCount, GroundCoverHazelCoppiceCount, BroadleafGrovesWithTrees, SpruceGroveCenters.Num(), MaxBroadleafTreeCount);
+				if (bGatherMeadowSpatialDiagnostics)
+				{
+					TArray<FIntPoint> SortedTreeTiles;
+					TreeSpatialTileCounts.GetKeys(SortedTreeTiles);
+					SortedTreeTiles.Sort([](const FIntPoint& A, const FIntPoint& B)
+						{ return A.Y == B.Y ? A.X < B.X : A.Y < B.Y; });
+					for (const FIntPoint& Tile : SortedTreeTiles)
+					{
+						const FTreeSpatialDiagnosticCounts* Counts = TreeSpatialTileCounts.Find(Tile);
+						if (!Counts) continue;
+						UE_LOG(LogIslandWeather, Display,
+							TEXT("Mature tree tile [%d,%d] (200 m): spruce=%d, Norway maple=%d, European aspen=%d, European beech=%d, black alder=%d."),
+							Tile.X, Tile.Y, Counts->Species[0], Counts->Species[1], Counts->Species[2], Counts->Species[3], Counts->Species[4]);
+					}
+				}
 		}
 	}
 	}
