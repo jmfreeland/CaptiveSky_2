@@ -1,5 +1,25 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Stop the first live PIE memory sample early
+
+The currently open `CaptiveSky_2` editor reported `r.Nanite.Foliage = 1`
+(`LastSetBy: ProjectSetting`) in its console. A PIE Island session did start and
+the live log showed resident decisions for Raven, Aster, the Innkeeper, and Rat,
+but the viewport immediately displayed: “Video memory has been exhausted
+(184,840 MB over budget). Expect extremely poor performance.” PIE was stopped
+after 32 seconds rather than leaving it to run under that warning. The session
+log reported four completed model requests and zero still in flight; it also
+warned that it could not find a `RecastNavMesh` instance while creating a crowd
+manager. This is a short runtime observation, not a 15–30 minute playtest or
+proof of the user-requested feedback check-in. The warning's displayed numeric
+value is preserved verbatim, not treated as a trustworthy measurement. Before
+another long run, identify the source of the memory warning and confirm the
+editor project copy and device-level budget; retain the 30-FPS floor and
+request/deadline safeguards. Immediately after PIE stopped, `nvidia-smi`
+reported 8,600 MiB used of 12,282 MiB on the RTX 4080 Laptop GPU, but WDDM
+provided no per-process breakdown. This post-stop snapshot does not establish
+which process or resource caused the in-PIE warning.
+
 ## 2026-10-31 — Make nearby object proposals pointable by name
 
 The request-upgrade prompt already allowed residents to propose aesthetic,
