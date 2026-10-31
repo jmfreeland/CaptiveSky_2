@@ -83,6 +83,8 @@ The playtest log also assigned the Rat's lines to the Innkeeper because the Rat
 mentioned the hearth; the summarizer now prioritizes stable Rat identity. New
 decision and action-outcome log lines will include each resident's stable agent
 ID instead of only the generic controller class, making future attribution
-reliable. This improves review of resident initiative without adding model
-calls; historic totals for action indices 7 and above must be re-read from raw
-logs or regenerated with the updated script.
+reliable. New session reports also include the literal lines residents chose to
+say, so their feedback can be reviewed alongside actions without introducing a
+separate questionnaire or extra model call. Historic totals for action indices
+7 and above must be re-read from raw logs or regenerated with the updated
+script; older speech entries may still carry generic controller names.

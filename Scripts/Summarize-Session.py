@@ -35,6 +35,7 @@ ACTIONS = [
 STAMP = re.compile(r"^\[(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2}):(\d{3})\]")
 DECIDED = re.compile(r"LogAutonomousAgentAI: (\S+) decided: \"(.*)\" \(Action=(\d+)\)")
 OUTCOME = re.compile(r"LogAutonomousAgentAI: (\S+) outcome: (.*)$")
+SPEECH = re.compile(r'LogAutonomousAgentAI: (\S+) chose speech: "(.*)"$')
 SITUATION = re.compile(r"Situation for (\S+) \((\d+) chars, system prompt (\d+) chars\): (.*)$")
 PROPOSAL_ID = re.compile(r"(?:Object request|Upgrade suggestion) ([0-9a-fA-F]{8})\b")
 SESSION_START = re.compile(r"LogAgentSession: (?:Play safety active:|Continuous play:)")
@@ -107,6 +108,7 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     stamps = [stamp for stamp in (timestamp(line) for line in lines) if stamp]
     decisions: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     thoughts: dict[str, list[str]] = collections.defaultdict(list)
+    speech: dict[str, list[str]] = collections.defaultdict(list)
     interactions: collections.Counter = collections.Counter()
     failures: collections.Counter = collections.Counter()
     builds: list[str] = []
@@ -129,6 +131,10 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
             index = int(action)
             decisions[controller][ACTIONS[index] if index < len(ACTIONS) else f"action {index}"] += 1
             thoughts[controller].append(thought)
+            continue
+        if match := SPEECH.search(line):
+            controller, words = match.groups()
+            speech[controller].append(" ".join(words.split()))
             continue
         if match := OUTCOME.search(line):
             controller, outcome = match.groups()
@@ -156,6 +162,11 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     out += ["", f"## Decisions ({total})", "", "| Resident | " + " | ".join(ACTIONS) + " | total |", "|---" * (len(ACTIONS) + 2) + "|"]
     for controller, counter in sorted(decisions.items()):
         out.append(f"| {resident_name(controller, thoughts[controller])} | " + " | ".join(str(counter[action]) for action in ACTIONS) + f" | {sum(counter.values())} |")
+    out += ["", "## What residents said", ""]
+    for controller, lines_spoken in sorted(speech.items()):
+        out.extend(f"- {resident_name(controller, thoughts[controller])}: “{words}”" for words in lines_spoken)
+    if not speech:
+        out.append("- No speech lines logged.")
     if situations:
         out += ["", "## What residents were shown", "", "| Resident | situations | median situation chars | median system prompt chars | most often in view |", "|---|---|---|---|---|"]
         for agent, lengths in sorted(situations.items()):

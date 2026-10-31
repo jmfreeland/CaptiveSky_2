@@ -1328,7 +1328,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 			ReportAction(FString::Printf(TEXT("Your automatic conversation with %s is still resting; the other resident did not hear that speech. Choose another activity and wait for the pause to end."), *Decision.ActionTarget));
 			break;
 		}
-		UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s chose speech: \"%s\""), *GetName(), *Decision.Speech);
+		UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s chose speech: \"%s\""), *GetAgentLogIdentity(this), *Decision.Speech);
 		break;
 	case EAgentActionType::Interact:
 		InspectTarget(FName(*Decision.ActionTarget));
