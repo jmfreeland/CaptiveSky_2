@@ -84,6 +84,16 @@ four tree species; their distinction is not obvious in this particular view.
 The next visual pass should inspect species silhouette, material separation,
 and habitat placement before changing the fixed tree budget.
 
+**Rendered-session headroom gate (2026-10-31):** while the restarted editor was
+open, `nvidia-smi` reported 9,888 / 12,282 MiB used (2,394 MiB free), 78 °C,
+and 55% GPU utilization; WDDM exposed no per-process breakdown. No PIE/Game run
+was started. The worktree spectator launcher now offers an opt-in
+`-RequireGpuHeadroom` check that requires at least 4 GiB free before starting a
+rendered session. Its live check correctly refused the present 2,394 MiB
+snapshot without launching Unreal. This is only a device-wide preflight; it
+does not prove runtime headroom or replace in-run FPS and memory monitoring.
+Details and tests: [GPU memory preflight](findings/2026-10-31-gpu-memory-preflight.md).
+
 ## 2026-10-31 — Make nearby object proposals pointable by name
 
 The request-upgrade prompt already allowed residents to propose aesthetic,

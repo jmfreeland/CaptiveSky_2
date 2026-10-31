@@ -68,6 +68,21 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("-NullRHI cannot be combined with -Shots", launcher)
         self.assertIn('$windowStyle = if ($NullRHI) { "Hidden" } else { "Normal" }', launcher)
 
+    def test_gpu_headroom_gate_is_opt_in_and_runs_before_project_launch(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$RequireGpuHeadroom", launcher)
+        self.assertIn("$MinimumFreeGpuMemoryMiB = 4096", launcher)
+        self.assertIn("Get-Command nvidia-smi", launcher)
+        self.assertIn("--query-gpu=memory.used,memory.total", launcher)
+        self.assertIn("Assert-GpuMemoryHeadroom", launcher)
+        self.assertIn("-RequireGpuHeadroom is only applicable to rendered sessions", launcher)
+        self.assertLess(launcher.index("if ($RequireGpuHeadroom) {"), launcher.index("$projectCandidate ="))
+
+        module = (ROOT / "Scripts" / "GpuMemoryBudget.psm1").read_text(encoding="utf-8")
+        self.assertIn("No rendered session was started", module)
+        self.assertIn("$freeMiB -lt $MinimumFreeMiB", module)
+
 
 if __name__ == "__main__":
     unittest.main()

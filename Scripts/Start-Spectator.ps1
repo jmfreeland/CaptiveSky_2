@@ -15,6 +15,11 @@ either cap is supplied, even -Continuous ends at that limit. -ViewpointHour sets
 clock when -DataRoot is supplied, whether or not -Shots is enabled. Press ` and type Island.Spectate to
 toggle back to normal control.
 
+-RequireGpuHeadroom performs a device-wide NVIDIA memory preflight before a rendered launch. It fails
+closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB free. This is a launch
+check only; it does not guarantee or monitor in-run memory headroom. Use -GpuIndex and
+-MinimumFreeGpuMemoryMiB to tune the check for the target machine.
+
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
@@ -37,6 +42,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
+./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatial -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -NullRHI -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatialNullRHI -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
@@ -77,6 +83,9 @@ param(
 	[switch]$DisableDynamicGlobalIllumination,
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
+	[switch]$RequireGpuHeadroom,
+	[ValidateRange(0, 15)][int]$GpuIndex = 0,
+	[ValidateRange(512, 16384)][int]$MinimumFreeGpuMemoryMiB = 4096,
 	[switch]$Continuous,
 	[string]$ProjectPath,
 	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
@@ -133,6 +142,18 @@ if ($NullRHI) {
 		throw "-NullRHI requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
 	if ($Shots) { throw "-NullRHI cannot be combined with -Shots because it has no rendered output." }
+}
+if ($RequireGpuHeadroom) {
+	if ($NullRHI) { throw "-RequireGpuHeadroom is only applicable to rendered sessions; omit it for -NullRHI." }
+	$gpuMemoryTool = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+	if (-not $gpuMemoryTool) { throw "-RequireGpuHeadroom needs nvidia-smi on PATH; no rendered session was started." }
+	$gpuMemoryRows = & $gpuMemoryTool.Source "--id=$GpuIndex" "--query-gpu=memory.used,memory.total" "--format=csv,noheader,nounits" 2>$null
+	if ($LASTEXITCODE -ne 0) { throw "nvidia-smi could not read GPU $GpuIndex memory; no rendered session was started." }
+	Import-Module (Join-Path $PSScriptRoot "GpuMemoryBudget.psm1") -Force
+	$gpuMemory = ConvertFrom-NvidiaGpuMemoryOutput -OutputLines $gpuMemoryRows
+	$gpuBudget = Assert-GpuMemoryHeadroom -UsedMiB $gpuMemory.UsedMiB -TotalMiB $gpuMemory.TotalMiB -MinimumFreeMiB $MinimumFreeGpuMemoryMiB
+	Write-Host ("GPU memory preflight passed on GPU {0}: {1} MiB free of {2} MiB (minimum {3} MiB)." -f
+		$GpuIndex, $gpuBudget.FreeMiB, $gpuBudget.TotalMiB, $MinimumFreeGpuMemoryMiB)
 }
 $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 	Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject"
