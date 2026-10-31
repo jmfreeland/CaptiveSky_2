@@ -12,9 +12,31 @@ failed to expose a targetable window. The existing `Saved/Logs/CaptiveSky_2.log`
 still ends at the normal shutdown timestamp (2026-10-31 14:20:00); no new
 project-local crash context was produced by these attempts.
 
-This does not identify the cause and is not evidence that Nanite Foliage loaded
-after restart. No map, source, project setting, or crash-report contents were
-changed or dismissed. Keep the editor restart and `r.Nanite.Foliage=1` readback
-unverified. Next: reopen the project from a responsive desktop, inspect any
-visible crash details before dismissing them, then verify a new startup log and
-the live console value before running a bounded visual check.
+This did not identify the cause and was not evidence that Nanite Foliage loaded
+after restart. No map, source, or project setting was changed.
+
+## Correct-project restart follow-up (2026-10-31 14:47)
+
+The editor was restarted through the UE 5.8 project browser. The first
+`CaptiveSky_2` recent-project tile resolved to the stale
+`D:/Projects - Athena/Unreal/captivesky_2_claude` copy and displayed a missing
+`Aura` plugin prompt. The prompt was declined; the plugin was not disabled. In
+Open Project, the selected main project path was verified as
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject`, then opened.
+The Island map loaded in the editor and its status bar showed **All Saved**.
+
+The main project's fresh `Saved/Logs/CaptiveSky_2.log` was written at
+2026-10-31 14:47:18 and records `r.Nanite.ProjectEnabled:1`,
+`bEnableNaniteFoliage:1` (deferred dummy CVar), and `r.Nanite.Foliage:1` during
+startup. This verifies that the project setting was applied after restart. It
+does not show that Nanite foliage improved frame time, memory, or appearance.
+The first post-load capture displayed a landscape-texture streaming
+notification. That notification had disappeared ten seconds later, but the
+Output Log still showed one queued and one async package, so resource settling
+remains unverified.
+
+The same main D: project still has `MaxModelRequests=120` and permits 120 in
+`Scripts/Start-Spectator.ps1`; the current tracked worktree has a hard/config
+cap of 64. Do not run a long model-active session from D: until the guarded
+source is integrated and rebuilt there. The Aura prompt belonged to the stale
+`_claude` recent-project entry, not the selected main project.
