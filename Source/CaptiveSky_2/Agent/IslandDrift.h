@@ -58,8 +58,8 @@ public:
 	static float LiftWindSpeed(EIslandDriftKind Kind);
 	/** Steady fall speed (cm/s) of this kind in still air. */
 	static float SinkSpeed(EIslandDriftKind Kind);
-	/** One step of a mote's velocity: it relaxes toward the wind while sinking. Pure. */
-	static FVector StepVelocity(const FVector& Velocity, const FVector& Wind, EIslandDriftKind Kind, float Seconds);
+	/** One step of a mote's velocity: it relaxes toward the wind while sinking; wet wind pushes a little harder. Pure. */
+	static FVector StepVelocity(const FVector& Velocity, const FVector& Wind, EIslandDriftKind Kind, float Seconds, float Rain = 0.f);
 	/** The kind that mote slot Index belongs to (slots are partitioned by kind). */
 	static EIslandDriftKind KindForSlot(int32 Index);
 	/** What a resident notices drifting past in this wind (cm/s); empty when nothing is lifting. */

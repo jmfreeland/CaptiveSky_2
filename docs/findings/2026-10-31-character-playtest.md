@@ -166,7 +166,9 @@ in the rain basin, leaving two leaves in the isolated world state. The chronicle
 contains 32 decisions (Aster 8, Innkeeper 7, Rat 7, Raven 10), with no
 `request_upgrade` or `request_object` proposals. This is actionable, voluntary
 feedback about weather and small wildlife, not a direct request to build or
-change anything.
+change anything. The weather observation inspired a sparse, capped wet-leaf
+gust response; implementation and focused NullRHI evidence are recorded in
+[`2026-10-31-wet-leaf-drift.md`](2026-10-31-wet-leaf-drift.md).
 
 This validates the bounded feedback path and source compatibility with the
 saved Island, but not rendered vegetation appearance, frame rate, or VRAM: the

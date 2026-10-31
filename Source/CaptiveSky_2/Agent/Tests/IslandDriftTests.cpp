@@ -4,7 +4,7 @@
 #include "IslandDrift.h"
 #include <limits>
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandDriftTest, "CaptiveSky2.Agent.IslandDrift",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandDriftTest, "CaptiveSky2.Agent.IslandDrift.WetWeatherMotes",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandDriftTest::RunTest(const FString& Parameters)
@@ -13,7 +13,10 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Dead calm lifts only a few seeds"), Drift::DesiredCount(0.f, 0.f, 1.f), 6);
 	TestEqual(TEXT("A gale fills the air"), Drift::DesiredCount(400.f, 0.f, 1.f), Drift::MaxMotes);
 	TestTrue(TEXT("More wind lifts more"), Drift::DesiredCount(80.f, 0.f, 1.f) < Drift::DesiredCount(160.f, 0.f, 1.f));
-	TestEqual(TEXT("Rain holds the leaves down"), Drift::DesiredCount(400.f, 1.f, 1.f), 0);
+	TestTrue(TEXT("A windy rain keeps only a sparse wet-leaf drift"),
+		Drift::DesiredCount(400.f, 0.8f, 1.f) > 0 && Drift::DesiredCount(400.f, 0.8f, 1.f) < Drift::MaxMotes);
+	TestEqual(TEXT("A light shower does not ask for a population too small to see"), Drift::DesiredCount(400.f, 0.4f, 1.f), 0);
+	TestEqual(TEXT("Calm rain leaves the drift grounded"), Drift::DesiredCount(20.f, 0.8f, 1.f), 0);
 	TestEqual(TEXT("Night holds them too"), Drift::DesiredCount(400.f, 0.f, 0.f), 0);
 	TestEqual(TEXT("Negative wind is clamped"), Drift::DesiredCount(-50.f, 0.f, 1.f), 6);
 	TestEqual(TEXT("A malformed wind sample suppresses new motes"),
@@ -36,7 +39,10 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A breeze carries petals"), Drift::DescribeDrift(80.f, 0.f, 1.f).Contains(TEXT("Petals")));
 	TestTrue(TEXT("A wind tumbles leaves"), Drift::DescribeDrift(160.f, 0.f, 1.f).Contains(TEXT("tumble")));
 	TestTrue(TEXT("A gale flings them"), Drift::DescribeDrift(400.f, 0.f, 1.f).Contains(TEXT("flinging")));
-	TestTrue(TEXT("Nothing drifts in rain"), Drift::DescribeDrift(400.f, 1.f, 1.f).IsEmpty());
+	TestTrue(TEXT("Wind-driven rain carries wet leaves ahead of the gusts"), Drift::DescribeDrift(400.f, 0.8f, 1.f).Contains(TEXT("sweeping a few wet leaves")));
+	TestTrue(TEXT("A light shower does not describe invisible wet-leaf motion"), Drift::DescribeDrift(400.f, 0.4f, 1.f).IsEmpty());
+	TestTrue(TEXT("Calm rain does not claim that leaves are moving"), Drift::DescribeDrift(20.f, 0.8f, 1.f).IsEmpty());
+	TestTrue(TEXT("Light gusts with no lifted motes do not invent rainy drift"), Drift::DescribeDrift(120.f, 0.8f, 1.f).IsEmpty());
 	TestTrue(TEXT("Nothing is seen at night"), Drift::DescribeDrift(400.f, 0.f, 0.f).IsEmpty());
 
 	const FVector Wind(200.f, 0.f, 0.f);
@@ -47,6 +53,9 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	const FVector Gust = Drift::StepVelocity(FVector::ZeroVector, Wind, EIslandDriftKind::GreenLeaf, 0.1f);
 	const FVector GustSeed = Drift::StepVelocity(FVector::ZeroVector, Wind, EIslandDriftKind::Seed, 0.1f);
 	TestTrue(TEXT("A seed answers a gust faster than a green leaf"), GustSeed.X > Gust.X);
+	const FVector WetGust = Drift::StepVelocity(FVector::ZeroVector, Wind, EIslandDriftKind::DryLeaf, 0.1f, 0.8f);
+	TestTrue(TEXT("Rain-laden wind carries a leaf a little faster"), WetGust.X > Drift::StepVelocity(
+		FVector::ZeroVector, Wind, EIslandDriftKind::DryLeaf, 0.1f).X);
 	const FVector InvalidStep = Drift::StepVelocity(
 		FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f),
 		FVector(std::numeric_limits<float>::infinity(), 0.f, 0.f), EIslandDriftKind::Seed,
@@ -90,7 +99,16 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 
 		const TFunctionRef<FVector(const FVector&)> Storm = [](const FVector&) { return FVector(400.f, 0.f, 0.f); };
 		for (int32 Step = 0; Step < 100; ++Step) Actor->Advance(0.1f, Viewer, Storm, 1.f, 1.f);
-		TestEqual(TEXT("Heavy rain clears the air"), Actor->GetActiveCount(), 0);
+		TestTrue(TEXT("Heavy rain keeps a small gust-driven wet-leaf population"),
+			Actor->GetActiveCount() > 0 && Actor->GetActiveCount() < Drift::MaxMotes);
+		bool bRainMotesAreLeaves = true;
+		for (int32 Slot = 0; Slot < Actor->GetMotes().Num(); ++Slot)
+			if (Actor->GetMotes()[Slot].bActive)
+			{
+				const EIslandDriftKind Kind = Drift::KindForSlot(Slot);
+				bRainMotesAreLeaves &= Kind == EIslandDriftKind::DryLeaf || Kind == EIslandDriftKind::GreenLeaf;
+			}
+		TestTrue(TEXT("Rain replaces airborne seeds and petals with wet leaves"), bRainMotesAreLeaves);
 
 		const TFunctionRef<FVector(const FVector&)> InvalidWind = [](const FVector&)
 		{
@@ -102,10 +120,12 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 		Actor->Motes[1].Velocity.Y = std::numeric_limits<double>::infinity();
 		Actor->Motes[2].bActive = true;
 		Actor->Motes[2].Spin = std::numeric_limits<double>::quiet_NaN();
+		const int32 ActiveBeforeMalformedWeather = Actor->GetActiveCount();
 		Actor->Advance(std::numeric_limits<float>::infinity(),
 			FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), InvalidWind,
 			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity());
-		TestEqual(TEXT("Malformed weather and wind fail closed without spawning motes"), Actor->GetActiveCount(), 0);
+		TestTrue(TEXT("Malformed weather and wind fail closed without spawning extra motes"),
+			Actor->GetActiveCount() <= ActiveBeforeMalformedWeather);
 		TestTrue(TEXT("A malformed viewer location cannot move the drift actor to an invalid transform"),
 			FMath::IsFinite(Actor->GetActorLocation().X) && FMath::IsFinite(Actor->GetActorLocation().Y) &&
 			FMath::IsFinite(Actor->GetActorLocation().Z));
