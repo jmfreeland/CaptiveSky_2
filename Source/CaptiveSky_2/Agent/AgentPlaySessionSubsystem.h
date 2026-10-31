@@ -21,10 +21,11 @@ class CAPTIVESKY_2_API UAgentPlaySessionSubsystem : public UGameInstanceSubsyste
 {
 	GENERATED_BODY()
 public:
+	static constexpr int32 MaxModelRequestsHardLimit = 64;
 	UPROPERTY(Config, BlueprintReadOnly, Category="Agent|Safety")
 	float MaxRealtimeSeconds = 1800.f;
 	UPROPERTY(Config, BlueprintReadOnly, Category="Agent|Safety")
-	int32 MaxModelRequests = 120;
+	int32 MaxModelRequests = MaxModelRequestsHardLimit;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Agent|Safety")
 	int32 ModelRequests = 0;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Agent|Safety")

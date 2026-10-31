@@ -14,9 +14,12 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Short smoke-test duration"), UAgentPlaySessionSubsystem::ClampDuration(12), 12.0);
 	TestEqual(TEXT("Zero model-request budget is a valid closed cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(0), 0);
 	TestEqual(TEXT("Negative model-request budgets clamp to zero"), UAgentPlaySessionSubsystem::ClampRequestLimit(-1), 0);
-	TestEqual(TEXT("Request budget cannot exceed hard cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(1000), 120);
+	TestEqual(TEXT("Request budget cannot exceed hard cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(1000),
+		UAgentPlaySessionSubsystem::MaxModelRequestsHardLimit);
+	TestEqual(TEXT("The default session budget stays within the established 64-request ceiling"),
+		GetDefault<UAgentPlaySessionSubsystem>()->MaxModelRequests, UAgentPlaySessionSubsystem::MaxModelRequestsHardLimit);
 	float SessionSeconds = 1800.f;
-	int32 SessionRequests = 120;
+	int32 SessionRequests = 64;
 	bool bHasExplicitTimeCap = false;
 	bool bHasExplicitRequestCap = false;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=240 -CaptiveSkyMaxModelRequests=8"),
@@ -31,14 +34,14 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Command line cannot lengthen configured session"), SessionSeconds, 300.f);
 	TestEqual(TEXT("Command line cannot raise configured request cap"), SessionRequests, 12);
 	SessionSeconds = 1800.f;
-	SessionRequests = 120;
+	SessionRequests = 64;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=0 -CaptiveSkyMaxModelRequests=0"), SessionSeconds, SessionRequests);
 	TestEqual(TEXT("Command line cannot disable real-time cap"), SessionSeconds, 1.f);
 	TestEqual(TEXT("Command line zero request cap disables all model calls"), SessionRequests, 0);
 	SessionSeconds = 1800.f;
-	SessionRequests = 120;
+	SessionRequests = 64;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=12"), SessionSeconds, SessionRequests);
-	TestEqual(TEXT("Omitting the request override preserves the configured request cap"), SessionRequests, 120);
+	TestEqual(TEXT("Omitting the request override preserves the configured request cap"), SessionRequests, 64);
 	TestEqual(TEXT("Legacy 15-second Blueprint interval is bounded"), AAutonomousAgentAIController::BackgroundDelay(0, 15), 60.0);
 	TestEqual(TEXT("Repeats back off"), AAutonomousAgentAIController::BackgroundDelay(3, 60), 240.0);
 	TestEqual(TEXT("Backoff capped at five minutes"), AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
@@ -95,7 +98,7 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	RealtimeCappedDrain->StartedAt = FPlatformTime::Seconds() - 2.0;
 	TestTrue(TEXT("Hard real-time cap still ends play with a request in flight"), RealtimeCappedDrain->IsExpired());
 
-	Session->ModelRequests = 120;
+	Session->ModelRequests = 64;
 	Session->MaxModelRequests = 10000;
 	TestFalse(TEXT("Configuration cannot exceed hard request cap"), Session->TryReserveModelRequest());
 	Session->ModelRequests = 0;

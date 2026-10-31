@@ -84,8 +84,8 @@ without a matched measurement.
 
 **Bounded runtime recheck (2026-10-31):** after the approved editor restart,
 `r.Nanite.Foliage=1` remained active during a 15m 52s standalone preview
-(19 model requests; isolated playtest data). The night view around the rain
-basin showed dense layered understory and multiple tree silhouettes, but this
+(49 model requests; isolated playtest data, according to the Unreal session
+log). The night view around the rain basin showed dense layered understory and multiple tree silhouettes, but this
 local composition does not establish natural scatter or species readability
 over the island; the editor-only view still cannot show the runtime-generated
 broadleaf population. Raven again signaled that the west roost is too exposed,
@@ -94,6 +94,15 @@ The run was not a performance profile and did not test water walking. Next:
 capture a matched daylight woodland-transition traversal with close/middle/far
 species identification, frame-time p95, and whole-device VRAM; separately test
 ocean contact and swim pose. See the [playtest record](findings/2026-10-31-character-playtest.md#second-bounded-preview).
+
+**Request-cap mismatch (2026-10-31):** the newly reopened local project copy
+reported a default 1,800-second / 120-request play cap, unlike the earlier
+64-request preview. A dark PIE attempt was stopped after 82.8 seconds and nine
+requests, before any water-contact validation. In this tracked worktree the
+configured default and hard clamp are now both 64; the focused UE 5.8.3 build
+and `CaptiveSky2.Agent.SessionSafety` automation pass. Do not start another
+long model-active session until the intended project copy is rebuilt and its
+log confirms the 64-request ceiling.
 
 ### 2. Repair presentation dependencies in bounded groups
 
