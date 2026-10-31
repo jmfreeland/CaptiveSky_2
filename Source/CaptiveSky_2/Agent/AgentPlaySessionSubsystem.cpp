@@ -5,17 +5,33 @@
 #include "HAL/PlatformTime.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
 #include "Dom/JsonObject.h"
+#include "Engine/GameInstance.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "Engine/World.h"
 #if WITH_EDITOR
 #include "Editor.h"
 #endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentSession, Log, All);
+
+static FAutoConsoleCommandWithWorld GAgentSessionApplyPlaytestCapsCommand(
+	TEXT("CaptiveSky.Session.ApplyPlaytestCaps"),
+	TEXT("Lower the active bounded play session to at most 15 minutes remaining and 32 total model requests. Never raises caps; does nothing in continuous play."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		UGameInstance* GameInstance = World && World->IsGameWorld() ? World->GetGameInstance() : nullptr;
+		UAgentPlaySessionSubsystem* Session = GameInstance ? GameInstance->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
+		if (Session)
+			Session->ApplyPlaytestCaps();
+		else
+			UE_LOG(LogAgentSession, Warning, TEXT("ApplyPlaytestCaps requires an active PIE or Game world."));
+	}));
 
 double UAgentPlaySessionSubsystem::ClampDuration(double Requested)
 {
@@ -73,6 +89,28 @@ bool UAgentPlaySessionSubsystem::HasReachedRequestCap() const
 {
 	return (!bContinuousPlay || bHasExplicitRequestCap) &&
 		ModelRequests >= ClampRequestLimit(MaxModelRequests);
+}
+
+void UAgentPlaySessionSubsystem::ApplyPlaytestCaps()
+{
+	if (bContinuousPlay)
+	{
+		UE_LOG(LogAgentSession, Log, TEXT("ApplyPlaytestCaps refused: continuous play is unchanged."));
+		return;
+	}
+
+	const double ElapsedSeconds = GetElapsedRealSeconds();
+	const float PreviousSeconds = MaxRealtimeSeconds;
+	const int32 PreviousRequests = MaxModelRequests;
+	MaxRealtimeSeconds = FMath::Min(static_cast<float>(ClampDuration(MaxRealtimeSeconds)),
+		static_cast<float>(ElapsedSeconds + 900.0));
+	MaxModelRequests = FMath::Min(ClampRequestLimit(MaxModelRequests), 32);
+	bHasExplicitTimeCap = true;
+	bHasExplicitRequestCap = true;
+	UE_LOG(LogAgentSession, Display,
+		TEXT("Playtest caps reduced: %.0f seconds remaining (deadline %.0f s from start; was %.0f), at most %d requests (was %d)."),
+		FMath::Max(0.f, MaxRealtimeSeconds - static_cast<float>(ElapsedSeconds)), MaxRealtimeSeconds,
+		PreviousSeconds, MaxModelRequests, PreviousRequests);
 }
 
 bool UAgentPlaySessionSubsystem::IsExpired() const

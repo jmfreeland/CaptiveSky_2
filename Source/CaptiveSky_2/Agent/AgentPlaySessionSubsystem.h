@@ -65,6 +65,8 @@ public:
 	/** Applies command-line smoke-test limits without permitting either active cap to increase. */
 	static void ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests,
 		bool* bOutHasExplicitTimeCap = nullptr, bool* bOutHasExplicitRequestCap = nullptr);
+	/** Console-only, one-way reduction for a live bounded playtest; never raises configured limits. */
+	void ApplyPlaytestCaps();
 private:
 	friend class FAgentSafetyTest;
 	double StartedAt = 0;

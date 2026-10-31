@@ -80,3 +80,22 @@ Runtime verification is still pending: the active editor is the separate main
 D: project, while this compiled worktree has no local `Content/` tree. Do not
 claim that the command-line override or the resulting counts have run in the
 Island until the rebuilt module is integrated with the main project's assets.
+
+## Live PIE safety control (2026-10-31)
+
+The open editor has no console command that can lower the loaded session's
+request cap; its console autocomplete did not expose
+`CaptiveSkyMaxModelRequests`. To allow an in-editor feedback run without
+relaunching Unreal, the tracked subsystem now registers
+`CaptiveSky.Session.ApplyPlaytestCaps`. In a running bounded PIE/Game world it
+only reduces the deadline to no later than 15 minutes from invocation and the
+total request budget to at most 32. It refuses continuous mode, never raises
+existing limits, and repeating it cannot extend the deadline. Safety
+automation covers lower configured caps, repeat calls, request rejection at
+the reduced ceiling, and the continuous-mode refusal. This is compiled in the
+worktree but has not yet been loaded into the active D: editor. The updated
+UE 5.8 editor target rebuilt successfully in 37.81 seconds, compiling both
+`AgentPlaySessionSubsystem.cpp` and `AgentSafetyTests.cpp`. The automation
+test is compiled but not executed in this turn; the active editor still has
+the older module, and the previously observed command-line pre-initialization
+crashes make an isolated launch an unsafe substitute for a live test.

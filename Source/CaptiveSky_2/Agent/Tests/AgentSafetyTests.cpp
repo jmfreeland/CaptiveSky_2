@@ -79,6 +79,40 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	NoModelRequests->MaxRealtimeSeconds = 1.f;
 	TestTrue(TEXT("Zero model-request cap still obeys the real-time watchdog"), NoModelRequests->IsExpired());
 
+	UAgentPlaySessionSubsystem* PlaytestCaps = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	PlaytestCaps->StartedAt = 1000.0;
+	PlaytestCaps->NowOverride = 1060.0;
+	PlaytestCaps->MaxRealtimeSeconds = 1800.f;
+	PlaytestCaps->MaxModelRequests = 64;
+	PlaytestCaps->ApplyPlaytestCaps();
+	TestEqual(TEXT("Live playtest command allows no more than fifteen minutes from application"),
+		PlaytestCaps->MaxRealtimeSeconds, 960.f);
+	TestEqual(TEXT("Live playtest command lowers requests to 32"), PlaytestCaps->MaxModelRequests, 32);
+	TestTrue(TEXT("Live reduction marks both caps explicit"), PlaytestCaps->bHasExplicitTimeCap && PlaytestCaps->bHasExplicitRequestCap);
+	PlaytestCaps->NowOverride = 1100.0;
+	PlaytestCaps->ApplyPlaytestCaps();
+	TestEqual(TEXT("Repeating the command cannot extend the existing deadline"), PlaytestCaps->MaxRealtimeSeconds, 960.f);
+	PlaytestCaps->ModelRequests = 32;
+	TestFalse(TEXT("The reduced live cap rejects further model requests"), PlaytestCaps->TryReserveModelRequest());
+
+	UAgentPlaySessionSubsystem* LowerConfiguredCaps = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	LowerConfiguredCaps->StartedAt = 1000.0;
+	LowerConfiguredCaps->NowOverride = 1010.0;
+	LowerConfiguredCaps->MaxRealtimeSeconds = 600.f;
+	LowerConfiguredCaps->MaxModelRequests = 12;
+	LowerConfiguredCaps->ApplyPlaytestCaps();
+	TestEqual(TEXT("Live command preserves a stricter configured time limit"), LowerConfiguredCaps->MaxRealtimeSeconds, 600.f);
+	TestEqual(TEXT("Live command preserves a stricter configured request limit"), LowerConfiguredCaps->MaxModelRequests, 12);
+
+	UAgentPlaySessionSubsystem* ContinuousCaps = NewObject<UAgentPlaySessionSubsystem>(Instance);
+	ContinuousCaps->bContinuousPlay = true;
+	ContinuousCaps->MaxRealtimeSeconds = 1800.f;
+	ContinuousCaps->MaxModelRequests = 64;
+	ContinuousCaps->ApplyPlaytestCaps();
+	TestEqual(TEXT("Live playtest command leaves continuous-play time unchanged"), ContinuousCaps->MaxRealtimeSeconds, 1800.f);
+	TestEqual(TEXT("Live playtest command leaves continuous-play requests unchanged"), ContinuousCaps->MaxModelRequests, 64);
+	TestFalse(TEXT("Refused continuous reduction does not claim an explicit request cap"), ContinuousCaps->bHasExplicitRequestCap);
+
 	UAgentPlaySessionSubsystem* TimedOutDrain = NewObject<UAgentPlaySessionSubsystem>(Instance);
 	TimedOutDrain->StartedAt = FPlatformTime::Seconds();
 	TimedOutDrain->NowOverride = 1000.0;
