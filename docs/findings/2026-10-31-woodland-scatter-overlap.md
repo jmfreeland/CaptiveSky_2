@@ -15,9 +15,11 @@ the vegetation budget or GPU cost by design.
 
 Validation: the UE 5.8.3 `CaptiveSky_2Editor` target compiled successfully
 against the isolated `Saved/CS58` project copy, whose content is a read-only
-junction to the main project's assets. The subsequent Editor-Cmd automation
-process remained live for two minutes but emitted only SDK-preflight output and
-never created its project log; it was stopped, so no automation pass is
+junction to the main project's assets. The code now includes a focused
+`BroadleafDiversity` assertion that all five layer ranges have a shared radial
+habitat; it compiled with the change. Two Editor-Cmd automation attempts
+remained live for two minutes, emitted only SDK-preflight output, and never
+created their project logs; they were stopped, so no automation pass is
 claimed. A rendered comparison is also pending: the live editor had about 2.5
 GiB of GPU memory free, below the project's 4 GiB preview gate.
 

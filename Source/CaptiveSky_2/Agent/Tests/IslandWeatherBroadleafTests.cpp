@@ -77,6 +77,16 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		AIslandWeather::GetBroadleafSpeciesLimit(1), AIslandWeather::BroadleafTreePopulationBudget);
 	TestEqual(TEXT("No resolved species admits no broadleaf instances"),
 		AIslandWeather::GetBroadleafSpeciesLimit(0), 0);
+	const float SharedLayerInnerRadius = FMath::Max(
+		FMath::Max(AIslandWeather::WoodlandMatureTreeInnerRadiusCm, AIslandWeather::WoodlandSaplingInnerRadiusCm),
+		FMath::Max(FMath::Max(AIslandWeather::WoodlandShrubInnerRadiusCm, AIslandWeather::WoodlandFlowerInnerRadiusCm),
+			AIslandWeather::WoodlandCoppiceInnerRadiusCm));
+	const float SharedLayerOuterRadius = FMath::Min(
+		FMath::Min(AIslandWeather::WoodlandMatureTreeOuterRadiusCm, AIslandWeather::WoodlandSaplingOuterRadiusCm),
+		FMath::Min(FMath::Min(AIslandWeather::WoodlandShrubOuterRadiusCm, AIslandWeather::WoodlandFlowerOuterRadiusCm),
+			AIslandWeather::WoodlandCoppiceOuterRadiusCm));
+	TestTrue(TEXT("Mature trees, saplings, shrubs, flowers and coppice share a mixed radial habitat"),
+		SharedLayerInnerRadius < SharedLayerOuterRadius);
 
 	const AIslandWeather* Defaults = GetDefault<AIslandWeather>();
 	const UInstancedSkinnedMeshComponent* BlackAlders = Defaults ? Defaults->IslandBlackAlders : nullptr;

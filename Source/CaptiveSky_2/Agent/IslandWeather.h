@@ -161,6 +161,18 @@ private:
 	friend class FIslandFoxStagAwarenessCaptureTest;
 	friend class FIslandMinnowTest;
 	friend class FIslandViewpointCaptureTest;
+	// Overlapping radial footprints keep a woodland community mixed rather than
+	// separating each vegetation layer into its own ring.
+	static constexpr float WoodlandMatureTreeInnerRadiusCm = 0.f;
+	static constexpr float WoodlandMatureTreeOuterRadiusCm = 1800.f;
+	static constexpr float WoodlandSaplingInnerRadiusCm = 800.f;
+	static constexpr float WoodlandSaplingOuterRadiusCm = 2800.f;
+	static constexpr float WoodlandShrubInnerRadiusCm = 250.f;
+	static constexpr float WoodlandShrubOuterRadiusCm = 2400.f;
+	static constexpr float WoodlandFlowerInnerRadiusCm = 600.f;
+	static constexpr float WoodlandFlowerOuterRadiusCm = 3500.f;
+	static constexpr float WoodlandCoppiceInnerRadiusCm = 900.f;
+	static constexpr float WoodlandCoppiceOuterRadiusCm = 3200.f;
 	TArray<FIslandTransientGust> TransientGusts;
 	TArray<TWeakObjectPtr<AIslandFirefly>> NightFireflies;
 	TArray<TWeakObjectPtr<AIslandTidepoolCrab>> DayCrabs;
