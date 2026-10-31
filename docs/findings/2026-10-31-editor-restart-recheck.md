@@ -217,3 +217,30 @@ Island and `All Saved`. A transient toast reported that landscape texture
 resources were still being prepared, so this capture does not establish that
 streaming has settled. No PIE was started and the main project's sources and
 request cap were not changed.
+
+## Nanite Foliage restart confirmation (2026-10-31 18:39–18:40)
+
+After the user confirmed all changes were saved and approved a restart, the
+first recent-project card opened the stale Claude project and prompted for a
+missing `Aura` plugin. The prompt was declined. In UE 5.8's **My Projects**
+picker, the selected tile's tooltip and Project Location field both identified
+the intended main project at
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject`; opening that
+verified path loaded the Island without a plugin prompt. The editor status bar
+showed **All Saved**.
+
+The fresh main-project log was written at 18:40:46. It records
+`r.Nanite.ProjectEnabled:1`, `bEnableNaniteFoliage:1`, and
+`r.Nanite.Foliage:1` during startup (18:39:24). A live console query returned
+`r.Nanite.Foliage = "1"`, `LastSetBy: ProjectSetting` (18:40:46). This confirms
+the requested setting survived the restart. The initial landscape-texture
+toast disappeared after a short wait, but the Output Log still showed one
+queued and one async package; full streaming settle is unverified. The log also
+repeats the 4033x4033 landscape edit-layer merge versus 1024x1024 desired
+maximum warning.
+
+The open editor view remains the sparse hillside with only a few nearby trees
+and small ground cover. This is one editor-camera composition, not a species
+census or proof of a density defect. No PIE, movement, FPS, VRAM, or runtime
+memory check was performed. Main project source, settings, and Island map were
+not edited or saved during this restart.
