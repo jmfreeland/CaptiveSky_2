@@ -36,6 +36,27 @@ command-line startup attempt failed to provide a usable project window. No
 cause for that first attempt was established, and no D: project files were
 edited during this verification.
 
+## Current restart recheck (23:12 UTC)
+
+The startup prompt asked whether to keep waiting for ZenServer. The user had
+already confirmed the Island was saved and approved the restart; choosing
+“Yes” allowed the normal project-browser startup to continue. In **My
+Projects**, the selected project tooltip and Project Location both identified
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject` (UE 5.8), not
+the stale Claude copy or the Codex worktree. The Island reopened with 183 actors
+and the status bar showed **All Saved**. The `r.Nanite.Foliage` console tooltip
+reported **Current value: 1**. This verifies the setting is active after
+restart, not that it improved performance or that all Megaplant materials
+render correctly.
+
+The editor camera is still facing open water and a distant island, so it is not
+a representative foliage view. The Output Log still showed one queued and one
+async package plus the landscape edit-layer batch-resolution warning. A
+read-only `nvidia-smi` snapshot reported 9,450/12,282 MiB used, 2,548 MiB free,
+47% utilization, and 66 °C. This remains below the project's 4 GiB rendered
+session gate; no PIE/Game session was started. No D: map, source, asset, or
+setting was edited or saved during this recheck.
+
 ## Follow-up restart (21:35 UTC)
 
 The editor was closed after the user confirmed **All Saved** and explicitly
