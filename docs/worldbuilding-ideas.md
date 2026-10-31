@@ -1,5 +1,25 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Verify Nanite Foliage after restarting the actual project
+
+After the user confirmed the Island was saved and approved a restart, the active
+UE 5.8.3 editor was closed and reopened through Unreal's project browser. The
+selected recent-project entry identified
+`D:\Projects - Athena\Unreal\CaptiveSky_2\CaptiveSky_2.uproject`, not the
+Claude-named sibling or this Codex worktree. The new D: startup log records
+`r.Nanite.Foliage=1` from the project setting, and the viewport returned to the
+saved Island. The visible post-load Output Log tail had no Nanite-disabled
+assembly warning; it did show the existing landscape edit-layer merge batch
+resolution warning. This verifies activation in the correct running editor,
+not tree appearance, frame time, or an improvement in VRAM.
+
+The editor's viewport briefly reported that it was waiting for Landscape
+texture resources. Once the project had loaded, `nvidia-smi` still showed only
+2,083 MiB free (9,915 / 12,282 MiB used), 75 °C, and 59% GPU utilization.
+That remains below the guarded 4 GiB headroom needed for rendered play, so no
+PIE/Game session was started. The 30-FPS floor and 15–30 minute feedback run
+remain pending. No D: project files were edited during this verification.
+
 ## 2026-10-31 — Give the Island's quiet turns more room to breathe
 
 The 15m52s standalone preview recorded 45 resident decisions and 49 model
