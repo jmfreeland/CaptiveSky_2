@@ -17,9 +17,11 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
+#include "Components/InstancedSkinnedMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "IslandInteractionUtility.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
@@ -76,6 +78,20 @@ namespace
 		DisplayName.RemoveFromStart(TEXT("SKM_"));
 		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
 		return DisplayName + TEXT(" vegetation");
+	}
+
+	FString DescribeBroadleafTreeMesh(const USkeletalMesh& Mesh)
+	{
+		const FString LowerName = Mesh.GetName().ToLower();
+		if (LowerName.Contains(TEXT("norway_maple"))) return TEXT("Norway maple trees");
+		if (LowerName.Contains(TEXT("european_aspen"))) return TEXT("European aspen trees");
+		if (LowerName.Contains(TEXT("european_beech"))) return TEXT("European beech trees");
+		if (LowerName.Contains(TEXT("black_alder"))) return TEXT("black alder trees");
+
+		FString DisplayName = Mesh.GetName();
+		DisplayName.RemoveFromStart(TEXT("SKM_"));
+		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
+		return DisplayName + TEXT(" trees");
 	}
 }
 
@@ -672,6 +688,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			double DistanceSquared = TNumericLimits<double>::Max();
 			FVector Location = FVector::ZeroVector;
 		};
+		struct FNearbyPlantInstance
+		{
+			double DistanceSquared = TNumericLimits<double>::Max();
+			FVector Location = FVector::ZeroVector;
+		};
 		TArray<FNearbyPlantPatch> NearbyPlantPatches;
 		constexpr float PlantPerceptionRadius = 650.f;
 		constexpr int32 MaxPlantInstancesExaminedPerComponent = 48;
@@ -692,11 +713,6 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				const TArray<int32> CandidateIndices = Foliage->GetInstancesOverlappingSphere(Location, PlantPerceptionRadius, true);
 				if (CandidateIndices.IsEmpty()) continue;
 
-				struct FNearbyPlantInstance
-				{
-					double DistanceSquared = TNumericLimits<double>::Max();
-					FVector Location = FVector::ZeroVector;
-				};
 				TArray<FNearbyPlantInstance> Candidates;
 				const int32 CandidateLimit = FMath::Min(CandidateIndices.Num(), MaxPlantInstancesExaminedPerComponent);
 				for (int32 Candidate = 0; Candidate < CandidateLimit; ++Candidate)
@@ -741,6 +757,72 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					else
 					{
 						NearbyPlantPatches.Add({ MeshName, MoveTemp(DisplayName), NearestVisibleDistanceSquared, NearestVisibleLocation });
+					}
+				}
+			}
+		}
+		// Broadleaf trees are instanced-skinned rather than HISM. Their total
+		// population is capped by IslandWeather; retain nearby transforms, then
+		// ray-check only the closest few so this remains prompt-build work.
+		for (TActorIterator<AIslandWeather> WeatherIt(GetWorld()); WeatherIt; ++WeatherIt)
+		{
+			TArray<UActorComponent*> SkinnedTreeComponents;
+			WeatherIt->GetComponents(UInstancedSkinnedMeshComponent::StaticClass(), SkinnedTreeComponents);
+			for (UActorComponent* TreeComponent : SkinnedTreeComponents)
+			{
+				UInstancedSkinnedMeshComponent* Trees = Cast<UInstancedSkinnedMeshComponent>(TreeComponent);
+				const USkeletalMesh* Mesh = Trees ? Cast<USkeletalMesh>(Trees->GetSkinnedAsset()) : nullptr;
+				if (!Trees || !Mesh || !Trees->IsVisible() || Trees->bHiddenInGame || Trees->GetInstanceCount() == 0) continue;
+
+				TArray<FNearbyPlantInstance> Candidates;
+				const int32 InstanceCount = Trees->GetInstanceCount();
+				for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
+				{
+					FTransform InstanceTransform;
+					const FPrimitiveInstanceId InstanceId = Trees->GetInstanceId(InstanceIndex);
+					if (!Trees->GetInstanceTransform(InstanceId, InstanceTransform, true)) continue;
+
+					const FVector InstanceLocation = InstanceTransform.GetLocation();
+					const double DistanceSquared = FVector::DistSquared(Location, InstanceLocation);
+					if (DistanceSquared > FMath::Square(PlantPerceptionRadius)) continue;
+					Candidates.Add({ DistanceSquared, InstanceLocation });
+				}
+				if (Candidates.IsEmpty()) continue;
+
+				Candidates.Sort([](const FNearbyPlantInstance& A, const FNearbyPlantInstance& B)
+					{ return A.DistanceSquared < B.DistanceSquared; });
+				bool bFoundVisibleInstance = false;
+				FVector NearestVisibleLocation = FVector::ZeroVector;
+				double NearestVisibleDistanceSquared = TNumericLimits<double>::Max();
+				const int32 VisibilityLimit = FMath::Min(Candidates.Num(), MaxVisibilityChecksPerComponent);
+				for (int32 Candidate = 0; Candidate < VisibilityLimit; ++Candidate)
+				{
+					const FVector Target = Candidates[Candidate].Location + FVector(0.f, 0.f, FMath::Max(35.f, Mesh->GetBounds().BoxExtent.Z * 0.55f));
+					FCollisionQueryParams Params(SCENE_QUERY_STAT(AgentNearbyBroadleafVisibility), false, Owner);
+					Params.AddIgnoredActor(*WeatherIt);
+					FHitResult Hit;
+					if (GetWorld()->LineTraceSingleByChannel(Hit, PlantViewStart, Target, ECC_Visibility, Params)) continue;
+					bFoundVisibleInstance = true;
+					NearestVisibleLocation = Candidates[Candidate].Location;
+					NearestVisibleDistanceSquared = Candidates[Candidate].DistanceSquared;
+					break;
+				}
+				if (!bFoundVisibleInstance) continue;
+
+				const FName MeshName = Mesh->GetFName();
+				FNearbyPlantPatch* ExistingPatch = NearbyPlantPatches.FindByPredicate(
+					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });
+				if (!ExistingPatch || NearestVisibleDistanceSquared < ExistingPatch->DistanceSquared)
+				{
+					const FString DisplayName = DescribeBroadleafTreeMesh(*Mesh);
+					if (ExistingPatch)
+					{
+						ExistingPatch->DistanceSquared = NearestVisibleDistanceSquared;
+						ExistingPatch->Location = NearestVisibleLocation;
+					}
+					else
+					{
+						NearbyPlantPatches.Add({ MeshName, DisplayName, NearestVisibleDistanceSquared, NearestVisibleLocation });
 					}
 				}
 			}

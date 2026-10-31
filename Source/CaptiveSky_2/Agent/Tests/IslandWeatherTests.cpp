@@ -9,6 +9,7 @@
 #include "Components/InstancedSkinnedMeshComponent.h"
 #include "DynamicWindData.h"
 #include "Engine/Engine.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -390,6 +391,30 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A plant description never creates a movement or interaction target"),
 		VisibleSituation.Contains(TEXT("no movement or interaction target")) && !VisibleSituation.Contains(TEXT("move_to target: Cube")));
 
+	USkeletalMesh* NorwayMapleTestMesh = NewObject<USkeletalMesh>(Weather, TEXT("Tree_Norway_Maple_Forest_01_A"));
+	TestNotNull(TEXT("A transient broadleaf mesh can exercise instanced-skinned plant perception"), NorwayMapleTestMesh);
+	UInstancedSkinnedMeshComponent* BroadleafTrees = NewObject<UInstancedSkinnedMeshComponent>(Weather);
+	Weather->AddInstanceComponent(BroadleafTrees);
+	BroadleafTrees->SetSkinnedAsset(NorwayMapleTestMesh);
+	BroadleafTrees->RegisterComponent();
+	BroadleafTrees->SetVisibility(true);
+	BroadleafTrees->SetHiddenInGame(false);
+	BroadleafTrees->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	BroadleafTrees->AddInstance(FTransform(FRotator::ZeroRotator, FVector(350.f, 0.f, 0.f)), 0, true);
+	const FString BroadleafSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby visible instanced-skinned maple is described by common species name for an optional upgrade"),
+		BroadleafSituation.Contains(TEXT("patch of Norway maple trees")) && BroadleafSituation.Contains(TEXT("request_upgrade")));
+	TestFalse(TEXT("Broadleaf perception does not expose the imported technical asset name"),
+		BroadleafSituation.Contains(TEXT("Tree Norway Maple Forest")));
+	TestFalse(TEXT("Broadleaf plant descriptions do not become movement targets"),
+		BroadleafSituation.Contains(TEXT("move_to target: Norway maple")));
+
+	BroadleafTrees->SetVisibility(false);
+	const FString HiddenBroadleafSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("A hidden instanced-skinned tree is not described as a visible patch"),
+		HiddenBroadleafSituation.Contains(TEXT("patch of Norway maple trees")));
+	BroadleafTrees->SetVisibility(true);
+
 	UStaticMesh* FlowerMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("flower_04_01"));
 	TestNotNull(TEXT("A transient flower-named mesh can exercise the Island's asset-label rule"), FlowerMesh);
 	Foliage->SetStaticMesh(FlowerMesh);
@@ -442,11 +467,15 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	const FString OccludedSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("A plant hidden behind solid geometry is not described as visible"),
 		OccludedSituation.Contains(TEXT("patch of Cube vegetation")));
+	TestFalse(TEXT("A broadleaf tree patch hidden behind solid geometry is not described"),
+		OccludedSituation.Contains(TEXT("patch of Norway maple trees")));
 	Occluder->Destroy();
 
 	Observer->SetActorLocation(FVector(2000.f, 0.f, 0.f));
 	const FString DistantSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("HISM vegetation beyond the short perception radius is omitted"),
 		DistantSituation.Contains(TEXT("patch of Cube vegetation")));
+	TestFalse(TEXT("Instanced-skinned vegetation beyond the short perception radius is omitted"),
+		DistantSituation.Contains(TEXT("patch of Norway maple trees")));
 	return true;
 }

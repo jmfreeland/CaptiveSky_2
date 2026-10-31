@@ -1,5 +1,36 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Let residents notice the mixed broadleaf canopy
+
+The existing nearby-plant perception already described visible HISM ground
+cover, but the Island's Norway maple, European aspen, European beech and black
+alder groves use `UInstancedSkinnedMeshComponent` and were invisible to that
+scan. `BuildSituationSummary` now also checks those instanced-skinned patches
+within 6.5 m, sorts local transforms by distance, and performs visibility traces
+for at most the three closest candidates per component. It uses ordinary
+species names and frames the patch as optional `request_upgrade` context only;
+plants remain without movement or interaction targets. This is descriptive
+perception only: no extra model call, world mutation, memory write, or foliage
+population increase.
+
+The UE 5.8.3 editor target built successfully, and
+`CaptiveSky2.Agent.NearbyVegetationPerception` passed under NullRHI (exit code
+0). The fixture verifies the Norway-maple label, keeps it out of movement-target
+wording, and omits it when hidden, occluded, or outside the short radius. That
+test does not measure prompt-build cost against the full 3,600-tree population
+or validate live species visibility and visual quality; capture a bounded
+timing sample on the Island before widening the scan.
+
+**Active-editor setting check (2026-10-31):** after the approved restart, the
+active `D:\Projects - Athena\unreal\captivesky_2_claude` editor loaded
+responsively, but its `DefaultEngine.ini` still says `r.Nanite.Foliage=False`
+and its startup log sets the CVar to `0`. This is distinct from the earlier
+standalone preview that logged the CVar as `1`; the active editor copy therefore
+does not currently prove Nanite Foliage is enabled. The D: project is outside
+this worktree's writable scope, so no setting was changed. Enable it in that
+project, restart, and confirm the startup log before treating Nanite Assembly
+warnings as resolved.
+
 ## 2026-10-31 — Let an exposed roost become a character-led proposal
 
 Raven's latest isolated playtest again found the west roost exposed to weather,
