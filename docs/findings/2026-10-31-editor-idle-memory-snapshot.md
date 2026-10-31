@@ -41,3 +41,20 @@ contributors before changing pool size, foliage count, scalability, or
 landscape settings. Keep this editor-idle snapshot separate from Game/PIE
 measurements. Do not treat a 91% editor streaming-pool occupancy as proof of
 either a texture-pool overage or the whole-GPU warning.
+
+## Post-restart Nanite Foliage check (2026-10-31)
+
+After the user-approved editor restart, the correct `D:/Projects -
+Athena/Unreal/CaptiveSky_2` project reopened on the saved Island. Querying
+`r.Nanite.Foliage` in its Output Log returned `1` with `LastSetBy: ProjectSetting`;
+the editor status remained **All Saved**. The feature toggle is therefore active
+in this editor session. This does not prove that any particular imported
+Megaplant asset is eligible for or actually using Nanite Foliage, nor that the
+feature improves this project's frame time or memory use. The idle viewport
+still shows an exposed hillside and a few nearby similar-looking tree forms;
+it is one editor angle, not a runtime census of the four broadleaf species.
+
+Next, inspect the four tree meshes' Nanite eligibility and runtime rendering,
+then compare the same fixed Game view and a separate player traversal with
+streaming/RHI measurements. Keep the user's over-budget warning distinct from
+this editor-idle setting check.
