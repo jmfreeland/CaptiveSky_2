@@ -48,3 +48,18 @@ The same main D: project still has `MaxModelRequests=120` and permits 120 in
 cap of 64. Do not run a long model-active session from D: until the guarded
 source is integrated and rebuilt there. The Aura prompt belonged to the stale
 `_claude` recent-project entry, not the selected main project.
+
+## Read-only ground-cover diagnostic check (2026-10-31 14:57)
+
+The live editor's console autocomplete recognizes
+`CaptiveSky.Island.GroundCoverSpatialDiagnostics`; its tooltip describes
+logging broad meadow placements per 200 m terrain tile and reports current
+value `0`. Querying it confirmed `0` (`LastSetBy: Constructor`). It was left
+unchanged: the diagnostic is gathered during scatter, so enabling it after
+Island has already loaded would not provide counts for the existing slope.
+
+The current editor view still shows an open, visibly sparse hillside with a
+small cluster of similar yellow-leaved trees. This is an angle-specific
+observation, not a species census. A useful next validation is a controlled
+reload with the diagnostic enabled before scatter, then a Tideglass-to-grove
+pass; avoid increasing density until those counts and performance are known.
