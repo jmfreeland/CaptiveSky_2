@@ -20,6 +20,18 @@ placed, or saved. The user's chosen hollow concept remains unresolved pending a
 disposable Island review of ground contact, concealment, and Rat-scale
 navigation. Full assessment: [RatHollow V5 recheck](findings/2026-10-31-rathollow-v5-recheck.md).
 
+## 2026-10-31 — Compare a lower-contrast RatHollow bark material
+
+The separate V6 RatHollow candidate reuses the V5 shell with a generated,
+versioned, darker broadleaf-bark albedo; it leaves the shared V4 maps alone.
+Blender export/re-import verification passes (2,352 triangles, five simple
+colliders, `UVMap`, `PROBLEMS []`), as do the new texture-pack regression and
+25 existing RatHollow tests. Its entrance-facing neutral preview is warmer than
+V5, but it still reads as a stylized stump, and the reused V4 normal map keeps
+the bark too directional. Do not import or place it until fresh PBR derivatives
+and a disposable Unreal woodland review establish a better result. Full prompt,
+verification, and limits: [RatHollow V6 bark candidate](findings/2026-10-31-rathollow-v6-bark-candidate.md).
+
 ## 2026-10-31 — Stop the first live PIE memory sample early
 
 The currently open `CaptiveSky_2` editor reported `r.Nanite.Foliage = 1`
