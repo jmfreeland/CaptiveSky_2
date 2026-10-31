@@ -21,7 +21,21 @@ editor project copy and device-level budget; retain the 30-FPS floor and
 request/deadline safeguards. Immediately after PIE stopped, `nvidia-smi`
 reported 8,600 MiB used of 12,282 MiB on the RTX 4080 Laptop GPU, but WDDM
 provided no per-process breakdown. This post-stop snapshot does not establish
-which process or resource caused the in-PIE warning.
+which process or resource caused the in-PIE warning. A read-only editor
+`stat Streaming` sample then showed a 3,693.27 / 4,096.03 MB streaming pool
+(90%), with 375.92 MB non-streaming mips and 281.59 MB wanted mips. `stat RHI`
+separately reported 2,966.44 MB of Render Target 2D memory and 1,874.67 MB of
+UAV texture memory; these RHI categories are not assumed to be additive. The
+pool is already near its configured ceiling in the editor, but these samples
+were taken after PIE and do not prove the immediate warning's cause. Epic's
+[texture-streaming reference](https://dev.epicgames.com/documentation/unreal-engine/texture-streaming-configuration-in-unreal-engine)
+defines the pool and the VRAM-limit setting; don't increase the 4,096 MB pool
+without a measured device-memory budget. The same editor log reports 900 each
+of Norway maple, European aspen, European beech, and black alder instances, plus
+39 birch and 57 hazel coppice instances. That confirms the active generator has
+four tree species; their distinction is not obvious in this particular view.
+The next visual pass should inspect species silhouette, material separation,
+and habitat placement before changing the fixed tree budget.
 
 ## 2026-10-31 — Make nearby object proposals pointable by name
 
