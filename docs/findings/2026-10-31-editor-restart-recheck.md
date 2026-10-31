@@ -30,10 +30,18 @@ The main project's fresh `Saved/Logs/CaptiveSky_2.log` was written at
 `bEnableNaniteFoliage:1` (deferred dummy CVar), and `r.Nanite.Foliage:1` during
 startup. This verifies that the project setting was applied after restart. It
 does not show that Nanite foliage improved frame time, memory, or appearance.
+The live editor console independently returned `r.Nanite.Foliage = "1"` with
+`LastSetBy: ProjectSetting`.
 The first post-load capture displayed a landscape-texture streaming
 notification. That notification had disappeared ten seconds later, but the
 Output Log still showed one queued and one async package, so resource settling
 remains unverified.
+
+The settled viewport's local view is a broad open slope with sparse low plants
+and a small group of trees. This is useful as a repeatable composition warning,
+not a full-island species census; it reinforces the need for a controlled
+Tideglass-to-woodland visual pass before changing scatter density or claiming
+species diversity improved.
 
 The same main D: project still has `MaxModelRequests=120` and permits 120 in
 `Scripts/Start-Spectator.ps1`; the current tracked worktree has a hard/config
