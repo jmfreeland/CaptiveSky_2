@@ -51,6 +51,19 @@ editor run. Historical captures vary from 18.03 ms p95 in a stationary view to
 23.84 FPS p95 for a full-cover capture, so a density increase is not justified
 without a matched measurement.
 
+**Bounded runtime recheck (2026-10-31):** after the approved editor restart,
+`r.Nanite.Foliage=1` remained active during a 15m 52s standalone preview
+(19 model requests; isolated playtest data). The night view around the rain
+basin showed dense layered understory and multiple tree silhouettes, but this
+local composition does not establish natural scatter or species readability
+over the island; the editor-only view still cannot show the runtime-generated
+broadleaf population. Raven again signaled that the west roost is too exposed,
+Rat preferred a sheltered hollow, and Aster floated another leaf in the basin.
+The run was not a performance profile and did not test water walking. Next:
+capture a matched daylight woodland-transition traversal with close/middle/far
+species identification, frame-time p95, and whole-device VRAM; separately test
+ocean contact and swim pose. See the [playtest record](findings/2026-10-31-character-playtest.md#second-bounded-preview).
+
 ### 2. Repair presentation dependencies in bounded groups
 
 Resolve the `M_Island_Textured_Wet` texture-collection index warning separately

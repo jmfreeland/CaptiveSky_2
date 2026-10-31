@@ -27,6 +27,16 @@
 - The night PIE view around the rain basin looked notably lush, with dense low vegetation, floating leaves, an agent, and the water feature. The editor viewport still showed broad open slopes and visibly sparse groundcover; this run does not establish that the whole island now has natural distribution or multiple tree species.
 - Walking-on-water behavior was not explicitly tested in this session. Treat that report as open.
 
+## Second bounded preview
+
+- After the user approved the restart, the editor reopened with `r.Nanite.Foliage=1`. A second standalone Island preview ran for 952.0 real seconds (15m 52s), then was stopped from the editor toolbar. It used 19 model requests, with none in flight at shutdown; the safety limits remained 1,800 seconds and 64 requests.
+- The second preview used the same isolated playtest root, not the shared live-world state. The chronicle advanced through day two to about 03:18 and continued to record autonomous resident activity.
+- Raven described the west roost as exposed to wind and rain, later chose to sleep there, and then decided to walk somewhere less familiar. Rat expressed a preference for a sheltered, familiar hollow. These are direct, actionable signals for a more protective nest and the hidden fallen-wood hollow already chosen for Rat.
+- Rat and Raven discussed how gusts made the Listening Stones sound “almost like a chord.” A meteor appeared naturally. Aster approached the rain basin and floated a leaf in it; the isolated basin now recorded three drifting leaves.
+- The nighttime standalone view showed dense, layered fern/grass cover around the basin and several distinct tree silhouettes across the middle distance, unlike the editor-only viewport. This is a local composition, not proof of naturally distributed or legible species across the island; the close groundcover still reads dense and clustered in places.
+- This was a visual/behavioral observation, not a performance profile: no matched frame-time or whole-device VRAM measurement was collected. The walking-on-water report also remains untested in this run. Keep both open; do not infer that Nanite foliage resolved memory pressure or the ocean collision issue from this preview alone.
+- The editor returned to the saved map after Stop. The log reported a clean PIE end with 19 requests and zero still in flight. The session was within its configured limits; it was not left running overnight.
+
 ## Evidence
 
 - Unreal log: `D:/Projects - Athena/unreal/CaptiveSky_2/Saved/Logs/CaptiveSky_2.log` (local machine).
