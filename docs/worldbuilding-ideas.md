@@ -23,6 +23,20 @@ so shared Island state and the normal proposal inbox were untouched. Do not
 repeat the same launch blindly; obtain symbolized dump analysis or a fresh
 startup diagnostic before the next feedback attempt.
 
+**Follow-up startup diagnosis (22:42 UTC):** the 64-request feedback launch
+and a fresh 32-request retry both exited before the world-ready marker; their
+data roots were separate and no resident session started. A 30-second,
+zero-request `UnrealEditor-Cmd.exe` NullRHI smoke run also failed at startup
+with Trace Server launch disabled. Its crash context records the same kind of
+null-address access violation on the game thread, with only UnrealEditor-Core
+frames and `PCallStackHash F405610C114D120D4B6F5ABA901EC469AC9FAA26` (0 seconds
+since start). The captured context/minidump was overwritten by Unreal's reused
+`Saved/Crashes/_0000` slot; individual launch logs remain there. No local CDB,
+WinDbg, or Unreal Core PDB was found, and Windows Application event-log reads
+were denied. This makes the Trace Server error and request cap insufficient
+explanations, but does not identify the fault. Stop further blind retries until
+symbolized dump analysis or a materially different startup path is available.
+
 ## 2026-10-31 — Verify Nanite Foliage after restarting the actual project
 
 After the user confirmed the Island was saved and approved a restart, the active
