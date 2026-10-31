@@ -63,3 +63,20 @@ small cluster of similar yellow-leaved trees. This is an angle-specific
 observation, not a species census. A useful next validation is a controlled
 reload with the diagnostic enabled before scatter, then a Tideglass-to-grove
 pass; avoid increasing density until those counts and performance are known.
+
+## Startup diagnostic path (2026-10-31)
+
+The scatter now accepts the explicit startup argument
+`-CaptiveSky.Island.GroundCoverSpatialDiagnostics=1`, read at the start of
+placement so it takes effect before the first scatter rather than relying on a
+late console command. `Scripts/Start-Spectator.ps1` exposes this as
+`-GroundCoverSpatialDiagnostics` and refuses to launch unless the run is
+bounded, uses an isolated `-DataRoot`, disables agent thinking, and supplies
+startup, real-time, and model-request caps. The documented 3-minute check sets
+model requests to zero. PowerShell parsing and both isolation/cap rejection
+checks passed, and the UE 5.8 editor target compiled successfully (40.26 s).
+
+Runtime verification is still pending: the active editor is the separate main
+D: project, while this compiled worktree has no local `Content/` tree. Do not
+claim that the command-line override or the resulting counts have run in the
+Island until the rebuilt module is integrated with the main project's assets.

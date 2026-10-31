@@ -38,6 +38,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -Continuous
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
+./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatial -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
 #>
 param(
 	[switch]$Windowed,
@@ -65,6 +66,7 @@ param(
 	[switch]$DisablePython,
 	[switch]$LogSituations,
 	[switch]$LogDragonflyFlowerVisits,
+	[switch]$GroundCoverSpatialDiagnostics,
 	[switch]$DisableGroundCoverSway,
 	[switch]$TextureStreamingStats,
 	[switch]$DisableFoliageMaterialWind,
@@ -107,6 +109,16 @@ if ($LogDragonflyFlowerVisits) {
 		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
 		throw "-LogDragonflyFlowerVisits requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+}
+if ($GroundCoverSpatialDiagnostics) {
+	if ($Continuous) { throw "-GroundCoverSpatialDiagnostics is supported only for bounded non-continuous sessions." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-GroundCoverSpatialDiagnostics requires an isolated -DataRoot." }
+	if (-not $DisableAgentThinking) { throw "-GroundCoverSpatialDiagnostics requires -DisableAgentThinking to avoid model requests during the diagnostic." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-GroundCoverSpatialDiagnostics requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
 }
 $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
@@ -175,6 +187,7 @@ if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", 
 if ($DisablePython) { $arguments += "-DisablePython" }
 if ($LogSituations) { $arguments += "-CaptiveSkyLogSituations" }
 if ($LogDragonflyFlowerVisits) { $execCommands += "CaptiveSky.Island.DragonflyFlowerTelemetry 1" }
+if ($GroundCoverSpatialDiagnostics) { $arguments += "-CaptiveSky.Island.GroundCoverSpatialDiagnostics=1" }
 if ($DisableGroundCoverSway) { $arguments += "-IslandDisableGroundCoverSway" }
 if ($DisableFoliageMaterialWind) { $arguments += "-IslandDisableFoliageMaterialWind" }
 if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }

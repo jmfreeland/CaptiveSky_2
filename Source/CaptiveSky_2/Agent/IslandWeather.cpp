@@ -1475,7 +1475,9 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> ValidMeadowTerrainCells;
 		ValidMeadowTerrainCells.Reserve(FMath::Min(MaxMeadowTerrainCells, TerrainCellColumns * TerrainCellRows));
 		constexpr float MeadowSpatialDiagnosticTileSizeCm = 20000.f;
-		const bool bGatherMeadowSpatialDiagnostics = CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread() > 0;
+		int32 RequestedMeadowSpatialDiagnostics = CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread();
+		FParse::Value(FCommandLine::Get(), TEXT("CaptiveSky.Island.GroundCoverSpatialDiagnostics="), RequestedMeadowSpatialDiagnostics);
+		const bool bGatherMeadowSpatialDiagnostics = RequestedMeadowSpatialDiagnostics > 0;
 		TMap<FIntPoint, FIntPoint> MeadowSpatialTileCounts;
 		if (bGatherMeadowSpatialDiagnostics)
 			MeadowSpatialTileCounts.Reserve(512);
