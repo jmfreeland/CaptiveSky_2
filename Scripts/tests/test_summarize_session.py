@@ -125,6 +125,29 @@ class SessionSummaryTests(unittest.TestCase):
 
         self.assertIn("| Aster | 0 | 0 | 1 |", report)
 
+    def test_mature_tree_diagnostic_summarizes_local_species_diversity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            log_path = Path(temporary_directory) / "tree-diagnostic.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "[2026.10.31-12.00.00:000][  0]LogAgentSession: Play safety active: 900 real seconds, at most 32 model requests.",
+                        "[2026.10.31-12.00.01:000][  1]LogIslandWeather: Mature tree tile [-2,3] (200 m): spruce=4, Norway maple=0, European aspen=2, European beech=0, black alder=1.",
+                        "[2026.10.31-12.00.02:000][  2]LogIslandWeather: Mature tree tile [0,3] (200 m): spruce=7, Norway maple=0, European aspen=0, European beech=0, black alder=0.",
+                        "[2026.10.31-12.15.00:000][  3]LogAgentSession: Play ended after 900 real seconds with 0 model requests (0 still in flight).",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            report = SESSION["summarize"](log_path)
+
+        self.assertIn("## Mature tree distribution (200 m diagnostic)", report)
+        self.assertIn("2 occupied tiles; 1 (50%) contain at least two mature-tree species.", report)
+        self.assertIn("| Norway maple | 0 | 0 |", report)
+        self.assertIn("| European aspen | 1 | 2 |", report)
+        self.assertIn("Single-species tile examples: [0,3].", report)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,9 @@ empty and recording returns immediately.
 
 - UE 5.8 editor target compiled successfully after this change (39.99 s).
 - `git diff --check` passed for the source change.
+- `Scripts/tests/test_summarize_session.py` passes all five tests. The session
+  report now turns tile rows into occupied-tile richness, per-species tile and
+  tree totals, and examples of single-species tiles.
 - The diagnostic was not run against the live Island: the active D: project is
   separate from this source worktree and has not loaded this compiled module.
 - Runtime tile counts, naturalness, FPS, VRAM, and visual tree readability

@@ -38,6 +38,11 @@ OUTCOME = re.compile(r"LogAutonomousAgentAI: (\S+) outcome: (.*)$")
 SPEECH = re.compile(r'LogAutonomousAgentAI: (\S+) chose speech: "(.*)"$')
 FEEDBACK_INVITE = re.compile(r"LogAgentBrain: Optional resident-feedback invitation shown to (\S+) after (\d+) real seconds\.")
 FEEDBACK_RESULT = re.compile(r'LogAgentBrain: Resident feedback check-in result for (\S+): (.*)$')
+TREE_TILE = re.compile(
+    r"Mature tree tile \[(-?\d+),(-?\d+)\] \(200 m\): spruce=(\d+), Norway maple=(\d+), "
+    r"European aspen=(\d+), European beech=(\d+), black alder=(\d+)\."
+)
+TREE_SPECIES = ("spruce", "Norway maple", "European aspen", "European beech", "black alder")
 SITUATION = re.compile(r"Situation for (\S+) \((\d+) chars, system prompt (\d+) chars\): (.*)$")
 PROPOSAL_ID = re.compile(r"(?:Object request|Upgrade suggestion) ([0-9a-fA-F]{8})\b")
 SESSION_START = re.compile(r"LogAgentSession: (?:Play safety active:|Continuous play:)")
@@ -113,6 +118,7 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     speech: dict[str, list[str]] = collections.defaultdict(list)
     feedback_invites: dict[str, int] = {}
     feedback_results: dict[str, str] = {}
+    mature_tree_tiles: dict[tuple[int, int], tuple[int, ...]] = {}
     interactions: collections.Counter = collections.Counter()
     failures: collections.Counter = collections.Counter()
     builds: list[str] = []
@@ -123,6 +129,10 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     systems: dict[str, list[int]] = collections.defaultdict(list)
     noticed: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for line in lines:
+        if match := TREE_TILE.search(line):
+            x, y, *counts = (int(value) for value in match.groups())
+            mature_tree_tiles[(x, y)] = tuple(counts)
+            continue
         if match := FEEDBACK_INVITE.search(line):
             agent, elapsed = match.groups()
             feedback_invites[agent] = int(elapsed)
@@ -184,6 +194,23 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
         for agent, elapsed in sorted(feedback_invites.items()):
             result = feedback_results.get(agent, "invitation was shown; no result was logged")
             out.append(f"- {resident_name(agent, thoughts[agent])} (invited after {elapsed // 60} min): {result}")
+    if mature_tree_tiles:
+        species_richness = collections.Counter(sum(value > 0 for value in counts) for counts in mature_tree_tiles.values())
+        multi_species_tiles = sum(count for richness, count in species_richness.items() if richness >= 2)
+        coverage = [sum(counts[index] > 0 for counts in mature_tree_tiles.values()) for index in range(len(TREE_SPECIES))]
+        totals = [sum(counts[index] for counts in mature_tree_tiles.values()) for index in range(len(TREE_SPECIES))]
+        out += ["", "## Mature tree distribution (200 m diagnostic)", "",
+                f"- {len(mature_tree_tiles)} occupied tiles; {multi_species_tiles} ({multi_species_tiles / len(mature_tree_tiles):.0%}) contain at least two mature-tree species.",
+                "- Tiles by species richness: " + ", ".join(
+                    f"{richness} species: {species_richness[richness]}" for richness in sorted(species_richness)),
+                "", "| Species | occupied tiles | mature trees |", "|---|---:|---:|"]
+        out.extend(f"| {name} | {coverage[index]} | {totals[index]} |" for index, name in enumerate(TREE_SPECIES))
+        single_species_tiles = sorted(tile for tile, counts in mature_tree_tiles.items()
+                                       if sum(value > 0 for value in counts) == 1)
+        if single_species_tiles:
+            examples = ", ".join(f"[{x},{y}]" for x, y in single_species_tiles[:8])
+            suffix = " …" if len(single_species_tiles) > 8 else ""
+            out.append(f"- Single-species tile examples: {examples}{suffix}.")
     if situations:
         out += ["", "## What residents were shown", "", "| Resident | situations | median situation chars | median system prompt chars | most often in view |", "|---|---|---|---|---|"]
         for agent, lengths in sorted(situations.items()):
