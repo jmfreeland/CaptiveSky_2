@@ -135,11 +135,13 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Region summary carries the most recent known use"), ActiveRegion.LastUseDay, 19);
 	TestTrue(TEXT("Recent dated use proves an active region despite older unknown cells"), ActiveRegion.State == EIslandTrailRegionState::Active);
 	TestEqual(TEXT("Small regions return every contributing cell as a sample"), ActiveRegion.SampleCells.Num(), 3);
-	RegionLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = 14;
-	const FIslandTrailRegionSummary RecoveringRegion = RegionLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
+	FIslandTrailLedger AgeStateLedger = RegionLedger;
+	AgeStateLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = 14;
+	AgeStateLedger.Cells.FindChecked(FIntPoint(1, 0)).LastUseDay = 16;
+	const FIslandTrailRegionSummary RecoveringRegion = AgeStateLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
 	TestTrue(TEXT("Fully dated quiet regions are marked recovering"), RecoveringRegion.State == EIslandTrailRegionState::Recovering);
-	RegionLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = -1;
-	const FIslandTrailRegionSummary UnknownRegion = RegionLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
+	AgeStateLedger.Cells.FindChecked(FIntPoint(7, 7)).LastUseDay = -1;
+	const FIslandTrailRegionSummary UnknownRegion = AgeStateLedger.SummarizeRegionForCell(FIntPoint(3, 4), 20);
 	TestTrue(TEXT("Undated legacy wear stays explicitly unknown"), UnknownRegion.State == EIslandTrailRegionState::Unknown);
 
 	FIslandTrailLedger DenseRegionLedger;

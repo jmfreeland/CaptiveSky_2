@@ -4,6 +4,6 @@ Visible worn-ground patches are refreshed around the first player's active view 
 
 The implementation reuses the existing 1.5-second refresh cadence, 55 m draw radius, and 360-instance cap. It changes no saved trail data and adds no per-frame work. `IslandTrailTests.cpp` covers camera preference and invalid-view fallback.
 
-The UE 5.8 editor target compiled and linked successfully against the isolated `Saved/CS58` project copy. The focused automation test and rendered behavior remain unverified: on restart, Unreal opened a `Wait for ZenServer?` prompt, and that prompt is awaiting the user's choice.
+The UE 5.8 editor target compiled and linked successfully against the isolated `Saved/CS58` project copy. `CaptiveSky2.Agent.IslandTrail` and `CaptiveSky2.Agent.IslandTrailVisitor` then passed in a NullRHI commandlet run with agent thinking disabled, a zero model-request cap, and an isolated data root (`Saved/CS58/Saved/Logs/Codex_TrailView_20261031_Final.log`, exit code 0). The focused run exposed two stale date-fixture assumptions; the test now uses a copy of the ledger for recovering/unknown-age cases, preserving the independent active-region record assertions. NullRHI verifies the logic and test fixtures, not rendered wear placement.
 
-Next: after the editor opens, run the focused trail automation once, then inspect wear while viewing from a detached spectator/camera-cut location. Do not expand the draw cap without measured GPU headroom.
+The GUI restart remains at a `Wait for ZenServer?` prompt, so rendered behavior is still unverified. Next, after the editor opens, inspect wear while viewing from a detached spectator/camera-cut location. Do not expand the draw cap without measured GPU headroom.
