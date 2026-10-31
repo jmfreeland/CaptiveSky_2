@@ -37,6 +37,14 @@
 - This was a visual/behavioral observation, not a performance profile: no matched frame-time or whole-device VRAM measurement was collected. The walking-on-water report also remains untested in this run. Keep both open; do not infer that Nanite foliage resolved memory pressure or the ocean collision issue from this preview alone.
 - The editor returned to the saved map after Stop. The log reported a clean PIE end with 49 requests and zero still in flight. The session was within its configured limits; it was not left running overnight.
 
+Reprocessing the saved log with the corrected session selector isolates the
+second 15m 52s run at 45 resident decisions (Aster 12, Innkeeper 11, Rat 11,
+Raven 11) across 49 model requests. No request-object, request-upgrade, or
+craft-proposal actions were recorded. The feedback above therefore came from
+residents' ordinary choices and speech, not a direct end-of-run questionnaire.
+Add a small, budgeted feedback prompt to a future run after the active project
+safety guard is brought up to date.
+
 ## Request-cap mismatch follow-up
 
 During the later restart check, the reopened project at
@@ -62,3 +70,19 @@ was inspected but not modified from this worktree.
 - Unreal log: `D:/Projects - Athena/unreal/CaptiveSky_2/Saved/Logs/CaptiveSky_2.log` (local machine).
 - Isolated chronicle, resident memories, trails, and world state: `Saved/Playtests/Codex_CharacterFeedback_20261031/` (local ignored playtest data).
 - The repository’s read-only summarizer was run against the completed Unreal log: `Scripts/Summarize-Session.py`.
+
+**Session-reporting correction (2026-10-31):** the summarizer’s action table
+only covered the first seven `EAgentActionType` values, so landings, asset
+requests, upgrade proposals, and craft experiments were reported as anonymous
+`action N` counts. It now tracks all eleven current actions, with a regression
+for the four newer agency actions. An optional `--requests` inbox path also
+joins logged proposal IDs to full resident-authored descriptions, targets,
+kinds, and review status—only for IDs logged in that session, excluding older
+unrelated inbox entries. The test passed with UE 5.8.3’s bundled Python 3.11.
+The playtest log also assigned the Rat's lines to the Innkeeper because the Rat
+mentioned the hearth; the summarizer now prioritizes stable Rat identity. New
+decision and action-outcome log lines will include each resident's stable agent
+ID instead of only the generic controller class, making future attribution
+reliable. This improves review of resident initiative without adding model
+calls; historic totals for action indices 7 and above must be re-read from raw
+logs or regenerated with the updated script.

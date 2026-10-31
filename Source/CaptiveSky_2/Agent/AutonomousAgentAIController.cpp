@@ -36,6 +36,14 @@ DEFINE_LOG_CATEGORY_STATIC(LogAutonomousAgentAI, Log, All);
 
 namespace
 {
+	FString GetAgentLogIdentity(const AAutonomousAgentAIController* Controller)
+	{
+		const APawn* Body = Controller ? Controller->GetPawn() : nullptr;
+		const UAgentMemoryComponent* Memory = Body ? Body->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+		const FString AgentId = Memory ? Memory->GetResolvedAgentId() : FString();
+		return AgentId.IsEmpty() ? GetNameSafe(Controller) : AgentId;
+	}
+
 	TAutoConsoleVariable<int32> CVarDisableAgentThinking(
 		TEXT("CaptiveSky.Agent.DisableThinking"), 0,
 		TEXT("When non-zero, autonomous residents do not request LLM decisions. Useful for safe, zero-request PIE validation."),
@@ -773,7 +781,7 @@ bool AAutonomousAgentAIController::TryRest(FName RequestedRestSite)
 void AAutonomousAgentAIController::ReportAction(const FString& Outcome)
 {
 	LastActionOutcome = Outcome;
-	UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s outcome: %s"), *GetName(), *Outcome);
+	UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s outcome: %s"), *GetAgentLogIdentity(this), *Outcome);
 }
 FString AAutonomousAgentAIController::DescribeActionState() const
 {
@@ -1043,7 +1051,8 @@ void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Dec
 		}
 	}
 
-	UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s decided: \"%s\" (Action=%d)"), *GetName(), *Decision.Thought, static_cast<int32>(Decision.ActionType));
+	UE_LOG(LogAutonomousAgentAI, Log, TEXT("%s decided: \"%s\" (Action=%d)"),
+		*GetAgentLogIdentity(this), *Decision.Thought, static_cast<int32>(Decision.ActionType));
 
 	GroundedLandmarkRecoveryAttempts = 0;
 	ActOnDecision(Decision);
