@@ -800,3 +800,13 @@ present after the save. The 13 Everestian rhododendron fallbacks remain a
 separate broken graph and were not toggled. Next: once the editor closes, repeat
 the capped zero-request Tideglass Game view and verify both warning removal and
 appearance. Details and backups: [material repair finding](findings/2026-10-10-starter-instanced-materials.md).
+
+## 2026-10-31 — Rat's fallen-wood hollow
+
+Rat's first-home concept is a hidden fallen-wood hollow. A local V7 asset
+candidate now reads as a horizontal trunk in an oblique Blender view, with an
+irregular root canopy and low side roots. It is still too stylized and has not
+been reviewed against Island terrain, woodland cover, or Rat-scale movement.
+Keep the canonical home and memory unset until a disposable Unreal placement
+passes entrance visibility, ground contact, collision, and navigation review.
+See [the V7 candidate finding](findings/2026-10-31-rathollow-hidden-v7.md).
