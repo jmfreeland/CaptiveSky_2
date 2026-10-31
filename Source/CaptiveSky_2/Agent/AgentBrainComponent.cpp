@@ -93,6 +93,23 @@ namespace
 		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
 		return DisplayName + TEXT(" trees");
 	}
+
+	bool IsGeneratedActorLabel(const FString& Label)
+	{
+		for (const TCHAR* Prefix : { TEXT("Actor"), TEXT("StaticMeshActor") })
+		{
+			const FString PrefixString(Prefix);
+			if (Label == PrefixString) return true;
+			if (!Label.StartsWith(PrefixString + TEXT("_"))) continue;
+
+			const FString Suffix = Label.Mid(PrefixString.Len() + 1);
+			if (Suffix.IsEmpty()) continue;
+			bool bNumericSuffix = true;
+			for (const TCHAR Character : Suffix) bNumericSuffix &= FChar::IsDigit(Character);
+			if (bNumericSuffix) return true;
+		}
+		return false;
+	}
 }
 
 UAgentBrainComponent::UAgentBrainComponent()
@@ -876,10 +893,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			Label.ReplaceInline(TEXT("\n"), TEXT(" "));
 			Label.ReplaceInline(TEXT("\""), TEXT("'"));
 			Label.TrimStartAndEndInline();
-			if (Label.IsEmpty())
+			if (Label.IsEmpty() || IsGeneratedActorLabel(Label))
 			{
 				Label = MeshComponent->GetStaticMesh()->GetName();
 				Label.RemoveFromStart(TEXT("SM_"));
+				Label.RemoveFromStart(TEXT("SKM_"));
 				Label.ReplaceInline(TEXT("_"), TEXT(" "));
 			}
 			Label = Label.Left(64);

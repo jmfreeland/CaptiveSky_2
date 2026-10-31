@@ -1,5 +1,23 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Make nearby object proposals pointable by name
+
+The request-upgrade prompt already allowed residents to propose aesthetic,
+variation, or functionality changes to any landscape/level feature. Nearby
+ordinary props can also be surfaced, but an engine-generated actor label such
+as `StaticMeshActor_27` is not a useful thing for a resident or human reviewer
+to identify. When a prop has only a default generated label, perception now
+falls back to its mesh asset name (for example, `SM_Notice_Board_Weathered`
+becomes “Notice Board Weathered”). Authored actor labels remain preferred.
+This changes only what is named in the situation summary: it neither grants a
+movement/interaction target nor edits the object. A focused regression checks
+that an inspectable nearby notice board is targetable in a human-readable
+upgrade proposal and that the generated actor label stays hidden. The UE 5.8.3
+editor target built, and `CaptiveSky2.Agent.NearbyVegetationPerception` passed
+under NullRHI (exit code 0); its warmed 3,600-tree fixture averaged 0.198 ms
+across ten samples. This does not establish live prop labeling or Island visual
+quality in the active D: project.
+
 ## 2026-10-31 — Let residents notice the mixed broadleaf canopy
 
 The existing nearby-plant perception already described visible HISM ground

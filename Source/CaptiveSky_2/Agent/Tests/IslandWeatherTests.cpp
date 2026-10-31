@@ -461,6 +461,20 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	FlowerPatch->SetVisibility(false);
 	GroundCoverPatch->SetVisibility(false);
 
+	UStaticMesh* NoticeBoardMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("SM_Notice_Board_Weathered"));
+	AActor* GeneratedLabelProp = World->SpawnActor<AActor>(FVector(600.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	UStaticMeshComponent* NoticeBoard = NewObject<UStaticMeshComponent>(GeneratedLabelProp);
+	GeneratedLabelProp->SetRootComponent(NoticeBoard);
+	NoticeBoard->SetStaticMesh(NoticeBoardMesh);
+	NoticeBoard->SetCollisionProfileName(TEXT("BlockAll"));
+	NoticeBoard->RegisterComponent();
+	GeneratedLabelProp->SetActorLabel(TEXT("StaticMeshActor_27"));
+	const FString NoticeBoardSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby ordinary prop remains available for an optional upgrade proposal"),
+		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered")) && NoticeBoardSituation.Contains(TEXT("request_upgrade")));
+	TestFalse(TEXT("Residents are not asked to target an engine-generated actor label"),
+		NoticeBoardSituation.Contains(TEXT("StaticMeshActor_27")));
+
 	struct FInstalledPlantLabelCase
 	{
 		const TCHAR* AssetPath;
