@@ -37,3 +37,25 @@ the current fallback when the asset is unavailable, and validate mixed-species
 counts, FPS, and peak VRAM before calling it a production tree.
 
 This inspection made no map, package, or source changes in the live project.
+
+## Six-species metadata preflight (2026-10-31 22:34 UTC)
+
+Added `Scripts/Inspect-MegaplantAssetRegistry.py`, a fast, read-only
+Asset-Registry inventory that enumerates package paths and classes without
+loading mesh/PVE objects or building Nanite data. Against the isolated UE 5.8.3
+scratch project, whose `Content` is a read-only junction to the main project,
+it reported 371 registry entries: 24 A–D skeletal tree variants and 18 PVE
+assets across Aleppo Pine, Black Alder, Common Hazel, European Aspen, European
+Beech, and Norway Maple (four mesh variants and three PVE-related assets per
+species). The run used NullRHI and did not load the Island. Log:
+`Saved/CS58/Saved/Logs/Codex_MegaplantRegistryAudit_20261031.log`.
+
+The existing detailed inventory was also tried against this read-only Content
+view, but loading Aleppo variants began on-demand skeletal/Nanite work and
+remained at `Waiting for skinned assets to be ready 0/1` for over two minutes.
+That isolated commandlet was stopped before its report completed. The script
+made no explicit save, and the live project/map remained untouched. This is a
+concrete reason to use registry-only preflight under memory pressure; it is
+availability evidence only, not a successful mesh-load or render check. The
+incomplete detailed run is preserved at
+`Saved/CS58/Saved/Logs/Codex_MegaplantFullInventory_20261031.log`.
