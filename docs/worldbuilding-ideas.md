@@ -11,16 +11,21 @@ for at most the three closest candidates per component. It uses ordinary
 species names and frames the patch as optional `request_upgrade` context only;
 plants remain without movement or interaction targets. This is descriptive
 perception only: no extra model call, world mutation, memory write, or foliage
-population increase.
+population increase. The summary remains capped at three plant patches; when
+nearby HISM ground cover would otherwise occupy all three slots, it reserves
+the third for the nearest visible broadleaf patch while keeping the two nearest
+other patches. A crowding regression covers this mixed-canopy case.
 
 The UE 5.8.3 editor target built successfully, and
 `CaptiveSky2.Agent.NearbyVegetationPerception` passed under NullRHI (exit code
 0). The fixture verifies the Norway-maple label, keeps it out of movement-target
 wording, and omits it when hidden, occluded, or outside the short radius. A
-stress fixture populated all four species components to the 3,600-tree budget
-and timed ten warmed summary builds at an average of 0.187 ms under NullRHI.
-This isolates CPU transform scanning with transient meshes; it is not a full
-Island prompt-construction profile and does not validate live species
+crowding case places three closer HISM patches before the maple and verifies
+that the two closest plus the maple—not the third HISM—fit the three-patch cap.
+A stress fixture populated all four species components to the 3,600-tree
+budget and timed ten warmed summary builds at an average of 0.132 ms under
+NullRHI. This isolates CPU transform scanning with transient meshes; it is not
+a full Island prompt-construction profile and does not validate live species
 visibility or visual quality. Keep the 6.5 m radius and bounded visibility
 traces until an in-world daylight check confirms what residents actually see.
 

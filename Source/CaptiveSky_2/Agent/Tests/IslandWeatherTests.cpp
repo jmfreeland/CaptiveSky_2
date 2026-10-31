@@ -430,6 +430,37 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Numbered ground-cover asset IDs are described perceptually"),
 		GroundCoverSituation.Contains(TEXT("patch of low groundcover")) && !GroundCoverSituation.Contains(TEXT("ground 05 01")));
 
+	// Dense ground-cover patches must not starve the mixed canopy from the
+	// three-item prompt budget: keep the two closest patches and reserve the
+	// remaining slot for the nearest broadleaf tree.
+	auto AddCrowdingPatch = [Weather](UStaticMesh* Mesh, const FVector& PatchLocation)
+		-> UHierarchicalInstancedStaticMeshComponent*
+	{
+		UHierarchicalInstancedStaticMeshComponent* Patch = NewObject<UHierarchicalInstancedStaticMeshComponent>(Weather);
+		Weather->AddInstanceComponent(Patch);
+		Patch->SetStaticMesh(Mesh);
+		Patch->RegisterComponent();
+		Patch->SetVisibility(true);
+		Patch->SetHiddenInGame(false);
+		Patch->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Patch->AddInstance(FTransform(FRotator::ZeroRotator, PatchLocation));
+		return Patch;
+	};
+	UHierarchicalInstancedStaticMeshComponent* FlowerPatch = AddCrowdingPatch(
+		FlowerMesh, FVector(100.f, 0.f, 0.f));
+	UHierarchicalInstancedStaticMeshComponent* GroundCoverPatch = AddCrowdingPatch(
+		GroundCoverMesh, FVector(200.f, 0.f, 0.f));
+	Foliage->SetStaticMesh(Cube);
+	const FString CrowdedSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("The closest flower and ground-cover patches remain in the three-item summary"),
+		CrowdedSituation.Contains(TEXT("patch of wildflowers")) && CrowdedSituation.Contains(TEXT("patch of low groundcover")));
+	TestTrue(TEXT("A nearby broadleaf gets a reserved summary slot even when three closer HISM patches would crowd it out"),
+		CrowdedSituation.Contains(TEXT("patch of Norway maple trees")));
+	TestFalse(TEXT("The broadleaf reservation still leaves the summary bounded to three patches"),
+		CrowdedSituation.Contains(TEXT("patch of Cube vegetation")));
+	FlowerPatch->SetVisibility(false);
+	GroundCoverPatch->SetVisibility(false);
+
 	struct FInstalledPlantLabelCase
 	{
 		const TCHAR* AssetPath;

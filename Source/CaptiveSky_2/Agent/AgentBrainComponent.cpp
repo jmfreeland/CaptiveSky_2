@@ -687,6 +687,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			FString DisplayName;
 			double DistanceSquared = TNumericLimits<double>::Max();
 			FVector Location = FVector::ZeroVector;
+			bool bBroadleaf = false;
 		};
 		struct FNearbyPlantInstance
 		{
@@ -756,7 +757,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					}
 					else
 					{
-						NearbyPlantPatches.Add({ MeshName, MoveTemp(DisplayName), NearestVisibleDistanceSquared, NearestVisibleLocation });
+						NearbyPlantPatches.Add({ MeshName, MoveTemp(DisplayName), NearestVisibleDistanceSquared, NearestVisibleLocation, false });
 					}
 				}
 			}
@@ -822,13 +823,29 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					}
 					else
 					{
-						NearbyPlantPatches.Add({ MeshName, DisplayName, NearestVisibleDistanceSquared, NearestVisibleLocation });
+						NearbyPlantPatches.Add({ MeshName, DisplayName, NearestVisibleDistanceSquared, NearestVisibleLocation, true });
 					}
 				}
 			}
 		}
 		NearbyPlantPatches.Sort([](const FNearbyPlantPatch& A, const FNearbyPlantPatch& B)
 			{ return A.DistanceSquared < B.DistanceSquared; });
+		const int32 ReportedPlantCount = FMath::Min(3, NearbyPlantPatches.Num());
+		bool bReportedBroadleaf = false;
+		for (int32 Index = 0; Index < ReportedPlantCount; ++Index)
+			bReportedBroadleaf |= NearbyPlantPatches[Index].bBroadleaf;
+		if (ReportedPlantCount > 0 && !bReportedBroadleaf)
+		{
+			const int32 NearestBroadleafIndex = NearbyPlantPatches.IndexOfByPredicate(
+				[](const FNearbyPlantPatch& Patch) { return Patch.bBroadleaf; });
+			if (NearestBroadleafIndex >= ReportedPlantCount)
+			{
+				NearbyPlantPatches[ReportedPlantCount - 1] = MoveTemp(NearbyPlantPatches[NearestBroadleafIndex]);
+				NearbyPlantPatches.SetNum(ReportedPlantCount);
+				NearbyPlantPatches.Sort([](const FNearbyPlantPatch& A, const FNearbyPlantPatch& B)
+					{ return A.DistanceSquared < B.DistanceSquared; });
+			}
+		}
 		for (int32 Index = 0; Index < FMath::Min(3, NearbyPlantPatches.Num()); ++Index)
 		{
 			const FNearbyPlantPatch& Patch = NearbyPlantPatches[Index];
