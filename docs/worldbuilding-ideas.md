@@ -7,6 +7,19 @@ automation run passed both `CaptiveSky2.Agent.ModelTier` and
 `CaptiveSky2.Agent.ModelTierWorldFacts` (`Result={Success}`, exit code 0;
 [`Codex_ResidentFeedback_ModelTier_20261031.log`](../Saved/Logs/Codex_ResidentFeedback_ModelTier_20261031.log)). The regression confirms the optional feedback invitation becomes eligible at 720 real seconds, is not repeated for a resident during that session, and does not interrupt visitor or agent conversation turns. It also exercises nearby-landmark facts that route a quiet resident to the full model. This is source-level eligibility evidence, not a 12-minute resident response or a 15–30 minute world playtest. The sparse checkout lacks `Content/Maps/Island.umap` and the local plant assets, so Unreal could not load the Island; missing asset warnings in this run do not establish a defect in the active D: project. Keep the session time/request limits unchanged. Next, restore editor input access, verify the active project and startup settings, then capture one bounded character-feedback run with its response, FPS and device-memory state recorded.
 
+## 2026-10-31 — Recheck the RatHollow V5 candidate
+
+The local V5 RatHollow FBX rebuilt and re-imported cleanly in Blender 5.2.2
+(2,352 triangles; five box colliders; `UVMap`; `PROBLEMS []`), and 25
+RatHollow-related source tests passed under Blender's bundled Python. The
+entrance-facing preview is readable but still looks like a short, manufactured
+stump with dominant high-contrast bark; it is not ready for placement. A
+read-only check of the actual D: project found older RatHollow imports but no
+V5 asset and no canonical `wildlife_homes` record. Nothing was imported,
+placed, or saved. The user's chosen hollow concept remains unresolved pending a
+disposable Island review of ground contact, concealment, and Rat-scale
+navigation. Full assessment: [RatHollow V5 recheck](findings/2026-10-31-rathollow-v5-recheck.md).
+
 ## 2026-10-31 — Stop the first live PIE memory sample early
 
 The currently open `CaptiveSky_2` editor reported `r.Nanite.Foliage = 1`
