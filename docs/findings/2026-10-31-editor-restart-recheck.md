@@ -259,3 +259,25 @@ This confirms the correct main project is open and the setting remains enabled
 after restart. The earlier missing-plugin prompt belongs to a different recent
 project entry and remains unresolved for that stale copy. No main-project
 source, setting, map, or asset was modified.
+
+## User-approved restart and live setting check (2026-10-31 23:46–23:48)
+
+After the user again confirmed all changes were saved and approved a restart,
+the editor was closed normally and reopened through the Unreal project browser.
+The selected `.uproject` was verified as
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject` (UE 5.8).
+The Island reopened with 183 actors and the status bar showed **All Saved**.
+The live console query returned:
+
+```text
+r.Nanite.Foliage = "1"      LastSetBy: ProjectSetting
+```
+
+The fresh `Saved/Logs/CaptiveSky_2.log` also records `r.Nanite.Foliage:1` at
+startup. A contemporaneous `nvidia-smi` reading was 9,067 / 12,282 MiB used,
+2,931 MiB free, and 48% GPU utilization. This remains below the existing
+4,096 MiB rendered-session guard, so no PIE/Game run was started. The editor
+viewport remains sea-facing; no foliage or player shoreline behavior was
+visually validated. The startup log still includes the landscape edit-layer
+merge batch-resolution warning. This confirms the setting after restart, not
+that Nanite Foliage has improved memory, performance, or appearance.
