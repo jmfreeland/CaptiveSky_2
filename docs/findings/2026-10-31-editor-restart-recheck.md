@@ -99,3 +99,10 @@ UE 5.8 editor target rebuilt successfully in 37.81 seconds, compiling both
 test is compiled but not executed in this turn; the active editor still has
 the older module, and the previously observed command-line pre-initialization
 crashes make an isolated launch an unsafe substitute for a live test.
+
+The ground-cover startup override also has pure regression assertions for
+default-off, CVar-on, startup-argument-on, and explicit startup-argument-off
+precedence in `CaptiveSky2.Agent.MeadowBudgetSplit`. The UE 5.8 editor target
+rebuilt successfully again (41.67 s), compiling `IslandWeather.cpp` and
+`IslandMeadowBudgetTests.cpp`; the automation was compiled but not executed
+because the active D: editor still has the older module.

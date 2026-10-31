@@ -299,6 +299,8 @@ private:
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity = 0.f);
 	/** Softly modulate broad meadow cover between open patches and lush communities without a hard habitat edge. */
 	static float CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity);
+	/** Resolve the diagnostic CVar with an optional scatter-time command-line override. */
+	static bool ShouldGatherMeadowSpatialDiagnostics(int32 ConsoleValue, const FString& CommandLine);
 	/** Reserve a bounded share of the total meadow-candidate budget for landmark-centered patches. */
 	static int32 CalculateLandmarkMeadowPatchLimit(int32 TotalCandidateBudget, int32 CandidatesPerPatch, float LandmarkBudgetShare);
 	/** Give unused candidate capacity back to broad terrain scatter. */

@@ -8,6 +8,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMeadowBudgetTest,
 
 bool FIslandMeadowBudgetTest::RunTest(const FString& Parameters)
 {
+	TestFalse(TEXT("Spatial diagnostics are disabled by default"),
+		AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(0, FString()));
+	TestTrue(TEXT("The diagnostic CVar enables per-tile gathering"),
+		AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(1, FString()));
+	TestTrue(TEXT("A startup argument enables gathering before scatter begins"),
+		AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(0,
+			TEXT("-CaptiveSky.Island.GroundCoverSpatialDiagnostics=1")));
+	TestFalse(TEXT("An explicit startup zero overrides an enabled CVar"),
+		AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(1,
+			TEXT("-CaptiveSky.Island.GroundCoverSpatialDiagnostics=0")));
+
 	constexpr int32 TotalCandidatesAtFivePercent = 96000;
 	constexpr int32 CandidatesPerLandmarkPatch = 1875;
 	const int32 LandmarkPatchLimit = AIslandWeather::CalculateLandmarkMeadowPatchLimit(

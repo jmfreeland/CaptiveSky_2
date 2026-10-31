@@ -697,6 +697,13 @@ float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatComm
 	return 0.28f + 0.72f * (1.f - BroadHabitat) * (1.f - FineCommunity);
 }
 
+bool AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(int32 ConsoleValue, const FString& CommandLine)
+{
+	int32 RequestedValue = ConsoleValue;
+	FParse::Value(*CommandLine, TEXT("CaptiveSky.Island.GroundCoverSpatialDiagnostics="), RequestedValue);
+	return RequestedValue > 0;
+}
+
 int32 AIslandWeather::CalculateLandmarkMeadowPatchLimit(int32 TotalCandidateBudget,
 	int32 CandidatesPerPatch, float LandmarkBudgetShare)
 {
@@ -1475,9 +1482,8 @@ void AIslandWeather::InitializeGroundCover()
 		TArray<FVector> ValidMeadowTerrainCells;
 		ValidMeadowTerrainCells.Reserve(FMath::Min(MaxMeadowTerrainCells, TerrainCellColumns * TerrainCellRows));
 		constexpr float MeadowSpatialDiagnosticTileSizeCm = 20000.f;
-		int32 RequestedMeadowSpatialDiagnostics = CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread();
-		FParse::Value(FCommandLine::Get(), TEXT("CaptiveSky.Island.GroundCoverSpatialDiagnostics="), RequestedMeadowSpatialDiagnostics);
-		const bool bGatherMeadowSpatialDiagnostics = RequestedMeadowSpatialDiagnostics > 0;
+		const bool bGatherMeadowSpatialDiagnostics = ShouldGatherMeadowSpatialDiagnostics(
+			CVarIslandGroundCoverSpatialDiagnostics.GetValueOnGameThread(), FCommandLine::Get());
 		TMap<FIntPoint, FIntPoint> MeadowSpatialTileCounts;
 		if (bGatherMeadowSpatialDiagnostics)
 			MeadowSpatialTileCounts.Reserve(512);
