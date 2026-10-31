@@ -163,6 +163,10 @@ EIslandDriftKind AIslandDrift::KindForSlot(int32 Index)
 
 FString AIslandDrift::DescribeDrift(float WindSpeed, float Rain, float Daylight)
 {
+	if (!FMath::IsFinite(WindSpeed) || !FMath::IsFinite(Rain) || !FMath::IsFinite(Daylight)) return FString();
+	WindSpeed = FMath::Max(0.f, WindSpeed);
+	Rain = FMath::Clamp(Rain, 0.f, 1.f);
+	Daylight = FMath::Clamp(Daylight, 0.f, 1.f);
 	if (Daylight < 0.3f) return FString();
 	if (Rain > 0.35f)
 	{

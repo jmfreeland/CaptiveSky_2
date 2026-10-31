@@ -16,9 +16,10 @@ observations grounded in the same thresholds as the simulation.
 `CaptiveSky_2Editor` compiled successfully with UE 5.8.3. The focused
 `CaptiveSky2.Agent.IslandDrift.WetWeatherMotes` automation passed in the
 isolated `Saved/CS58/` scratch project under NullRHI with agent thinking
-disabled and zero model requests. Log:
-`Saved/CS58/Saved/Logs/Codex_WetDrift_20261031_4.log`. This verifies the
+disabled and zero model requests. Final log:
+`Saved/CS58/Saved/Logs/Codex_WetDrift_20261031b.log`. This verifies the
 deterministic count, weather cue, velocity response, rain-only leaf population,
-and malformed-input behavior; it does not validate rendered appearance or
-gameplay frame rate. The commandlet logged a non-fatal HTTP listener bind
-warning for `127.0.0.1:8000` while the main editor was open.
+and malformed-input behavior, including silence when non-finite wind, rain, or
+daylight cannot support a truthful observation; it does not validate rendered
+appearance or gameplay frame rate. The commandlet logged a non-fatal HTTP
+listener bind warning for `127.0.0.1:8000` while the main editor was open.

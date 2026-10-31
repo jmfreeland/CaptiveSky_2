@@ -44,6 +44,12 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Calm rain does not claim that leaves are moving"), Drift::DescribeDrift(20.f, 0.8f, 1.f).IsEmpty());
 	TestTrue(TEXT("Light gusts with no lifted motes do not invent rainy drift"), Drift::DescribeDrift(120.f, 0.8f, 1.f).IsEmpty());
 	TestTrue(TEXT("Nothing is seen at night"), Drift::DescribeDrift(400.f, 0.f, 0.f).IsEmpty());
+	TestTrue(TEXT("Invalid wind suppresses an unsupported weather observation"),
+		Drift::DescribeDrift(std::numeric_limits<float>::quiet_NaN(), 0.f, 1.f).IsEmpty());
+	TestTrue(TEXT("Invalid rain suppresses an unsupported weather observation"),
+		Drift::DescribeDrift(400.f, std::numeric_limits<float>::quiet_NaN(), 1.f).IsEmpty());
+	TestTrue(TEXT("Invalid daylight suppresses an unsupported weather observation"),
+		Drift::DescribeDrift(400.f, 0.f, std::numeric_limits<float>::infinity()).IsEmpty());
 
 	const FVector Wind(200.f, 0.f, 0.f);
 	FVector Velocity = FVector::ZeroVector;
