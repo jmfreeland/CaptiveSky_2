@@ -39,6 +39,21 @@ class StartSpectatorCapTests(unittest.TestCase):
         }
         self.assertEqual(limits, {name: 64 for name in limits})
 
+    def test_dragonfly_visit_logging_requires_isolated_bounded_diagnostics(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+        ecology_source = ROOT / "Source" / "CaptiveSky_2" / "Agent" / "IslandTideglassDragonfly.cpp"
+        ecology = ecology_source.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$LogDragonflyFlowerVisits", launcher)
+        self.assertIn("-LogDragonflyFlowerVisits requires an isolated -DataRoot", launcher)
+        self.assertIn("-LogDragonflyFlowerVisits requires -DisableAgentThinking", launcher)
+        self.assertIn(
+            "-LogDragonflyFlowerVisits requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps",
+            launcher,
+        )
+        self.assertIn('"CaptiveSky.Island.DragonflyFlowerTelemetry 1"', launcher)
+        self.assertIn('TEXT("CaptiveSky.Island.DragonflyFlowerTelemetry")', ecology)
+
 
 if __name__ == "__main__":
     unittest.main()

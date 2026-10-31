@@ -37,6 +37,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
+./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
 #>
 param(
 	[switch]$Windowed,
@@ -63,6 +64,7 @@ param(
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
 	[switch]$LogSituations,
+	[switch]$LogDragonflyFlowerVisits,
 	[switch]$DisableGroundCoverSway,
 	[switch]$TextureStreamingStats,
 	[switch]$DisableFoliageMaterialWind,
@@ -95,6 +97,16 @@ if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) {
 		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
 		throw "-ForceStormSeconds requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+}
+if ($LogDragonflyFlowerVisits) {
+	if ($Continuous) { throw "-LogDragonflyFlowerVisits is supported only for bounded diagnostic sessions." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-LogDragonflyFlowerVisits requires an isolated -DataRoot." }
+	if (-not $DisableAgentThinking) { throw "-LogDragonflyFlowerVisits requires -DisableAgentThinking to avoid model requests during the diagnostic." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-LogDragonflyFlowerVisits requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
 }
 $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
@@ -162,6 +174,7 @@ if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-Spe
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($DisablePython) { $arguments += "-DisablePython" }
 if ($LogSituations) { $arguments += "-CaptiveSkyLogSituations" }
+if ($LogDragonflyFlowerVisits) { $execCommands += "CaptiveSky.Island.DragonflyFlowerTelemetry 1" }
 if ($DisableGroundCoverSway) { $arguments += "-IslandDisableGroundCoverSway" }
 if ($DisableFoliageMaterialWind) { $arguments += "-IslandDisableFoliageMaterialWind" }
 if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }

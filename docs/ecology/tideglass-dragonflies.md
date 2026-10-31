@@ -4,6 +4,8 @@ Three wild dragonflies patrol close to the Tideglass shore from 06:00 until dusk
 
 Residents can notice the nearest visible dragonfly within 18 metres. If one is close and in clear view, Aster or the raven may choose `Interact` with target `TideglassDragonfly` to watch; it darts a short way off and resumes its pool-side flight. This is a brief, reversible response. Dragonflies are never movement targets, companions, collectables, or saved entities, and observation makes no model request or persistent world change.
 
+Flower visits are already available as a short hover over an existing bloom, with a cooldown and interruption by heavy rain, a water ripple, a quiet observer, or nearby wildlife. For a bounded no-model telemetry check, `Start-Spectator.ps1 -LogDragonflyFlowerVisits` enables the `CaptiveSky.Island.DragonflyFlowerTelemetry` console variable and logs visit start/completion/interruption. This diagnostic switch requires `-DisableAgentThinking`, an isolated `-DataRoot`, and explicit startup, real-time, and model-request caps; it does not alter flower or dragonfly state.
+
 `AIslandWeather::RefreshNightEcology` owns their bounded population alongside the existing daylight crabs and minnows. Repeated refreshes reuse the three actors; dusk removes them, and the next daylight refresh creates a new small population. Their collision is disabled and they cast no shadows, so they cannot obstruct residents, the raven, or navigation.
 
 ## UE 5.8.3 validation (2026-10-04)
