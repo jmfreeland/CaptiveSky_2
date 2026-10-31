@@ -23,6 +23,7 @@
 - After restart, querying `r.Nanite.Foliage` in the editor returned `1` with `LastSetBy: ProjectSetting`.
 - During the 15m 43s PIE run, the Unreal process remained responsive. The project log contained no fatal, unhandled-exception, or video-memory-exhaustion entry.
 - PIE teardown logged the existing `Unable to find RecastNavMesh instance while trying to create UCrowdManager instance` warning. Project load also logged the landscape edit-layer merge batch-size warning (4033² landscape vs. 1024² configured batch maximum).
+- After the run, `CaptiveSky2.Agent.IslandOcean` passed in the editor. `CaptiveSky2.Agent.IslandWeather.BroadleafMixing` also passed. `BroadleafDiversity` reported only two alder cull-distance mismatches: the compiled editor test expected 80/125 m while the loaded component reported 120/220 m. Both the checked-in `IslandWeather.cpp` and `IslandWeatherBroadleafTests.cpp` specify 120/220 m, indicating the live editor's automation binary is stale relative to this checkout; rebuild before treating this as a source regression.
 - The night PIE view around the rain basin looked notably lush, with dense low vegetation, floating leaves, an agent, and the water feature. The editor viewport still showed broad open slopes and visibly sparse groundcover; this run does not establish that the whole island now has natural distribution or multiple tree species.
 - Walking-on-water behavior was not explicitly tested in this session. Treat that report as open.
 

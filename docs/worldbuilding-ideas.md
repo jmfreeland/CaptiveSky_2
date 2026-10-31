@@ -22,14 +22,23 @@ whole-device graphics memory; preserve the 30-FPS floor and stop if memory
 pressure appears. Compare the distinctive tree silhouettes at close, middle
 and far distance instead of inferring naturalness from instance totals.
 
-The map/runtime review is currently gated: the most recent editor-startup
-attempts crashed before project logging, and the editor is not open in the
-current desktop session. Do not repeat an identical launch. Reconnect only
-after the startup environment changes or the minidump can be symbolized. Keep
-the water-walking concern open too: collision checks and the custom
-`MOVE_Swimming` path pass focused regressions, but the player's animation graph
-has no swim state, so collision correctness does not yet establish a convincing
-surface-swim experience.
+The editor is available again, and `r.Nanite.Foliage` reads `1` after restart.
+The Island ocean automation passes, including disabling legacy ocean-plane
+collision and transitioning grounded characters into swimming. This verifies
+the movement/collision path, not the visual swim animation; the character
+animation graph still has no swim state, so keep the water-walking report open
+until a short visual test confirms the character's position and pose at the
+surface.
+
+The broadleaf diversity automation currently fails only its two alder cull
+distance assertions in the live editor: its compiled test expects 80/125 m,
+while the loaded component reports 120/220 m. The checked-in source and test
+both specify 120/220 m, so this points to stale editor binaries. Rebuild from
+the current source before treating that test as a code regression. The
+BroadleafMixing automation passed. The next useful visual pass is still one
+bounded daylight traversal from Tideglass to a broadleaf grove, with per-species
+visibility checked close, middle, and far; do not increase foliage counts to
+compensate for a visibility or material issue.
 
 ### 2. Repair presentation dependencies in bounded groups
 
