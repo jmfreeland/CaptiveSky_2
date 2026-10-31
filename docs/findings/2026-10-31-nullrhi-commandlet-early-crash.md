@@ -21,19 +21,26 @@ data roots, zero model requests, and a 30-second in-game cap.
    still reported `EXCEPTION_ACCESS_VIOLATION` reading address zero at
    `SecondsSinceStart=0`, with the same PCallStackHash
    `F405610C114D120D4B6F5ABA901EC469AC9FAA26`.
+3. The normal `UnrealEditor.exe` launcher, with thinking disabled and no
+   commandlet or trace-server override, also exited before world-ready. It
+   reproduced `EXCEPTION_ACCESS_VIOLATION` at `SecondsSinceStart=0` with
+   `PCallStackHash 4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`, matching the
+   earlier 900-second feedback startup failure.
 
 Artifacts are under `Saved/CS58/Saved/Crashes/_0000/`:
 
 - `Codex_CommandletSmoke_20261031.log`
 - `Codex_NoTraceServerSmoke_20261031.log`
+- `Codex_EditorExeNullRHISmoke_20261031.log`
 - `CrashContext.runtime-xml`
 - `UEMinidump.dmp`
 
 ## Conclusion and next step
 
-The Trace Server error was incidental, not the cause of this commandlet crash.
-Do not repeat the same launch variants. The matching zero-address crash stack
-points to a failure before the project world starts. Resume feedback only after
-diagnosing that early engine/process initialization path or after a known-good
-bounded launch succeeds. The live editor remained open; no main-project save data
-was used or modified by these attempts.
+The Trace Server error was incidental, not the cause of the commandlet crash.
+Both UnrealEditor executables now reproduce an early null-address crash, with
+the standard executable matching the prior feedback failure. Do not repeat
+these launch variants. Resume feedback only after diagnosing that engine/process
+initialization path or after a known-good bounded launch succeeds. The live
+editor remained open; no main-project save data was used or modified by these
+attempts.
