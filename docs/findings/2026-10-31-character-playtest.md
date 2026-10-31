@@ -39,14 +39,23 @@
 
 ## Request-cap mismatch follow-up
 
-During the later restart check, the reopened local project copy logged a
-1,800-second / 120-request cap. A dark PIE attempt was stopped manually after
-82.8 seconds and nine model requests, before any water-contact or vegetation
-route check; it is not counted as a gameplay validation. The current tracked
-worktree now sets both the configured default and hard request ceiling to 64,
-and its focused `CaptiveSky2.Agent.SessionSafety` automation passes. Rebuild
-the intended project copy and verify its startup log says 64 before another
-long model-active playtest.
+During the later restart check, the reopened project at
+`D:\Projects - Athena\unreal\captivesky_2_claude\CaptiveSky_2.uproject` still
+had `MaxModelRequests=120` in both `DefaultGame.ini` and the compiled-source
+default. Its `ClampRequestLimit` also allows 120; unlike the current tracked
+worktree, it has no 64-request hard ceiling. The editor restart log confirms
+`r.Nanite.Foliage=0` as well, so neither the foliage setting nor the new
+request guard has reached this project copy yet. A dark PIE attempt from the
+earlier check was stopped manually after 82.8 seconds and nine model requests,
+before any water-contact or vegetation-route check; it is not counted as
+gameplay validation.
+
+The current tracked worktree sets both the configured default and hard request
+ceiling to 64. Its `CaptiveSky2.Agent.SessionSafety` automation passed again
+under NullRHI on 2026-10-31 (exit code 0). Do not run another long model-active
+playtest from the D: editor until the guarded code is integrated and rebuilt;
+then verify the startup log reports a 64-request ceiling. The D: project copy
+was inspected but not modified from this worktree.
 
 ## Evidence
 
