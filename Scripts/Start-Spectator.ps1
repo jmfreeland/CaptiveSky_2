@@ -23,6 +23,9 @@ check only; it does not guarantee or monitor in-run memory headroom. Use -GpuInd
 -NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
 -DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
 minutes and the existing 64-request hard ceiling. Plain -NullRHI remains zero-thinking by default.
+Use -UseCommandletExecutable with -NullRHI for a bounded hidden run through UnrealEditor-Cmd.exe;
+the same isolated-data and timeout checks still apply.
+-DisableTraceServer with -NullRHI suppresses the local Unreal Trace Server launch for diagnostics.
 
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
@@ -48,6 +51,8 @@ minutes and the existing 64-request hard ceiling. Plain -NullRHI remains zero-th
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 64
+./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHICommandletSmoke -LogPath Saved/Logs/NullRHICommandletSmoke.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
+./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -DisableTraceServer -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHIWithoutTraceServer -LogPath Saved/Logs/NullRHIWithoutTraceServer.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatial -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -NullRHI -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatialNullRHI -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
@@ -78,6 +83,8 @@ param(
 	[switch]$DisablePython,
 	[switch]$NullRHI,
 	[switch]$NullRHICharacterFeedback,
+	[switch]$UseCommandletExecutable,
+	[switch]$DisableTraceServer,
 	[switch]$LogSituations,
 	[switch]$LogDragonflyFlowerVisits,
 	[switch]$GroundCoverSpatialDiagnostics,
@@ -152,6 +159,14 @@ if ($NullRHICharacterFeedback) {
 	if ($MaxRealtimeSeconds -gt 900) { throw "-NullRHICharacterFeedback is capped at 900 real-time seconds." }
 	if ($MaxModelRequests -lt 1 -or $MaxModelRequests -gt 64) { throw "-NullRHICharacterFeedback requires a model-request cap from 1 through 64; this is the existing hard ceiling." }
 }
+if ($UseCommandletExecutable) {
+	if (-not $NullRHI) { throw "-UseCommandletExecutable requires -NullRHI; it never selects the commandlet executable for rendered play." }
+	if ($Windowed -or $Shots) { throw "-UseCommandletExecutable is only for hidden, non-rendered sessions; omit -Windowed and -Shots." }
+	if ($Continuous) { throw "-UseCommandletExecutable requires a bounded session." }
+}
+if ($DisableTraceServer -and -not $NullRHI) {
+	throw "-DisableTraceServer is restricted to hidden, non-rendered -NullRHI diagnostics."
+}
 if ($NullRHI) {
 	if ($Continuous) { throw "-NullRHI is supported only for bounded diagnostic sessions." }
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-NullRHI requires an isolated -DataRoot." }
@@ -186,8 +201,9 @@ $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 }
 $project = Resolve-Path -LiteralPath $projectCandidate
 $projectRoot = Split-Path $project
-$editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor.exe"
-if (-not (Test-Path $editor)) { throw "UnrealEditor.exe not found under $EngineDir; pass -EngineDir." }
+$editorExecutable = if ($UseCommandletExecutable) { "UnrealEditor-Cmd.exe" } else { "UnrealEditor.exe" }
+$editor = Join-Path $EngineDir "Engine\Binaries\Win64\$editorExecutable"
+if (-not (Test-Path $editor)) { throw "$editorExecutable not found under $EngineDir; pass -EngineDir." }
 $editor = (Resolve-Path -LiteralPath $editor).Path
 $engineWorkingDirectory = Split-Path -Parent $editor
 
@@ -241,6 +257,7 @@ if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) { $execCommands += "Isl
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($NullRHI) { $arguments += "-NullRHI" }
+if ($DisableTraceServer) { $arguments += "-notraceserver" }
 if ($DisablePython) { $arguments += "-DisablePython" }
 if ($LogSituations) { $arguments += "-CaptiveSkyLogSituations" }
 if ($LogDragonflyFlowerVisits) { $execCommands += "CaptiveSky.Island.DragonflyFlowerTelemetry 1" }

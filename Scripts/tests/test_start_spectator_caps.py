@@ -81,6 +81,23 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("this is the existing hard ceiling", launcher)
         self.assertIn("-NullRHICharacterFeedback requires resident thinking to remain enabled", launcher)
 
+    def test_commandlet_executable_is_confined_to_hidden_bounded_null_rhi(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$UseCommandletExecutable", launcher)
+        self.assertIn("-UseCommandletExecutable requires -NullRHI", launcher)
+        self.assertIn("never selects the commandlet executable for rendered play", launcher)
+        self.assertIn("-UseCommandletExecutable requires a bounded session", launcher)
+        self.assertIn('if ($UseCommandletExecutable) { "UnrealEditor-Cmd.exe" } else { "UnrealEditor.exe" }', launcher)
+        self.assertIn("-UseCommandletExecutable -NullRHI -DisableAgentThinking", launcher)
+
+    def test_trace_server_disable_is_limited_to_null_rhi(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$DisableTraceServer", launcher)
+        self.assertIn("-DisableTraceServer is restricted to hidden, non-rendered -NullRHI diagnostics", launcher)
+        self.assertIn('if ($DisableTraceServer) { $arguments += "-notraceserver" }', launcher)
+
     def test_gpu_headroom_gate_is_opt_in_and_runs_before_project_launch(self) -> None:
         launcher = LAUNCHER.read_text(encoding="utf-8")
 
