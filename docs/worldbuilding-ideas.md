@@ -333,6 +333,19 @@ visual naturalness, frame rate, or VRAM. The broader prefix run separately
 passed habitat-selection and height-profile tests; its diversity test could
 not complete because this worktree lacks the Black Alder asset.
 
+**Representative habitat-grid regression (2026-10-31):** the broadleaf test
+no longer probes a one-dimensional line extending 10 km off-map. It now checks
+all four species against an 81-point, 3 km coordinate grid around the authored
+Island center, using the same seed salt as tree placement. The worktree target
+compiled successfully. A single-precision reproduction of the field selects
+the four species 12, 28, 26, and 15 times respectively. This checks field
+coverage only; it does not apply the landscape validity mask or prove visible
+trees. UE commandlet attempts using both the CS58 scratch project and the root
+worktree crashed before automation discovery with an access violation, leaving
+the actual C++ test result unverified (`Saved/CS58/Saved/Crashes/_0000/` and
+`Saved/Crashes/_0000/`). Do not treat the arithmetic reproduction as a test
+pass; rerun the automation once commandlet startup is stable.
+
 **Fresh viewport check (2026-10-31):** the restarted editor is responsive and
 the daylight viewport is unobstructed. In the current wide view, foreground
 groundcover forms separated clumps, but the broad slope reads mostly bare and

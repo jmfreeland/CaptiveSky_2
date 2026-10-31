@@ -94,10 +94,28 @@ bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Paramet
 		AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(1000.f, 1000.f, 0.f), HabitatSeed), PatchSpecies);
 	TestEqual(TEXT("Repeated position and seed resolve deterministically"),
 		AIslandWeather::GetBroadleafSpeciesIndexAt(PatchOrigin, HabitatSeed), PatchSpecies);
-	int32 DistantSpecies = PatchSpecies;
-	for (int32 Step = 1; Step <= 200 && DistantSpecies == PatchSpecies; ++Step)
-		DistantSpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(Step * 5000.f, 0.f, 0.f), HabitatSeed);
-	TestTrue(TEXT("The smooth habitat field forms different broadleaf communities across the landscape"),
-		DistantSpecies >= 0 && DistantSpecies < 4 && DistantSpecies != PatchSpecies);
+	// Sample a 3 km coordinate neighborhood around the Island's authored landmark
+	// center. This checks the species field at scene scale, not which samples are
+	// valid land; the former test only marched along one axis out to 10 km, well
+	// beyond the playable landscape. The placement path salts WeatherSeed with
+	// this value before sampling, so use the same field here.
+	int32 SpeciesCounts[AIslandWeather::BroadleafTreeSpeciesCount] = {};
+	const FVector IslandCenter(-100000.f, 100000.f, 0.f);
+	const int32 PlacementSeed = HabitatSeed ^ 0x3b67ae85;
+	for (int32 GridY = -4; GridY <= 4; ++GridY)
+	{
+		for (int32 GridX = -4; GridX <= 4; ++GridX)
+		{
+			const FVector Sample = IslandCenter + FVector(GridX * 37500.f, GridY * 37500.f, 0.f);
+			const int32 Species = AIslandWeather::GetBroadleafSpeciesIndexAt(Sample, PlacementSeed);
+			if (Species >= 0 && Species < AIslandWeather::BroadleafTreeSpeciesCount)
+				++SpeciesCounts[Species];
+		}
+	}
+	for (int32 Species = 0; Species < AIslandWeather::BroadleafTreeSpeciesCount; ++Species)
+	{
+		TestTrue(FString::Printf(TEXT("Broadleaf species %d is selectable in the Island-scale habitat field"), Species),
+			SpeciesCounts[Species] > 0);
+	}
 	return true;
 }
