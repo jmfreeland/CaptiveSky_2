@@ -62,3 +62,26 @@ This establishes a working elevated NullRHI automation path and shows the
 earlier startup failures were specific to the prior launch conditions; it does
 not yet establish a long-running resident-feedback session. The new meadow test
 log is `Saved/CS58/Saved/Logs/Codex_MeadowHabitatAutomation_20261031.log`.
+
+## Bounded resident-feedback recheck (23:36 UTC)
+
+After the woodland-scatter build, the supervised launcher was asked for a
+15-minute NullRHI resident-feedback run with an isolated data root, logging of
+resident situations, Python disabled, a 300-second startup timeout, and a
+16-request hard cap. The launched `UnrealEditor-Cmd.exe` exited before the
+Island world-ready marker; the supervisor returned failure and did not count
+the zero process exit code as startup success. No character feedback or model
+request occurred. The expected session log was not created; the crash reporter
+copied the short startup log and dump into `Saved/Crashes/_0000/`.
+
+The new `CrashContext.runtime-xml` reports
+`EXCEPTION_ACCESS_VIOLATION reading address 0x0000000000000000` at
+`SecondsSinceStart=0`, with `PCallStackHash
+F405610C114D120D4B6F5ABA901EC469AC9FAA26` in `UnrealEditor-Core` and
+`UnrealEditor-Cmd`. This is the same early commandlet signature recorded above.
+The startup log again reports a Trace Server launch error, but the earlier
+`-notraceserver` attempt had the same access-violation hash, so Trace Server
+failure is not established as causal. The isolated run did not modify the main
+D: project's map or persistent state. Do not repeat this commandlet feedback
+launch until the engine initialization fault has a new diagnostic lead or a
+known-good supervised startup is demonstrated.
