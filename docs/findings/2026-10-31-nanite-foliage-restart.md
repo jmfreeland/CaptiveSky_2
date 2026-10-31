@@ -35,3 +35,15 @@ The editor was relaunched through Unreal's project browser after a direct
 command-line startup attempt failed to provide a usable project window. No
 cause for that first attempt was established, and no D: project files were
 edited during this verification.
+
+## Follow-up restart (21:35 UTC)
+
+The editor was closed after the user confirmed **All Saved** and explicitly
+approved a restart. Direct launches from the restricted process context exited
+before writing a new project log. Relaunching the same project with the access
+needed for normal UE startup logs/caches succeeded; startup first asked whether
+to keep waiting for ZenServer, then loaded the Island editor. The fresh project
+log records `r.Nanite.Foliage:1`, and the editor status bar showed **All Saved**.
+This verifies the setting is active on this project process. The current
+viewport was a sea-facing editor view; foliage appearance, texture settling,
+and performance were not assessed, and PIE was not started.
