@@ -18,7 +18,20 @@ texture resources. Once the project had loaded, `nvidia-smi` still showed only
 2,083 MiB free (9,915 / 12,282 MiB used), 75 °C, and 59% GPU utilization.
 That remains below the guarded 4 GiB headroom needed for rendered play, so no
 PIE/Game session was started. The 30-FPS floor and 15–30 minute feedback run
-remain pending. No D: project files were edited during this verification.
+remain pending. No D: project code, content, or maps were edited during this
+verification.
+
+An editor-only establishing screenshot was captured at
+`D:\Projects - Athena\Unreal\CaptiveSky_2\Saved\Screenshots\WindowsEditor\HighResScreenshot00003.png`
+(1280×720). It shows the distant Island, bright cloud cover, and calm water
+reflection; it is a useful mood/lighting reference, not a gameplay screenshot.
+The edit-time viewport does not show the runtime-generated tree communities,
+so it cannot settle the reported species-silhouette or natural-scatter issue.
+The latest device check is still below the rendered-play gate: 9,917 MiB used,
+2,081 MiB free, 50% GPU utilization, 78 °C. Keep the fixed tree budget and
+species mix unchanged until a runtime view can compare placement and silhouette
+above the 30-FPS floor; then run the bounded 15–30 minute character-feedback
+session with live memory and frame-time monitoring.
 
 ## 2026-10-31 — Give the Island's quiet turns more room to breathe
 
