@@ -10,7 +10,10 @@ but the viewport immediately displayed: “Video memory has been exhausted
 after 32 seconds rather than leaving it to run under that warning. The session
 log reported four completed model requests and zero still in flight; it also
 warned that it could not find a `RecastNavMesh` instance while creating a crowd
-manager. This is a short runtime observation, not a 15–30 minute playtest or
+manager. The same Output Log showed `M_Island_Textured_Wet` requesting invalid
+texture index `21 / 20`; the current worktree has no matching `Content` asset
+to inspect, so the warning's relationship to the active project material is
+unconfirmed. This is a short runtime observation, not a 15–30 minute playtest or
 proof of the user-requested feedback check-in. The warning's displayed numeric
 value is preserved verbatim, not treated as a trustworthy measurement. Before
 another long run, identify the source of the memory warning and confirm the
