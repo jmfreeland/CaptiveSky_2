@@ -1,5 +1,12 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Verify the delayed resident-feedback invitation
+
+The UE 5.8.3 editor target was already up to date. A headless `-NullRHI`
+automation run passed both `CaptiveSky2.Agent.ModelTier` and
+`CaptiveSky2.Agent.ModelTierWorldFacts` (`Result={Success}`, exit code 0;
+[`Codex_ResidentFeedback_ModelTier_20261031.log`](../Saved/Logs/Codex_ResidentFeedback_ModelTier_20261031.log)). The regression confirms the optional feedback invitation becomes eligible at 720 real seconds, is not repeated for a resident during that session, and does not interrupt visitor or agent conversation turns. It also exercises nearby-landmark facts that route a quiet resident to the full model. This is source-level eligibility evidence, not a 12-minute resident response or a 15–30 minute world playtest. The sparse checkout lacks `Content/Maps/Island.umap` and the local plant assets, so Unreal could not load the Island; missing asset warnings in this run do not establish a defect in the active D: project. Keep the session time/request limits unchanged. Next, restore editor input access, verify the active project and startup settings, then capture one bounded character-feedback run with its response, FPS and device-memory state recorded.
+
 ## 2026-10-31 — Stop the first live PIE memory sample early
 
 The currently open `CaptiveSky_2` editor reported `r.Nanite.Foliage = 1`
