@@ -20,6 +20,7 @@
 ## Stability and visual notes
 
 - The first editor launch stalled at the Zen startup prompt. Once Zen was available, two editor instances briefly opened; the duplicate was closed. The large video-memory warning disappeared with only one editor remaining.
+- After restart, querying `r.Nanite.Foliage` in the editor returned `1` with `LastSetBy: ProjectSetting`.
 - During the 15m 43s PIE run, the Unreal process remained responsive. The project log contained no fatal, unhandled-exception, or video-memory-exhaustion entry.
 - PIE teardown logged the existing `Unable to find RecastNavMesh instance while trying to create UCrowdManager instance` warning. Project load also logged the landscape edit-layer merge batch-size warning (4033² landscape vs. 1024² configured batch maximum).
 - The night PIE view around the rain basin looked notably lush, with dense low vegetation, floating leaves, an agent, and the water feature. The editor viewport still showed broad open slopes and visibly sparse groundcover; this run does not establish that the whole island now has natural distribution or multiple tree species.
