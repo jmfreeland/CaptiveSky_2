@@ -297,8 +297,10 @@ private:
 		const TArray<FVector>& OtherAnchors, float InnerRadius, float OuterRadius);
 	/** Select one stable flower species per world-space patch, with an optional woodland niche bias. */
 	static int32 SelectMeadowFlowerVariant(const FVector& Position, int32 Seed, float WoodlandAffinity = 0.f);
-	/** Softly modulate broad meadow cover between open patches and lush communities without a hard habitat edge. */
-	static float CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity);
+	/** Sample bounded seeded value noise for ecology diagnostics and deterministic placement tests. */
+	static float SampleLandscapeCommunityFieldAtScale(const FVector& Position, int32 Seed, float FieldCellSizeCm);
+	/** Modulate broad meadow cover across nested macro, meso, and micro habitats without hard edges. */
+	static float CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity, float MeadowMicroPatch);
 	/** Resolve the diagnostic CVar with an optional scatter-time command-line override. */
 	static bool ShouldGatherMeadowSpatialDiagnostics(int32 ConsoleValue, const FString& CommandLine);
 	/** Reserve a bounded share of the total meadow-candidate budget for landmark-centered patches. */

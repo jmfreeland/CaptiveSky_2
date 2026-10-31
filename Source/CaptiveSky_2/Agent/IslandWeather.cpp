@@ -147,6 +147,12 @@ namespace
 	}
 }
 
+float AIslandWeather::SampleLandscapeCommunityFieldAtScale(const FVector& Position, int32 Seed, float FieldCellSizeCm)
+{
+	if (Position.ContainsNaN() || !FMath::IsFinite(FieldCellSizeCm)) return 0.5f;
+	return SampleGroundCoverFieldAtScale(Position, Seed, FieldCellSizeCm);
+}
+
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -697,14 +703,18 @@ int32 AIslandWeather::SelectMeadowFlowerVariant(const FVector& Position, int32 S
 	return static_cast<int32>(Hash % TideglassMarshMarigoldSpeciesIndex);
 }
 
-float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity)
+float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatCommunity, float MeadowSubcommunity, float MeadowMicroPatch)
 {
 	const float BroadHabitat = FMath::IsFinite(HabitatCommunity) ? FMath::Clamp(HabitatCommunity, 0.f, 1.f) : 0.5f;
-	const float FineCommunity = FMath::IsFinite(MeadowSubcommunity) ? FMath::Clamp(MeadowSubcommunity, 0.f, 1.f) : 0.5f;
-	// Preserve the former two cutoffs' 46% mean while giving lush low-noise
-	// communities a visibly denser cover and leaving open ground as readable glades.
-	// The correlated field, not per-instance species alternation, forms the patches.
-	return 0.28f + 0.72f * (1.f - BroadHabitat) * (1.f - FineCommunity);
+	const float MidCommunity = FMath::IsFinite(MeadowSubcommunity) ? FMath::Clamp(MeadowSubcommunity, 0.f, 1.f) : 0.5f;
+	const float FineCommunity = FMath::IsFinite(MeadowMicroPatch) ? FMath::Clamp(MeadowMicroPatch, 0.f, 1.f) : 0.5f;
+	// A 180 m habitat field creates visitor-scale glades and lush masses; 60 m and
+	// 9 m fields soften their edges. Keep the mean near the previous 46% while
+	// increasing spatial contrast, without changing candidate or instance budgets.
+	constexpr float OpenGladeFloor = 0.08f;
+	constexpr float NestedPatchStrength = 3.16f;
+	const float LushSignal = (1.f - BroadHabitat) * (1.f - MidCommunity) * (1.f - FineCommunity);
+	return FMath::Clamp(OpenGladeFloor + NestedPatchStrength * LushSignal, OpenGladeFloor, 1.f);
 }
 
 bool AIslandWeather::ShouldGatherMeadowSpatialDiagnostics(int32 ConsoleValue, const FString& CommandLine)
@@ -1548,17 +1558,17 @@ void AIslandWeather::InitializeGroundCover()
 			if (!GetWorld()->LineTraceSingleByChannel(CandidateHit,
 				FVector(Candidate.X, Candidate.Y, TraceTop), FVector(Candidate.X, Candidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 				!Cast<ALandscapeProxy>(CandidateHit.GetActor()) || CandidateHit.ImpactNormal.Z < 0.72f || CandidateHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
-			// Nest a fine meadow mosaic inside broad, seeded habitat communities. This
-			// keeps the same average acceptance as the former single 42 m field, but
-			// groups plants into coherent woodland-meadow regions instead of even specks.
-			// Use island-scale habitat bands plus neighborhood-sized meadow pockets. The prior
-			// 18 km / 2.4 km fields were too broad for this 4 km island and read nearly even
-			// across 200 m tiles; these scales let lush patches and glades alternate visibly.
+			// Nested seeded value-noise bands make broad 180 m glades and lush masses,
+			// with 60 m and 9 m structure feathering their boundaries. Their correlated
+			// fields, not per-instance species alternation, create visitor-readable forms.
 			const float HabitatCommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
-				WeatherSeed ^ 0x7cb25431, 6000.f);
+				WeatherSeed ^ 0x18ac70e5, 18000.f);
 			const float MeadowSubcommunity = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
+				WeatherSeed ^ 0x7cb25431, 6000.f);
+			const float MeadowMicroPatch = SampleGroundCoverFieldAtScale(CandidateHit.ImpactPoint,
 				WeatherSeed ^ 0x4cf5ad43, 900.f);
-			if (MeadowRandom.FRand() >= CalculateLandscapeMeadowAcceptanceChance(HabitatCommunity, MeadowSubcommunity)) continue;
+			if (MeadowRandom.FRand() >= CalculateLandscapeMeadowAcceptanceChance(
+				HabitatCommunity, MeadowSubcommunity, MeadowMicroPatch)) continue;
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
 			const int32 InstanceCountBefore = GroundCoverInstanceCount;

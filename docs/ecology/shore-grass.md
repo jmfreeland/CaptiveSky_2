@@ -494,3 +494,24 @@ learn only from their local underfoot observations, not from the Chronicle.
 The UE 5.8.3 editor target compiled this policy and its focused regression test
 successfully. Automation execution remains pending because the command-line
 editor has repeatedly crashed before tests start; see the startup finding above.
+
+## Nested landscape meadow habitats (2026-10-31)
+
+To address the exposed-landscape scatter reading as too even, broad meadow
+acceptance now combines deterministic smooth value-noise fields at 180 m, 60 m,
+and 9 m scales. The macro field creates visitor-scale open glades and lush
+masses; the smaller fields feather their boundaries. The acceptance curve is
+tuned to preserve approximately the former 46% mean candidate acceptance, and
+the candidate/instance ceilings, species mix, and landmark verges are unchanged.
+This changes only the spatial pattern and introduces no new assets or runtime
+model calls.
+
+The `IslandWeather` automation now covers open-to-lush contrast, bounded invalid
+inputs, deterministic field sampling, and mean acceptance over a 4 km square.
+The UE 5.8.3 editor target compiled and linked successfully in the isolated
+`Saved/CS58` scratch project with its `Source` junction pointing to this
+worktree. The automation test itself was not run: command-line UE startup has
+repeatedly crashed before world-ready, and the live D: project has not been
+synced to this worktree. A rendered comparison and gameplay frame-time check
+remain necessary before treating the new pattern as visually or performantly
+validated.
