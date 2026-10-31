@@ -151,6 +151,7 @@ protected:
 
 private:
 	friend class FIslandWeatherTest;
+	friend class FIslandWeatherMeadowHabitatTest;
 	friend class FIslandMeadowBudgetTest;
 	friend class FIslandWeatherBroadleafDiversityTest;
 	friend class FIslandNightEcologyTest;

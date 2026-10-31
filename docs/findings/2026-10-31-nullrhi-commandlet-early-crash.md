@@ -44,3 +44,21 @@ these launch variants. Resume feedback only after diagnosing that engine/process
 initialization path or after a known-good bounded launch succeeds. The live
 editor remained open; no main-project save data was used or modified by these
 attempts.
+
+## Elevated NullRHI follow-up (21:45 UTC)
+
+After the main editor was relaunched with access for its normal D: startup
+cache/log writes, the same UE 5.8.3 `UnrealEditor-Cmd` binary successfully
+initialized the isolated `Saved/CS58` scratch project with NullRHI. A first
+`Automation RunTests CaptiveSky2.Agent.IslandWeather` run completed three
+Broadleaf child tests, but its filter did not discover the base
+`FIslandWeatherTest`. The meadow assertions were moved into the uniquely named
+`CaptiveSky2.Agent.IslandWeather.MeadowHabitat` test; after a fresh isolated
+build, that exact test passed with exit code 0 and zero model requests. Its log
+also reports the commandlet's optional HTTP listener could not bind to
+127.0.0.1:8000 while the main editor was open; this did not affect the test.
+
+This establishes a working elevated NullRHI automation path and shows the
+earlier startup failures were specific to the prior launch conditions; it does
+not yet establish a long-running resident-feedback session. The new meadow test
+log is `Saved/CS58/Saved/Logs/Codex_MeadowHabitatAutomation_20261031.log`.

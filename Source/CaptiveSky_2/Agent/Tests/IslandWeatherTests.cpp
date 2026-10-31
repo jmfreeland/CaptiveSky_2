@@ -30,16 +30,6 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, true));
 	TestFalse(TEXT("An offscreen non-player resident does not create an invisible plant-sway neighborhood"),
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, false));
-	TestTrue(TEXT("Meadow habitat retains full lush-community coverage"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f, 0.f), 1.f));
-	TestTrue(TEXT("Nested open habitat leaves readable glades"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f, 1.f), 0.08f));
-	TestTrue(TEXT("Three habitat scales create stronger glade-to-lush contrast"),
-		AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.1f, 0.1f, 0.1f) -
-		AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.9f, 0.9f, 0.9f) > 0.7f);
-	TestTrue(TEXT("Invalid meadow fields resolve to a bounded neutral density"),
-		FMath::IsFinite(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
-			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity())));
 	const FVector TideglassWorldCenter(-99500.f, 100300.f, 2890.f);
 	const FVector TideglassWindArch(-101650.f, 100200.f, 2950.f);
 	const FVector TideglassListeningStones(-101650.f, 101600.f, 2650.f);
@@ -76,23 +66,6 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 			}
 		}
 	}
-	double AverageMeadowAcceptance = 0.0;
-	constexpr int32 MeadowFieldSamples = 128;
-	constexpr float MeadowWorldMin = -201600.f;
-	constexpr float MeadowWorldSpan = 403200.f;
-	for (int32 Y = 0; Y < MeadowFieldSamples; ++Y)
-		for (int32 X = 0; X < MeadowFieldSamples; ++X)
-		{
-			const FVector Position(MeadowWorldMin + (X + 0.5f) * MeadowWorldSpan / MeadowFieldSamples,
-				MeadowWorldMin + (Y + 0.5f) * MeadowWorldSpan / MeadowFieldSamples, 0.f);
-			const float Macro = AIslandWeather::SampleLandscapeCommunityFieldAtScale(Position, 0x18ac70e5, 18000.f);
-			const float Meso = AIslandWeather::SampleLandscapeCommunityFieldAtScale(Position, 0x7cb25431, 6000.f);
-			const float Micro = AIslandWeather::SampleLandscapeCommunityFieldAtScale(Position, 0x4cf5ad43, 900.f);
-			AverageMeadowAcceptance += AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(Macro, Meso, Micro);
-		}
-	AverageMeadowAcceptance /= FMath::Square(MeadowFieldSamples);
-	TestTrue(TEXT("Nested spatial fields preserve near-46% mean candidate acceptance over the Island bounds"),
-		FMath::IsNearlyEqual(static_cast<float>(AverageMeadowAcceptance), 0.46f, 0.01f));
 	float MinimumRain = 2.f;
 	float MaximumRain = -1.f;
 	double MinimumRainTime = 0.0;

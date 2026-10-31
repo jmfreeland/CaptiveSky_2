@@ -506,12 +506,16 @@ the candidate/instance ceilings, species mix, and landmark verges are unchanged.
 This changes only the spatial pattern and introduces no new assets or runtime
 model calls.
 
-The `IslandWeather` automation now covers open-to-lush contrast, bounded invalid
-inputs, deterministic field sampling, and mean acceptance over a 4 km square.
-The UE 5.8.3 editor target compiled and linked successfully in the isolated
-`Saved/CS58` scratch project with its `Source` junction pointing to this
-worktree. The automation test itself was not run: command-line UE startup has
-repeatedly crashed before world-ready, and the live D: project has not been
-synced to this worktree. A rendered comparison and gameplay frame-time check
-remain necessary before treating the new pattern as visually or performantly
-validated.
+`CaptiveSky2.Agent.IslandWeather.MeadowHabitat` covers open-to-lush contrast,
+bounded invalid inputs, deterministic fields, and mean acceptance over a 4 km
+square. The UE 5.8.3 editor target compiled and linked successfully in the
+isolated `Saved/CS58` scratch project with its `Source` junction pointing to
+this worktree; the focused NullRHI automation test passed (exit code 0, zero
+model requests). A broader `IslandWeather` filter initially discovered only
+the three broadleaf child tests, so the meadow assertions were moved into a
+uniquely named leaf test before the successful run. The commandlet logged a
+non-fatal inability to bind its optional HTTP listener on 127.0.0.1:8000 while
+the main editor was open. No rendered comparison is available: the live D:
+project has not been synced to this worktree, and current GPU free memory is
+below the 4 GiB play guard. Visual naturalness and gameplay frame time therefore
+remain unverified.
