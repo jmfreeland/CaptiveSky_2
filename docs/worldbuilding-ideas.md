@@ -91,15 +91,18 @@ a full Island prompt-construction profile and does not validate live species
 visibility or visual quality. Keep the 6.5 m radius and bounded visibility
 traces until an in-world daylight check confirms what residents actually see.
 
-**Active-editor setting check (2026-10-31):** after the approved restart, the
-active `D:\Projects - Athena\unreal\captivesky_2_claude` editor loaded
-responsively, but its `DefaultEngine.ini` still says `r.Nanite.Foliage=False`
-and its startup log sets the CVar to `0`. This is distinct from the earlier
-standalone preview that logged the CVar as `1`; the active editor copy therefore
-does not currently prove Nanite Foliage is enabled. The D: project is outside
-this worktree's writable scope, so no setting was changed. Enable it in that
-project, restart, and confirm the startup log before treating Nanite Assembly
-warnings as resolved.
+**Active-project setting check (2026-10-31 14:20):** the actual
+`D:\Projects - Athena\unreal\captivesky_2_claude\Config\DefaultEngine.ini`
+sets `r.Nanite.Foliage=False`; that project's latest editor log (14:01 startup)
+sets the CVar to `0`, and its three preceding 2026-10-31 backup logs do too.
+This branch's separate worktree config says `True`, but it is not the project
+loaded by the user's editor. The earlier console reading of `1` belongs to a
+different preview/context and does not prove the D: project has Nanite Foliage
+enabled. The approved restart was not carried out: the desktop bridge could
+capture the window but would not send it input. The D: project is outside this
+worktree's writable scope, so no setting was changed. Enable it in that project
+once that write is authorized, restart, and confirm the startup log before
+treating Nanite Assembly warnings as resolved.
 
 ## 2026-10-31 — Let an exposed roost become a character-led proposal
 
@@ -142,13 +145,14 @@ whole-device graphics memory; preserve the 30-FPS floor and stop if memory
 pressure appears. Compare the distinctive tree silhouettes at close, middle
 and far distance instead of inferring naturalness from instance totals.
 
-The editor is available again, and `r.Nanite.Foliage` reads `1` after restart.
-The Island ocean automation passes, including disabling legacy ocean-plane
-collision and transitioning grounded characters into swimming. This verifies
-the movement/collision path, not the visual swim animation; the character
-animation graph still has no swim state, so keep the water-walking report open
-until a short visual test confirms the character's position and pose at the
-surface.
+An earlier standalone preview read `r.Nanite.Foliage=1` after restart; the later
+active-project check above shows this was not the D: project currently used by
+the editor. The Island ocean automation passes, including disabling legacy
+ocean-plane collision and transitioning grounded characters into swimming.
+This verifies the movement/collision path, not the visual swim animation; the
+character animation graph still has no swim state, so keep the water-walking
+report open until a short visual test confirms the character's position and
+pose at the surface.
 
 The broadleaf diversity automation currently fails only its two alder cull
 distance assertions in the live editor: its compiled test expects 80/125 m,
