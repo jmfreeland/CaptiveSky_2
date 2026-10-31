@@ -1639,8 +1639,11 @@ void AIslandWeather::InitializeGroundCover()
 			constexpr int32 SpruceGroveCount = 500;
 			constexpr int32 SpruceTreesPerGrove = 32;
 			constexpr int32 MaxSpruceTracesPerGrove = 160;
-			constexpr float SpruceGroveInnerRadius = 500.f;
-			constexpr float SpruceGroveOuterRadius = 1600.f;
+			// Let every woodland layer share an overlapping footprint. Separate,
+			// non-overlapping annuli made each species read as a planted ring around
+			// the grove center instead of a mixed, irregular community.
+			constexpr float SpruceGroveInnerRadius = 0.f;
+			constexpr float SpruceGroveOuterRadius = 1800.f;
 			constexpr float SpruceGroveMinSpacing = 2400.f;
 			constexpr float SpruceTreeMinSpacing = 650.f;
 			constexpr float SpruceLandmarkClearance = 2600.f;
@@ -1805,8 +1808,8 @@ void AIslandWeather::InitializeGroundCover()
 					// native mesh, but a distinct scale band and spacing so they read as younger growth.
 					constexpr int32 SaplingsPerGrove = 20;
 					constexpr int32 MaxSaplingTracesPerGrove = 64;
-					constexpr float SaplingInnerRadius = 1700.f;
-					constexpr float SaplingOuterRadius = 2600.f;
+					constexpr float SaplingInnerRadius = 800.f;
+					constexpr float SaplingOuterRadius = 2800.f;
 					constexpr float SaplingMinSpacing = 450.f;
 					const int32 SaplingsBeforeGrove = SpruceSaplingCount;
 					for (int32 Attempt = 0; Attempt < MaxSaplingTracesPerGrove && SpruceSaplingCount - SaplingsBeforeGrove < SaplingsPerGrove; ++Attempt)
@@ -1841,8 +1844,8 @@ void AIslandWeather::InitializeGroundCover()
 					// filling the landmark clearings or multiplying the dense meadow budget.
 					constexpr int32 ShrubsPerGrove = 32;
 					constexpr int32 MaxShrubTracesPerGrove = 128;
-					constexpr float ShrubInnerRadius = 750.f;
-					constexpr float ShrubOuterRadius = 2050.f;
+					constexpr float ShrubInnerRadius = 250.f;
+					constexpr float ShrubOuterRadius = 2400.f;
 					constexpr float ShrubMinSpacing = 275.f;
 					const FBoxSphereBounds ShrubBounds = IslandShrubs->GetStaticMesh()->GetBounds();
 					const int32 ShrubsBeforeGrove = GroundCoverShrubCount;
@@ -1882,8 +1885,8 @@ void AIslandWeather::InitializeGroundCover()
 					// multi-material species sparse so it adds color without dominating the meadow.
 					constexpr int32 RhododendronsPerGrove = 3;
 					constexpr int32 MaxRhododendronTracesPerGrove = 48;
-					constexpr float RhododendronInnerRadius = 2100.f;
-					constexpr float RhododendronOuterRadius = 3600.f;
+					constexpr float RhododendronInnerRadius = 600.f;
+					constexpr float RhododendronOuterRadius = 3500.f;
 					constexpr float RhododendronMinSpacing = 475.f;
 					const FBoxSphereBounds RhododendronBounds = IslandRhododendrons && IslandRhododendrons->GetStaticMesh()
 						? IslandRhododendrons->GetStaticMesh()->GetBounds() : FBoxSphereBounds();
@@ -1931,8 +1934,8 @@ void AIslandWeather::InitializeGroundCover()
 					constexpr int32 WoodlandCoppicesPerBroadleafGrove = 2;
 					constexpr int32 MaxWoodlandCoppices = 96;
 					constexpr int32 MaxWoodlandCoppiceTracesPerGrove = 24;
-					constexpr float WoodlandCoppiceInnerRadius = 2300.f;
-					constexpr float WoodlandCoppiceOuterRadius = 3000.f;
+					constexpr float WoodlandCoppiceInnerRadius = 900.f;
+					constexpr float WoodlandCoppiceOuterRadius = 3200.f;
 					constexpr float WoodlandCoppiceMinSpacing = 750.f;
 					const UStaticMesh* BirchMesh = IslandBirchCoppices ? IslandBirchCoppices->GetStaticMesh() : nullptr;
 					const UStaticMesh* HazelMesh = IslandHazelCoppices ? IslandHazelCoppices->GetStaticMesh() : nullptr;
