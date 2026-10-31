@@ -43,3 +43,16 @@ view still reads as one species, adjust placement or distance readability from
 that evidence rather than increasing the total budget. In the same bounded Game
 pass, verify grounded movement across the shoreline and confirm the player
 enters water or falls instead of walking on the legacy plane.
+
+## Follow-up ocean automation baseline (2026-10-31 22:22 UTC)
+
+The focused `CaptiveSky2.Agent.IslandOcean` test passed again against the
+current UE 5.8.3 scratch build under NullRHI, with agent thinking disabled and
+zero model requests (`Saved/CS58/Saved/Logs/Codex_OceanAudit_20261031.log`, exit
+code 0). It verifies legacy-plane collision shutdown, the native Water plugin
+surface query, transitions between falling/swimming/wading, and the shallow
+shore fixture. These checks run in a transient test world, not the saved
+Island or a player-controlled Game session, so they do not resolve the
+reported walk-on-water behavior. The same-device sample showed only 2,550 MiB
+free GPU memory; the guarded real-RHI traversal was not started. Keep the
+shoreline movement and frame-time/VRAM pass open for a later low-load session.
