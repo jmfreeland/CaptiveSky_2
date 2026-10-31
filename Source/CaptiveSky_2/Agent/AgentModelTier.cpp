@@ -58,6 +58,11 @@ namespace AgentModelTier
 			AttemptsThisSession < ResidentFeedbackInvitationMaximumAttempts;
 	}
 
+	FString BuildResidentFeedbackInvitationPrompt()
+	{
+		return TEXT("A one-time optional check-in from outside the Island: If you wish, use speech to share one thing you would like to explore, change, preserve, or understand here. If a particular object or place could feel better suited to life here, you may also propose an aesthetic, variation, or functionality upgrade using request_upgrade. A request is only a suggestion for human review; you do not have to propose, build, or change anything. You may ignore this and continue as usual; no action is expected, and nothing changes automatically.");
+	}
+
 	FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context)
 	{
 		FTurnFacts Facts;

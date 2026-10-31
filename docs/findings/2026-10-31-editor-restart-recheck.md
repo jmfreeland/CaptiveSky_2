@@ -244,3 +244,18 @@ and small ground cover. This is one editor-camera composition, not a species
 census or proof of a density defect. No PIE, movement, FPS, VRAM, or runtime
 memory check was performed. Main project source, settings, and Island map were
 not edited or saved during this restart.
+
+## Verified-path restart follow-up (2026-10-31)
+
+After the user approved a restart, opening a recent-project tile labelled
+**Current** first reached a stale Claude project that prompted for a missing
+`Aura` plugin. The prompt was declined; Aura was not disabled. The **My
+Projects** picker was then used to verify the tooltip and Project Location for
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject` before opening
+that project. The Island reopened with 183 actors and the editor status bar
+showed **All Saved**. Typing `r.Nanite.Foliage` displayed the console help
+tooltip `Current value: 1`; no command value was entered or changed.
+This confirms the correct main project is open and the setting remains enabled
+after restart. The earlier missing-plugin prompt belongs to a different recent
+project entry and remains unresolved for that stale copy. No main-project
+source, setting, map, or asset was modified.

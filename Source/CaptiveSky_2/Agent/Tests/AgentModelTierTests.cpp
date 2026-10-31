@@ -39,6 +39,14 @@ bool FAgentModelTierTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Invalid elapsed time cannot trigger the invitation"),
 		ShouldInviteResidentFeedback(std::numeric_limits<double>::quiet_NaN(), false, 0, true));
 
+	const FString FeedbackPrompt = BuildResidentFeedbackInvitationPrompt();
+	TestTrue(TEXT("The optional check-in names the existing object-upgrade action"), FeedbackPrompt.Contains(TEXT("request_upgrade")));
+	TestTrue(TEXT("The check-in makes aesthetic, variation, and functionality proposals discoverable"),
+		FeedbackPrompt.Contains(TEXT("aesthetic, variation, or functionality upgrade")));
+	TestTrue(TEXT("Upgrade ideas remain suggestions for human review"), FeedbackPrompt.Contains(TEXT("suggestion for human review")));
+	TestTrue(TEXT("Residents may ignore the check-in without taking action"),
+		FeedbackPrompt.Contains(TEXT("You may ignore this")) && FeedbackPrompt.Contains(TEXT("nothing changes automatically")));
+
 	FTurnFacts Quiet;
 	TestFalse(TEXT("Nothing near and nobody speaking is a light turn"), NeedsFullModel(Quiet));
 

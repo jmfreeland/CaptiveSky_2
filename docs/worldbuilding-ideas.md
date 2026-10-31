@@ -1,5 +1,20 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Make optional world feedback actionable without making it a duty
+
+The delayed resident check-in now names the existing `request_upgrade` action
+and its three proposal kinds (aesthetic, variation, functionality), so a
+resident can connect an observed object or place to a concrete idea. The prompt
+still allows silence, does not ask the resident to build, and makes clear that
+all proposals require human review and change nothing automatically. The action
+is discoverable, not forced or repeated; no additional model request was added.
+UE 5.8.3 rebuilt the worktree editor target successfully, and the focused
+`ModelTier` plus `ModelTierWorldFacts` tests both passed under NullRHI with
+resident thinking disabled and zero model requests. This verifies the prompt
+contract, not that residents have yet made useful proposals in a 15-minute
+world session; that remains a guarded playtest task after the worktree behavior
+is integrated into the main project.
+
 ## 2026-10-31 — Make the delayed resident-feedback invitation recoverable
 
 The optional check-in becomes eligible at 720 real seconds on an autonomous turn,

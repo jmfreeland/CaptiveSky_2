@@ -1404,7 +1404,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	FString Situation = AddReviewedRequestUpdatesToSituation(BuildSituationSummary(Context), MemoryComp);
 	if (bFeedbackInvitationDue)
 	{
-		Situation += TEXT("\n\nA one-time optional invitation from outside the Island: If you wish, use speech to share one thing you would like to explore, change, preserve, or understand here. You may ignore this and continue as usual; no action is expected, and this invitation changes nothing in the world. Any idea will be reviewed by a human before it is acted on.");
+		Situation += TEXT("\n\n") + AgentModelTier::BuildResidentFeedbackInvitationPrompt();
 		bFeedbackInvitationDeliveredThisSession = true;
 		++FeedbackInvitationAttemptsThisSession;
 		UE_LOG(LogAgentBrain, Log, TEXT("Optional resident-feedback invitation shown to %s after %.0f real seconds."),

@@ -37,6 +37,8 @@ namespace AgentModelTier
 		int32 AttemptsThisSession, bool bAutonomousTurn);
 	CAPTIVESKY_2_API bool ShouldRetryResidentFeedbackRequest(bool bRequestSucceeded, bool bDecisionValid,
 		int32 AttemptsThisSession);
+	/** Optional resident check-in, including human-reviewed ways to suggest world improvements. */
+	CAPTIVESKY_2_API FString BuildResidentFeedbackInvitationPrompt();
 	CAPTIVESKY_2_API FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context);
 
 	/** The light model's id: -CaptiveSkyLightModel=, else UAgentLLMSettings::LightModel. Empty means the tier is off. */
