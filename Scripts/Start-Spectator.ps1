@@ -36,6 +36,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/RenderTrace -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/RenderTrace/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -TraceProfileFile Saved/Profiling/Traces/RenderTrace.utrace -TraceProfileDelaySeconds 45 -TraceProfileDurationSeconds 30
 ./Scripts/Start-Spectator.ps1 -DisablePython -DisableAgentThinking -DataRoot Saved/Playtests/PythonOff -MaxRealtimeSeconds 60 -MaxModelRequests 1
 ./Scripts/Start-Spectator.ps1 -Continuous
+./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 #>
 param(
 	[switch]$Windowed,
@@ -61,6 +62,7 @@ param(
 	[ValidateRange(4500, 15000)][Nullable[int]]$FoliageDetailRangeCm,
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
+	[switch]$LogSituations,
 	[switch]$DisableGroundCoverSway,
 	[switch]$TextureStreamingStats,
 	[switch]$DisableFoliageMaterialWind,
@@ -70,6 +72,7 @@ param(
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
 	[switch]$Continuous,
+	[string]$ProjectPath,
 	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
@@ -94,7 +97,14 @@ if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) {
 		throw "-ForceStormSeconds requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
 }
-$project = Resolve-Path (Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject")
+$projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
+	Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject"
+} elseif ([System.IO.Path]::IsPathRooted($ProjectPath)) {
+	$ProjectPath
+} else {
+	Join-Path $PSScriptRoot $ProjectPath
+}
+$project = Resolve-Path -LiteralPath $projectCandidate
 $projectRoot = Split-Path $project
 $editor = Join-Path $EngineDir "Engine\Binaries\Win64\UnrealEditor.exe"
 if (-not (Test-Path $editor)) { throw "UnrealEditor.exe not found under $EngineDir; pass -EngineDir." }
@@ -151,6 +161,7 @@ if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) { $execCommands += "Isl
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
 if ($DisablePython) { $arguments += "-DisablePython" }
+if ($LogSituations) { $arguments += "-CaptiveSkyLogSituations" }
 if ($DisableGroundCoverSway) { $arguments += "-IslandDisableGroundCoverSway" }
 if ($DisableFoliageMaterialWind) { $arguments += "-IslandDisableFoliageMaterialWind" }
 if ($NoZenLocalFallback) { $arguments += "-ddc=NoZenLocalFallback" }
