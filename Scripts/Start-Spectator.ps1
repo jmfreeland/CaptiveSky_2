@@ -260,7 +260,8 @@ if (-not $Continuous) {
 		if ("$_" -match '\s') { "`"$_`"" } else { "$_" }
 	}
 	$gameLaunchTime = Get-Date
-	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -WorkingDirectory $engineWorkingDirectory -PassThru
+	$windowStyle = if ($NullRHI) { "Hidden" } else { "Normal" }
+	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -WorkingDirectory $engineWorkingDirectory -WindowStyle $windowStyle -PassThru
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
 	$mapObjectName = ($MapPath -split '/')[-1]

@@ -66,6 +66,7 @@ class StartSpectatorCapTests(unittest.TestCase):
         )
         self.assertIn('if ($NullRHI) { $arguments += "-NullRHI" }', launcher)
         self.assertIn("-NullRHI cannot be combined with -Shots", launcher)
+        self.assertIn('$windowStyle = if ($NullRHI) { "Hidden" } else { "Normal" }', launcher)
 
 
 if __name__ == "__main__":
