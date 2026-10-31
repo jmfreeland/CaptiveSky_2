@@ -1181,7 +1181,9 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 		CoverBox->SetCollisionProfileName(TEXT("BlockAll"));
 		CoverBox->RegisterComponent();
 		OverheadCover->SetActorLocation(Perch->GetActorLocation() + FVector(0.f, 0.f, Raven->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 35.f));
-		TestTrue(TEXT("Solid overhead fixture is found by the cover probes"), Controller->AssessRoostSite(Perch).Contains(TEXT("5 of 5 short vertical visibility probes")));
+		const FString CoveredSiteAssessment = Controller->AssessRoostSite(Perch);
+		TestTrue(TEXT("Solid overhead fixture is found by the cover probes"), CoveredSiteAssessment.Contains(TEXT("5 of 5 short vertical visibility probes")));
+		TestFalse(TEXT("A covered roost does not invite an unnecessary shelter upgrade"), CoveredSiteAssessment.Contains(TEXT("request_upgrade")));
 		OverheadCover->Destroy();
 	}
 	UAgentBrainComponent* RavenBrain = NewObject<UAgentBrainComponent>(Raven);

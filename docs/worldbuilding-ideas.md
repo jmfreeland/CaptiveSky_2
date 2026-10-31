@@ -15,7 +15,9 @@ The UE 5.8.3 worktree editor target built successfully. The new assertion in
 `CaptiveSky2.Agent.RavenPerch` passed in a NullRHI run, but the full automation
 still fails later because this sparse worktree lacks the Raven placeholder
 Blueprint and several referenced Content assets. Rerun the complete test when
-the project Content is available; the open D: editor and map were not changed.
+the project Content is available. The regression also confirms that a site
+with all five overhead probes covered does not trigger the proposal cue. The
+open D: editor and map were not changed.
 
 ## 2026-10-29 — Make the existing diversity visible before adding more
 
