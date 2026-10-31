@@ -13,6 +13,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/PlatformTime.h"
 #include "GameFramework/Character.h"
 #include "Misc/ScopeExit.h"
 #include "Sound/SoundWaveProcedural.h"
@@ -477,5 +478,95 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 		DistantSituation.Contains(TEXT("patch of Cube vegetation")));
 	TestFalse(TEXT("Instanced-skinned vegetation beyond the short perception radius is omitted"),
 		DistantSituation.Contains(TEXT("patch of Norway maple trees")));
+
+	// Measure prompt-summary construction at the Island's complete 3,600-tree
+	// broadleaf budget without loading art assets or invoking any model/provider.
+	TArray<FTransform> OffscreenTreeTransforms;
+	OffscreenTreeTransforms.Reserve(899);
+	for (int32 Index = 0; Index < 899; ++Index)
+	{
+		OffscreenTreeTransforms.Emplace(FRotator::ZeroRotator,
+			FVector(5000.f + (Index % 30) * 1000.f, (Index / 30) * 1000.f, 0.f));
+	}
+	TArray<int32> OffscreenAnimationIndices;
+	OffscreenAnimationIndices.Init(0, OffscreenTreeTransforms.Num());
+	BroadleafTrees->AddInstances(OffscreenTreeTransforms, OffscreenAnimationIndices, false, true);
+
+	auto AddStressTreeSpecies = [this, Weather, &OffscreenTreeTransforms](const TCHAR* MeshName, const FVector& NearbyLocation)
+		-> UInstancedSkinnedMeshComponent*
+	{
+		USkeletalMesh* Mesh = NewObject<USkeletalMesh>(Weather, MeshName);
+		if (!TestNotNull(TEXT("A transient species mesh can be created for the 3,600-tree scan"), Mesh)) return nullptr;
+
+		UInstancedSkinnedMeshComponent* Trees = NewObject<UInstancedSkinnedMeshComponent>(Weather);
+		Weather->AddInstanceComponent(Trees);
+		Trees->SetSkinnedAsset(Mesh);
+		Trees->RegisterComponent();
+		Trees->SetVisibility(true);
+		Trees->SetHiddenInGame(false);
+		Trees->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		TArray<FTransform> SpeciesTransforms;
+		SpeciesTransforms.Reserve(900);
+		SpeciesTransforms.Emplace(FRotator::ZeroRotator, NearbyLocation);
+		SpeciesTransforms.Append(OffscreenTreeTransforms);
+		TArray<int32> AnimationIndices;
+		AnimationIndices.Init(0, SpeciesTransforms.Num());
+		Trees->AddInstances(SpeciesTransforms, AnimationIndices, false, true);
+		return Trees;
+	};
+	UInstancedSkinnedMeshComponent* AspenTrees = AddStressTreeSpecies(
+		TEXT("Tree_European_Aspen_Forest_01_A"), FVector(400.f, 0.f, 0.f));
+	UInstancedSkinnedMeshComponent* BeechTrees = AddStressTreeSpecies(
+		TEXT("Tree_European_Beech_Forest_01_A"), FVector(450.f, 0.f, 0.f));
+	UInstancedSkinnedMeshComponent* AlderTrees = AddStressTreeSpecies(
+		TEXT("Tree_Black_Alder_Forest_01_A"), FVector(500.f, 0.f, 0.f));
+	if (!AspenTrees || !BeechTrees || !AlderTrees) return false;
+	TestEqual(TEXT("The timing fixture uses the fixed 3,600-tree broadleaf budget"),
+		BroadleafTrees->GetInstanceCount() + AspenTrees->GetInstanceCount() +
+		BeechTrees->GetInstanceCount() + AlderTrees->GetInstanceCount(), 3600);
+
+	Observer->SetActorLocation(FVector::ZeroVector);
+	Foliage->SetVisibility(false);
+	const TArray<TPair<UInstancedSkinnedMeshComponent*, const TCHAR*>> SpeciesLabels =
+	{
+		{ BroadleafTrees, TEXT("patch of Norway maple trees") },
+		{ AspenTrees, TEXT("patch of European aspen trees") },
+		{ BeechTrees, TEXT("patch of European beech trees") },
+		{ AlderTrees, TEXT("patch of black alder trees") }
+	};
+	for (const TPair<UInstancedSkinnedMeshComponent*, const TCHAR*>& SpeciesLabel : SpeciesLabels)
+	{
+		for (const TPair<UInstancedSkinnedMeshComponent*, const TCHAR*>& OtherSpecies : SpeciesLabels)
+			OtherSpecies.Key->SetVisibility(OtherSpecies.Key == SpeciesLabel.Key);
+		const FString SpeciesSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+		TestTrue(FString::Printf(TEXT("A full-budget %s canopy keeps its common resident label"), SpeciesLabel.Value),
+			SpeciesSituation.Contains(SpeciesLabel.Value));
+	}
+	for (const TPair<UInstancedSkinnedMeshComponent*, const TCHAR*>& SpeciesLabel : SpeciesLabels)
+		SpeciesLabel.Key->SetVisibility(true);
+
+	FString FullPopulationSituation;
+	TArray<double> SummaryBuildMilliseconds;
+	constexpr int32 WarmupSummaryBuilds = 2;
+	constexpr int32 MeasuredSummaryBuilds = 10;
+	for (int32 Iteration = 0; Iteration < WarmupSummaryBuilds + MeasuredSummaryBuilds; ++Iteration)
+	{
+		const double StartSeconds = FPlatformTime::Seconds();
+		FullPopulationSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+		const double ElapsedMilliseconds = (FPlatformTime::Seconds() - StartSeconds) * 1000.0;
+		if (Iteration >= WarmupSummaryBuilds) SummaryBuildMilliseconds.Add(ElapsedMilliseconds);
+	}
+	TestTrue(TEXT("The full-budget fixture reports the three nearest broadleaf species"),
+		FullPopulationSituation.Contains(TEXT("patch of Norway maple trees")) &&
+		FullPopulationSituation.Contains(TEXT("patch of European aspen trees")) &&
+		FullPopulationSituation.Contains(TEXT("patch of European beech trees")) &&
+		!FullPopulationSituation.Contains(TEXT("patch of black alder trees")));
+	double TotalSummaryMilliseconds = 0.0;
+	for (const double ElapsedMilliseconds : SummaryBuildMilliseconds) TotalSummaryMilliseconds += ElapsedMilliseconds;
+	const double AverageSummaryMilliseconds = SummaryBuildMilliseconds.IsEmpty()
+		? 0.0 : TotalSummaryMilliseconds / SummaryBuildMilliseconds.Num();
+	AddInfo(FString::Printf(TEXT("Full 3,600-tree broadleaf prompt-summary build averaged %.3f ms across %d warmed NullRHI fixture samples; no models or assets were loaded."),
+		AverageSummaryMilliseconds, SummaryBuildMilliseconds.Num()));
 	return true;
 }

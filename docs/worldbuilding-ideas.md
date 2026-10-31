@@ -16,10 +16,13 @@ population increase.
 The UE 5.8.3 editor target built successfully, and
 `CaptiveSky2.Agent.NearbyVegetationPerception` passed under NullRHI (exit code
 0). The fixture verifies the Norway-maple label, keeps it out of movement-target
-wording, and omits it when hidden, occluded, or outside the short radius. That
-test does not measure prompt-build cost against the full 3,600-tree population
-or validate live species visibility and visual quality; capture a bounded
-timing sample on the Island before widening the scan.
+wording, and omits it when hidden, occluded, or outside the short radius. A
+stress fixture populated all four species components to the 3,600-tree budget
+and timed ten warmed summary builds at an average of 0.187 ms under NullRHI.
+This isolates CPU transform scanning with transient meshes; it is not a full
+Island prompt-construction profile and does not validate live species
+visibility or visual quality. Keep the 6.5 m radius and bounded visibility
+traces until an in-world daylight check confirms what residents actually see.
 
 **Active-editor setting check (2026-10-31):** after the approved restart, the
 active `D:\Projects - Athena\unreal\captivesky_2_claude` editor loaded
