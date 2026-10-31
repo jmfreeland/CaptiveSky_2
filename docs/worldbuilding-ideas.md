@@ -7,10 +7,21 @@ proposals, but did not mention the separate `request_object` path. It now lets
 a resident suggest one concrete physical object if something useful feels
 genuinely missing. Both paths remain optional human-review proposals: the
 check-in does not build, generate, import, or place anything, and residents may
-ignore it. The focused `Agent.ModelTier` prompt test now covers discoverability
-and the shared review boundary. This improves the invitation contract only; a
-future bounded Island session still needs to establish whether residents make
-useful requests without feeling prompted into a duty.
+ignore it. The UE 5.8 build succeeded, and the focused `Agent.ModelTier` and
+`Agent.ModelTierWorldFacts` automations passed. This improves the invitation
+contract, but does not establish whether residents make useful requests
+without feeling prompted into a duty.
+
+**Bounded feedback attempt:** after rebuilding the scratch-project module, the
+900-second isolated NullRHI feedback run exited before the Island's world-ready
+marker. Its crash context records a null-address access violation during engine
+pre-initialization (`PCallStackHash 4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`);
+there is no resident session or model-request result to report. The launcher
+correctly rejected the zero exit code as startup failure. The run's data root
+was isolated under `Saved/CS58/Saved/Playtests/Codex_ObjectFeedback_20261031/`,
+so shared Island state and the normal proposal inbox were untouched. Do not
+repeat the same launch blindly; obtain symbolized dump analysis or a fresh
+startup diagnostic before the next feedback attempt.
 
 ## 2026-10-31 — Verify Nanite Foliage after restarting the actual project
 
