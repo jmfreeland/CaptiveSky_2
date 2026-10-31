@@ -40,6 +40,17 @@ bounded daylight traversal from Tideglass to a broadleaf grove, with per-species
 visibility checked close, middle, and far; do not increase foliage counts to
 compensate for a visibility or material issue.
 
+**Fresh viewport check (2026-10-31):** the restarted editor is responsive and
+the daylight viewport is unobstructed. In the current wide view, foreground
+groundcover forms separated clumps, but the broad slope reads mostly bare and
+only a few tree silhouettes stand out. This angle cannot establish which tree
+species are visible, and no map or runtime state was changed. Keep the next
+check at the woodland transition: identify the species at close/middle/far
+distance and record p95 frame time plus whole-device VRAM in the same single-
+editor run. Historical captures vary from 18.03 ms p95 in a stationary view to
+23.84 FPS p95 for a full-cover capture, so a density increase is not justified
+without a matched measurement.
+
 ### 2. Repair presentation dependencies in bounded groups
 
 Resolve the `M_Island_Textured_Wet` texture-collection index warning separately
