@@ -39,6 +39,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatial -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
+./Scripts/Start-Spectator.ps1 -NullRHI -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatialNullRHI -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
 #>
 param(
 	[switch]$Windowed,
@@ -64,6 +65,7 @@ param(
 	[ValidateRange(4500, 15000)][Nullable[int]]$FoliageDetailRangeCm,
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
+	[switch]$NullRHI,
 	[switch]$LogSituations,
 	[switch]$LogDragonflyFlowerVisits,
 	[switch]$GroundCoverSpatialDiagnostics,
@@ -120,6 +122,17 @@ if ($GroundCoverSpatialDiagnostics) {
 		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
 		throw "-GroundCoverSpatialDiagnostics requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
+}
+if ($NullRHI) {
+	if ($Continuous) { throw "-NullRHI is supported only for bounded diagnostic sessions." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-NullRHI requires an isolated -DataRoot." }
+	if (-not $DisableAgentThinking) { throw "-NullRHI requires -DisableAgentThinking to avoid model requests during the diagnostic." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-NullRHI requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+	if ($Shots) { throw "-NullRHI cannot be combined with -Shots because it has no rendered output." }
 }
 $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 	Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject"
@@ -184,6 +197,7 @@ if ($PSBoundParameters.ContainsKey("ViewpointHour")) {
 if ($PSBoundParameters.ContainsKey("ForceStormSeconds")) { $execCommands += "Island.Storm $ForceStormSeconds" }
 if ($PSBoundParameters.ContainsKey("EstablishingSeconds")) { $arguments += "-SpectatorEstablishingSeconds=$EstablishingSeconds" }
 if ($DisableAgentThinking) { $arguments += @("-CaptiveSkyDisableAgentThinking", "-unattended") }
+if ($NullRHI) { $arguments += "-NullRHI" }
 if ($DisablePython) { $arguments += "-DisablePython" }
 if ($LogSituations) { $arguments += "-CaptiveSkyLogSituations" }
 if ($LogDragonflyFlowerVisits) { $execCommands += "CaptiveSky.Island.DragonflyFlowerTelemetry 1" }

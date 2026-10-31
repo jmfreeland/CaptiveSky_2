@@ -54,6 +54,19 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn('"CaptiveSky.Island.DragonflyFlowerTelemetry 1"', launcher)
         self.assertIn('TEXT("CaptiveSky.Island.DragonflyFlowerTelemetry")', ecology)
 
+    def test_null_rhi_requires_isolated_bounded_zero_thinking_run(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$NullRHI", launcher)
+        self.assertIn("-NullRHI requires an isolated -DataRoot", launcher)
+        self.assertIn("-NullRHI requires -DisableAgentThinking", launcher)
+        self.assertIn(
+            "-NullRHI requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps",
+            launcher,
+        )
+        self.assertIn('if ($NullRHI) { $arguments += "-NullRHI" }', launcher)
+        self.assertIn("-NullRHI cannot be combined with -Shots", launcher)
+
 
 if __name__ == "__main__":
     unittest.main()
