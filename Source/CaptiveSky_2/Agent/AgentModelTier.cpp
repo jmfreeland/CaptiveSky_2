@@ -44,6 +44,12 @@ namespace AgentModelTier
 			|| Facts.NearestBeingCm <= BeingRangeCm || Facts.NearestAffordanceCm <= AffordanceRangeCm;
 	}
 
+	bool ShouldInviteResidentFeedback(double ElapsedRealSeconds, bool bAlreadyInvited, bool bAutonomousTurn)
+	{
+		return bAutonomousTurn && !bAlreadyInvited && FMath::IsFinite(ElapsedRealSeconds)
+			&& ElapsedRealSeconds >= ResidentFeedbackInvitationAfterSeconds;
+	}
+
 	FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context)
 	{
 		FTurnFacts Facts;

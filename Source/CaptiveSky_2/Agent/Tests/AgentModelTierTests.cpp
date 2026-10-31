@@ -4,6 +4,7 @@
 #include "Engine/Engine.h"
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
+#include <limits>
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentModelTierTest, "CaptiveSky2.Agent.ModelTier",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -11,6 +12,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentModelTierTest, "CaptiveSky2.Agent.ModelTi
 bool FAgentModelTierTest::RunTest(const FString& Parameters)
 {
 	using namespace AgentModelTier;
+
+	TestFalse(TEXT("Feedback invitation waits for the twelve-minute play threshold"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds - 1.0, false, true));
+	TestTrue(TEXT("An autonomous turn receives one feedback invitation at the threshold"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds, false, true));
+	TestFalse(TEXT("An already-invited resident is not asked again during the session"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, true, true));
+	TestFalse(TEXT("A visitor or agent conversation is never interrupted with the invitation"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false, false));
+	TestFalse(TEXT("Invalid elapsed time cannot trigger the invitation"),
+		ShouldInviteResidentFeedback(std::numeric_limits<double>::quiet_NaN(), false, true));
 
 	FTurnFacts Quiet;
 	TestFalse(TEXT("Nothing near and nobody speaking is a light turn"), NeedsFullModel(Quiet));

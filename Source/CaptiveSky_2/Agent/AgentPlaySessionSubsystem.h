@@ -49,6 +49,7 @@ public:
 	static constexpr double ContinuousAgentSpacingSeconds = 12.0;
 	static constexpr double RequestDrainGraceSeconds = 45.0;
 	bool IsContinuous() const { return bContinuousPlay; }
+	double GetElapsedRealSeconds() const;
 	/** Tests point this at a scratch file; empty uses Saved/CaptiveSky/ModelBudget.json. */
 	FString LedgerPathOverride;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;

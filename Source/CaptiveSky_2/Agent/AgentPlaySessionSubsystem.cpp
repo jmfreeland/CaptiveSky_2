@@ -155,6 +155,11 @@ double UAgentPlaySessionSubsystem::Now() const
 	return NowOverride >= 0.0 ? NowOverride : FPlatformTime::Seconds();
 }
 
+double UAgentPlaySessionSubsystem::GetElapsedRealSeconds() const
+{
+	return FMath::Max(0.0, Now() - StartedAt);
+}
+
 void UAgentPlaySessionSubsystem::BeginContinuous()
 {
 	// Start half full, so a fresh launch can't spend a whole burst in its first seconds.

@@ -36,6 +36,8 @@ STAMP = re.compile(r"^\[(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})\.(\d{2}):(\d{
 DECIDED = re.compile(r"LogAutonomousAgentAI: (\S+) decided: \"(.*)\" \(Action=(\d+)\)")
 OUTCOME = re.compile(r"LogAutonomousAgentAI: (\S+) outcome: (.*)$")
 SPEECH = re.compile(r'LogAutonomousAgentAI: (\S+) chose speech: "(.*)"$')
+FEEDBACK_INVITE = re.compile(r"LogAgentBrain: Optional resident-feedback invitation shown to (\S+) after (\d+) real seconds\.")
+FEEDBACK_RESULT = re.compile(r'LogAgentBrain: Resident feedback check-in result for (\S+): (.*)$')
 SITUATION = re.compile(r"Situation for (\S+) \((\d+) chars, system prompt (\d+) chars\): (.*)$")
 PROPOSAL_ID = re.compile(r"(?:Object request|Upgrade suggestion) ([0-9a-fA-F]{8})\b")
 SESSION_START = re.compile(r"LogAgentSession: (?:Play safety active:|Continuous play:)")
@@ -109,6 +111,8 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     decisions: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     thoughts: dict[str, list[str]] = collections.defaultdict(list)
     speech: dict[str, list[str]] = collections.defaultdict(list)
+    feedback_invites: dict[str, int] = {}
+    feedback_results: dict[str, str] = {}
     interactions: collections.Counter = collections.Counter()
     failures: collections.Counter = collections.Counter()
     builds: list[str] = []
@@ -119,6 +123,14 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
     systems: dict[str, list[int]] = collections.defaultdict(list)
     noticed: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     for line in lines:
+        if match := FEEDBACK_INVITE.search(line):
+            agent, elapsed = match.groups()
+            feedback_invites[agent] = int(elapsed)
+            continue
+        if match := FEEDBACK_RESULT.search(line):
+            agent, result = match.groups()
+            feedback_results[agent] = result
+            continue
         if match := SITUATION.search(line):
             agent, length, system, text = match.groups()
             situations[agent].append(int(length))
@@ -167,6 +179,11 @@ def summarize(path: Path, request_inbox: Path | None = None, session: int = -1) 
         out.extend(f"- {resident_name(controller, thoughts[controller])}: “{words}”" for words in lines_spoken)
     if not speech:
         out.append("- No speech lines logged.")
+    if feedback_invites:
+        out += ["", "## Optional resident feedback", ""]
+        for agent, elapsed in sorted(feedback_invites.items()):
+            result = feedback_results.get(agent, "invitation was shown; no result was logged")
+            out.append(f"- {resident_name(agent, thoughts[agent])} (invited after {elapsed // 60} min): {result}")
     if situations:
         out += ["", "## What residents were shown", "", "| Resident | situations | median situation chars | median system prompt chars | most often in view |", "|---|---|---|---|---|"]
         for agent, lengths in sorted(situations.items()):

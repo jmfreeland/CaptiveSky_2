@@ -25,6 +25,10 @@ class SessionSummaryTests(unittest.TestCase):
                         '[2026.10.31-12.00.01:000][  1]LogAutonomousAgentAI: AsterController_0 decided: "The perch needs shelter." (Action=9)',
                         '[2026.10.31-12.00.02:000][  2]LogAutonomousAgentAI: AsterController_0 decided: "I will try a new recipe." (Action=10)',
                         '[2026.10.31-12.00.02:500][  2]LogAutonomousAgentAI: Agent_Aster_01 chose speech: "The gusts make the Listening Stones sound almost like a chord."',
+                        '[2026.10.31-12.12.00:000][ 20]LogAgentBrain: Optional resident-feedback invitation shown to Agent_Raven_01 after 720 real seconds.',
+                        '[2026.10.31-12.12.04:000][ 24]LogAgentBrain: Resident feedback check-in result for Agent_Raven_01: speech "The east fork needs a thicker screen from the wind.".',
+                        '[2026.10.31-12.12.10:000][ 30]LogAgentBrain: Optional resident-feedback invitation shown to Agent_Aster_01 after 730 real seconds.',
+                        '[2026.10.31-12.12.14:000][ 34]LogAgentBrain: Resident feedback check-in result for Agent_Aster_01: no spoken response; other choices remain available.',
                         '[2026.10.31-12.00.03:000][  3]LogAutonomousAgentAI: RavenAgentAIController_0 decided: "I will settle here." (Action=7)',
                         '[2026.10.31-12.00.04:000][  4]LogAutonomousAgentAI: AsterController_0 outcome: Object request 12345678 was added to the human-review queue; no asset has been made or placed.',
                         '[2026.10.31-12.00.05:000][  5]LogAutonomousAgentAI: AsterController_0 outcome: Upgrade suggestion abcdef01 for west roost was added for human review; nothing in the world changed.',
@@ -65,6 +69,9 @@ class SessionSummaryTests(unittest.TestCase):
         self.assertIn("request_upgrade", report)
         self.assertIn("practice_craft", report)
         self.assertIn("Aster: “The gusts make the Listening Stones sound almost like a chord.”", report)
+        self.assertIn("## Optional resident feedback", report)
+        self.assertIn("Raven (invited after 12 min): speech \"The east fork needs a thicker screen from the wind.\".", report)
+        self.assertIn("Aster (invited after 12 min): no spoken response; other choices remain available.", report)
         self.assertIn("| Raven | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 |", report)
         self.assertIn("| AsterController_0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 1 | 1 | 3 |", report)
         self.assertIn("moss-lined resting bowl", report)

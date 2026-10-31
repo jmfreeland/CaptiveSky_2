@@ -122,6 +122,7 @@ private:
 	friend class FAgentConsolidationTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
+	bool bFeedbackInvitationDeliveredThisSession = false;
 	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.
 	TArray<FVector> RecentDecisionSpots;
 

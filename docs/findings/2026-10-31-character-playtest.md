@@ -88,3 +88,13 @@ say, so their feedback can be reviewed alongside actions without introducing a
 separate questionnaire or extra model call. Historic totals for action indices
 7 and above must be re-read from raw logs or regenerated with the updated
 script; older speech entries may still carry generic controller names.
+
+The next bounded-session iteration now offers each resident one optional
+reflection during their first autonomous decision after twelve real minutes.
+The invitation does not interrupt a visitor or resident conversation, upgrades
+that ordinary turn to the full model so speaking is available, and does not
+make a proposal or alter the world. A resident may ignore it or continue any
+other activity. The one-time gate is covered by `CaptiveSky2.Agent.ModelTier`,
+and the selected response (spoken feedback or another choice) is logged and
+included in session reports. Actual resident responses and request-cap cost
+still need confirmation in a later guarded 15–30 minute run.
