@@ -13,6 +13,16 @@ is unchanged. The focused `CaptiveSky2.Agent.SessionSafety` automation now
 passes with the new timings. This is not yet a measured 30-minute runtime
 result; a later guarded session must confirm the real request rate.
 
+After the cadence rebuild, a headless NullRHI regression pass also reconfirmed
+`Agent.ModelTier`, `Agent.ModelTierWorldFacts`,
+`Agent.NearbyVegetationPerception`, and
+`Agent.IslandWeather.BroadleafHabitatSelection` (all passed; zero model
+requests). Logs: `Saved/Logs/Codex_EcologyFeedbackRegression_20261031.log`,
+`Saved/Logs/Codex_CaptiveSky2_Agent_NearbyVegetationPerception_20261031.log`,
+and `Saved/Logs/Codex_CaptiveSky2_Agent_IslandWeather_BroadleafHabitatSelection_20261031.log`.
+These are source-level checks, not a rendered Island or character-response
+playtest.
+
 ## 2026-10-31 — Make optional world feedback actionable without making it a duty
 
 The delayed resident check-in now names the existing `request_upgrade` action
