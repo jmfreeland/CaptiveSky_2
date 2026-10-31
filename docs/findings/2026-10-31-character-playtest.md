@@ -145,3 +145,32 @@ are local under `Saved/CS58/Saved/Logs/` and
 The separate main D: project still has not received the worktree source; a
 deliberate sync/rebuild and a rendered feedback run remain pending approval and
 sufficient GPU headroom.
+
+## Nested-meadow worktree feedback run — 2026-10-31 21:48 UTC
+
+After the elevated UE 5.8.3 launch path succeeded, the current worktree source
+was exercised on the complete Island through `Saved/CS58/`: `Source` points to
+this worktree, `Content` is a read-only junction to the main D: project, and
+playtest data is isolated under
+`Saved/CS58/Saved/Playtests/Codex_MeadowFeedback_20261031/`. The hidden NullRHI
+session reached world-ready in 34.5 seconds and ran for 774.5 real seconds. It
+ended cleanly at the 32-request cap with zero requests in flight, before its
+900-second deadline; no request limit was raised mid-run.
+
+All four residents received the optional check-in after 745–747 seconds. Aster
+chose to say: “I wonder if the rain will carry them farther than the breeze
+did. The minnows are making their own little ripples now, too.” Rat, Raven, and
+the Innkeeper chose no spoken response and continued with other activities.
+Raven later answered Aster warmly; Rat and the Innkeeper each set a leaf afloat
+in the rain basin, leaving two leaves in the isolated world state. The chronicle
+contains 32 decisions (Aster 8, Innkeeper 7, Rat 7, Raven 10), with no
+`request_upgrade` or `request_object` proposals. This is actionable, voluntary
+feedback about weather and small wildlife, not a direct request to build or
+change anything.
+
+This validates the bounded feedback path and source compatibility with the
+saved Island, but not rendered vegetation appearance, frame rate, or VRAM: the
+run used NullRHI. Current device free memory remained below the 4 GiB guard, so
+no rendered PIE was started. Logs: `Saved/CS58/Saved/Logs/`
+(`Codex_MeadowFeedback_20261031.log`); isolated resident memories, chronicle,
+and world state are in the DataRoot above.
