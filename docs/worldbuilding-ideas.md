@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-10-31 — Surface missing-object requests in the optional resident check-in
+
+The twelve-minute resident check-in already invited optional `request_upgrade`
+proposals, but did not mention the separate `request_object` path. It now lets
+a resident suggest one concrete physical object if something useful feels
+genuinely missing. Both paths remain optional human-review proposals: the
+check-in does not build, generate, import, or place anything, and residents may
+ignore it. The focused `Agent.ModelTier` prompt test now covers discoverability
+and the shared review boundary. This improves the invitation contract only; a
+future bounded Island session still needs to establish whether residents make
+useful requests without feeling prompted into a duty.
+
 ## 2026-10-31 — Verify Nanite Foliage after restarting the actual project
 
 After the user confirmed the Island was saved and approved a restart, the active
