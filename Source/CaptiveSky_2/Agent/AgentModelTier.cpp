@@ -44,9 +44,11 @@ namespace AgentModelTier
 			|| Facts.NearestBeingCm <= BeingRangeCm || Facts.NearestAffordanceCm <= AffordanceRangeCm;
 	}
 
-	bool ShouldInviteResidentFeedback(double ElapsedRealSeconds, bool bAlreadyInvited, bool bAutonomousTurn)
+	bool ShouldInviteResidentFeedback(double ElapsedRealSeconds, bool bAlreadyInvited,
+		int32 AttemptsThisSession, bool bAutonomousTurn)
 	{
-		return bAutonomousTurn && !bAlreadyInvited && FMath::IsFinite(ElapsedRealSeconds)
+		return bAutonomousTurn && !bAlreadyInvited && AttemptsThisSession >= 0 &&
+			AttemptsThisSession < ResidentFeedbackInvitationMaximumAttempts && FMath::IsFinite(ElapsedRealSeconds)
 			&& ElapsedRealSeconds >= ResidentFeedbackInvitationAfterSeconds;
 	}
 

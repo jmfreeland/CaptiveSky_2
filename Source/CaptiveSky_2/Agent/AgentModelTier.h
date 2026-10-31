@@ -21,6 +21,8 @@ namespace AgentModelTier
 	static constexpr float AffordanceRangeCm = 400.f;
 	static constexpr float FarCm = 1.0e9f;
 	static constexpr double ResidentFeedbackInvitationAfterSeconds = 720.0;
+	/** Allow one retry if the provider fails before a resident can receive the invitation. */
+	static constexpr int32 ResidentFeedbackInvitationMaximumAttempts = 2;
 
 	struct FTurnFacts
 	{
@@ -31,7 +33,8 @@ namespace AgentModelTier
 	};
 
 	CAPTIVESKY_2_API bool NeedsFullModel(const FTurnFacts& Facts);
-	CAPTIVESKY_2_API bool ShouldInviteResidentFeedback(double ElapsedRealSeconds, bool bAlreadyInvited, bool bAutonomousTurn);
+	CAPTIVESKY_2_API bool ShouldInviteResidentFeedback(double ElapsedRealSeconds, bool bAlreadyInvited,
+		int32 AttemptsThisSession, bool bAutonomousTurn);
 	CAPTIVESKY_2_API FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context);
 
 	/** The light model's id: -CaptiveSkyLightModel=, else UAgentLLMSettings::LightModel. Empty means the tier is off. */

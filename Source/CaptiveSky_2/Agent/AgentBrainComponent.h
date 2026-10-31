@@ -123,6 +123,7 @@ private:
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
 	bool bFeedbackInvitationDeliveredThisSession = false;
+	int32 FeedbackInvitationAttemptsThisSession = 0;
 	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.
 	TArray<FVector> RecentDecisionSpots;
 

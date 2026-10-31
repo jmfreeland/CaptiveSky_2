@@ -14,15 +14,20 @@ bool FAgentModelTierTest::RunTest(const FString& Parameters)
 	using namespace AgentModelTier;
 
 	TestFalse(TEXT("Feedback invitation waits for the twelve-minute play threshold"),
-		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds - 1.0, false, true));
-	TestTrue(TEXT("An autonomous turn receives one feedback invitation at the threshold"),
-		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds, false, true));
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds - 1.0, false, 0, true));
+	TestTrue(TEXT("An autonomous turn receives the first feedback invitation at the threshold"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds, false, 0, true));
+	TestTrue(TEXT("One provider failure permits a single invitation retry"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false, 1, true));
+	TestFalse(TEXT("The resident-feedback request remains bounded to its maximum attempts"),
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false,
+			ResidentFeedbackInvitationMaximumAttempts, true));
 	TestFalse(TEXT("An already-invited resident is not asked again during the session"),
-		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, true, true));
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, true, 1, true));
 	TestFalse(TEXT("A visitor or agent conversation is never interrupted with the invitation"),
-		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false, false));
+		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false, 0, false));
 	TestFalse(TEXT("Invalid elapsed time cannot trigger the invitation"),
-		ShouldInviteResidentFeedback(std::numeric_limits<double>::quiet_NaN(), false, true));
+		ShouldInviteResidentFeedback(std::numeric_limits<double>::quiet_NaN(), false, 0, true));
 
 	FTurnFacts Quiet;
 	TestFalse(TEXT("Nothing near and nobody speaking is a light turn"), NeedsFullModel(Quiet));

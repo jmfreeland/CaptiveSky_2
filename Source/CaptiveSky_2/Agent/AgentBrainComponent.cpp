@@ -124,6 +124,7 @@ void UAgentBrainComponent::BeginPlay()
 	Super::BeginPlay();
 	bEndedPlay = false;
 	bFeedbackInvitationDeliveredThisSession = false;
+	FeedbackInvitationAttemptsThisSession = 0;
 	Provider = CreateAgentLLMProvider();
 }
 
@@ -1364,7 +1365,8 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	if (!LightModel.IsEmpty()) TurnFacts = AgentModelTier::GatherTurnFacts(Owner, Context);
 	const bool bAutonomousTurn = Context.Text.IsEmpty() && !Context.bExternal && !Context.bAgentToAgent;
 	const bool bFeedbackInvitationDue = Session && AgentModelTier::ShouldInviteResidentFeedback(
-		Session->GetElapsedRealSeconds(), bFeedbackInvitationDeliveredThisSession, bAutonomousTurn);
+		Session->GetElapsedRealSeconds(), bFeedbackInvitationDeliveredThisSession,
+		FeedbackInvitationAttemptsThisSession, bAutonomousTurn);
 	const bool bLight = !bFeedbackInvitationDue && !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(TurnFacts);
 	if (Session && !Session->TryReserveModelRequest(AgentId, bLight))
 	{
@@ -1404,6 +1406,7 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	{
 		Situation += TEXT("\n\nA one-time optional invitation from outside the Island: If you wish, use speech to share one thing you would like to explore, change, preserve, or understand here. You may ignore this and continue as usual; no action is expected, and this invitation changes nothing in the world. Any idea will be reviewed by a human before it is acted on.");
 		bFeedbackInvitationDeliveredThisSession = true;
+		++FeedbackInvitationAttemptsThisSession;
 		UE_LOG(LogAgentBrain, Log, TEXT("Optional resident-feedback invitation shown to %s after %.0f real seconds."),
 			*AgentId, Session->GetElapsedRealSeconds());
 	}
@@ -1541,7 +1544,19 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		}
 		if (bFeedbackInvitationDue)
 		{
-			if (Decision.bValid && !Decision.Speech.IsEmpty())
+			if (!Result.bSuccess || !Decision.bValid)
+			{
+				const bool bRetryAvailable = StrongThis->FeedbackInvitationAttemptsThisSession <
+					AgentModelTier::ResidentFeedbackInvitationMaximumAttempts;
+				StrongThis->bFeedbackInvitationDeliveredThisSession = !bRetryAvailable;
+				UE_LOG(LogAgentBrain, Warning,
+					TEXT("Resident feedback invitation failed for %s on attempt %d of %d; %s."),
+					WeakMemory.IsValid() ? *WeakMemory->GetResolvedAgentId() : *GetNameSafe(StrongThis->GetOwner()),
+					StrongThis->FeedbackInvitationAttemptsThisSession,
+					AgentModelTier::ResidentFeedbackInvitationMaximumAttempts,
+					bRetryAvailable ? TEXT("one retry remains") : TEXT("no retry remains"));
+			}
+			else if (!Decision.Speech.IsEmpty())
 			{
 				UE_LOG(LogAgentBrain, Log, TEXT("Resident feedback check-in result for %s: speech \"%s\"."),
 					WeakMemory.IsValid() ? *WeakMemory->GetResolvedAgentId() : *GetNameSafe(StrongThis->GetOwner()),

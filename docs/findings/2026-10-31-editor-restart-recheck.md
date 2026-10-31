@@ -106,3 +106,99 @@ precedence in `CaptiveSky2.Agent.MeadowBudgetSplit`. The UE 5.8 editor target
 rebuilt successfully again (41.67 s), compiling `IslandWeather.cpp` and
 `IslandMeadowBudgetTests.cpp`; the automation was compiled but not executed
 because the active D: editor still has the older module.
+
+## Fresh runtime recheck (2026-10-31 16:33)
+
+The editor was no longer present in the current Windows app inventory. The
+main D: project's `Config/DefaultEngine.ini` still contains
+`r.Nanite.ProjectEnabled=True` and `r.Nanite.Foliage=True` (line 189), but that
+is configuration evidence only. A fresh GUI launch attempt exited before
+writing a new project log or exposing a project workspace; the available
+computer-use capture continued to show the browser behind a blank Unreal
+window frame. Runtime application of the setting was therefore not rechecked.
+
+To validate the existing water movement test without touching the main D:
+project, UE 5.8.3 `UnrealEditor-Cmd.exe` was run against this worktree with
+`-NullRHI` and `Automation RunTests CaptiveSky2.Agent.IslandOcean`. It crashed
+at 16:30:37 before reporting test discovery/results, writing
+`Saved/Crashes/_0000/CrashContext.runtime-xml`, with
+`EXCEPTION_ACCESS_VIOLATION` reading `0x0000000000000000`; the crash context
+contains only `UnrealEditor-Core` / `UnrealEditor-Cmd` frames and no symbols.
+The test result is unknown, not failed. Windows Application event-log access
+was denied, so the process-level crash has not been attributed. Do not use this
+attempt as evidence that the water fix passes or fails. Next, reopen the main
+project through the UE 5.8 project browser or a working desktop session, verify
+the Island loads and query `r.Nanite.Foliage`, then run the bounded zero-request
+water reproduction and inspect capsule movement mode/floor hit at the shore.
+
+## Successful project-browser restart (2026-10-31 16:57)
+
+The prior window inventory was stale. A direct launch with the project path
+containing spaces opened the UE 5.8 project browser, so the main project was
+selected through Open Project using the verified path
+`D:/Projects - Athena/Unreal/CaptiveSky_2/CaptiveSky_2.uproject`. The project
+window then reached `CaptiveSky_2 - Unreal Editor`; the Island map was visible,
+the status bar reported `All Saved`, and the project was left open.
+
+The fresh main-project log records `bEnableNaniteFoliage:1` and
+`r.Nanite.Foliage:1` at 16:57:16. The live console autocomplete tooltip also
+reported `Current value: 1`. This verifies the setting is active after restart.
+It does not establish a frame-time or memory improvement.
+
+The reopened viewport shows a broad open hillside with sparse small ground
+cover and only a few nearby trees around the current landmark view. This is
+consistent with the user's visual concern, but is only one editor-camera angle
+and not a full-island species census. The earlier 15:27 startup log records
+900 each of Norway maple, European aspen, European beech, and black alder, plus
+61,918 total ground-cover instances; those counts prove population diversity
+and quantity, not that the species read distinctly or are naturally composed
+from visitor height. No reload, foliage-density edit, PIE run, water collision
+test, or performance measurement was performed during this restart.
+
+Next: integrate and rebuild the guarded resident-feedback changes in the main
+project. Then run a 15-minute bounded session, capture the hillside and a
+Tideglass-to-woodland route from player height, check movement at the shore,
+and record frame time/VRAM before changing the fixed vegetation budget or
+species composition.
+
+## Playtest readiness recheck (2026-10-31 17:00)
+
+Before entering PIE, rechecked the authoritative main D: project. Its current
+`Config/DefaultGame.ini` sets `MaxRealtimeSeconds=1800` and
+`MaxModelRequests=120`. The loaded source has the normal bounded watchdog and
+lower-only startup overrides, but does not contain the newer
+`CaptiveSky.Session.ApplyPlaytestCaps` console command. It also has no
+12-minute resident-feedback invitation in the agent sources. Those two
+features exist in the Codex worktree, not in this loaded main-project source.
+The integration set is `AgentPlaySessionSubsystem.{cpp,h}` plus
+`AgentSafetyTests.cpp` for the lower-only live cap, and
+`AgentBrainComponent.{cpp,h}` plus `AgentModelTier.{cpp,h}` and
+`AgentModelTierTests.cpp` for the once-per-resident feedback invitation.
+
+Therefore no PIE session was started: the requested resident check-in cannot
+be validated in this build, and the 120-request cap is higher than the reduced
+cap prepared in the worktree. Before a 15-minute feedback run, integrate and
+rebuild the worktree changes into the main project, or launch a fresh guarded
+instance with explicit real-time and request-cap overrides and confirm its
+startup log before play begins.
+
+The UE 5.8.3 `CaptiveSky_2Editor` UBT check against the writable Codex worktree
+returned `Succeeded` and `Target is up to date` (zero actions). It confirms no
+stale build dependency was detected, but it did not freshly compile or execute
+automation tests in this turn. The main D: project was not written or rebuilt.
+
+## Worktree feedback retry validation and editor restoration (2026-10-31 17:19)
+
+The optional 12-minute resident-feedback invitation now allows one retry after
+a provider failure or invalid decision; a valid silent response remains an
+intentional pass. UE 5.8.3 rebuilt the worktree editor target successfully
+(15 actions), and both `CaptiveSky2.Agent.ModelTier` and
+`CaptiveSky2.Agent.ModelTierWorldFacts` passed in the zero-model-request
+NullRHI run (`Codex_ResidentFeedback_ModelTier_Retry20261031.log`).
+
+The main D: Island editor was closed only while building, then reopened. Its
+project-local log at 17:19:10 again recorded `bEnableNaniteFoliage:1` and
+`r.Nanite.Foliage:1`, and the editor returned with the Island visible and
+`All Saved`. No PIE or full-content test was run. No worktree source or binary
+was copied to D:, and its previous 120-request cap and missing feedback
+invitation remain unchanged pending approval to sync.

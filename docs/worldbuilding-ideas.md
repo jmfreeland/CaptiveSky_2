@@ -1,11 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
-## 2026-10-31 — Verify the delayed resident-feedback invitation
+## 2026-10-31 — Make the delayed resident-feedback invitation recoverable
 
-The UE 5.8.3 editor target was already up to date. A headless `-NullRHI`
-automation run passed both `CaptiveSky2.Agent.ModelTier` and
+The optional check-in becomes eligible at 720 real seconds on an autonomous turn,
+never interrupts visitor or agent conversation, and is sent at most twice per
+resident per session: the initial invitation plus one retry if the provider
+fails or returns an invalid decision. A valid response with no speech is treated
+as an intentional pass and is not retried. This preserves the character's
+choice while preventing a transient provider error from consuming the only
+chance to receive feedback.
+
+The UE 5.8.3 editor target rebuilt successfully with this retry logic, and a
+headless `-NullRHI` run passed both `CaptiveSky2.Agent.ModelTier` and
 `CaptiveSky2.Agent.ModelTierWorldFacts` (`Result={Success}`, exit code 0;
-[`Codex_ResidentFeedback_ModelTier_20261031.log`](../Saved/Logs/Codex_ResidentFeedback_ModelTier_20261031.log)). The regression confirms the optional feedback invitation becomes eligible at 720 real seconds, is not repeated for a resident during that session, and does not interrupt visitor or agent conversation turns. It also exercises nearby-landmark facts that route a quiet resident to the full model. This is source-level eligibility evidence, not a 12-minute resident response or a 15–30 minute world playtest. The sparse checkout lacks `Content/Maps/Island.umap` and the local plant assets, so Unreal could not load the Island; missing asset warnings in this run do not establish a defect in the active D: project. Keep the session time/request limits unchanged. Next, restore editor input access, verify the active project and startup settings, then capture one bounded character-feedback run with its response, FPS and device-memory state recorded.
+[`Codex_ResidentFeedback_ModelTier_Retry20261031.log`](../Saved/Logs/Codex_ResidentFeedback_ModelTier_Retry20261031.log)). This is source-level eligibility and retry-bound evidence, not a 12-minute resident response or a 15–30 minute world playtest. The sparse worktree lacks `Content/Maps/Island.umap` and local plant assets, so it cannot validate the complete Island or runtime visual quality. The retry logic and lower-only playtest cap remain in the worktree; the open D: project source has not been synchronized. Next, obtain approval to sync/rebuild those safeguards in D:, then run a bounded character-feedback playtest and record the response, frame rate, and device-memory state.
 
 ## 2026-10-31 — Recheck the RatHollow V5 candidate
 
@@ -159,6 +167,16 @@ the counts prove exists. Several graph-valid coppice materials have since had
 their instanced usage repaired, but the daylight effect and graphics-memory
 cost remain unmeasured. Do not raise global vegetation counts to solve a
 readability problem.
+
+**Cull-horizon diagnosis (2026-10-31):** the current constructor gives Norway
+maple, European aspen, and European beech an 80–125 m fade/cull range; black
+alder reaches 120–220 m, while spruce reaches 350–550 m. This is a concrete
+reason distant views can collapse to “one kind of tree” even when the local
+grove mix contains four broadleaf species. It does not prove that culling is
+the only cause: fallback materials, species placement, and the selected view
+still matter. Do not extend the three broadleaf horizons until a matched
+daylight route measures species readability, frame-time p95, and whole-device
+VRAM; a far-canopy proxy could later retain silhouette variety at lower cost.
 
 ### 1. Finish one daylight coastal-to-woodland visitor route
 
