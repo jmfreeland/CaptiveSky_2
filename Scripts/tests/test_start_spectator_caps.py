@@ -59,7 +59,7 @@ class StartSpectatorCapTests(unittest.TestCase):
 
         self.assertIn("[switch]$NullRHI", launcher)
         self.assertIn("-NullRHI requires an isolated -DataRoot", launcher)
-        self.assertIn("-NullRHI requires -DisableAgentThinking", launcher)
+        self.assertIn("-NullRHI requires -DisableAgentThinking unless the explicit bounded -NullRHICharacterFeedback mode is used", launcher)
         self.assertIn(
             "-NullRHI requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps",
             launcher,
@@ -67,6 +67,19 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn('if ($NullRHI) { $arguments += "-NullRHI" }', launcher)
         self.assertIn("-NullRHI cannot be combined with -Shots", launcher)
         self.assertIn('$windowStyle = if ($NullRHI) { "Hidden" } else { "Normal" }', launcher)
+
+    def test_null_rhi_character_feedback_is_explicit_and_tightly_bounded(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$NullRHICharacterFeedback", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires -NullRHI", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires an isolated -DataRoot", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires -LogSituations", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires -DisablePython", launcher)
+        self.assertIn("-NullRHICharacterFeedback is capped at 900 real-time seconds", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires a model-request cap from 1 through 64", launcher)
+        self.assertIn("this is the existing hard ceiling", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires resident thinking to remain enabled", launcher)
 
     def test_gpu_headroom_gate_is_opt_in_and_runs_before_project_launch(self) -> None:
         launcher = LAUNCHER.read_text(encoding="utf-8")

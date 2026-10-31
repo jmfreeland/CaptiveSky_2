@@ -20,6 +20,10 @@ closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB f
 check only; it does not guarantee or monitor in-run memory headroom. Use -GpuIndex and
 -MinimumFreeGpuMemoryMiB to tune the check for the target machine.
 
+-NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
+-DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
+minutes and the existing 64-request hard ceiling. Plain -NullRHI remains zero-thinking by default.
+
 .EXAMPLE
 ./Scripts/Start-Spectator.ps1
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots
@@ -43,6 +47,7 @@ check only; it does not guarantee or monitor in-run memory headroom. Use -GpuInd
 ./Scripts/Start-Spectator.ps1 -Continuous
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
+./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 64
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatial -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -NullRHI -DisableAgentThinking -DisablePython -GroundCoverSpatialDiagnostics -DataRoot Saved/Playtests/GroundCoverSpatialNullRHI -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 180 -MaxModelRequests 0
@@ -72,6 +77,7 @@ param(
 	[switch]$DisableAgentThinking,
 	[switch]$DisablePython,
 	[switch]$NullRHI,
+	[switch]$NullRHICharacterFeedback,
 	[switch]$LogSituations,
 	[switch]$LogDragonflyFlowerVisits,
 	[switch]$GroundCoverSpatialDiagnostics,
@@ -132,10 +138,26 @@ if ($GroundCoverSpatialDiagnostics) {
 		throw "-GroundCoverSpatialDiagnostics requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
 	}
 }
+if ($NullRHICharacterFeedback) {
+	if (-not $NullRHI) { throw "-NullRHICharacterFeedback requires -NullRHI; it never enables thinking in a rendered session." }
+	if ($DisableAgentThinking) { throw "-NullRHICharacterFeedback requires resident thinking to remain enabled." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-NullRHICharacterFeedback requires an isolated -DataRoot." }
+	if (-not $LogSituations) { throw "-NullRHICharacterFeedback requires -LogSituations so resident responses are captured." }
+	if (-not $DisablePython) { throw "-NullRHICharacterFeedback requires -DisablePython." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-NullRHICharacterFeedback requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+	if ($MaxRealtimeSeconds -gt 900) { throw "-NullRHICharacterFeedback is capped at 900 real-time seconds." }
+	if ($MaxModelRequests -lt 1 -or $MaxModelRequests -gt 64) { throw "-NullRHICharacterFeedback requires a model-request cap from 1 through 64; this is the existing hard ceiling." }
+}
 if ($NullRHI) {
 	if ($Continuous) { throw "-NullRHI is supported only for bounded diagnostic sessions." }
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-NullRHI requires an isolated -DataRoot." }
-	if (-not $DisableAgentThinking) { throw "-NullRHI requires -DisableAgentThinking to avoid model requests during the diagnostic." }
+	if (-not $DisableAgentThinking -and -not $NullRHICharacterFeedback) {
+		throw "-NullRHI requires -DisableAgentThinking unless the explicit bounded -NullRHICharacterFeedback mode is used."
+	}
 	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
