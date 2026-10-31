@@ -38,6 +38,13 @@ bool FIslandTrailTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Repeated passes wear the same ground progressively"), Trail::WearAmount(FirstMidpoint) < Trail::WearAmount(SecondMidpoint));
 	TestEqual(TEXT("A well-used path is fully worn"), Trail::WearAmount(Trail::WearFullSteps), 1.f);
 	TestEqual(TEXT("Wear is capped"), Trail::WearAmount(100000), 1.f);
+	const FVector PawnViewer(100.f, 200.f, 0.f);
+	const FVector CameraViewer(900.f, 1200.f, 300.f);
+	TestEqual(TEXT("Spectator-visible wear follows the active camera rather than the pawn"),
+		Trail::ResolveWearViewerLocation(PawnViewer, CameraViewer), CameraViewer);
+	const float InvalidViewerCoordinate = std::numeric_limits<float>::quiet_NaN();
+	TestEqual(TEXT("Invalid camera coordinates fall back to the pawn for wear rendering"),
+		Trail::ResolveWearViewerLocation(PawnViewer, FVector(InvalidViewerCoordinate, 0.f, 0.f)), PawnViewer);
 	const FLinearColor Dry = Trail::WearColor(0.f);
 	const FLinearColor Wet = Trail::WearColor(1.f);
 	TestTrue(TEXT("Wet worn earth is darker"), Wet.R < Dry.R && Wet.G < Dry.G);

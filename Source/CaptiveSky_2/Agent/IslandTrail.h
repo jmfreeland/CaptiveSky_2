@@ -133,6 +133,8 @@ public:
 	static bool ShouldRefreshPrintInstance(bool bActive, bool bRendered, float Scale);
 	/** 0..1 how worn a cell is after this many footfalls. */
 	static float WearAmount(int32 Steps);
+	/** Prefer the active camera for bounded wear rendering; fall back to the pawn when its view is invalid. */
+	static FVector ResolveWearViewerLocation(const FVector& PawnLocation, const FVector& ViewLocation);
 	/** Dusty when dry, dark mud when the ground is wet. */
 	static FLinearColor WearColor(float Wetness);
 	/** A bounded chronicle note is due only when a region newly becomes an active, repeatedly worn path. */

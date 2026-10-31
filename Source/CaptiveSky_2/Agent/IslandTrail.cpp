@@ -440,6 +440,11 @@ float UIslandTrailSubsystem::WearAmount(int32 Steps)
 	return FMath::SmoothStep(static_cast<float>(WearStartSteps), static_cast<float>(WearFullSteps), static_cast<float>(Steps));
 }
 
+FVector UIslandTrailSubsystem::ResolveWearViewerLocation(const FVector& PawnLocation, const FVector& ViewLocation)
+{
+	return ViewLocation.ContainsNaN() ? PawnLocation : ViewLocation;
+}
+
 FLinearColor UIslandTrailSubsystem::WearColor(float Wetness)
 {
 	return FMath::Lerp(FLinearColor(0.2f, 0.15f, 0.09f), FLinearColor(0.055f, 0.04f, 0.028f), FMath::SmoothStep(0.1f, 0.8f, Wetness));
@@ -906,11 +911,17 @@ void UIslandTrailSubsystem::Tick(float DeltaTime)
 		RefreshPrints(Now, Wetness);
 	}
 
-	const APlayerController* Player = World->GetFirstPlayerController();
-	if (Player && Player->GetPawn() && Now >= NextWearRefresh)
+	APlayerController* Player = World->GetFirstPlayerController();
+	if (Player && Now >= NextWearRefresh)
 	{
 		NextWearRefresh = Now + 1.5;
-		RefreshWear(Player->GetPawn()->GetActorLocation(), Wetness);
+		const APawn* PlayerPawn = Player->GetPawn();
+		const AActor* ViewTarget = Player->GetViewTarget();
+		const FVector PawnLocation = PlayerPawn ? PlayerPawn->GetActorLocation() : (ViewTarget ? ViewTarget->GetActorLocation() : FVector::ZeroVector);
+		FVector ViewLocation = PawnLocation;
+		FRotator ViewRotation = FRotator::ZeroRotator;
+		Player->GetPlayerViewPoint(ViewLocation, ViewRotation);
+		RefreshWear(ResolveWearViewerLocation(PawnLocation, ViewLocation), Wetness);
 	}
 	if (Now >= NextWeathering)
 	{
