@@ -52,6 +52,12 @@ namespace AgentModelTier
 			&& ElapsedRealSeconds >= ResidentFeedbackInvitationAfterSeconds;
 	}
 
+	bool ShouldRetryResidentFeedbackRequest(bool bRequestSucceeded, bool bDecisionValid, int32 AttemptsThisSession)
+	{
+		return (!bRequestSucceeded || !bDecisionValid) && AttemptsThisSession >= 0 &&
+			AttemptsThisSession < ResidentFeedbackInvitationMaximumAttempts;
+	}
+
 	FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context)
 	{
 		FTurnFacts Facts;

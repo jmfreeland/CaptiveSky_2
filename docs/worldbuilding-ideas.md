@@ -15,6 +15,13 @@ headless `-NullRHI` run passed both `CaptiveSky2.Agent.ModelTier` and
 `CaptiveSky2.Agent.ModelTierWorldFacts` (`Result={Success}`, exit code 0;
 [`Codex_ResidentFeedback_ModelTier_Retry20261031.log`](../Saved/Logs/Codex_ResidentFeedback_ModelTier_Retry20261031.log)). This is source-level eligibility and retry-bound evidence, not a 12-minute resident response or a 15–30 minute world playtest. The sparse worktree lacks `Content/Maps/Island.umap` and local plant assets, so it cannot validate the complete Island or runtime visual quality. The retry logic and lower-only playtest cap remain in the worktree; the open D: project source has not been synchronized. Next, obtain approval to sync/rebuild those safeguards in D:, then run a bounded character-feedback playtest and record the response, frame rate, and device-memory state.
 
+The retry predicate is now a separately tested pure helper: provider failure and
+invalid decisions may consume the one remaining retry, while a valid response
+without speech is a deliberate pass and cannot retry. Negative attempt counts
+and requests beyond the two-attempt ceiling are also rejected. The expanded
+`ModelTier` and `ModelTierWorldFacts` tests both passed after a fresh rebuild
+(`Saved/Logs/Codex_ResidentFeedbackRetryPolicy_20261031.log`, exit code 0).
+
 ## 2026-10-31 — Recheck the RatHollow V5 candidate
 
 The local V5 RatHollow FBX rebuilt and re-imported cleanly in Blender 5.2.2

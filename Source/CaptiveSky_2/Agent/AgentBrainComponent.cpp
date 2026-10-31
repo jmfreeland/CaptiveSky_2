@@ -1546,8 +1546,8 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 		{
 			if (!Result.bSuccess || !Decision.bValid)
 			{
-				const bool bRetryAvailable = StrongThis->FeedbackInvitationAttemptsThisSession <
-					AgentModelTier::ResidentFeedbackInvitationMaximumAttempts;
+				const bool bRetryAvailable = AgentModelTier::ShouldRetryResidentFeedbackRequest(
+					Result.bSuccess, Decision.bValid, StrongThis->FeedbackInvitationAttemptsThisSession);
 				StrongThis->bFeedbackInvitationDeliveredThisSession = !bRetryAvailable;
 				UE_LOG(LogAgentBrain, Warning,
 					TEXT("Resident feedback invitation failed for %s on attempt %d of %d; %s."),

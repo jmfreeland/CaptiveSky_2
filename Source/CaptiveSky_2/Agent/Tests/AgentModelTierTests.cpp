@@ -22,6 +22,16 @@ bool FAgentModelTierTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("The resident-feedback request remains bounded to its maximum attempts"),
 		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, false,
 			ResidentFeedbackInvitationMaximumAttempts, true));
+	TestTrue(TEXT("A provider failure keeps the invitation eligible for its one retry"),
+		ShouldRetryResidentFeedbackRequest(false, false, 1));
+	TestTrue(TEXT("A successful provider response with an invalid decision can be retried"),
+		ShouldRetryResidentFeedbackRequest(true, false, 1));
+	TestFalse(TEXT("A valid silent response is an intentional pass, not a retry"),
+		ShouldRetryResidentFeedbackRequest(true, true, 1));
+	TestFalse(TEXT("A provider failure cannot exceed the two-attempt invitation bound"),
+		ShouldRetryResidentFeedbackRequest(false, false, ResidentFeedbackInvitationMaximumAttempts));
+	TestFalse(TEXT("Invalid attempt counts do not create a retry"),
+		ShouldRetryResidentFeedbackRequest(false, false, -1));
 	TestFalse(TEXT("An already-invited resident is not asked again during the session"),
 		ShouldInviteResidentFeedback(ResidentFeedbackInvitationAfterSeconds + 60.0, true, 1, true));
 	TestFalse(TEXT("A visitor or agent conversation is never interrupted with the invitation"),

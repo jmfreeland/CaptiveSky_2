@@ -202,3 +202,18 @@ project-local log at 17:19:10 again recorded `bEnableNaniteFoliage:1` and
 `All Saved`. No PIE or full-content test was run. No worktree source or binary
 was copied to D:, and its previous 120-request cap and missing feedback
 invitation remain unchanged pending approval to sync.
+
+## Retry-decision regression and second editor restoration (2026-10-31 17:26)
+
+The feedback retry gate is now factored into a pure predicate and directly
+covered for provider failure, invalid decisions, valid silent responses,
+negative counts, and the two-attempt ceiling. The UE 5.8.3 worktree editor
+target rebuilt successfully (6 actions); `CaptiveSky2.Agent.ModelTier` and
+`CaptiveSky2.Agent.ModelTierWorldFacts` both passed in the zero-request
+NullRHI run (`Codex_ResidentFeedbackRetryPolicy_20261031.log`, exit code 0).
+
+The main D: project was again reopened after the build; its editor shows the
+Island and `All Saved`. A transient toast reported that landscape texture
+resources were still being prepared, so this capture does not establish that
+streaming has settled. No PIE was started and the main project's sources and
+request cap were not changed.
