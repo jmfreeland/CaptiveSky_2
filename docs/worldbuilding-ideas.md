@@ -59,6 +59,18 @@ bounded daylight traversal from Tideglass to a broadleaf grove, with per-species
 visibility checked close, middle, and far; do not increase foliage counts to
 compensate for a visibility or material issue.
 
+**Meadow acceptance regression correction (2026-10-31):** an earlier change
+intentionally broadened landscape acceptance from 40–64% to 28–100% while
+preserving the same 46% mean, creating stronger open glades and lush patches
+without increasing the candidate budget. Two endpoint assertions still
+expected the old range; they now match the current function. UE 5.8.3 rebuilt
+the isolated worktree target, and the exact `CaptiveSky2.Agent.IslandWeather`
+automation passed under NullRHI (exit code 0, no resident model requests).
+This validates the scalar habitat rule, not the resulting Island scatter,
+visual naturalness, frame rate, or VRAM. The broader prefix run separately
+passed habitat-selection and height-profile tests; its diversity test could
+not complete because this worktree lacks the Black Alder asset.
+
 **Fresh viewport check (2026-10-31):** the restarted editor is responsive and
 the daylight viewport is unobstructed. In the current wide view, foreground
 groundcover forms separated clumps, but the broad slope reads mostly bare and

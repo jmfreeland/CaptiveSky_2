@@ -29,9 +29,9 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("An offscreen non-player resident does not create an invisible plant-sway neighborhood"),
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, false));
 	TestTrue(TEXT("Meadow habitat retains lush-community coverage"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f), 0.64f));
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f), 1.f));
 	TestTrue(TEXT("Meadow habitat keeps a light baseline in open communities"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f), 0.40f));
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f), 0.28f));
 	TestTrue(TEXT("Invalid meadow fields resolve to a bounded neutral density"),
 		FMath::IsFinite(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
 			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity())));
