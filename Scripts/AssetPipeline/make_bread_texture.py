@@ -5,7 +5,6 @@ from pathlib import Path
 import sys
 
 import numpy as np
-from PIL import Image
 
 PIPE = Path(__file__).resolve().parent
 sys.path.insert(0, str(PIPE))
@@ -95,6 +94,11 @@ def make_maps(size=512, seed=20261011):
 
 
 def generate(out_dir=None, size=512, seed=20261011):
+    # Keep Pillow confined to the PNG-writing path. The deterministic map
+    # functions can then be imported and tested in Blender's bundled Python,
+    # which ships NumPy but not Pillow.
+    from PIL import Image
+
     out_dir = Path(out_dir or (Path(ROOT) / "Library" / "Textures"))
     out_dir.mkdir(parents=True, exist_ok=True)
     albedo, normal, orm = make_maps(size, seed)

@@ -78,6 +78,8 @@ python -B -m unittest discover -s Scripts\AssetPipeline\tests -p 'test_*.py'
 
 These tests inspect the authored scripts and manifests, exercise deterministic texture helpers, and use temporary inboxes/mocked subprocesses for request routing. They do not launch Blender, ComfyUI, Unreal, generate or import an asset, or prove how a mesh reads at Island scale. Inspect each exported `Preview.png`, then review a disposable Unreal import in-world before any Island placement.
 
+If the system Python environment is unavailable, this suite also runs with Blender 5.2's bundled Python. On this machine that interpreter includes NumPy but not Pillow; `make_bread_texture.py` therefore imports Pillow only inside `generate()`, which writes PNGs. Its deterministic `make_maps()` helper and tests do not need Pillow, but texture export still requires a Python environment with Pillow installed.
+
 ## Make or change a prop
 
 ```powershell
