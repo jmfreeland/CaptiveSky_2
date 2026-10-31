@@ -6,7 +6,7 @@ when they speak or make something lasting.
 .DESCRIPTION
 Runs the project as a game (not the editor) with -Spectator. Residents think and remember as in any
 play session. By default the usual bounded limits apply (Config/DefaultGame.ini: at most 30 real
-minutes and 120 model requests), after which the game closes. -Continuous switches to continuous play
+minutes and 64 model requests), after which the game closes. -Continuous switches to continuous play
 for an unattended screen: no end time, model requests drawn from a steadily refilling allowance, and a
 daily ceiling (see AgentPlaySessionSubsystem). With -Continuous the world is relaunched if the game
 crashes (not when it is closed normally), at most five times in any hour; each restart is noted in
@@ -76,7 +76,7 @@ param(
 	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
 	[string]$DataRoot,
 	[ValidateRange(1, 1800)][Nullable[double]]$MaxRealtimeSeconds,
-	[ValidateRange(0, 120)][Nullable[int]]$MaxModelRequests,
+	[ValidateRange(0, 64)][Nullable[int]]$MaxModelRequests,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
 )
 
