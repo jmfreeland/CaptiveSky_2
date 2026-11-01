@@ -12,25 +12,27 @@ one valid tile empty. These are useful distribution checks, but NullRHI cannot
 establish whether canopies look distinct, whether the ground feels naturally
 scattered, or whether the view performs acceptably.
 
-The current source resolves one A variant per broadleaf species. The installed
-Megaplant audit reports four A-D meshes per species, but these additional
-variants have not been qualified for Island rendering, wind, Nanite cost, or
-memory. Existing broadleaf cull distances are 80-125 m for maple, aspen, and
-beech, and 120-220 m for alder, compared with 550 m for spruce. Thus an
-island-wide species census can be healthy while distant visitor silhouettes
-become spruce-dominated; close-range repetition can likewise persist because
-only one broadleaf silhouette is selected per species.
+The live project source now assigns a deterministic A/B canopy variant per
+broadleaf tree while preserving the fixed species populations. This reduces
+single-silhouette repetition without adding instances. The installed
+Megaplant audit reports four A-D meshes per species, but C and D remain
+unqualified for Island rendering, wind, Nanite cost, and memory. Existing
+broadleaf cull distances are 80-125 m for maple, aspen, and beech, and
+120-220 m for alder, compared with 550 m for spruce. Thus an island-wide
+species census can be healthy while distant visitor silhouettes become
+spruce-dominated; whether the A/B split is visibly distinct still needs a
+rendered comparison.
 
 ## Next experiment
 
-Once the whole-device GPU has at least 4 GiB free, compare a matched daylight
-woodland view with the current A-only baseline and a small A/B variant split.
+Once the whole-device GPU has at least 4 GiB free, capture a matched daylight
+woodland view of the current A/B build and compare it with a reproducible A-only
+baseline if that baseline can be built without changing the live project.
 Keep the total tree count, species counts, cull distances, camera, and
 scalability fixed. Record close/middle/far silhouette readability, p95 frame
 time, and whole-device VRAM. Stop on a video-memory warning or sustained frame
 rate below 30 FPS. Do not raise population or cull distances unless this
-constant-population comparison shows headroom. The last observed device sample
-was only 2.4 GiB free, so no rendered comparison was started.
+constant-population comparison shows headroom.
 
 ## Post-restart GPU gate recheck — 2026-11-01
 
@@ -44,3 +46,14 @@ started, and no new frame-time or visual evidence was collected.
 Sources: `Saved/CS58/Saved/SessionReports/TreeSpatialNullRHI_20261031.md`,
 `docs/findings/2026-10-31-nullrhi-tree-spatial-audit.md`, and
 `docs/findings/2026-10-31-megaplant-tree-variant-audit.md`.
+
+## Live source and GPU recheck — 2026-11-01
+
+Read-only inspection of the open D: project's `IslandWeather` source confirms
+that all four broadleaf species have A/B components and use a stable local
+variant selector. The viewport currently shows a close woodland-floor path,
+not a view that can establish far-canopy diversity. The whole-device GPU sample
+was 8,897 / 12,282 MiB used (3,385 MiB free, 54% utilization, 78 C), below the
+4 GiB rendered-session gate. No rendered comparison was started. Do not infer
+that the variant code is missing from the live project or visually successful
+from the source and placement census alone.
