@@ -32,3 +32,14 @@ year-round if imported. Before placement, review silhouette, shading, ground
 contact, and its 4,222-triangle cost in a disposable Unreal map and compare it
 among the existing fern, strawberry, and litter forms. No Island instance,
 map save, resident memory, or home record was changed for this candidate.
+
+### Preview review (2026-11-01)
+
+The exported-FBX preview confirms the individual leaf shapes and flower heads,
+but the seven basal rosettes read as separate, rather flat fans at the current
+framing; the three small white umbels are easy to lose against the ground and
+sky. This is a useful first asset study, not yet a convincing woodland-floor
+accent. Before any Unreal import, consider a tighter, more naturally overlapping
+rosette composition and clearer flower-head silhouette, while keeping the
+collisionless geometry light. A Blender preview cannot establish ground contact,
+scale readability, or material response under Island lighting.
