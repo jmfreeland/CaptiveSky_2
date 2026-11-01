@@ -10,7 +10,9 @@ plugin is editor-only or unavailable in the game target.
 The report includes instance texture/scalar/vector/static-switch overrides,
 nested material-function calls, and direct texture/collection references so a
 project-owned runtime material can be designed against the installed textures
-without editing any assets.
+without editing any assets. The runtime copy plan is metadata-only: it maps each
+plugin package to a proposed project path and checks for exact destination
+collisions without creating folders or assets.
 """
 
 import json
@@ -34,6 +36,7 @@ PLUGIN_PREFIXES = (
     "/ProceduralVegetationEditor/",
     "/ProceduralVegetation/",
 )
+RUNTIME_COPY_ROOT = "/Game/Megaplant_Library/RuntimeMaterials"
 
 
 def object_path(asset):
@@ -95,6 +98,56 @@ def dependency_closure(asset_registry, roots):
         dependencies = asset_registry.get_dependencies(package, options) or []
         pending.extend(str(dependency) for dependency in dependencies if str(dependency) not in visited)
     return sorted(visited)
+
+
+def runtime_copy_plan(asset_registry, plugin_packages):
+    """Build a collision-checked package mapping without creating any assets."""
+    plan = []
+    for source_package in plugin_packages:
+        source_prefix = next((prefix for prefix in PLUGIN_PREFIXES if source_package.startswith(prefix)), None)
+        if not source_prefix:
+            continue
+        plugin_label = "PVE" if source_prefix == "/ProceduralVegetationEditor/" else "ProceduralVegetation"
+        relative_package = source_package[len(source_prefix):].strip("/")
+        destination_package = "{}/{}/{}".format(RUNTIME_COPY_ROOT, plugin_label, relative_package)
+        source_assets = asset_registry.get_assets_by_package_name(source_package) or []
+        destination_assets = asset_registry.get_assets_by_package_name(destination_package) or []
+        destination_object_names = {
+            str(asset_data.get_editor_property("asset_name"))
+            for asset_data in destination_assets
+        }
+
+        if not source_assets:
+            plan.append({
+                "source_package": source_package,
+                "destination_package": destination_package,
+                "source_asset_count": 0,
+                "destination_package_asset_count": len(destination_assets),
+                "status": "source_asset_missing",
+            })
+            continue
+
+        for source_asset in source_assets:
+            asset_name = str(source_asset.get_editor_property("asset_name"))
+            class_path = source_asset.get_editor_property("asset_class_path")
+            source_class = "{}.{}".format(
+                class_path.get_editor_property("package_name"),
+                class_path.get_editor_property("asset_name"),
+            )
+            destination_object = "{}.{}".format(destination_package, asset_name)
+            object_exists = asset_name in destination_object_names
+            plan.append({
+                "source_package": source_package,
+                "source_object": "{}.{}".format(source_package, asset_name),
+                "source_class": source_class,
+                "destination_package": destination_package,
+                "destination_object": destination_object,
+                "source_asset_count": len(source_assets),
+                "destination_package_asset_count": len(destination_assets),
+                "destination_object_exists": object_exists,
+                "status": "destination_collision" if object_exists else "ready",
+            })
+    return plan
 
 
 def material_function_graph(roots):
@@ -210,6 +263,7 @@ def main():
     report["material_function_graph"] = material_function_graph(material_roots)
     report["unique_plugin_dependencies"] = plugin_packages
     report["unique_plugin_dependency_count"] = len(plugin_packages)
+    report["runtime_copy_plan"] = runtime_copy_plan(asset_registry, plugin_packages)
     graph_calls = [
         call
         for asset in report["material_function_graph"]
@@ -230,12 +284,23 @@ def main():
         if reference["asset"] and any(reference["asset"].startswith(prefix) for prefix in PLUGIN_PREFIXES)
     })
     report["material_graph_plugin_asset_references"] = referenced_plugin_assets
+    plan = report["runtime_copy_plan"]
+    plan_status_counts = {}
+    for entry in plan:
+        status = entry["status"]
+        plan_status_counts[status] = plan_status_counts.get(status, 0) + 1
+    report["runtime_copy_plan_summary"] = {
+        "mapped_objects": len(plan),
+        "source_packages": len(plugin_packages),
+        "status_counts": plan_status_counts,
+    }
     unreal.log("[MegaplantRuntimeMaterialAudit] REPORT " + json.dumps(report, sort_keys=True))
     unreal.log(
-        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={} graph_assets={} function_calls={} unresolved_calls={} missing_setters={} direct_references={} plugin_direct_assets={}".format(
+        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={} graph_assets={} function_calls={} unresolved_calls={} missing_setters={} direct_references={} plugin_direct_assets={} mapped_objects={} copy_plan_statuses={}".format(
             len(report["trees"]), len(plugin_packages), len(report["material_function_graph"]),
             len(graph_calls), len(unresolved_calls), len(missing_setters),
-            len(graph_asset_references), len(referenced_plugin_assets)
+            len(graph_asset_references), len(referenced_plugin_assets), len(plan),
+            json.dumps(plan_status_counts, sort_keys=True)
         )
     )
 

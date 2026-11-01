@@ -43,6 +43,18 @@ Thus the repeated cold start is expected for that live project; the earlier
 paired-launch contention can add further delay when starts overlap. No cache
 reset or live-project write was made.
 
+**Repeat-launch confirmation:** the user reports seeing the slow-start warning
+on every editor launch. The D: project's logs support that this is a recurring
+problem, though not literally every recorded start: same-day runs include a
+1.626-second successful initialization, a 32.506-second initialization, and
+the 52.602-second initialization above. The 32.506-second run overlaps the
+52.602-second run and logged a wait for Zen startup/recovery; both eventually
+attached to a healthy local DDC. This reinforces startup contention plus the
+missing live-project keep-alive setting as likely contributors, but does not
+identify why any particular startup is slow. A current desktop observation
+shows the project editor open and responsive; it was left running. Do not
+restart it or launch another editor just to reproduce the warning.
+
 **Later live-editor observation (2026-11-01):** a read-only desktop snapshot
 showed the Island loaded in an Unreal Editor window, with no Zen warning or
 crash dialog visible. This confirms that the editor reached the map on that

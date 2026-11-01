@@ -11,8 +11,13 @@ instance also carries seasonal/health/translucency overrides. Preserve that
 art direction when copying the full dependency graph into project content; do
 not flatten it to a two-texture substitute. A read-only nested graph walk found
 62 resolvable function calls and the four unique direct PVE expression assets:
-three virtual textures and `MPC_GlobalFoliageActor`. No assets were changed.
-Details:
+three virtual textures and `MPC_GlobalFoliageActor`. The collision-checked
+mapping now covers all 24 dependencies (3 textures, 1 master material, 19
+functions, 1 parameter collection); every proposed destination under
+`/Game/Megaplant_Library/RuntimeMaterials/PVE/` is empty and name-collision
+free. No assets were changed. Next, copy and remap only in a disposable project
+copy, then compile and preview with the editor-only plugin unavailable before
+touching any live tree parents. Details:
 [runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
 
 ## 2026-11-01 — Give the rain basin breathing room

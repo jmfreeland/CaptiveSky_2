@@ -51,10 +51,33 @@ Epic documents the collection expression's `collection` property in its
 the texture-base and texture-collection expression types are also present in
 the [UE 5.8 Python API](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/index).
 
-Next, verify the full 24-package source-to-destination mapping, including the
-master material and every function, before copying/remapping into a disposable
-project folder. Compile and preview there before touching the live species
-parents. The original PVE graph and Island remain unchanged.
+## Collision-checked runtime copy plan
+
+The editor audit now checks every source package through the UE Asset Registry
+and emits its actual class path, source object path, proposed destination, and
+destination collision status. It verified 24 source packages / 24 objects:
+three `Texture2D` virtual textures, one `Material`, 19 `MaterialFunction`
+assets, and one `MaterialParameterCollection`. Every package contains exactly
+one asset; every proposed destination package is empty; there are no exact
+object-name collisions (`ready=24`, `destination_collision=0`,
+`source_asset_missing=0`).
+
+The reversible naming rule preserves the source-relative layout beneath
+`/Game/Megaplant_Library/RuntimeMaterials/PVE/`. For example,
+`/ProceduralVegetationEditor/SampleAssets/Materials/MasterMaterials/MA_Foliage_Trees.MA_Foliage_Trees`
+maps to
+`/Game/Megaplant_Library/RuntimeMaterials/PVE/SampleAssets/Materials/MasterMaterials/MA_Foliage_Trees.MA_Foliage_Trees`;
+each of the three virtual textures and 19 nested functions follows the same
+rule with its object name preserved. The plan is generated in
+`runtime_copy_plan` by `Scripts/Inspect-MegaplantRuntimeMaterialDependencies.py`;
+it performs no folder creation, asset copy, or save.
+
+This clears the package-mapping/collision gate, not the runtime-readiness gate.
+Next, materialize the complete closure only in a disposable project copy,
+remap its graph references, then compile and preview it with the plugin disabled
+in the runtime target before touching live species parents. In particular,
+verify virtual-texture support and the foliage collection's runtime behavior.
+The original PVE graph and Island remain unchanged.
 
 ## Direction
 
