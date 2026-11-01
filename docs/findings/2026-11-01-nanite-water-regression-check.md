@@ -29,14 +29,23 @@ collision shutdown, native Water surface querying, and transient swim/fall/
 shallow-shore transitions. It is not a player-controlled traversal of the
 saved Island and does not settle the reported walk-on-water behavior.
 
+After the approved restart, the live D: editor's Session Frontend also ran
+`CaptiveSky2.Agent.IslandOcean` (Automation Test Run 6). Its loaded editor
+module reported `Test Completed. Result={Success}` at 03:10:05 in
+`Saved/Logs/CaptiveSky_2.log`; the log records disabling legacy `OceanPlane`
+collision, entering and leaving surface swimming, and the shallow-shore exit
+fixture. This validates the test behavior against the restarted project's
+loaded module, but still is not real player traversal and does not replace a
+fresh build from this worktree.
+
 ## Rendered validation gate
 
-Immediately after reopening the editor, `nvidia-smi` reported 9,616 MiB used
-and 2,382 MiB free out of 12,282 MiB on the RTX 4080 Laptop GPU. That is below
-the project's 4 GiB rendered-play gate, so no PIE/Game session or character
-feedback run was started. The reported graphics-memory exhaustion, water
-traversal, and local vegetation readability therefore remain unverified in a
-real-RHI player session.
+After reopening the editor, `nvidia-smi` reported 9,178 MiB used and 2,820 MiB
+free out of 12,282 MiB on the RTX 4080 Laptop GPU (44% utilization, 73 °C).
+That is below the project's 4 GiB rendered-play gate, so no PIE/Game session
+or character feedback run was started. The reported graphics-memory
+exhaustion, water traversal, and local vegetation readability therefore
+remain unverified in a real-RHI player session.
 
 ## Next step
 
