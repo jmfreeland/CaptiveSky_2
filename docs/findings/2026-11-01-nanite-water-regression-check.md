@@ -261,3 +261,22 @@ Next, load/rebuild the D: project with both pushed fixes, then perform a short
 shore-to-open-water traversal recording movement mode, mesh pose, and the
 blocking hit actor. Keep the rendered run behind the existing 4 GiB GPU reserve.
 No D: source, content, or map was changed during this audit.
+
+## Fresh live-checkout confirmation — 2026-11-01 16:47 UTC
+
+A focused SHA-256 comparison against the project currently open at
+`D:/Projects - Athena/Unreal/CaptiveSky_2` reconfirmed that all six relevant
+water files differ from this worktree: `CaptiveSky_2Character.cpp/.h`,
+`IslandOceanSubsystem.cpp`, `IslandSurfaceSwimMovementComponent.cpp/.h`, and
+`IslandOceanTests.cpp`. This is a source-version comparison only; different
+hashes do not mean all six live files should be replaced, especially given the
+broader checkout divergence. The latest live editor log was timestamped
+16:41 UTC and contained no `[PlayerWater]`, `IslandOcean`, or traversal-test
+records, so it provides no new runtime observation. The project remained
+outside PIE; no process, live file, map, or shared Zen data was changed.
+
+The existing worktree water implementation and focused NullRHI tests remain
+the available verified source candidate. Before any live edit, preserve and
+merge the live-only changes in these six files; after rebuilding, verify the
+targeted automation and then do a short real-RHI shore-to-open-water traversal
+only after the existing 4 GiB GPU headroom gate passes.
