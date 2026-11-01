@@ -19,6 +19,7 @@ Discord is the first channel adapter, not part of the agent model. Routing, iden
 - External memories are tagged with their channel and stable participant ID. Headless correspondence uses a zero location; embodied correspondence records the body's actual location and first-person context.
 - Discord delivery IDs are remembered under `Agents/<AgentId>/.gateway/` so reconnects cannot create duplicate experiences.
 - A per-agent gateway lease prevents two gateway processes from thinking as the same being simultaneously.
+- Headless LLM replies have a persisted per-agent rolling budget of 64 turns per 30 minutes. When exhausted, Raven says the message wasn't read or saved and gives an approximate retry time; an unreadable budget state fails closed. Embodied replies continue to use Unreal's existing play-session cap.
 - Each Discord route filters for permitted messages addressed to that agent, then processes them in arrival order through a bounded 16-message queue. This prevents ordinary channel chatter or a message burst from creating an unbounded task backlog behind the per-agent lease; when the queue is full, the message is explicitly not queued and the channel receives a throttled resend notice.
 - Every autonomous Unreal body publishes a short-lived embodiment lease. Only one body with a given `AgentId` may own it.
 
@@ -28,7 +29,7 @@ When no embodiment heartbeat is present, the gateway answers headlessly and publ
 
 Untouched turns fall back to the headless responder if a body disappears before claiming them. A graceful Unreal shutdown returns a claimed turn to the inbox, and a new authoritative embodiment recovers orphaned processing files left by a crash. Discord redelivery IDs remain deduplicated across either route.
 
-In the current tracked Unreal source, play ends automatically after at most 30 real minutes or 64 shared embodied model requests. This ends the simulation, not the Discord gateway: headless correspondence remains reactive to incoming permitted messages, with no autonomous overnight play loop. Pending correspondence uses the same graceful handoff described above. The live D: project audit on 2026-10-31 still found an older 120-request build; rebuild and verify its startup log before relying on the tracked-source cap. Neither limit is a gateway-wide spending quota.
+In the current tracked Unreal source, play ends automatically after at most 30 real minutes or 64 shared embodied model requests. This ends the simulation, not the Discord gateway: headless correspondence remains reactive to incoming permitted messages, with no autonomous overnight play loop. Its separate persisted allowance is 64 headless replies in any rolling 30-minute window per agent. Pending correspondence uses the same graceful handoff described above. The live D: project audit on 2026-10-31 still found an older 120-request build; rebuild and verify its startup log before relying on the tracked-source cap.
 
 ## Discord setup
 

@@ -10,7 +10,8 @@ public sealed class AgentMessageRouter(
     AgentRuntimeLease runtimeLease,
     MessageDeduplicator deduplicator,
     FileEmbodimentBridge embodimentBridge,
-    HeadlessTurnMarker headlessTurnMarker)
+    HeadlessTurnMarker headlessTurnMarker,
+    HeadlessTurnBudget headlessTurnBudget)
 {
     public async Task<AgentReply?> RouteAsync(ExternalMessage message, CancellationToken cancellationToken)
     {
@@ -46,6 +47,19 @@ public sealed class AgentMessageRouter(
         }
 
         await using var headlessMarker = headlessMarkerLease;
+        var reservation = await headlessTurnBudget.TryReserveAsync(DateTimeOffset.UtcNow, cancellationToken);
+        if (!reservation.Allowed)
+        {
+            await deduplicator.MarkProcessedAsync(message.Source, message.MessageId, cancellationToken);
+            if (reservation.AvailableAt is DateTimeOffset availableAt)
+            {
+                var minutes = Math.Max(1, (int)Math.Ceiling((availableAt - DateTimeOffset.UtcNow).TotalMinutes));
+                var unit = minutes == 1 ? "minute" : "minutes";
+                return new AgentReply($"I've reached my headless reply limit. I haven't read or saved this message; please send it again in about {minutes} {unit}.");
+            }
+            return new AgentReply("I can't verify my headless reply allowance right now, so I haven't read or saved this message. Please try again later.");
+        }
+
         await memories.AppendConversationAsync(message, message.Text, spokenByAgent: false, cancellationToken);
         var response = await responder.RespondAsync(message, cancellationToken);
         foreach (var memory in response.NewMemories)

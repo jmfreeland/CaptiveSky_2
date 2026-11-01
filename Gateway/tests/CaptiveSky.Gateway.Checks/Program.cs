@@ -48,6 +48,29 @@ try
     Assert(home.LoadOptionalPersonalityEvolution() == "{\"revision\":1}", "headless gateway reads evolving personality state");
     AssertThrows<ArgumentException>(() => new AgentHome(root, "../escape"), "agent ids cannot escape the project");
 
+    var quotaHome = new AgentHome(root, "Agent_Quota_01");
+    Directory.CreateDirectory(quotaHome.DirectoryPath);
+    var quotaNow = DateTimeOffset.UtcNow;
+    var quota = new HeadlessTurnBudget(quotaHome, 2, TimeSpan.FromMinutes(30));
+    Assert((await quota.TryReserveAsync(quotaNow, CancellationToken.None)).Allowed &&
+           (await quota.TryReserveAsync(quotaNow, CancellationToken.None)).Allowed,
+        "headless budget admits turns up to its per-agent window limit");
+    var quotaDenied = await quota.TryReserveAsync(quotaNow, CancellationToken.None);
+    Assert(!quotaDenied.Allowed && quotaDenied.AvailableAt == quotaNow.AddMinutes(30),
+        "headless budget returns the oldest reservation's reset time when full");
+    var reloadedQuota = new HeadlessTurnBudget(quotaHome, 2, TimeSpan.FromMinutes(30));
+    Assert(!(await reloadedQuota.TryReserveAsync(quotaNow.AddMinutes(10), CancellationToken.None)).Allowed,
+        "headless budget survives creation of a new gateway budget instance");
+    Assert((await reloadedQuota.TryReserveAsync(quotaNow.AddMinutes(30), CancellationToken.None)).Allowed,
+        "headless budget recovers as the rolling window expires");
+    var corruptQuotaHome = new AgentHome(root, "Agent_CorruptQuota_01");
+    Directory.CreateDirectory(corruptQuotaHome.GatewayStatePath);
+    await File.WriteAllTextAsync(Path.Combine(corruptQuotaHome.GatewayStatePath, "headless-turn-budget.json"), "{not json");
+    var corruptQuota = await new HeadlessTurnBudget(corruptQuotaHome)
+        .TryReserveAsync(quotaNow, CancellationToken.None);
+    Assert(!corruptQuota.Allowed && corruptQuota.StateError,
+        "unreadable headless budget fails closed without authorizing an LLM request");
+
     Assert(WorldStateSummary.Describe(root, home.AgentId) == string.Empty, "no world state means no world facts");
     Directory.CreateDirectory(Path.Combine(root, "WorldState"));
     await File.WriteAllTextAsync(Path.Combine(root, "WorldState", "Broken.json"), "{ not json");
@@ -141,7 +164,8 @@ try
         new AgentRuntimeLease(home),
         new MessageDeduplicator(home),
         new FileEmbodimentBridge(home, bridgeConfiguration),
-        new HeadlessTurnMarker(home));
+        new HeadlessTurnMarker(home),
+        new HeadlessTurnBudget(home));
     var message = new ExternalMessage(
         "discord-message-1",
         home.AgentId,
@@ -164,6 +188,36 @@ try
     Assert(records[2].Text.Contains("I replied", StringComparison.Ordinal), "agent speech is remembered");
     Assert(responder.SawHeadlessMarker, "headless turns are visible to an Unreal embodiment");
 
+    var limitedHome = new AgentHome(root, "Agent_Limited_01");
+    Directory.CreateDirectory(limitedHome.DirectoryPath);
+    await File.WriteAllTextAsync(Path.Combine(limitedHome.DirectoryPath, "identity.md"), "A budgeted test being.");
+    await File.WriteAllTextAsync(Path.Combine(limitedHome.DirectoryPath, "personality.md"), "Careful and concise.");
+    var limitedMemories = new AgentMemoryStore(limitedHome);
+    var limitedResponder = new FakeResponder(limitedHome);
+    var limitedRouter = new AgentMessageRouter(
+        limitedMemories,
+        limitedResponder,
+        new AgentRuntimeLease(limitedHome),
+        new MessageDeduplicator(limitedHome),
+        new FileEmbodimentBridge(limitedHome, bridgeConfiguration),
+        new HeadlessTurnMarker(limitedHome),
+        new HeadlessTurnBudget(limitedHome, 1, TimeSpan.FromMinutes(30)));
+    var limitedMessage = message with { AgentId = limitedHome.AgentId, MessageId = "limited-1" };
+    var limitedFirstReply = await limitedRouter.RouteAsync(limitedMessage, CancellationToken.None);
+    var limitedSecondReply = await limitedRouter.RouteAsync(
+        limitedMessage with { MessageId = "limited-2" }, CancellationToken.None);
+    var limitedDuplicateReply = await limitedRouter.RouteAsync(
+        limitedMessage with { MessageId = "limited-2" }, CancellationToken.None);
+    Assert(limitedFirstReply?.Speech == "Hello from the test agent.", "first headless turn is answered under the rolling budget");
+    Assert(limitedSecondReply is not null &&
+           limitedSecondReply.Speech.Contains("headless reply limit", StringComparison.Ordinal) &&
+           limitedSecondReply.Speech.Contains("haven't read or saved", StringComparison.Ordinal),
+        "budget exhaustion explains the pause without pretending the agent experienced the message");
+    Assert(limitedResponder.CallCount == 1, "a budget-denied turn creates no model call");
+    Assert(limitedDuplicateReply is null, "a budget-denied Discord delivery is deduplicated");
+    Assert(File.Exists(Path.Combine(limitedHome.GatewayStatePath, "headless-turn-budget.json")),
+        "headless turn reservations are persisted with the agent's gateway state");
+
     var proposedAction = new AgentProposal("upgrade", "Add a sheltered landing rail", "RavenNest", "functionality");
     var proposalResponder = new FakeResponder(home, proposedAction);
     var proposalRouter = new AgentMessageRouter(
@@ -172,7 +226,8 @@ try
         new AgentRuntimeLease(home),
         new MessageDeduplicator(home),
         new FileEmbodimentBridge(home, bridgeConfiguration),
-        new HeadlessTurnMarker(home));
+        new HeadlessTurnMarker(home),
+        new HeadlessTurnBudget(home));
     var proposalReply = await proposalRouter.RouteAsync(
         message with { MessageId = "discord-message-agent-proposal" }, CancellationToken.None);
     Assert(proposalReply?.Proposal == proposedAction,
@@ -194,7 +249,8 @@ try
         new AgentRuntimeLease(embodiedHome),
         new MessageDeduplicator(embodiedHome),
         new FileEmbodimentBridge(embodiedHome, bridgeConfiguration),
-        new HeadlessTurnMarker(embodiedHome));
+        new HeadlessTurnMarker(embodiedHome),
+        new HeadlessTurnBudget(embodiedHome));
     var embodimentWorker = Task.Run(async () =>
     {
         var inbox = Path.Combine(embodiedHome.GatewayStatePath, "inbox");
@@ -568,7 +624,8 @@ try
         new AgentRuntimeLease(vanishedHome),
         new MessageDeduplicator(vanishedHome),
         new FileEmbodimentBridge(vanishedHome, bridgeConfiguration),
-        new HeadlessTurnMarker(vanishedHome));
+        new HeadlessTurnMarker(vanishedHome),
+        new HeadlessTurnBudget(vanishedHome));
     var vanishedReply = await vanishedRouter.RouteAsync(
         message with { MessageId = "discord-message-3", AgentId = vanishedHome.AgentId }, CancellationToken.None);
     Assert(vanishedReply?.Speech == "Hello from the test agent.",

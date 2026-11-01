@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Give headless correspondents the same bounded reply horizon
+
+The Unreal play-session path already stops after 30 real minutes or 64 shared
+embodied model requests, but the Discord headless responder could previously
+answer indefinitely. Headless turns now reserve from a persisted per-agent
+rolling allowance of 64 replies per 30 minutes. The reservation is written
+before a model call and survives gateway restarts; direct review/status
+commands do not use LLM turns. At the limit, the correspondent gets an
+approximate retry time, and the declined message is neither read into memory
+nor remembered as experience. Corrupt or unavailable quota state fails closed.
+Gateway checks pass for capacity, reset timing, restart persistence, denied-turn
+behavior, deduplication, and no extra model call. Details: [Gateway README](../Gateway/README.md).
+
 ## 2026-11-01 — Bound Discord turn backlogs for multi-user hosting
 
 Discord events previously spawned one task per inbound message, even though
