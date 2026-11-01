@@ -367,7 +367,6 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					NearbyBeings += UIslandDewSubsystem::DescribeDew(Dew->GetStrength());
 				if (const UIslandSeaStateSubsystem* SeaState = GetWorld()->GetSubsystem<UIslandSeaStateSubsystem>())
 					NearbyBeings += UIslandSeaStateSubsystem::DescribeSea(SeaState->GetSea());
-				NearbyBeings += AIslandDrift::DescribeDrift(It->SampleWind(Location, SkyNow).Size2D(), Environment->GetRainIntensity(), Environment->GetDaylight());
 				if (const UIslandTrailSubsystem* Trail = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
 				{
 					const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
@@ -382,6 +381,11 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						NearbyBeings += Wrack->DescribeShoreForRaven(Wrack->GetLedger().Items, Location, Today);
 				}
 			}
+			break;
+		}
+		for (TActorIterator<AIslandDrift> DriftIt(GetWorld()); DriftIt; ++DriftIt)
+		{
+			NearbyBeings += DriftIt->DescribeMotesNear(Location, Owner);
 			break;
 		}
 		int32 VisibleRoosts = 0;

@@ -116,6 +116,24 @@ bool FIslandDriftTest::RunTest(const FString& Parameters)
 			}
 		TestTrue(TEXT("Rain replaces airborne seeds and petals with wet leaves"), bRainMotesAreLeaves);
 
+		Actor->Motes.Init(FIslandDriftMote(), Drift::MaxMotes);
+		int32 LeafSlot = INDEX_NONE;
+		for (int32 Slot = 0; Slot < Drift::MaxMotes; ++Slot)
+			if (Drift::KindForSlot(Slot) == EIslandDriftKind::DryLeaf) { LeafSlot = Slot; break; }
+		TestTrue(TEXT("A leaf mote slot is available for perception checks"), LeafSlot != INDEX_NONE);
+		if (LeafSlot != INDEX_NONE)
+		{
+			FIslandDriftMote& Leaf = Actor->Motes[LeafSlot];
+			Leaf.bActive = true;
+			Leaf.Position = FVector(500.f, 0.f, 0.f);
+			TestTrue(TEXT("Residents notice a real nearby active leaf"), Actor->DescribeMotesNear(FVector::ZeroVector).Contains(TEXT("leaves")));
+			Leaf.Position = FVector(1300.f, 0.f, 0.f);
+			TestTrue(TEXT("Residents do not notice drift beyond the perception radius"), Actor->DescribeMotesNear(FVector::ZeroVector).IsEmpty());
+			Leaf.Position = FVector(500.f, 0.f, 0.f);
+			Leaf.bActive = false;
+			TestTrue(TEXT("Residents do not infer drift from inactive slots"), Actor->DescribeMotesNear(FVector::ZeroVector).IsEmpty());
+		}
+
 		const TFunctionRef<FVector(const FVector&)> InvalidWind = [](const FVector&)
 		{
 			return FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f);

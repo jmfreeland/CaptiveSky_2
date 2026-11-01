@@ -180,6 +180,56 @@ FString AIslandDrift::DescribeDrift(float WindSpeed, float Rain, float Daylight)
 	return TEXT(" A few seeds hang almost motionless in the still air.");
 }
 
+FString AIslandDrift::DescribeMotesNear(const FVector& ObserverPosition, const AActor* Observer) const
+{
+	if (!IsFiniteVector(ObserverPosition)) return FString();
+	constexpr double NoticeRadius = 1200.0;
+	const double NoticeRadiusSquared = FMath::Square(NoticeRadius);
+	double NearestDistanceSquared[static_cast<int32>(EIslandDriftKind::Count)];
+	int32 NearestSlot[static_cast<int32>(EIslandDriftKind::Count)];
+	for (int32 Kind = 0; Kind < static_cast<int32>(EIslandDriftKind::Count); ++Kind)
+	{
+		NearestDistanceSquared[Kind] = NoticeRadiusSquared;
+		NearestSlot[Kind] = INDEX_NONE;
+	}
+	for (int32 Slot = 0; Slot < Motes.Num(); ++Slot)
+	{
+		const FIslandDriftMote& Mote = Motes[Slot];
+		if (!Mote.bActive || !IsFiniteVector(Mote.Position)) continue;
+		const double DistanceSquared = FVector::DistSquared(ObserverPosition, Mote.Position);
+		const int32 Kind = static_cast<int32>(KindForSlot(Slot));
+		if (DistanceSquared <= NearestDistanceSquared[Kind])
+		{
+			NearestDistanceSquared[Kind] = DistanceSquared;
+			NearestSlot[Kind] = Slot;
+		}
+	}
+
+	const UWorld* World = GetWorld();
+	const auto IsVisible = [this, World, Observer, &ObserverPosition](int32 Slot)
+	{
+		if (Slot == INDEX_NONE) return false;
+		if (!Observer || !World) return true;
+		FHitResult Hit;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandDriftSightline), false, this);
+		Query.AddIgnoredActor(Observer);
+		return !World->LineTraceSingleByChannel(Hit, ObserverPosition, Motes[Slot].Position, ECC_Visibility, Query);
+	};
+	const int32 DryLeaves = static_cast<int32>(EIslandDriftKind::DryLeaf);
+	const int32 GreenLeaves = static_cast<int32>(EIslandDriftKind::GreenLeaf);
+	const int32 Petals = static_cast<int32>(EIslandDriftKind::Petal);
+	const int32 Seeds = static_cast<int32>(EIslandDriftKind::Seed);
+	const int32 NearestLeafSlot = NearestDistanceSquared[DryLeaves] <= NearestDistanceSquared[GreenLeaves]
+		? NearestSlot[DryLeaves] : NearestSlot[GreenLeaves];
+	if (IsVisible(NearestLeafSlot))
+		return TEXT(" A few leaves are tumbling nearby in the wind.");
+	if (IsVisible(NearestSlot[Petals]))
+		return TEXT(" A few petals are drifting past nearby.");
+	if (IsVisible(NearestSlot[Seeds]))
+		return TEXT(" A few seeds hang in the air nearby.");
+	return FString();
+}
+
 int32 AIslandDrift::GetActiveCount() const
 {
 	int32 Count = 0;

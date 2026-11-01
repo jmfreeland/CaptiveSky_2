@@ -1,5 +1,21 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Ground drift narration in visible motes
+
+Resident situation summaries previously described airborne seeds, petals, or
+leaves from local wind and rain values alone, despite the drift effect being
+spawned around the local viewer. That could make a resident narrate something
+they could not see. Residents now describe drift only when an active mote is
+within 12 metres and, when a resident actor is available, has an unobstructed
+visibility trace. The line names only the observed kind and remains empty when
+there is no visible mote. Focused coverage checks nearby, distant, and inactive
+leaf slots. This corrects perception grounding; it does not change mote
+placement, weather, or the visual effect. The UE 5.8.3 editor target compiled
+and linked successfully, including the focused regression cases. Automation was
+not run because the known NullRHI startup crash has not been resolved. The
+actual D: project reopened successfully and reports All Saved; no PIE session
+was started because GPU headroom remains below the 4 GiB safety margin.
+
 ## 2026-11-01 — Confirm Nanite Foliage after the editor restart
 
 The user-approved restart reopened the actual D: `CaptiveSky_2` project in UE

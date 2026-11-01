@@ -64,6 +64,8 @@ public:
 	static EIslandDriftKind KindForSlot(int32 Index);
 	/** What a resident notices drifting past in this wind (cm/s); empty when nothing is lifting. */
 	static FString DescribeDrift(float WindSpeed, float Rain, float Daylight);
+	/** Describe only active, nearby motes with a clear sightline from one resident. */
+	FString DescribeMotesNear(const FVector& ObserverPosition, const AActor* Observer = nullptr) const;
 
 	/**
 	 * Advance every mote by Dt seconds around Viewer. WindAt gives the wind (cm/s) at a point; Rain and
