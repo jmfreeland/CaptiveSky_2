@@ -25,11 +25,13 @@ actual resident-controller interaction, verifies one leaf is saved, then
 verifies that a second same-day attempt adds no leaf. Existing basin persistence
 and per-day checks remain in the same test. The UE 5.8.3 scratch Editor target
 compiled and linked successfully with Live Coding patching disabled; the open
-D: editor was not modified. The most recent commandlet launch in this
-environment reproduced the known UE bootstrap crash before test startup
-(`SecondsSinceStart=0`, hash `F405610C114D120D4B6F5ABA901EC469AC9FAA26`), so I
-did not repeat the identical startup after this build. The new world-level
-test has not run yet.
+D: editor was not modified. A focused scratch-project retry on 2026-11-01
+11:38 UTC, with NullRHI, `-NoZen`, memory DDC, agent thinking disabled, zero
+model requests, and a queue-empty exit condition, reproduced the UE bootstrap
+crash before test startup (`SecondsSinceStart=0`, null access violation, hash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`). No test assertions ran. The crash
+context and startup log are under
+[`Saved/CC/Project/Saved/Crashes/_0000`](../../Saved/CC/Project/Saved/Crashes/_0000/Codex_RainBasinWorld_20261101.log).
 
 ## Next check
 

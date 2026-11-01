@@ -55,3 +55,12 @@ the canonical world-state directory. Rendered play remains gated on at least
 4 GiB free GPU memory and the existing 30 FPS floor. The live viewport faces
 offshore and does not show the generated woodland, so it also cannot validate
 the vegetation changes.
+
+**Commandlet retry (2026-11-01 11:38 UTC):** a focused
+`CaptiveSky2.Agent.IslandRainBasinWorld` run used the isolated scratch project,
+NullRHI, `-NoZen`, memory DDC, disabled resident thinking, zero model requests,
+and `-TestExit="Automation Test Queue Empty"`. Unreal again crashed before
+initialization (`SecondsSinceStart=0`, null access violation, hash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26`); no automation test was discovered
+or run. The crash context and startup log are under
+[`Saved/CC/Project/Saved/Crashes/_0000`](../../Saved/CC/Project/Saved/Crashes/_0000/Codex_RainBasinWorld_20261101.log).
