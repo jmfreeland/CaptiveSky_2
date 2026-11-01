@@ -32,6 +32,15 @@ rate below 30 FPS. Do not raise population or cull distances unless this
 constant-population comparison shows headroom. The last observed device sample
 was only 2.4 GiB free, so no rendered comparison was started.
 
+## Post-restart GPU gate recheck — 2026-11-01
+
+After reopening the actual D: project, a follow-up `nvidia-smi` sample showed
+9,600 / 12,282 MiB used (2,682 MiB free), 42% utilization, and 73 °C. This is
+still below the 4 GiB rendered-session gate. The NVIDIA WDDM process table
+reported no per-process entries, so this sample does not identify which
+applications account for the reserved memory. No PIE or Game session was
+started, and no new frame-time or visual evidence was collected.
+
 Sources: `Saved/CS58/Saved/SessionReports/TreeSpatialNullRHI_20261031.md`,
 `docs/findings/2026-10-31-nullrhi-tree-spatial-audit.md`, and
 `docs/findings/2026-10-31-megaplant-tree-variant-audit.md`.
