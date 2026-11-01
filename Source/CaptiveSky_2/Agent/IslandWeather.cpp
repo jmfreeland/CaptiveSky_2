@@ -69,11 +69,11 @@ namespace
 {
 	struct FTreeSpatialDiagnosticCounts
 	{
-		int32 Species[5] = {};
+		int32 Species[6] = {};
 
 		void Add(int32 SpeciesIndex)
 		{
-			if (SpeciesIndex >= 0 && SpeciesIndex < 5) ++Species[SpeciesIndex];
+			if (SpeciesIndex >= 0 && SpeciesIndex < 6) ++Species[SpeciesIndex];
 		}
 	};
 
@@ -378,6 +378,14 @@ AIslandWeather::AIslandWeather()
 	IslandBlackAlders->SetCastShadow(false);
 	IslandBlackAlders->bReceivesDecals = false;
 	IslandBlackAlders->SetVisibility(false);
+	IslandCommonHazels = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandCommonHazels"));
+	IslandCommonHazels->SetupAttachment(RootComponent);
+	IslandCommonHazels->SetMobility(EComponentMobility::Movable);
+	IslandCommonHazels->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	IslandCommonHazels->SetCanEverAffectNavigation(false);
+	IslandCommonHazels->SetCastShadow(false);
+	IslandCommonHazels->bReceivesDecals = false;
+	IslandCommonHazels->SetVisibility(false);
 	IslandNorwayMaplesVariantB = CreateDefaultSubobject<UInstancedSkinnedMeshComponent>(TEXT("IslandNorwayMaplesVariantB"));
 	IslandNorwayMaplesVariantB->SetupAttachment(RootComponent);
 	IslandNorwayMaplesVariantB->SetMobility(EComponentMobility::Movable);
@@ -504,6 +512,7 @@ AIslandWeather::AIslandWeather()
 	// 125 m, without extending the other species or matching the spruce horizon.
 	IslandBlackAlders->SetCullDistances(12000, 22000);
 	IslandBlackAldersVariantB->SetCullDistances(12000, 22000);
+	IslandCommonHazels->SetCullDistances(8000, 12500);
 
 	WindAmbienceAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("WindAmbience"));
 	WindAmbienceAudio->SetupAttachment(RootComponent);
@@ -605,6 +614,9 @@ void AIslandWeather::BeginPlay()
 	if (USkeletalMesh* BlackAlderMesh = LoadObject<USkeletalMesh>(nullptr,
 		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A")))
 		IslandBlackAlders->SetSkinnedAssetAndUpdate(BlackAlderMesh);
+	if (USkeletalMesh* CommonHazelMesh = LoadObject<USkeletalMesh>(nullptr,
+		TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Tree_Common_Hazel_01/Tree_Common_Hazel_01_A.Tree_Common_Hazel_01_A")))
+		IslandCommonHazels->SetSkinnedAssetAndUpdate(CommonHazelMesh);
 	if (USkeletalMesh* NorwayMapleVariantB = LoadObject<USkeletalMesh>(nullptr,
 		TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B")))
 		IslandNorwayMaplesVariantB->SetSkinnedAssetAndUpdate(NorwayMapleVariantB);
@@ -1114,6 +1126,7 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandEuropeanAspens) IslandEuropeanAspens->ClearInstances();
 	if (IslandEuropeanBeeches) IslandEuropeanBeeches->ClearInstances();
 	if (IslandBlackAlders) IslandBlackAlders->ClearInstances();
+	if (IslandCommonHazels) IslandCommonHazels->ClearInstances();
 	if (IslandNorwayMaplesVariantB) IslandNorwayMaplesVariantB->ClearInstances();
 	if (IslandEuropeanAspensVariantB) IslandEuropeanAspensVariantB->ClearInstances();
 	if (IslandEuropeanBeechesVariantB) IslandEuropeanBeechesVariantB->ClearInstances();
@@ -1130,6 +1143,7 @@ void AIslandWeather::InitializeGroundCover()
 	GroundCoverAspenTreeCount = 0;
 	GroundCoverBeechTreeCount = 0;
 	GroundCoverBlackAlderTreeCount = 0;
+	GroundCoverCommonHazelTreeCount = 0;
 	GroundCoverBirchCoppiceCount = 0;
 	GroundCoverHazelCoppiceCount = 0;
 	auto ConfigureTreeWind = [this](UInstancedSkinnedMeshComponent* Component)
@@ -1150,6 +1164,7 @@ void AIslandWeather::InitializeGroundCover()
 	ConfigureTreeWind(IslandEuropeanAspens);
 	ConfigureTreeWind(IslandEuropeanBeeches);
 	ConfigureTreeWind(IslandBlackAlders);
+	ConfigureTreeWind(IslandCommonHazels);
 	ConfigureTreeWind(IslandNorwayMaplesVariantB);
 	ConfigureTreeWind(IslandEuropeanAspensVariantB);
 	ConfigureTreeWind(IslandEuropeanBeechesVariantB);
@@ -1877,8 +1892,11 @@ void AIslandWeather::InitializeGroundCover()
 			USkeletalMesh* BlackAlderVariantBMesh = IslandBlackAldersVariantB
 				? Cast<USkeletalMesh>(IslandBlackAldersVariantB->GetSkinnedAsset()) : nullptr;
 			const FBoxSphereBounds BlackAlderVariantBBounds = BlackAlderVariantBMesh ? BlackAlderVariantBMesh->GetBounds() : FBoxSphereBounds(ForceInit);
+			const USkeletalMesh* CommonHazelMesh = IslandCommonHazels
+				? Cast<USkeletalMesh>(IslandCommonHazels->GetSkinnedAsset()) : nullptr;
+			const FBoxSphereBounds CommonHazelBounds = CommonHazelMesh ? CommonHazelMesh->GetBounds() : FBoxSphereBounds(ForceInit);
 			const int32 AvailableBroadleafSpeciesCount = (MapleMesh ? 1 : 0) + (AspenMesh ? 1 : 0) +
-				(BeechMesh ? 1 : 0) + (BlackAlderMesh ? 1 : 0);
+				(BeechMesh ? 1 : 0) + (BlackAlderMesh ? 1 : 0) + (CommonHazelMesh ? 1 : 0);
 			const int32 MaxBroadleafTreesPerSpecies = GetBroadleafSpeciesLimit(AvailableBroadleafSpeciesCount);
 			constexpr int32 MaxBroadleafTreeCount = BroadleafTreePopulationBudget;
 			// Replace spruce placements with broadleaf trees in mixed groves. Keep the
@@ -1992,7 +2010,8 @@ void AIslandWeather::InitializeGroundCover()
 								case 0: Component = IslandNorwayMaples; Mesh = MapleMesh; MeshBounds = &MapleBounds; VariantBComponent = IslandNorwayMaplesVariantB; VariantBMesh = MapleVariantBMesh; VariantBBounds = &MapleVariantBBounds; SpeciesCount = &GroundCoverMapleTreeCount; break;
 								case 1: Component = IslandEuropeanAspens; Mesh = AspenMesh; MeshBounds = &AspenBounds; VariantBComponent = IslandEuropeanAspensVariantB; VariantBMesh = AspenVariantBMesh; VariantBBounds = &AspenVariantBBounds; SpeciesCount = &GroundCoverAspenTreeCount; break;
 								case 2: Component = IslandEuropeanBeeches; Mesh = BeechMesh; MeshBounds = &BeechBounds; VariantBComponent = IslandEuropeanBeechesVariantB; VariantBMesh = BeechVariantBMesh; VariantBBounds = &BeechVariantBBounds; SpeciesCount = &GroundCoverBeechTreeCount; break;
-								default: Component = IslandBlackAlders; Mesh = BlackAlderMesh; MeshBounds = &BlackAlderBounds; VariantBComponent = IslandBlackAldersVariantB; VariantBMesh = BlackAlderVariantBMesh; VariantBBounds = &BlackAlderVariantBBounds; SpeciesCount = &GroundCoverBlackAlderTreeCount; break;
+								case 3: Component = IslandBlackAlders; Mesh = BlackAlderMesh; MeshBounds = &BlackAlderBounds; VariantBComponent = IslandBlackAldersVariantB; VariantBMesh = BlackAlderVariantBMesh; VariantBBounds = &BlackAlderVariantBBounds; SpeciesCount = &GroundCoverBlackAlderTreeCount; break;
+								default: Component = IslandCommonHazels; Mesh = CommonHazelMesh; MeshBounds = &CommonHazelBounds; SpeciesCount = &GroundCoverCommonHazelTreeCount; break;
 								}
 								if (!Component || !Mesh || !MeshBounds || MeshBounds->BoxExtent.Z <= KINDA_SMALL_NUMBER ||
 									!SpeciesCount || *SpeciesCount >= MaxBroadleafTreesPerSpecies) return false;
@@ -2486,10 +2505,11 @@ void AIslandWeather::InitializeGroundCover()
 				}
 				UE_LOG(LogIslandWeather, Log, TEXT("Landscape woodland placed %d trees (%d saplings), %d broadleaf shrubs, and %d flowering rhododendrons in %d groves after %d bounded traces."),
 					GroundCoverTreeCount, SpruceSaplingCount, GroundCoverShrubCount, GroveFlowerCount, SpruceGroveCenters.Num(), SpruceTraceCount);
-				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d black alder, %d birch coppice, and %d hazel coppice instances; broadleaf trees span %d/%d groves under the fixed %d-tree budget."),
+				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d black alder, %d common hazel, %d birch coppice, and %d hazel coppice instances; broadleaf trees span %d/%d groves under the fixed %d-tree budget."),
 					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBlackAlderTreeCount,
+					GroundCoverCommonHazelTreeCount,
 					GroundCoverBirchCoppiceCount, GroundCoverHazelCoppiceCount, BroadleafGrovesWithTrees, SpruceGroveCenters.Num(), MaxBroadleafTreeCount);
-				UE_LOG(LogIslandWeather, Log, TEXT("Island broadleaf mesh variants (A/B): Norway maple %d/%d, European aspen %d/%d, European beech %d/%d, black alder %d/%d."),
+				UE_LOG(LogIslandWeather, Log, TEXT("Island broadleaf mesh variants (A/B): Norway maple %d/%d, European aspen %d/%d, European beech %d/%d, black alder %d/%d, common hazel %d/0."),
 					IslandNorwayMaples ? IslandNorwayMaples->GetInstanceCount() : 0,
 					IslandNorwayMaplesVariantB ? IslandNorwayMaplesVariantB->GetInstanceCount() : 0,
 					IslandEuropeanAspens ? IslandEuropeanAspens->GetInstanceCount() : 0,
@@ -2497,7 +2517,8 @@ void AIslandWeather::InitializeGroundCover()
 					IslandEuropeanBeeches ? IslandEuropeanBeeches->GetInstanceCount() : 0,
 					IslandEuropeanBeechesVariantB ? IslandEuropeanBeechesVariantB->GetInstanceCount() : 0,
 					IslandBlackAlders ? IslandBlackAlders->GetInstanceCount() : 0,
-					IslandBlackAldersVariantB ? IslandBlackAldersVariantB->GetInstanceCount() : 0);
+					IslandBlackAldersVariantB ? IslandBlackAldersVariantB->GetInstanceCount() : 0,
+					IslandCommonHazels ? IslandCommonHazels->GetInstanceCount() : 0);
 				if (bGatherMeadowSpatialDiagnostics)
 				{
 					TArray<FIntPoint> SortedTreeTiles;
@@ -2509,8 +2530,8 @@ void AIslandWeather::InitializeGroundCover()
 						const FTreeSpatialDiagnosticCounts* Counts = TreeSpatialTileCounts.Find(Tile);
 						if (!Counts) continue;
 						UE_LOG(LogIslandWeather, Display,
-							TEXT("Mature tree tile [%d,%d] (200 m): spruce=%d, Norway maple=%d, European aspen=%d, European beech=%d, black alder=%d."),
-							Tile.X, Tile.Y, Counts->Species[0], Counts->Species[1], Counts->Species[2], Counts->Species[3], Counts->Species[4]);
+							TEXT("Mature tree tile [%d,%d] (200 m): spruce=%d, Norway maple=%d, European aspen=%d, European beech=%d, black alder=%d, common hazel=%d."),
+							Tile.X, Tile.Y, Counts->Species[0], Counts->Species[1], Counts->Species[2], Counts->Species[3], Counts->Species[4], Counts->Species[5]);
 					}
 				}
 		}
@@ -2662,6 +2683,7 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandEuropeanAspens) IslandEuropeanAspens->SetVisibility(GroundCoverAspenTreeCount > 0, true);
 	if (IslandEuropeanBeeches) IslandEuropeanBeeches->SetVisibility(GroundCoverBeechTreeCount > 0, true);
 	if (IslandBlackAlders) IslandBlackAlders->SetVisibility(GroundCoverBlackAlderTreeCount > 0, true);
+	if (IslandCommonHazels) IslandCommonHazels->SetVisibility(GroundCoverCommonHazelTreeCount > 0, true);
 	if (IslandNorwayMaplesVariantB) IslandNorwayMaplesVariantB->SetVisibility(IslandNorwayMaplesVariantB->GetInstanceCount() > 0, true);
 	if (IslandEuropeanAspensVariantB) IslandEuropeanAspensVariantB->SetVisibility(IslandEuropeanAspensVariantB->GetInstanceCount() > 0, true);
 	if (IslandEuropeanBeechesVariantB) IslandEuropeanBeechesVariantB->SetVisibility(IslandEuropeanBeechesVariantB->GetInstanceCount() > 0, true);
@@ -2710,6 +2732,7 @@ void AIslandWeather::ClearGroundCover()
 	if (IslandEuropeanAspens) { IslandEuropeanAspens->ClearInstances(); IslandEuropeanAspens->SetVisibility(false, true); }
 	if (IslandEuropeanBeeches) { IslandEuropeanBeeches->ClearInstances(); IslandEuropeanBeeches->SetVisibility(false, true); }
 	if (IslandBlackAlders) { IslandBlackAlders->ClearInstances(); IslandBlackAlders->SetVisibility(false, true); }
+	if (IslandCommonHazels) { IslandCommonHazels->ClearInstances(); IslandCommonHazels->SetVisibility(false, true); }
 	if (IslandNorwayMaplesVariantB) { IslandNorwayMaplesVariantB->ClearInstances(); IslandNorwayMaplesVariantB->SetVisibility(false, true); }
 	if (IslandEuropeanAspensVariantB) { IslandEuropeanAspensVariantB->ClearInstances(); IslandEuropeanAspensVariantB->SetVisibility(false, true); }
 	if (IslandEuropeanBeechesVariantB) { IslandEuropeanBeechesVariantB->ClearInstances(); IslandEuropeanBeechesVariantB->SetVisibility(false, true); }
@@ -2726,6 +2749,7 @@ void AIslandWeather::ClearGroundCover()
 	GroundCoverAspenTreeCount = 0;
 	GroundCoverBeechTreeCount = 0;
 	GroundCoverBlackAlderTreeCount = 0;
+	GroundCoverCommonHazelTreeCount = 0;
 	GroundCoverBirchCoppiceCount = 0;
 	GroundCoverHazelCoppiceCount = 0;
 	IslandShrubBaseTransforms.Reset();
@@ -4115,8 +4139,8 @@ int32 AIslandWeather::ResolveBroadleafVariantIndex(int32 RequestedVariantIndex, 
 
 float AIslandWeather::GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample)
 {
-	static constexpr float MinimumHeights[] = { 1000.f, 1250.f, 1050.f, 900.f };
-	static constexpr float MaximumHeights[] = { 1500.f, 1800.f, 1600.f, 1400.f };
+	static constexpr float MinimumHeights[] = { 1000.f, 1250.f, 1050.f, 900.f, 450.f };
+	static constexpr float MaximumHeights[] = { 1500.f, 1800.f, 1600.f, 1400.f, 700.f };
 	if (SpeciesIndex < 0 || SpeciesIndex >= UE_ARRAY_COUNT(MinimumHeights)) return 0.f;
 	const float ClampedSample = FMath::IsFinite(HeightSample) ? FMath::Clamp(HeightSample, 0.f, 1.f) : 0.5f;
 	return FMath::Lerp(MinimumHeights[SpeciesIndex], MaximumHeights[SpeciesIndex], ClampedSample);

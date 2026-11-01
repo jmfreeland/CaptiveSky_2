@@ -93,7 +93,7 @@ public:
 	static constexpr float TideglassPollinatorFlowerCattailClearance = 375.f;
 	/** Preserve a fixed mixed-tree population while spreading it across available Megaplant species. */
 	static constexpr int32 BroadleafTreePopulationBudget = 3600;
-	static constexpr int32 BroadleafTreeSpeciesCount = 4;
+	static constexpr int32 BroadleafTreeSpeciesCount = 5;
 	/** Keep the earlier general meadow scatter clear of later Tideglass specialist flower sites. */
 	static constexpr float TideglassPollinatorFlowerSiteClearance = 475.f;
 	/** Fixed share and visible annulus for flower pockets around Listening Stones. */
@@ -204,6 +204,7 @@ private:
 	int32 GroundCoverAspenTreeCount = 0;
 	int32 GroundCoverBeechTreeCount = 0;
 	int32 GroundCoverBlackAlderTreeCount = 0;
+	int32 GroundCoverCommonHazelTreeCount = 0;
 	int32 GroundCoverBirchCoppiceCount = 0;
 	int32 GroundCoverHazelCoppiceCount = 0;
 	TArray<FTransform> IslandShrubBaseTransforms;
@@ -239,6 +240,8 @@ private:
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanBeeches;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandBlackAlders;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandCommonHazels;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandNorwayMaplesVariantB;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")

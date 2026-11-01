@@ -55,16 +55,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafDiversityTest,
 
 bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("The first habitat-field quarter selects Norway maple"),
-		AIslandWeather::GetBroadleafSpeciesIndex(0.125f), 0);
-	TestEqual(TEXT("The second habitat-field quarter selects European aspen"),
-		AIslandWeather::GetBroadleafSpeciesIndex(0.375f), 1);
-	TestEqual(TEXT("The third habitat-field quarter selects European beech"),
-		AIslandWeather::GetBroadleafSpeciesIndex(0.625f), 2);
-	TestEqual(TEXT("The final habitat-field quarter selects black alder"),
-		AIslandWeather::GetBroadleafSpeciesIndex(0.875f), 3);
+	TestEqual(TEXT("The first habitat-field fifth selects Norway maple"),
+		AIslandWeather::GetBroadleafSpeciesIndex(0.1f), 0);
+	TestEqual(TEXT("The second habitat-field fifth selects European aspen"),
+		AIslandWeather::GetBroadleafSpeciesIndex(0.3f), 1);
+	TestEqual(TEXT("The middle habitat-field fifth selects European beech"),
+		AIslandWeather::GetBroadleafSpeciesIndex(0.5f), 2);
+	TestEqual(TEXT("The fourth habitat-field fifth selects black alder"),
+		AIslandWeather::GetBroadleafSpeciesIndex(0.7f), 3);
+	TestEqual(TEXT("The final habitat-field fifth selects common hazel"),
+		AIslandWeather::GetBroadleafSpeciesIndex(0.9f), 4);
 	TestEqual(TEXT("A field at the upper endpoint stays within the last species"),
-		AIslandWeather::GetBroadleafSpeciesIndex(1.f), 3);
+		AIslandWeather::GetBroadleafSpeciesIndex(1.f), 4);
 	TestEqual(TEXT("A field below zero stays within the first species"),
 		AIslandWeather::GetBroadleafSpeciesIndex(-0.1f), 0);
 	TestEqual(TEXT("A non-finite habitat field resolves deterministically"),
@@ -92,7 +94,9 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The representative Island-scale field uses both canopy silhouettes"),
 		VariantCounts[0] >= 16 && VariantCounts[0] <= 65 &&
 		VariantCounts[1] >= 16 && VariantCounts[1] <= 65);
-	TestEqual(TEXT("Four resolved species share the 3,600-tree budget evenly"),
+	TestEqual(TEXT("Five resolved species share the 3,600-tree budget evenly"),
+		AIslandWeather::GetBroadleafSpeciesLimit(5), 720);
+	TestEqual(TEXT("Four resolved species retain 900-tree shares"),
 		AIslandWeather::GetBroadleafSpeciesLimit(4), 900);
 	TestEqual(TEXT("Three resolved species preserve the former 1,200-tree shares"),
 		AIslandWeather::GetBroadleafSpeciesLimit(3), 1200);
@@ -148,8 +152,21 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	const AIslandWeather* Defaults = GetDefault<AIslandWeather>();
 	const UInstancedSkinnedMeshComponent* BlackAlders = Defaults ? Defaults->IslandBlackAlders : nullptr;
 	const UInstancedSkinnedMeshComponent* BlackAldersB = Defaults ? Defaults->IslandBlackAldersVariantB : nullptr;
+	const UInstancedSkinnedMeshComponent* CommonHazels = Defaults ? Defaults->IslandCommonHazels : nullptr;
 	TestNotNull(TEXT("Black Alder uses its own instanced-skinned foliage component"), BlackAlders);
 	TestNotNull(TEXT("Black Alder B uses a separate instanced-skinned foliage component"), BlackAldersB);
+	TestNotNull(TEXT("Common Hazel uses an instanced-skinned foliage component"), CommonHazels);
+	if (CommonHazels)
+	{
+		TestEqual(TEXT("Common Hazel foliage has no collision"),
+			CommonHazels->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Common Hazel foliage does not affect navigation"), CommonHazels->CanEverAffectNavigation());
+		int32 CullStart = 0;
+		int32 CullEnd = 0;
+		CommonHazels->GetCullDistances(CullStart, CullEnd);
+		TestEqual(TEXT("Common Hazel joins the established broadleaf fade range at 80 m"), CullStart, 8000);
+		TestEqual(TEXT("Common Hazel stays inside the established 125 m cull end"), CullEnd, 12500);
+	}
 	if (BlackAlders)
 	{
 		TestEqual(TEXT("Black Alder foliage has no collision"),
@@ -190,7 +207,8 @@ bool FIslandWeatherBroadleafNaniteReadinessAssetsTest::RunTest(const FString& Pa
 		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"),
 		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B"),
 		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A"),
-		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B")
+		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_Common_Hazel/Tree_Common_Hazel_01/Tree_Common_Hazel_01_A.Tree_Common_Hazel_01_A")
 	};
 	for (const TCHAR* AssetPath : BroadleafAssemblyAssetPaths)
 	{
@@ -221,12 +239,16 @@ bool FIslandWeatherBroadleafHeightProfilesTest::RunTest(const FString& Parameter
 		AIslandWeather::GetBroadleafTreeHeight(2, 0.5f), 1325.f);
 	TestEqual(TEXT("Black alder retains a lower moisture-edge canopy profile"),
 		AIslandWeather::GetBroadleafTreeHeight(3, 1.f), 1400.f);
+	TestEqual(TEXT("Common hazel occupies a distinct lower woodland-canopy band"),
+		AIslandWeather::GetBroadleafTreeHeight(4, 0.f), 450.f);
+	TestEqual(TEXT("Common hazel reaches the installed mesh's approximately five-metre silhouette"),
+		AIslandWeather::GetBroadleafTreeHeight(4, 1.f), 700.f);
 	TestEqual(TEXT("Height samples below range clamp to the species minimum"),
 		AIslandWeather::GetBroadleafTreeHeight(3, -1.f), 900.f);
 	TestEqual(TEXT("Non-finite height samples resolve to the profile midpoint"),
 		AIslandWeather::GetBroadleafTreeHeight(0, std::numeric_limits<float>::quiet_NaN()), 1250.f);
 	TestEqual(TEXT("Invalid species indices do not produce a tree height"),
-		AIslandWeather::GetBroadleafTreeHeight(4, 0.5f), 0.f);
+		AIslandWeather::GetBroadleafTreeHeight(5, 0.5f), 0.f);
 	return true;
 }
 
@@ -239,8 +261,8 @@ bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Paramet
 	constexpr int32 HabitatSeed = 12345;
 	const FVector PatchOrigin(0.f, 0.f, 0.f);
 	const int32 PatchSpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(PatchOrigin, HabitatSeed);
-	TestTrue(TEXT("A sampled habitat field resolves to one of the four broadleaf species"),
-		PatchSpecies >= 0 && PatchSpecies < 4);
+	TestTrue(TEXT("A sampled habitat field resolves to one of the five broadleaf species"),
+		PatchSpecies >= 0 && PatchSpecies < 5);
 	TestEqual(TEXT("Nearby trees remain in the same smoothed habitat patch"),
 		AIslandWeather::GetBroadleafSpeciesIndexAt(FVector(500.f, 700.f, 0.f), HabitatSeed), PatchSpecies);
 	TestEqual(TEXT("A second nearby tree remains in that habitat patch"),
@@ -265,15 +287,15 @@ bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Paramet
 				++SpeciesCounts[Species];
 		}
 	}
-	// The representative 81-point Island-scale sample previously resolved to
-	// 12/28/26/15. Keep each species between 8 and 32 so all remain meaningful
-	// communities without pinning the field to exact counts or proving valid land.
+	// Keep all five species present and avoid one habitat label dominating this
+	// representative 81-point Island-scale sample. This measures the smoothed
+	// field, not valid land or final placed-tree counts.
 	for (int32 Species = 0; Species < AIslandWeather::BroadleafTreeSpeciesCount; ++Species)
 	{
 		TestTrue(FString::Printf(TEXT("Broadleaf species %d is selectable in the Island-scale habitat field"), Species),
 			SpeciesCounts[Species] > 0);
 		TestTrue(FString::Printf(TEXT("Broadleaf species %d retains a meaningful share of the representative Island-scale field"), Species),
-			SpeciesCounts[Species] >= 8 && SpeciesCounts[Species] <= 32);
+			SpeciesCounts[Species] >= 5 && SpeciesCounts[Species] <= 28);
 	}
 	return true;
 }

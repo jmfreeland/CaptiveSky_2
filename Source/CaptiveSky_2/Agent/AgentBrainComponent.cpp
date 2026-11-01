@@ -91,6 +91,7 @@ namespace
 		if (LowerName.Contains(TEXT("european_aspen"))) return TEXT("European aspen trees");
 		if (LowerName.Contains(TEXT("european_beech"))) return TEXT("European beech trees");
 		if (LowerName.Contains(TEXT("black_alder"))) return TEXT("black alder trees");
+		if (LowerName.Contains(TEXT("common_hazel"))) return TEXT("common hazel trees");
 
 		FString DisplayName = Mesh.GetName();
 		DisplayName.RemoveFromStart(TEXT("SKM_"));
