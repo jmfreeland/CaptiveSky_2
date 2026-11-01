@@ -162,6 +162,30 @@ float AIslandWeather::GetWoodlandGroveRadiusScaleAt(const FVector& Position, int
 	return FMath::Lerp(0.82f, 1.18f, GroveField);
 }
 
+bool AIslandWeather::DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay)
+{
+	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % AIslandDayNight::CalendarDaysPerYear;
+	const int32 SeasonIndex = DayOfYear / AIslandDayNight::CalendarDaysPerSeason;
+	if (SpeciesIndex == WoodlandBluebellSpeciesIndex || SpeciesIndex == TideglassMarshMarigoldSpeciesIndex)
+		return SeasonIndex == 0; // Spring.
+	if (SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex)
+		return SeasonIndex <= 1; // Spring through summer.
+	return true; // The general meadow species have no authored flowering calendar yet.
+}
+
+void AIslandWeather::UpdateSeasonalFlowerVisibility(int32 IslandDay)
+{
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num(); ++SpeciesIndex)
+	{
+		UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers[SpeciesIndex];
+		if (!FlowerSpecies) continue;
+		const bool bBlooming = FlowerSpecies->GetInstanceCount() > 0 &&
+			DoesMeadowFlowerSpeciesBloomInSeason(SpeciesIndex, IslandDay);
+		if (FlowerSpecies->IsVisible() != bBlooming)
+			FlowerSpecies->SetVisibility(bBlooming, true);
+	}
+}
+
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -2543,6 +2567,7 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		if (MeadowFlower) MeadowFlower->SetVisibility(MeadowFlower->GetInstanceCount() > 0, true);
+	UpdateSeasonalFlowerVisibility(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
 	if (IslandCattails) IslandCattails->SetVisibility(GroundCoverWetlandCount > 0, true);
 	if (IslandFestuca) IslandFestuca->SetVisibility(IslandFestuca->GetInstanceCount() > 0, true);
 	if (IslandPhalaris) IslandPhalaris->SetVisibility(IslandPhalaris->GetInstanceCount() > 0, true);
@@ -3445,6 +3470,7 @@ void AIslandWeather::RefreshNightEcology()
 		CurrentDay = It->DayNumber;
 		break;
 	}
+	UpdateSeasonalFlowerVisibility(CurrentDay);
 	const bool bDay = CurrentHour >= AIslandDayNight::SunriseHour(CurrentDay) &&
 		CurrentHour < AIslandDayNight::SunsetHour(CurrentDay);
 	const bool bNight = CurrentHour >= 0.f && !bDay;

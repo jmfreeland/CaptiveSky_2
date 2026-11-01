@@ -75,6 +75,8 @@ public:
 	static constexpr int32 WoodlandBluebellSpeciesIndex = 8;
 	static constexpr int32 TideglassMarshMarigoldSpeciesIndex = 9;
 	static constexpr int32 TideglassYellowFlagIrisSpeciesIndex = 10;
+	/** Seasonal phenology for named habitat specialists; general meadow forms remain year-round. */
+	static bool DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay);
 	static constexpr float WoodlandBluebellInnerRadius = 1200.f;
 	static constexpr float WoodlandBluebellOuterRadius = 3800.f;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
@@ -363,6 +365,7 @@ private:
 		const FVector& LocalWind, double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
 	UHierarchicalInstancedStaticMeshComponent* FindShoreGrassC() const;
 	void InitializeGroundCover();
+	void UpdateSeasonalFlowerVisibility(int32 IslandDay);
 	void UpdateGroundCoverSway();
 	void UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius);
 	void ClearGroundCover();

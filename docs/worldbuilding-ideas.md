@@ -1,5 +1,21 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let habitat flowers follow the Island seasons
+
+The persistent 90-day temperate calendar now drives a first small botanical
+phenology pass: woodland bluebells and Tideglass marsh marigolds appear in
+spring; yellow-flag iris appears in spring and summer. Their collisionless HISM
+components switch only at the 30-second ecology refresh and on initial ground
+cover setup. General meadow flowers stay year-round because their current
+species identities do not yet have authored bloom windows. This adds no assets,
+instances, or per-frame transform work; wildlife's nearest-bloom query naturally
+stops treating dormant specialist flowers as present. The UE 5.8.3 editor target
+built successfully with no-hot-reload flags, keeping the open editor untouched;
+the `IslandWeather.SeasonalFlowers` automation passed under `-NullRHI` (log:
+[`Codex_SeasonalFlowers_20261101.log`](../Saved/Logs/Codex_SeasonalFlowers_20261101.log)).
+Runtime visual progression and gradual bud/flower/fade transitions remain
+unverified and are the next polish step.
+
 ## 2026-11-01 — Let shore and woodland routines follow the changing day
 
 The temperate calendar now changes sunrise and sunset, so shore animals should
