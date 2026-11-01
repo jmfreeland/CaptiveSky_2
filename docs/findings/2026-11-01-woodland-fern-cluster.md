@@ -30,6 +30,8 @@ Source-level geometry/material tests are in
 source-contract tests covering this fern and the neighboring fly-agaric
 candidate pass inside Blender 5.2.2's bundled Python. The six tests in
 `Scripts/tests/test_woodland_fly_agaric_review.py` also pass there, covering
-the two-asset preflight, candidate offsets, and copy-only map save. Exported-FBX
-verification also passed; no Unreal import, map, runtime, or performance check
-is claimed.
+the two-asset preflight, candidate offsets, resume behavior, and copy-only map
+save. The complete asset-pipeline suite now passes all 120 tests under Blender
+5.2.2's bundled Python, including request-routing and export-verification
+safety. Exported-FBX verification also passed; no Unreal import, map, runtime,
+or performance check is claimed.
