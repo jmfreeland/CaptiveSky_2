@@ -169,3 +169,22 @@ separate module, and the NullRHI startup crash and sub-4-GiB GPU reserve still
 preclude a safe behavior/render claim. Verify the focused test in a validation
 editor, then use a bounded real-RHI shoreline traversal when memory headroom
 allows.
+
+## User-authorized restart recheck — 2026-11-01 05:21 UTC
+
+After the user confirmed the Island was saved, the live editor was closed
+cleanly and the exact D: `CaptiveSky_2.uproject` was reopened. Startup paused on
+the Unreal Zen Storage Server delay prompt; choosing “keep waiting” allowed the
+project to load, and the Island map is responsive again. The editor had the
+Home Panel overlay open; dismissing it exposed the offshore-facing viewport.
+
+The viewport displays Unreal's red video-memory warning: **634.522 MiB over
+budget**. No PIE/Game session or character run was started. The camera still
+faces offshore, so this restart did not validate tree silhouettes or ground
+scatter. Earlier `ListTextures` evidence recorded about 1.6 GiB of transient
+render-target allocations while the idle view's world textures were only about
+114 MiB; this is a promising lead, not proof those targets caused today's
+warning. Keep the existing 4 GiB headroom gate. Next inspect render-target
+lifetime/resolution in a bounded diagnostic and reduce those buffers only if
+the owning system and visual trade-off are verified. No map, texture-pool, or
+landscape settings were changed during this restart.
