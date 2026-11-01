@@ -8,6 +8,15 @@ NullRHI resident run. The real-time guard ended it normally at the configured
 requested. This validates bounded behavior and simulation logic only, not
 render quality, frame rate, or GPU memory.
 
+The same initialization logged 61,417 ground-cover instances, 15,513 trees
+(8,537 saplings), 15,555 broadleaf shrubs, and 1,489 flowering rhododendrons.
+The mature mix included 900 each of Norway maple, European aspen, European
+beech, and black alder across 372 of 500 groves, plus 36 birch coppices and 60
+hazel coppices. A/B variants were close to evenly represented for all four
+Megaplant species. This confirms ecological spawn diversity in the runtime;
+NullRHI cannot tell us whether those canopies look healthy or naturally
+scattered on screen.
+
 ## What residents did
 
 - Aster opened a conversation with Raven about the rain and the pool. They
