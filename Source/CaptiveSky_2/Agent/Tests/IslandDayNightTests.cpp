@@ -239,6 +239,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 			TestEqual(FString::Printf(TEXT("%s gives the brightest directional light the unique top priority"), Phase),
 				BrightestLight->ForwardShadingPriority, Lights.Num() - 1);
 	};
+	auto GetMoonPhaseRight = [Clock, Sun]()
+	{
+		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
+		const FVector SunDirection = -Sun->GetActorForwardVector().GetSafeNormal();
+		FVector Right = (SunDirection - MoonDirection * FVector::DotProduct(SunDirection, MoonDirection)).GetSafeNormal();
+		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(MoonDirection, FVector::UpVector).GetSafeNormal();
+		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(MoonDirection, FVector::RightVector).GetSafeNormal();
+		return Right;
+	};
 	if (Clock->Starfield)
 	{
 		TestEqual(TEXT("The sky mesh has six star groups, a transient meteor, and a moon disc"),
@@ -406,8 +415,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		{
 			TestTrue(TEXT("A clear, risen full moon reveals its procedural disc"), MoonSection->bSectionVisible);
 			const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
-			FVector MoonRight = FVector::CrossProduct(MoonDirection, FVector::UpVector).GetSafeNormal();
-			if (MoonRight.IsNearlyZero()) MoonRight = FVector::CrossProduct(MoonDirection, FVector::RightVector).GetSafeNormal();
+			const FVector MoonRight = GetMoonPhaseRight();
 			const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
 			float MinMoonX = MAX_flt;
 			float MaxMoonX = -MAX_flt;
@@ -489,8 +497,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	if (WaxingCrescentSection)
 	{
 		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
-		FVector MoonRight = FVector::CrossProduct(MoonDirection, FVector::UpVector).GetSafeNormal();
-		if (MoonRight.IsNearlyZero()) MoonRight = FVector::CrossProduct(MoonDirection, FVector::RightVector).GetSafeNormal();
+		const FVector MoonRight = GetMoonPhaseRight();
 		const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
 		float MinMoonX = MAX_flt;
 		float MaxMoonX = -MAX_flt;
@@ -501,6 +508,29 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 			MaxMoonX = FMath::Max(MaxMoonX, X);
 		}
 		TestTrue(TEXT("The waxing crescent reveals only the sunlit right-hand arc"),
+			MinMoonX > 0.35f * AIslandDayNight::MoonDiscRadius &&
+			MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
+	}
+	Clock->DayNumber = 26;
+	Clock->CurrentHour = 4.f;
+	Clock->UpdateLighting();
+	const FProcMeshSection* WaningCrescentSection = Clock->Starfield
+		? Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1) : nullptr;
+	TestTrue(TEXT("A clear, risen waning crescent is visible"), WaningCrescentSection && WaningCrescentSection->bSectionVisible);
+	if (WaningCrescentSection)
+	{
+		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
+		const FVector MoonRight = GetMoonPhaseRight();
+		const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
+		float MinMoonX = MAX_flt;
+		float MaxMoonX = -MAX_flt;
+		for (const FProcMeshVertex& Vertex : WaningCrescentSection->ProcVertexBuffer)
+		{
+			const float X = FVector::DotProduct(Vertex.Position - MoonCenter, MoonRight);
+			MinMoonX = FMath::Min(MinMoonX, X);
+			MaxMoonX = FMath::Max(MaxMoonX, X);
+		}
+		TestTrue(TEXT("The waning crescent also faces the actual projected sunlight"),
 			MinMoonX > 0.35f * AIslandDayNight::MoonDiscRadius &&
 			MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
 	}

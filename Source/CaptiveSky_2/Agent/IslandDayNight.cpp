@@ -72,22 +72,20 @@ namespace
 		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Tangents.Add(Tangent);
 	}
 
-	void BuildMoonDisc(FVector Direction, float LunarProgress, float Brightness,
+	void BuildMoonDisc(FVector Direction, FVector SunDirection, float Brightness,
 		TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals,
 		TArray<FVector2D>& UVs, TArray<FColor>& Colors, TArray<FProcMeshTangent>& Tangents)
 	{
 		Direction = Direction.GetSafeNormal();
 		if (Direction.IsNearlyZero()) Direction = FVector::UpVector;
-		FVector Right = FVector::CrossProduct(Direction, FVector::UpVector).GetSafeNormal();
+		SunDirection = SunDirection.GetSafeNormal();
+		if (SunDirection.IsNearlyZero()) SunDirection = -Direction;
+		const float SunAlongView = FMath::Clamp(FVector::DotProduct(SunDirection, Direction), -1.f, 1.f);
+		FVector Right = (SunDirection - Direction * SunAlongView).GetSafeNormal();
+		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(Direction, FVector::UpVector).GetSafeNormal();
 		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(Direction, FVector::RightVector).GetSafeNormal();
 		const FVector Up = FVector::CrossProduct(Right, Direction).GetSafeNormal();
 		const FVector Center = Direction * AIslandDayNight::NightStarShellRadius;
-		const float Phase = FMath::IsFinite(LunarProgress)
-			? FMath::Fmod(FMath::Fmod(LunarProgress, 1.f) + 1.f, 1.f)
-			: 0.f;
-		const float PhaseAngle = Phase * 2.f * PI;
-		const float PhaseSin = FMath::Sin(PhaseAngle);
-		const float PhaseCos = FMath::Cos(PhaseAngle);
 		const FColor MoonColor = (FLinearColor(0.78f, 0.86f, 1.f) * FMath::Clamp(Brightness, 0.f, 1.f)).ToFColor(true);
 		Vertices.Reserve((AIslandDayNight::MoonDiscBandCount + 1) * 2);
 		Triangles.Reserve(AIslandDayNight::MoonDiscBandCount * 6);
@@ -99,8 +97,8 @@ namespace
 		{
 			const float Y = -1.f + 2.f * static_cast<float>(Row) / AIslandDayNight::MoonDiscBandCount;
 			const float ChordRadius = FMath::Sqrt(FMath::Max(0.f, 1.f - Y * Y));
-			const float LeftX = PhaseSin >= 0.f ? PhaseCos * ChordRadius : -ChordRadius;
-			const float RightX = PhaseSin >= 0.f ? ChordRadius : -PhaseCos * ChordRadius;
+			const float LeftX = SunAlongView * ChordRadius;
+			const float RightX = ChordRadius;
 			const float ClampedLeftX = FMath::Clamp(LeftX, -ChordRadius, ChordRadius);
 			const float ClampedRightX = FMath::Clamp(RightX, ClampedLeftX, ChordRadius);
 			for (const float X : { ClampedLeftX, ClampedRightX })
@@ -454,7 +452,8 @@ void AIslandDayNight::BuildStarfield()
 	TArray<FVector2D> MoonUVs;
 	TArray<FColor> MoonColors;
 	TArray<FProcMeshTangent> MoonTangents;
-	BuildMoonDisc(FVector::UpVector, 0.5f, 1.f, MoonVertices, MoonTriangles, MoonNormals, MoonUVs, MoonColors, MoonTangents);
+	BuildMoonDisc(FVector::UpVector, -FVector::UpVector, 1.f,
+		MoonVertices, MoonTriangles, MoonNormals, MoonUVs, MoonColors, MoonTangents);
 	Starfield->CreateMeshSection(MoonDiscSectionIndex, MoonVertices, MoonTriangles, MoonNormals,
 		MoonUVs, MoonColors, MoonTangents, false);
 	Starfield->SetMaterial(MoonDiscSectionIndex, StarMaterial);
@@ -577,6 +576,7 @@ void AIslandDayNight::UpdateLighting()
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
 		NightAmount(CurrentHour) * CloudMoonlightTransmission(CloudCover));
 	const FVector MoonDirection = Moon ? -Moon->GetForwardVector().GetSafeNormal() : FVector::ZeroVector;
+	const FVector SunDirection = Sun ? -Sun->GetActorForwardVector().GetSafeNormal() : -MoonDirection;
 	const bool bShowMoonDisc = Starfield && Moon && MoonDirection.Z > 0.1f &&
 		NightAmount(CurrentHour) > 0.25f && LunarIlluminationAmount > 0.035f &&
 		!IsMoonHiddenByCloud(MoonHeight(DayNumber, CurrentHour), NightAmount(CurrentHour), CloudCover) &&
@@ -589,7 +589,7 @@ void AIslandDayNight::UpdateLighting()
 		TArray<FVector2D> MoonUVs;
 		TArray<FColor> MoonColors;
 		TArray<FProcMeshTangent> MoonTangents;
-		BuildMoonDisc(MoonDirection, LunarProgress,
+		BuildMoonDisc(MoonDirection, SunDirection,
 			CloudMoonlightTransmission(CloudCover) * FMath::Clamp(MoonIntensity / 1.5f, 0.f, 1.f),
 			MoonVertices, MoonTriangles, MoonNormals, MoonUVs, MoonColors, MoonTangents);
 		Starfield->UpdateMeshSection(MoonDiscSectionIndex, MoonVertices, MoonNormals, MoonUVs, MoonColors, MoonTangents);

@@ -5,11 +5,12 @@
 The visible moon previously used one uniformly bright circular disc, so its
 shape disagreed with the Island's waxing/waning phase description. The shared
 procedural sky mesh now spans the illuminated portion of the lunar disc only.
-For each of 49 horizontal rows, the lit chord follows the phase's projected
-sun direction: waxing phases illuminate from the right; waning phases from the
-left; quarter moons expose half the disc; and full moon fills the circle. The
-unlit region is omitted from the mesh, preserving stars instead of painting a
-dark circle over them.
+For each of 49 horizontal rows, the lit chord uses the actual sun direction
+projected onto the moon's sky plane. That keeps the illuminated limb pointed
+toward the sun as the moon moves, for both waxing and waning phases; quarter
+moons expose half the disc and full moon fills the circle. The unlit region is
+omitted from the mesh, preserving stars instead of painting a dark circle over
+them.
 
 The mesh has 98 vertices and 96 triangles, reuses the existing vertex-color
 sky material and sky shell, and adds no actor, texture, material, Niagara
@@ -20,8 +21,8 @@ consistent albedo so a crescent is thinner rather than uniformly dimmer.
 ## Validation and limits
 
 `IslandDayNightTests.cpp` now checks the fixed geometry budget, two illuminated
-limbs near full moon, and the one-sided lit arc of a clear, risen waxing
-crescent. This is geometry evidence, not a rendered appearance check. The
+limbs near full moon, and the sun-facing lit arc for clear, risen waxing and
+waning crescents. This is geometry evidence, not a rendered appearance check. The
 change still needs a matched new/quarter/full/last-quarter night capture to
 inspect orientation, smoothness, apparent size and whether the source vertex-
 color material renders the exposed lit mesh as intended.
