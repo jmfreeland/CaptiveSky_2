@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Make rendered-play retries wait for symbolized startup-crash evidence
+
+A guarded 15-minute Game feedback launch passed its fresh 4 GiB GPU and RAM
+preflights, then exited before world-ready with the same zero-second
+null-address `UnrealEditor-Core` fingerprint as the earlier NullRHI startup
+crash. A short, zero-request diagnostic with `-DDC-ForceMemoryCache` and
+`-ddc=NoZenLocalFallback` reproduced the identical failure, so Zen/DDC is
+unlikely to explain this crash (separate from Zen's recoverable slow cold
+start). Both attempts stayed under the launcher supervisor; neither produced
+world state or model requests. The 15-minute NullRHI feedback pass remains the
+latest successful character session. Do not repeat either Game launch recipe
+unchanged; symbolize the dump or validate a materially different startup path
+before resuming rendered play. Details: [guarded rendered-play startup](findings/2026-11-01-rendered-playtest-startup.md).
+
 ## 2026-11-01 — Keep rendered-play safety tests aligned with the launcher
 
 Two source-only regression assertions had drifted from the safeguards they

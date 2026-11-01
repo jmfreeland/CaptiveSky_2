@@ -48,3 +48,39 @@ Artifacts:
 - Crash context: `Saved/CS58/Saved/Crashes/_0000/CrashContext.runtime-xml`
 - Crash log: `Saved/CS58/Saved/Crashes/_0000/Codex_RenderedResidentFeedback_AB_20261101_0853.log`
 - Minidump: `Saved/CS58/Saved/Crashes/_0000/UEMinidump.dmp`
+
+## Cross-mode startup recheck — 14:37–14:40 UTC
+
+A fresh 15-minute rendered resident-feedback launch used the current
+`Saved/CC/Project` scratch project, a 40-request ceiling, isolated playtest
+data, and both 4 GiB preflights plus live GPU/RAM monitors. Preflight passed at
+5,537 MiB free GPU and 11,678 MiB free physical RAM. The Game exited before
+world-ready with exit code 0; its crash context records a null-address
+`EXCEPTION_ACCESS_VIOLATION`, `SecondsSinceStart=0`, and the same
+`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D` fingerprint. No character request
+or playtest state was produced.
+
+A second, 30-second zero-request startup diagnostic used
+`-DDC-ForceMemoryCache -ddc=NoZenLocalFallback` to bypass the Zen-backed DDC
+path. Its preflight passed at 5,537 MiB GPU and 11,577 MiB physical RAM free,
+but it exited with the identical zero-second crash fingerprint. This weighs
+against Zen/DDC being the cause of this access violation; the separate Zen
+slow-start warning remains a recovered cold-start/contention issue. The crash
+log also reports Unreal Trace Server error `0x0000a005`, but does not establish
+that as causal. The minidump still has only module offsets, and installed UE
+symbols/debugger remain unavailable. Do not retry the same Game startup with
+or without DDC bypass; continue source-side work until the dump can be
+symbolized or a genuinely different startup path is validated.
+
+The guarded launcher terminated both attempts within its own scope. After the
+second exit, no Unreal or CrashReportClient process remained; a follow-up
+sample showed 5,253 MiB free GPU and 11,699 MiB free physical RAM. The earlier
+bounded 15-minute NullRHI feedback run is still the latest successful
+character-feedback sample.
+
+Artifacts:
+
+- Cross-mode crash context: `Saved/CC/Project/Saved/Crashes/_0000/CrashContext.runtime-xml`
+- Rendered crash log: `Saved/CC/Project/Saved/Crashes/_0000/Codex_ResidentFeedback_20261101_143340.log`
+- DDC-bypass crash log: `Saved/CC/Project/Saved/Crashes/_0000/Codex_StartupMemoryDDC_20261101_1440.log`
+- DDC-bypass Unreal log: `Saved/CC/Project/Saved/Logs/Codex_StartupMemoryDDC_20261101_1440.log`
