@@ -150,6 +150,15 @@ deterministic helpers, request routing, and mocked generation; they do not launc
 Blender, ComfyUI, Unreal, or Discord, and do not validate any asset in the
 Island.
 
+**AssetPipeline helper recheck (2026-11-01):** all 112 tests passed using the
+Python 3.13.13 runtime bundled with Blender 5.2.2. `TEMP` and `TMP` were scoped
+to the ignored `Saved/CompileScratch/AssetPipelineTemp_20261101/` directory.
+This refresh includes the newer RatHollow V7 source checks alongside the
+request/routing, build-lock, and authored-asset tests. It exercised synthetic
+request fixtures only; no production inbox, Unreal session, Discord channel,
+ComfyUI service, or live asset generation was used. The suite validates the
+asset-request boundary, not visual quality or placement in the Island.
+
 **Gateway craft-lineage repeat (2026-10-19):** the current Gateway source and
 check program still match the isolated `Codex_GatewayChecks_20261018` copy by
 SHA-256. `dotnet run --no-build` passed all checks when
