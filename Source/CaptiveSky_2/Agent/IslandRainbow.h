@@ -65,7 +65,7 @@ class CAPTIVESKY_2_API UIslandRainbowSubsystem : public UTickableWorldSubsystem
 	GENERATED_BODY()
 public:
 	/** Unit direction from the viewer toward the anti-solar point (below the horizon while the sun is up). Pure. */
-	static FVector AntiSolarAxis(float IslandHour);
+	static FVector AntiSolarAxis(float IslandHour, int32 IslandDay = 46);
 	/** What a resident notices; empty when there is no bow. Pure. */
 	static FString DescribeRainbow(float Strength);
 

@@ -19,9 +19,11 @@ small smooth annual offset: neutral at the spring/autumn equinox points,
 warmest near midsummer, and coolest near midwinter. Cloud moderates the
 seasonal and daily swings together. This is descriptive felt warmth, not a
 measured temperature or weather forecast. Firefly and tidepool-periwinkle
-activity, frog night activity, and lichen glow now follow the seasonally
-changing night interval. Seasonal plant growth and appearance remain future
-work.
+activity, minnow rest, frog night activity, lichen glow, and the day/night
+routines for shore and woodland wildlife now follow the seasonally changing
+sunrise and sunset. The minnow transition keeps its former equinox timing but
+eases at the new winter/summer horizons. Seasonal plant growth and appearance
+remain future work.
 
 The focused `IslandDayNight` regression covers the season boundaries, annual
 photoperiod and warmth extrema, day/night intervals, cloud damping, and the

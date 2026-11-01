@@ -1282,6 +1282,15 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Minnow rest wraps valid clock hours and rejects non-finite time"),
 		FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(-1.f), 1.f) &&
 		FMath::IsNearlyZero(AIslandTidepoolMinnows::NightRestAmount(std::numeric_limits<float>::quiet_NaN())));
+	TestTrue(TEXT("Minnow dawn and dusk transitions follow seasonal sunrise and sunset"),
+		FMath::IsNearlyEqual(AIslandTidepoolMinnows::NightRestAmount(7.f, 316), 1.f) &&
+		AIslandTidepoolMinnows::NightRestAmount(8.5f, 316) > 0.f &&
+		AIslandTidepoolMinnows::NightRestAmount(8.5f, 316) < 1.f &&
+		FMath::IsNearlyZero(AIslandTidepoolMinnows::NightRestAmount(10.f, 316)) &&
+		AIslandTidepoolMinnows::NightRestAmount(5.f, 136) > 0.f &&
+		AIslandTidepoolMinnows::NightRestAmount(5.f, 136) < 1.f &&
+		AIslandTidepoolMinnows::NightRestAmount(23.f, 136) > 0.f &&
+		AIslandTidepoolMinnows::NightRestAmount(23.f, 136) < 1.f);
 	TestTrue(TEXT("Night rest slows but does not stop the school"),
 		AIslandTidepoolMinnows::NightActivityScale(1.f) > 0.f && AIslandTidepoolMinnows::NightActivityScale(1.f) < 0.25f &&
 		AIslandTidepoolMinnows::NightActivityScale(0.f) == 1.f);

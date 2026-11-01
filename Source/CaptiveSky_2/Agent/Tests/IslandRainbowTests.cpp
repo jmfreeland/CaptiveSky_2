@@ -1,4 +1,5 @@
 #include "Misc/AutomationTest.h"
+#include "IslandDayNight.h"
 #include "IslandRainbow.h"
 #include <limits>
 
@@ -78,6 +79,11 @@ bool FIslandRainbowTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Axis is a unit vector"), FMath::IsNearlyEqual(Morning.Size(), 1.f, 0.001f));
 	const FVector Evening = UIslandRainbowSubsystem::AntiSolarAxis(16.f);
 	TestTrue(TEXT("Morning and evening bows stand on opposite sides"), FVector::DotProduct(Morning.GetSafeNormal2D(), Evening.GetSafeNormal2D()) < -0.9f);
+	const FVector SummerDawn = UIslandRainbowSubsystem::AntiSolarAxis(5.f, 136);
+	const FVector WinterDawn = UIslandRainbowSubsystem::AntiSolarAxis(5.f, 316);
+	TestTrue(TEXT("Anti-solar direction follows seasonal sun elevation at the same clock hour"),
+		AIslandDayNight::SunHeight(5.f, 136) > 0.f && AIslandDayNight::SunHeight(5.f, 316) < 0.f &&
+		SummerDawn.Z < 0.f && WinterDawn.Z > 0.f);
 
 	TestTrue(TEXT("Nothing is said without a bow"), UIslandRainbowSubsystem::DescribeRainbow(0.1f).IsEmpty());
 	TestTrue(TEXT("A faint bow is mentioned"), UIslandRainbowSubsystem::DescribeRainbow(0.5f).Contains(TEXT("faint rainbow")));

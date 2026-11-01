@@ -71,7 +71,7 @@ private:
 	static constexpr float FrogPresenceRearmRadiusCm = 900.f;
 	static constexpr float FrogPresenceHeightToleranceCm = 350.f;
 	static constexpr float FrogPresenceCooldownSeconds = 8.f;
-	static float NightRestAmount(float CurrentHour);
+	static float NightRestAmount(float CurrentHour, int32 IslandDay = 46);
 	static float NightActivityScale(float RestAmount);
 	static float SwimRateForRest(float RestAmount);
 	static float SurfaceBreakInterval(float RestAmount);

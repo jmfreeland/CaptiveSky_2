@@ -635,17 +635,25 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 	SurfaceBreakRemaining = FMath::Lerp(4.f, 16.f, NightRest);
 }
 
-float AIslandTidepoolMinnows::NightRestAmount(float CurrentHour)
+float AIslandTidepoolMinnows::NightRestAmount(float CurrentHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(CurrentHour)) return 0.f;
 	const float WrappedHour = FMath::Fmod(CurrentHour, 24.f);
 	const float Hour = WrappedHour < 0.f ? WrappedHour + 24.f : WrappedHour;
-	// The sleep interval crosses midnight, so dusk and dawn are separate
-	// transitions rather than a product of two curves evaluated all night.
-	if (Hour < 5.f || Hour >= 22.f) return 1.f;
-	if (Hour < 8.f) return 1.f - FMath::SmoothStep(5.f, 8.f, Hour);
-	if (Hour < 19.f) return 0.f;
-	return FMath::SmoothStep(19.f, 22.f, Hour);
+	// Preserve the equinox rhythm (wake easing from one hour before sunrise,
+	// evening rest beginning one hour after sunset) while following seasonal edges.
+	const float WakeStart = AIslandDayNight::SunriseHour(IslandDay) - 1.f;
+	const float WakeEnd = AIslandDayNight::SunriseHour(IslandDay) + 2.f;
+	const float DuskStart = AIslandDayNight::SunsetHour(IslandDay) + 1.f;
+	const float RestStart = AIslandDayNight::WrapHour(DuskStart + 3.f);
+	if (Hour >= WakeStart && Hour < WakeEnd)
+		return 1.f - FMath::SmoothStep(WakeStart, WakeEnd, Hour);
+	const bool bInDuskTransition = RestStart > DuskStart
+		? Hour >= DuskStart && Hour < RestStart
+		: Hour >= DuskStart || Hour < RestStart;
+	if (bInDuskTransition)
+		return FMath::SmoothStep(0.f, 3.f, AIslandDayNight::WrapHour(Hour - DuskStart));
+	return Hour >= WakeEnd && Hour < DuskStart ? 0.f : 1.f;
 }
 
 float AIslandTidepoolMinnows::NightActivityScale(float RestAmount)
@@ -678,7 +686,7 @@ float AIslandTidepoolMinnows::GetTideOffsetCm() const
 
 float AIslandTidepoolMinnows::GetNightRestAmount() const
 {
-	return IslandClock.IsValid() ? NightRestAmount(IslandClock->CurrentHour) : 0.f;
+	return IslandClock.IsValid() ? NightRestAmount(IslandClock->CurrentHour, IslandClock->DayNumber) : 0.f;
 }
 
 float AIslandTidepoolMinnows::GetScatterAlpha() const

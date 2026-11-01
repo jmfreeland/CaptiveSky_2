@@ -80,6 +80,7 @@ public:
 	float GetWindSpeed() const { return Wind.Size(); }
 	FVector GetWind() const { return Wind; }
 	float GetIslandHour() const { return IslandHour; }
+	int32 GetIslandDay() const { return IslandDay; }
 	/** True after the subsystem has sampled live Island weather at least once this session. */
 	bool HasLiveWeatherSample() const { return bWetnessInitialized && bHasWeatherActorSample; }
 
@@ -150,6 +151,7 @@ private:
 	float SunHeight = 1.f;
 	float GoldenHour = 0.f;
 	float IslandHour = 12.f;
+	int32 IslandDay = 1;
 	float Storm = 0.f;
 	float LightningFlash = 0.f;
 	float Mist = 0.f;

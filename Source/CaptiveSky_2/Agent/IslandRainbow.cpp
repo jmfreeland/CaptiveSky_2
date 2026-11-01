@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
+#include "IslandDayNight.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -78,11 +79,10 @@ void AIslandRainbowActor::Apply(const FVector& ViewerLocation, const FVector& Ax
 	Material->SetScalarParameterValue(TEXT("HorizonZ"), ViewerLocation.Z);
 }
 
-FVector UIslandRainbowSubsystem::AntiSolarAxis(float IslandHour)
+FVector UIslandRainbowSubsystem::AntiSolarAxis(float IslandHour, int32 IslandDay)
 {
-	// Mirrors AIslandDayNight, which aims the sun light with pitch -(hour - 6) * 15 and yaw 35: the
-	// light's forward vector points at the anti-solar point.
-	return FRotator(-(IslandHour - 6.f) * 15.f, 35.f, 0.f).Vector().GetSafeNormal();
+	// Match the seasonal solar arc; the directional sun's forward vector points opposite this axis.
+	return FRotator(-AIslandDayNight::SolarArcAngle(IslandHour, IslandDay), 35.f, 0.f).Vector().GetSafeNormal();
 }
 
 FString UIslandRainbowSubsystem::DescribeRainbow(float InStrength)
@@ -145,5 +145,5 @@ void UIslandRainbowSubsystem::Tick(float DeltaTime)
 	FVector ViewLocation;
 	FRotator ViewRotation;
 	Player->GetPlayerViewPoint(ViewLocation, ViewRotation);
-	Bow->Apply(ViewLocation, AntiSolarAxis(Environment->GetIslandHour()), Strength);
+	Bow->Apply(ViewLocation, AntiSolarAxis(Environment->GetIslandHour(), Environment->GetIslandDay()), Strength);
 }

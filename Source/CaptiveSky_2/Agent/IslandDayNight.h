@@ -50,6 +50,8 @@ public:
 	static constexpr int32 CalendarDaysPerYear = CalendarDaysPerSeason * 4;
 	/** Legacy hour-only helper calls use the spring equinox so 06:00/18:00 remain the neutral reference. */
 	static constexpr int32 CalendarSpringEquinoxDay = CalendarDaysPerSeason / 2 + 1;
+	/** Degrees along the seasonally adjusted daily solar arc; shared by sky and anti-solar effects. */
+	static float SolarArcAngle(float Hour, int32 IslandDay);
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
 	static constexpr int32 NightStarCount = 1200;
 	static constexpr int32 NightStarSectionCount = 6;
@@ -140,7 +142,6 @@ private:
 	UMaterialInterface* StarMaterial = nullptr;
 	void BuildStarfield();
 	void UpdateStarfieldVisibility(float SolarElevation);
-	static float SolarArcAngle(float Hour, int32 IslandDay);
 	void PersistHour();
 	friend class FIslandClockTest;
 	friend class FIslandClockPersistenceTest;

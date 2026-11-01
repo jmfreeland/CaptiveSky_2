@@ -3438,13 +3438,16 @@ void AIslandWeather::RefreshNightEcology()
 	if (!GetWorld()) return;
 
 	float CurrentHour = -1.f;
+	int32 CurrentDay = 1;
 	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
 	{
 		CurrentHour = It->CurrentHour;
+		CurrentDay = It->DayNumber;
 		break;
 	}
-	const bool bNight = CurrentHour >= 19.f || (CurrentHour >= 0.f && CurrentHour < 5.f);
-	const bool bDay = CurrentHour >= 6.f && CurrentHour < 19.f;
+	const bool bDay = CurrentHour >= AIslandDayNight::SunriseHour(CurrentDay) &&
+		CurrentHour < AIslandDayNight::SunsetHour(CurrentDay);
+	const bool bNight = CurrentHour >= 0.f && !bDay;
 
 	if (CurrentHour < 0.f)
 	{

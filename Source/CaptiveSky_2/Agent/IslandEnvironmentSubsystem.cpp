@@ -508,7 +508,7 @@ void UIslandEnvironmentSubsystem::Tick(float DeltaTime)
 	}
 	Indoors = IsInsideInnAt(World, Viewpoint, ViewpointActor) ? 1.f : 0.f;
 	IslandHour = 12.f;
-	int32 IslandDay = 1;
+	IslandDay = 1;
 	for (TActorIterator<AIslandDayNight> It(World); It; ++It) { IslandHour = It->CurrentHour; IslandDay = It->DayNumber; break; }
 	SunHeight = AIslandDayNight::SunHeight(IslandHour, IslandDay);
 	Daylight = FMath::SmoothStep(-0.04f, 0.18f, SunHeight);

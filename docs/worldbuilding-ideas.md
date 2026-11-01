@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let shore and woodland routines follow the changing day
+
+The temperate calendar now changes sunrise and sunset, so shore animals should
+not keep a fixed 06:00–19:00 activity window. Minnow rest eases around the
+seasonal dawn and dusk while preserving its former equinox schedule. The
+ecology scheduler now uses the same sunrise/sunset for fireflies, shore
+crabs, dragonflies, minnows, and the day/night resting routines of woodland
+residents. The rainbow's anti-solar direction also follows the season-adjusted
+sun arc. This changes no population or actor budget. The UE 5.8.3 editor target
+compiled and linked, including seasonal minnow and rainbow regression cases;
+automation was not run because the known NullRHI startup issue persists.
+Rendered seasonal behavior remains unverified while the play safety gate is
+closed.
+
 ## 2026-11-01 — Give the Island's lunar clock a visible moon
 
 The Island already tracked a 29.53-day lunar cycle, changing moonrise/set and
