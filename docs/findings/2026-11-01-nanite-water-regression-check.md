@@ -226,3 +226,14 @@ longer walk on water in the rendered Island: the last observed editor warning
 showed only 634 MiB of GPU memory over budget, below the established 4 GiB
 headroom gate. Do not start PIE for this check until that gate is met; then do
 a short real-RHI shoreline entry and open-water traversal and record the result.
+
+**Current-source re-run (2026-11-01 09:59 UTC):** after commit `259e9b91`,
+the same two named tests were rerun from the short-path isolated scratch project
+with `-NullRHI -NoZen -NoSound -DisablePython -unattended`. Both
+`RuntimeSwim` and `SavedMapCollision` again completed with `Success` and process
+exit code 0; the log confirms a player-sized capsule crossed the transient open
+ocean without a blocking hit and the saved Island collision audit passed. The
+whole-device GPU sample was 3,101 MiB free, still below the 4,096 MiB render
+reserve, so no PIE or real-RHI traversal was started. Scratch log:
+`Saved/CC/Project/Saved/Logs/CaptiveSky_2.log`. This is current-source NullRHI
+behavior evidence, not a rendered-play claim.
