@@ -1,4 +1,4 @@
-# Recurring Unreal Zen Storage startup delay (2026-11-02)
+# Recurring Unreal Zen Storage startup delay (2026-11-01)
 
 The user reports that Unreal's “Zen Storage Server is slow to launch” warning
 appears on every editor start. The available worktree logs confirm that slow
@@ -21,6 +21,11 @@ that it explains every interactive editor launch. A `zen.exe service status`
 check reporting that the Windows `ZenServer` service is not installed is not
 by itself a failure: Unreal normally manages its local Zen server with the
 editor rather than requiring a separately installed Windows service.
+
+A subsequent read-only desktop snapshot showed `CaptiveSky_2 - Unreal Editor`
+with the Island loaded and no Zen warning or crash dialog visible. This
+confirms that the current editor reached the map, but the screenshot does not
+establish the launch duration or explain the user's repeated-warning report.
 
 Do not delete the Zen data directory, reinstall the server, or change DDC
 configuration based on these logs alone. On the next occurrence, preserve the
