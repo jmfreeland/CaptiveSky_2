@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Separate canopy counts from visitor-visible variety
+
+The saved NullRHI spatial report confirms broad five-species canopy coverage,
+but does not show what a visitor can distinguish. Source inspection also finds
+only variant A loaded for each broadleaf species, with shorter cull ranges than
+spruce. This may explain why distant views feel spruce-heavy and nearby forms
+repeat, without implying that more trees are needed. Keep population and cull
+distances fixed; when GPU headroom allows, compare the same daylight route with
+a small A/B mesh-variant split while measuring visual readability, frame-time
+p95, and device VRAM. No rendered run is justified at the latest 2.4 GiB free
+sample. Details and exact counters: [canopy coverage finding](findings/2026-11-01-canopy-variant-coverage.md).
+
 ## 2026-11-01 — Ground drift narration in visible motes
 
 Resident situation summaries previously described airborne seeds, petals, or
