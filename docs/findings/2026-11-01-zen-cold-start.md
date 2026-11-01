@@ -33,15 +33,23 @@ being applied to Game startup and keeps Zen available after Game exit; the next
 editor launch is still needed to verify its startup warning and post-editor
 lifetime specifically.
 
-**Live-project configuration check (2026-11-01):** the current D: project log
-`CaptiveSky_2_2.log` still shows Zen launched with `--owner-pid 20644`, then
-becoming healthy after 52.602 seconds. A read-only check of that project's
-`Config/DefaultEngine.ini` found no `[Zen.AutoLaunch]` / `LimitProcessLifetime`
-entry. The persistent-lifetime mitigation is present in this worktree's
-configuration, but has not reached the D: project currently being opened.
-Thus the repeated cold start is expected for that live project; the earlier
-paired-launch contention can add further delay when starts overlap. No cache
-reset or live-project write was made.
+**Live-project configuration check (2026-11-01):** the D: project log
+`CaptiveSky_2_2.log` shows Zen launched with `--owner-pid 20644`, then becoming
+healthy after 52.602 seconds. A read-only check found no
+`[Zen.AutoLaunch]` / `LimitProcessLifetime` entry in that project's
+`Config/DefaultEngine.ini`. After confirming no UnrealEditor or Zen process was
+running, the project config received only the missing project-scoped setting:
+
+```ini
+[Zen.AutoLaunch]
+LimitProcessLifetime=False
+```
+
+This is now present in both the worktree and active D: project. It asks Zen to
+remain available between editor sessions; it does not modify or clear Zen data
+and does not resolve contention from concurrently starting editors. Runtime
+verification is pending: the next single-editor launch should report a short
+Zen initialization and the Zen process should remain healthy after editor exit.
 
 **Repeat-launch confirmation:** the user reports seeing the slow-start warning
 on every editor launch. The D: project's logs support that this is a recurring
@@ -64,9 +72,9 @@ has been synchronized.
 
 ## Next diagnostic
 
-Once the setting is applied to the D: project, verify a single-editor launch
-and confirm the process stays healthy after closing the editor. If that launch
-still shows the warning, capture its `Unreal.log` and `zenserver.log` with no
-second editor or Unreal automation starting concurrently, then compare the
-Zen process start/ready interval and any warnings around it. Do not clear its
-cache as a first response.
+On the next planned editor session, verify a single-editor launch and confirm
+the process stays healthy after closing the editor. If that launch still shows
+the warning, capture its `Unreal.log` and `zenserver.log` with no second editor
+or Unreal automation starting concurrently, then compare the Zen process
+start/ready interval and any warnings around it. Do not clear its cache as a
+first response.

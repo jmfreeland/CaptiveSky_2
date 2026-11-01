@@ -38,7 +38,8 @@ the audit cannot run.
 
 ## Zen startup evidence
 
-The D: project's `Config/DefaultEngine.ini` lacks the
+At the time of the original parity audit, the D: project's
+`Config/DefaultEngine.ini` lacked the
 `[Zen.AutoLaunch] LimitProcessLifetime=False` setting present in this worktree.
 The live log `Saved/Logs/CaptiveSky_2-backup-2026.11.01-07.54.36.log` records
 Zen waiting for another process's startup/recovery, timing out after 32.507
@@ -47,11 +48,12 @@ seconds, then connecting to ZenLocal with status OK. The following
 Zen, and became healthy after 52.602 seconds. This supports recurring recovery
 waits and cold starts; it does not establish why the other startup is delayed.
 
-The keep-alive setting is a plausible way to reduce cold starts after the
-project config is deliberately synchronized, but it will not necessarily fix
-the 32-second wait on another process. No D: files or Zen data were changed in
-this audit. Do not delete Zen cache/data or kill processes as a diagnostic
-shortcut; capture the relevant Unreal/Zen logs and identify the owner first.
+**Follow-up:** after verifying no UnrealEditor or Zen process was running, the
+missing project-scoped keep-alive setting was added to D:'s
+`Config/DefaultEngine.ini`. This should reduce cold starts, but will not
+necessarily fix waits caused by another editor concurrently using the shared
+Zen data. Runtime verification remains pending. No Zen cache/data was deleted
+and no process was terminated.
 
 ## Verification
 
@@ -67,9 +69,10 @@ shortcut; capture the relevant Unreal/Zen logs and identify the owner first.
   target and did not update the open D: editor's loaded module.
 - Full read-only audit: 516 files compared; 108 identical, 378 different,
   30 live-missing, 0 source-missing.
-- No build was run in the open D: editor project and no rendered gameplay was
-  started; this finding makes no runtime claim beyond what the captured
-  startup logs establish.
+- No build was run in the D: editor project and no rendered gameplay was
+  started; the only later D: change is the project-scoped Zen setting above.
+  This finding makes no runtime claim beyond what the captured startup logs
+  establish.
 
 ## Vegetation source-parity recheck (2026-11-01)
 
