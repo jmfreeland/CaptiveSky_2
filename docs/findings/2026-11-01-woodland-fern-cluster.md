@@ -16,14 +16,20 @@ at visitor distance.
 
 The FBX and `Preview.png` are local ignored outputs at
 `Saved/CaptiveSky/ComfyBlender/WoodlandFernCluster/`. The asset is **not imported
-into Unreal or placed on the Island**. The next review should import it through
-the manifest-aware ComfyBlender importer into a unique generated folder, then
-inspect a collisionless isolated Island copy beside existing understory at
-matching close and visitor-scale views. Keep it unplaced unless its silhouette,
-ground contact, material response, and grass occlusion all hold up in Unreal.
+into Unreal or placed on the Island**. The staged workflow in
+`Scripts/Preview-WoodlandFlyAgaricReview.py` now imports both this fern and the
+red-cap candidate, then places them on opposite sides of the existing ochre
+cluster in an isolated Island copy at
+`/Game/Generated/ComfyBlender/WoodlandUnderstoryReview_20261101/Maps/Island_WoodlandUnderstory_20261101`.
+Review matching close and visitor-scale views there; keep the fern unplaced
+unless its silhouette, ground contact, material response, and grass occlusion
+all hold up under Island lighting.
 
 Source-level geometry/material tests are in
 `Scripts/AssetPipeline/tests/test_woodland_fern_cluster.py`. Four focused
 source-contract tests covering this fern and the neighboring fly-agaric
-candidate pass inside Blender 5.2.2's bundled Python. Exported-FBX verification
-also passed; no Unreal import, map, runtime, or performance check is claimed.
+candidate pass inside Blender 5.2.2's bundled Python. The six tests in
+`Scripts/tests/test_woodland_fly_agaric_review.py` also pass there, covering
+the two-asset preflight, candidate offsets, and copy-only map save. Exported-FBX
+verification also passed; no Unreal import, map, runtime, or performance check
+is claimed.

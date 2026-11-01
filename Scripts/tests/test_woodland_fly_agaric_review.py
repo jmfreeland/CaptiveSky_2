@@ -2,8 +2,10 @@ import importlib.util
 import os
 from pathlib import Path
 import sys
+import tempfile
 import types
 import unittest
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "Preview-WoodlandFlyAgaricReview.py"
@@ -69,10 +71,60 @@ class WoodlandFlyAgaricReviewTests(unittest.TestCase):
 
     def tearDown(self):
         if self.original_asset_library is None:
-            delattr(review.unreal, "EditorAssetLibrary")
+            if hasattr(review.unreal, "EditorAssetLibrary"):
+                delattr(review.unreal, "EditorAssetLibrary")
         else:
             review.unreal.EditorAssetLibrary = self.original_asset_library
         review.unreal.logs = self.original_logs
+
+    def test_review_roster_compares_fungus_agaric_and_fern_without_collisions(self):
+        self.assertEqual([item["name"] for item in review.CANDIDATES],
+                         ["WoodlandFlyAgaricCluster", "WoodlandFernCluster"])
+        self.assertEqual(len({item["mesh_path"] for item in review.CANDIDATES}), 2)
+        self.assertEqual(len({item["actor_label"] for item in review.CANDIDATES}), 2)
+        self.assertTrue(all(item["mesh_path"].startswith("/Game/Generated/ComfyBlender/")
+                            for item in review.CANDIDATES))
+        offsets = [item["offset_x_cm"] for item in review.CANDIDATES]
+        self.assertGreater(offsets[0], 0)
+        self.assertLess(offsets[1], 0)
+
+    def test_import_preflights_both_candidate_sources_before_any_import(self):
+        with tempfile.TemporaryDirectory() as root:
+            first = review.CANDIDATES[0]
+            asset_dir = Path(root, "Saved", "CaptiveSky", "ComfyBlender", first["name"])
+            asset_dir.mkdir(parents=True)
+            (asset_dir / first["filename"]).touch()
+
+            previous_project_root = review.project_root
+            review.project_root = lambda: root
+            review.unreal.EditorAssetLibrary = FakeEditorAssetLibrary()
+            try:
+                with mock.patch.object(review.runpy, "run_path") as run_import:
+                    with self.assertRaisesRegex(RuntimeError, "Verified candidate FBX is missing"):
+                        review.import_candidates()
+                    run_import.assert_not_called()
+            finally:
+                review.project_root = previous_project_root
+
+    def test_import_never_overwrites_an_existing_unvalidated_mesh(self):
+        existing_path = review.CANDIDATES[0]["mesh_path"]
+        review.unreal.EditorAssetLibrary = FakeEditorAssetLibrary((existing_path,))
+        with tempfile.TemporaryDirectory() as root:
+            for candidate in review.CANDIDATES:
+                asset_dir = Path(root, "Saved", "CaptiveSky", "ComfyBlender", candidate["name"])
+                asset_dir.mkdir(parents=True)
+                (asset_dir / candidate["filename"]).touch()
+
+            previous_project_root = review.project_root
+            review.project_root = lambda: root
+            try:
+                with mock.patch.object(review.unreal, "load_asset", return_value=None, create=True):
+                    with mock.patch.object(review.runpy, "run_path") as run_import:
+                        with self.assertRaisesRegex(RuntimeError, "Imported candidate Static Mesh is missing"):
+                            review.import_candidates()
+                        run_import.assert_not_called()
+            finally:
+                review.project_root = previous_project_root
 
     def test_duplicate_refuses_to_overwrite_an_existing_review_map(self):
         library = FakeEditorAssetLibrary((review.SOURCE_MAP, review.DEST_MAP))

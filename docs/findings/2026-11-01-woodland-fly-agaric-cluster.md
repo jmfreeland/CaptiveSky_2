@@ -29,22 +29,25 @@ The full asset-pipeline suite passed (118 tests) under Blender 5.2's bundled
 Python 3.11 runtime. The FBX and `Preview.png` are local ignored outputs; rebuild
 from the tracked source with Blender 5.2 using `run_asset.py` and `verify_asset.py`.
 
-## Isolated Unreal comparison workflow
+## Isolated Unreal understory comparison workflow
 
 `Scripts/Preview-WoodlandFlyAgaricReview.py` now provides three explicit Unreal
-Python stages: `import` reuses the manifest-aware importer into the unique
-`/Game/Generated/ComfyBlender/WoodlandFlyAgaricCluster` folder; `duplicate`
-creates a non-overwriting copy of `/Game/Maps/Island`; and `place` adds the
-collisionless red-cap candidate 160 cm beside the existing
+Python stages for a three-way understory comparison. `import` preflights both
+verified candidate FBXs, then reuses the manifest-aware importer for the
+red-cap fungus and fern. If a prior interrupted run already imported one mesh,
+the stage reuses it only after the importer report validates; it never
+overwrites an existing mesh. `duplicate` creates a
+non-overwriting copy of `/Game/Maps/Island`. `place` adds both collisionless
+candidates on opposite sides of the existing
 `WoodlandFungusCluster_Review_01` in that copy. It refuses to overwrite an
-existing review map or duplicate the comparison actor, and never saves the
+existing review map or duplicate either comparison actor, and never saves the
 source Island. The destination review map is
-`/Game/Generated/ComfyBlender/WoodlandFlyAgaricReview_20261101/Maps/Island_WoodlandFungusAB_20261101`.
+`/Game/Generated/ComfyBlender/WoodlandUnderstoryReview_20261101/Maps/Island_WoodlandUnderstory_20261101`.
 
-This workflow is prepared but **has not been run in Unreal**. Python syntax
-compilation passes; all 42 `Scripts/tests` cases pass, including three focused
-map-safety tests; and both fly-agaric geometry/material tests pass. None
-validates Unreal import, material rendering, or the A/B scene.
-After reviewing each stage in the editor, compare the existing ochre cluster
-and red-cap candidate at the same visitor-scale angle before considering any
-change to the main map.
+This workflow is prepared but **has not been run in Unreal**. Its source and
+map-safety tests verify the two-candidate roster, import preflight/resume
+behavior, and that only the copied map is saved; these checks do not validate
+Unreal import, material rendering, or the three-way scene. After reviewing
+each stage in the editor, compare scale,
+material response, and grass occlusion for all three forms before considering
+any change to the main map.
