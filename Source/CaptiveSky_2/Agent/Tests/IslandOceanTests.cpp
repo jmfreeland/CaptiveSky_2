@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerController.h"
 #include "Materials/Material.h"
 #include "CaptiveSky_2Character.h"
@@ -26,6 +27,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcea
 
 bool FIslandOceanTest::RunTest(const FString& Parameters)
 {
+	// The saved project uses this Blueprint GameMode. Keep its configured player
+	// pawn on the water-aware C++ character; the transient movement fixture below
+	// cannot catch an accidental change to the project's actual default pawn.
+	UClass* IslandGameModeClass = StaticLoadClass(AGameModeBase::StaticClass(), nullptr,
+		TEXT("/Game/ThirdPerson/Blueprints/BP_ThirdPersonGameMode.BP_ThirdPersonGameMode_C"));
+	if (TestNotNull(TEXT("The configured Island GameMode Blueprint loads"), IslandGameModeClass))
+	{
+		const AGameModeBase* IslandGameMode = Cast<AGameModeBase>(IslandGameModeClass->GetDefaultObject());
+		TestNotNull(TEXT("The configured Island GameMode default object exists"), IslandGameMode);
+		TestTrue(TEXT("The configured Island GameMode uses the custom water-aware character"),
+			IslandGameMode && IslandGameMode->DefaultPawnClass &&
+			IslandGameMode->DefaultPawnClass->IsChildOf(ACaptiveSky_2Character::StaticClass()));
+	}
+
 	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
