@@ -48,6 +48,8 @@ public:
 	/** Simple temperate calendar for seasonal ecology; lunar phase continues independently. */
 	static constexpr int32 CalendarDaysPerSeason = 90;
 	static constexpr int32 CalendarDaysPerYear = CalendarDaysPerSeason * 4;
+	/** Legacy hour-only helper calls use the spring equinox so 06:00/18:00 remain the neutral reference. */
+	static constexpr int32 CalendarSpringEquinoxDay = CalendarDaysPerSeason / 2 + 1;
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
 	static constexpr int32 NightStarCount = 1200;
 	static constexpr int32 NightStarSectionCount = 6;
@@ -68,25 +70,29 @@ public:
 	UProceduralMeshComponent* Starfield = nullptr;
 
 	static float WrapHour(double Hour);
-	static float SunHeight(float Hour);
+	/** Smooth temperate photoperiod: 8 hours at midwinter, 16 at midsummer, 12 at equinoxes. */
+	static float DaylightHours(int32 IslandDay);
+	static float SunriseHour(int32 IslandDay);
+	static float SunsetHour(int32 IslandDay);
+	static float SunHeight(float Hour, int32 IslandDay = CalendarSpringEquinoxDay);
 	/** 0 by day, ramping to 1 once the sun is well below the horizon; the same ramp that fades the moon and starlight in. */
-	static float NightAmount(float Hour);
+	static float NightAmount(float Hour, int32 IslandDay = CalendarSpringEquinoxDay);
 	/** Gentle shadowless cool fill during low-angle sunrise/sunset, fading to zero under a high sun. */
 	static constexpr float TwilightFillStrength = 0.6f;
-	static float TwilightFillAmount(float Hour);
+	static float TwilightFillAmount(float Hour, int32 IslandDay = CalendarSpringEquinoxDay);
 	/** Extra ambient skylight during golden hour; returns exactly to baseline at full night. */
 	static constexpr float GoldenHourSkylightBoost = 0.7f;
-	static float GoldenHourSkylightScale(float Hour);
+	static float GoldenHourSkylightScale(float Hour, int32 IslandDay = CalendarSpringEquinoxDay);
 	static float LunarPhaseProgress(int32 IslandDay, float IslandHour);
 	static float LunarIllumination(int32 IslandDay, float IslandHour);
 	/** Traditional name of the phase at a 0..1 cycle progress (new moon at 0, full at 0.5): eight equal bins centred on the principal phases. Pure. */
 	static const TCHAR* LunarPhaseName(float Progress);
 	/** Sine of the moon's elevation, -1..1, matching the direction UpdateLighting gives the Moon light. Pure. */
 	static float MoonHeight(int32 IslandDay, float IslandHour);
-	/** A sentence about the sun touching the horizon within about half an hour of 06:00 or 18:00; empty otherwise. Pure. */
-	static FString DescribeSunEdge(float IslandHour);
-	/** How cloud dresses a sunrise or sunset: clear and bright, streaked with colour, or flat grey; empty outside the half hour either side of 06:00 and 18:00. Pure. */
-	static FString DescribeHorizonColour(float IslandHour, float CloudCover);
+	/** A sentence about the sun touching the seasonally changing horizon; empty outside a half-hour window. Pure. */
+	static FString DescribeSunEdge(float IslandHour, int32 IslandDay = CalendarSpringEquinoxDay);
+	/** How cloud dresses a sunrise or sunset; empty outside the seasonal half-hour horizon window. Pure. */
+	static FString DescribeHorizonColour(float IslandHour, float CloudCover, int32 IslandDay = CalendarSpringEquinoxDay);
 	/** Whether a meteor is crossing the sky in this ten-minute slot of Island time. Deterministic from the day and slot (no state to save), rarer under bright moon or cloud, never by day. Pure. */
 	static bool IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination);
 	/** Island day, temperate season, and whole days until the next full and new moon. Pure. */
@@ -109,10 +115,10 @@ public:
 	static FString DescribeWarmth(float IslandHour, float CloudCover, int32 IslandDay = 1);
 	/** How wind and rain change the felt warmth: a biting wind on cool air, a chilling rain, a welcome breeze on a warm day; empty when they change nothing. WindSpeed in cm/s. Pure. */
 	static FString DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed, int32 IslandDay = 1);
-	/** Hours until the sun next crosses the horizon (sunrise at 06:00, sunset at 18:00), 0..24. Pure. */
-	static float HoursUntilSunEdge(float IslandHour);
-	/** How long until sunset by day or sunrise by night, in whole hours; empty within the half hour of the edge (DescribeSunEdge speaks then). Pure. */
-	static FString DescribeDaylightLeft(float IslandHour);
+	/** Hours until the sun next crosses the seasonally changing horizon, 0..24. Pure. */
+	static float HoursUntilSunEdge(float IslandHour, int32 IslandDay = CalendarSpringEquinoxDay);
+	/** How long until sunset by day or sunrise by night, in whole hours; empty within the half hour of the seasonal edge. Pure. */
+	static FString DescribeDaylightLeft(float IslandHour, int32 IslandDay = CalendarSpringEquinoxDay);
 	/** True when the moon is up in a dark sky but thick cloud keeps it out of sight. Pure. */
 	static bool IsMoonHiddenByCloud(float MoonElevation, float Night, float CloudCover);
 	/** Moon light scale for a lunar illumination: NewMoonLightFloor at new moon, 1 at full. */
@@ -134,6 +140,7 @@ private:
 	UMaterialInterface* StarMaterial = nullptr;
 	void BuildStarfield();
 	void UpdateStarfieldVisibility(float SolarElevation);
+	static float SolarArcAngle(float Hour, int32 IslandDay);
 	void PersistHour();
 	friend class FIslandClockTest;
 	friend class FIslandClockPersistenceTest;

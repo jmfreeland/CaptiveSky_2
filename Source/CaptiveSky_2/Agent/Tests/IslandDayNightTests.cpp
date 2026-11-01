@@ -20,6 +20,22 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("Midnight wraps"), AIslandDayNight::WrapHour(24), 0.f);
 	TestEqual(TEXT("Negative preview wraps"), AIslandDayNight::WrapHour(-1), 23.f);
+	TestTrue(TEXT("Photoperiod is shortest in midwinter and longest in midsummer"),
+		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(316), 8.f, 0.001f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(136), 16.f, 0.001f));
+	TestTrue(TEXT("Photoperiod is twelve hours at both equinoxes and repeats annually"),
+		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(46), 12.f, 0.001f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(226), 12.f, 0.001f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(406), 12.f, 0.001f));
+	TestTrue(TEXT("Winter and summer sun arcs rise, peak and set at seasonal edges"),
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(136), 136)) &&
+		FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 136), 1.f) &&
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(136), 136)) &&
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(316), 316)) &&
+		FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 316), 1.f) &&
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(316), 316)));
+	TestTrue(TEXT("Seasonal night follows the earlier summer and later winter sunrise"),
+		AIslandDayNight::NightAmount(7.f, 136) < 0.01f && AIslandDayNight::NightAmount(7.f, 316) > 0.99f);
 	TestTrue(TEXT("Sun rises at six"), FMath::IsNearlyZero(AIslandDayNight::SunHeight(6)));
 	TestTrue(TEXT("Sun overhead at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12), 1.f));
 	TestTrue(TEXT("Sun below horizon at midnight"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(0), -1.f));
@@ -118,15 +134,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		AIslandDayNight::DescribeHorizonColour(12.f, 0.5f).IsEmpty() && AIslandDayNight::DescribeHorizonColour(NAN, 0.5f).IsEmpty());
 	TestTrue(TEXT("Dawn is coolest, mid-afternoon warmest"), AIslandDayNight::WarmthLevel(5.f, 0.f) < 0.01f && AIslandDayNight::WarmthLevel(17.f, 0.f) > 0.99f);
 	TestTrue(TEXT("Cloud pulls the extremes toward the middle"), AIslandDayNight::WarmthLevel(17.f, 1.f) < AIslandDayNight::WarmthLevel(17.f, 0.f) && AIslandDayNight::WarmthLevel(5.f, 1.f) > AIslandDayNight::WarmthLevel(5.f, 0.f));
-	const float SpringFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 1);
-	const float SummerFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 91);
-	const float AutumnFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 181);
-	const float WinterFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 271);
+	const float SpringFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 46);
+	const float SummerFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 136);
+	const float AutumnFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 226);
+	const float WinterFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 316);
 	TestTrue(TEXT("Season gently warms midsummer and cools midwinter with mild equinoxes"),
 		SummerFeel > SpringFeel && FMath::IsNearlyEqual(SpringFeel, AutumnFeel, 0.001f) &&
-		WinterFeel < SpringFeel && FMath::IsNearlyEqual(SpringFeel, AIslandDayNight::WarmthLevel(11.f, 0.f, 361), 0.001f));
+		WinterFeel < SpringFeel && FMath::IsNearlyEqual(SpringFeel, AIslandDayNight::WarmthLevel(11.f, 0.f, 406), 0.001f));
 	TestTrue(TEXT("Cloud moderates the seasonal warmth swing"),
-		SummerFeel - WinterFeel > AIslandDayNight::WarmthLevel(11.f, 1.f, 91) - AIslandDayNight::WarmthLevel(11.f, 1.f, 271));
+		SummerFeel - WinterFeel > AIslandDayNight::WarmthLevel(11.f, 1.f, 136) - AIslandDayNight::WarmthLevel(11.f, 1.f, 316));
 	TestTrue(TEXT("Cold before dawn"), AIslandDayNight::DescribeWarmth(5.f, 0.f).Contains(TEXT("cold")));
 	TestTrue(TEXT("Warm in the afternoon"), AIslandDayNight::DescribeWarmth(16.f, 0.f).Contains(TEXT("warm")));
 	TestTrue(TEXT("Evening cools"), AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("cooling")) || AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("losing")));
@@ -135,9 +151,9 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cold wind-driven rain cuts"), AIslandDayNight::DescribeChill(5.f, 0.f, 0.8f, 400.f).Contains(TEXT("cuts through")));
 	TestTrue(TEXT("Warm breeze is welcome"), AIslandDayNight::DescribeChill(17.f, 0.f, 0.f, 400.f).Contains(TEXT("welcome")));
 	TestTrue(TEXT("Resident chill perception includes the Island season"),
-		AIslandDayNight::DescribeWarmth(11.f, 0.f, 91).Contains(TEXT("mild")) &&
-		AIslandDayNight::DescribeWarmth(11.f, 0.f, 271).Contains(TEXT("cool")) &&
-		AIslandDayNight::DescribeChill(11.f, 0.f, 0.f, 400.f, 271).Contains(TEXT("bites")));
+		AIslandDayNight::DescribeWarmth(11.f, 0.f, 136).Contains(TEXT("warm")) &&
+		AIslandDayNight::DescribeWarmth(11.f, 0.f, 316).Contains(TEXT("cool")) &&
+		AIslandDayNight::DescribeChill(11.f, 0.f, 0.f, 400.f, 316).Contains(TEXT("bites")));
 	TestTrue(TEXT("Calm mild air says nothing"), AIslandDayNight::DescribeChill(11.f, 0.f, 0.f, 50.f).IsEmpty());
 	TestTrue(TEXT("Non-finite weather says nothing"), AIslandDayNight::DescribeChill(5.f, 0.f, NAN, 400.f).IsEmpty());
 	TestTrue(TEXT("Noon is six hours from sunset"), FMath::IsNearlyEqual(AIslandDayNight::HoursUntilSunEdge(12.f), 6.f, 0.001f));
@@ -147,6 +163,11 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Darkness left is counted by night"), AIslandDayNight::DescribeDaylightLeft(0.f).Contains(TEXT("6 hours of darkness")));
 	TestTrue(TEXT("One hour is singular"), AIslandDayNight::DescribeDaylightLeft(17.f).Contains(TEXT("1 hour of daylight remains")));
 	TestTrue(TEXT("Silent at the edge itself"), AIslandDayNight::DescribeDaylightLeft(17.8f).IsEmpty() && AIslandDayNight::DescribeDaylightLeft(6.1f).Contains(TEXT("12 hours")));
+	TestTrue(TEXT("Winter residents report the short day and summer residents report the long one"),
+		FMath::IsNearlyEqual(AIslandDayNight::HoursUntilSunEdge(12.f, 316), 4.f, 0.001f) &&
+		FMath::IsNearlyEqual(AIslandDayNight::HoursUntilSunEdge(12.f, 136), 8.f, 0.001f) &&
+		AIslandDayNight::DescribeDaylightLeft(12.f, 316).Contains(TEXT("4 hours of daylight")) &&
+		AIslandDayNight::DescribeDaylightLeft(12.f, 136).Contains(TEXT("8 hours of daylight")));
 	TestTrue(TEXT("No stars text by day"), AIslandDayNight::DescribeStars(0.f, 0.f, 0.f, -1.f).IsEmpty());
 	TestTrue(TEXT("A clear moonless night is crowded with stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 0.f, -1.f).Contains(TEXT("Milky Way")));
 	TestTrue(TEXT("A bright moon up drowns the stars"), AIslandDayNight::DescribeStars(1.f, 0.f, 1.f, 0.8f).Contains(TEXT("drowns")));

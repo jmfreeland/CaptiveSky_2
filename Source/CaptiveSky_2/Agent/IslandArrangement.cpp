@@ -115,7 +115,7 @@ void AIslandArrangement::UpdateLichen()
 		for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It) { DayNight = *It; break; }
 	// Age keeps advancing with the clock during a long session; without a clock the shown day stands.
 	const int32 Today = DayNight.IsValid() ? DayNight->DayNumber : ShownDay;
-	const float Night = DayNight.IsValid() ? AIslandDayNight::NightAmount(DayNight->CurrentHour) : 0.f;
+	const float Night = DayNight.IsValid() ? AIslandDayNight::NightAmount(DayNight->CurrentHour, DayNight->DayNumber) : 0.f;
 	const float Age = bHasWork ? LichenGlow(Today - WorkDay) : 0.f;
 	LichenLevel = Age * Night;
 	Lichen->SetVisibility(Age > 0.f);

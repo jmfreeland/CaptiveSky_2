@@ -161,25 +161,55 @@ float AIslandDayNight::WrapHour(double Hour)
 	return static_cast<float>(FMath::Fmod(FMath::Fmod(Hour, 24.0) + 24.0, 24.0));
 }
 
-float AIslandDayNight::SunHeight(float Hour)
+float AIslandDayNight::DaylightHours(int32 IslandDay)
 {
-	return FMath::Sin((WrapHour(Hour) - 6.f) * PI / 12.f);
+	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % CalendarDaysPerYear;
+	const float SeasonalPhase = (static_cast<float>(DayOfYear) - 1.5f * CalendarDaysPerSeason) /
+		static_cast<float>(CalendarDaysPerYear) * 2.f * PI;
+	return 12.f + 4.f * FMath::Cos(SeasonalPhase);
 }
 
-float AIslandDayNight::NightAmount(float Hour)
+float AIslandDayNight::SunriseHour(int32 IslandDay)
 {
-	return FMath::SmoothStep(0.02f, 0.25f, -SunHeight(Hour));
+	return 12.f - DaylightHours(IslandDay) * 0.5f;
 }
 
-float AIslandDayNight::TwilightFillAmount(float Hour)
+float AIslandDayNight::SunsetHour(int32 IslandDay)
+{
+	return 12.f + DaylightHours(IslandDay) * 0.5f;
+}
+
+float AIslandDayNight::SolarArcAngle(float Hour, int32 IslandDay)
+{
+	const float WrappedHour = WrapHour(Hour);
+	const float Sunrise = SunriseHour(IslandDay);
+	const float Sunset = SunsetHour(IslandDay);
+	const float Daylight = Sunset - Sunrise;
+	const float Progress = WrappedHour >= Sunrise && WrappedHour < Sunset
+		? (WrappedHour - Sunrise) / Daylight
+		: 1.f + WrapHour(WrappedHour - Sunset) / (24.f - Daylight);
+	return Progress * 180.f;
+}
+
+float AIslandDayNight::SunHeight(float Hour, int32 IslandDay)
+{
+	return FMath::Sin(FMath::DegreesToRadians(SolarArcAngle(Hour, IslandDay)));
+}
+
+float AIslandDayNight::NightAmount(float Hour, int32 IslandDay)
+{
+	return FMath::SmoothStep(0.02f, 0.25f, -SunHeight(Hour, IslandDay));
+}
+
+float AIslandDayNight::TwilightFillAmount(float Hour, int32 IslandDay)
 {
 	// Begin lifting long shadows while the sun is still above the horizon, rather than only at sunset.
-	return 1.f - FMath::SmoothStep(-0.04f, 0.72f, SunHeight(Hour));
+	return 1.f - FMath::SmoothStep(-0.04f, 0.72f, SunHeight(Hour, IslandDay));
 }
 
-float AIslandDayNight::GoldenHourSkylightScale(float Hour)
+float AIslandDayNight::GoldenHourSkylightScale(float Hour, int32 IslandDay)
 {
-	const float Twilight = TwilightFillAmount(Hour) * (1.f - NightAmount(Hour));
+	const float Twilight = TwilightFillAmount(Hour, IslandDay) * (1.f - NightAmount(Hour, IslandDay));
 	return 1.f + GoldenHourSkylightBoost * FMath::Clamp(Twilight, 0.f, 1.f);
 }
 
@@ -208,18 +238,20 @@ const TCHAR* AIslandDayNight::LunarPhaseName(float Progress)
 
 float AIslandDayNight::MoonHeight(int32 IslandDay, float IslandHour)
 {
-	const float SunAngle = FMath::DegreesToRadians((WrapHour(IslandHour) - 6.f) * 15.f);
-	return FMath::Sin(SunAngle - LunarPhaseProgress(IslandDay, IslandHour) * 2.f * PI);
+	const float MoonArc = SolarArcAngle(IslandHour, IslandDay) - LunarPhaseProgress(IslandDay, IslandHour) * 360.f;
+	return FMath::Sin(FMath::DegreesToRadians(MoonArc));
 }
 
-FString AIslandDayNight::DescribeSunEdge(float IslandHour)
+FString AIslandDayNight::DescribeSunEdge(float IslandHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(IslandHour)) return FString();
 	const float Hour = WrapHour(IslandHour);
-	if (Hour >= 5.5f && Hour < 6.f) return TEXT(" The sky is paling; the sun is about to rise.");
-	if (Hour >= 6.f && Hour < 6.5f) return TEXT(" The sun has just cleared the horizon and the light is low and gold.");
-	if (Hour >= 17.5f && Hour < 18.f) return TEXT(" The sun is nearly touching the horizon and the light is low and gold.");
-	if (Hour >= 18.f && Hour < 18.5f) return TEXT(" The sun has just set and the last colour is draining from the sky.");
+	const float Sunrise = SunriseHour(IslandDay);
+	const float Sunset = SunsetHour(IslandDay);
+	if (Hour >= Sunrise - 0.5f && Hour < Sunrise) return TEXT(" The sky is paling; the sun is about to rise.");
+	if (Hour >= Sunrise && Hour < Sunrise + 0.5f) return TEXT(" The sun has just cleared the horizon and the light is low and gold.");
+	if (Hour >= Sunset - 0.5f && Hour < Sunset) return TEXT(" The sun is nearly touching the horizon and the light is low and gold.");
+	if (Hour >= Sunset && Hour < Sunset + 0.5f) return TEXT(" The sun has just set and the last colour is draining from the sky.");
 	return FString();
 }
 
@@ -262,10 +294,10 @@ FString AIslandDayNight::DescribeMoonHorizon(int32 IslandDay, float IslandHour)
 	return FString::Printf(TEXT(" The moon will %s in about %d hour%s."), bUp ? TEXT("set") : TEXT("rise"), Hours, Hours == 1 ? TEXT("") : TEXT("s"));
 }
 
-FString AIslandDayNight::DescribeHorizonColour(float IslandHour, float CloudCover)
+FString AIslandDayNight::DescribeHorizonColour(float IslandHour, float CloudCover, int32 IslandDay)
 {
 	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(CloudCover)) return FString();
-	if (DescribeSunEdge(IslandHour).IsEmpty()) return FString();
+	if (DescribeSunEdge(IslandHour, IslandDay).IsEmpty()) return FString();
 	if (CloudCover < 0.3f) return TEXT(" With no cloud to catch it, the horizon glows clear and bright.");
 	if (CloudCover < 0.7f) return TEXT(" Broken cloud catches the colour in streaks of pink and gold.");
 	return TEXT(" Thick cloud mutes the light to a flat grey.");
@@ -333,7 +365,7 @@ FString AIslandDayNight::DescribeCalendar(int32 IslandDay, float LunarProgress)
 bool AIslandDayNight::IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination)
 {
 	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(CloudCover) || !FMath::IsFinite(LunarIllumination)) return false;
-	const float Dark = NightAmount(IslandHour);
+	const float Dark = NightAmount(IslandHour, IslandDay);
 	if (Dark < 0.9f || CloudCover > 0.6f) return false;
 	const int32 Slot = FMath::FloorToInt(WrapHour(IslandHour) * 6.f);
 	// Murmur-style finaliser: neighbouring days and slots must not give correlated rolls.
@@ -528,9 +560,9 @@ void AIslandDayNight::PersistHour()
 
 void AIslandDayNight::UpdateLighting()
 {
-	const float Height = SunHeight(CurrentHour);
+	const float Height = SunHeight(CurrentHour, DayNumber);
 	const float Daylight = FMath::SmoothStep(-0.04f, 0.18f, Height);
-	const float Angle = (CurrentHour - 6.f) * 15.f;
+	const float Angle = SolarArcAngle(CurrentHour, DayNumber);
 	float CloudCover = 0.f;
 	if (GetWorld())
 	{
@@ -578,12 +610,12 @@ void AIslandDayNight::UpdateLighting()
 	// Intermediate phases therefore shift the moon's rise and set through the night.
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
-		NightAmount(CurrentHour) * CloudMoonlightTransmission(CloudCover));
+		NightAmount(CurrentHour, DayNumber) * CloudMoonlightTransmission(CloudCover));
 	const FVector MoonDirection = Moon ? -Moon->GetForwardVector().GetSafeNormal() : FVector::ZeroVector;
 	const FVector SunDirection = Sun ? -Sun->GetActorForwardVector().GetSafeNormal() : -MoonDirection;
 	const bool bShowMoonDisc = Starfield && Moon && MoonDirection.Z > 0.1f &&
-		NightAmount(CurrentHour) > 0.25f && LunarIlluminationAmount > 0.035f &&
-		!IsMoonHiddenByCloud(MoonHeight(DayNumber, CurrentHour), NightAmount(CurrentHour), CloudCover) &&
+		NightAmount(CurrentHour, DayNumber) > 0.25f && LunarIlluminationAmount > 0.035f &&
+		!IsMoonHiddenByCloud(MoonHeight(DayNumber, CurrentHour), NightAmount(CurrentHour, DayNumber), CloudCover) &&
 		MoonIntensity > 0.f;
 	if (bShowMoonDisc)
 	{
@@ -605,11 +637,11 @@ void AIslandDayNight::UpdateLighting()
 			MoonSection && MoonSection->bSectionVisible)
 			Starfield->SetMeshSectionVisible(MoonDiscSectionIndex, false);
 	}
-	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
+	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour, DayNumber), TwilightFillAmount(CurrentHour, DayNumber) * TwilightFillStrength);
 	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
 	if (Sky) Sky->GetLightComponent()->SetIntensity(
 		FMath::Lerp(NightSkylightFloor, 1.f, Daylight) *
-		GoldenHourSkylightScale(CurrentHour) * CloudSkylightTransmission(CloudCover));
+		GoldenHourSkylightScale(CurrentHour, DayNumber) * CloudSkylightTransmission(CloudCover));
 
 	// Translucent water and volumetric fog can use only one directional light. Give
 	// the brightest current source a unique top priority; keep the inactive/secondary
@@ -646,9 +678,9 @@ float AIslandDayNight::WarmthLevel(float IslandHour, float CloudCover, int32 Isl
 	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % CalendarDaysPerYear;
 	// The temperate year is mild at the spring/autumn boundaries, warmest near midsummer,
 	// and coolest near midwinter. Keep this as a small felt-temperature offset, not a forecast.
-	const float SeasonalPhase = (static_cast<float>(DayOfYear) - CalendarDaysPerSeason) /
+	const float SeasonalPhase = (static_cast<float>(DayOfYear) - 1.5f * CalendarDaysPerSeason) /
 		static_cast<float>(CalendarDaysPerYear) * 2.f * PI;
-	const float SeasonalOffset = 0.14f * FMath::Cos(SeasonalPhase);
+	const float SeasonalOffset = 0.18f * FMath::Cos(SeasonalPhase);
 	return FMath::Clamp(0.5f + (Raw - 0.5f) * Damp + SeasonalOffset * Damp, 0.f, 1.f);
 }
 
@@ -677,21 +709,23 @@ FString AIslandDayNight::DescribeChill(float IslandHour, float CloudCover, float
 	return FString();
 }
 
-float AIslandDayNight::HoursUntilSunEdge(float IslandHour)
+float AIslandDayNight::HoursUntilSunEdge(float IslandHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(IslandHour)) return 0.f;
 	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
-	const float Edge = Hour >= 6.f && Hour < 18.f ? 18.f : 6.f;
+	const float Sunrise = SunriseHour(IslandDay);
+	const float Sunset = SunsetHour(IslandDay);
+	const float Edge = Hour >= Sunrise && Hour < Sunset ? Sunset : Sunrise;
 	return FMath::Fmod(Edge - Hour + 24.f, 24.f);
 }
 
-FString AIslandDayNight::DescribeDaylightLeft(float IslandHour)
+FString AIslandDayNight::DescribeDaylightLeft(float IslandHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(IslandHour)) return FString();
-	const float Wait = HoursUntilSunEdge(IslandHour);
+	const float Wait = HoursUntilSunEdge(IslandHour, IslandDay);
 	if (Wait < 0.5f || Wait > 23.5f) return FString();
 	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
-	const bool bDay = Hour >= 6.f && Hour < 18.f;
+	const bool bDay = Hour >= SunriseHour(IslandDay) && Hour < SunsetHour(IslandDay);
 	const int32 Hours = FMath::Max(1, FMath::RoundToInt(Wait));
 	return FString::Printf(TEXT(" About %d hour%s of %s remain%s."), Hours, Hours == 1 ? TEXT("") : TEXT("s"),
 		bDay ? TEXT("daylight") : TEXT("darkness"), Hours == 1 ? TEXT("s") : TEXT(""));
@@ -699,9 +733,11 @@ FString AIslandDayNight::DescribeDaylightLeft(float IslandHour)
 
 FString AIslandDayNight::DescribeTime() const
 {
-	const TCHAR* Phase = CurrentHour < 5.f || CurrentHour >= 20.f ? TEXT("night") :
-		CurrentHour < 7.f ? TEXT("dawn") : CurrentHour < 12.f ? TEXT("morning") :
-		CurrentHour < 17.f ? TEXT("afternoon") : TEXT("dusk");
+	const float Sunrise = SunriseHour(DayNumber);
+	const float Sunset = SunsetHour(DayNumber);
+	const TCHAR* Phase = CurrentHour < Sunrise - 0.5f || CurrentHour >= Sunset + 0.5f ? TEXT("night") :
+		CurrentHour < Sunrise + 0.5f ? TEXT("dawn") : CurrentHour < 12.f ? TEXT("morning") :
+		CurrentHour < Sunset - 0.5f ? TEXT("afternoon") : TEXT("dusk");
 	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
 	const TCHAR* LunarName = LunarPhaseName(LunarProgress);
 	const float LunarLight = LunarIllumination(DayNumber, CurrentHour);
@@ -717,15 +753,16 @@ FString AIslandDayNight::DescribeTime() const
 			CloudNow = It->SampleCloudCover(GetWorld()->GetTimeSeconds());
 			break;
 		}
-	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeHorizonColour(CurrentHour, CloudNow) + DescribeCalendar(DayNumber, LunarProgress);
+	const FString SunEdge = DescribeSunEdge(CurrentHour, DayNumber) + DescribeHorizonColour(CurrentHour, CloudNow, DayNumber) + DescribeCalendar(DayNumber, LunarProgress);
 	const FString Meteor = GetShootingStarAnimationProgress(DayNumber, CurrentHour, CloudNow, LunarLight) >= 0.f
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
-	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
+	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour, DayNumber), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour) + DescribeWarmth(CurrentHour, CloudNow, DayNumber) + DescribeDaylightLeft(CurrentHour);
-	const FString Stars = DescribeStars(NightAmount(CurrentHour), CloudNow, LunarLight, MoonElevation);
-	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s%s"),
-		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor, *Tide);
+	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour) + DescribeWarmth(CurrentHour, CloudNow, DayNumber) + DescribeDaylightLeft(CurrentHour, DayNumber);
+	const FString Stars = DescribeStars(NightAmount(CurrentHour, DayNumber), CloudNow, LunarLight, MoonElevation);
+	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows a seasonally longer or shorter arc, with about %.0f hours of daylight; cloud cover gently softens direct and ambient light.%s%s%s%s%s"),
+		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition,
+		DaylightHours(DayNumber), *SunEdge, *Hidden, *Stars, *Meteor, *Tide);
 }
 
 static FAutoConsoleCommandWithWorldAndArgs GIslandSkyReportCommand(

@@ -490,7 +490,7 @@ void AIslandCommonFrog::Tick(float DeltaSeconds)
 	AmbientHopRemaining -= Delta;
 	if (AmbientHopRemaining > 0.f) return;
 	const float Rain = Weather.IsValid() && GetWorld() ? Weather->SampleRainIntensity(GetWorld()->GetTimeSeconds()) : 0.f;
-	const float Night = IslandClock.IsValid() ? AIslandDayNight::NightAmount(IslandClock->CurrentHour) : 0.f;
+	const float Night = IslandClock.IsValid() ? AIslandDayNight::NightAmount(IslandClock->CurrentHour, IslandClock->DayNumber) : 0.f;
 	const float Activity = AmbientActivityScale(Rain, Night);
 	AmbientHopRemaining = Activity >= 0.42f ? Random.FRandRange(24.f, 48.f) : Random.FRandRange(36.f, 70.f);
 	if (Activity < 0.42f) return;

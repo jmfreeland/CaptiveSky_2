@@ -236,30 +236,30 @@ float AIslandFirefly::MoonlightGlowScale(float LunarIllumination)
 	return FMath::Lerp(1.f, 0.72f, FMath::Clamp(LunarIllumination, 0.f, 1.f));
 }
 
-float AIslandFirefly::DaylightWanderScale(float CurrentHour)
+float AIslandFirefly::DaylightWanderScale(float CurrentHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(CurrentHour)) return 1.f;
 
 	// During bright hours the firefly stays close to its home point; twilight
 	// gradually opens the larger, slow night-flight loop.
 	constexpr float DaytimeWander = 0.22f;
-	return DaytimeWander + (1.f - DaytimeWander) * AIslandDayNight::NightAmount(CurrentHour);
+	return DaytimeWander + (1.f - DaytimeWander) * AIslandDayNight::NightAmount(CurrentHour, IslandDay);
 }
 
-float AIslandFirefly::DaylightGlowScale(float CurrentHour)
+float AIslandFirefly::DaylightGlowScale(float CurrentHour, int32 IslandDay)
 {
 	if (!FMath::IsFinite(CurrentHour)) return 1.f;
 
 	constexpr float DaylightGlow = 0.16f;
-	return DaylightGlow + (1.f - DaylightGlow) * AIslandDayNight::NightAmount(CurrentHour);
+	return DaylightGlow + (1.f - DaylightGlow) * AIslandDayNight::NightAmount(CurrentHour, IslandDay);
 }
 
-float AIslandFirefly::PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount)
+float AIslandFirefly::PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount, int32 IslandDay)
 {
 	if (!FMath::IsFinite(CurrentHour) || !FMath::IsFinite(RainIntensity) || NearbyFireflyCount <= 0)
 		return 0.f;
 
-	const float Night = AIslandDayNight::NightAmount(CurrentHour);
+	const float Night = AIslandDayNight::NightAmount(CurrentHour, IslandDay);
 	const float Calm = 1.f - RainActivity(RainIntensity);
 	const float LocalCohesion = FMath::Clamp(0.5f + 0.15f * (NearbyFireflyCount - 1), 0.f, 1.f);
 	return 0.055f * Night * Calm * LocalCohesion;
@@ -282,7 +282,7 @@ void AIslandFirefly::UpdatePulseCluster(float IslandTimeSeconds, float RainInten
 	if (!World || !DayNight.IsValid()) return;
 
 	const float CurrentHour = DayNight->CurrentHour;
-	if (PulseCouplingScale(CurrentHour, RainIntensity, 1) <= 0.f) return;
+	if (PulseCouplingScale(CurrentHour, RainIntensity, 1, DayNight->DayNumber) <= 0.f) return;
 
 	constexpr float PulseAngularRate = 4.2f;
 	constexpr float NeighbourRadius = 460.f;
@@ -315,7 +315,7 @@ void AIslandFirefly::UpdatePulseCluster(float IslandTimeSeconds, float RainInten
 
 	if (NeighbourCount == 0) return;
 
-	const float Coupling = PulseCouplingScale(CurrentHour, RainIntensity, NeighbourCount);
+	const float Coupling = PulseCouplingScale(CurrentHour, RainIntensity, NeighbourCount, DayNight->DayNumber);
 	const float MeanRate = NeighbourRateTotal / static_cast<float>(NeighbourCount);
 	const float RateBlend = FMath::Clamp(Coupling * 0.75f, 0.f, 0.05f);
 	PulseRate = FMath::Lerp(PulseRate, MeanRate, RateBlend);
@@ -434,7 +434,7 @@ void AIslandFirefly::Tick(float DeltaSeconds)
 	const float RainActivityFactor = RainActivity(Rain);
 	const float MotionTime = T * MotionRate;
 	const float CircadianWander = DayNight.IsValid()
-		? DaylightWanderScale(DayNight->CurrentHour)
+		? DaylightWanderScale(DayNight->CurrentHour, DayNight->DayNumber)
 		: 1.f;
 	const float WeatherWander = RainMovementScale(Rain);
 	const FVector Offset(
@@ -472,7 +472,7 @@ void AIslandFirefly::UpdateGlow(double IslandTimeSeconds, float RainIntensity)
 	const float LunarIllumination = DayNight.IsValid()
 		? AIslandDayNight::LunarIllumination(DayNight->DayNumber, DayNight->CurrentHour)
 		: 0.f;
-	const float CircadianGlow = DayNight.IsValid() ? DaylightGlowScale(DayNight->CurrentHour) : 1.f;
+	const float CircadianGlow = DayNight.IsValid() ? DaylightGlowScale(DayNight->CurrentHour, DayNight->DayNumber) : 1.f;
 	const float GlowScale = CircadianGlow * RainGlowScale(RainIntensity) *
 		MoonlightGlowScale(LunarIllumination) * ChimePulse * ObservationAccent;
 	Glow->SetIntensity(GlowIntensity * GlowScale);

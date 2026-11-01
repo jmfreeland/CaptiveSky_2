@@ -1355,7 +1355,7 @@ void ARavenAgentAIController::CheckForNearbyWildlifePresence()
 	}
 	if (IslandClock)
 	{
-		const bool bNightGlowProminent = AIslandFirefly::DaylightGlowScale(IslandClock->CurrentHour) >= 0.82f;
+		const bool bNightGlowProminent = AIslandFirefly::DaylightGlowScale(IslandClock->CurrentHour, IslandClock->DayNumber) >= 0.82f;
 		for (TActorIterator<AIslandFirefly> It(GetWorld()); It; ++It)
 		{
 			AIslandFirefly* Firefly = *It;

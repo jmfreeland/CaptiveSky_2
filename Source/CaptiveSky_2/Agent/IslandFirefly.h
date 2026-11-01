@@ -39,11 +39,12 @@ public:
 	/** Firefly contrast gently yields to moonlight without going dark. */
 	static float MoonlightGlowScale(float LunarIllumination);
 	/** Keep a small daytime hover, opening into a wider flight pattern after dusk. */
-	static float DaylightWanderScale(float CurrentHour);
+	/** Optional day defaults to the equinoctial 12-hour reference; runtime callers supply the saved Island day. */
+	static float DaylightWanderScale(float CurrentHour, int32 IslandDay = 46);
 	/** Keep the bioluminescent pulse faint by day, emerging smoothly at night. */
-	static float DaylightGlowScale(float CurrentHour);
+	static float DaylightGlowScale(float CurrentHour, int32 IslandDay = 46);
 	/** Nearby fireflies very slowly share pulse timing on calm nights. */
-	static float PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount);
+	static float PulseCouplingScale(float CurrentHour, float RainIntensity, int32 NearbyFireflyCount, int32 IslandDay = 46);
 	/** Bounded shortest-arc nudge toward a nearby cluster's mean pulse phase. */
 	static float EvaluatePulsePhaseNudge(float CurrentPhaseRadians, float NeighborPhaseRadians, float CouplingScale);
 	/** Small deterministic multiplier for natural variation between firefly glow hues. */

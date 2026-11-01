@@ -48,7 +48,8 @@ public:
 	/** Active grazing time advances with openness and stops completely while fully tucked. */
 	static float AdvanceGrazingTime(float ActiveSeconds, float DeltaSeconds, float ExposureRest);
 	/** Daytime grazing remains possible, with a gentle increase after dusk. */
-	static float GrazingActivityForHour(float CurrentHour);
+	/** Optional day defaults to the equinoctial 12-hour reference; runtime callers supply the saved Island day. */
+	static float GrazingActivityForHour(float CurrentHour, int32 IslandDay = 46);
 	static constexpr float GrazingMaxExcursionCm = 16.f;
 	static constexpr float MinnowAttentionHoldSeconds = 0.9f;
 
