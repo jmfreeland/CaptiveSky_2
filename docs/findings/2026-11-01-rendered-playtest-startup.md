@@ -84,3 +84,24 @@ Artifacts:
 - Rendered crash log: `Saved/CC/Project/Saved/Crashes/_0000/Codex_ResidentFeedback_20261101_143340.log`
 - DDC-bypass crash log: `Saved/CC/Project/Saved/Crashes/_0000/Codex_StartupMemoryDDC_20261101_1440.log`
 - DDC-bypass Unreal log: `Saved/CC/Project/Saved/Logs/Codex_StartupMemoryDDC_20261101_1440.log`
+
+## Symbolization path check — 2026-11-01
+
+The repeated `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D` crash still has only
+module-relative offsets in `UnrealEditor-Core` and `UnrealEditor`, so it cannot
+yet identify a responsible function. A read-only check of the installed UE
+5.8.3 `Engine/Binaries/Win64` found no `UnrealEditor*.pdb` or matching map
+files. Visual Studio 2022 Community is installed, but the Windows SDK debugger
+folder contains supporting DLLs only and no `cdb.exe` or `windbg.exe`.
+
+Epic's [UE 5.8 installation guide](https://dev.epicgames.com/documentation/unreal-engine/install-unreal-engine)
+documents `Editor symbols for debugging` as an optional component that can be
+added from the Epic Games Launcher: Unreal Engine > Library > the UE 5.8 tile's
+Options > select `Editor symbols for debugging` > Apply. The dialog shows the
+additional disk requirement before applying. No component was downloaded or
+installed during this check. If the user enables it, verify that the matching
+5.8.3 PDBs appear, then open the existing minidump in Visual Studio and resolve
+symbols against the exact installed engine binaries before retrying resident
+feedback. Until then, do not rerun an equivalent launch; the earlier bounded
+15-minute NullRHI resident-feedback session remains the latest successful
+character sample.
