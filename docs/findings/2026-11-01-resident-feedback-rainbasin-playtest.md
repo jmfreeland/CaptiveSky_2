@@ -54,14 +54,30 @@ self-contained. The same log cannot load native PVE graph assets because the
 prove what the rendered trees look like, but they establish that runtime tree
 materials still reach into editor-plugin content.
 
-`Scripts/Inspect-MegaplantRuntimeMaterialDependencies.py` now provides a
-read-only audit over all eight A/B runtime tree meshes. It records their
-material-slot parent chains and recursively traverses hard, soft, game, and
-editor-only package dependencies. Its syntax check passes; it has not yet been
-run in Unreal. Next asset milestone: run that audit with the plugin mounted,
-then replace the runtime tree parents with project-owned, self-contained
-materials (or project-own and remap their full dependency closure). Validate
-material compilation and a small controlled tree preview. Keep PVE graph
-assets editor-only; do not depend on the PVE plugin's sample content in runtime
-materials. The open Unreal editor was left untouched, and no Content assets
-were changed during this playtest.
+`Scripts/Inspect-MegaplantRuntimeMaterialDependencies.py` was run read-only in
+the open UE 5.8 editor with PVE mounted. The report is in
+`D:/Projects - Athena/Unreal/CaptiveSky_2/Saved/Logs/CaptiveSky_2_2.log` at
+13:56:00 (`MegaplantRuntimeMaterialAudit`). All eight A/B meshes loaded and all
+material slots were inspected without errors. The recursive closure contains
+24 unique `/ProceduralVegetationEditor/SampleAssets/...` packages: the PVE
+master material, three virtual textures, nineteen material functions, and
+`MPC_GlobalFoliageActor`.
+
+Every A/B variant has the same parent pattern. Norway Maple, European Aspen,
+and European Beech bark instances use the project-owned
+`/Game/Megaplant_Library/Materials/MA_Foliage_Trees_InstancedSkinned`, but
+their foliage instances still parent directly to PVE's
+`MA_Foliage_Trees`. Both Black Alder slots (bark and foliage) still parent
+directly to that PVE material. Crucially, the project-owned bark parent itself
+still has the complete PVE dependency closure; duplicating only the master and
+reparenting instances is not a runtime fix. There are 10 direct PVE-parented
+slots across the eight meshes, plus six bark slots whose apparently
+project-owned parent still resolves into PVE content.
+
+Next asset milestone: make a self-contained runtime foliage material and
+remap the species instances to it, or copy and remap the *entire* dependency
+closure into project content. Validate compiled materials and a small
+controlled tree preview before rolling the change into Island distribution.
+Keep PVE graph assets editor-only; runtime materials must not rely on the
+editor plugin's sample content. This audit did not save or modify Content
+assets; the editor's current Island scene remains open.
