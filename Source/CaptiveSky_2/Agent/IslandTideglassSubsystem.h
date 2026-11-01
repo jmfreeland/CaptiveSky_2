@@ -19,12 +19,22 @@ class CAPTIVESKY_2_API UIslandTideglassSubsystem : public UTickableWorldSubsyste
 	GENERATED_BODY()
 
 public:
+	enum class ETideTrend : uint8
+	{
+		Rising,
+		Falling,
+		NearHighWater,
+		NearLowWater
+	};
+
 	static const TCHAR* MaterialPath;
 	static const TCHAR* RippleMaterialPath;
 	static constexpr float TidalDayHours = 24.84f;
 	static constexpr float MaximumTideOffsetCm = 14.f;
 	/** Small semidiurnal tide: spring range follows new/full moon, reduced at quarter moons. */
 	static float TideOffsetCm(float IslandHour, int32 IslandDay);
+	/** Describes whether the shallow pool is flooding, ebbing, or near a turn. */
+	static ETideTrend GetTideTrend(float IslandHour, int32 IslandDay);
 
 	/** Tests may inject a transient material; otherwise the additive project asset is loaded at play start. */
 	UPROPERTY(Transient)

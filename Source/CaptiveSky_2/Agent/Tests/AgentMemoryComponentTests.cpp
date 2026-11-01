@@ -207,6 +207,12 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 		const FString DistinctResponse = TEXT("{\"thought\":\"A new day\",\"action\":{\"type\":\"idle\"},\"new_memories\":[{\"text\":\"Today I met a fox by the old stone bridge during the storm.\",\"importance\":0.7,\"tags\":[\"fox\",\"bridge\"]}]}");
 		UAgentBrainComponent::ParseDecisionAndStoreMemories(DistinctResponse, Writer);
 		TestEqual(TEXT("A distinct reflection remains eligible for storage"), Writer->GetMemoryCount(), CountBeforeDuplicate + 1);
+
+		const FString PrematureInteractionMemory = TEXT("{\"thought\":\"I will set a leaf afloat\",\"action\":{\"type\":\"interact\",\"target\":\"RainBasin\"},\"new_memories\":[{\"text\":\"I set a leaf afloat on the rain basin.\",\"importance\":0.7,\"tags\":[\"rain-basin\"]}]}");
+		const int32 CountBeforeInteraction = Writer->GetMemoryCount();
+		const FAgentDecision InteractionDecision = UAgentBrainComponent::ParseDecisionAndStoreMemories(PrematureInteractionMemory, Writer);
+		TestTrue(TEXT("The interaction decision is still valid"), InteractionDecision.bValid && InteractionDecision.ActionType == EAgentActionType::Interact);
+		TestEqual(TEXT("A pending interaction cannot be remembered before its outcome is known"), Writer->GetMemoryCount(), CountBeforeInteraction);
 	}
 
 	// --- JSON line round trip is exact for the fields that matter ---
@@ -257,6 +263,9 @@ bool FAgentMemoryComponentTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Remembered places are optional returns, not claims of changed world state"),
 		SystemPrompt.Contains(TEXT("optional return destinations, not evidence that anything has changed")) &&
 		SystemPrompt.Contains(TEXT("return only if you are curious")));
+	TestTrue(TEXT("The current action cannot be mistaken for a completed event in memory"),
+		SystemPrompt.Contains(TEXT("The action in this reply has not happened yet")) &&
+		SystemPrompt.Contains(TEXT("verified result will be available on a later turn")));
 	TestTrue(TEXT("The prompt restricts land to Raven and listed open-ground sites"),
 		SystemPrompt.Contains(TEXT("The land action is for the raven only")) && SystemPrompt.Contains(TEXT("ArrangingGround target")));
 	TestTrue(TEXT("The response schema lists the human-reviewed object request action"),

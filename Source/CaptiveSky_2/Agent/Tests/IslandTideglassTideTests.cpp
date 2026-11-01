@@ -22,6 +22,21 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 		NewMoonHigh > 13.8f && NewMoonHigh <= UIslandTideglassSubsystem::MaximumTideOffsetCm);
 	TestTrue(TEXT("The following semidiurnal low tide is almost equally below the resting level"),
 		NewMoonLow < -13.8f && NewMoonLow >= -UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	using ETideTrend = UIslandTideglassSubsystem::ETideTrend;
+	TestEqual(TEXT("Tideglass is flooding before spring high water"),
+		UIslandTideglassSubsystem::GetTideTrend(5.5f, 1), ETideTrend::Rising);
+	TestEqual(TEXT("Tideglass is near its high-water turn"),
+		UIslandTideglassSubsystem::GetTideTrend(6.21f, 1), ETideTrend::NearHighWater);
+	TestEqual(TEXT("Tideglass is ebbing after spring high water"),
+		UIslandTideglassSubsystem::GetTideTrend(8.5f, 1), ETideTrend::Falling);
+	TestEqual(TEXT("Tideglass is near its low-water turn"),
+		UIslandTideglassSubsystem::GetTideTrend(18.63f, 1), ETideTrend::NearLowWater);
+	TestEqual(TEXT("Tideglass resumes flooding after low water"),
+		UIslandTideglassSubsystem::GetTideTrend(20.f, 1), ETideTrend::Rising);
+	TestEqual(TEXT("The tide is flooding immediately before the Island day boundary"),
+		UIslandTideglassSubsystem::GetTideTrend(23.9f, 1), ETideTrend::Rising);
+	TestEqual(TEXT("The tide remains flooding immediately after the Island day boundary"),
+		UIslandTideglassSubsystem::GetTideTrend(0.1f, 2), ETideTrend::Rising);
 	TestTrue(TEXT("The pool begins at its mean waterline at the day boundary"),
 		FMath::IsNearlyZero(UIslandTideglassSubsystem::TideOffsetCm(0.f, 1), 0.01f));
 
@@ -101,7 +116,8 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 		Brain->RegisterComponent();
 		const FString HighWaterSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 		TestTrue(TEXT("A nearby resident can perceive Tideglass near spring high water"),
-			HighWaterSituation.Contains(TEXT("near high water")) && HighWaterSituation.Contains(TEXT("cm above its mean level")));
+			HighWaterSituation.Contains(TEXT("near high water")) && HighWaterSituation.Contains(TEXT("cm above its mean level")) &&
+			HighWaterSituation.Contains(TEXT("turning near high water")));
 	}
 	else TestTrue(TEXT("A resident perception fixture is available"), Resident && Brain);
 	if (Subsystem->RuntimeSurface)
@@ -118,7 +134,8 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 	{
 		const FString LowWaterSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 		TestTrue(TEXT("The same resident perceives Tideglass near spring low water without invented travel claims"),
-			LowWaterSituation.Contains(TEXT("near low water")) && LowWaterSituation.Contains(TEXT("cm below its mean level")));
+			LowWaterSituation.Contains(TEXT("near low water")) && LowWaterSituation.Contains(TEXT("cm below its mean level")) &&
+			LowWaterSituation.Contains(TEXT("turning near low water")));
 	}
 	return true;
 }

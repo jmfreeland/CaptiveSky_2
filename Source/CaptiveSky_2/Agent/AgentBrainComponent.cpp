@@ -665,6 +665,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				if (LocalClock)
 				{
 					const float TideOffset = UIslandTideglassSubsystem::TideOffsetCm(LocalClock->CurrentHour, LocalClock->DayNumber);
+					const UIslandTideglassSubsystem::ETideTrend TideTrend =
+						UIslandTideglassSubsystem::GetTideTrend(LocalClock->CurrentHour, LocalClock->DayNumber);
 					if (FMath::Abs(TideOffset) < 0.5f)
 						NearbyBeings += TEXT(" The shallow pool's waterline is near its mean level.");
 					else
@@ -674,6 +676,21 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						NearbyBeings += FString::Printf(TEXT(" The shallow pool's waterline is about %.0f cm %s its mean level, %s."),
 							FMath::Abs(TideOffset), bHighWater ? TEXT("above") : TEXT("below"),
 							bNearTurn ? (bHighWater ? TEXT("near high water") : TEXT("near low water")) : TEXT("between high and low water"));
+					}
+					switch (TideTrend)
+					{
+					case UIslandTideglassSubsystem::ETideTrend::Rising:
+						NearbyBeings += TEXT(" The tide is rising across the shallow edge; this is the flood.");
+						break;
+					case UIslandTideglassSubsystem::ETideTrend::Falling:
+						NearbyBeings += TEXT(" The tide is falling back from the shallow edge; this is the ebb.");
+						break;
+					case UIslandTideglassSubsystem::ETideTrend::NearHighWater:
+						NearbyBeings += TEXT(" The tide is turning near high water; the waterline should soon begin to fall.");
+						break;
+					case UIslandTideglassSubsystem::ETideTrend::NearLowWater:
+						NearbyBeings += TEXT(" The tide is turning near low water; the waterline should soon begin to rise.");
+						break;
 					}
 				}
 			}
@@ -1184,6 +1201,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"At the inn counter, build target GuestBook may use \"intent\" for one short line in the shared guest book; other residents can read it, so do not write private secrets there. Writing is optional and limited to one line per Island day. "
 		"If your body can use a visible nearby roost, in rough weather you may consider its measured wind shelter and short overhead-cover clue before choosing where to perch or rest. During a strong shower, one site with clearly more overhead probe hits may offer some cover, but this small local sample does not prove dryness, branch strength, or safety. This is your choice, not an automatic requirement, and only a completed physical action confirms arrival. "
 		"A movement request is not evidence of arrival; use the physical action result. An intention is not a discovery. "
+		"The action in this reply has not happened yet. Do not put its hoped-for result in new_memories. If an interaction succeeds, its verified result will be available on a later turn and may then be remembered. "
 		"When another resident is nearby, you may use their listed move_to target to approach them; this does not obligate either of you to speak. "
 		"Wildlife descriptions are observations of nearby living things, not invitations to command, own, or follow them; you may simply notice them. "
 		"Wander takes you on a short walk (or flight) to a nearby place you have not chosen precisely; it is the easiest way to come across things you cannot yet see. "
@@ -1682,7 +1700,10 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 
 	Decision.bValid = true;
 
-	if (MemoryComp)
+	// Interactions execute after parsing. Their outcomes are not known here; controllers record
+	// verified action-result observations after execution, so model memories from this same reply
+	// must not pre-emptively claim that an interaction succeeded.
+	if (MemoryComp && Decision.ActionType != EAgentActionType::Interact)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* NewMemoriesArray = nullptr;
 		if (Root->TryGetArrayField(TEXT("new_memories"), NewMemoriesArray) && NewMemoriesArray)

@@ -34,6 +34,25 @@ float UIslandTideglassSubsystem::TideOffsetCm(float IslandHour, int32 IslandDay)
 	return MaximumTideOffsetCm * SpringRange * static_cast<float>(FMath::Sin(TideAngle));
 }
 
+UIslandTideglassSubsystem::ETideTrend UIslandTideglassSubsystem::GetTideTrend(float IslandHour, int32 IslandDay)
+{
+	const float CurrentHour = AIslandDayNight::WrapHour(IslandHour);
+	const float CurrentOffset = TideOffsetCm(CurrentHour, IslandDay);
+	constexpr float LookAheadHours = 0.25f;
+	float FutureHour = CurrentHour + LookAheadHours;
+	int32 FutureDay = FMath::Max(1, IslandDay);
+	if (FutureHour >= 24.f)
+	{
+		FutureHour -= 24.f;
+		++FutureDay;
+	}
+	const float FutureOffset = TideOffsetCm(FutureHour, FutureDay);
+	const float Change = FutureOffset - CurrentOffset;
+	if (FMath::Abs(Change) <= 0.1f && FMath::Abs(CurrentOffset) >= MaximumTideOffsetCm * 0.5f)
+		return CurrentOffset >= 0.f ? ETideTrend::NearHighWater : ETideTrend::NearLowWater;
+	return Change > 0.f ? ETideTrend::Rising : ETideTrend::Falling;
+}
+
 namespace
 {
 	constexpr TCHAR TideglassRockMeshPath[] = TEXT("/Game/StarterContent/Props/SM_Rock.SM_Rock");
