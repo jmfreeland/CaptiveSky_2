@@ -21,10 +21,14 @@ Runtime module, so the next check must prove the copied graph works without its
 Editor module and establish whether the Runtime module can also be omitted.
 An isolated project and copy/remap/verify scripts are prepared, but the first
 UE 5.8.3 NullRHI commandlet crashed before script execution; no sandbox assets
-were created. The harness passes offline Python syntax checks. Do not retry
-that startup path until it is understood or a safe rendered-editor window is
-available. No assets were changed. Then copy and remap only in the disposable
-project, compile and preview before touching any live tree parents. Details:
+were created. Its crash report records a zero-second null read in the
+UnrealEditor-Core/Cmd bootstrap (no installed symbols), but the current
+isolated UE 5.8.3 Editor target compiles and links in 44 actions. The harness
+also passes offline Python syntax checks. The build does not execute Unreal
+automation, and the startup failure remains unexplained; do not retry that
+commandlet recipe unchanged. No assets were changed. Next, find a materially
+different safe validation route, then copy/remap only in the disposable
+project and compile/preview before touching live tree parents. Details:
 [runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
 
 ## 2026-11-01 — Give the rain basin breathing room

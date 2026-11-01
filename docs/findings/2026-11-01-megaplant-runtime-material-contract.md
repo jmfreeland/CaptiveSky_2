@@ -96,6 +96,21 @@ created. This is not evidence for or against material portability, and the
 NullRHI startup path should not be retried without addressing the bootstrap
 failure first.
 
+Crash-report follow-up: the saved report records `SecondsSinceStart=0`, a read
+access violation at null, and `PCallStackHash=F405610C114D120D4B6F5ABA901EC469AC9FAA26`.
+The partial stack is in `UnrealEditor-Core` and `UnrealEditor-Cmd`; the crash
+context's structured `CommandLine` field is empty even though the preceding
+startup log records the full sandbox command. Engine symbols are not installed
+with this UE distribution, so the offsets cannot currently be mapped to a
+function. This narrows the failure to commandlet bootstrap, but does not explain
+its cause.
+
+The isolated UE 5.8.3 Editor target subsequently compiled and linked
+successfully (44 UBT actions) against `Saved/CS58/CaptiveSky_2.uproject`.
+This validates the current worktree C++ modules, including ecology and
+resident tests, but does not execute Unreal automation or materialize the
+sandbox assets. The open D: editor and its binaries were not changed.
+
 This clears the package-mapping/collision gate, not the runtime-readiness gate.
 Next, use the isolated project when a stable UE launch path is available to
 materialize the closure, remap its graph references, then compile and preview
