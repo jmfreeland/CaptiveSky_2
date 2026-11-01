@@ -68,3 +68,14 @@ log records `r.Nanite.Foliage:1`, and the editor status bar showed **All Saved**
 This verifies the setting is active on this project process. The current
 viewport was a sea-facing editor view; foliage appearance, texture settling,
 and performance were not assessed, and PIE was not started.
+
+## Live editor recheck (2026-11-01)
+
+The currently open `CaptiveSky_2 - Unreal Editor` window is responsive and
+shows the Island with 183 actors. The Output Log still reports
+`r.Nanite.Foliage = "1"` with `LastSetBy: ProjectSetting`; the editor status
+bar shows `All Saved`. A fresh device snapshot reports 9,068 / 12,282 MiB in
+use (2,930 MiB free), 44% GPU utilization, and 75 °C. This is still below the
+4 GiB rendered-play gate, so no PIE/Game session was started. The editor's
+sea-facing view is not a foliage or shore-movement validation, and the
+water-walking report remains open.
