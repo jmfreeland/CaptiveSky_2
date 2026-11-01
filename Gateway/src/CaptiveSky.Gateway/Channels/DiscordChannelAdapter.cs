@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Net.Sockets;
 using CaptiveSky.Gateway.Configuration;
 using CaptiveSky.Gateway.Domain;
+using CaptiveSky.Gateway.Infrastructure;
 using CaptiveSky.Gateway.Proposals;
 using Discord;
 using Discord.WebSocket;
@@ -9,11 +11,20 @@ namespace CaptiveSky.Gateway.Channels;
 
 public sealed class DiscordChannelAdapter : IChannelAdapter
 {
+    private const int InboundQueueCapacity = 16;
+    private static readonly TimeSpan BackpressureNoticeInterval = TimeSpan.FromSeconds(30);
+
     private readonly AgentConfiguration _agent;
     private readonly DiscordSocketClient _client;
     private readonly AssetProposalQueue _proposalQueue;
+    private readonly BoundedAsyncQueue<SocketMessage> _inboundMessages = new(InboundQueueCapacity);
+    private readonly CancellationTokenSource _messagePumpShutdown = new();
+    private readonly object _backpressureNoticeLock = new();
+    private readonly Dictionary<ulong, DateTimeOffset> _lastBackpressureNoticeByChannel = [];
+    private CancellationTokenSource? _messageProcessingCancellation;
     private ExternalMessageHandler? _handler;
     private CancellationToken _shutdownToken;
+    private Task? _messagePump;
 
     public DiscordChannelAdapter(AgentConfiguration agent, string projectRoot)
     {
@@ -36,7 +47,7 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
         };
         _client.MessageReceived += message =>
         {
-            _ = Task.Run(() => HandleMessageAsync(message), _shutdownToken);
+            EnqueueEligibleMessage(message);
             return Task.CompletedTask;
         };
     }
@@ -44,7 +55,9 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
     public async Task StartAsync(ExternalMessageHandler handler, CancellationToken cancellationToken)
     {
         _handler = handler;
-        _shutdownToken = cancellationToken;
+        _messageProcessingCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken, _messagePumpShutdown.Token);
+        _shutdownToken = _messageProcessingCancellation.Token;
         var token = Environment.GetEnvironmentVariable(_agent.Discord.TokenEnvironmentVariable);
         if (string.IsNullOrWhiteSpace(token))
             throw new InvalidOperationException(
@@ -62,6 +75,7 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
             await ready.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            _messagePump = Task.Run(PumpInboundMessagesAsync, CancellationToken.None);
             Console.WriteLine($"Discord adapter ready: {_agent.AgentId} as {_client.CurrentUser.Username}.");
         }
         finally
@@ -72,13 +86,96 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        _messagePumpShutdown.Cancel();
+        _inboundMessages.Complete();
         await _client.StopAsync();
         await _client.LogoutAsync();
+        if (_messagePump is not null)
+        {
+            try
+            {
+                await _messagePump.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (_messagePumpShutdown.IsCancellationRequested)
+            {
+            }
+        }
+        _messageProcessingCancellation?.Dispose();
+        _messageProcessingCancellation = null;
     }
 
     public async ValueTask DisposeAsync()
     {
+        _messagePumpShutdown.Cancel();
+        _inboundMessages.Complete();
+        if (_messagePump is not null)
+            await _messagePump;
+        _messageProcessingCancellation?.Dispose();
+        _messageProcessingCancellation = null;
+        _messagePumpShutdown.Dispose();
         await _client.DisposeAsync();
+    }
+
+    private void EnqueueEligibleMessage(SocketMessage socketMessage)
+    {
+        if (_messagePumpShutdown.IsCancellationRequested ||
+            socketMessage is not SocketUserMessage message ||
+            !IsAllowedAuthor(message.Author.Id, message.Author.IsBot, _agent.Discord) ||
+            !IsAddressedToAgent(message) ||
+            (message.Author.IsBot &&
+             (message.Channel is not SocketGuildChannel || !IsAllowedBotChannel(message.Channel.Id, _agent.Discord))))
+        {
+            return;
+        }
+
+        if (_inboundMessages.TryEnqueue(message))
+            return;
+
+        Console.Error.WriteLine($"Discord/{_agent.AgentId} inbound queue full; message {message.Id} was not queued.");
+        if (TryReserveBackpressureNotice(message.Channel.Id))
+            _ = SendBackpressureNoticeAsync(message);
+    }
+
+    private async Task PumpInboundMessagesAsync()
+    {
+        try
+        {
+            await foreach (var message in _inboundMessages.ReadAllAsync(_messagePumpShutdown.Token))
+                await HandleMessageAsync(message);
+        }
+        catch (OperationCanceledException) when (_messagePumpShutdown.IsCancellationRequested)
+        {
+        }
+    }
+
+    private bool TryReserveBackpressureNotice(ulong channelId)
+    {
+        lock (_backpressureNoticeLock)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (_lastBackpressureNoticeByChannel.TryGetValue(channelId, out var lastNotice) &&
+                now - lastNotice < BackpressureNoticeInterval)
+            {
+                return false;
+            }
+
+            _lastBackpressureNoticeByChannel[channelId] = now;
+            return true;
+        }
+    }
+
+    private async Task SendBackpressureNoticeAsync(SocketUserMessage message)
+    {
+        try
+        {
+            await message.Channel.SendMessageAsync(
+                "I’m catching up on a few messages. This one wasn’t queued; please send it again in a moment.",
+                messageReference: new MessageReference(message.Id));
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"Discord/{_agent.AgentId} could not send an overload notice: {exception.GetType().Name}.");
+        }
     }
 
     private static string GetExceptionTypeChain(Exception? exception)

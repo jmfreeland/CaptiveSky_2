@@ -1,5 +1,20 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Bound Discord turn backlogs for multi-user hosting
+
+Discord events previously spawned one task per inbound message, even though
+the per-agent runtime lease serializes the actual turn. A burst could therefore
+leave an unbounded set of waiting tasks behind the lease. Each route now feeds
+a FIFO queue capped at 16 messages and processes accepted messages in arrival
+order. When full, a new message is explicitly not queued and an allow-listed,
+addressed sender receives a resend notice at most once per channel every 30
+seconds. Unaddressed guild chatter is filtered before queue admission, so it
+cannot occupy the agent's turn slots. The gateway checks cover ordering, capacity, overflow, drain, and
+invalid capacity; all checks passed. The cap is per agent route and does not
+change the embodied play/request limits. If more channel adapters are added,
+keep the same per-agent bounded-routing boundary rather than giving each
+adapter an independent unlimited worker pool. Details: [Gateway README](../Gateway/README.md).
+
 ## 2026-11-01 — Add a RAM guard to hidden resident-feedback runs
 
 The 15-minute NullRHI character-feedback path now requires the existing 4 GiB

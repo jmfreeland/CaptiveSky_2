@@ -20,6 +20,21 @@ if (args.Length == 2 && args[0] == "--hold-proposal-inbox-lock")
 var configuredRoot = Environment.GetEnvironmentVariable("CAPTIVESKY_GATEWAY_CHECKS_ROOT");
 var rootBase = string.IsNullOrWhiteSpace(configuredRoot) ? Path.GetTempPath() : configuredRoot;
 var root = Path.Combine(Path.GetFullPath(rootBase), $"CaptiveSkyGatewayChecks-{Guid.NewGuid():N}");
+
+var inboundQueue = new BoundedAsyncQueue<int>(2);
+Assert(inboundQueue.TryEnqueue(1) && inboundQueue.TryEnqueue(2), "bounded inbound queue accepts work up to capacity");
+Assert(!inboundQueue.TryEnqueue(3), "bounded inbound queue rejects excess work instead of accumulating tasks");
+await using (var inboundReader = inboundQueue.ReadAllAsync().GetAsyncEnumerator())
+{
+    Assert(await inboundReader.MoveNextAsync() && inboundReader.Current == 1, "bounded inbound queue preserves FIFO order");
+    Assert(inboundQueue.TryEnqueue(3), "dequeueing work makes queue capacity available again");
+    inboundQueue.Complete();
+    Assert(await inboundReader.MoveNextAsync() && inboundReader.Current == 2, "bounded queue retains already accepted work");
+    Assert(await inboundReader.MoveNextAsync() && inboundReader.Current == 3, "bounded queue drains newly accepted work in order");
+    Assert(!await inboundReader.MoveNextAsync(), "completed bounded queue terminates after draining");
+}
+AssertThrows<ArgumentOutOfRangeException>(() => new BoundedAsyncQueue<int>(0), "bounded queue rejects zero capacity");
+
 try
 {
     var home = new AgentHome(root, "Agent_Test_01");

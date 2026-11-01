@@ -19,6 +19,7 @@ Discord is the first channel adapter, not part of the agent model. Routing, iden
 - External memories are tagged with their channel and stable participant ID. Headless correspondence uses a zero location; embodied correspondence records the body's actual location and first-person context.
 - Discord delivery IDs are remembered under `Agents/<AgentId>/.gateway/` so reconnects cannot create duplicate experiences.
 - A per-agent gateway lease prevents two gateway processes from thinking as the same being simultaneously.
+- Each Discord route filters for permitted messages addressed to that agent, then processes them in arrival order through a bounded 16-message queue. This prevents ordinary channel chatter or a message burst from creating an unbounded task backlog behind the per-agent lease; when the queue is full, the message is explicitly not queued and the channel receives a throttled resend notice.
 - Every autonomous Unreal body publishes a short-lived embodiment lease. Only one body with a given `AgentId` may own it.
 
 ## Embodiment handoff
