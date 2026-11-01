@@ -21,6 +21,9 @@ namespace
 	constexpr float ShootingStarPhaseDuration = 0.16f;
 	constexpr float ShootingStarHalfLength = 30000.f;
 	constexpr float ShootingStarHalfWidth = 1800.f;
+	constexpr int32 MoonDiscSectionIndex = AIslandDayNight::NightStarSectionCount + 1;
+	constexpr int32 MoonDiscSegmentCount = 48;
+	constexpr float MoonDiscRadius = 9000.f;
 
 	float GetShootingStarAnimationProgress(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination)
 	{
@@ -69,6 +72,44 @@ namespace
 		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Colors.Add(MeteorColor);
 		const FProcMeshTangent Tangent(Trail, false);
 		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Tangents.Add(Tangent);
+	}
+
+	void BuildMoonDisc(FVector Direction, float Illumination,
+		TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals,
+		TArray<FVector2D>& UVs, TArray<FColor>& Colors, TArray<FProcMeshTangent>& Tangents)
+	{
+		Direction = Direction.GetSafeNormal();
+		if (Direction.IsNearlyZero()) Direction = FVector::UpVector;
+		FVector Right = FVector::CrossProduct(Direction, FVector::UpVector).GetSafeNormal();
+		if (Right.IsNearlyZero()) Right = FVector::CrossProduct(Direction, FVector::RightVector).GetSafeNormal();
+		const FVector Up = FVector::CrossProduct(Right, Direction).GetSafeNormal();
+		const FVector Center = Direction * AIslandDayNight::NightStarShellRadius;
+		const FColor MoonColor = (FLinearColor(0.78f, 0.86f, 1.f) * FMath::Clamp(Illumination, 0.f, 1.f)).ToFColor(true);
+		Vertices.Reserve(MoonDiscSegmentCount + 1);
+		Triangles.Reserve(MoonDiscSegmentCount * 3);
+		Normals.Reserve(MoonDiscSegmentCount + 1);
+		UVs.Reserve(MoonDiscSegmentCount + 1);
+		Colors.Reserve(MoonDiscSegmentCount + 1);
+		Tangents.Reserve(MoonDiscSegmentCount + 1);
+		Vertices.Add(Center);
+		Normals.Add(-Direction);
+		UVs.Add(FVector2D(0.5f, 0.5f));
+		Colors.Add(MoonColor);
+		Tangents.Add(FProcMeshTangent(Right, false));
+		for (int32 Segment = 0; Segment < MoonDiscSegmentCount; ++Segment)
+		{
+			const float Angle = 2.f * PI * static_cast<float>(Segment) / MoonDiscSegmentCount;
+			const float X = FMath::Cos(Angle);
+			const float Y = FMath::Sin(Angle);
+			Vertices.Add(Center + (Right * X + Up * Y) * MoonDiscRadius);
+			Normals.Add(-Direction);
+			UVs.Add(FVector2D(0.5f + X * 0.5f, 0.5f + Y * 0.5f));
+			Colors.Add(MoonColor);
+			Tangents.Add(FProcMeshTangent(Right, false));
+			Triangles.Add(0);
+			Triangles.Add(Segment + 1);
+			Triangles.Add((Segment + 1) % MoonDiscSegmentCount + 1);
+		}
 	}
 }
 
@@ -390,6 +431,18 @@ void AIslandDayNight::BuildStarfield()
 		MeteorUVs, MeteorColors, MeteorTangents, false);
 	Starfield->SetMaterial(ShootingStarSectionIndex, StarMaterial);
 	Starfield->SetMeshSectionVisible(ShootingStarSectionIndex, false);
+
+	TArray<FVector> MoonVertices;
+	TArray<int32> MoonTriangles;
+	TArray<FVector> MoonNormals;
+	TArray<FVector2D> MoonUVs;
+	TArray<FColor> MoonColors;
+	TArray<FProcMeshTangent> MoonTangents;
+	BuildMoonDisc(FVector::UpVector, 1.f, MoonVertices, MoonTriangles, MoonNormals, MoonUVs, MoonColors, MoonTangents);
+	Starfield->CreateMeshSection(MoonDiscSectionIndex, MoonVertices, MoonTriangles, MoonNormals,
+		MoonUVs, MoonColors, MoonTangents, false);
+	Starfield->SetMaterial(MoonDiscSectionIndex, StarMaterial);
+	Starfield->SetMeshSectionVisible(MoonDiscSectionIndex, false);
 }
 
 void AIslandDayNight::UpdateStarfieldVisibility(float SolarElevation)
@@ -507,6 +560,31 @@ void AIslandDayNight::UpdateLighting()
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
 	Moon->SetIntensity(FMath::Max(0.f, MoonIntensity) * MoonlightScale(LunarIlluminationAmount) *
 		NightAmount(CurrentHour) * CloudMoonlightTransmission(CloudCover));
+	const FVector MoonDirection = Moon ? -Moon->GetForwardVector().GetSafeNormal() : FVector::ZeroVector;
+	const bool bShowMoonDisc = Starfield && Moon && MoonDirection.Z > 0.1f &&
+		NightAmount(CurrentHour) > 0.25f && LunarIlluminationAmount > 0.035f &&
+		!IsMoonHiddenByCloud(MoonHeight(DayNumber, CurrentHour), NightAmount(CurrentHour), CloudCover) &&
+		MoonIntensity > 0.f;
+	if (bShowMoonDisc)
+	{
+		TArray<FVector> MoonVertices;
+		TArray<int32> MoonTriangles;
+		TArray<FVector> MoonNormals;
+		TArray<FVector2D> MoonUVs;
+		TArray<FColor> MoonColors;
+		TArray<FProcMeshTangent> MoonTangents;
+		BuildMoonDisc(MoonDirection,
+			LunarIlluminationAmount * CloudMoonlightTransmission(CloudCover) * FMath::Clamp(MoonIntensity / 1.5f, 0.f, 1.f),
+			MoonVertices, MoonTriangles, MoonNormals, MoonUVs, MoonColors, MoonTangents);
+		Starfield->UpdateMeshSection(MoonDiscSectionIndex, MoonVertices, MoonNormals, MoonUVs, MoonColors, MoonTangents);
+		Starfield->SetMeshSectionVisible(MoonDiscSectionIndex, true);
+	}
+	else if (Starfield)
+	{
+		if (const FProcMeshSection* MoonSection = Starfield->GetProcMeshSection(MoonDiscSectionIndex);
+			MoonSection && MoonSection->bSectionVisible)
+			Starfield->SetMeshSectionVisible(MoonDiscSectionIndex, false);
+	}
 	const float StarlightAmount = FMath::Max(NightAmount(CurrentHour), TwilightFillAmount(CurrentHour) * TwilightFillStrength);
 	Starlight->SetIntensity(FMath::Max(0.f, StarlightIntensity) * StarlightAmount);
 	if (Sky) Sky->GetLightComponent()->SetIntensity(

@@ -241,8 +241,8 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	};
 	if (Clock->Starfield)
 	{
-		TestEqual(TEXT("The starfield has six twilight groups plus one transient meteor section"),
-			Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount + 1);
+		TestEqual(TEXT("The sky mesh has six star groups, a transient meteor, and a moon disc"),
+			Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount + 2);
 		int32 ProceduralStarVertices = 0;
 		float SmallestStarWidth = TNumericLimits<float>::Max();
 		float LargestStarWidth = 0.f;
@@ -271,6 +271,14 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		{
 			TestEqual(TEXT("The shooting star uses one lightweight four-vertex card"), MeteorSection->ProcVertexBuffer.Num(), 4);
 			TestFalse(TEXT("The meteor card starts hidden"), MeteorSection->bSectionVisible);
+		}
+		const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1);
+		TestNotNull(TEXT("The lunar disc is preallocated in the shared sky mesh"), MoonSection);
+		if (MoonSection)
+		{
+			TestEqual(TEXT("The smooth moon disc has one center plus 48 perimeter vertices"), MoonSection->ProcVertexBuffer.Num(), 49);
+			TestEqual(TEXT("The moon disc is a lightweight 48-triangle fan"), MoonSection->ProcIndexBuffer.Num(), 144);
+			TestFalse(TEXT("The moon disc starts hidden in daylight"), MoonSection->bSectionVisible);
 		}
 	}
 	int32 MeteorWeatherSeed = 0;
@@ -333,6 +341,9 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 			bNoStarGroupsAtNoon &= Section && !Section->bSectionVisible;
 		}
 	TestTrue(TEXT("Daylight keeps all star groups hidden"), bNoStarGroupsAtNoon);
+	if (Clock->Starfield)
+		if (const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1))
+			TestFalse(TEXT("The moon disc remains hidden at noon"), MoonSection->bSectionVisible);
 	TestEqual(TEXT("Default moon illumination is tuned for a visible but dark night"), Clock->MoonIntensity, 1.5f);
 	TestTrue(TEXT("Fixed-exposure night fill keeps a readable skylight floor"), AIslandDayNight::NightSkylightFloor >= 2.5f);
 	Clock->CurrentHour = 17.f;
@@ -355,6 +366,9 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->CurrentHour = 0.f;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("New moon"));
+	if (Clock->Starfield)
+		if (const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1))
+			TestFalse(TEXT("A new moon does not show an illuminated disc"), MoonSection->bSectionVisible);
 	bool bFirstTwilightGroupVisible = false;
 	if (Clock->Starfield)
 		if (const FProcMeshSection* FirstStarGroup = Clock->Starfield->GetProcMeshSection(0))
@@ -385,6 +399,9 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->DayNumber = 15;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("Full moon"));
+	if (Clock->Starfield)
+		if (const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1))
+			TestTrue(TEXT("A clear, risen full moon reveals its procedural disc"), MoonSection->bSectionVisible);
 	const float FullMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near full moon, the moon moves opposite the sun's arc"), FullMoonOffset > 170.f);
 	const FString FullMoonDescription = Clock->DescribeTime();
@@ -432,6 +449,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A clear near-full-moon midnight keeps moonlight active"), FMath::IsNearlyEqual(Clock->Moon->Intensity,
 		Clock->MoonIntensity * AIslandDayNight::MoonlightScale(AIslandDayNight::LunarIllumination(Clock->DayNumber, Clock->CurrentHour)) *
 		AIslandDayNight::CloudMoonlightTransmission(Weather->SampleCloudCover(World->GetTimeSeconds())), 0.001f));
+	Weather->WeatherSeed = OvercastSeed;
+	Clock->UpdateLighting();
+	if (Clock->Starfield)
+		if (const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1))
+			TestFalse(TEXT("Thick cloud hides the moon disc with the reported moon"), MoonSection->bSectionVisible);
+	Weather->WeatherSeed = ClearSeed;
+	Clock->UpdateLighting();
 	const float ClearMoonlight = Clock->Moon->Intensity;
 	Weather->WeatherSeed = OvercastSeed;
 	Clock->UpdateLighting();

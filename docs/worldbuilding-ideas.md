@@ -1,5 +1,16 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Give the Island's lunar clock a visible moon
+
+The Island already tracked a 29.53-day lunar cycle, changing moonrise/set and
+moonlight, but no moon appeared in the sky. The existing procedural sky mesh
+now carries a small disc at the actual moon-light direction; it dims with phase
+and cloud transmission, and hides below the horizon, in daylight, at new moon,
+or under thick cloud. It uses 48 triangles and no additional actor or asset.
+Build and deterministic visibility tests are the immediate checks; a night
+render still needs GPU headroom. The disc is phase-tinted rather than a shaped
+crescent, which remains an art upgrade. See [visible lunar disc](findings/2026-11-01-visible-lunar-disc.md).
+
 ## 2026-11-01 — Let residents see the shooting stars they describe
 
 The night calendar already made rare meteors part of the sky's narration, but
