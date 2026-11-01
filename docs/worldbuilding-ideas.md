@@ -9,15 +9,22 @@ with its own non-colliding, non-navigable instanced-skinned component and a
 450–700 cm height band. The mature-tree total remains capped at 3,600; when
 all five assets resolve, the per-species cap is 720. Existing species keep
 their A/B variation, while Hazel uses the inspected A mesh only. Resident
-observations can name Common Hazel. Next: compile and run the focused
-broadleaf/Nanite automation in the isolated project whose Content junction
-resolves the installed Fab assets, then compare a rendered Island view and
-memory/frame-time telemetry before syncing code to the live D: checkout. The
+observations can name Common Hazel. Next: run the focused broadleaf/Nanite
+automation in the isolated project whose Content junction resolves the
+installed Fab assets, then compare a rendered Island view and memory/frame-time
+telemetry before syncing code to the live D: checkout. The
 UE 5.8.3 editor target has now compiled and linked successfully (41 actions),
 including the new component, scatter path, resident description, and tests.
 The focused automation is not yet run: the active editor is the separate live
 D: checkout, and the previous headless commandlet attempt failed before engine
-startup. No live map or asset was changed.
+startup. A read-only look at the live editor's actual
+`Tree_Common_Hazel_01_A` Skeletal Mesh preview confirms the compact, leafy
+multi-stem silhouette (3,714 LOD0 triangles; approximately 5.32 m bounds); it
+is an asset sanity check, not an Island placement review. The workstation's
+GPU snapshot during this review reported 10,752 MiB used, only 1,246 MiB free,
+76 °C, and 46% utilization. This is below the existing 4 GiB rendered-session
+gate, so no second editor or Game renderer was started. No live map or asset
+was changed.
 
 ## 2026-11-01 — Prepare a no-default-site review for Rat's fallen-wood hollow
 
