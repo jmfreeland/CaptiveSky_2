@@ -109,6 +109,8 @@ components before source syncing more diversity code.
 
 ## Next step
 
+**Current desktop recheck:** a read-only app snapshot shows both `CaptiveSky_2 - Unreal Editor` and a separate `Tree_Common_Hazel_01_A` asset-editor window; the mesh preview is focused. This confirms the Hazel asset is open for inspection, not that it has been placed or rendered on the Island. The latest D: log has no `Island tree mix` runtime count entry. The latest GPU sample is 10,774/12,282 MiB used (1,224 MiB free), 43% utilization, 76°C, below the 4 GiB reserve. No editor input, PIE, additional renderer, source sync, or map edit was performed.
+
 Once GPU headroom permits, inspect live per-species instance counts and
 component visibility, then merge only any missing diversity behavior. Separately,
 agree on a controlled source-sync point for D: (including preservation of any
