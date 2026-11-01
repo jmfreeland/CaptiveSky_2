@@ -16,7 +16,7 @@ this file is the text version and the map of everything under `docs/`.
 |---|---|
 | `ecology/` | Notes on living systems and seasonal ecology (Tideglass water, minnows, dragonflies, shore grass, meadow flowers, rain basin, Island seasons). |
 | `residents/` | Drafts and active profiles for residents (rat, innkeeper). |
-| `plans/` | Forward plans, currently the inn. |
+| `plans/` | Forward plans for the inn and shared-world hosting. |
 | `findings/` | Dated, evidence-based reviews and test reports (the project's lab notebook). |
 | `worldbuilding-ideas.md` | Weekly idea branches and their verification notes. |
 | `technical-ideas.md` | Engineering ideas not yet built. |

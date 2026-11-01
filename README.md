@@ -35,10 +35,11 @@ All of that state is saved in `WorldState/<Map>.json`, and the Island clock (hou
 
 Where to look:
 - **This README:** the dated sections under Roadmap below are the design record for each system, newest last.
-- **`docs/plans/`:** forward plans (the inn).
+- **`docs/plans/`:** forward plans for the inn and shared-world hosting.
 - **`docs/residents/`:** proposed future residents (the rat and the still-unnamed innkeeper).
 - **`docs/findings/`:** evidence-based reviews, such as the resident memory review and [landscape-material audit](docs/findings/2026-09-28-landscape-material-audit.md).
 - **`COORDINATION.md`:** how Claude Code and Codex share this tree.
+- **Shared-world hosting plan:** [authority, persistence, privacy, safety, and staged multiplayer evidence](docs/plans/shared-world-hosting.md).
 - **Tools:**
   - `Scripts/Capture-Viewpoints.ps1`: journey captures.
   - `Scripts/Probe-InnkeeperMovement.ps1`: isolated runtime movement check; agent thinking is disabled and data is redirected under `Saved/Playtests/`.
