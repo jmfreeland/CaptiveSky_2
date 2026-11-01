@@ -71,6 +71,27 @@ shortcut; capture the relevant Unreal/Zen logs and identify the owner first.
   started; this finding makes no runtime claim beyond what the captured
   startup logs establish.
 
+## Vegetation source-parity recheck (2026-11-01)
+
+The current worktree's `IslandWeather.cpp` resolves and scatters five broadleaf
+canopy species—Norway maple, European aspen, European beech, black alder, and
+Common Hazel—inside seeded, spatially clustered groves. The mature-tree budget
+is fixed, and the separate birch/hazel coppice layer is non-colliding. A
+read-only SHA-256 comparison against the on-disk D: project's
+`Source/CaptiveSky_2/Agent/IslandWeather.cpp` confirms that file is different;
+the D: copy is dated 2026-10-29, while the current worktree includes the later
+species work. This is consistent with the reported single-species view, but
+does not prove the runtime cause or the exact live editor checkout. Do not
+copy the file wholesale: the existing 378-file checkout divergence makes that
+unsafe without a deliberate source merge.
+
+The current GPU sample was 1,224 MiB free (10,774 MiB used of 12,282 MiB),
+below the established 4 GiB reserve. No PIE, second renderer, source sync, or
+map edit was attempted. The worktree diversity logic is already present; the
+next useful step is a controlled source-sync/merge with the D: checkout,
+followed by a rendered composition and performance review once GPU headroom
+passes the gate.
+
 ## Next step
 
 Agree on a controlled source-sync point for D: (including preservation of any
