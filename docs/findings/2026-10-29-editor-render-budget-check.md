@@ -82,3 +82,34 @@ utilization, and 80°C. WDDM exposed no per-process rows, so attribution to
 Unreal is unavailable. PIE remains stopped; defer the runtime scatter check
 until GPU headroom improves and the main project's source checkout can safely
 receive the branch changes. No editor asset or level was modified.
+
+## Live transient-target recheck — 2026-11-01 03:34 UTC
+
+From the restarted D: editor's Session Frontend, a read-only `ListTextures`
+command reproduced the large editor render-target footprint. The live
+`r.Streaming.PoolSize` query returned 4096 with `LastSetBy: SystemSettingsIni`.
+At 03:34:24 UTC the inventory reported 1,637 MiB in
+`TEXTUREGROUP_RenderTarget` and 216 MiB in
+`TEXTUREGROUP_Terrain_Heightmap`. The largest 4096×4096 transient allocations
+were 256 MiB each for `JumpFloodRTA/B` and `WaterDepthAndVelocityRT`, 128 MiB
+each for `CombinedVelocityAndHeightRTA/B` and `DepthAndShapeRT`, plus five
+64 MiB `ScratchLandscapeRT2D` targets, two 64 MiB heightmap targets, and two
+16 MiB weightmap targets. The editor's installed Water plugin header declares
+these as transient `AWaterBrushManager` render targets; it exposes calculated
+`LandscapeRTRes`, but the plugin implementation source is not installed here,
+so no safe resolution-control path is verified.
+
+The same idle, offshore view counted only 113.68 MiB in `TEXTUREGROUP_World`
+and 21.80 MiB in `TEXTUREGROUP_WorldNormalMap`. The installed 8K foliage
+textures queried by the dump were currently resident at 64×64 mips. This does
+not describe a woodland gameplay camera, but it provides no basis for reducing
+the source foliage textures; the observed editor footprint is dominated by
+transient render targets, not currently resident foliage mips.
+
+An immediately following whole-device sample showed 9,131 / 12,282 MiB used,
+2,867 MiB free, 51% utilization, and 75 °C—still below the 4 GiB rendered-play
+gate. The repeat strengthens the editor-memory lead, but does not establish
+that these allocations persist or peak during PIE, or caused the earlier
+graphics-memory warning. No water-resolution or landscape setting was changed;
+do not tune these editor buffers until their lifetime and game-time cost can
+be measured safely.
