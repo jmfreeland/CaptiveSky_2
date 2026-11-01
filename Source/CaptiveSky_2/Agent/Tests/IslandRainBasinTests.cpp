@@ -255,8 +255,13 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			Resident->AddInstanceComponent(Brain);
 			Brain->RegisterComponent();
 			const FString Situation = Brain->BuildSituationSummary(FAgentConversationContext());
+			const FString SystemPrompt = Brain->BuildSystemPrompt({});
 			TestTrue(TEXT("Resident situation names the nearby basin and its exact interaction target"),
 				Situation.Contains(TEXT("rain basin")) && Situation.Contains(TEXT("RainBasin")) && Situation.Contains(TEXT("rainwater")));
+			TestTrue(TEXT("Resident prompt separates out-of-range object approach from interaction while forbidding wildlife pursuit"),
+				SystemPrompt.Contains(TEXT("more than four metres away, choose move_to with its exact target first")) &&
+				SystemPrompt.Contains(TEXT("Wildlife are never movement targets")) &&
+				SystemPrompt.Contains(TEXT("interact only when already within four metres")));
 
 			const bool bCanInteract = IslandInteractionUtility::CanInteract(Resident, BasinActor, 250.f);
 			TestTrue(*FString::Printf(TEXT("Resident can perceive the basin at %.1f cm (hidden=%d)"),

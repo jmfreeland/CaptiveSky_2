@@ -23,3 +23,18 @@ feedback pass should check whether Rat approaches first and only floats a leaf
 when the basin is wet and he is within reach.
 
 Run log: [`Codex_RainBasinRangeAffordance_20261101.log`](../../Saved/CS58/Saved/Logs/Codex_RainBasinRangeAffordance_20261101.log).
+
+## General interaction rule follow-up
+
+The ordinary resident decision prompt now generalizes the same range contract
+to inanimate landmarks and objects: beyond four metres, move to the exact
+offered target first and reconsider interaction after arrival. It explicitly
+keeps wildlife outside `move_to` and permits wildlife interaction only when
+already within four metres. This keeps the failed basin choice from becoming a
+repeatable pattern at the other shared landmark affordances without making
+movement or interaction automatic.
+
+The UE 5.8.3 scratch Editor target rebuilt successfully after the prompt change.
+The focused `IslandRainBasin` and `IslandRainBasinWorld` automation tests both
+passed under NullRHI, including an assertion for the global prompt contract.
+Run log: [`Codex_RainBasinGlobalRange_20261101.log`](../../Saved/CS58/Saved/Logs/Codex_RainBasinGlobalRange_20261101.log).
