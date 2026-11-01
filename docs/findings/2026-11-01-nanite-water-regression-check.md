@@ -129,3 +129,23 @@ launcher argument is available; no such session was started, and the current
 model-active live run, verify its startup log reports the explicit 900/64 caps
 and keep its data root isolated. The D: project has not been synchronized with
 the worktree's 64-request hard ceiling.
+
+## Saved-map water collision regression
+
+The existing `CaptiveSky2.Agent.IslandOcean` test covers a transient swim
+fixture and verifies that play start disables the legacy `OceanPlane`, but it
+did not inspect the authored Island's own water geometry. Added
+`CaptiveSky2.Agent.IslandOcean.SavedMapCollision`, which loads
+`/Game/Maps/Island.Island` and checks that the saved ocean plane, native ocean
+collision components, and generated water-zone mesh cannot block the player
+channel. This makes the next water audit target the actual saved map instead
+of only a synthetic world.
+
+The isolated UE 5.8.3 Editor target compiled and linked successfully (4 build
+actions, including `IslandOceanTests.cpp`). The test itself has not run: the
+open D: editor loads its separate project module, and the known NullRHI
+pre-initialization crash remains. This is compile evidence, not proof that the
+saved Island passes the collision assertions or that player traversal now
+swims. Run the focused test from an editor that loads this worktree module;
+then perform the same real-RHI shoreline traversal only after the 4 GiB GPU
+headroom gate is met.

@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "IslandOceanSubsystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -20,7 +21,67 @@
 #include "WaterBodyComponent.h"
 #include "WaterBodyOceanActor.h"
 #include "WaterSubsystem.h"
+#include "WaterMeshComponent.h"
 #include "WaterZoneActor.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanSavedMapCollisionTest,
+	"CaptiveSky2.Agent.IslandOcean.SavedMapCollision",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandOceanSavedMapCollisionTest::RunTest(const FString& Parameters)
+{
+	// The transient swim fixtures below cannot see a second collider left in the
+	// authored Island. Inspect the actual saved map's water surfaces and require
+	// that none of their collision geometry can support the player capsule.
+	UWorld* IslandMap = LoadObject<UWorld>(nullptr, TEXT("/Game/Maps/Island.Island"));
+	if (!TestNotNull(TEXT("The saved Island map loads for its collision audit"), IslandMap))
+	{
+		return false;
+	}
+
+	AStaticMeshActor* OceanPlane = UIslandOceanSubsystem::FindOceanPlane(IslandMap);
+	if (TestNotNull(TEXT("The saved Island contains its legacy ocean plane"), OceanPlane))
+	{
+		UStaticMeshComponent* PlaneMesh = OceanPlane->GetStaticMeshComponent();
+		if (TestNotNull(TEXT("The saved ocean plane has a mesh component"), PlaneMesh))
+		{
+			TestFalse(TEXT("The saved legacy ocean plane cannot block the player"),
+				PlaneMesh->IsCollisionEnabled() && PlaneMesh->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block);
+		}
+	}
+
+	int32 OceanBodyCount = 0;
+	for (TActorIterator<AWaterBodyOcean> It(IslandMap); It; ++It)
+	{
+		++OceanBodyCount;
+		UWaterBodyComponent* WaterBody = It->GetWaterBodyComponent();
+		if (!TestNotNull(TEXT("A saved ocean body has a water component"), WaterBody)) continue;
+
+		const TArray<UPrimitiveComponent*> CollisionComponents = WaterBody->GetCollisionComponents(false);
+		for (int32 ComponentIndex = 0; ComponentIndex < CollisionComponents.Num(); ++ComponentIndex)
+		{
+			const UPrimitiveComponent* Collision = CollisionComponents[ComponentIndex];
+			if (!Collision) continue;
+			const FString Context = FString::Printf(TEXT("Saved ocean collision component %s cannot block the player"), *Collision->GetName());
+			TestFalse(Context, Collision->IsCollisionEnabled() &&
+				Collision->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block);
+		}
+	}
+	TestTrue(TEXT("The saved Island has a native ocean body to audit"), OceanBodyCount > 0);
+
+	int32 WaterZoneCount = 0;
+	for (TActorIterator<AWaterZone> It(IslandMap); It; ++It)
+	{
+		++WaterZoneCount;
+		const UWaterMeshComponent* WaterMesh = It->GetWaterMeshComponent();
+		if (!TestNotNull(TEXT("A saved water zone has its water mesh component"), WaterMesh)) continue;
+		const FString Context = FString::Printf(TEXT("Saved water mesh %s cannot block the player"), *WaterMesh->GetName());
+		TestFalse(Context, WaterMesh->IsCollisionEnabled() &&
+			WaterMesh->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block);
+	}
+	TestTrue(TEXT("The saved Island has a native water zone to audit"), WaterZoneCount > 0);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcean",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
