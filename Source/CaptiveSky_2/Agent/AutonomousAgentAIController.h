@@ -37,7 +37,7 @@ public:
 
 	// How often the agent asks its brain for a new decision while no request is already in flight.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
-	float ThinkIntervalSeconds = 120.f;
+	float ThinkIntervalSeconds = 240.f;
 
 	// Radius used to pick a random reachable point for the Wander action.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent")
@@ -77,8 +77,8 @@ public:
 		const FVector& TargetLocation, FNavLocation& OutGoal, AActor* PathfindingContext = nullptr);
 	/** Fallback lifetime cap applies only to bounded play; continuous mode is governed by the shared session budget. */
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
-	/** Minimum spacing between autonomous background requests; conversations remain immediate. */
-	static constexpr double MinimumBackgroundThinkIntervalSeconds = 120.0;
+	/** Minimum spacing between autonomous background requests; direct conversations remain immediate. */
+	static constexpr double MinimumBackgroundThinkIntervalSeconds = 240.0;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;

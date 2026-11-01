@@ -56,7 +56,7 @@ public:
 	static constexpr float MinimumConversationCooldownSeconds = 300.f;
 	static float EffectiveConversationCooldownSeconds(float ConfiguredSeconds);
 	/** Replies pause so an exchange does not become a burst of model calls and speech. */
-	static constexpr float MinimumConversationReplyPauseSeconds = 25.f;
+	static constexpr float MinimumConversationReplyPauseSeconds = 60.f;
 	static float EffectiveConversationReplyPauseSeconds(float ConfiguredSeconds);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "100.0"))
@@ -69,9 +69,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "300.0"))
 	float ConversationCooldownSeconds = 300.f;
 
-	/** Minimum real-time pause before replying to another resident within an automatic exchange. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "25.0"))
-	float ConversationReplyPauseSeconds = 25.f;
+	/** Minimum real-time pause between replies in an automatic conversation. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "60.0"))
+	float ConversationReplyPauseSeconds = 60.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "1", ClampMax = "16"))
 	int32 MaximumPendingUtterances = 4;

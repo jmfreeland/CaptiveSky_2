@@ -43,12 +43,12 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	SessionRequests = 64;
 	UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(TEXT("-CaptiveSkyMaxRealtimeSeconds=12"), SessionSeconds, SessionRequests);
 	TestEqual(TEXT("Omitting the request override preserves the configured request cap"), SessionRequests, 64);
-	TestEqual(TEXT("Legacy Blueprint intervals are raised to the patient two-minute minimum"),
+	TestEqual(TEXT("Legacy Blueprint intervals are raised to the patient four-minute minimum"),
 		AAutonomousAgentAIController::BackgroundDelay(0, 15), AAutonomousAgentAIController::MinimumBackgroundThinkIntervalSeconds);
 	TestEqual(TEXT("A slower designer-authored background interval is preserved"),
-		AAutonomousAgentAIController::BackgroundDelay(0, 180), 180.0);
+		AAutonomousAgentAIController::BackgroundDelay(0, 300), 300.0);
 	TestEqual(TEXT("Repeated background choices back off from the new minimum"),
-		AAutonomousAgentAIController::BackgroundDelay(2, 120), 240.0);
+		AAutonomousAgentAIController::BackgroundDelay(2, 240), 300.0);
 	TestEqual(TEXT("Background backoff remains capped at five minutes"),
 		AAutonomousAgentAIController::BackgroundDelay(1000, 60), 300.0);
 	TestEqual(TEXT("Invalid designer timing uses the safe minimum"),
