@@ -60,3 +60,23 @@ symbolized dump or materially different engine startup path first. The latest
 device sample remains below the separate 4 GiB rendered-session gate.
 
 Crash artifact: [`Codex_PostRangePrompt_20261101.log`](../../Saved/CS58/Saved/Crashes/_0000/Codex_PostRangePrompt_20261101.log).
+
+### Trace-server-disabled startup diagnostic
+
+A materially different, shorter NullRHI startup was then tried with
+`-DisableTraceServer`, agent thinking disabled, Python disabled, a fresh
+isolated data root, a 120-second startup timeout, a 30-second runtime cap, and
+zero model requests. Unreal still exited before the world-ready marker with the
+same zero-second null-access signature and exact hash
+`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. The captured startup log confirms
+`-notraceserver` was applied and tracing stayed in-memory, so Trace Server
+startup is not the distinguishing cause of this failure. No further identical
+launch retries are warranted without symbols or a materially changed engine
+startup path.
+
+The actual D: editor is still visible through the desktop and remains on a
+sea-facing Island viewport; it provides no view of the runtime vegetation or
+shoreline. Whole-device GPU memory is still 9,616 / 12,282 MiB used (2,382 MiB
+free, 45% utilization, 74 °C), below the 4,096 MiB rendered-play reserve.
+
+Crash artifact: [`Codex_TraceDisabledStartup_20261101.log`](../../Saved/CS58/Saved/Crashes/_0000/Codex_TraceDisabledStartup_20261101.log).
