@@ -406,6 +406,27 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Numbered flower asset IDs are described as wildflowers, not exposed as technical names"),
 		FlowerSituation.Contains(TEXT("patch of wildflowers")) && !FlowerSituation.Contains(TEXT("flower 04 01")));
 
+	UHierarchicalInstancedStaticMeshComponent* BluebellFoliage = nullptr;
+	for (UHierarchicalInstancedStaticMeshComponent* Candidate : FoliageComponents)
+		if (Candidate && Candidate->GetFName() == TEXT("IslandMeadowBluebells"))
+		{
+			BluebellFoliage = Candidate;
+			break;
+		}
+	if (!TestNotNull(TEXT("The weather actor exposes its dedicated bluebell patch"), BluebellFoliage)) return false;
+	UStaticMesh* BluebellMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("SM_TestBluebell"));
+	if (!TestNotNull(TEXT("A separate transient mesh keeps the bluebell candidate distinct from general flowers"), BluebellMesh)) return false;
+	BluebellFoliage->SetStaticMesh(BluebellMesh);
+	BluebellFoliage->SetVisibility(true);
+	BluebellFoliage->AddInstance(FTransform(FRotator::ZeroRotator, FVector(425.f, 0.f, 0.f)));
+	const FString BluebellSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("Residents perceive the dedicated woodland-bluebell species by its common name"),
+		BluebellSituation.Contains(TEXT("patch of woodland bluebells")));
+	BluebellFoliage->SetVisibility(false);
+	const FString DormantBluebellSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestFalse(TEXT("A dormant or hidden bluebell component is not described as a visible patch"),
+		DormantBluebellSituation.Contains(TEXT("patch of woodland bluebells")));
+
 	UStaticMesh* GroundCoverMesh = DuplicateObject<UStaticMesh>(Cube, GetTransientPackage(), TEXT("ground_05_01"));
 	TestNotNull(TEXT("A transient ground-cover mesh can exercise the Island's asset-label rule"), GroundCoverMesh);
 	Foliage->SetStaticMesh(GroundCoverMesh);

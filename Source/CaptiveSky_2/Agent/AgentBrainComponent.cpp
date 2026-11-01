@@ -63,8 +63,12 @@ namespace
 		return AgentModelTier::FormatEvolvingTendencies(Tendencies);
 	}
 
-	FString DescribeVegetationMesh(const UStaticMesh& Mesh)
+	FString DescribeVegetationMesh(const UStaticMesh& Mesh, const UHierarchicalInstancedStaticMeshComponent& Foliage)
 	{
+		const FName ComponentName = Foliage.GetFName();
+		if (ComponentName == TEXT("IslandMeadowBluebells")) return TEXT("woodland bluebells");
+		if (ComponentName == TEXT("IslandTideglassMarshMarigolds")) return TEXT("Tideglass marsh marigolds");
+		if (ComponentName == TEXT("IslandTideglassYellowFlagIrises")) return TEXT("yellow-flag irises");
 		const FString Name = Mesh.GetName();
 		const FString LowerName = Name.ToLower();
 		const FString LowerPath = Mesh.GetPathName().ToLower();
@@ -769,7 +773,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 				if (!bFoundVisibleInstance) continue;
 
-				FString DisplayName = DescribeVegetationMesh(*Mesh);
+				FString DisplayName = DescribeVegetationMesh(*Mesh, *Foliage);
 				const FName MeshName = Mesh->GetFName();
 				FNearbyPlantPatch* ExistingPatch = NearbyPlantPatches.FindByPredicate(
 					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });

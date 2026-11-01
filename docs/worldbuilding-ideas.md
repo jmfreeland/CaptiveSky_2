@@ -1,5 +1,20 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let residents recognize the seasonal flower patches
+
+Now that dedicated woodland-bluebell, Tideglass marsh-marigold, and
+yellow-flag-iris components have seasonal bloom windows, nearby residents name
+those species in their visible-vegetation summary instead of receiving only
+the generic "wildflowers" label. Existing visibility and line-of-sight rules
+still apply, so dormant or hidden components are not described as present. The
+worktree editor target built successfully; `NearbyVegetationPerception` and
+`IslandWeather.SeasonalFlowers` each pass separately under `-NullRHI`, with
+resident thinking disabled and maximum model requests set to zero (logs:
+[`resident vegetation perception`](../Saved/Logs/Codex_SeasonalResidentPerception_20261101.log),
+[`seasonal flowers`](../Saved/Logs/Codex_SeasonalFlowersFinal_20261101.log)).
+The main D: project's module still needs this branch before residents there can
+use the new labels.
+
 ## 2026-11-01 — Let habitat flowers follow the Island seasons
 
 The persistent 90-day temperate calendar now drives a first small botanical
