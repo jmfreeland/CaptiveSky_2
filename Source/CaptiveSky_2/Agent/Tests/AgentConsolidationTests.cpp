@@ -34,6 +34,8 @@ bool FAgentConsolidationTest::RunTest(const FString& Parameters)
 		TEXT("/Game/Agents/BP_Agent_Placeholder.BP_Agent_Placeholder_C")));
 	CheckConsciousResidentBody(TEXT("Raven"), LoadClass<AAutonomousAgentCharacter>(nullptr,
 		TEXT("/Game/Agents/BP_Raven_Placeholder.BP_Raven_Placeholder_C")));
+	CheckConsciousResidentBody(TEXT("Rat"), LoadClass<AAutonomousAgentCharacter>(nullptr,
+		TEXT("/Game/Agents/BP_Rat_Placeholder.BP_Rat_Placeholder_C")));
 	const UIslandInnkeeperSubsystem* InnkeeperDefaults = GetDefault<UIslandInnkeeperSubsystem>();
 	CheckConsciousResidentBody(TEXT("Innkeeper"), InnkeeperDefaults ? InnkeeperDefaults->BodyClass.LoadSynchronous() : nullptr);
 
