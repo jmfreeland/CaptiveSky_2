@@ -38,6 +38,17 @@ fixture. This validates the test behavior against the restarted project's
 loaded module, but still is not real player traversal and does not replace a
 fresh build from this worktree.
 
+After the follow-up restart, the focused test was run once more from Session
+Frontend. The Automation Testing Log reports Test Run 5 and
+`CaptiveSky2.Agent.IslandOcean` completed with result `Success`. The Output Log
+shows the transient shallow-shore and open-water player fixtures executing,
+followed by the automation controller's successful result. This confirms the
+loaded editor module passes its water/player regression in a transient test
+world, including the legacy-plane collision guard and swimming checks. It is
+not a rendered shoreline traversal and does not prove that the entire saved
+Island has no walkable collision above water; keep a bounded visual shoreline
+check open for a later session with adequate GPU headroom.
+
 ## Rendered validation gate
 
 After reopening the editor, `nvidia-smi` reported 9,178 MiB used and 2,820 MiB
