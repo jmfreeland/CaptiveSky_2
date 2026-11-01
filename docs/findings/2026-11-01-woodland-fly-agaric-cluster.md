@@ -28,3 +28,22 @@ Source-level tests: `Scripts/AssetPipeline/tests/test_woodland_fly_agaric_cluste
 The full asset-pipeline suite passed (118 tests) under Blender 5.2's bundled
 Python 3.11 runtime. The FBX and `Preview.png` are local ignored outputs; rebuild
 from the tracked source with Blender 5.2 using `run_asset.py` and `verify_asset.py`.
+
+## Isolated Unreal comparison workflow
+
+`Scripts/Preview-WoodlandFlyAgaricReview.py` now provides three explicit Unreal
+Python stages: `import` reuses the manifest-aware importer into the unique
+`/Game/Generated/ComfyBlender/WoodlandFlyAgaricCluster` folder; `duplicate`
+creates a non-overwriting copy of `/Game/Maps/Island`; and `place` adds the
+collisionless red-cap candidate 160 cm beside the existing
+`WoodlandFungusCluster_Review_01` in that copy. It refuses to overwrite an
+existing review map or duplicate the comparison actor, and never saves the
+source Island. The destination review map is
+`/Game/Generated/ComfyBlender/WoodlandFlyAgaricReview_20261101/Maps/Island_WoodlandFungusAB_20261101`.
+
+This workflow is prepared but **has not been run in Unreal**. The script passes
+Python syntax compilation, and the two focused fly-agaric asset tests pass;
+neither result validates Unreal import, material rendering, or the A/B scene.
+After reviewing each stage in the editor, compare the existing ochre cluster
+and red-cap candidate at the same visitor-scale angle before considering any
+change to the main map.
