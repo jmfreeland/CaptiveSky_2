@@ -125,12 +125,14 @@ public:
 	FString DescribeAt(const FVector& Position, const AActor* Observer = nullptr) const;
 	/** Describe only current upwind line-of-sight shelter; this does not claim roof cover or perch support. */
 	FString DescribeWindShelterAt(const FVector& Position, const AActor* Observer = nullptr) const;
-	/** Count vertical samples intersecting mature spruce crown envelopes without enabling foliage collision. */
-	int32 CountSpruceCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const;
+	/** Count vertical samples intersecting mature spruce or broadleaf crown envelopes without enabling foliage collision. */
+	int32 CountTreeCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const;
+	/** Gather nearby mature spruce and broadleaf tree origins for read-only habitat ranking. */
+	void GatherMatureTreeLocations(const FVector2D& Center, float SearchRadius, TArray<FVector>& OutLocations) const;
 	/** Read-only closest-bloom query for small wildlife; rejects invalid radii and never edits instances. */
 	bool FindNearestMeadowFlower(const FVector& Position, float MaxDistance, FVector& OutFlowerLocation) const;
 	/** Conservative upper-crown envelope test for a vertical cover probe; not a waterproofness test. */
-	static bool DoesSpruceCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
+	static bool DoesTreeCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
 		const FVector& ProbeStart, const FVector& ProbeEnd);
 	/** Add a bounded, temporary local wind response; it naturally fades in space and time. */
 	void AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds);

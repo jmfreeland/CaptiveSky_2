@@ -3077,34 +3077,65 @@ void AIslandWeather::ClearGroundCoverPreview()
 	ClearGroundCover();
 }
 
-int32 AIslandWeather::CountSpruceCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const
+int32 AIslandWeather::CountTreeCrownCoverProbes(const TArray<FVector>& ProbeStarts, const TArray<FVector>& ProbeEnds) const
 {
-	if (!IslandSpruce || !IslandSpruce->GetStaticMesh() || ProbeStarts.IsEmpty() || ProbeStarts.Num() != ProbeEnds.Num()) return 0;
-	const FBox LocalBounds = IslandSpruce->GetStaticMesh()->GetBoundingBox();
-	if (!LocalBounds.IsValid || LocalBounds.GetSize().Z <= KINDA_SMALL_NUMBER) return 0;
+	if (ProbeStarts.IsEmpty() || ProbeStarts.Num() != ProbeEnds.Num()) return 0;
 	TArray<uint8> Covered;
 	Covered.Init(0, ProbeStarts.Num());
 	int32 CoveredCount = 0;
-	for (int32 TreeIndex = 0; TreeIndex < IslandSpruce->GetInstanceCount() && CoveredCount < Covered.Num(); ++TreeIndex)
+	auto CountTreeInstances = [&Covered, &CoveredCount, &ProbeStarts, &ProbeEnds](const FBox& LocalBounds, int32 InstanceCount, auto&& GetTransform)
 	{
-		FTransform TreeTransform;
-		if (!IslandSpruce->GetInstanceTransform(TreeIndex, TreeTransform, true)) continue;
-		const FBox WorldBounds = LocalBounds.TransformBy(TreeTransform);
-		// Saplings and shrubs remain visible species, but are too short to count as rain-cover crowns.
-		if (WorldBounds.GetSize().Z < 900.f) continue;
-		const float SearchRadius = FMath::Max(WorldBounds.GetExtent().X, WorldBounds.GetExtent().Y) + 30.f;
-		for (int32 ProbeIndex = 0; ProbeIndex < Covered.Num(); ++ProbeIndex)
+		if (!LocalBounds.IsValid || LocalBounds.GetSize().Z <= KINDA_SMALL_NUMBER) return;
+		for (int32 TreeIndex = 0; TreeIndex < InstanceCount && CoveredCount < Covered.Num(); ++TreeIndex)
 		{
-			if (Covered[ProbeIndex] || FVector::DistSquared2D(TreeTransform.GetLocation(), ProbeStarts[ProbeIndex]) > FMath::Square(SearchRadius)) continue;
-			if (!DoesSpruceCrownCoverProbeSegment(LocalBounds, TreeTransform, ProbeStarts[ProbeIndex], ProbeEnds[ProbeIndex])) continue;
-			Covered[ProbeIndex] = 1;
-			++CoveredCount;
+			FTransform TreeTransform;
+			if (!GetTransform(TreeIndex, TreeTransform)) continue;
+			const FBox WorldBounds = LocalBounds.TransformBy(TreeTransform);
+			// Saplings and shrubs remain visible species, but are too short to count as rain-cover crowns.
+			if (WorldBounds.GetSize().Z < 900.f) continue;
+			const float SearchRadius = FMath::Max(WorldBounds.GetExtent().X, WorldBounds.GetExtent().Y) + 30.f;
+			for (int32 ProbeIndex = 0; ProbeIndex < Covered.Num(); ++ProbeIndex)
+			{
+				if (Covered[ProbeIndex] || FVector::DistSquared2D(TreeTransform.GetLocation(), ProbeStarts[ProbeIndex]) > FMath::Square(SearchRadius)) continue;
+				if (!DoesTreeCrownCoverProbeSegment(LocalBounds, TreeTransform, ProbeStarts[ProbeIndex], ProbeEnds[ProbeIndex])) continue;
+				Covered[ProbeIndex] = 1;
+				++CoveredCount;
+			}
 		}
+	};
+
+	if (IslandSpruce && IslandSpruce->GetStaticMesh())
+	{
+		const FBox LocalBounds = IslandSpruce->GetStaticMesh()->GetBoundingBox();
+		CountTreeInstances(LocalBounds, IslandSpruce->GetInstanceCount(), [this](int32 Index, FTransform& OutTransform)
+		{
+			return IslandSpruce->GetInstanceTransform(Index, OutTransform, true);
+		});
+	}
+
+	const UInstancedSkinnedMeshComponent* BroadleafComponents[] = {
+		IslandNorwayMaples, IslandNorwayMaplesVariantB,
+		IslandEuropeanAspens, IslandEuropeanAspensVariantB,
+		IslandEuropeanBeeches, IslandEuropeanBeechesVariantB,
+		IslandBlackAlders, IslandBlackAldersVariantB,
+		IslandCommonHazels
+	};
+	for (const UInstancedSkinnedMeshComponent* Component : BroadleafComponents)
+	{
+		if (!Component) continue;
+		const USkeletalMesh* Mesh = Cast<USkeletalMesh>(Component->GetSkinnedAsset());
+		if (!Mesh) continue;
+		const FBox LocalBounds = Mesh->GetBounds().GetBox();
+		CountTreeInstances(LocalBounds, Component->GetInstanceCount(), [Component](int32 Index, FTransform& OutTransform)
+		{
+			return Component->GetInstanceTransform(Component->GetInstanceId(Index), OutTransform, true);
+		});
+		if (CoveredCount >= Covered.Num()) break;
 	}
 	return CoveredCount;
 }
 
-bool AIslandWeather::DoesSpruceCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
+bool AIslandWeather::DoesTreeCrownCoverProbeSegment(const FBox& LocalMeshBounds, const FTransform& TreeTransform,
 	const FVector& ProbeStart, const FVector& ProbeEnd)
 {
 	if (!LocalMeshBounds.IsValid || ProbeStart.ContainsNaN() || ProbeEnd.ContainsNaN() ||
@@ -3142,6 +3173,48 @@ bool AIslandWeather::DoesSpruceCrownCoverProbeSegment(const FBox& LocalMeshBound
 		if (TMin > TMax) return false;
 	}
 	return true;
+}
+
+void AIslandWeather::GatherMatureTreeLocations(const FVector2D& Center, float SearchRadius, TArray<FVector>& OutLocations) const
+{
+	OutLocations.Reset();
+	if (!FMath::IsFinite(SearchRadius) || SearchRadius < 0.f) return;
+	const float SearchRadiusSquared = FMath::Square(SearchRadius);
+	auto GatherTreeInstances = [&OutLocations, Center, SearchRadiusSquared](const FBox& LocalBounds, int32 InstanceCount, auto&& GetTransform)
+	{
+		if (!LocalBounds.IsValid || LocalBounds.GetSize().Z <= KINDA_SMALL_NUMBER) return;
+		const float LocalHeight = LocalBounds.GetSize().Z;
+		for (int32 Index = 0; Index < InstanceCount; ++Index)
+		{
+			FTransform InstanceTransform;
+			if (!GetTransform(Index, InstanceTransform)) continue;
+			const float Height = LocalHeight * FMath::Abs(InstanceTransform.GetScale3D().Z);
+			if (Height < 900.f) continue;
+			const FVector Location = InstanceTransform.GetLocation();
+			if (FVector2D::DistSquared(FVector2D(Location.X, Location.Y), Center) <= SearchRadiusSquared)
+				OutLocations.Add(Location);
+		}
+	};
+
+	if (IslandSpruce && IslandSpruce->GetStaticMesh())
+		GatherTreeInstances(IslandSpruce->GetStaticMesh()->GetBoundingBox(), IslandSpruce->GetInstanceCount(), [this](int32 Index, FTransform& OutTransform)
+		{ return IslandSpruce->GetInstanceTransform(Index, OutTransform, true); });
+
+	const UInstancedSkinnedMeshComponent* BroadleafComponents[] = {
+		IslandNorwayMaples, IslandNorwayMaplesVariantB,
+		IslandEuropeanAspens, IslandEuropeanAspensVariantB,
+		IslandEuropeanBeeches, IslandEuropeanBeechesVariantB,
+		IslandBlackAlders, IslandBlackAldersVariantB,
+		IslandCommonHazels
+	};
+	for (const UInstancedSkinnedMeshComponent* Component : BroadleafComponents)
+	{
+		if (!Component) continue;
+		const USkeletalMesh* Mesh = Cast<USkeletalMesh>(Component->GetSkinnedAsset());
+		if (!Mesh) continue;
+		GatherTreeInstances(Mesh->GetBounds().GetBox(), Component->GetInstanceCount(), [Component](int32 Index, FTransform& OutTransform)
+		{ return Component->GetInstanceTransform(Component->GetInstanceId(Index), OutTransform, true); });
+	}
 }
 
 void AIslandWeather::EndPlay(const EEndPlayReason::Type EndPlayReason)

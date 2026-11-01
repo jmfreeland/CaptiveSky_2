@@ -1842,7 +1842,7 @@ int32 ARavenAgentAIController::CountOverheadCoverProbes(const AActor* Site) cons
 	}
 	for (TActorIterator<AIslandWeather> It(GetWorld()); It; ++It)
 	{
-		OverheadBlockCount += It->CountSpruceCrownCoverProbes(UncoveredStarts, UncoveredEnds);
+		OverheadBlockCount += It->CountTreeCrownCoverProbes(UncoveredStarts, UncoveredEnds);
 		break;
 	}
 	return OverheadBlockCount;

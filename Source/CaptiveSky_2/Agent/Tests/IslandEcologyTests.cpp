@@ -56,8 +56,28 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFireflyCorridorPlacementTest, "CaptiveSk
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandGroundCoverTest, "CaptiveSky2.Agent.GroundCover",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTreeCrownProbeGeometryTest, "CaptiveSky2.Agent.TreeCrownProbeGeometry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandMeadowFlowerSpeciesTest, "CaptiveSky2.Agent.MeadowFlowerSpecies",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandTreeCrownProbeGeometryTest::RunTest(const FString& Parameters)
+{
+	const FBox SyntheticBroadleafBounds(FVector(-140.f, -105.f, -35.f), FVector(140.f, 105.f, 965.f));
+	const FTransform MatureMaple(FRotator::ZeroRotator, FVector(450.f, -200.f, 120.f), FVector(1.2f));
+	const FVector CrownCenter(0.f, 0.f, SyntheticBroadleafBounds.Min.Z + SyntheticBroadleafBounds.GetSize().Z * 0.62f);
+	TestTrue(TEXT("A vertical probe through a mature broadleaf upper canopy counts as overhead cover"),
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticBroadleafBounds, MatureMaple,
+			MatureMaple.TransformPosition(CrownCenter), MatureMaple.TransformPosition(CrownCenter + FVector(0.f, 0.f, 180.f))));
+	TestFalse(TEXT("A trunk-height probe does not masquerade as a broadleaf crown"),
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticBroadleafBounds, MatureMaple,
+			MatureMaple.TransformPosition(FVector(0.f, 0.f, 90.f)), MatureMaple.TransformPosition(FVector(0.f, 0.f, 160.f))));
+	TestFalse(TEXT("A probe outside the broadleaf crown footprint is not counted as sheltered"),
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticBroadleafBounds, MatureMaple,
+			MatureMaple.TransformPosition(FVector(220.f, 0.f, 650.f)), MatureMaple.TransformPosition(FVector(220.f, 0.f, 850.f))));
+	return true;
+}
 
 bool FIslandFireflyCorridorPlacementTest::RunTest(const FString& Parameters)
 {
@@ -507,7 +527,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TArray<FVector> MatureProbeStarts, MatureProbeEnds;
 		MakeCrownProbe(MatureTree, MatureProbeStarts, MatureProbeEnds);
 		TestEqual(TEXT("The collisionless mature spruce HISM contributes a crown-cover clue"),
-			Weather->CountSpruceCrownCoverProbes(MatureProbeStarts, MatureProbeEnds), 1);
+			Weather->CountTreeCrownCoverProbes(MatureProbeStarts, MatureProbeEnds), 1);
 		TestEqual(TEXT("Spruce remains non-colliding for the canopy query"),
 			Weather->IslandSpruce->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		const FTransform Sapling(FRotator::ZeroRotator, FVector(17000.f, 0.f, 0.f), FVector(500.f / SpruceMeshHeight));
@@ -515,7 +535,7 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		TArray<FVector> SaplingProbeStarts, SaplingProbeEnds;
 		MakeCrownProbe(Sapling, SaplingProbeStarts, SaplingProbeEnds);
 		TestEqual(TEXT("A short spruce sapling does not count as overhead shelter"),
-			Weather->CountSpruceCrownCoverProbes(SaplingProbeStarts, SaplingProbeEnds), 0);
+			Weather->CountTreeCrownCoverProbes(SaplingProbeStarts, SaplingProbeEnds), 0);
 		Weather->IslandSpruce->ClearInstances();
 	}
 	const FVector SpeciesPatchProbe(-100500.f, 100500.f, 0.f);

@@ -110,16 +110,16 @@ bool FRavenPerchTest::RunTest(const FString& Parameters)
 	const FBox SyntheticSpruceBounds(FVector(-100.f, -100.f, 0.f), FVector(100.f, 100.f, 1200.f));
 	const FTransform UprightSpruce(FVector::ZeroVector);
 	TestTrue(TEXT("A probe through the mature spruce upper crown provides a cautious cover clue"),
-		AIslandWeather::DoesSpruceCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
 			FVector(0.f, 0.f, 700.f), FVector(0.f, 0.f, 900.f)));
 	TestFalse(TEXT("A probe beneath the spruce crown is not counted as overhead cover"),
-		AIslandWeather::DoesSpruceCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
 			FVector(0.f, 0.f, 200.f), FVector(0.f, 0.f, 350.f)));
 	TestFalse(TEXT("A probe outside the upper-crown footprint is not covered"),
-		AIslandWeather::DoesSpruceCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticSpruceBounds, UprightSpruce,
 			FVector(140.f, 0.f, 700.f), FVector(140.f, 0.f, 1000.f)));
 	TestTrue(TEXT("A tilted mature spruce crown still covers a segment in its local upper canopy"),
-		AIslandWeather::DoesSpruceCrownCoverProbeSegment(SyntheticSpruceBounds,
+		AIslandWeather::DoesTreeCrownCoverProbeSegment(SyntheticSpruceBounds,
 			FTransform(FRotator(15.f, 25.f, 10.f), FVector(50.f, -20.f, 100.f), FVector(1.2f)),
 			FTransform(FRotator(15.f, 25.f, 10.f), FVector(50.f, -20.f, 100.f), FVector(1.2f)).TransformPosition(FVector(0.f, 0.f, 700.f)),
 			FTransform(FRotator(15.f, 25.f, 10.f), FVector(50.f, -20.f, 100.f), FVector(1.2f)).TransformPosition(FVector(0.f, 0.f, 1000.f))));
