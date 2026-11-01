@@ -167,10 +167,13 @@ but does not show what a visitor can distinguish. The live project source now
 uses deterministic A/B variants for each broadleaf species, while keeping tree
 counts and cull distances unchanged. Shorter broadleaf cull ranges than spruce
 may still make distant views feel spruce-heavy; the A/B split's visible effect
-has not been measured. Keep population and cull distances fixed; when GPU
-headroom allows, capture the same daylight route and record close/middle/far
-silhouette readability, frame-time p95, and device VRAM. The latest sample had
-3,385 MiB free, below the 4 GiB render gate. Details and exact counters:
+has not been measured. An opt-in `-IslandBroadleafAOnly` launch profile now
+forces the same deterministic placement field to use A meshes only, giving the
+next view a direct, constant-population comparison. Keep cull distances fixed;
+when GPU headroom allows, capture the same daylight route and record
+close/middle/far silhouette readability, frame-time p95, and device VRAM. The
+latest sample had 3,384 MiB free, below the 4 GiB render gate. Details and
+exact counters:
 [canopy coverage finding](findings/2026-11-01-canopy-variant-coverage.md).
 
 ## 2026-11-01 — Ground drift narration in visible motes

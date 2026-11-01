@@ -1036,6 +1036,9 @@ void AIslandWeather::InitializeGroundCover()
 		!ShoreGroundPlantLowA->GetStaticMesh() || !ShoreGroundPlantLowB->GetStaticMesh() || !ShoreGroundPlantLowC->GetStaticMesh() ||
 		!ShoreGroundPlantLowD->GetStaticMesh() || !IslandShrubs->GetStaticMesh()) return;
 	bGroundCoverInitialized = true;
+	const bool bBroadleafAOnlyBaseline = FParse::Param(FCommandLine::Get(), TEXT("IslandBroadleafAOnly"));
+	UE_LOG(LogIslandWeather, Display, TEXT("Island broadleaf comparison profile: %s."),
+		bBroadleafAOnlyBaseline ? TEXT("A-only baseline (-IslandBroadleafAOnly)") : TEXT("seeded A/B default"));
 	ShoreGrassA->ClearInstances();
 	ShoreGrassB->ClearInstances();
 	GrassC->ClearInstances();
@@ -1935,7 +1938,9 @@ void AIslandWeather::InitializeGroundCover()
 								const UDynamicWindSkeletalData* VariantBWindData = VariantBMesh
 									? Cast<UDynamicWindSkeletalData>(VariantBMesh->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()))
 									: nullptr;
-								if (GetBroadleafVariantIndexAt(TreeHit.ImpactPoint, WeatherSeed ^ 0x9e3779b9) == 1 &&
+								const int32 BroadleafVariant = ResolveBroadleafVariantIndex(
+									GetBroadleafVariantIndexAt(TreeHit.ImpactPoint, WeatherSeed ^ 0x9e3779b9), !bBroadleafAOnlyBaseline);
+								if (BroadleafVariant == 1 &&
 									VariantBComponent && VariantBMesh && VariantBBounds && VariantBBounds->BoxExtent.Z > KINDA_SMALL_NUMBER &&
 									VariantBWindData && VariantBWindData->bIsEnabled)
 								{
@@ -4030,6 +4035,11 @@ int32 AIslandWeather::GetBroadleafVariantIndexAt(const FVector& Position, int32 
 	// species community while remaining stable when placement order changes.
 	const float VariantField = SampleGroundCoverFieldAtScale(Position, Seed ^ 0x7f4a7c15, 1800.f);
 	return FMath::Min(1, FMath::FloorToInt(FMath::Clamp(VariantField, 0.f, 1.f) * 2.f));
+}
+
+int32 AIslandWeather::ResolveBroadleafVariantIndex(int32 RequestedVariantIndex, bool bVariantBEnabled)
+{
+	return bVariantBEnabled ? FMath::Clamp(RequestedVariantIndex, 0, 1) : 0;
 }
 
 float AIslandWeather::GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample)

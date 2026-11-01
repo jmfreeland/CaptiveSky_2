@@ -143,6 +143,8 @@ public:
 	static int32 GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed);
 	/** Resolve a stable local A/B canopy variant without consuming placement RNG. */
 	static int32 GetBroadleafVariantIndexAt(const FVector& Position, int32 Seed);
+	/** Resolve an A-only diagnostic profile without changing the deterministic variant field. */
+	static int32 ResolveBroadleafVariantIndex(int32 RequestedVariantIndex, bool bVariantBEnabled);
 	/** Species-specific mature-tree height envelope, interpolated by a seeded 0..1 sample (cm). */
 	static float GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample);
 	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */

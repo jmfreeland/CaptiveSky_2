@@ -25,14 +25,16 @@ rendered comparison.
 
 ## Next experiment
 
-Once the whole-device GPU has at least 4 GiB free, capture a matched daylight
-woodland view of the current A/B build and compare it with a reproducible A-only
-baseline if that baseline can be built without changing the live project.
-Keep the total tree count, species counts, cull distances, camera, and
-scalability fixed. Record close/middle/far silhouette readability, p95 frame
-time, and whole-device VRAM. Stop on a video-memory warning or sustained frame
-rate below 30 FPS. Do not raise population or cull distances unless this
-constant-population comparison shows headroom.
+The A-only baseline is now an opt-in launch profile: `-IslandBroadleafAOnly`
+forces requested B selections to A without changing the deterministic placement
+field, tree populations, or cull distances. The normal launch remains seeded
+A/B. A startup log identifies the selected profile and retains per-species
+A/B instance counts. Once the whole-device GPU has at least 4 GiB free, capture
+matched daylight woodland views with and without the flag using the same world
+seed, route, and scalability. Record close/middle/far silhouette readability,
+p95 frame time, and whole-device VRAM. Stop on a video-memory warning or
+sustained frame rate below 30 FPS. Do not raise population or cull distances
+unless this constant-population comparison shows headroom.
 
 ## Post-restart GPU gate recheck — 2026-11-01
 
@@ -53,7 +55,20 @@ Read-only inspection of the open D: project's `IslandWeather` source confirms
 that all four broadleaf species have A/B components and use a stable local
 variant selector. The viewport currently shows a close woodland-floor path,
 not a view that can establish far-canopy diversity. The whole-device GPU sample
-was 8,897 / 12,282 MiB used (3,385 MiB free, 54% utilization, 78 C), below the
+was 8,898 / 12,282 MiB used (3,384 MiB free, 58% utilization, 78 C), below the
 4 GiB rendered-session gate. No rendered comparison was started. Do not infer
 that the variant code is missing from the live project or visually successful
 from the source and placement census alone.
+
+## A-only comparison profile — 2026-11-01
+
+Added the explicit `-IslandBroadleafAOnly` profile for a matched A-only
+appearance baseline. It resolves every requested broadleaf B variant to A
+without consuming scatter RNG or changing tree counts and placement candidates;
+the normal profile remains deterministic A/B. A focused automation regression
+covers the resolver, and the UE 5.8.3 isolated Editor target compiled and linked
+successfully (39 actions, followed by a 4-action incremental relink). The
+automation has not run under Unreal, and the profile has not been rendered.
+After the build, whole-device GPU memory was 8,898 / 12,282 MiB used (3,384 MiB
+free), still below the 4 GiB gate; keep the visual comparison pending until
+memory headroom is available.

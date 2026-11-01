@@ -74,6 +74,12 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The local canopy field selects only A or B"), VariantSample == 0 || VariantSample == 1);
 	TestEqual(TEXT("A/B canopy assignment is stable for a position and seed"),
 		AIslandWeather::GetBroadleafVariantIndexAt(VariantSamplePosition, 0x5a17), VariantSample);
+	TestEqual(TEXT("A-only diagnostic baseline maps every requested variant to A"),
+		AIslandWeather::ResolveBroadleafVariantIndex(1, false), 0);
+	TestEqual(TEXT("Default comparison profile preserves requested B variants"),
+		AIslandWeather::ResolveBroadleafVariantIndex(1, true), 1);
+	TestEqual(TEXT("A variants stay A in both comparison profiles"),
+		AIslandWeather::ResolveBroadleafVariantIndex(0, true), 0);
 	int32 VariantCounts[2] = {};
 	for (int32 GridY = -4; GridY <= 4; ++GridY)
 	{
