@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "IslandWeather.h"
 #include "Components/InstancedSkinnedMeshComponent.h"
+#include "DynamicWindSkeletalData.h"
 #include "Engine/SkeletalMesh.h"
 #include <limits>
 
@@ -221,6 +222,23 @@ bool FIslandWeatherBroadleafNaniteReadinessAssetsTest::RunTest(const FString& Pa
 			TestTrue(FString::Printf(TEXT("Broadleaf mesh is a Nanite Assembly: %s"), AssetPath),
 				BroadleafAsset->IsNaniteAssembly());
 		}
+	}
+	const TCHAR* BroadleafVariantBPaths[] =
+	{
+		TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_B.Tree_European_Aspen_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B")
+	};
+	for (const TCHAR* AssetPath : BroadleafVariantBPaths)
+	{
+		USkeletalMesh* BroadleafVariantB = LoadObject<USkeletalMesh>(nullptr, AssetPath);
+		const UDynamicWindSkeletalData* WindData = BroadleafVariantB
+			? Cast<UDynamicWindSkeletalData>(BroadleafVariantB->GetAssetUserDataOfClass(UDynamicWindSkeletalData::StaticClass()))
+			: nullptr;
+		TestNotNull(FString::Printf(TEXT("Broadleaf B variant retains Dynamic Wind data: %s"), AssetPath), WindData);
+		if (WindData)
+			TestTrue(FString::Printf(TEXT("Broadleaf B variant is enabled for the runtime wind path: %s"), AssetPath), WindData->bIsEnabled);
 	}
 	return true;
 }
