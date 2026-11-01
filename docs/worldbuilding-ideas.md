@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let a resident finish an interaction they explicitly chose
+
+The isolated 15-minute feedback log caught Rat choosing the rain-basin leaf
+interaction from roughly 17 metres away; the controller rejected it at the
+4-metre boundary, so the basin's wet state never got a leaf. A bounded recovery
+now lets a resident approach a visible stationary target within 25 metres after
+that explicit choice, but does not approach wildlife or perform the interaction
+until arrival is revalidated. Focused regression cases compile in the UE 5.8.3
+worktree target; the known NullRHI startup crash and current GPU-headroom gate
+mean the runtime pass is still pending. Details:
+[bounded resident interaction approach](findings/2026-11-01-resident-interaction-approach.md).
+
 ## 2026-11-01 — Tighten the rendered-play safety gate after a PIE memory spike
 
 The restarted D: editor reported 6,560 MiB of free GPU memory while idle, but

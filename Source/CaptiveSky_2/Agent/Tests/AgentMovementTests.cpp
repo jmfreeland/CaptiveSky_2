@@ -103,6 +103,22 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 	TargetRoot->RegisterComponent();
 	Target->SetActorLocation(FVector(200.f, 0.f, 0.f));
 	TestTrue(TEXT("Landmark fixture retains its intended target location"), Target->GetActorLocation().Equals(FVector(200.f, 0.f, 0.f)));
+	TestFalse(TEXT("A reachable interactable is not treated as an approach request"),
+		AAutonomousAgentAIController::ShouldAutoApproachInteraction(Observer, Target, TEXT("TideglassPool")));
+	Target->SetActorLocation(FVector(1200.f, 0.f, 0.f));
+	TestTrue(TEXT("An explicit interaction with a nearby stationary landmark may start a bounded approach"),
+		AAutonomousAgentAIController::ShouldAutoApproachInteraction(Observer, Target, TEXT("TideglassPool")));
+	TestFalse(TEXT("A mismatched interaction tag cannot redirect the approach"),
+		AAutonomousAgentAIController::ShouldAutoApproachInteraction(Observer, Target, TEXT("ListeningStones")));
+	Target->SetActorLocation(FVector(2600.f, 0.f, 0.f));
+	TestFalse(TEXT("An interaction request cannot trigger a long automatic trek"),
+		AAutonomousAgentAIController::ShouldAutoApproachInteraction(Observer, Target, TEXT("TideglassPool")));
+	Target->SetActorLocation(FVector(1200.f, 0.f, 0.f));
+	Target->Tags.AddUnique(TEXT("IslandLife"));
+	TestFalse(TEXT("Automatic approach never turns an interaction into a wildlife chase"),
+		AAutonomousAgentAIController::ShouldAutoApproachInteraction(Observer, Target, TEXT("TideglassPool")));
+	Target->Tags.Remove(TEXT("IslandLife"));
+	Target->SetActorLocation(FVector(200.f, 0.f, 0.f));
 	World->BeginPlay();
 	Controller->Possess(Observer);
 	TestTrue(TEXT("A nearby landmark can be inspected from the observer's current position"),
@@ -133,6 +149,33 @@ bool FAgentBlockedGroundMoveTest::RunTest(const FString& Parameters)
 		AAutonomousAgentAIController::IsWanderLandmarkEligible(Target, Controller->InspectedUntil, FPlatformTime::Seconds()));
 	TestFalse(TEXT("The inherited walker/flight curiosity gate uses the resident controller's real inspection history"),
 		Controller->CanFollowWanderCuriosityToward(Target, FPlatformTime::Seconds()));
+	Controller->InspectedUntil.Remove(FName(TEXT("TideglassPool")));
+	Controller->PendingInteractionTargetTag = FName(TEXT("TideglassPool"));
+	Controller->OnMoveCompleted(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Success, FPathFollowingResultFlags::None));
+	TestTrue(TEXT("A completed bounded approach rechecks and performs the resident's original interaction"),
+		Controller->DescribeActionState().Contains(TEXT("TideglassPool:")) &&
+		Controller->DescribeActionState().Contains(TEXT("It expands and fades")));
+	int32 RipplesAfterArrivedInteraction = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (!It->ActorHasTag(TEXT("RainImpact"))) ++RipplesAfterArrivedInteraction;
+	TestEqual(TEXT("The arrived interaction produces exactly one additional ripple"), RipplesAfterArrivedInteraction, 2);
+	Target->SetActorLocation(FVector(1200.f, 0.f, 0.f));
+	Controller->PendingInteractionTargetTag = FName(TEXT("TideglassPool"));
+	Controller->OnMoveCompleted(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Blocked, FPathFollowingResultFlags::None));
+	TestTrue(TEXT("A blocked approach clears its pending interaction without triggering it"),
+		Controller->PendingInteractionTargetTag.IsNone() &&
+		Controller->DescribeActionState().Contains(TEXT("Movement did not complete")));
+	int32 RipplesAfterBlockedApproach = 0;
+	for (TActorIterator<AIslandPoolRippleEffect> It(World); It; ++It)
+		if (!It->ActorHasTag(TEXT("RainImpact"))) ++RipplesAfterBlockedApproach;
+	TestEqual(TEXT("A blocked approach has no interaction side effect"), RipplesAfterBlockedApproach, 2);
+	Controller->InspectedUntil.Remove(FName(TEXT("TideglassPool")));
+	Controller->InspectTarget(TEXT("TideglassPool"));
+	TestTrue(TEXT("When no grounded route exists, the approach failure is preserved instead of being disguised as a range failure"),
+		Controller->DescribeActionState().Contains(TEXT("Movement failed")) &&
+		!Controller->DescribeActionState().Contains(TEXT("Too far away to inspect")) &&
+		Controller->PendingInteractionTargetTag.IsNone());
+	Target->SetActorLocation(FVector(200.f, 0.f, 0.f));
 
 	Observer->SetActorLocation(FVector(-300.f, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
 	ReportBlockedMove();

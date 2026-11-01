@@ -82,6 +82,8 @@ public:
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
+	/** An explicit interaction may begin a short approach to a stationary target, but never a long trek. */
+	static constexpr float MaximumAutomaticInteractionApproachDistance = 2500.f;
 	static constexpr float WanderFrontierProgressWeight = 4000.f;
 	static constexpr float WanderLandmarkProgressWeight = 4000.f;
 	/** A fully worn route may adjust an existing wander curiosity score by at most this fraction. */
@@ -102,6 +104,8 @@ public:
 		const TArray<FVector>& VisibleLandmarks);
 	/** Hidden, unidentified or recently inspected landmarks do not attract an explicit wander. */
 	static bool IsWanderLandmarkEligible(const AActor* Landmark, const TMap<FName, double>& RecentInspections, double Now);
+	/** A deliberate, nearby stationary-target interaction may route an agent closer, but never chase wildlife. */
+	static bool ShouldAutoApproachInteraction(const AActor* Observer, const AActor* Target, FName RequestedTag);
 	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
 	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 
@@ -145,6 +149,7 @@ private:
 	bool bCurrentMoveIsWander = false;
 	FName PendingGroundMoveTargetName;
 	FName PendingGroundMoveTargetTag;
+	FName PendingInteractionTargetTag;
 	bool bPendingGroundLandmarkRecoveryMove = false;
 	int32 GroundedLandmarkRecoveryAttempts = 0;
 	double NextThinkAt = 0;

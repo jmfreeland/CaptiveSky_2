@@ -99,6 +99,7 @@ void AAutonomousAgentAIController::OnPossess(APawn* InPawn)
 void AAutonomousAgentAIController::OnUnPossess()
 {
 	GetWorldTimerManager().ClearTimer(ThinkTimerHandle);
+	PendingInteractionTargetTag = NAME_None;
 
 	if (AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(GetPawn()))
 	{
@@ -540,6 +541,18 @@ bool AAutonomousAgentAIController::CanFollowWanderCuriosityToward(const AActor* 
 {
 	return IsWanderLandmarkEligible(Landmark, InspectedUntil, Now);
 }
+bool AAutonomousAgentAIController::ShouldAutoApproachInteraction(const AActor* Observer, const AActor* Target, FName RequestedTag)
+{
+	if (!IsValid(Observer) || !IsValid(Target) || Observer == Target || RequestedTag.IsNone() ||
+		!Observer->GetWorld() || Observer->GetWorld() != Target->GetWorld() || Target->IsHidden() ||
+		Target->ActorHasTag(TEXT("IslandLife")) || !IslandInteractionUtility::IsMovementTargetAllowed(Target) ||
+		IslandInteractionUtility::GetTargetTag(Target) != RequestedTag)
+		return false;
+
+	const float DistanceSquared = FVector::DistSquared(Observer->GetActorLocation(), Target->GetActorLocation());
+	return DistanceSquared > FMath::Square(IslandInteractionUtility::DefaultInteractionRange) &&
+		DistanceSquared <= FMath::Square(MaximumAutomaticInteractionApproachDistance);
+}
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
 	if (!Navigation) return false;
@@ -843,6 +856,7 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 	{
 		const FName TargetActorName = PendingGroundMoveTargetName;
 		const FName TargetTag = PendingGroundMoveTargetTag;
+		const FName InteractionTag = PendingInteractionTargetTag;
 		bPendingGroundLandmarkRecoveryMove = false;
 		if (Result.IsSuccess())
 		{
@@ -858,11 +872,14 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 				Retry.ActionType = EAgentActionType::MoveTo;
 				Retry.ActionTarget = TargetTag.ToString();
 				ActOnDecision(Retry);
+				if (GetMoveStatus() == EPathFollowingStatus::Moving)
+					PendingInteractionTargetTag = InteractionTag;
 				return;
 			}
 		}
 		PendingGroundMoveTargetName = NAME_None;
 		PendingGroundMoveTargetTag = NAME_None;
+		PendingInteractionTargetTag = NAME_None;
 		GroundedLandmarkRecoveryAttempts = 0;
 		ReportAction(Result.IsSuccess()
 			? TEXT("Movement did not resume: the landmark disappeared before the clear approach could continue.")
@@ -878,12 +895,29 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 		const FName TargetTag = IslandInteractionUtility::GetTargetTag(Target);
 		if (ControlledPawn && !TargetTag.IsNone() && IslandInteractionUtility::CanInspect(ControlledPawn, Target))
 		{
+			const FName InteractionTag = PendingInteractionTargetTag;
 			PendingGroundMoveTargetName = NAME_None;
 			PendingGroundMoveTargetTag = NAME_None;
 			GroundedLandmarkRecoveryAttempts = 0;
+			if (!InteractionTag.IsNone())
+			{
+				PendingInteractionTargetTag = NAME_None;
+				InspectTarget(InteractionTag);
+				return;
+			}
 			ReportAction(FString::Printf(
 				TEXT("The route to the projected ground point was blocked, but you stopped within clear inspection range of %s. You may inspect or interact from this reachable approach; you did not reach the marker itself."),
 				*TargetTag.ToString()));
+			return;
+		}
+	}
+	if (!PendingInteractionTargetTag.IsNone())
+	{
+		const FName InteractionTag = PendingInteractionTargetTag;
+		PendingInteractionTargetTag = NAME_None;
+		if (Result.IsSuccess())
+		{
+			InspectTarget(InteractionTag);
 			return;
 		}
 	}
@@ -915,6 +949,21 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 		if (Target == FName(TEXT("TideglassPool")) && !It->ActorHasTag(TEXT("IslandLandmark"))) continue;
 		if (FVector::DistSquared(It->GetActorLocation(), Observer->GetActorLocation()) > FMath::Square(400.f))
 		{
+			if (ShouldAutoApproachInteraction(Observer, *It, Target))
+			{
+				FAgentDecision Approach;
+				Approach.ActionType = EAgentActionType::MoveTo;
+				Approach.ActionTarget = Target.ToString();
+				ActOnDecision(Approach);
+				if (GetMoveStatus() == EPathFollowingStatus::Moving)
+				{
+					PendingInteractionTargetTag = Target;
+					ReportAction(FString::Printf(
+						TEXT("You chose to interact with %s, so you are approaching it first. No interaction has happened yet; it will be rechecked at close range."),
+						*Target.ToString()));
+				}
+				return;
+			}
 			ReportAction(TEXT("Too far away to inspect; move within four metres first."));
 			return;
 		}
@@ -1071,6 +1120,7 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	}
 	PendingGroundMoveTargetName = NAME_None;
 	PendingGroundMoveTargetTag = NAME_None;
+	PendingInteractionTargetTag = NAME_None;
 	bPendingGroundLandmarkRecoveryMove = false;
 
 	switch (Decision.ActionType)
