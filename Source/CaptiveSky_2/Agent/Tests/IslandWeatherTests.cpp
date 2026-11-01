@@ -412,6 +412,15 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 		BroadleafSituation.Contains(TEXT("Tree Norway Maple Forest")));
 	TestFalse(TEXT("Broadleaf plant descriptions do not become movement targets"),
 		BroadleafSituation.Contains(TEXT("move_to target: Norway maple")));
+	USkeletalMesh* CommonHazelTestMesh = NewObject<USkeletalMesh>(Weather, TEXT("Tree_Common_Hazel_01_A"));
+	TestNotNull(TEXT("A transient common-hazel mesh can exercise resident species naming"), CommonHazelTestMesh);
+	BroadleafTrees->SetSkinnedAsset(CommonHazelTestMesh);
+	const FString CommonHazelSituation = Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A nearby Hazel patch is described by its common species name for an optional upgrade"),
+		CommonHazelSituation.Contains(TEXT("patch of common hazel trees")) && CommonHazelSituation.Contains(TEXT("request_upgrade")));
+	TestFalse(TEXT("Hazel perception does not expose the imported technical asset name"),
+		CommonHazelSituation.Contains(TEXT("Tree Common Hazel")));
+	BroadleafTrees->SetSkinnedAsset(NorwayMapleTestMesh);
 
 	BroadleafTrees->SetVisibility(false);
 	const FString HiddenBroadleafSituation = Brain->BuildSituationSummary(FAgentConversationContext());
