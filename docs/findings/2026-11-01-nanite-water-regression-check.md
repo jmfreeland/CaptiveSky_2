@@ -237,3 +237,27 @@ whole-device GPU sample was 3,101 MiB free, still below the 4,096 MiB render
 reserve, so no PIE or real-RHI traversal was started. Scratch log:
 `Saved/CC/Project/Saved/Logs/CaptiveSky_2.log`. This is current-source NullRHI
 behavior evidence, not a rendered-play claim.
+
+## Live D: source parity check — 2026-11-01
+
+Read-only comparison of the open D: project's source against this worktree
+found two relevant fixes that are present on the pushed branch but absent from
+the live project source. D:'s `CaptiveSky_2Character.cpp` enters surface-swim
+mode but does not rotate the character mesh horizontally; commit `bf46bdfc`
+adds the 90-degree surface-swim pose and restores the authored pose on exit.
+That makes an upright swimmer look like a character walking on the water, so
+the user's visual report does not by itself prove a collision failure.
+
+D:'s `IslandOceanSubsystem.cpp` disables only the hidden legacy `OceanPlane`;
+it lacks the later `AWaterBodyOcean` collision-hull and `AWaterZone` mesh Pawn
+response guard from commit `799d1309`. The current worktree's automation
+explicitly forces those surfaces to block, calls startup cleanup, and checks a
+player-sized capsule sweep; its earlier NullRHI run passed. The open editor is
+currently on the Island outside PIE, so this comparison did not observe live
+movement mode, capsule hits, or generated-water collision. It establishes a
+source-version gap, not which symptom is occurring in the current runtime.
+
+Next, load/rebuild the D: project with both pushed fixes, then perform a short
+shore-to-open-water traversal recording movement mode, mesh pose, and the
+blocking hit actor. Keep the rendered run behind the existing 4 GiB GPU reserve.
+No D: source, content, or map was changed during this audit.
