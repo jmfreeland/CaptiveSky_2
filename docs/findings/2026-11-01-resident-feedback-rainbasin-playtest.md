@@ -41,19 +41,27 @@ scattered on screen.
 
 The `-game` log reports that project-owned
 `/Game/Megaplant_Library/Materials/MA_Foliage_Trees_InstancedSkinned` depends on
-multiple material functions under
-`/ProceduralVegetationEditor/SampleAssets/Materials/MaterialFunctions/` (for
-example `MF_adjustAO`, `MF_adjustBaseColor`, and `MF_adjustNormal`). Those
-packages are skipped because the Procedural Vegetation Editor plugin is not
-mounted in this game run. The same log cannot load native PVE graph assets
-because the `/Script/ProceduralVegetation` classes are unavailable. These
-warnings do not prove what the rendered bark looks like, but they do prove the
-duplicated bark parent is not dependency-self-contained for a plugin-free game
-runtime.
+many packages under the plugin's sample-material tree, including material
+functions (`MF_adjustAO`, `MF_adjustBaseColor`, `MF_adjustNormal`, and others),
+virtual textures, and a material-parameter collection. They are skipped
+because the Procedural Vegetation Editor plugin is not mounted in this game
+run. The log also shows the Norway maple, aspen, and beech foliage instances,
+plus both Black Alder bark and foliage instances, still reference the plugin's
+`MA_Foliage_Trees` parent. The existing repair script only reparents the bark
+instances for the first three species, and its copied parent is not
+self-contained. The same log cannot load native PVE graph assets because the
+`/Script/ProceduralVegetation` classes are unavailable. These warnings do not
+prove what the rendered trees look like, but they establish that runtime tree
+materials still reach into editor-plugin content.
 
-Next asset milestone: replace the runtime bark parent with a project-owned,
-self-contained material (or project-own every required dependency), then
-validate its material compile and a small controlled tree preview. Keep PVE
-graph assets editor-only; do not depend on the PVE plugin's sample content in
-the runtime material. The open Unreal editor was left untouched, and no
-Content assets were changed during this playtest.
+`Scripts/Inspect-MegaplantRuntimeMaterialDependencies.py` now provides a
+read-only audit over all eight A/B runtime tree meshes. It records their
+material-slot parent chains and recursively traverses hard, soft, game, and
+editor-only package dependencies. Its syntax check passes; it has not yet been
+run in Unreal. Next asset milestone: run that audit with the plugin mounted,
+then replace the runtime tree parents with project-owned, self-contained
+materials (or project-own and remap their full dependency closure). Validate
+material compilation and a small controlled tree preview. Keep PVE graph
+assets editor-only; do not depend on the PVE plugin's sample content in runtime
+materials. The open Unreal editor was left untouched, and no Content assets
+were changed during this playtest.
