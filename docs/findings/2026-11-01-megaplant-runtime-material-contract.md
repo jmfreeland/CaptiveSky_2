@@ -164,9 +164,28 @@ The sandbox run generated a local `Config/DefaultEngine.ini` with a transient
 Android File Server security token, so generated Config is ignored alongside
 binary/cache outputs and is deliberately not committed.
 
-Next: copy one A/B tree mesh and its material instance into the disposable
-project, remap its foliage and bark slots to the copied parent while preserving
-the audited per-species overrides, then verify dependencies with PVE disabled.
-Keep actual rendering gated by at least 4 GiB of free GPU memory. Only after a
-preview confirms leaf response and species color/season variation should any
-live Island material parent change.
+## Norway Maple A/B material fixture preparation — 2026-11-02
+
+Copied the source Norway Maple package tree (82 `.uasset` packages, 164,340,206
+bytes) from the D: project into the sandbox's ignored `Content/` folder. This
+includes A/B and other species-source assets but changes none of them. The
+source audit confirms both A/B meshes share the same bark and foliage material
+instances and their four species textures. Bark has 10 scalar and 2 vector
+overrides; foliage has 13 scalar and 10 vector overrides, plus two authored
+texture overrides. The foliage values include distinct leaf-backside tint,
+season colors, health, roughness, and translucency controls.
+
+Added `Prepare-MegaplantNorwayMapleMaterialSandbox.py` to duplicate only the
+bark and foliage instances, reparent the copies to the verified project-owned
+master, compare every texture/scalar/vector override before and after, then
+record the output in the sandbox manifest. The PVE-free verifier now checks
+those material instances' parent and override counts and scans both PVE editor
+and runtime package prefixes. Both sandbox descriptors enable Dynamic Wind so
+the later tree-asset check can retain its user data while excluding PVE.
+All five focused Python harness tests pass.
+
+The instance-copy/No-PVE UE run is still pending: the D: editor log is actively
+locked by the open editor, so no second UE process was launched to disturb its
+Zen/DDC or unsaved state. The GPU sample remains below the 4 GiB render gate.
+Once the live editor is safely closed, run the guarded instance-copy script and
+PVE-free verifier; only then proceed to a rendered single-tree preview.

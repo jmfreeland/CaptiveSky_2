@@ -6,7 +6,7 @@ import unreal
 
 
 MANIFEST_RELATIVE_PATH = os.path.join("MegaplantRuntimeMaterialSandbox", "copy-manifest.json")
-PLUGIN_PREFIX = "/ProceduralVegetationEditor/"
+PLUGIN_PREFIXES = ("/ProceduralVegetationEditor/", "/ProceduralVegetation/")
 
 
 def fail(message):
@@ -51,6 +51,29 @@ for material in materials:
             material.get_path_name(), "; ".join(str(error) for error in errors)
         ))
 
+species_instances = []
+expected_parent = (
+    "/Game/Megaplant_Library/RuntimeMaterials/PVE/SampleAssets/Materials/"
+    "MasterMaterials/MA_Foliage_Trees.MA_Foliage_Trees"
+)
+for entry in manifest.get("norway_maple_material_instances", []):
+    instance = unreal.EditorAssetLibrary.load_asset(entry["destination_object"])
+    if not isinstance(instance, unreal.MaterialInstanceConstant):
+        fail("copied Norway Maple material instance failed to load: " + entry["destination_object"])
+    parent = instance.get_editor_property("parent")
+    if not parent or parent.get_path_name() != expected_parent:
+        fail("Norway Maple instance has an unexpected parent: " + entry["destination_object"])
+    if entry.get("parent_object") != expected_parent:
+        fail("manifest parent does not match the project-owned runtime parent")
+    override_counts = {
+        "texture": len(instance.get_editor_property("texture_parameter_values") or []),
+        "scalar": len(instance.get_editor_property("scalar_parameter_values") or []),
+        "vector": len(instance.get_editor_property("vector_parameter_values") or []),
+    }
+    if override_counts != entry.get("override_counts"):
+        fail("Norway Maple override counts changed after saving: " + entry["destination_object"])
+    species_instances.append(instance)
+
 registry = unreal.AssetRegistryHelpers.get_asset_registry()
 options = unreal.AssetRegistryDependencyOptions(
     include_hard_package_references=True,
@@ -59,6 +82,7 @@ options = unreal.AssetRegistryDependencyOptions(
     include_editor_only_package_references=True,
 )
 pending = [entry["destination_object"].split(".", 1)[0] for entry in manifest["assets"]]
+pending.extend(instance.get_path_name().split(".", 1)[0] for instance in species_instances)
 visited = set()
 plugin_dependencies = set()
 while pending:
@@ -68,7 +92,7 @@ while pending:
     visited.add(package)
     for dependency in registry.get_dependencies(package, options) or []:
         name = str(dependency)
-        if name.startswith(PLUGIN_PREFIX):
+        if any(name.startswith(prefix) for prefix in PLUGIN_PREFIXES):
             plugin_dependencies.add(name)
         if name.startswith("/Game/") and name not in visited:
             pending.append(name)
@@ -77,7 +101,7 @@ if plugin_dependencies:
     fail("runtime copy references plugin packages: " + ", ".join(sorted(plugin_dependencies)))
 
 unreal.log(
-    "[MegaplantRuntimeMaterialSandbox] NO_PLUGIN_VERIFY_COMPLETE assets={} materials={} plugin_dependencies=0".format(
-        len(assets), len(materials)
+    "[MegaplantRuntimeMaterialSandbox] NO_PLUGIN_VERIFY_COMPLETE assets={} materials={} species_instances={} plugin_dependencies=0".format(
+        len(assets), len(materials), len(species_instances)
     )
 )
