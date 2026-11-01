@@ -12,6 +12,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Pawn.h"
+#include "HAL/PlatformTime.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -112,6 +114,12 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("One leaf is singular"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 1).Contains(TEXT("1 leaf drifts")));
 	TestTrue(TEXT("Several leaves are plural"), UIslandRainBasinSubsystem::DescribeWater(0.5f, 3).Contains(TEXT("3 leaves drift")));
 	TestTrue(TEXT("Leaves on a dry basin lie on the stone"), UIslandRainBasinSubsystem::DescribeWater(0.f, 2).Contains(TEXT("dried leaves lie")));
+	TestEqual(TEXT("The basin's per-resident daily leaf limit replaces the generic inspection cooldown"),
+		AAutonomousAgentAIController::GetInspectionCooldownSeconds(FName(TEXT("RainBasin"))), 0.0);
+	TestEqual(TEXT("Ordinary factual inspections retain their five-minute delay"),
+		AAutonomousAgentAIController::GetInspectionCooldownSeconds(FName(TEXT("TideglassPool"))), 300.0);
+	TestEqual(TEXT("The reversible hearth interaction retains its shorter cooldown"),
+		AAutonomousAgentAIController::GetInspectionCooldownSeconds(FName(TEXT("InnHearth"))), 60.0);
 	const FTransform LeafBase(FRotator(0.f, 20.f, 0.f), FVector(30.f, 0.f, 8.f), FVector(0.12f, 0.06f, 0.01f));
 	TestTrue(TEXT("A calm basin leaves a floating leaf still"),
 		AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector::ZeroVector, 12.0, 3).Equals(LeafBase));
@@ -278,6 +286,29 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 				AAutonomousAgentAIController::ShouldAutoApproachInteraction(Resident, BasinActor, FName(TEXT("RainBasin"))));
 			Resident->SetActorLocation(ResidentPosition, false, nullptr, ETeleportType::TeleportPhysics);
 
+			APawn* ControlledResident = World->SpawnActor<APawn>();
+			AAutonomousAgentAIController* ResidentController = World->SpawnActor<AAutonomousAgentAIController>();
+			TestNotNull(TEXT("A controller pawn is created for the repeated-inspection regression"), ControlledResident);
+			TestNotNull(TEXT("An autonomous controller is created for the repeated-inspection regression"), ResidentController);
+			if (ControlledResident && ResidentController)
+			{
+				USceneComponent* PawnRoot = NewObject<USceneComponent>(ControlledResident);
+				ControlledResident->SetRootComponent(PawnRoot);
+				PawnRoot->RegisterComponent();
+				ControlledResident->SetActorLocation(BasinActor->GetActorLocation() + FVector(50.f, 0.f, 40.f));
+				ResidentController->Possess(ControlledResident);
+				ResidentController->InspectedUntil.Add(FName(TEXT("RainBasin")), FPlatformTime::Seconds() + 32.0);
+				ResidentController->InspectTarget(FName(TEXT("RainBasin")));
+				TestTrue(TEXT("A recent look cannot suppress a ready leaf-float interaction"),
+					Basin->GetState().Leaves.Num() == 1 && ResidentController->LastActionOutcome.Contains(TEXT("set it on the water")));
+				TestFalse(TEXT("The basin uses its own daily guard rather than adding a generic inspection cooldown"),
+					ResidentController->InspectedUntil.Contains(FName(TEXT("RainBasin"))));
+				ResidentController->InspectTarget(FName(TEXT("RainBasin")));
+				TestTrue(TEXT("The basin still prevents a second leaf from the same resident that day"),
+					Basin->GetState().Leaves.Num() == 1 && ResidentController->LastActionOutcome.Contains(TEXT("earlier today")));
+			}
+			AActor* InteractionObserver = ControlledResident ? static_cast<AActor*>(ControlledResident) : Resident;
+
 			const bool bCanInteract = IslandInteractionUtility::CanInteract(Resident, BasinActor, 250.f);
 			TestTrue(*FString::Printf(TEXT("Resident can perceive the basin at %.1f cm (hidden=%d)"),
 				FVector::Dist(Resident->GetActorLocation(), BasinActor->GetActorLocation()), BasinActor->IsHidden()), bCanInteract);
@@ -285,8 +316,9 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			TestTrue(*FString::Printf(TEXT("Ordinary nearest-visible-target discovery finds the basin (found=%s)"),
 				FoundTarget ? *IslandInteractionUtility::GetTargetTag(FoundTarget).ToString() : TEXT("none")), FoundTarget == BasinActor);
 			FString Fact;
-			TestTrue(TEXT("Resident inspection uses the ordinary interaction path"), IslandInteractionUtility::Perform(Resident, BasinActor, Fact));
-			TestTrue(TEXT("The resident's first inspection sets a leaf afloat"), Fact.Contains(TEXT("set it on the water")) && Basin->GetState().Leaves.Num() == 1);
+			TestTrue(TEXT("A resident repeat uses the ordinary interaction path"), IslandInteractionUtility::Perform(InteractionObserver, BasinActor, Fact));
+			TestTrue(TEXT("The basin's per-resident/day guard remains authoritative across interaction paths"),
+				Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == 1);
 			TestTrue(TEXT("Setting a leaf afloat makes one brief, non-persistent water ripple"), BasinActor->IsWaterRippleActive());
 			BasinActor->Tick(0.2f);
 			TestEqual(TEXT("One floating-leaf presentation slot is tracked"), BasinActor->FloatingLeaves.Num(), 1);
@@ -305,13 +337,13 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			const int32 LeafCount = Basin->GetState().Leaves.Num();
 			const float RippleAgeBeforeRepeat = BasinActor->RainRippleElapsed;
 			TestTrue(TEXT("A repeat inspection reports today's leaf without changing the basin"),
-				IslandInteractionUtility::Perform(Resident, BasinActor, Fact) && Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == LeafCount);
+				IslandInteractionUtility::Perform(InteractionObserver, BasinActor, Fact) && Fact.Contains(TEXT("earlier today")) && Basin->GetState().Leaves.Num() == LeafCount);
 			TestTrue(TEXT("A refused repeat does not restart the transient ripple"), BasinActor->IsWaterRippleActive() &&
 				FMath::IsNearlyEqual(BasinActor->RainRippleElapsed, RippleAgeBeforeRepeat, 0.001f));
 			TestTrue(TEXT("Water and the resident's leaf are durably saved"),
 				FFileHelper::LoadFileToString(Json, *StateFile) && PlacedState.FromJson(Json) &&
 				FMath::IsNearlyEqual(PlacedState.Water, Basin->GetState().Water) && PlacedState.Leaves.Num() == 1 &&
-				PlacedState.Leaves[0].AgentId == Resident->GetName());
+				PlacedState.Leaves[0].AgentId == InteractionObserver->GetName());
 		}
 	}
 	const FVector ExpectedLocation = Basin->GetState().Location;

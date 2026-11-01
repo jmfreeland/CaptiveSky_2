@@ -106,6 +106,8 @@ public:
 	static bool IsWanderLandmarkEligible(const AActor* Landmark, const TMap<FName, double>& RecentInspections, double Now);
 	/** A deliberate, nearby stationary-target interaction may route an agent closer, but never chase wildlife. */
 	static bool ShouldAutoApproachInteraction(const AActor* Observer, const AActor* Target, FName RequestedTag);
+	/** Generic repeat-inspection delay; actions with their own durable rate limit may return zero. */
+	static double GetInspectionCooldownSeconds(FName Target);
 	/** Prefer a nearby floor-level walking point, sampling around blocked fixtures before an elevated fallback. */
 	static bool ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation);
 
@@ -138,6 +140,7 @@ private:
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
 	friend class FIslandProposalMemoryTest;
+	friend class FIslandRainBasinWorldTest;
 	FTimerHandle ThinkTimerHandle;
 	FString LastActionOutcome = TEXT("No completed action yet.");
 	FString LastActionKey;

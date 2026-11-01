@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let a ready basin interaction survive a recent inspection
+
+The bounded 15-minute resident session caught Raven choosing to float a leaf
+in a full basin from two metres away, but the controller rejected it because
+the basin was still on its generic five-minute inspection cooldown. The basin
+already enforces the meaningful limit itself: one leaf per resident per Island
+day. Basin interactions now bypass only the generic inspection cooldown, while
+ordinary landmarks retain five minutes and the reversible hearth retains one.
+The UE 5.8.3 scratch Editor target compiled and linked the implementation and a
+world-level regression for the exact sequence. Runtime automation remains
+unverified because the known NullRHI bootstrap crash recurred before test
+startup. Details: [basin interaction cooldown](findings/2026-11-01-rainbasin-interaction-cooldown.md).
+
 ## 2026-11-01 — Let residents recognize the seasonal flower patches
 
 Now that dedicated woodland-bluebell, Tideglass marsh-marigold, and

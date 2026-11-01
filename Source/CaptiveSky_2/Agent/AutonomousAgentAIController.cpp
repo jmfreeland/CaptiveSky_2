@@ -553,6 +553,14 @@ bool AAutonomousAgentAIController::ShouldAutoApproachInteraction(const AActor* O
 	return DistanceSquared > FMath::Square(IslandInteractionUtility::DefaultInteractionRange) &&
 		DistanceSquared <= FMath::Square(MaximumAutomaticInteractionApproachDistance);
 }
+double AAutonomousAgentAIController::GetInspectionCooldownSeconds(FName Target)
+{
+	// The basin has a meaningful per-resident/day guard; applying the generic look cooldown
+	// can suppress a leaf-float interaction after the resident has only just inspected it.
+	if (Target == FName(TEXT("RainBasin"))) return 0.0;
+	if (Target == FName(TEXT("InnHearth"))) return 60.0;
+	return 300.0;
+}
 bool AAutonomousAgentAIController::ProjectGroundedTarget(UNavigationSystemV1* Navigation, const FVector& Target, const FNavAgentProperties& AgentProperties, FNavLocation& OutLocation)
 {
 	if (!Navigation) return false;
@@ -805,7 +813,8 @@ FString AAutonomousAgentAIController::DescribeActionState() const
 	FString Result = TEXT(" Last physical action result: ") + LastActionOutcome;
 	Result += IsActionInProgress() ? TEXT(" Movement is still in progress.") : TEXT(" No movement is currently in progress.");
 	for (const auto& Entry : InspectedUntil)
-		if (Entry.Value > FPlatformTime::Seconds()) Result += FString::Printf(TEXT(" %s was already inspected; no new interaction is available for %.0f more real seconds."), *Entry.Key.ToString(), Entry.Value - FPlatformTime::Seconds());
+		if (GetInspectionCooldownSeconds(Entry.Key) > 0.0 && Entry.Value > FPlatformTime::Seconds())
+			Result += FString::Printf(TEXT(" %s was already inspected; no new interaction is available for %.0f more real seconds."), *Entry.Key.ToString(), Entry.Value - FPlatformTime::Seconds());
 	if (RepeatedActions >= 2) Result += TEXT(" You have repeated this choice without new progress. Rest, wait quietly, speak, or choose something different; do not invent a discovery.");
 	if (const APawn* Observer = GetPawn())
 	{
@@ -931,10 +940,19 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 	if (Target.IsNone()) { ReportAction(TEXT("Inspection failed: no target supplied.")); return; }
 	APawn* Observer = GetPawn();
 	if (!Observer) { ReportAction(TEXT("Inspection failed: no character is currently under your control.")); return; }
-	if (const double* Until = InspectedUntil.Find(Target); Until && *Until > FPlatformTime::Seconds())
+	const double CooldownSeconds = GetInspectionCooldownSeconds(Target);
+	if (CooldownSeconds > 0.0)
 	{
-		ReportAction(TEXT("Already inspected that place recently; no additional interaction is available yet."));
-		return;
+		if (const double* Until = InspectedUntil.Find(Target); Until && *Until > FPlatformTime::Seconds())
+		{
+			ReportAction(TEXT("Already inspected that place recently; no additional interaction is available yet."));
+			return;
+		}
+	}
+	else
+	{
+		// Clear a legacy in-memory value if a controller was live-patched while the basin cooldown was active.
+		InspectedUntil.Remove(Target);
 	}
 	bool bNearbyWildlifeOccluded = false;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
@@ -1001,8 +1019,8 @@ void AAutonomousAgentAIController::InspectTarget(FName Target)
 			if (!IslandInteractionUtility::Perform(Observer, *It, Fact)) { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
 		}
 		else { ReportAction(TEXT("This target has no implemented inspection interaction.")); return; }
-		// The hearth is deliberately reversible: residents may tend it again before its light expires.
-		InspectedUntil.Add(Target, FPlatformTime::Seconds() + (Target == FName(TEXT("InnHearth")) ? 60.0 : 300.0));
+		if (CooldownSeconds > 0.0)
+			InspectedUntil.Add(Target, FPlatformTime::Seconds() + CooldownSeconds);
 		ReportAction(Target.ToString() + TEXT(": ") + Fact);
 		if (UAgentMemoryComponent* Memory = Observer->FindComponentByClass<UAgentMemoryComponent>())
 			Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, Target.ToString() + TEXT(": ") + Fact, 0.45f, {TEXT("action-result"), Target.ToString()}));
