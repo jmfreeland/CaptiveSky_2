@@ -7,6 +7,9 @@ every material slot on the A/B tree variants used by IslandWeather, their
 material-instance parent chains, and recursively referenced packages. Plugin
 content in a runtime material dependency closure is a shipping risk when that
 plugin is editor-only or unavailable in the game target.
+The report includes instance texture/scalar/vector/static-switch overrides so a
+project-owned runtime material can be designed against the installed textures
+without editing any assets.
 """
 
 import json
@@ -23,6 +26,7 @@ TREE_ASSETS = (
     "/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B",
     "/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A",
     "/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B",
+    "/Game/Megaplant_Library/Tree_Common_Hazel/Tree_Common_Hazel_01/Tree_Common_Hazel_01_A",
 )
 
 PLUGIN_PREFIXES = (
@@ -56,6 +60,21 @@ def material_parent_chain(material):
         else:
             break
     return chain
+
+
+def parameter_overrides(instance, property_name, value_property, render_path=False):
+    values = instance.get_editor_property(property_name) or []
+    result = []
+    for value in values:
+        info = value.get_editor_property("parameter_info")
+        parameter_name = str(info.get_editor_property("name"))
+        parameter_value = value.get_editor_property(value_property)
+        if render_path and parameter_value:
+            parameter_value = object_path(parameter_value)
+        else:
+            parameter_value = str(parameter_value)
+        result.append({"name": parameter_name, "value": parameter_value})
+    return result
 
 
 def dependency_closure(asset_registry, roots):
@@ -92,6 +111,12 @@ def inspect_tree(path, asset_registry):
         material = slot.get_editor_property("material_interface")
         chain = material_parent_chain(material)
         slot_result = {"slot": slot_index, "parent_chain": chain}
+        if isinstance(material, unreal.MaterialInstance):
+            slot_result["overrides"] = {
+                "texture": parameter_overrides(material, "texture_parameter_values", "parameter_value", True),
+                "scalar": parameter_overrides(material, "scalar_parameter_values", "parameter_value"),
+                "vector": parameter_overrides(material, "vector_parameter_values", "parameter_value"),
+            }
         result["material_slots"].append(slot_result)
         material_roots.extend(entry.get("path") for entry in chain if entry.get("path"))
 

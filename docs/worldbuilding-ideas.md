@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Keep Megaplant materials self-contained at runtime
+
+The expanded UE Editor audit now covers Common Hazel as well as the original
+installed tree variants. It confirms that all nine meshes still reach the
+ProceduralVegetationEditor sample material closure (24 packages); the
+project-owned bark parent is not yet a runtime fix because it shares that
+closure. Species textures are already project-owned, while each material
+instance also carries seasonal/health/translucency overrides. Preserve that
+art direction when copying the full dependency graph into project content; do
+not flatten it to a two-texture substitute. No assets were changed. Details:
+[runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
+
 ## 2026-11-01 — Give the rain basin breathing room
 
 Resident feedback found Rat's direct approach to the basin blocked by
