@@ -10,6 +10,19 @@ all four project config files and many asset-pipeline scripts. Treat the D:
 project and this source worktree as separate code states; do not assume a
 committed worktree change is present in the editor.
 
+The differences are distributed across the checkout, not just pipeline noise:
+
+| Root | Identical | Different | Missing from D: |
+| --- | ---: | ---: | ---: |
+| `Config/` | 2 | 4 | 0 |
+| `Source/` | 97 | 202 | 4 |
+| `Scripts/` | 9 | 171 | 26 |
+
+In particular, 202 source files differ. This is too broad for a safe blind
+copy; first identify live-only edits in D: and choose an intentional merge or
+build/sync strategy. The `.uproject` and Content assets were not part of this
+source/config/script count.
+
 Use the read-only audit before diagnosing a live-editor/source discrepancy:
 
 ```powershell
