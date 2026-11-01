@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Keep native ocean surfaces from acting like solid ground
+
+The active D: project had the legacy hidden `OceanPlane` collision disabled,
+but did not yet change Pawn blocking on generated WaterBodyOcean hulls or the
+WaterZone mesh. A narrow merge now updates those responses to overlap while
+preserving the water query behavior, and extends the existing native-ocean
+fixture with a regression assertion. UE 5.8.3 compiled the subsystem and the
+updated test; final linking was blocked by the editor holding its DLL, so the
+automation and actual traversal remain unverified. Do not terminate the editor
+or start another renderer to force this check. Next: after a safe editor reload,
+run `CaptiveSky2.Agent.IslandOcean` and test an actual player entry into the
+water. Details: [active-project water collision merge](findings/2026-11-01-live-checkout-parity-and-zen-startup.md#active-project-water-collision-merge-2026-11-01).
+
 ## 2026-11-01 — Give headless correspondents the same bounded reply horizon
 
 The Unreal play-session path already stops after 30 real minutes or 64 shared

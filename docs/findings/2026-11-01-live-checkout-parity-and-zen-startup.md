@@ -117,8 +117,32 @@ components before source syncing more diversity code.
 **Texture-pool versus full-GPU-memory recheck:** both the current worktree and D: `DefaultEngine.ini` set `r.Streaming.PoolSize=4096` and `r.Streaming.LimitPoolSizeToVRAM=1`. The active D: editor log also reports `Texture pool size now 4096 MB`. This is the streaming-pool setting, not total GPU allocation; the available 1,224 MiB is device-wide free VRAM. `nvidia-smi` exposed process IDs but denied process names, so this sample cannot attribute the allocation. Do not raise the pool or start another renderer without a settled `stat streaming` sample from the user's warning view and more GPU headroom.
 
 Once GPU headroom permits, inspect live per-species instance counts and
-component visibility, then merge only any missing diversity behavior. Separately,
-agree on a controlled source-sync point for D: (including preservation of any
-live-only edits) before syncing the Zen config and comparing a single-editor
-startup. Keep water traversal and real-RHI performance as separate runtime
-gates.
+component visibility, then merge only any missing diversity behavior. Keep
+water traversal and real-RHI performance as separate runtime gates.
+
+## Active-project water collision merge (2026-11-01)
+
+The D: `IslandOceanSubsystem.cpp` differed from the current worktree: it only
+disabled the legacy `OceanPlane`, leaving native `AWaterBodyOcean` collision
+and `AWaterZone`'s `WaterMesh` able to block the player. The focused merge keeps
+the legacy-plane behavior and changes only Pawn-blocking native water
+components to `Overlap`, preserving other query/overlap behavior. A runtime log
+records how many blockers were corrected. The D: `IslandOceanTests.cpp` now
+extends its existing native-ocean fixture to assert that startup changes the
+WaterMesh response and that generated ocean collision no longer blocks Pawn.
+
+Validation is partial but source-specific: UE 5.8.3 compiled
+`IslandOceanSubsystem.cpp` successfully. A full Editor link then failed because
+`UnrealEditor.exe` held the project's target DLL. After folding the regression
+into D:'s existing WaterZone fixture, the same target's `-NoLink` compile
+successfully compiled `IslandOceanTests.cpp`. The automation was not executed
+and no player traversal was performed; don't treat the user's water-walking
+issue as runtime-verified until a safe editor reload and in-world traversal
+confirm it. The editor-held DLL was not terminated. This source change is
+limited to water collision and does not synchronize the divergent
+`IslandWeather.cpp` or any other D: source.
+
+**Next:** once the current editor has safely closed or reloaded its module, run
+`CaptiveSky2.Agent.IslandOcean` and a short actual player shoreline-to-ocean
+traversal. Keep the 4 GiB rendered-GPU reserve; at the latest sample only
+1,224 MiB was free.
