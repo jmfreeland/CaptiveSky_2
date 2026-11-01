@@ -13,7 +13,8 @@ spread without a global culture score, extra model call, or mandatory teaching.
 
 The focused `Agent.CraftTeaching` regression now covers the shared
 conversation transport, exact optional ID, durable memory reload and
-attribution, speaker-knowledge gate, invented IDs, and range gate. The UE 5.8
+attribution, activation of the existing non-interruption choice, speaker-
+knowledge gate, invented IDs, and range gate. The UE 5.8
 editor target builds successfully, but the automation test has not been run:
 the worktree's headless NullRHI startup previously crashed before harness
 initialization, and the separate live D: project has not loaded this worktree's

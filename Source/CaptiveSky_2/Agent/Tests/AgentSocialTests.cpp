@@ -4,6 +4,7 @@
 #include "AgentMemoryComponent.h"
 #include "AgentMemoryTypes.h"
 #include "AgentSocialComponent.h"
+#include "AutonomousAgentAIController.h"
 #include "AutonomousAgentCharacter.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -196,8 +197,10 @@ bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("A fresh learner memory component can verify persistence"), ReloadedLearnerMemory))
 	{
 		ReloadedLearnerMemory->AgentId = LearnerId;
-		TestTrue(TEXT("The taught place practice survives reloading the learner's persistent memory file"),
-			ReloadedLearnerMemory->HasMemoryTag(TEXT("practice:quiet-listening")));
+		const bool bLearnedPracticeSurvivedReload = ReloadedLearnerMemory->HasMemoryTag(TEXT("practice:quiet-listening"));
+		TestTrue(TEXT("The taught place practice survives reloading the learner's persistent memory file"), bLearnedPracticeSurvivedReload);
+		TestTrue(TEXT("Reloaded practice knowledge activates the Listening Stones non-interruption choice"),
+			AAutonomousAgentAIController::ShouldUseListeningStonesEtiquette(bLearnedPracticeSurvivedReload, true, false));
 		for (const FAgentMemoryRecord& Memory : ReloadedLearnerMemory->GetMemoriesSince(FDateTime::MinValue()))
 			if (Memory.Text.Contains(Teacher->GetAgentDisplayName()) && Memory.Text.Contains(TEXT("did not witness the original visit myself")))
 				bAttributedPracticeMemoryFound = true;

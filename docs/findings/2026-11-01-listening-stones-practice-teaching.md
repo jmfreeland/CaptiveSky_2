@@ -17,8 +17,9 @@ duplicate memory.
 
 The `Agent.CraftTeaching` automation now covers the exact ID and prompt,
 delivered attribution after reloading the learner's memory file, a speaker
-without the witnessed tag, invented IDs, and out-of-range delivery. The UE
-5.8.3 editor target compiled successfully,
+without the witnessed tag, activation of the existing quiet-listener etiquette
+choice, invented IDs, and out-of-range delivery. The UE 5.8.3 editor target
+compiled successfully,
 including the modified social-teaching test translation unit. The automation
 was not executed: this worktree's prior `-NullRHI` commandlet attempts crashed
 before automation initialization, and the open D: editor is a separate project
