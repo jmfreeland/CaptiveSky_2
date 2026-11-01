@@ -142,7 +142,17 @@ confirm it. The editor-held DLL was not terminated. This source change is
 limited to water collision and does not synchronize the divergent
 `IslandWeather.cpp` or any other D: source.
 
+**Desktop recheck (2026-11-01):** a read-only app inventory shows the UE 5.8
+`UnrealEditor.exe` application running with both `CaptiveSky_2 - Unreal
+Editor` and `Tree_Common_Hazel_01_A` windows. A shell process query returned no
+matching process, so that query is incomplete in this environment and must not
+be used to decide that the project DLL is free. A later full-build retry again
+failed to link the DLL while UnrealEditor was open. Current GPU use is
+10,742/12,282 MiB (1,256 MiB free), below the 4 GiB rendered-play reserve. No
+window was activated or closed, no PIE was started, and the user's editor state
+was left untouched.
+
 **Next:** once the current editor has safely closed or reloaded its module, run
 `CaptiveSky2.Agent.IslandOcean` and a short actual player shoreline-to-ocean
 traversal. Keep the 4 GiB rendered-GPU reserve; at the latest sample only
-1,224 MiB was free.
+1,256 MiB was free.
