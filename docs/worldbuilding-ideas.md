@@ -15,6 +15,20 @@ change the embodied play/request limits. If more channel adapters are added,
 keep the same per-agent bounded-routing boundary rather than giving each
 adapter an independent unlimited worker pool. Details: [Gateway README](../Gateway/README.md).
 
+## 2026-11-01 — Refine the spring woodland ramsons candidate
+
+The first plain-material preview showed separate low leaf fans and small,
+hard-to-read flower heads. The seven rosettes are now tighter, leaf blades
+narrower, and the three leafless scapes 38–43 cm tall, in line with the
+up-to-45 cm range in [Plantlife's woodland ID guide](https://www.plantlife.org.uk/wp-content/uploads/2024/06/WEB-Plantlife-ID-Guide.pdf).
+The refreshed 98 × 101 × 49 cm FBX remains at 4,222 triangles and exports
+collisionless with five material slots. The source contract passes in Blender
+5.2.2, and the FBX re-import verifier reports one UV layer and `PROBLEMS []`.
+The preview is improved but leaves still look somewhat planar; keep it
+unplaced until a disposable Unreal import confirms ground contact, material
+response, and visitor-scale readability. Details:
+[ramsons candidate](findings/2026-11-01-woodland-ramsons-candidate.md).
+
 ## 2026-11-01 — Add a RAM guard to hidden resident-feedback runs
 
 The 15-minute NullRHI character-feedback path now requires the existing 4 GiB

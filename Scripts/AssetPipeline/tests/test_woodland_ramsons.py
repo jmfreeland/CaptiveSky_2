@@ -31,6 +31,11 @@ class WoodlandRamsonsTests(unittest.TestCase):
         self.assertEqual(values["NAME"], "WoodlandRamsons")
         self.assertEqual(len(values["ROSETTES"]), 7)
         self.assertEqual(values["FLOWERING_ROSETTES"], (0, 3, 6))
+        self.assertEqual(values["SCAPE_HEIGHTS"], (0.38, 0.43, 0.40))
+        self.assertLessEqual(max(point[0] for point in values["ROSETTES"]) -
+                             min(point[0] for point in values["ROSETTES"]), 0.5)
+        self.assertLessEqual(max(point[1] for point in values["ROSETTES"]) -
+                             min(point[1] for point in values["ROSETTES"]), 0.55)
         self.assertEqual(values["FLORETS_PER_UMBEL"], 16)
         self.assertIn("collisionless", values["PROVENANCE"])
 

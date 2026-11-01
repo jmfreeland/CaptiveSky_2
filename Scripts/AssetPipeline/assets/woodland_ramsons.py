@@ -10,15 +10,16 @@ import lib
 
 NAME = "WoodlandRamsons"
 ROSETTES = (
-    (-0.34, -0.18, 0.20, 0.92),
-    (0.02, -0.34, 1.46, 1.00),
-    (0.36, -0.22, 2.52, 0.82),
-    (-0.42, 0.21, 0.78, 0.80),
-    (-0.04, 0.13, 2.08, 1.00),
-    (0.34, 0.19, 0.04, 0.88),
-    (-0.11, 0.41, 1.26, 0.78),
+    (-0.26, -0.14, 0.20, 0.92),
+    (0.02, -0.26, 1.46, 1.00),
+    (0.24, -0.13, 2.52, 0.82),
+    (-0.24, 0.12, 0.78, 0.80),
+    (-0.03, 0.06, 2.08, 1.00),
+    (0.22, 0.12, 0.04, 0.88),
+    (-0.09, 0.27, 1.26, 0.78),
 )
 FLOWERING_ROSETTES = (0, 3, 6)
+SCAPE_HEIGHTS = (0.38, 0.43, 0.40)
 FLORETS_PER_UMBEL = 16
 PROVENANCE = (
     "Procedurally authored in Blender 5.2 from a botanical form reference; "
@@ -92,8 +93,8 @@ def _pollen_dot(bm, centre, normal):
 
 
 def build(A):
-    lib.PLAIN["ramson_leaf_deep"] = {"BaseColor": [0.10, 0.24, 0.055], "Roughness": 0.88}
-    lib.PLAIN["ramson_leaf_fresh"] = {"BaseColor": [0.18, 0.36, 0.085], "Roughness": 0.84}
+    lib.PLAIN["ramson_leaf_deep"] = {"BaseColor": [0.12, 0.29, 0.065], "Roughness": 0.88}
+    lib.PLAIN["ramson_leaf_fresh"] = {"BaseColor": [0.21, 0.41, 0.10], "Roughness": 0.84}
     lib.PLAIN["ramson_stem"] = {"BaseColor": [0.13, 0.25, 0.045], "Roughness": 0.90}
     lib.PLAIN["ramson_flower"] = {"BaseColor": [0.91, 0.89, 0.75], "Roughness": 0.82}
     lib.PLAIN["ramson_pollen"] = {"BaseColor": [0.91, 0.66, 0.18], "Roughness": 0.74}
@@ -106,7 +107,7 @@ def build(A):
         for leaf_index in range(2):
             angle = heading + math.pi * leaf_index + 0.16 * math.sin(plant_index * 1.7 + leaf_index)
             length = (0.245 + 0.028 * ((plant_index + leaf_index) % 3)) * scale
-            width = (0.071 + 0.008 * ((plant_index + 2 * leaf_index) % 3)) * scale
+            width = (0.052 + 0.006 * ((plant_index + 2 * leaf_index) % 3)) * scale
             target = fresh_leaves if (plant_index + leaf_index) % 3 == 0 else leaves
             _leaflet(target, origin, angle, length, width, plant_index * 0.7 + leaf_index)
 
@@ -123,7 +124,7 @@ def build(A):
     flowers = bmesh.new()
     pollen = bmesh.new()
     for flower_index, (origin, heading, plant_index) in enumerate(flowering_bases):
-        stem_height = 0.235 + 0.018 * (flower_index % 2)
+        stem_height = SCAPE_HEIGHTS[flower_index]
         lean = Vector((0.026 * math.cos(heading + 0.6),
                        0.024 * math.sin(heading + 0.6), 0.0))
         stem_path = [origin + Vector((0, 0, 0.012)),
