@@ -1,10 +1,11 @@
 """Compile the copied Megaplant master material after the PVE plugin is disabled."""
 
 import json
+import os
 import unreal
 
 
-MANIFEST_PATH = "Saved/MegaplantRuntimeMaterialSandbox/copy-manifest.json"
+MANIFEST_RELATIVE_PATH = os.path.join("MegaplantRuntimeMaterialSandbox", "copy-manifest.json")
 PLUGIN_PREFIX = "/ProceduralVegetationEditor/"
 
 
@@ -12,7 +13,21 @@ def fail(message):
     raise RuntimeError("[MegaplantRuntimeMaterialSandbox] " + message)
 
 
-with open(MANIFEST_PATH, "r", encoding="utf-8") as source:
+def require_sandbox_manifest():
+    project_dir = os.path.realpath(unreal.Paths.project_dir())
+    project_name = os.path.basename(os.path.normpath(project_dir))
+    project_file = os.path.join(project_dir, "MegaplantRuntimeMaterialSandbox.uproject")
+    if project_name.casefold() != "megaplantruntimematerialsandbox" or not os.path.isfile(project_file):
+        fail("refusing to verify assets outside the dedicated MegaplantRuntimeMaterialSandbox project")
+    saved_dir = os.path.realpath(unreal.Paths.project_saved_dir())
+    manifest_path = os.path.realpath(os.path.join(saved_dir, MANIFEST_RELATIVE_PATH))
+    if os.path.commonpath((saved_dir, manifest_path)) != saved_dir:
+        fail("copy manifest path escaped the sandbox Saved directory")
+    return manifest_path
+
+
+manifest_path = require_sandbox_manifest()
+with open(manifest_path, "r", encoding="utf-8") as source:
     manifest = json.load(source)
 
 if manifest.get("count") != len(manifest.get("assets", [])) or not manifest.get("assets"):

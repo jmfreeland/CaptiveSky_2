@@ -24,6 +24,18 @@ boundary so PVE stays available without reintroducing PlantFactory. The new
 test and all 59 `Scripts/tests` cases pass. No Unreal process, asset, or map was
 changed. Details: [PlantFactory migration](findings/2026-10-12-plantfactory-migration.md).
 
+## 2026-11-01 — Confine the Megaplant runtime-material proof project
+
+The prepared 24-package PVE material-closure copy/rewire scripts now refuse to
+run unless the active project is the dedicated
+`MegaplantRuntimeMaterialSandbox`, and store/read their manifest under that
+project's own `Saved/` directory. This closes a real safety gap in the harness:
+the previous scripts relied on operators to choose the correct project and on
+the process working directory to resolve the manifest. Three focused boundary
+tests and all 62 `Scripts/tests` cases pass. The UE sandbox still has not
+materialized any assets; the existing NullRHI commandlet bootstrap failure is
+unchanged. Details: [Megaplant runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
+
 ## 2026-11-01 — Keep Megaplant materials self-contained at runtime
 
 The expanded UE Editor audit now covers Common Hazel as well as the original

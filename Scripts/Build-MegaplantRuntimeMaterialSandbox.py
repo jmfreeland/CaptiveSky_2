@@ -12,7 +12,7 @@ import unreal
 
 PLUGIN_PREFIX = "/ProceduralVegetationEditor/"
 DESTINATION_ROOT = "/Game/Megaplant_Library/RuntimeMaterials/PVE"
-MANIFEST_PATH = "Saved/MegaplantRuntimeMaterialSandbox/copy-manifest.json"
+MANIFEST_RELATIVE_PATH = os.path.join("MegaplantRuntimeMaterialSandbox", "copy-manifest.json")
 SOURCE_PACKAGES = (
     "/ProceduralVegetationEditor/SampleAssets/Materials/MSVTTextures/DefaultDiffuse_VT",
     "/ProceduralVegetationEditor/SampleAssets/Materials/MSVTTextures/Leaf_Mask_VT",
@@ -61,6 +61,19 @@ def fail(message):
     raise RuntimeError("[MegaplantRuntimeMaterialSandbox] " + message)
 
 
+def require_sandbox_project():
+    project_dir = os.path.realpath(unreal.Paths.project_dir())
+    project_name = os.path.basename(os.path.normpath(project_dir))
+    project_file = os.path.join(project_dir, "MegaplantRuntimeMaterialSandbox.uproject")
+    if project_name.casefold() != "megaplantruntimematerialsandbox" or not os.path.isfile(project_file):
+        fail("refusing to copy assets outside the dedicated MegaplantRuntimeMaterialSandbox project")
+    saved_dir = os.path.realpath(unreal.Paths.project_saved_dir())
+    manifest_path = os.path.realpath(os.path.join(saved_dir, MANIFEST_RELATIVE_PATH))
+    if os.path.commonpath((saved_dir, manifest_path)) != saved_dir:
+        fail("copy manifest path escaped the sandbox Saved directory")
+    return manifest_path
+
+
 def destination_for(source_package, asset_name):
     if not source_package.startswith(PLUGIN_PREFIX):
         fail("unexpected source package: " + source_package)
@@ -99,6 +112,7 @@ def references_for(asset):
 
 
 def main():
+    manifest_path = require_sandbox_project()
     registry = unreal.AssetRegistryHelpers.get_asset_registry()
     asset_library = unreal.EditorAssetLibrary
     dependency_options = unreal.AssetRegistryDependencyOptions(
@@ -216,8 +230,8 @@ def main():
     if plugin_dependencies:
         fail("copied closure still references PVE packages: " + ", ".join(sorted(plugin_dependencies)))
 
-    os.makedirs(os.path.dirname(MANIFEST_PATH), exist_ok=True)
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as output:
+    os.makedirs(os.path.dirname(manifest_path), exist_ok=True)
+    with open(manifest_path, "w", encoding="utf-8") as output:
         json.dump({"assets": manifest, "count": len(manifest)}, output, indent=2)
     unreal.log(
         "[MegaplantRuntimeMaterialSandbox] COPY_COMPLETE assets={} materials={} rewired={} plugin_dependencies=0".format(
