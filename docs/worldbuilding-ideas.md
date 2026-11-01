@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Keep rendered-play safety tests aligned with the launcher
+
+Two source-only regression assertions had drifted from the safeguards they
+protect: the launcher now polls at the shorter configured GPU/RAM interval,
+and its system-memory check uses `GlobalMemoryStatusEx` behind
+`Get-AvailableSystemMemoryMiB` rather than querying WMI directly. The tests now
+assert those actual boundaries. All 39 `Scripts/tests` cases pass, including
+the GPU/RAM preflight, monitoring, process-scope, and bounded-feedback checks;
+all 15 resident asset-request workflow tests also pass. The wider asset-pipeline
+suite had 112 passing tests, with its separate bread-texture test unable to
+import `numpy` in the available Python. No dependency was installed. This is
+test-harness validation only: no Unreal build or rendered play was run, so the
+water-crossing and GPU-gated visual checks remain open.
+
 ## 2026-11-01 — Let residents read the changing tide, and remember only what happened
 
 Rat and the Innkeeper both wondered how the shore changes as the tide falls.

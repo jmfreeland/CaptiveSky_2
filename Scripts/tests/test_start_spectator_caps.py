@@ -121,7 +121,10 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("-MonitorGpuHeadroom requires a bounded session", launcher)
         self.assertIn("-MonitorGpuHeadroom requires an isolated -DataRoot", launcher)
         self.assertIn("-MonitorGpuHeadroom requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps", launcher)
-        self.assertIn("WaitForExit($GpuMemoryMonitorIntervalSeconds * 1000)", launcher)
+        self.assertIn("$activeIntervals += $GpuMemoryMonitorIntervalSeconds", launcher)
+        self.assertIn("$activeIntervals += $SystemMemoryMonitorIntervalSeconds", launcher)
+        self.assertIn("$monitorIntervalSeconds = ($activeIntervals | Measure-Object -Minimum).Minimum", launcher)
+        self.assertIn("WaitForExit($monitorIntervalSeconds * 1000)", launcher)
         self.assertIn("Get-GpuHeadroomMonitorDecision", launcher)
         self.assertIn("$Game.Kill($true)", launcher)
         self.assertIn("Only the Game process tree launched by this script will be terminated", launcher)
@@ -132,13 +135,14 @@ class StartSpectatorCapTests(unittest.TestCase):
 
         self.assertIn("[switch]$RequireSystemMemoryHeadroom", launcher)
         self.assertIn("$MinimumFreeSystemMemoryMiB = 4096", launcher)
-        self.assertIn("Get-CimInstance -ClassName Win32_OperatingSystem", launcher)
-        self.assertIn("FreePhysicalMemory", launcher)
+        self.assertIn("Get-AvailableSystemMemoryMiB", launcher)
         self.assertIn("Assert-SystemMemoryHeadroom", launcher)
         self.assertIn("-RequireSystemMemoryHeadroom is only applicable to rendered sessions", launcher)
         self.assertLess(launcher.index("if ($RequireSystemMemoryHeadroom) {"), launcher.index("$projectCandidate ="))
 
         module = (ROOT / "Scripts" / "SystemMemoryBudget.psm1").read_text(encoding="utf-8")
+        self.assertIn("GlobalMemoryStatusEx", module)
+        self.assertIn("AvailablePhysical", module)
         self.assertIn("No rendered session was started", module)
         self.assertIn("$FreeMiB -lt $MinimumFreeMiB", module)
 
