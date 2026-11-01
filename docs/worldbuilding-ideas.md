@@ -17,7 +17,9 @@ offline AssetPipeline suite also passed 112 tests. This is implementation and
 package-path evidence, not an in-game appearance, wind, memory, or performance
 result: the live editor still has the previous DLL, whole-device GPU headroom
 is 2,509 MiB (below the 4 GiB rendered-session gate), and the known NullRHI
-pre-initialization crash prevents blindly repeating commandlet automation.
+pre-initialization crash prevents blindly repeating commandlet automation. The
+woodland startup log now also reports A/B instance counts per species, so the
+next run can verify how the valid-land scatter split actually materialized.
 Keep this A/B split as the candidate for the matched woodland comparison; do
 not increase population or extend cull distances. Full evidence and remaining
 checks: [broadleaf A/B variant support](findings/2026-11-01-broadleaf-ab-variants.md).

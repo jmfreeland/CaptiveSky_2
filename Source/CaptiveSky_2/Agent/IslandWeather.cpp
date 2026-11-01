@@ -2334,6 +2334,15 @@ void AIslandWeather::InitializeGroundCover()
 				UE_LOG(LogIslandWeather, Log, TEXT("Island tree mix: %d Norway maple, %d European aspen, %d European beech, %d black alder, %d birch coppice, and %d hazel coppice instances; broadleaf trees span %d/%d groves under the fixed %d-tree budget."),
 					GroundCoverMapleTreeCount, GroundCoverAspenTreeCount, GroundCoverBeechTreeCount, GroundCoverBlackAlderTreeCount,
 					GroundCoverBirchCoppiceCount, GroundCoverHazelCoppiceCount, BroadleafGrovesWithTrees, SpruceGroveCenters.Num(), MaxBroadleafTreeCount);
+				UE_LOG(LogIslandWeather, Log, TEXT("Island broadleaf mesh variants (A/B): Norway maple %d/%d, European aspen %d/%d, European beech %d/%d, black alder %d/%d."),
+					IslandNorwayMaples ? IslandNorwayMaples->GetInstanceCount() : 0,
+					IslandNorwayMaplesVariantB ? IslandNorwayMaplesVariantB->GetInstanceCount() : 0,
+					IslandEuropeanAspens ? IslandEuropeanAspens->GetInstanceCount() : 0,
+					IslandEuropeanAspensVariantB ? IslandEuropeanAspensVariantB->GetInstanceCount() : 0,
+					IslandEuropeanBeeches ? IslandEuropeanBeeches->GetInstanceCount() : 0,
+					IslandEuropeanBeechesVariantB ? IslandEuropeanBeechesVariantB->GetInstanceCount() : 0,
+					IslandBlackAlders ? IslandBlackAlders->GetInstanceCount() : 0,
+					IslandBlackAldersVariantB ? IslandBlackAldersVariantB->GetInstanceCount() : 0);
 				if (bGatherMeadowSpatialDiagnostics)
 				{
 					TArray<FIntPoint> SortedTreeTiles;

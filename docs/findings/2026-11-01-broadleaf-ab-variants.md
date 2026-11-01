@@ -18,6 +18,9 @@ with the existing instanced-skinned DynamicWind setup. B is only selected when
 its asset has enabled DynamicWind data, avoiding static, windless replacements.
 Nearby-plant perception already enumerates all instanced-skinned components, so
 visible B instances use the same observation path as A.
+The post-scatter startup report also logs A/B instance counts for each species,
+making it possible to distinguish a valid-land sampling imbalance from an asset
+or DynamicWind fallback in the next runtime check.
 
 ## Validation completed
 
