@@ -96,6 +96,41 @@ def dependency_closure(asset_registry, roots):
     return sorted(visited)
 
 
+def material_function_graph(roots):
+    """Inspect Material/MaterialFunction calls without compiling or editing them."""
+    pending = [path for path in roots if path]
+    visited = set()
+    graph = []
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        asset = unreal.EditorAssetLibrary.load_asset(path)
+        if isinstance(asset, unreal.Material):
+            expressions = unreal.MaterialEditingLibrary.get_material_expressions(asset)
+        elif isinstance(asset, unreal.MaterialFunction):
+            expressions = unreal.MaterialEditingLibrary.get_material_function_expressions(asset)
+        else:
+            continue
+
+        calls = []
+        for expression in expressions:
+            if not isinstance(expression, unreal.MaterialExpressionMaterialFunctionCall):
+                continue
+            function = expression.get_editor_property("material_function")
+            function_path = object_path(function)
+            calls.append({
+                "node": expression.get_name(),
+                "function": function_path,
+                "setter_available": callable(getattr(expression, "set_material_function", None)),
+            })
+            if function_path and function_path not in visited:
+                pending.append(function_path)
+        graph.append({"asset": path, "class": asset.get_class().get_name(), "function_calls": calls})
+    return sorted(graph, key=lambda entry: entry["asset"])
+
+
 def inspect_tree(path, asset_registry):
     result = {"mesh": path, "material_slots": [], "errors": []}
     mesh = unreal.EditorAssetLibrary.load_asset(path)
@@ -141,12 +176,28 @@ def main():
         for tree in report["trees"]
         for package in tree.get("plugin_dependencies", [])
     })
+    material_roots = sorted({
+        entry.get("path")
+        for tree in report["trees"]
+        for slot in tree.get("material_slots", [])
+        for entry in slot.get("parent_chain", [])
+        if entry.get("path")
+    })
+    report["material_function_graph"] = material_function_graph(material_roots)
     report["unique_plugin_dependencies"] = plugin_packages
     report["unique_plugin_dependency_count"] = len(plugin_packages)
+    graph_calls = [
+        call
+        for asset in report["material_function_graph"]
+        for call in asset["function_calls"]
+    ]
+    unresolved_calls = [call for call in graph_calls if not call["function"]]
+    missing_setters = [call for call in graph_calls if not call["setter_available"]]
     unreal.log("[MegaplantRuntimeMaterialAudit] REPORT " + json.dumps(report, sort_keys=True))
     unreal.log(
-        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={}".format(
-            len(report["trees"]), len(plugin_packages)
+        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={} graph_assets={} function_calls={} unresolved_calls={} missing_setters={}".format(
+            len(report["trees"]), len(plugin_packages), len(report["material_function_graph"]),
+            len(graph_calls), len(unresolved_calls), len(missing_setters)
         )
     )
 

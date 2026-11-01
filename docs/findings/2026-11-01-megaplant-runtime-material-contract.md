@@ -24,6 +24,24 @@ Common Hazel follows the same texture contract. Its new material instance
 references project-owned textures, so the shared parent graph—not missing
 Hazel images—is the plugin dependency.
 
+## Material-function graph feasibility
+
+Extended the same read-only audit to traverse `MaterialExpressionMaterialFunctionCall`
+nodes recursively using UE 5.8's `MaterialEditingLibrary` APIs. The editor log
+for the nine-tree run reports 32 material/function graph assets and 62 function
+calls; all calls resolved, and the Python wrapper exposed a callable function
+setter on every call node (`unresolved_calls=0`, `missing_setters=0`). This is
+evidence that nested function references can be inspected and likely remapped
+in a project-local graph copy. No expressions were changed, and this does not
+yet prove that copied graphs compile or render correctly.
+
+The function-call graph walk is not a complete graph-copy validator: direct
+texture and collection references on expression nodes have not yet been
+inventoried. Before copying, extend the audit to enumerate those references
+and verify every source exists in the destination closure; then copy/remap into
+a disposable project folder, compile, and preview before touching the live
+species parents. The original PVE graph and Island remain unchanged.
+
 ## Direction
 
 Do not replace this graph with a bare two-texture material: it would discard
@@ -34,4 +52,5 @@ sample assets. Re-run this audit to prove the runtime closure is clear, compile
 the copied material, then preview one instance-skinned tree before reparenting
 the remaining species. Preserve the current parent graph, maps, and all
 instance overrides until that preview has passed. No material assets were
-created or changed in this milestone.
+created or changed in this milestone. The graph API discovery reduces the
+main implementation uncertainty but does not change this safety gate.
