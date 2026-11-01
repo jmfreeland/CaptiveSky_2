@@ -147,6 +147,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A quarter into the cycle the full moon is about a week off"), Calendar.Contains(TEXT("full in about 7 days")));
 		TestTrue(TEXT("A quarter into the cycle the new moon is about three weeks off"), Calendar.Contains(TEXT("new in about 22 days")));
 		TestTrue(TEXT("At full moon the calendar says today"), AIslandDayNight::DescribeCalendar(15, 0.5f).Contains(TEXT("full today")));
+		TestTrue(TEXT("The temperate season changes on the 90-day boundary"),
+			AIslandDayNight::DescribeCalendar(90, 0.1f).Contains(TEXT("spring")) &&
+			AIslandDayNight::DescribeCalendar(91, 0.1f).Contains(TEXT("summer")) &&
+			AIslandDayNight::DescribeCalendar(180, 0.1f).Contains(TEXT("summer")) &&
+			AIslandDayNight::DescribeCalendar(181, 0.1f).Contains(TEXT("autumn")) &&
+			AIslandDayNight::DescribeCalendar(270, 0.1f).Contains(TEXT("autumn")) &&
+			AIslandDayNight::DescribeCalendar(271, 0.1f).Contains(TEXT("winter")) &&
+			AIslandDayNight::DescribeCalendar(360, 0.1f).Contains(TEXT("winter")) &&
+			AIslandDayNight::DescribeCalendar(361, 0.1f).Contains(TEXT("spring")));
 		TestTrue(TEXT("Non-finite progress is harmless"), AIslandDayNight::DescribeCalendar(1, NAN).IsEmpty());
 	}
 	{

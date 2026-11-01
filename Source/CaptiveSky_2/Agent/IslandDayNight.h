@@ -45,6 +45,9 @@ public:
 	static constexpr float OvercastMoonlightFloor = 0.35f;
 	/** Approximate synodic month used for the repeating Island moon-light cycle. */
 	static constexpr double LunarCycleDays = 29.53059;
+	/** Simple temperate calendar for seasonal ecology; lunar phase continues independently. */
+	static constexpr int32 CalendarDaysPerSeason = 90;
+	static constexpr int32 CalendarDaysPerYear = CalendarDaysPerSeason * 4;
 	/** Deterministic depth-tested star points, grouped to emerge through twilight. */
 	static constexpr int32 NightStarCount = 1200;
 	static constexpr int32 NightStarSectionCount = 6;
@@ -86,7 +89,7 @@ public:
 	static FString DescribeHorizonColour(float IslandHour, float CloudCover);
 	/** Whether a meteor is crossing the sky in this ten-minute slot of Island time. Deterministic from the day and slot (no state to save), rarer under bright moon or cloud, never by day. Pure. */
 	static bool IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination);
-	/** Island day count plus whole days until the next full and new moon, so residents can reckon time across sessions. Pure. */
+	/** Island day, temperate season, and whole days until the next full and new moon. Pure. */
 	static FString DescribeCalendar(int32 IslandDay, float LunarProgress);
 	/** Island hours until the moon next crosses the horizon (rising if it is below, setting if above), in quarter-hour steps; negative if none within 26 hours. Pure. */
 	static float HoursUntilMoonHorizon(int32 IslandDay, float IslandHour);

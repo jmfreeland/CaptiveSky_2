@@ -318,12 +318,16 @@ FString AIslandDayNight::DescribeTide(int32 IslandDay, float IslandHour)
 FString AIslandDayNight::DescribeCalendar(int32 IslandDay, float LunarProgress)
 {
 	if (!FMath::IsFinite(LunarProgress)) return FString();
+	static const TCHAR* const Seasons[] = { TEXT("spring"), TEXT("summer"), TEXT("autumn"), TEXT("winter") };
+	const int32 Day = FMath::Max(1, IslandDay);
+	const int32 DayOfYear = (Day - 1) % CalendarDaysPerYear;
+	const TCHAR* const Season = Seasons[DayOfYear / CalendarDaysPerSeason];
 	const float Progress = LunarProgress - FMath::FloorToFloat(LunarProgress);
 	const int32 ToFull = FMath::RoundToInt(FMath::Frac(0.5f - Progress + 1.f) * static_cast<float>(LunarCycleDays));
 	const int32 ToNew = FMath::RoundToInt((1.f - Progress) * static_cast<float>(LunarCycleDays));
 	const auto Days = [](int32 N) { return N <= 0 ? FString(TEXT("today")) : N == 1 ? FString(TEXT("tomorrow")) : FString::Printf(TEXT("in about %d days"), N); };
-	return FString::Printf(TEXT(" It is day %d of the Island; the moon will be full %s and new %s."),
-		FMath::Max(1, IslandDay), *Days(ToFull), *Days(ToNew));
+	return FString::Printf(TEXT(" It is day %d of the Island, in %s; the moon will be full %s and new %s."),
+		Day, Season, *Days(ToFull), *Days(ToNew));
 }
 
 bool AIslandDayNight::IsShootingStarSlot(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination)
