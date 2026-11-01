@@ -150,6 +150,10 @@ bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
 	Learner->Memory->AgentId = LearnerId;
 	UnknownLearner->Memory->AgentId = UnknownLearnerId;
 	DistantLearner->Memory->AgentId = DistantLearnerId;
+	TArray<FString> QuietPracticeTags;
+	QuietPracticeTags.Add(TEXT("practice:quiet-listening"));
+	Teacher->Memory->AppendMemory(Teacher->Memory->MakeMemory(EAgentMemoryType::Observation,
+		TEXT("I watched another resident pause quietly at the Listening Stones."), 0.6f, QuietPracticeTags));
 
 	FIslandCraftParameter Moisture;
 	Moisture.Id = TEXT("moisture");
@@ -162,39 +166,67 @@ bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
 	const FString LearnerSituation = Learner->Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("Only a resident who knows the tradition sees its exact optional teaching ID"),
 		TeacherSituation.Contains(TEXT("teach_craft ID: HearthLoaf")) && !LearnerSituation.Contains(TEXT("teach_craft ID: HearthLoaf")));
+	TestTrue(TEXT("A resident with witnessed quiet-listening memory sees its optional teaching ID"),
+		TeacherSituation.Contains(TEXT("teach_practice ID: quiet-listening")) && !LearnerSituation.Contains(TEXT("teach_practice ID: quiet-listening")));
 	TArray<FAgentMemoryRecord> NoMemories;
 	TestTrue(TEXT("The one scheduled decision prompt describes optional resident-to-resident craft teaching"),
 		Teacher->Brain->BuildSystemPrompt(NoMemories).Contains(TEXT("teach_craft")));
-	const FString Response = TEXT("{\"thought\":\"share a remembered method\",\"action\":{\"type\":\"speak\",\"target\":\"CraftLearner\",\"speech\":\"I remember a slow rise for this loaf.\",\"teach_craft\":\"HearthLoaf\"},\"new_memories\":[]}");
+	TestTrue(TEXT("The one scheduled decision prompt describes optional place-practice teaching"),
+		Teacher->Brain->BuildSystemPrompt(NoMemories).Contains(TEXT("teach_practice")));
+	const FString Response = TEXT("{\"thought\":\"share a remembered method\",\"action\":{\"type\":\"speak\",\"target\":\"CraftLearner\",\"speech\":\"I remember a slow rise for this loaf, and we leave room for a quiet listener at the Stones.\",\"teach_craft\":\"HearthLoaf\",\"teach_practice\":\"quiet-listening\"},\"new_memories\":[]}");
 	const FAgentDecision Decision = UAgentBrainComponent::ParseDecisionAndStoreMemories(Response, nullptr);
 	TestTrue(TEXT("The decision parser preserves the optional craft lineage ID"),
 		Decision.bValid && Decision.ActionType == EAgentActionType::Speak && Decision.TeachCraft == TEXT("HearthLoaf"));
+	TestEqual(TEXT("The decision parser preserves the exact place-practice teaching ID"), Decision.TeachPractice, FString(TEXT("quiet-listening")));
 
 	const bool bReserved = Teacher->Social->TryReserveAutomaticConversation(Learner->Social, TeacherId, LearnerId, ConversationId);
 	TestTrue(TEXT("The teacher and learner enter the existing bounded conversation path"), bReserved);
 	if (bReserved)
-		Teacher->Social->DeliverSpeech(Learner, Decision.Speech, ConversationId, 1, FString(), Decision.TeachCraft);
+		Teacher->Social->DeliverSpeech(Learner, Decision.Speech, ConversationId, 1, FString(), Decision.TeachCraft, Decision.TeachPractice);
 	const FIslandCraftTraditionRecord* Tradition = WorldState->FindCraftTradition(TEXT("HearthLoaf"));
 	TestTrue(TEXT("A delivered nearby resident line grants exactly attributed craft knowledge"),
 		WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), LearnerId) && Tradition && Tradition->Lessons.Num() == 1 &&
 		Tradition->Lessons[0].TeacherAgentId == TeacherId && Tradition->Lessons[0].LearnerAgentId == LearnerId);
 	TestEqual(TEXT("Teaching queues the ordinary reply but starts no additional model request"),
 		Learner->Brain->bRequestInFlight, false);
+	TestTrue(TEXT("A directly delivered nearby lesson gives the learner a private quiet-listening memory"),
+		Learner->Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
+	bool bAttributedPracticeMemoryFound = false;
+	for (const FAgentMemoryRecord& Memory : Learner->Memory->GetMemoriesSince(FDateTime::MinValue()))
+		if (Memory.Text.Contains(Teacher->GetAgentDisplayName()) && Memory.Text.Contains(TEXT("did not witness the original visit myself")))
+			bAttributedPracticeMemoryFound = true;
+	TestTrue(TEXT("The learned practice retains a clear speaker attribution and source limitation"), bAttributedPracticeMemoryFound);
 
 	Teacher->Social->ReleaseAutomaticConversation(Learner->Social, ConversationId);
 	TestTrue(TEXT("An unrelated nearby conversation can be reserved afterward"),
 		Teacher->Social->TryReserveAutomaticConversation(UnknownLearner->Social, TeacherId, UnknownLearnerId, UnknownConversationId));
 	Teacher->Social->DeliverSpeech(UnknownLearner, TEXT("I describe a practice I do not know."), UnknownConversationId, 1,
-		FString(), TEXT("InventedTradition"));
+		FString(), TEXT("InventedTradition"), TEXT("invented-practice"));
 	TestFalse(TEXT("An invented tradition ID cannot grant craft knowledge"),
 		WorldState->HasCraftKnowledge(TEXT("InventedTradition"), UnknownLearnerId));
+	TestFalse(TEXT("An invented place-practice ID cannot grant tagged etiquette knowledge"),
+		UnknownLearner->Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
 	Teacher->Social->ReleaseAutomaticConversation(UnknownLearner->Social, UnknownConversationId);
+
+	const FString UninformedConversationId = TEXT("uninformed-practice-") + Suffix;
+	DistantLearner->SetActorLocation(FVector(300.f, 0.f, 0.f));
+	TestTrue(TEXT("A resident without the practice can still hold an ordinary nearby conversation"),
+		DistantLearner->Social->TryReserveAutomaticConversation(UnknownLearner->Social,
+			DistantLearnerId, UnknownLearnerId, UninformedConversationId));
+	DistantLearner->Social->DeliverSpeech(UnknownLearner, TEXT("I cannot teach what I have not witnessed."),
+		UninformedConversationId, 1, FString(), FString(), TEXT("quiet-listening"));
+	TestFalse(TEXT("A speaker without the witnessed practice cannot teach it by naming its ID"),
+		UnknownLearner->Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
+	DistantLearner->Social->ReleaseAutomaticConversation(UnknownLearner->Social, UninformedConversationId);
+	DistantLearner->SetActorLocation(FVector(5000.f, 0.f, 0.f));
 
 	TestTrue(TEXT("The distant pair can reserve independently"),
 		Teacher->Social->TryReserveAutomaticConversation(DistantLearner->Social, TeacherId, DistantLearnerId, DistantConversationId));
 	Teacher->Social->DeliverSpeech(DistantLearner, TEXT("This line is out of range."), DistantConversationId, 1,
-		FString(), TEXT("HearthLoaf"));
+		FString(), TEXT("HearthLoaf"), TEXT("quiet-listening"));
 	TestFalse(TEXT("A line outside speaking range teaches nothing"), WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), DistantLearnerId));
+	TestFalse(TEXT("A line outside speaking range does not teach place practice"),
+		DistantLearner->Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);

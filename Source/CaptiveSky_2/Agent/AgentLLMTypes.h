@@ -139,6 +139,10 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachCraft;
 
+	/** Optional witnessed place-practice shared through a nearby resident conversation. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString TeachPractice;
+
 	/** Optional new-object description, only used when ActionType == RequestObject. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString ObjectRequest;

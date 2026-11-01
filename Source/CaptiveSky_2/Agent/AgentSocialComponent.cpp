@@ -224,7 +224,7 @@ void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other
 void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Utterance)
 {
 	AAutonomousAgentCharacter* Sender = FindAgent(Utterance.SenderAgentId);
-	const UAgentMemoryComponent* OwnMemory = GetOwner()
+	UAgentMemoryComponent* OwnMemory = GetOwner()
 		? GetOwner()->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
 	UAgentSocialComponent* SenderSocial = Sender
 		? Sender->FindComponentByClass<UAgentSocialComponent>() : nullptr;
@@ -260,6 +260,20 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 			WorldState->RecordCraftTeaching(FName(*Utterance.TeachCraftTraditionId),
 				Utterance.SenderAgentId, OwnMemory->GetResolvedAgentId(),
 				UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+		}
+	}
+	if (Utterance.TeachPracticeId == TEXT("quiet-listening"))
+	{
+		const UAgentMemoryComponent* SenderMemory = Sender->FindComponentByClass<UAgentMemoryComponent>();
+		const FString PracticeTag = TEXT("practice:quiet-listening");
+		if (SenderMemory && SenderMemory->HasMemoryTag(PracticeTag) && !OwnMemory->HasMemoryTag(PracticeTag))
+		{
+			TArray<FString> PracticeTags;
+			PracticeTags.Add(PracticeTag);
+			const FString PracticeMemory = FString::Printf(
+				TEXT("%s told me that visitors at the Listening Stones may leave room for someone pausing quietly there. I learned this account in conversation and did not witness the original visit myself."),
+				*Utterance.SenderDisplayName);
+			OwnMemory->AppendMemory(OwnMemory->MakeMemory(EAgentMemoryType::Observation, PracticeMemory, 0.6f, PracticeTags));
 		}
 	}
 	PendingUtterances.Add(Utterance);
@@ -322,7 +336,7 @@ void UAgentSocialComponent::HandleDecisionReady(const FAgentDecision& Decision)
 			CompletedUtterance.TurnIndex < MaximumConversationTurns && IsWithinSpeakingRange(Sender))
 		{
 			DeliverSpeech(Sender, Decision.Speech, CompletedUtterance.ConversationId, CompletedUtterance.TurnIndex + 1,
-				Decision.TeachArrangement, Decision.TeachCraft);
+				Decision.TeachArrangement, Decision.TeachCraft, Decision.TeachPractice);
 		}
 		else
 		{
@@ -368,13 +382,13 @@ void UAgentSocialComponent::TryBeginSpontaneousConversation(const FAgentDecision
 	if (TryReserveAutomaticConversation(RecipientSocial, OwnMemory->GetResolvedAgentId(),
 		RecipientMemory->GetResolvedAgentId(), ConversationId))
 	{
-		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement, Decision.TeachCraft);
+		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement, Decision.TeachCraft, Decision.TeachPractice);
 	}
 }
 
 void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
 	const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId,
-	const FString& TeachCraftTraditionId)
+	const FString& TeachCraftTraditionId, const FString& TeachPracticeId)
 {
 	AAutonomousAgentCharacter* Speaker = GetAgentOwner();
 	if (!Speaker || !Recipient || Speech.IsEmpty() || !IsWithinSpeakingRange(Recipient))
@@ -422,6 +436,7 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	Utterance.Speech = Speech;
 	Utterance.TeachArrangementSiteId = TeachArrangementSiteId;
 	Utterance.TeachCraftTraditionId = TeachCraftTraditionId;
+	Utterance.TeachPracticeId = TeachPracticeId;
 	Utterance.TurnIndex = TurnIndex;
 	if (IsConversationAtTurnLimit(TurnIndex))
 	{

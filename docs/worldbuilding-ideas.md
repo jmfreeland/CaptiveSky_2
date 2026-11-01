@@ -1,5 +1,25 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let residents pass the Listening Stones' quiet practice along
+
+A resident who directly witnesses another's quiet visit can now optionally
+share that practice in an ordinary nearby resident conversation using
+`teach_practice: "quiet-listening"`. The speaker must already hold the
+witnessed practice memory; the recipient gains one private, attributed memory
+only after the line is delivered through a reserved in-world conversation.
+Invented IDs, uninformed speakers, player/Discord exchanges, and out-of-range
+lines cannot grant the practice. This adds a small path for place etiquette to
+spread without a global culture score, extra model call, or mandatory teaching.
+
+The focused `Agent.CraftTeaching` regression now covers the shared
+conversation transport, exact optional ID, personal memory attribution,
+speaker-knowledge gate, invented IDs, and range gate. The UE 5.8 editor target
+builds successfully, but the automation test has not been run: the worktree's
+headless NullRHI startup previously crashed before harness initialization, and
+the separate live D: project has not loaded this worktree's module. Keep the
+runtime transmission and ordinary resident pacing unverified until a safe
+editor test session is available.
+
 ## 2026-10-31 — Surface missing-object requests in the optional resident check-in
 
 The twelve-minute resident check-in already invited optional `request_upgrade`

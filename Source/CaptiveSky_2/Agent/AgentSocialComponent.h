@@ -35,6 +35,10 @@ struct FAgentSocialUtterance
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	FString TeachCraftTraditionId;
 
+	/** Optional witnessed place-practice intentionally shared in this line. */
+	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
+	FString TeachPracticeId;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Agent Social")
 	int32 TurnIndex = 1;
 };
@@ -113,7 +117,7 @@ private:
 	void TryBeginSpontaneousConversation(const FAgentDecision& Decision);
 	void DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
 		const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId = FString(),
-		const FString& TeachCraftTraditionId = FString());
+		const FString& TeachCraftTraditionId = FString(), const FString& TeachPracticeId = FString());
 
 	UFUNCTION()
 	void HandleDecisionReady(const FAgentDecision& Decision);
