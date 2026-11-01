@@ -7,10 +7,12 @@ their bloom windows over an Island day, with deterministic local staggering so
 each patch does not change all at once. This uses the existing 30-second
 ecology refresh and ground-cover transforms; no plants, actors, collision, or
 per-frame work were added. Closed blossoms are no longer chosen as pollinator
-targets. The isolated UE 5.8.3 Editor target built successfully and seasonal
-curve regressions compile, but the automation run and rendered appearance are
-still unverified. Do not infer pivot quality or play performance from the build
-alone. Details: [seasonal flower transitions](findings/2026-11-01-seasonal-flower-transitions.md).
+targets. The isolated UE 5.8.3 Editor target built successfully and the updated
+`IslandWeather.SeasonalFlowers` automation passed. Its commandlet lingered after
+the successful test because the early `Quit` was processed before the test
+session; the bounded wrapper then stopped it. Rendered appearance, flower
+readability, and play performance remain unverified while GPU headroom is below
+the 4 GiB gate. Details: [seasonal flower transitions](findings/2026-11-01-seasonal-flower-transitions.md).
 
 ## 2026-11-01 — Let a ready basin interaction survive a recent inspection
 
