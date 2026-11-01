@@ -14,6 +14,7 @@ _V6_SPEC.loader.exec_module(rathollow_barkv6)
 
 
 NAME = "RatHollow_HiddenV9"
+BARK_TILE_METRES = 1.2
 ASSET_ANCHORS_CM = {
     "entrance": (-132.0, 0.0, 66.0),
     "nest_bed": (-32.0, 0.0, 32.0),
@@ -73,8 +74,8 @@ def _vectors(points):
 def build(A):
     rathollow_barkv6._ensure_versioned_textures()
     rathollow = rathollow_barkv6.rathollow
-    rathollow.lib.TILED["bark"] = ("T_Lib_RatHollow_BarkV6", 1.2)
-    rathollow._hollow_log(A, conform_moss=True)
+    rathollow.lib.TILED["bark"] = ("T_Lib_RatHollow_BarkV6", BARK_TILE_METRES)
+    rathollow._hollow_log(A, conform_moss=True, bark_tile=BARK_TILE_METRES)
     _remove_protruding_base_tips(A)
 
     # A crooked, low canopy shades the upper opening without projecting past

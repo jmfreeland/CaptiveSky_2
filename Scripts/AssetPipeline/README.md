@@ -6,9 +6,12 @@ its script and rerun (10-60 s). Exports land in `Saved/CaptiveSky/ComfyBlender/<
 local; only these scripts are in git). Same review-then-import idea as `Saved/CaptiveSky/Tripo/`, but geometry and textures are
 authored here instead of generated as one mesh. Nothing here touches `Content/`.
 
-`assets/rathollow_hidden_v9.py` is the latest unplaced Rat-home study: 2,510 triangles,
-four material slots and the same five box colliders and named anchors as V7. It removes
-the exposed entrance splinters and split-rim tips, then adds a low canopy and tucked
+`assets/rathollow_hidden_v9.py` remains the preferred unplaced Rat-home study: 2,510 triangles,
+four material slots and the same five box colliders and named anchors as V7. V10 and V11
+are isolated bark-scale comparisons (1.8 m and 0.8 m versus V9's 1.2 m); CPU previews
+favoured V9's middle scale, so neither comparison is a replacement. See the
+[`V9–V11 bark-scale comparison`](../../docs/findings/2026-11-01-rathollow-bark-scale-ab.md).
+V9 removes the exposed entrance splinters and split-rim tips, then adds a low canopy and tucked
 asymmetric shoulders while keeping the passage open. The Blender previews show the
 shape only; it still needs disposable Unreal review for bark appearance, ground contact,
 entrance legibility and Rat navigation before any Island placement. See

@@ -86,7 +86,7 @@ def _cap(bm, ring, x, center_z):
         bm.faces.new((center, ring[i], ring[(i + 1) % len(ring)]))
 
 
-def _hollow_log(A, conform_moss=False):
+def _hollow_log(A, conform_moss=False, bark_tile=1.2):
     segments = 40
     center_z = 0.66
     bm = bmesh.new()
@@ -117,7 +117,7 @@ def _hollow_log(A, conform_moss=False):
         _bridge(bm, first, second)
     # Keep the tunnel open to the dark backing below; a wood cap here hides the cavity.
 
-    A._finish(bm, "hollowBark", "bark", (0, 0, 0), (0, 0, 0), "box", "X", 1.2, True, 55)
+    A._finish(bm, "hollowBark", "bark", (0, 0, 0), (0, 0, 0), "box", "X", bark_tile, True, 55)
 
     # A dark inner end and a little dry nest lining make the opening legible at game scale.
     # Keep the recess dark, but let warm brown earth tone and ambient light
