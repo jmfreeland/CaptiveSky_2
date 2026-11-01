@@ -77,23 +77,23 @@ class WoodlandFlyAgaricReviewTests(unittest.TestCase):
             review.unreal.EditorAssetLibrary = self.original_asset_library
         review.unreal.logs = self.original_logs
 
-    def test_review_roster_compares_fungus_agaric_and_fern_without_collisions(self):
+    def test_review_roster_compares_understory_candidates_without_collisions(self):
         self.assertEqual([item["name"] for item in review.CANDIDATES],
-                         ["WoodlandFlyAgaricCluster", "WoodlandFernCluster"])
-        self.assertEqual(len({item["mesh_path"] for item in review.CANDIDATES}), 2)
-        self.assertEqual(len({item["actor_label"] for item in review.CANDIDATES}), 2)
+                         ["WoodlandFlyAgaricCluster", "WoodlandFernCluster", "WoodlandDogViolet"])
+        self.assertEqual(len({item["mesh_path"] for item in review.CANDIDATES}), 3)
+        self.assertEqual(len({item["actor_label"] for item in review.CANDIDATES}), 3)
         self.assertTrue(all(item["mesh_path"].startswith("/Game/Generated/ComfyBlender/")
                             for item in review.CANDIDATES))
-        offsets = [item["offset_x_cm"] for item in review.CANDIDATES]
-        self.assertGreater(offsets[0], 0)
-        self.assertLess(offsets[1], 0)
+        offsets = [(item["offset_x_cm"], item.get("offset_y_cm", 0.0))
+                   for item in review.CANDIDATES]
+        self.assertEqual(offsets, [(160.0, 0.0), (-190.0, 0.0), (0.0, 145.0)])
 
-    def test_import_preflights_both_candidate_sources_before_any_import(self):
+    def test_import_preflights_every_candidate_source_before_any_import(self):
         with tempfile.TemporaryDirectory() as root:
-            first = review.CANDIDATES[0]
-            asset_dir = Path(root, "Saved", "CaptiveSky", "ComfyBlender", first["name"])
-            asset_dir.mkdir(parents=True)
-            (asset_dir / first["filename"]).touch()
+            for candidate in review.CANDIDATES[:-1]:
+                asset_dir = Path(root, "Saved", "CaptiveSky", "ComfyBlender", candidate["name"])
+                asset_dir.mkdir(parents=True)
+                (asset_dir / candidate["filename"]).touch()
 
             previous_project_root = review.project_root
             review.project_root = lambda: root

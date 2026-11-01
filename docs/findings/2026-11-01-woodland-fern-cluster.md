@@ -17,9 +17,9 @@ at visitor distance.
 The FBX and `Preview.png` are local ignored outputs at
 `Saved/CaptiveSky/ComfyBlender/WoodlandFernCluster/`. The asset is **not imported
 into Unreal or placed on the Island**. The staged workflow in
-`Scripts/Preview-WoodlandFlyAgaricReview.py` now imports both this fern and the
-red-cap candidate, then places them on opposite sides of the existing ochre
-cluster in an isolated Island copy at
+`Scripts/Preview-WoodlandFlyAgaricReview.py` now imports this fern, the red-cap
+candidate, and the WoodlandDogViolet candidate, then places them around the
+existing ochre cluster in an isolated Island copy at
 `/Game/Generated/ComfyBlender/WoodlandUnderstoryReview_20261101/Maps/Island_WoodlandUnderstory_20261101`.
 Review matching close and visitor-scale views there; keep the fern unplaced
 unless its silhouette, ground contact, material response, and grass occlusion

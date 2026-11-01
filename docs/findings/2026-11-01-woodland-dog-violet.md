@@ -26,3 +26,9 @@ Island placement, seasonal visibility, gameplay-distance readability, or
 runtime performance has been validated. Review it in a disposable Island copy
 beside the existing fern and bluebell forms before considering use; keep it
 unplaced if its leaf planes or stems look artificial under Island lighting.
+
+The disposable comparison workflow now includes the violet alongside the fern,
+red-cap cluster, and existing ochre fungus actor. It preflights candidate FBXs
+before import, refuses to overwrite an existing review map or duplicate review
+actors, and saves only the copied Island map. The workflow is prepared but has
+not been run in Unreal; no candidate has been imported or placed.

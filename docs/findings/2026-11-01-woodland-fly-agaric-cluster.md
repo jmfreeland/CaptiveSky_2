@@ -31,23 +31,22 @@ from the tracked source with Blender 5.2 using `run_asset.py` and `verify_asset.
 
 ## Isolated Unreal understory comparison workflow
 
-`Scripts/Preview-WoodlandFlyAgaricReview.py` now provides three explicit Unreal
-Python stages for a three-way understory comparison. `import` preflights both
-verified candidate FBXs, then reuses the manifest-aware importer for the
-red-cap fungus and fern. If a prior interrupted run already imported one mesh,
+`Scripts/Preview-WoodlandFlyAgaricReview.py` provides three explicit Unreal
+Python stages for an understory comparison. `import` preflights every verified
+candidate FBX, then reuses the manifest-aware importer for the red-cap fungus,
+fern, and dog-violet. If a prior interrupted run already imported one mesh,
 the stage reuses it only after the importer report validates; it never
 overwrites an existing mesh. `duplicate` creates a
-non-overwriting copy of `/Game/Maps/Island`. `place` adds both collisionless
-candidates on opposite sides of the existing
+non-overwriting copy of `/Game/Maps/Island`. `place` adds the collisionless
+candidates around the existing
 `WoodlandFungusCluster_Review_01` in that copy. It refuses to overwrite an
-existing review map or duplicate either comparison actor, and never saves the
+existing review map or duplicate a comparison actor, and never saves the
 source Island. The destination review map is
 `/Game/Generated/ComfyBlender/WoodlandUnderstoryReview_20261101/Maps/Island_WoodlandUnderstory_20261101`.
 
 This workflow is prepared but **has not been run in Unreal**. Its source and
-map-safety tests verify the two-candidate roster, import preflight/resume
-behavior, and that only the copied map is saved; these checks do not validate
-Unreal import, material rendering, or the three-way scene. After reviewing
-each stage in the editor, compare scale,
-material response, and grass occlusion for all three forms before considering
+map-safety tests verify the candidate roster, import preflight/resume behavior,
+and that only the copied map is saved; these checks do not validate Unreal
+import, material rendering, or the comparison scene. After reviewing each stage
+in the editor, compare scale, material response, and grass occlusion before considering
 any change to the main map.

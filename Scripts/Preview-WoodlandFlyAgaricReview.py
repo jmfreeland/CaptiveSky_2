@@ -33,6 +33,14 @@ CANDIDATES = (
         "actor_label": "Preview_WoodlandFernCluster",
         "offset_x_cm": -190.0,
     },
+    {
+        "name": "WoodlandDogViolet",
+        "filename": "SM_WoodlandDogViolet_01.fbx",
+        "mesh_path": "/Game/Generated/ComfyBlender/WoodlandDogViolet/SM_WoodlandDogViolet_01.SM_WoodlandDogViolet_01",
+        "actor_label": "Preview_WoodlandDogViolet",
+        "offset_x_cm": 0.0,
+        "offset_y_cm": 145.0,
+    },
 )
 REVIEW_REPORT = "WoodlandUnderstoryReview_20261101/unreal_review.json"
 
@@ -145,7 +153,8 @@ def place_candidates():
         new_mesh = require(unreal.load_asset(candidate["mesh_path"]),
                            "Imported candidate mesh is missing: " + candidate["name"])
         new_location = unreal.Vector(old_location.x + candidate["offset_x_cm"],
-                                     old_location.y, old_location.z)
+                                     old_location.y + candidate.get("offset_y_cm", 0.0),
+                                     old_location.z)
         new_actor = require(actor_tools.spawn_actor_from_object(
             new_mesh, new_location, old_actor.get_actor_rotation(), False),
             "Could not spawn comparison candidate: " + candidate["name"])
@@ -159,6 +168,7 @@ def place_candidates():
             "candidate_actor": candidate["actor_label"],
             "candidate_mesh": new_mesh.get_path_name(),
             "offset_x_cm": candidate["offset_x_cm"],
+            "offset_y_cm": candidate.get("offset_y_cm", 0.0),
             "candidate_collision": "NoCollision",
         })
     require(unreal.EditorLevelLibrary.save_current_level(),
