@@ -26,8 +26,12 @@ eligibility limits, wildlife exclusion, interaction after a successful arrival,
 no interaction after a blocked approach, and preservation of a real path failure
 when navigation cannot start. The UE 5.8.3 isolated Editor target compiled and
 linked with these cases. The automation has not been executed: the worktree's
-known NullRHI startup crash remains unresolved, and no validation editor is
-currently running. This is not yet a replay of Rat's basin interaction.
+known NullRHI startup crash remains unresolved. The main CaptiveSky_2 editor is
+open and responsive in the Island map, but it is the separate project editor
+and has not loaded this worktree's module; it cannot validate this change yet.
+The current whole-device GPU sample is 9,601 / 12,282 MiB used (2,681 MiB
+free), below the 4 GiB rendered-play gate, so no PIE/Game session was started.
+This is not yet a replay of Rat's basin interaction.
 
 ## Next check
 
@@ -36,4 +40,6 @@ When a validation editor safely loads this worktree module, run the focused
 wet-basin feedback pass. Confirm Rat approaches the basin, only sets a leaf once
 within 4 m, and leaves a durable author/day entry. Keep that run isolated from
 the canonical world-state directory. Rendered play remains gated on at least
-4 GiB free GPU memory and the existing 30 FPS floor.
+4 GiB free GPU memory and the existing 30 FPS floor. The live viewport faces
+offshore and does not show the generated woodland, so it also cannot validate
+the vegetation changes.
