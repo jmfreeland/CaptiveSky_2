@@ -140,6 +140,7 @@ private:
 	friend class FIslandInnHearthTest;
 	friend class FIslandInnRestTest;
 	friend class FIslandProposalMemoryTest;
+	friend class FAgentRainBasinApproachDispatchTest;
 	friend class FIslandRainBasinWorldTest;
 	FTimerHandle ThinkTimerHandle;
 	FString LastActionOutcome = TEXT("No completed action yet.");

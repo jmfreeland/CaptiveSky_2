@@ -134,3 +134,30 @@ matching UE 5.8.3 symbols or a symbol-capable debugger and resolve the common
 startup frames. Once startup is diagnosable, retry a single 15-minute,
 isolated-feedback session with the existing real-time/request caps before
 considering a longer 30-minute run.
+
+## Rain-basin interaction follow-up — 2026-11-01
+
+The playtest's Rat selected `interact` on `RainBasin` at 01:37 UTC while the
+basin was about 17 metres away. The runtime returned “Too far away to inspect”
+and no leaf was saved. This was a genuine mismatch at the time of that run: the
+bounded explicit-interaction approach was added later, at 05:09 UTC in commit
+`2d072853`, so the 01:37 runtime could not have used that behavior. The later
+scratch editor DLL was rebuilt at 20:08 UTC and its `Source` junction resolves
+to this worktree.
+
+The current basin automation already verifies the 17-metre range gate. A new
+standalone automation, `CaptiveSky2.Agent.RainBasinApproachDispatch`, calls
+`InspectTarget("RainBasin")` through a concrete Rat controller with navigation
+deliberately disabled, asserting that dispatch attempts the bounded approach
+and reports route failure rather than the stale range error. It also confirms
+that failure does not claim to float a leaf. The isolated scratch project's
+own editor target was rebuilt from its `Source` junction before the run; the
+test passed with exit code 0 at 23:22 UTC. This covers dispatch, not successful
+arrival in a rendered world; a new character playtest remains needed to verify
+arrival, close-range recheck, and the resulting leaf presentation.
+
+The broader pre-existing `IslandRainBasinWorld` automation still has one
+separate fixture failure: its seven raised approach blockers do not make
+`HasClearGroundedApproach` reject the basin as expected. Keep this distinct
+from the passing dispatch regression; investigate the collision fixture before
+using that broader test as a green gate.

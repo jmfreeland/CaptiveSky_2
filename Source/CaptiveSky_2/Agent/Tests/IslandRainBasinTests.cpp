@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
 #include "AutonomousAgentAIController.h"
+#include "RatAgentAIController.h"
 #include "IslandRainBasin.h"
 #include "AgentBrainComponent.h"
 #include "IslandInteractionTestPlayerController.h"
@@ -131,6 +132,49 @@ bool FIslandRainBasinTest::RunTest(const FString& Parameters)
 		FVector::Dist2D(BreezyLeaf.GetLocation(), LeafBase.GetLocation()) <= 6.f && BreezyLeaf.GetLocation().Size2D() < 41.f);
 	TestTrue(TEXT("An invalid wind sample preserves the authored leaf pose"),
 		AIslandRainBasin::FloatingLeafWindTransform(LeafBase, FVector(NAN, 1.f, 0.f), 12.0, 3).Equals(LeafBase));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentRainBasinApproachDispatchTest, "CaptiveSky2.Agent.RainBasinApproachDispatch",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAgentRainBasinApproachDispatchTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("A synthetic no-navigation world is created"), World) || !TestNotNull(TEXT("Engine is available"), GEngine))
+	{
+		if (World) World->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	AIslandRainBasin* Basin = World->SpawnActor<AIslandRainBasin>(FVector::ZeroVector, FRotator::ZeroRotator);
+	APawn* Pawn = World->SpawnActor<APawn>(FVector(1700.f, 0.f, 40.f), FRotator::ZeroRotator);
+	ARatAgentAIController* Controller = World->SpawnActor<ARatAgentAIController>();
+	TestNotNull(TEXT("Tagged basin is created"), Basin);
+	TestNotNull(TEXT("Resident pawn is created 17 metres away"), Pawn);
+	TestNotNull(TEXT("Concrete Rat controller is created"), Controller);
+	if (Basin && Pawn && Controller)
+	{
+		TestEqual(TEXT("Fixture basin resolves to its interaction tag"),
+			IslandInteractionUtility::GetTargetTag(Basin), FName(TEXT("RainBasin")));
+		USceneComponent* Root = NewObject<USceneComponent>(Pawn);
+		Pawn->SetRootComponent(Root);
+		Root->RegisterComponent();
+		Pawn->SetActorLocation(FVector(1700.f, 0.f, 40.f), false, nullptr, ETeleportType::TeleportPhysics);
+		Controller->Possess(Pawn);
+		Controller->InspectTarget(FName(TEXT("RainBasin")));
+		TestTrue(*FString::Printf(TEXT("Far explicit basin interaction attempts bounded movement instead of returning the obsolete range error (outcome: %s)"), *Controller->LastActionOutcome),
+			Controller->LastActionOutcome.Contains(TEXT("Movement failed")) &&
+			!Controller->LastActionOutcome.Contains(TEXT("Too far away to inspect")));
+		TestFalse(TEXT("Failed movement does not claim to have floated a leaf"),
+			Controller->LastActionOutcome.Contains(TEXT("set it on the water")));
+		Controller->Destroy();
+		Pawn->Destroy();
+	}
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }
 
@@ -312,7 +356,7 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			Resident->SetActorLocation(ResidentPosition, false, nullptr, ETeleportType::TeleportPhysics);
 
 			APawn* ControlledResident = World->SpawnActor<APawn>();
-			AAutonomousAgentAIController* ResidentController = World->SpawnActor<AAutonomousAgentAIController>();
+			ARatAgentAIController* ResidentController = World->SpawnActor<ARatAgentAIController>();
 			TestNotNull(TEXT("A controller pawn is created for the repeated-inspection regression"), ControlledResident);
 			TestNotNull(TEXT("An autonomous controller is created for the repeated-inspection regression"), ResidentController);
 			if (ControlledResident && ResidentController)
