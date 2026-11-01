@@ -14,6 +14,64 @@
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 
+namespace
+{
+	constexpr int32 ShootingStarSectionIndex = AIslandDayNight::NightStarSectionCount;
+	constexpr float ShootingStarPhaseStart = 0.30f;
+	constexpr float ShootingStarPhaseDuration = 0.16f;
+	constexpr float ShootingStarHalfLength = 30000.f;
+	constexpr float ShootingStarHalfWidth = 1800.f;
+
+	float GetShootingStarAnimationProgress(int32 IslandDay, float IslandHour, float CloudCover, float LunarIllumination)
+	{
+		if (!AIslandDayNight::IsShootingStarSlot(IslandDay, IslandHour, CloudCover, LunarIllumination)) return -1.f;
+		const float SlotPhase = FMath::Frac(AIslandDayNight::WrapHour(IslandHour) * 6.f);
+		if (SlotPhase < ShootingStarPhaseStart || SlotPhase >= ShootingStarPhaseStart + ShootingStarPhaseDuration) return -1.f;
+		return (SlotPhase - ShootingStarPhaseStart) / ShootingStarPhaseDuration;
+	}
+
+	void BuildShootingStarCard(int32 IslandDay, float IslandHour, float Progress,
+		TArray<FVector>& Vertices, TArray<int32>& Triangles, TArray<FVector>& Normals,
+		TArray<FVector2D>& UVs, TArray<FColor>& Colors, TArray<FProcMeshTangent>& Tangents)
+	{
+		const int32 Slot = FMath::FloorToInt(AIslandDayNight::WrapHour(IslandHour) * 6.f);
+		uint32 Hash = static_cast<uint32>(IslandDay) * 2654435761u ^
+			(static_cast<uint32>(Slot) + 0x9e3779b9u) * 2246822519u;
+		Hash ^= Hash >> 16; Hash *= 0x85ebca6bu; Hash ^= Hash >> 13; Hash *= 0xc2b2ae35u; Hash ^= Hash >> 16;
+		FRandomStream Random(static_cast<int32>(Hash));
+		const float Azimuth = Random.FRandRange(0.f, 2.f * PI);
+		const float Elevation = FMath::DegreesToRadians(Random.FRandRange(28.f, 68.f));
+		const FVector Radial(FMath::Cos(Azimuth) * FMath::Cos(Elevation),
+			FMath::Sin(Azimuth) * FMath::Cos(Elevation), FMath::Sin(Elevation));
+		FVector PathTangent(-FMath::Sin(Azimuth), FMath::Cos(Azimuth), -0.25f);
+		PathTangent = (PathTangent - Radial * FVector::DotProduct(PathTangent, Radial)).GetSafeNormal();
+		const FVector Direction = (Radial + PathTangent * ((FMath::Clamp(Progress, 0.f, 1.f) - 0.5f) * 0.09f)).GetSafeNormal();
+		const FVector Trail = (PathTangent - Direction * FVector::DotProduct(PathTangent, Direction)).GetSafeNormal();
+		const FVector Across = FVector::CrossProduct(Trail, Direction).GetSafeNormal();
+		const FVector Center = Direction * AIslandDayNight::NightStarShellRadius;
+		const int32 FirstVertex = Vertices.Num();
+		Vertices.Add(Center - Trail * ShootingStarHalfLength - Across * ShootingStarHalfWidth);
+		Vertices.Add(Center + Trail * ShootingStarHalfLength - Across * ShootingStarHalfWidth);
+		Vertices.Add(Center + Trail * ShootingStarHalfLength + Across * ShootingStarHalfWidth);
+		Vertices.Add(Center - Trail * ShootingStarHalfLength + Across * ShootingStarHalfWidth);
+		Triangles.Add(FirstVertex);
+		Triangles.Add(FirstVertex + 1);
+		Triangles.Add(FirstVertex + 2);
+		Triangles.Add(FirstVertex);
+		Triangles.Add(FirstVertex + 2);
+		Triangles.Add(FirstVertex + 3);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Normals.Add(-Direction);
+		UVs.Add(FVector2D(0.f, 0.f));
+		UVs.Add(FVector2D(1.f, 0.f));
+		UVs.Add(FVector2D(1.f, 1.f));
+		UVs.Add(FVector2D(0.f, 1.f));
+		const FColor MeteorColor(255, 244, 219, 255);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Colors.Add(MeteorColor);
+		const FProcMeshTangent Tangent(Trail, false);
+		for (int32 VertexIndex = 0; VertexIndex < 4; ++VertexIndex) Tangents.Add(Tangent);
+	}
+}
+
 AIslandDayNight::AIslandDayNight()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -319,6 +377,19 @@ void AIslandDayNight::BuildStarfield()
 		Starfield->SetMaterial(SectionIndex, StarMaterial);
 		Starfield->SetMeshSectionVisible(SectionIndex, false);
 	}
+
+	TArray<FVector> MeteorVertices;
+	TArray<int32> MeteorTriangles;
+	TArray<FVector> MeteorNormals;
+	TArray<FVector2D> MeteorUVs;
+	TArray<FColor> MeteorColors;
+	TArray<FProcMeshTangent> MeteorTangents;
+	BuildShootingStarCard(1, 0.f, 0.5f, MeteorVertices, MeteorTriangles, MeteorNormals,
+		MeteorUVs, MeteorColors, MeteorTangents);
+	Starfield->CreateMeshSection(ShootingStarSectionIndex, MeteorVertices, MeteorTriangles, MeteorNormals,
+		MeteorUVs, MeteorColors, MeteorTangents, false);
+	Starfield->SetMaterial(ShootingStarSectionIndex, StarMaterial);
+	Starfield->SetMeshSectionVisible(ShootingStarSectionIndex, false);
 }
 
 void AIslandDayNight::UpdateStarfieldVisibility(float SolarElevation)
@@ -407,6 +478,30 @@ void AIslandDayNight::UpdateLighting()
 	const float LunarProgress = LunarPhaseProgress(DayNumber, CurrentHour);
 	const float LunarIlluminationAmount = LunarIllumination(DayNumber, CurrentHour);
 	UpdateStarfieldVisibility(Height);
+	const float ShootingStarProgress = GetShootingStarAnimationProgress(
+		DayNumber, CurrentHour, CloudCover, LunarIlluminationAmount);
+	if (Starfield)
+	{
+		if (ShootingStarProgress >= 0.f)
+		{
+			TArray<FVector> MeteorVertices;
+			TArray<int32> MeteorTriangles;
+			TArray<FVector> MeteorNormals;
+			TArray<FVector2D> MeteorUVs;
+			TArray<FColor> MeteorColors;
+			TArray<FProcMeshTangent> MeteorTangents;
+			BuildShootingStarCard(DayNumber, CurrentHour, ShootingStarProgress, MeteorVertices,
+				MeteorTriangles, MeteorNormals, MeteorUVs, MeteorColors, MeteorTangents);
+			Starfield->UpdateMeshSection(ShootingStarSectionIndex, MeteorVertices, MeteorNormals,
+				MeteorUVs, MeteorColors, MeteorTangents);
+			Starfield->SetMeshSectionVisible(ShootingStarSectionIndex, true);
+		}
+		else if (const FProcMeshSection* MeteorSection = Starfield->GetProcMeshSection(ShootingStarSectionIndex);
+			MeteorSection && MeteorSection->bSectionVisible)
+		{
+			Starfield->SetMeshSectionVisible(ShootingStarSectionIndex, false);
+		}
+	}
 	// New moon follows the sun below the horizon; full moon travels opposite it.
 	// Intermediate phases therefore shift the moon's rise and set through the night.
 	Moon->SetWorldRotation(FRotator(-Angle + LunarProgress * 360.f, 35.f, 0.f));
@@ -519,7 +614,7 @@ FString AIslandDayNight::DescribeTime() const
 			break;
 		}
 	const FString SunEdge = DescribeSunEdge(CurrentHour) + DescribeHorizonColour(CurrentHour, CloudNow) + DescribeCalendar(DayNumber, LunarProgress);
-	const FString Meteor = IsShootingStarSlot(DayNumber, CurrentHour, CloudNow, LunarLight)
+	const FString Meteor = GetShootingStarAnimationProgress(DayNumber, CurrentHour, CloudNow, LunarLight) >= 0.f
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();

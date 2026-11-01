@@ -241,7 +241,8 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	};
 	if (Clock->Starfield)
 	{
-		TestEqual(TEXT("The starfield has six progressive twilight groups"), Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount);
+		TestEqual(TEXT("The starfield has six twilight groups plus one transient meteor section"),
+			Clock->Starfield->GetNumSections(), AIslandDayNight::NightStarSectionCount + 1);
 		int32 ProceduralStarVertices = 0;
 		float SmallestStarWidth = TNumericLimits<float>::Max();
 		float LargestStarWidth = 0.f;
@@ -264,6 +265,59 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Random star cards remain within the authored size envelope"),
 			SmallestStarWidth >= AIslandDayNight::NightStarHalfSizeMin * 2.f &&
 			LargestStarWidth <= AIslandDayNight::NightStarHalfSizeMax * 2.f);
+		const FProcMeshSection* MeteorSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount);
+		TestNotNull(TEXT("The shooting-star section is preallocated with the sky mesh"), MeteorSection);
+		if (MeteorSection)
+		{
+			TestEqual(TEXT("The shooting star uses one lightweight four-vertex card"), MeteorSection->ProcVertexBuffer.Num(), 4);
+			TestFalse(TEXT("The meteor card starts hidden"), MeteorSection->bSectionVisible);
+		}
+	}
+	int32 MeteorWeatherSeed = 0;
+	float LowestMeteorCloudCover = MAX_flt;
+	for (int32 Seed = -1000; Seed <= 1000; ++Seed)
+	{
+		Weather->WeatherSeed = Seed;
+		const float Cover = Weather->SampleCloudCover(World->GetTimeSeconds());
+		if (Cover < LowestMeteorCloudCover)
+		{
+			LowestMeteorCloudCover = Cover;
+			MeteorWeatherSeed = Seed;
+		}
+	}
+	Weather->WeatherSeed = MeteorWeatherSeed;
+	int32 MeteorDay = 0;
+	int32 MeteorSlot = INDEX_NONE;
+	float MeteorHour = 0.f;
+	for (int32 Day = 1; Day <= 30 && MeteorDay == 0; ++Day)
+		for (int32 Slot = 0; Slot < 144; ++Slot)
+		{
+			const float CandidateHour = (Slot + 0.4f) / 6.f;
+			if (AIslandDayNight::IsShootingStarSlot(Day, CandidateHour, LowestMeteorCloudCover,
+				AIslandDayNight::LunarIllumination(Day, CandidateHour)))
+			{
+				MeteorDay = Day;
+				MeteorSlot = Slot;
+				MeteorHour = CandidateHour;
+				break;
+			}
+		}
+	TestTrue(TEXT("A clear dark test calendar contains a deterministic shooting-star slot"), MeteorDay > 0);
+	if (MeteorDay > 0 && Clock->Starfield)
+	{
+		Clock->DayNumber = MeteorDay;
+		Clock->CurrentHour = MeteorHour;
+		Clock->UpdateLighting();
+		const FProcMeshSection* MeteorSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount);
+		TestTrue(TEXT("The rare event reveals its moving procedural sky card"), MeteorSection && MeteorSection->bSectionVisible);
+		TestTrue(TEXT("Residents describe a shooting star only while its visual is crossing"),
+			Clock->DescribeTime().Contains(TEXT("A shooting star streaks across the sky")));
+		Clock->CurrentHour = (MeteorSlot + 0.8f) / 6.f;
+		Clock->UpdateLighting();
+		MeteorSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount);
+		TestTrue(TEXT("The moving meteor disappears after its short crossing"), MeteorSection && !MeteorSection->bSectionVisible);
+		TestFalse(TEXT("Residents are not told a meteor is crossing after it has passed"),
+			Clock->DescribeTime().Contains(TEXT("A shooting star streaks across the sky")));
 	}
 	Clock->CurrentHour = 12.f;
 	Clock->DayNumber = 1;

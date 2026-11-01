@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let residents see the shooting stars they describe
+
+The night calendar already made rare meteors part of the sky's narration, but
+the procedural sky showed only fixed stars. An eligible clear-night slot now
+animates one tiny, deterministic streak across the existing starfield, and the
+resident observation is limited to that same brief crossing. It adds no new
+actor or texture. The UE 5.8.3 scratch build succeeds; automation and rendered
+appearance remain unverified because the NullRHI startup issue persists and GPU
+headroom is only 258 MiB. Details: [visible shooting stars](findings/2026-11-01-visible-shooting-stars.md).
+
 ## 2026-11-01 — Let woodland communities vary without multiplying trees
 
 Every grove previously shared identical planting radii, which can reveal the
