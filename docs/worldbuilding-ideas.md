@@ -26,6 +26,19 @@ needs a deliberate, preservation-first config sync before that mitigation can
 be assessed there. Do not delete shared Zen data or launch a second editor to
 reproduce the warning. Details: [Zen cold-start finding](findings/2026-11-01-zen-cold-start.md).
 
+## 2026-11-01 — Hold the landscape-material comparison until the revision arrives
+
+A read-only check of the open D: project's `Content` tree found no landscape,
+ground, soil, terrain, or material-named Unreal asset newer than the existing
+October 12 Fab download; the Island landscape material assets themselves were
+last saved October 10. This does not rule out a source staged outside
+`Content`, but the proposed Claude landscape-material revision is not present
+in the project's asset tree yet. Do not change the Island assignment or save
+the map to guess at it. When the handoff path is known, preview that exact
+revision in an isolated copy and compare it against the current material,
+including the previously logged invalid texture-index warning (`21 / 20`),
+before proposing a map change.
+
 ## 2026-11-01 — Make rendered-play retries wait for symbolized startup-crash evidence
 
 A guarded 15-minute Game feedback launch passed its fresh 4 GiB GPU and RAM
