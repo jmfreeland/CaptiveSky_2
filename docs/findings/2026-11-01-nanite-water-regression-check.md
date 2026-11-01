@@ -80,3 +80,19 @@ was started. The latest whole-device sample is 9,623 / 12,282 MiB used
 filter found the IslandOcean test, but this attempt did not produce a completed
 test result; treat the previous 03:10 pass as the latest verified automation
 result.
+
+## User-approved restart recheck (2026-11-01, 03:43 UTC)
+
+After the user reconfirmed the editor was saved, the live D: editor closed
+cleanly and `CaptiveSky_2.uproject` was reopened directly. The editor returned
+to `/Game/Maps/Island`; its fresh startup log again records
+`bEnableNaniteFoliage:1` and `r.Nanite.Foliage:1`, and MapCheck completed with
+0 errors and 0 warnings. The viewport is still aimed offshore, so this does
+not visually validate the runtime tree communities. The landscape edit-layer
+merge warning recurred (4033x4033 required versus a 1024x1024 batch maximum).
+
+The post-restart `nvidia-smi` sample was 9,599 / 12,282 MiB used, leaving
+2,399 MiB free (45% GPU utilization, 72 C). This remains below the 4 GiB
+rendered-session gate; PIE/Game and character feedback were not started. The
+existing 03:10 `IslandOcean` automation pass remains the latest verified water
+test. No map or gameplay settings were edited during this restart.
