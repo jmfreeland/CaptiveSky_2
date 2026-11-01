@@ -139,6 +139,8 @@ public:
 	static int32 GetBroadleafSpeciesIndex(float SpeciesField);
 	/** Resolve the seeded, smoothed habitat field at a tree position to its local broadleaf species. */
 	static int32 GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed);
+	/** Resolve a stable local A/B canopy variant without consuming placement RNG. */
+	static int32 GetBroadleafVariantIndexAt(const FVector& Position, int32 Seed);
 	/** Species-specific mature-tree height envelope, interpolated by a seeded 0..1 sample (cm). */
 	static float GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample);
 	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */
@@ -226,6 +228,14 @@ private:
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanBeeches;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
 	TObjectPtr<UInstancedSkinnedMeshComponent> IslandBlackAlders;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandNorwayMaplesVariantB;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanAspensVariantB;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandEuropeanBeechesVariantB;
+	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Foliage")
+	TObjectPtr<UInstancedSkinnedMeshComponent> IslandBlackAldersVariantB;
 	TObjectPtr<UHierarchicalInstancedStaticMeshComponent> IslandShrubs;
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Weather|Audio")
 	TObjectPtr<UAudioComponent> WindAmbienceAudio;

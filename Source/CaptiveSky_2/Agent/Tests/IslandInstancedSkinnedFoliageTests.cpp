@@ -97,6 +97,14 @@ bool FIslandInstancedSkinnedFoliageProviderTest::RunTest(const FString& Paramete
 			TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A") },
 		{ TEXT("Norway Maple"),
 			TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A") },
+		{ TEXT("European Aspen B"),
+			TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_B.Tree_European_Aspen_01_B") },
+		{ TEXT("European Beech B"),
+			TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B") },
+		{ TEXT("Norway Maple B"),
+			TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B") },
+		{ TEXT("Black Alder B"),
+			TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B") },
 	};
 	int32 InstalledMegaplantCount = 0;
 	for (const FInstalledMegaplant& Megaplant : Megaplants)

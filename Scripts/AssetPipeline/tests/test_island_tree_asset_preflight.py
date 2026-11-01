@@ -14,11 +14,15 @@ class IslandTreeAssetPreflightTests(unittest.TestCase):
         source = '''
             LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Megaplant_Library/Tree_A/Tree_A.Tree_A"));
             LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Megaplant_Library/Tree_A/Tree_A.Tree_A"));
+            LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Megaplant_Library/Tree_A/Tree_A_B.Tree_A_B"));
             LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Plants/Tree_B.Tree_B"));
         '''
         self.assertEqual(
             preflight.referenced_tree_packages(source),
-            ["/Game/Megaplant_Library/Tree_A/Tree_A.Tree_A"],
+            [
+                "/Game/Megaplant_Library/Tree_A/Tree_A.Tree_A",
+                "/Game/Megaplant_Library/Tree_A/Tree_A_B.Tree_A_B",
+            ],
         )
 
     def test_maps_object_path_to_package_asset_file(self):
@@ -29,6 +33,13 @@ class IslandTreeAssetPreflightTests(unittest.TestCase):
         self.assertEqual(
             actual,
             root / "Content/Megaplant_Library/Tree_A/Tree_A.uasset",
+        )
+        variant_b = preflight.package_file_for_reference(
+            root, "/Game/Megaplant_Library/Tree_A/Tree_A_B.Tree_A_B"
+        )
+        self.assertEqual(
+            variant_b,
+            root / "Content/Megaplant_Library/Tree_A/Tree_A_B.uasset",
         )
 
     def test_rejects_paths_outside_megaplant_library(self):

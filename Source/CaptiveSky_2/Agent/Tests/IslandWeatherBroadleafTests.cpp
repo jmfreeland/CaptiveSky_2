@@ -69,6 +69,23 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		AIslandWeather::GetBroadleafSpeciesIndex(-0.1f), 0);
 	TestEqual(TEXT("A non-finite habitat field resolves deterministically"),
 		AIslandWeather::GetBroadleafSpeciesIndex(std::numeric_limits<float>::quiet_NaN()), 0);
+	const FVector VariantSamplePosition(-98250.f, 104125.f, 0.f);
+	const int32 VariantSample = AIslandWeather::GetBroadleafVariantIndexAt(VariantSamplePosition, 0x5a17);
+	TestTrue(TEXT("The local canopy field selects only A or B"), VariantSample == 0 || VariantSample == 1);
+	TestEqual(TEXT("A/B canopy assignment is stable for a position and seed"),
+		AIslandWeather::GetBroadleafVariantIndexAt(VariantSamplePosition, 0x5a17), VariantSample);
+	int32 VariantCounts[2] = {};
+	for (int32 GridY = -4; GridY <= 4; ++GridY)
+	{
+		for (int32 GridX = -4; GridX <= 4; ++GridX)
+		{
+			const FVector Sample = FVector(-100000.f, 100000.f, 0.f) + FVector(GridX * 37500.f, GridY * 37500.f, 0.f);
+			++VariantCounts[AIslandWeather::GetBroadleafVariantIndexAt(Sample, 0x5a17)];
+		}
+	}
+	TestTrue(TEXT("The representative Island-scale field uses both canopy silhouettes"),
+		VariantCounts[0] >= 16 && VariantCounts[0] <= 65 &&
+		VariantCounts[1] >= 16 && VariantCounts[1] <= 65);
 	TestEqual(TEXT("Four resolved species share the 3,600-tree budget evenly"),
 		AIslandWeather::GetBroadleafSpeciesLimit(4), 900);
 	TestEqual(TEXT("Three resolved species preserve the former 1,200-tree shares"),
@@ -90,7 +107,9 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 
 	const AIslandWeather* Defaults = GetDefault<AIslandWeather>();
 	const UInstancedSkinnedMeshComponent* BlackAlders = Defaults ? Defaults->IslandBlackAlders : nullptr;
+	const UInstancedSkinnedMeshComponent* BlackAldersB = Defaults ? Defaults->IslandBlackAldersVariantB : nullptr;
 	TestNotNull(TEXT("Black Alder uses its own instanced-skinned foliage component"), BlackAlders);
+	TestNotNull(TEXT("Black Alder B uses a separate instanced-skinned foliage component"), BlackAldersB);
 	if (BlackAlders)
 	{
 		TestEqual(TEXT("Black Alder foliage has no collision"),
@@ -102,10 +121,32 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Black Alder begins its distinct mid-distance fade at 120 m"), CullStart, 12000);
 		TestEqual(TEXT("Black Alder stays inside the spruce horizon with a 220 m cull end"), CullEnd, 22000);
 	}
+	if (BlackAlders && BlackAldersB)
+	{
+		int32 VariantBCullStart = 0;
+		int32 VariantBCullEnd = 0;
+		BlackAldersB->GetCullDistances(VariantBCullStart, VariantBCullEnd);
+		TestEqual(TEXT("Black Alder B keeps the A variant's 120 m fade start"), VariantBCullStart, 12000);
+		TestEqual(TEXT("Black Alder B keeps the A variant's 220 m cull end"), VariantBCullEnd, 22000);
+		TestEqual(TEXT("Black Alder B has no collision"), BlackAldersB->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+		TestFalse(TEXT("Black Alder B does not affect navigation"), BlackAldersB->CanEverAffectNavigation());
+	}
 
 	const TCHAR* BlackAlderAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A");
 	TestNotNull(TEXT("The approved Black Alder A skeletal mesh is available"),
 		LoadObject<USkeletalMesh>(nullptr, BlackAlderAssetPath));
+	const TCHAR* BlackAlderVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B");
+	TestNotNull(TEXT("The approved Black Alder B skeletal mesh is available"),
+		LoadObject<USkeletalMesh>(nullptr, BlackAlderVariantBAssetPath));
+	const TCHAR* NorwayMapleVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B");
+	const TCHAR* EuropeanAspenVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_B.Tree_European_Aspen_01_B");
+	const TCHAR* EuropeanBeechVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B");
+	TestNotNull(TEXT("The approved Norway Maple B skeletal mesh is available"),
+		LoadObject<USkeletalMesh>(nullptr, NorwayMapleVariantBAssetPath));
+	TestNotNull(TEXT("The approved European Aspen B skeletal mesh is available"),
+		LoadObject<USkeletalMesh>(nullptr, EuropeanAspenVariantBAssetPath));
+	TestNotNull(TEXT("The approved European Beech B skeletal mesh is available"),
+		LoadObject<USkeletalMesh>(nullptr, EuropeanBeechVariantBAssetPath));
 	return true;
 }
 

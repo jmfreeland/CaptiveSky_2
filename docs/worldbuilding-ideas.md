@@ -1,5 +1,27 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Give each broadleaf canopy a second local silhouette
+
+The Island's four broadleaf species now have a deterministic A/B mesh split,
+using the installed Norway maple, European aspen, European beech, and black alder
+variants. Variant assignment comes from an independent local field, so it is
+stable for a given world seed and position and does not consume the scatter RNG.
+The species counts, 3,600-tree broadleaf cap, existing cull distances, collision,
+and navigation behavior are unchanged; unavailable B meshes or disabled/missing
+DynamicWind data fall back to A. The new B components receive the same
+per-species cull range and DynamicWind setup.
+
+The UE 5.8.3 scratch Editor target compiled and linked successfully, and the
+asset preflight found all eight A/B packages in the installed Content tree. The
+offline AssetPipeline suite also passed 112 tests. This is implementation and
+package-path evidence, not an in-game appearance, wind, memory, or performance
+result: the live editor still has the previous DLL, whole-device GPU headroom
+is 2,509 MiB (below the 4 GiB rendered-session gate), and the known NullRHI
+pre-initialization crash prevents blindly repeating commandlet automation.
+Keep this A/B split as the candidate for the matched woodland comparison; do
+not increase population or extend cull distances. Full evidence and remaining
+checks: [broadleaf A/B variant support](findings/2026-11-01-broadleaf-ab-variants.md).
+
 ## 2026-11-01 — Separate canopy counts from visitor-visible variety
 
 The saved NullRHI spatial report confirms broad five-species canopy coverage,
