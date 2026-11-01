@@ -25,3 +25,24 @@ automation/runtime launch was performed in this check. If another dialog
 appears during an Unreal build or launch, capture its timestamp and matching
 `.NET Runtime` or `Application Error` event before attributing it to Unreal;
 this event-log sample does not identify the separate project pre-init crash.
+
+## 2026-10-28 event-log recheck
+
+Elevated, read-only Windows Application-log queries found paired events at
+22:08:20 and 22:09:48–49. The `.NET Runtime` 1026 entries and `Application
+Error` 1000 entries identify `CaptiveSky.Gateway.Checks.exe` (CoreCLR/.NET 8),
+not Unreal or `dotnet.exe` as the faulting application. Both stacks terminate
+on `System.UnauthorizedAccessException` in
+`HeadlessTurnMarker.MarkActiveAsync` while moving the temporary marker over
+`headless-turn.json`. These are repeat observations of the known test-harness
+path/permission issue; they do not prove that the screenshot's separately
+named `dotnet.exe` dialog was this event.
+
+The same event-log interval includes distinct Unreal native crashes: an
+`UnrealEditor-Core.dll` access violation (`0xC0000005`, offset `0x2950F9`) at
+21:09 on 2026-10-28, an unknown-module `0xC0000005` at 10:40 on 2026-10-29, and
+an `UnrealEditor-CaptiveSky_2.dll` `0xC0000005` at 13:11 on 2026-10-29 (offset
+`0x38923C`). Those are native access violations, not the managed
+`0xE0434352` marker exceptions. Keep the two classes separate; a future
+desktop dialog still needs timestamp/PID correlation before assigning it to
+either.
