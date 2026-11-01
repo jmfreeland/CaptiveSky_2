@@ -231,6 +231,12 @@ FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Targ
 	return FString::Printf(TEXT("%s: %s"), *Input, *Action);
 }
 
+FString ACaptiveSky_2PlayerController::FormatConversationHint(const FString& AgentName, bool bTouchControls)
+{
+	if (bTouchControls || AgentName.IsEmpty()) return FString();
+	return FString::Printf(TEXT("Enter: talk with %s"), *AgentName);
+}
+
 void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 {
 	if (!AmbientSpeechWidget) return;
@@ -251,6 +257,15 @@ void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 	{
 		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
 		Hint = FString::Printf(TEXT("%s: feel the weather"), *Input);
+	}
+	if (!ShouldUseTouchControls())
+	{
+		if (AAutonomousAgentCharacter* ConversationAgent = FindNearestConversationAgent())
+		{
+			const FString ConversationHint = FormatConversationHint(ConversationAgent->GetAgentDisplayName(), false);
+			if (!ConversationHint.IsEmpty())
+				Hint = Hint.IsEmpty() ? ConversationHint : Hint + LINE_TERMINATOR + ConversationHint;
+		}
 	}
 	if (Hint.IsEmpty()) AmbientSpeechWidget->HideInteractionHint();
 	else AmbientSpeechWidget->ShowInteractionHint(Hint);

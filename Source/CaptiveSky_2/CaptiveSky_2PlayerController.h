@@ -28,6 +28,8 @@ class ACaptiveSky_2PlayerController : public APlayerController
 	GENERATED_BODY()
 
 public:
+	/** Human-readable, non-triggering prompt for the keyboard conversation shortcut. */
+	static FString FormatConversationHint(const FString& AgentName, bool bTouchControls);
 	void SubmitConversation(const FString& Utterance);
 	void CloseConversation();
 	void SubmitGuestBookEntry(const FString& Line);

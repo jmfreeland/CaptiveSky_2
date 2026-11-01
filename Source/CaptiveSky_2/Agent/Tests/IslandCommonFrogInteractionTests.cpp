@@ -38,6 +38,12 @@ bool FIslandCommonFrogInteractionTest::RunTest(const FString& Parameters)
 		IslandInteractionUtility::GetTargetTag(Frog), FName(TEXT("TideglassFrog")));
 	const ACaptiveSky_2PlayerController* VisitorController =
 		ACaptiveSky_2PlayerController::StaticClass()->GetDefaultObject<ACaptiveSky_2PlayerController>();
+	TestEqual(TEXT("Desktop visitors get an optional prompt explaining how to speak with a resident"),
+		ACaptiveSky_2PlayerController::FormatConversationHint(TEXT("Aster"), false), FString(TEXT("Enter: talk with Aster")));
+	TestTrue(TEXT("An unnamed resident does not produce a confusing conversation prompt"),
+		ACaptiveSky_2PlayerController::FormatConversationHint(FString(), false).IsEmpty());
+	TestTrue(TEXT("Touch-control visitors are not shown an unavailable keyboard shortcut"),
+		ACaptiveSky_2PlayerController::FormatConversationHint(TEXT("Aster"), true).IsEmpty());
 	TestTrue(TEXT("The player proximity hint describes quiet frog observation naturally"),
 		VisitorController && VisitorController->DescribeWorldInteractionHint(Frog).Contains(TEXT("quietly watch a wild common frog")));
 	TestFalse(TEXT("Wild frogs remain non-movement targets"), IslandInteractionUtility::IsMovementTargetAllowed(Frog));

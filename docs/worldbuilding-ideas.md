@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Help visitors discover resident conversation
+
+The local interaction hint already described nearby objects, wildlife, trails,
+and weather, but the live `Enter` shortcut for talking to Aster, Raven, or the
+Innkeeper was only explained in the README. Desktop visitors now also see a
+quiet `Enter: talk with <name>` hint when a resident is within conversation
+range. It does not move or prompt the resident, begin a model call, or force a
+conversation; touch-control sessions do not advertise a keyboard-only key.
+The UE 5.8.3 compile-only build succeeded for the controller and focused hint
+test code. Runtime automation and an in-world UI check remain pending while
+the separate D: editor is open. Details: [visitor conversation hint](../Source/CaptiveSky_2/CaptiveSky_2PlayerController.cpp).
+
 ## 2026-11-01 — Keep native ocean surfaces from acting like solid ground
 
 The active D: project had the legacy hidden `OceanPlane` collision disabled,
