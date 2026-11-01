@@ -12,11 +12,12 @@ lines cannot grant the practice. This adds a small path for place etiquette to
 spread without a global culture score, extra model call, or mandatory teaching.
 
 The focused `Agent.CraftTeaching` regression now covers the shared
-conversation transport, exact optional ID, personal memory attribution,
-speaker-knowledge gate, invented IDs, and range gate. The UE 5.8 editor target
-builds successfully, but the automation test has not been run: the worktree's
-headless NullRHI startup previously crashed before harness initialization, and
-the separate live D: project has not loaded this worktree's module. Keep the
+conversation transport, exact optional ID, durable memory reload and
+attribution, speaker-knowledge gate, invented IDs, and range gate. The UE 5.8
+editor target builds successfully, but the automation test has not been run:
+the worktree's headless NullRHI startup previously crashed before harness
+initialization, and the separate live D: project has not loaded this worktree's
+module. Keep the
 runtime transmission and ordinary resident pacing unverified until a safe
 editor test session is available.
 

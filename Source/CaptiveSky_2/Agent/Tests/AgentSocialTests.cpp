@@ -191,10 +191,17 @@ bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
 		Learner->Brain->bRequestInFlight, false);
 	TestTrue(TEXT("A directly delivered nearby lesson gives the learner a private quiet-listening memory"),
 		Learner->Memory->HasMemoryTag(TEXT("practice:quiet-listening")));
+	UAgentMemoryComponent* ReloadedLearnerMemory = NewObject<UAgentMemoryComponent>(GetTransientPackage());
 	bool bAttributedPracticeMemoryFound = false;
-	for (const FAgentMemoryRecord& Memory : Learner->Memory->GetMemoriesSince(FDateTime::MinValue()))
-		if (Memory.Text.Contains(Teacher->GetAgentDisplayName()) && Memory.Text.Contains(TEXT("did not witness the original visit myself")))
-			bAttributedPracticeMemoryFound = true;
+	if (TestNotNull(TEXT("A fresh learner memory component can verify persistence"), ReloadedLearnerMemory))
+	{
+		ReloadedLearnerMemory->AgentId = LearnerId;
+		TestTrue(TEXT("The taught place practice survives reloading the learner's persistent memory file"),
+			ReloadedLearnerMemory->HasMemoryTag(TEXT("practice:quiet-listening")));
+		for (const FAgentMemoryRecord& Memory : ReloadedLearnerMemory->GetMemoriesSince(FDateTime::MinValue()))
+			if (Memory.Text.Contains(Teacher->GetAgentDisplayName()) && Memory.Text.Contains(TEXT("did not witness the original visit myself")))
+				bAttributedPracticeMemoryFound = true;
+	}
 	TestTrue(TEXT("The learned practice retains a clear speaker attribution and source limitation"), bAttributedPracticeMemoryFound);
 
 	Teacher->Social->ReleaseAutomaticConversation(Learner->Social, ConversationId);
