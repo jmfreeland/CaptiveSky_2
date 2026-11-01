@@ -29,7 +29,8 @@ finally:
 
 
 class FakeMapAsset:
-    pass
+    def __init__(self, path):
+        self.path = path
 
 
 class FakeEditorAssetLibrary:
@@ -53,10 +54,10 @@ class FakeEditorAssetLibrary:
         if source not in self.assets:
             return None
         self.assets.add(destination)
-        return FakeMapAsset()
+        return FakeMapAsset(destination)
 
     def save_loaded_asset(self, asset):
-        self.mutations.append(("save_loaded_asset", asset))
+        self.mutations.append(("save_loaded_asset", asset.path))
         return True
 
 
@@ -89,8 +90,9 @@ class WoodlandFlyAgaricReviewTests(unittest.TestCase):
         review.duplicate_island()
 
         self.assertIn(("duplicate_asset", review.SOURCE_MAP, review.DEST_MAP), library.mutations)
-        self.assertTrue(any(call[0] == "save_loaded_asset" for call in library.mutations))
-        self.assertFalse(any(call[0] == "save_source_map" for call in library.mutations))
+        saved_maps = [call[1] for call in library.mutations if call[0] == "save_loaded_asset"]
+        self.assertEqual(saved_maps, [review.DEST_MAP])
+        self.assertNotIn(review.SOURCE_MAP, saved_maps)
         self.assertIn(review.DEST_MAP, library.assets)
 
     def test_duplicate_does_not_mutate_when_source_map_is_missing(self):
