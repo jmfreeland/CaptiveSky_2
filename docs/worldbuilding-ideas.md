@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let seasonal flowers open and fade at different times
+
+Named bluebell, marsh-marigold, and yellow-flag-iris instances now ease through
+their bloom windows over an Island day, with deterministic local staggering so
+each patch does not change all at once. This uses the existing 30-second
+ecology refresh and ground-cover transforms; no plants, actors, collision, or
+per-frame work were added. Closed blossoms are no longer chosen as pollinator
+targets. The isolated UE 5.8.3 Editor target built successfully and seasonal
+curve regressions compile, but the automation run and rendered appearance are
+still unverified. Do not infer pivot quality or play performance from the build
+alone. Details: [seasonal flower transitions](findings/2026-11-01-seasonal-flower-transitions.md).
+
 ## 2026-11-01 — Let a ready basin interaction survive a recent inspection
 
 The bounded 15-minute resident session caught Raven choosing to float a leaf

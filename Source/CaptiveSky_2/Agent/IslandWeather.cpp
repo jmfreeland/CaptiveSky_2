@@ -162,27 +162,84 @@ float AIslandWeather::GetWoodlandGroveRadiusScaleAt(const FVector& Position, int
 	return FMath::Lerp(0.82f, 1.18f, GroveField);
 }
 
+float AIslandWeather::GetMeadowFlowerSpeciesBloomProgress(int32 SpeciesIndex, double IslandDay)
+{
+	if (SpeciesIndex != WoodlandBluebellSpeciesIndex && SpeciesIndex != TideglassMarshMarigoldSpeciesIndex &&
+		SpeciesIndex != TideglassYellowFlagIrisSpeciesIndex)
+		return 1.f; // General meadow species have no authored flowering calendar yet.
+	if (!FMath::IsFinite(IslandDay)) return 0.f;
+
+	const double DayOfYear = FMath::Fmod(FMath::Max(1.0, IslandDay) - 1.0,
+		static_cast<double>(AIslandDayNight::CalendarDaysPerYear));
+	const float SeasonLength = SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex
+		? 2.f * AIslandDayNight::CalendarDaysPerSeason
+		: static_cast<float>(AIslandDayNight::CalendarDaysPerSeason);
+	constexpr float TransitionDays = 1.f;
+	const float Day = static_cast<float>(DayOfYear);
+	return FMath::SmoothStep(0.f, TransitionDays, Day) *
+		(1.f - FMath::SmoothStep(SeasonLength - TransitionDays, SeasonLength, Day));
+}
+
 bool AIslandWeather::DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay)
 {
 	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % AIslandDayNight::CalendarDaysPerYear;
 	const int32 SeasonIndex = DayOfYear / AIslandDayNight::CalendarDaysPerSeason;
 	if (SpeciesIndex == WoodlandBluebellSpeciesIndex || SpeciesIndex == TideglassMarshMarigoldSpeciesIndex)
-		return SeasonIndex == 0; // Spring.
+		return SeasonIndex == 0; // Spring; the instance bloom curve stages the actual flowers within it.
 	if (SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex)
 		return SeasonIndex <= 1; // Spring through summer.
 	return true; // The general meadow species have no authored flowering calendar yet.
 }
 
-void AIslandWeather::UpdateSeasonalFlowerVisibility(int32 IslandDay)
+void AIslandWeather::UpdateSeasonalFlowerVisibility(double IslandDayProgress)
 {
 	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num(); ++SpeciesIndex)
 	{
 		UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers[SpeciesIndex];
 		if (!FlowerSpecies) continue;
-		const bool bBlooming = FlowerSpecies->GetInstanceCount() > 0 &&
-			DoesMeadowFlowerSpeciesBloomInSeason(SpeciesIndex, IslandDay);
-		if (FlowerSpecies->IsVisible() != bBlooming)
-			FlowerSpecies->SetVisibility(bBlooming, true);
+
+		const int32 InstanceCount = FlowerSpecies->GetInstanceCount();
+		TArray<float>& BloomScales = IslandMeadowFlowerBloomScales[SpeciesIndex];
+		const int32 PreviousBloomScaleCount = BloomScales.Num();
+		BloomScales.SetNum(InstanceCount);
+		const TArray<FTransform>& BaseTransforms = IslandMeadowFlowerBaseTransforms[SpeciesIndex];
+		const bool bCanUpdateTransforms = BaseTransforms.Num() == InstanceCount;
+		bool bBloomScaleChanged = false;
+		bool bAnyFlowerVisible = false;
+		for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
+		{
+			float BloomScale = 1.f;
+			if (SpeciesIndex == WoodlandBluebellSpeciesIndex || SpeciesIndex == TideglassMarshMarigoldSpeciesIndex ||
+				SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex)
+			{
+				const FVector Location = bCanUpdateTransforms
+					? BaseTransforms[InstanceIndex].GetLocation() : FVector::ZeroVector;
+				const float LocalStagger = SampleGroundCoverFieldAtScale(Location,
+					WeatherSeed ^ (SpeciesIndex * 0x45d9f3b), 500.f);
+				const double StaggeredIslandDay = IslandDayProgress + (static_cast<double>(LocalStagger) - 0.5) * 1.2;
+				BloomScale = GetMeadowFlowerSpeciesBloomProgress(SpeciesIndex, StaggeredIslandDay);
+			}
+
+			const float PreviousScale = InstanceIndex < PreviousBloomScaleCount ? BloomScales[InstanceIndex] : -1.f;
+			BloomScales[InstanceIndex] = BloomScale;
+			bBloomScaleChanged |= FMath::Abs(PreviousScale - BloomScale) > 0.002f;
+			bAnyFlowerVisible |= BloomScale > 0.03f;
+		}
+
+		if (bBloomScaleChanged && bCanUpdateTransforms && InstanceCount > 0)
+		{
+			for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
+			{
+				FTransform BloomTransform = BaseTransforms[InstanceIndex];
+				BloomTransform.SetScale3D(BaseTransforms[InstanceIndex].GetScale3D() * BloomScales[InstanceIndex]);
+				FlowerSpecies->UpdateInstanceTransform(InstanceIndex, BloomTransform, false,
+					InstanceIndex == InstanceCount - 1, true);
+			}
+		}
+
+		const bool bVisible = InstanceCount > 0 && bAnyFlowerVisible;
+		if (FlowerSpecies->IsVisible() != bVisible)
+			FlowerSpecies->SetVisibility(bVisible, true);
 	}
 }
 
@@ -371,6 +428,7 @@ AIslandWeather::AIslandWeather()
 	IslandRhododendrons->SetVisibility(false);
 	IslandMeadowFlowers.Reserve(MeadowFlowerSpeciesCount);
 	IslandMeadowFlowerBaseTransforms.SetNum(MeadowFlowerSpeciesCount);
+	IslandMeadowFlowerBloomScales.SetNum(MeadowFlowerSpeciesCount);
 	SwayedMeadowFlowerIndices.SetNum(MeadowFlowerSpeciesCount);
 	MeadowFlowerCells.SetNum(MeadowFlowerSpeciesCount);
 	const FName MeadowFlowerComponentNames[MeadowFlowerSpeciesCount] =
@@ -858,6 +916,8 @@ bool AIslandWeather::FindNearestMeadowFlower(const FVector& Position, float MaxD
 		{
 			FTransform InstanceTransform;
 			if (!FlowerSpecies->GetInstanceTransform(InstanceIndex, InstanceTransform, true)) continue;
+			const FVector FlowerScale = InstanceTransform.GetScale3D();
+			if (FMath::Min3(FMath::Abs(FlowerScale.X), FMath::Abs(FlowerScale.Y), FMath::Abs(FlowerScale.Z)) < 0.05f) continue;
 			const FVector FlowerLocation = InstanceTransform.GetLocation();
 			if (FlowerLocation.ContainsNaN()) continue;
 			const float DistanceSquared = FVector::DistSquared(Position, FlowerLocation);
@@ -1097,6 +1157,7 @@ void AIslandWeather::InitializeGroundCover()
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
 	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();
+	for (TArray<float>& BloomScales : IslandMeadowFlowerBloomScales) BloomScales.Reset();
 	for (TArray<int32>& Indices : SwayedMeadowFlowerIndices) Indices.Reset();
 	for (TMap<FIntPoint, TArray<int32>>& Cells : MeadowFlowerCells) Cells.Reset();
 	SwayedShoreGrassAIndices.Reset();
@@ -2609,7 +2670,13 @@ void AIslandWeather::InitializeGroundCover()
 	if (IslandRhododendrons) IslandRhododendrons->SetVisibility(IslandRhododendrons->GetInstanceCount() > 0, true);
 	for (UHierarchicalInstancedStaticMeshComponent* MeadowFlower : IslandMeadowFlowers)
 		if (MeadowFlower) MeadowFlower->SetVisibility(MeadowFlower->GetInstanceCount() > 0, true);
-	UpdateSeasonalFlowerVisibility(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+	double IslandDayProgress = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+	for (TActorIterator<AIslandDayNight> It(GetWorld()); It; ++It)
+	{
+		IslandDayProgress = It->DayNumber + AIslandDayNight::WrapHour(It->CurrentHour) / 24.0;
+		break;
+	}
+	UpdateSeasonalFlowerVisibility(IslandDayProgress);
 	if (IslandCattails) IslandCattails->SetVisibility(GroundCoverWetlandCount > 0, true);
 	if (IslandFestuca) IslandFestuca->SetVisibility(IslandFestuca->GetInstanceCount() > 0, true);
 	if (IslandPhalaris) IslandPhalaris->SetVisibility(IslandPhalaris->GetInstanceCount() > 0, true);
@@ -2664,6 +2731,7 @@ void AIslandWeather::ClearGroundCover()
 	IslandShrubBaseTransforms.Reset();
 	IslandRhododendronBaseTransforms.Reset();
 	for (TArray<FTransform>& Baselines : IslandMeadowFlowerBaseTransforms) Baselines.Reset();
+	for (TArray<float>& BloomScales : IslandMeadowFlowerBloomScales) BloomScales.Reset();
 	IslandCattailBaseTransforms.Reset();
 	IslandFestucaBaseTransforms.Reset();
 	IslandPhalarisBaseTransforms.Reset();
@@ -2813,7 +2881,8 @@ void AIslandWeather::UpdateGroundCoverSway()
 		if (Now >= Gust.StartedAt && Now < Gust.ExpiresAt) FocusPoints.Add(Gust.Center);
 	GroundCoverSwayLastUpdatedInstanceCount = 0;
 	auto UpdateSpecies = [this, Now, FocusRadius, &FocusPoints, &ResidentGroundPoints](UHierarchicalInstancedStaticMeshComponent* Grass, const TArray<FTransform>& BaseTransforms,
-		int32 FirstBaseline, int32 InstanceCount, const TMap<FIntPoint, TArray<int32>>& SwayCells, TArray<int32>& PreviousSwayedIndices)
+		int32 FirstBaseline, int32 InstanceCount, const TMap<FIntPoint, TArray<int32>>& SwayCells, TArray<int32>& PreviousSwayedIndices,
+		const TArray<float>* InstanceScales = nullptr)
 	{
 		if (!Grass || InstanceCount <= 0 || FirstBaseline < 0 || FirstBaseline + InstanceCount > BaseTransforms.Num()) return;
 		TArray<int32> CurrentSwayedIndices;
@@ -2887,6 +2956,8 @@ void AIslandWeather::UpdateGroundCoverSway()
 					Updated.SetRotation((Updated.GetRotation() * FQuat(BendAxis, FMath::DegreesToRadians(BendDegrees))).GetNormalized());
 				}
 			}
+			if (InstanceScales && InstanceScales->IsValidIndex(InstanceIndex))
+				Updated.SetScale3D(Base.GetScale3D() * (*InstanceScales)[InstanceIndex]);
 			Grass->UpdateInstanceTransform(InstanceIndex, Updated, false, Position == UpdateIndices.Num() - 1, true);
 		}
 		GroundCoverSwayLastUpdatedInstanceCount += CurrentSwayedIndices.Num();
@@ -2905,10 +2976,10 @@ void AIslandWeather::UpdateGroundCoverSway()
 	UpdateSpecies(IslandRhododendrons, IslandRhododendronBaseTransforms, 0, IslandRhododendronBaseTransforms.Num(), RhododendronCells, SwayedRhododendronIndices);
 	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num() &&
 		SpeciesIndex < IslandMeadowFlowerBaseTransforms.Num() && SpeciesIndex < MeadowFlowerCells.Num() &&
-		SpeciesIndex < SwayedMeadowFlowerIndices.Num(); ++SpeciesIndex)
+		SpeciesIndex < SwayedMeadowFlowerIndices.Num() && SpeciesIndex < IslandMeadowFlowerBloomScales.Num(); ++SpeciesIndex)
 		UpdateSpecies(IslandMeadowFlowers[SpeciesIndex], IslandMeadowFlowerBaseTransforms[SpeciesIndex], 0,
 			IslandMeadowFlowerBaseTransforms[SpeciesIndex].Num(), MeadowFlowerCells[SpeciesIndex],
-			SwayedMeadowFlowerIndices[SpeciesIndex]);
+			SwayedMeadowFlowerIndices[SpeciesIndex], &IslandMeadowFlowerBloomScales[SpeciesIndex]);
 	UpdateSpecies(IslandCattails, IslandCattailBaseTransforms, 0, IslandCattailBaseTransforms.Num(), CattailCells, SwayedCattailIndices);
 	UpdateSpecies(IslandFestuca, IslandFestucaBaseTransforms, 0, IslandFestucaBaseTransforms.Num(), FestucaCells, SwayedFestucaIndices);
 	UpdateSpecies(IslandPhalaris, IslandPhalarisBaseTransforms, 0, IslandPhalarisBaseTransforms.Num(), PhalarisCells, SwayedPhalarisIndices);
@@ -3515,7 +3586,7 @@ void AIslandWeather::RefreshNightEcology()
 		CurrentDay = It->DayNumber;
 		break;
 	}
-	UpdateSeasonalFlowerVisibility(CurrentDay);
+	UpdateSeasonalFlowerVisibility(CurrentDay + (CurrentHour >= 0.f ? CurrentHour / 24.0 : 0.0));
 	const bool bDay = CurrentHour >= AIslandDayNight::SunriseHour(CurrentDay) &&
 		CurrentHour < AIslandDayNight::SunsetHour(CurrentDay);
 	const bool bNight = CurrentHour >= 0.f && !bDay;

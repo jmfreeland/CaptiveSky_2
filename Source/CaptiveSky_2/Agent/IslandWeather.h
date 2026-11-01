@@ -77,6 +77,8 @@ public:
 	static constexpr int32 TideglassYellowFlagIrisSpeciesIndex = 10;
 	/** Seasonal phenology for named habitat specialists; general meadow forms remain year-round. */
 	static bool DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay);
+	/** Smooth seasonal bloom amount in [0, 1] at a 1-based fractional Island day. */
+	static float GetMeadowFlowerSpeciesBloomProgress(int32 SpeciesIndex, double IslandDay);
 	static constexpr float WoodlandBluebellInnerRadius = 1200.f;
 	static constexpr float WoodlandBluebellOuterRadius = 3800.f;
 	/** Each successful meadow-flower site can support one anchor bloom and two bounded neighbors. */
@@ -370,7 +372,7 @@ private:
 		const FVector& LocalWind, double TimeSeconds, int32 InstanceIndex, int32 Seed, float ReferenceWindSpeed);
 	UHierarchicalInstancedStaticMeshComponent* FindShoreGrassC() const;
 	void InitializeGroundCover();
-	void UpdateSeasonalFlowerVisibility(int32 IslandDay);
+	void UpdateSeasonalFlowerVisibility(double IslandDayProgress);
 	void UpdateGroundCoverSway();
 	void UpdateSpruceSway(const TArray<FVector>& FocusPoints, float FocusRadius);
 	void ClearGroundCover();
@@ -425,6 +427,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Transient, Category="Island|Ecology")
 	TArray<TObjectPtr<UHierarchicalInstancedStaticMeshComponent>> IslandMeadowFlowers;
 	TArray<TArray<FTransform>> IslandMeadowFlowerBaseTransforms;
+	TArray<TArray<float>> IslandMeadowFlowerBloomScales;
 	TArray<TArray<int32>> SwayedMeadowFlowerIndices;
 	TArray<TMap<FIntPoint, TArray<int32>>> MeadowFlowerCells;
 	TArray<FTransform> ShoreGroundPlantLowCBaseTransforms;
