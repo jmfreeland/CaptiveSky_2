@@ -132,21 +132,38 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Black Alder B does not affect navigation"), BlackAldersB->CanEverAffectNavigation());
 	}
 
-	const TCHAR* BlackAlderAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A");
-	TestNotNull(TEXT("The approved Black Alder A skeletal mesh is available"),
-		LoadObject<USkeletalMesh>(nullptr, BlackAlderAssetPath));
-	const TCHAR* BlackAlderVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B");
-	TestNotNull(TEXT("The approved Black Alder B skeletal mesh is available"),
-		LoadObject<USkeletalMesh>(nullptr, BlackAlderVariantBAssetPath));
-	const TCHAR* NorwayMapleVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B");
-	const TCHAR* EuropeanAspenVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_B.Tree_European_Aspen_01_B");
-	const TCHAR* EuropeanBeechVariantBAssetPath = TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B");
-	TestNotNull(TEXT("The approved Norway Maple B skeletal mesh is available"),
-		LoadObject<USkeletalMesh>(nullptr, NorwayMapleVariantBAssetPath));
-	TestNotNull(TEXT("The approved European Aspen B skeletal mesh is available"),
-		LoadObject<USkeletalMesh>(nullptr, EuropeanAspenVariantBAssetPath));
-	TestNotNull(TEXT("The approved European Beech B skeletal mesh is available"),
-		LoadObject<USkeletalMesh>(nullptr, EuropeanBeechVariantBAssetPath));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafNaniteReadinessAssetsTest,
+	"CaptiveSky2.Agent.IslandWeather.BroadleafNaniteReadinessAssets",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWeatherBroadleafNaniteReadinessAssetsTest::RunTest(const FString& Parameters)
+{
+	const TCHAR* BroadleafAssemblyAssetPaths[] =
+	{
+		TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_A.Tree_Norway_Maple_Forest_01_A"),
+		TEXT("/Game/Megaplant_Library/Tree_Norway_Maple/Tree_Norway_Maple_Forest_01/Tree_Norway_Maple_Forest_01_B.Tree_Norway_Maple_Forest_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_A.Tree_European_Aspen_01_A"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Aspen/Tree_European_Aspen_01/Tree_European_Aspen_01_B.Tree_European_Aspen_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_A.Tree_European_Beech_01_A"),
+		TEXT("/Game/Megaplant_Library/Tree_European_Beech/Tree_European_Beech_01/Tree_European_Beech_01_B.Tree_European_Beech_01_B"),
+		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_A.Tree_Black_Alder_01_A"),
+		TEXT("/Game/Megaplant_Library/Tree_Black_Alder/Tree_Black_Alder_01/Tree_Black_Alder_01_B.Tree_Black_Alder_01_B")
+	};
+	for (const TCHAR* AssetPath : BroadleafAssemblyAssetPaths)
+	{
+		USkeletalMesh* BroadleafAsset = LoadObject<USkeletalMesh>(nullptr, AssetPath);
+		TestNotNull(FString::Printf(TEXT("Broadleaf skeletal mesh is available: %s"), AssetPath), BroadleafAsset);
+		if (BroadleafAsset)
+		{
+			TestTrue(FString::Printf(TEXT("Broadleaf mesh has Nanite enabled: %s"), AssetPath),
+				BroadleafAsset->IsNaniteEnabled());
+			TestTrue(FString::Printf(TEXT("Broadleaf mesh is a Nanite Assembly: %s"), AssetPath),
+				BroadleafAsset->IsNaniteAssembly());
+		}
+	}
 	return true;
 }
 

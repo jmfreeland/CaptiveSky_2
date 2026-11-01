@@ -35,17 +35,25 @@ or DynamicWind fallback in the next runtime check.
   representative Island-scale use of both variants, unchanged Black Alder B
   culling/collision/navigation properties, asset presence, and DynamicWind
   provider support for all four B meshes.
+- A dedicated `CaptiveSky2.Agent.IslandWeather.BroadleafNaniteReadinessAssets`
+  regression loads all eight A/B skeletal meshes and checks both
+  `IsNaniteEnabled()` and `IsNaniteAssembly()`. It compiles and links in the
+  isolated UE 5.8.3 target. This distinguishes a project-level Nanite Foliage
+  setting from per-asset Nanite/assembly readiness, the three-part foliage
+  pipeline described in Epic's [Nanite Foliage](https://dev.epicgames.com/documentation/en-us/unreal-engine/nanite-foliage)
+  and [Nanite Assemblies](https://dev.epicgames.com/documentation/unreal-engine/nanite-assemblies?lang=en-US) documentation.
 
 ## Not yet verified
 
 The focused Unreal automation has not run against this build, and the live
-editor still holds its previous DLL. The actual D: `CaptiveSky_2` editor has
-since been restarted and confirms `r.Nanite.Foliage=1`, but that project has
-not been synchronized with this worktree's A/B module. The setting check does
-not validate these variants or their appearance.
+editor still holds its previous DLL. The actual D: `CaptiveSky_2` editor was
+restarted on 2026-11-01; its fresh project log records
+`r.Nanite.Foliage:1` at startup. That project has not been synchronized with
+this worktree's A/B module. The setting check does not validate these variants
+or their appearance, and the per-asset Nanite assertions have not executed yet.
 
-A fresh whole-device sample on 2026-11-01 reports 9,732 / 12,282 MiB used
-(2,266 MiB free), 42% utilization, and 68 °C. This remains below the project's
+A fresh whole-device sample after the restart reports 9,606 / 12,282 MiB used
+(2,392 MiB free), 46% utilization, and 71 °C. This remains below the project's
 4 GiB rendered-session gate. Do not start PIE/Game just to inspect the split at
 this headroom; WDDM's device-wide figure cannot attribute memory to Unreal
 alone. The live project's Nanite setting and this worktree's new canopy remain
