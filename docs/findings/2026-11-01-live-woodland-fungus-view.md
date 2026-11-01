@@ -21,3 +21,13 @@ grass occlusion feels natural and whether the ochre material retains shape
 without looking pale in direct light. Keep the current count and placement
 until that comparison; do not add more fungus instances based on this close
 frame alone. Rendered play remains subject to the GPU and system-memory gates.
+
+## Render-headroom recheck (2026-11-01)
+
+At the follow-up sample, the RTX 4080 Laptop GPU had 2,845 MiB free of
+12,282 MiB (9,153 MiB used, 56% utilization, 80 C). Windows had 10,271 MiB
+available physical RAM via the launcher's `GlobalMemoryStatusEx` helper. The
+GPU sample is below the 4,096 MiB rendered-play preflight, so no PIE/Game
+session or character-feedback run was started. This is one device-wide sample,
+not a performance or temperature trend. The open D: editor and map were not
+changed.
