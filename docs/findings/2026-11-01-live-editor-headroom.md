@@ -25,3 +25,19 @@ retrying the same launch unchanged. Capture a properly framed Island view from
 the live editor separately from any PIE/playtest evidence.
 
 This is a live-state checkpoint, not a visual-quality or runtime validation.
+
+## Follow-up sample (14:16 UTC)
+
+The editor remains open and responsive on `/Game/Maps/Island`; the viewport is
+now framed at the WoodlandFungusCluster review patch beside the Wind Arch. It
+shows the close pale-ochre caps and dense foreground grass documented in the
+fungus-view finding, but this editor frame is not a visitor-scale or Game
+capture. The Output Log is visible and still contains the read-only Megaplant
+dependency report; no PIE or separate renderer was started.
+
+The 14:16 UTC device sample reports 9,154 / 12,282 MiB GPU memory used (2,844
+MiB free, 57% utilization, 78 C). Node's OS query reports 10.93 / 31.75 GiB
+system RAM free. GPU headroom remains below the 4 GiB rendered-play gate even
+though system RAM is available, so keep PIE/Game closed and continue source-side
+work. This sample does not establish texture residency, frame rate, or peak
+playtime memory.
