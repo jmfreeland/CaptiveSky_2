@@ -45,4 +45,26 @@ function Assert-GpuMemoryHeadroom {
 	}
 }
 
-Export-ModuleMember -Function ConvertFrom-NvidiaGpuMemoryOutput, Assert-GpuMemoryHeadroom
+function Get-GpuHeadroomMonitorDecision {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory = $true)][int]$UsedMiB,
+		[Parameter(Mandatory = $true)][int]$TotalMiB,
+		[ValidateRange(512, 16384)][int]$MinimumFreeMiB = 4096,
+		[ValidateRange(0, 5)][int]$ConsecutiveLowSamples = 0,
+		[ValidateRange(1, 5)][int]$RequiredConsecutiveLowSamples = 2
+	)
+
+	if ($TotalMiB -le 0 -or $UsedMiB -lt 0 -or $UsedMiB -gt $TotalMiB) {
+		throw "Invalid GPU memory budget: used=$UsedMiB MiB, total=$TotalMiB MiB."
+	}
+	$freeMiB = $TotalMiB - $UsedMiB
+	$nextLowSamples = if ($freeMiB -lt $MinimumFreeMiB) { $ConsecutiveLowSamples + 1 } else { 0 }
+	[pscustomobject]@{
+		FreeMiB = $freeMiB
+		ConsecutiveLowSamples = $nextLowSamples
+		ShouldStop = ($nextLowSamples -ge $RequiredConsecutiveLowSamples)
+	}
+}
+
+Export-ModuleMember -Function ConvertFrom-NvidiaGpuMemoryOutput, Assert-GpuMemoryHeadroom, Get-GpuHeadroomMonitorDecision

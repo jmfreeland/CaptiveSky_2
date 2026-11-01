@@ -16,9 +16,10 @@ clock when -DataRoot is supplied, whether or not -Shots is enabled. Press ` and 
 toggle back to normal control.
 
 -RequireGpuHeadroom performs a device-wide NVIDIA memory preflight before a rendered launch. It fails
-closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB free. This is a launch
-check only; it does not guarantee or monitor in-run memory headroom. Use -GpuIndex and
--MinimumFreeGpuMemoryMiB to tune the check for the target machine.
+closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB free. Add
+-MonitorGpuHeadroom to a bounded, isolated rendered run to sample memory during startup and play; two
+consecutive low samples (or a failed memory query) terminate only the Game process tree launched here.
+Use -GpuIndex, -MinimumFreeGpuMemoryMiB, and -GpuMemoryMonitorIntervalSeconds to tune the guard.
 
 -NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
 -DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
@@ -50,6 +51,7 @@ the same isolated-data and timeout checks still apply.
 ./Scripts/Start-Spectator.ps1 -Continuous
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
+./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -MonitorGpuHeadroom -DataRoot Saved/Playtests/GuardedResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 64
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHICommandletSmoke -LogPath Saved/Logs/NullRHICommandletSmoke.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -DisableTraceServer -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHIWithoutTraceServer -LogPath Saved/Logs/NullRHIWithoutTraceServer.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
@@ -97,8 +99,10 @@ param(
 	[switch]$NoZenLocalFallback,
 	[switch]$ForceMemoryDDC,
 	[switch]$RequireGpuHeadroom,
+	[switch]$MonitorGpuHeadroom,
 	[ValidateRange(0, 15)][int]$GpuIndex = 0,
 	[ValidateRange(512, 16384)][int]$MinimumFreeGpuMemoryMiB = 4096,
+	[ValidateRange(1, 60)][int]$GpuMemoryMonitorIntervalSeconds = 5,
 	[switch]$Continuous,
 	[string]$ProjectPath,
 	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
@@ -180,6 +184,17 @@ if ($NullRHI) {
 	}
 	if ($Shots) { throw "-NullRHI cannot be combined with -Shots because it has no rendered output." }
 }
+if ($MonitorGpuHeadroom) {
+	if (-not $RequireGpuHeadroom) { throw "-MonitorGpuHeadroom requires -RequireGpuHeadroom for its initial memory preflight." }
+	if ($NullRHI) { throw "-MonitorGpuHeadroom is for rendered sessions; omit it for -NullRHI." }
+	if ($Continuous) { throw "-MonitorGpuHeadroom requires a bounded session; it cannot supervise -Continuous." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-MonitorGpuHeadroom requires an isolated -DataRoot." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-MonitorGpuHeadroom requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+}
 if ($RequireGpuHeadroom) {
 	if ($NullRHI) { throw "-RequireGpuHeadroom is only applicable to rendered sessions; omit it for -NullRHI." }
 	$gpuMemoryTool = Get-Command nvidia-smi -ErrorAction SilentlyContinue
@@ -222,6 +237,47 @@ if ($PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -and [string]::IsNul
 	$startupLogName = "SpectatorStartup_$((Get-Date).ToString('yyyyMMdd_HHmmss_fff')).log"
 	$LogPath = Join-Path (Join-Path $projectRoot "Saved\Logs") $startupLogName
 }
+function Stop-LaunchedGameForGpuMonitor([System.Diagnostics.Process]$Game, [string]$Reason) {
+	$message = "$Reason Only the Game process tree launched by this script will be terminated."
+	$Game.Refresh()
+	if (-not $Game.HasExited) {
+		try {
+			$Game.Kill($true)
+			$Game.WaitForExit()
+		} catch {
+			throw "$message Process-tree termination failed: $($_.Exception.Message)"
+		}
+	}
+	throw $message
+}
+
+function Invoke-GpuMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref]$ConsecutiveLowSamples) {
+	$Game.Refresh()
+	if ($Game.HasExited) { return }
+	try {
+		$gpuMemoryRows = & $gpuMemoryTool.Source "--id=$GpuIndex" "--query-gpu=memory.used,memory.total" "--format=csv,noheader,nounits" 2>$null
+		$gpuMemoryExitCode = $LASTEXITCODE
+	} catch {
+		Stop-LaunchedGameForGpuMonitor $Game "nvidia-smi could not run during the rendered session; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
+	}
+	if ($gpuMemoryExitCode -ne 0) {
+		Stop-LaunchedGameForGpuMonitor $Game "nvidia-smi could not read GPU $GpuIndex during the rendered session; stopping because GPU memory state is unknown."
+	}
+	try {
+		$gpuMemory = ConvertFrom-NvidiaGpuMemoryOutput -OutputLines $gpuMemoryRows
+		$decision = Get-GpuHeadroomMonitorDecision -UsedMiB $gpuMemory.UsedMiB -TotalMiB $gpuMemory.TotalMiB `
+			-MinimumFreeMiB $MinimumFreeGpuMemoryMiB -ConsecutiveLowSamples $ConsecutiveLowSamples.Value
+	} catch {
+		Stop-LaunchedGameForGpuMonitor $Game "GPU memory monitor returned unusable data; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
+	}
+	$ConsecutiveLowSamples.Value = $decision.ConsecutiveLowSamples
+	Write-Host ("GPU memory monitor: {0} MiB free of {1} MiB; low samples {2}/2 (minimum {3} MiB)." -f
+		$decision.FreeMiB, $gpuMemory.TotalMiB, $decision.ConsecutiveLowSamples, $MinimumFreeGpuMemoryMiB)
+	if ($decision.ShouldStop) {
+		Stop-LaunchedGameForGpuMonitor $Game "GPU memory headroom remained below $MinimumFreeGpuMemoryMiB MiB for two consecutive samples ({$($decision.FreeMiB)} MiB free)."
+	}
+}
+
 foreach ($outputDirectory in @($ScreenshotDirectory, $DataRoot, $ShaderWorkingDir, $LocalDataCachePath)) {
 	if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
 		New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
@@ -323,12 +379,18 @@ if (-not $Continuous) {
 	$windowStyle = if ($NullRHI) { "Hidden" } else { "Normal" }
 	$game = Start-Process -FilePath $editor -ArgumentList $quotedArguments -WorkingDirectory $engineWorkingDirectory -WindowStyle $windowStyle -PassThru
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
+	$lastGpuMonitorCheck = [DateTime]::UtcNow
+	$consecutiveLowGpuSamples = 0
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
 	$mapObjectName = ($MapPath -split '/')[-1]
 	$worldAssetPath = [regex]::Escape("$MapPath.$mapObjectName")
 	$worldReadyPattern = "LogWorld: Bringing World $worldAssetPath up for play"
 	$bWorldReady = $false
 	while (-not $game.HasExited -and $startupTimer.Elapsed.TotalSeconds -lt $StartupTimeoutSeconds) {
+		if ($MonitorGpuHeadroom -and ([DateTime]::UtcNow - $lastGpuMonitorCheck).TotalSeconds -ge $GpuMemoryMonitorIntervalSeconds) {
+			$lastGpuMonitorCheck = [DateTime]::UtcNow
+			Invoke-GpuMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowGpuSamples)
+		}
 		if (Test-Path -LiteralPath $LogPath) {
 			$logStream = $null
 			$logReader = $null
@@ -367,7 +429,15 @@ if (-not $Continuous) {
 	}
 	if ($bWorldReady -and -not $game.HasExited) {
 		Write-Host "Island world-ready after $([Math]::Round($startupTimer.Elapsed.TotalSeconds, 1)) seconds; waiting for the existing play/request caps."
-		$game.WaitForExit()
+		if ($MonitorGpuHeadroom) {
+			while (-not $game.HasExited) {
+				if ($game.WaitForExit($GpuMemoryMonitorIntervalSeconds * 1000)) { break }
+				$lastGpuMonitorCheck = [DateTime]::UtcNow
+				Invoke-GpuMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowGpuSamples)
+			}
+		} else {
+			$game.WaitForExit()
+		}
 	}
 	$game.Refresh()
 	if (-not $bWorldReady -and $game.HasExited) {

@@ -25,4 +25,17 @@ try {
 }
 if (-not $malformedFailed) { throw "Malformed nvidia-smi output must fail closed." }
 
+$firstLowSample = Get-GpuHeadroomMonitorDecision -UsedMiB 9000 -TotalMiB 12288 -MinimumFreeMiB 4096
+if ($firstLowSample.FreeMiB -ne 3288 -or $firstLowSample.ConsecutiveLowSamples -ne 1 -or $firstLowSample.ShouldStop) {
+	throw "One low sample should warn but not stop a rendered session."
+}
+$secondLowSample = Get-GpuHeadroomMonitorDecision -UsedMiB 9001 -TotalMiB 12288 -MinimumFreeMiB 4096 -ConsecutiveLowSamples $firstLowSample.ConsecutiveLowSamples
+if ($secondLowSample.ConsecutiveLowSamples -ne 2 -or -not $secondLowSample.ShouldStop) {
+	throw "Two consecutive low samples should trigger a guarded stop."
+}
+$recoveredSample = Get-GpuHeadroomMonitorDecision -UsedMiB 8192 -TotalMiB 12288 -MinimumFreeMiB 4096 -ConsecutiveLowSamples $firstLowSample.ConsecutiveLowSamples
+if ($recoveredSample.ConsecutiveLowSamples -ne 0 -or $recoveredSample.ShouldStop) {
+	throw "A recovered headroom sample should reset the low-sample streak."
+}
+
 Write-Output "GPU memory budget tests passed."

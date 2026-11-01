@@ -14,8 +14,16 @@ output directories are created or Unreal is launched, and fails closed if
 `nvidia-smi` is unavailable, returns malformed data, or reports less than the
 configurable 4,096 MiB reserve (`-MinimumFreeGpuMemoryMiB`). `-GpuIndex` selects
 the device. The gate is not enabled by default and does not change existing
-launches; it does not monitor memory after startup or guarantee safe runtime
-headroom. NullRHI runs do not use the rendered-session gate.
+launches. The opt-in `-MonitorGpuHeadroom` extends it to bounded rendered runs:
+it requires an isolated data root plus explicit startup, real-time, and request
+caps, polls during startup and play (5 seconds by default), and terminates only
+the Game process tree launched by the script after two consecutive samples
+below the reserve. A failed or malformed in-run memory query also stops that
+launched Game because headroom is then unknown. `-GpuMemoryMonitorIntervalSeconds`
+adjusts polling frequency. These are device-wide NVIDIA readings, not
+per-process Unreal allocations or a guarantee against instantaneous exhaustion;
+there is no in-run FPS monitor. NullRHI runs do not use the rendered-session
+guard.
 
 ## Verification
 
@@ -26,6 +34,12 @@ headroom. NullRHI runs do not use the rendered-session gate.
   rejected it with 2,394 MiB free, before launching a game or creating the
   requested output directories.
 - The spectator launcher passed PowerShell syntax parsing.
+- The in-run monitor follow-up (2026-11-01) verifies that one low sample warns
+  without stopping, a second consecutive low sample trips the guard, and a recovered
+  sample resets the streak. All eight spectator launcher tests passed, the
+  PowerShell GPU-memory tests passed, and the updated launcher parsed cleanly.
+- No monitored Game session was launched during this change; the live machine
+  remained below the 4 GiB preflight reserve.
 - The open main D: Island project, its settings, source, and map were not
   changed. This guard exists only in the writable worktree until explicitly
   integrated into the main project.

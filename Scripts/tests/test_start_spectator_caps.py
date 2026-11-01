@@ -113,6 +113,20 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("No rendered session was started", module)
         self.assertIn("$freeMiB -lt $MinimumFreeMiB", module)
 
+    def test_gpu_headroom_monitor_is_opt_in_bounded_and_only_stops_its_game(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$MonitorGpuHeadroom", launcher)
+        self.assertIn("-MonitorGpuHeadroom requires -RequireGpuHeadroom", launcher)
+        self.assertIn("-MonitorGpuHeadroom requires a bounded session", launcher)
+        self.assertIn("-MonitorGpuHeadroom requires an isolated -DataRoot", launcher)
+        self.assertIn("-MonitorGpuHeadroom requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps", launcher)
+        self.assertIn("WaitForExit($GpuMemoryMonitorIntervalSeconds * 1000)", launcher)
+        self.assertIn("Get-GpuHeadroomMonitorDecision", launcher)
+        self.assertIn("$Game.Kill($true)", launcher)
+        self.assertIn("Only the Game process tree launched by this script will be terminated", launcher)
+        self.assertIn("-MonitorGpuHeadroom to a bounded, isolated rendered run", launcher)
+
 
 if __name__ == "__main__":
     unittest.main()
