@@ -168,6 +168,9 @@ The fresh `CaptiveSky_2.log` again sets `r.Nanite.ProjectEnabled=1` and
 utilization, and 73 °C. No PIE or resident session was started. The latest
 restart and resource gate are recorded in
 [`editor restart memory recheck`](findings/2026-11-01-editor-restart-memory-recheck.md).
+The restart had left two identical editor windows. Closing one left the Island
+editor responsive and reduced whole-device GPU use to 8,451 MiB (3,547 MiB
+free); this remains below the 4 GiB reserve, so rendered play is still deferred.
 
 ## 2026-11-01 — Guard the balance of the broadleaf habitat field
 

@@ -33,3 +33,20 @@ targets to their owning systems, and test a reversible resolution change only
 after the owner and visual effect are verified. Resume a bounded 15–30 minute
 resident-feedback session only after both system RAM and GPU headroom are safe,
 with live 30-FPS and memory monitoring.
+
+## Duplicate-window follow-up — 08:09 UTC
+
+The editor restart exposed two targetable native windows with the same
+`CaptiveSky_2 - Unreal Editor` title and identical Island/offshore view. Closing
+one left a single responsive Island editor window. Whole-device GPU use then
+read 8,451 / 12,282 MiB (3,547 MiB free), 42% utilization, and 74 °C, compared
+with 11,675 MiB used (323 MiB free) before closing it. WDDM did not expose
+per-process attribution, so this temporal change strongly suggests the extra
+window/session consumed substantial GPU memory but does not prove which process
+owned the released allocation.
+
+The remaining 3,547 MiB is still 549 MiB below the 4,096 MiB reserve, and
+system-RAM headroom remains unavailable from this diagnostic shell. No PIE,
+Game, or feedback session was started. Before a future rendered pass, verify
+only one project editor session remains, then recheck GPU and system RAM; do not
+infer a safe margin from the partial recovery alone.
