@@ -72,12 +72,23 @@ rule with its object name preserved. The plan is generated in
 `runtime_copy_plan` by `Scripts/Inspect-MegaplantRuntimeMaterialDependencies.py`;
 it performs no folder creation, asset copy, or save.
 
+A filesystem preflight against the installed UE 5.8.3 plugin confirmed that all
+24 source packages have their corresponding `.uasset` files under
+`Engine/Plugins/Experimental/ProceduralVegetationEditor/Content`; the package
+files total 2.41 MiB, with no `.uexp` or `.ubulk` companions. The plugin
+descriptor separates `ProceduralVegetationEditor` (Editor module) from
+`ProceduralVegetation` (Runtime module). Therefore the next test must verify
+the copied graph in a runtime target without the editor module and determine
+whether the runtime module can also be omitted; do not assume that removing the
+entire plugin is valid from the content-package closure alone.
+
 This clears the package-mapping/collision gate, not the runtime-readiness gate.
 Next, materialize the complete closure only in a disposable project copy,
-remap its graph references, then compile and preview it with the plugin disabled
-in the runtime target before touching live species parents. In particular,
-verify virtual-texture support and the foliage collection's runtime behavior.
-The original PVE graph and Island remain unchanged.
+remap its graph references, then compile and preview it with the editor module
+unavailable before touching live species parents. In particular, verify
+virtual-texture support, the foliage collection's runtime behavior, and whether
+the runtime module remains necessary. The original PVE graph and Island remain
+unchanged.
 
 ## Direction
 
@@ -87,7 +98,9 @@ build a disposable project-local copy of the complete dependency closure and
 remap the copied material/function references without changing the plugin
 sample assets. Re-run this audit to prove the runtime closure is clear, compile
 the copied material, then preview one instance-skinned tree before reparenting
-the remaining species. Preserve the current parent graph, maps, and all
-instance overrides until that preview has passed. No material assets were
-created or changed in this milestone. The graph API discovery reduces the
-main implementation uncertainty but does not change this safety gate.
+the remaining species. Keep the editor-only module out of the runtime test and
+separately establish whether the plugin's runtime module can be removed.
+Preserve the current parent graph, maps, and all instance overrides until that
+preview has passed. No material assets were created or changed in this
+milestone. The graph API discovery reduces the main implementation uncertainty
+but does not change this safety gate.
