@@ -8,6 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = ROOT / "Scripts" / "Build-MegaplantRuntimeMaterialSandbox.py"
 VERIFY_SCRIPT = ROOT / "Scripts" / "Verify-MegaplantRuntimeMaterialSandbox.py"
+NO_PVE_PROJECT = ROOT / "Playtests" / "MegaplantRuntimeMaterialSandbox" / "MegaplantRuntimeMaterialSandbox_NoPVE.uproject"
 
 
 class MegaplantRuntimeMaterialSandboxTests(unittest.TestCase):
@@ -33,6 +34,19 @@ class MegaplantRuntimeMaterialSandboxTests(unittest.TestCase):
         source = VERIFY_SCRIPT.read_text(encoding="utf-8")
         self.assertLess(source.index("manifest_path = require_sandbox_manifest()"),
                         source.index('with open(manifest_path, "r"'))
+
+    def test_no_pve_project_keeps_editor_python_tools_but_disables_pve(self):
+        import json
+
+        descriptor = json.loads(NO_PVE_PROJECT.read_text(encoding="utf-8"))
+        enabled_plugins = {
+            plugin["Name"] for plugin in descriptor.get("Plugins", [])
+            if plugin.get("Enabled")
+        }
+        self.assertNotIn("ProceduralVegetationEditor", enabled_plugins)
+        self.assertNotIn("ProceduralVegetation", enabled_plugins)
+        self.assertIn("PythonScriptPlugin", enabled_plugins)
+        self.assertIn("EditorScriptingUtilities", enabled_plugins)
 
 
 if __name__ == "__main__":

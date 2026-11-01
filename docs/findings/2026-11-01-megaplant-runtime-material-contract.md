@@ -111,7 +111,9 @@ This validates the current worktree C++ modules, including ecology and
 resident tests, but does not execute Unreal automation or materialize the
 sandbox assets. The open D: editor and its binaries were not changed.
 
-This clears the package-mapping/collision gate, not the runtime-readiness gate.
+## Status as of 2026-11-01
+
+This cleared the package-mapping/collision gate, not the runtime-readiness gate.
 Next, use the isolated project when a stable UE launch path is available to
 materialize the closure, remap its graph references, then compile and preview
 it with the editor module unavailable before touching live species parents. In
@@ -119,7 +121,7 @@ particular, verify virtual-texture support, the foliage collection's runtime
 behavior, and whether the runtime module remains necessary. The original PVE
 graph and Island remain unchanged.
 
-## Direction
+## Initial direction (updated 2026-11-02 below)
 
 Do not replace this graph with a bare two-texture material: it would discard
 the authored per-species seasonal, health, and translucency behavior. Next,
@@ -132,7 +134,39 @@ runtime closure is clear, compile the copied material, then preview one
 instance-skinned tree before reparenting the remaining species. Keep the
 editor-only module out of the runtime test and separately establish whether
 the plugin's runtime module can be removed. Preserve the current parent graph,
-maps, and all instance overrides until that preview has passed. No material
-assets were created or changed in this milestone. The graph API discovery
+maps, and all instance overrides until that preview has passed. No live Island
+or source material assets were changed at that time. The graph API discovery
 reduces the main implementation uncertainty but does not change this safety
 gate.
+
+## Material graph portability proof — 2026-11-02
+
+Using `UnrealEditor-Cmd.exe -ExecutePythonScript` (not the failed
+`-run=pythonscript` commandlet path), the disposable builder copied all 24
+audited PVE packages, rewired 39 graph references, compiled the copied master
+material, and reported `COPY_COMPLETE ... plugin_dependencies=0`. The first
+correct editor invocation stopped at a DDC configuration fatal because the
+project-local cache path exceeded UE 5.8's 119-character limit. Retrying with a
+short temp DDC path and the normal Zen data directory completed successfully.
+
+Added a sibling `_NoPVE.uproject` descriptor that leaves editor Python tools
+available while disabling the ProceduralVegetationEditor plugin. The verifier
+then loaded and recompiled the copied closure under that descriptor and
+reported `NO_PLUGIN_VERIFY_COMPLETE assets=24 materials=1
+plugin_dependencies=0`. The four focused Python harness tests also pass. This
+proves that the copied shared master/function/texture/collection graph can be
+loaded and recompiled without the PVE plugin; it does not yet prove rendered
+appearance, material-instance override parity, or that the full tree assets
+work in a packaged runtime. No live Island or source Megaplant asset was
+modified.
+
+The sandbox run generated a local `Config/DefaultEngine.ini` with a transient
+Android File Server security token, so generated Config is ignored alongside
+binary/cache outputs and is deliberately not committed.
+
+Next: copy one A/B tree mesh and its material instance into the disposable
+project, remap its foliage and bark slots to the copied parent while preserving
+the audited per-species overrides, then verify dependencies with PVE disabled.
+Keep actual rendering gated by at least 4 GiB of free GPU memory. Only after a
+preview confirms leaf response and species color/season variation should any
+live Island material parent change.
