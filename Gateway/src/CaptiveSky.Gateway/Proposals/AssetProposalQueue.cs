@@ -10,6 +10,7 @@ public sealed class AssetProposalQueue(string projectRoot)
     private const int MaxPending = 64;
     private const int MaxPendingPerRequester = 3;
     private const int MaxRecentHistory = 5;
+    private const int MaxWorldSummaryEntries = 3;
     private static readonly TimeSpan InboxLockTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan InboxLockRetry = TimeSpan.FromMilliseconds(25);
     private static readonly SemaphoreSlim Gate = new(1, 1);
@@ -216,6 +217,68 @@ public sealed class AssetProposalQueue(string projectRoot)
         finally { Gate.Release(); }
     }
 
+    public async Task<string> GetPendingWorldSummaryAsync(CancellationToken cancellationToken)
+    {
+        await Gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!PathExists(_path)) return "(none recorded)";
+            await using var inboxLock = await AcquireInboxLockAsync(cancellationToken);
+
+            var entries = new List<string>();
+            foreach (var line in await File.ReadAllLinesAsync(_path, cancellationToken))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                using var document = JsonDocument.Parse(line);
+                var record = document.RootElement;
+                if (record.ValueKind != JsonValueKind.Object)
+                    throw new JsonException("The proposal record must be an object.");
+
+                // Unreal resident proposals have no Discord correspondent/channel fields.
+                // Keep this reviewer view separate from private Discord-authored proposals.
+                if (Get(record, "status") != "pending_review" ||
+                    Get(record, "source") == "discord" ||
+                    record.TryGetProperty("participant_id", out _) ||
+                    record.TryGetProperty("channel_id", out _))
+                    continue;
+
+                var id = Get(record, "id");
+                var requester = CleanDiscordText(Get(record, "requester"), 40);
+                if (id.Length < 8 || requester.Length == 0) continue;
+                var requestType = Get(record, "request_type");
+                var upgradeKind = Get(record, "upgrade_kind");
+                var kind = requestType switch
+                {
+                    "upgrade" when upgradeKind is "aesthetic" or "variation" or "functionality" => $"{upgradeKind} upgrade",
+                    "upgrade" => "upgrade",
+                    "new_object" or "" => "new object",
+                    _ => "proposal"
+                };
+                var target = CleanDiscordText(Get(record, "target"), 64);
+                var description = CleanDiscordText(Get(record, "description"), 120);
+                if (description.Length == 0) description = "(description unavailable)";
+                entries.Add($"- {id[..8]} [{requester}] {kind}{(target.Length == 0 ? "" : $" for {target}")}: {description}");
+            }
+
+            return entries.Count == 0
+                ? "No pending in-world resident proposals."
+                : "Pending in-world resident proposals (latest 3):\n" + string.Join('\n', entries.TakeLast(MaxWorldSummaryEntries));
+        }
+        catch (JsonException)
+        {
+            return "(unavailable: proposal inbox is unreadable)";
+        }
+        catch (IOException)
+        {
+            return "(unavailable: proposal inbox could not be read)";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return "(unavailable: proposal inbox is not readable)";
+        }
+        finally { Gate.Release(); }
+    }
+
     private static string Get(JsonElement record, string property) =>
         record.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
 
@@ -261,4 +324,7 @@ public sealed class AssetProposalQueue(string projectRoot)
         var clean = string.Concat(value.Select(character => char.IsControl(character) ? ' ' : character)).Trim();
         return clean.Length <= maximumCharacters ? clean : clean[..maximumCharacters];
     }
+
+    private static string CleanDiscordText(string value, int maximumCharacters) =>
+        CleanText(value, maximumCharacters).Replace("@", "＠", StringComparison.Ordinal).Replace('`', '\'');
 }

@@ -214,6 +214,17 @@ public sealed class DiscordChannelAdapter : IChannelAdapter
             if (string.IsNullOrWhiteSpace(text))
                 return;
 
+            if (DiscordProposalCommand.IsWorldSummaryCommand(text))
+            {
+                var response = !CanLookupProposalStatus(message.Author.Id, message.Author.IsBot, _agent.Discord)
+                    ? "Pending resident proposals are only visible to an explicitly allow-listed human reviewer."
+                    : await _proposalQueue.GetPendingWorldSummaryAsync(_shutdownToken);
+                await message.Channel.SendMessageAsync(response,
+                    allowedMentions: AllowedMentions.None,
+                    messageReference: new MessageReference(message.Id));
+                return;
+            }
+
             if (DiscordProposalCommand.IsStatusCommand(text))
             {
                 string response;

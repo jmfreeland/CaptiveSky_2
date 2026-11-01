@@ -314,6 +314,8 @@ try
         && worldUpgrade is { Target: "", UpgradeKind: "variation" }, "world upgrade omits a specific target");
     Assert(DiscordProposalCommand.IsStatusCommand("!request status deadbeef"), "proposal status command is recognized");
     Assert(!DiscordProposalCommand.IsStatusCommand("!request statuslight deadbeef"), "status command prefix is exact");
+    Assert(DiscordProposalCommand.IsWorldSummaryCommand("!request world"), "resident proposal summary command is recognized");
+    Assert(!DiscordProposalCommand.IsWorldSummaryCommand("!request worldview"), "resident proposal summary command is exact");
     Assert(DiscordProposalCommand.TryParseStatusRequest("!request status deadbeef", out var statusPrefix, out var statusError)
         && statusPrefix == "deadbeef" && statusError.Length == 0, "short proposal ID parses for status lookup");
     Assert(DiscordProposalCommand.TryParseStatusRequest("!request status too-short", out var invalidStatusPrefix, out var invalidStatusError)
@@ -324,6 +326,7 @@ try
         && proposalHelp.Contains("upgrade variation", StringComparison.Ordinal)
         && proposalHelp.Contains("upgrade functionality", StringComparison.Ordinal)
         && proposalHelp.Contains("!request status", StringComparison.Ordinal)
+        && proposalHelp.Contains("!request world", StringComparison.Ordinal)
         && proposalHelp.Contains("ask Raven", StringComparison.Ordinal)
         && proposalHelp.Contains("human review", StringComparison.Ordinal)
         && proposalHelp.Contains("nothing is created automatically", StringComparison.Ordinal), "help gives examples and explains review-only resident proposals");
@@ -459,6 +462,9 @@ try
     var unreadableHistory = await unwritableQueue.GetRecentSummaryAsync(home.AgentId, "42", CancellationToken.None);
     Assert(unreadableHistory.Contains("not readable", StringComparison.Ordinal),
         "an inbox path that cannot be read is not misreported as empty history");
+    var unreadableWorldSummary = await unwritableQueue.GetPendingWorldSummaryAsync(CancellationToken.None);
+    Assert(unreadableWorldSummary.Contains("not readable", StringComparison.Ordinal),
+        "resident proposal summary fails closed when the inbox cannot be read");
 
     var proposals = new AssetProposalQueue(root);
     var queuedObject = await proposals.AppendAsync(home.AgentId, objectProposal!, "42", "Visitor", "10", "100", CancellationToken.None);
@@ -497,6 +503,36 @@ try
         objectProposal! with { Description = "Add a small hazel seed cache" }, "42", "Visitor", "10", "108", CancellationToken.None);
     Assert(anotherResidentProposal.Success,
         "one resident reaching their pending limit does not block another resident");
+
+    var worldSummaryRoot = Path.Combine(root, "world-summary");
+    var worldSummaryQueue = new AssetProposalQueue(worldSummaryRoot);
+    var worldSummaryInbox = Path.Combine(worldSummaryRoot, "Saved", "CaptiveSky", "ComfyBlender", "Requests", "inbox.jsonl");
+    Directory.CreateDirectory(Path.GetDirectoryName(worldSummaryInbox)!);
+    var worldProposalRows = new object[]
+    {
+        new { id = "11111111-1111-1111-1111-111111111111", requester = "Agent_Raven_01", request_type = "upgrade", upgrade_kind = "functionality", target = "RavenNest", description = "Add a sheltered landing rail", pipeline = "human_review", status = "pending_review" },
+        new { id = "22222222-2222-2222-2222-222222222222", requester = "Agent_Aster_01", request_type = "upgrade", upgrade_kind = "aesthetic", target = "western stone tower", description = "Add lichen @everyone", pipeline = "human_review", status = "pending_review" },
+        new { id = "33333333-3333-3333-3333-333333333333", requester = "Agent_Rat_01", request_type = "new_object", target = "", description = "Add a dry seed nook", pipeline = "ComfyBlender", status = "pending_review" },
+        new { id = "44444444-4444-4444-4444-444444444444", requester = "Agent_Innkeeper_01", request_type = "upgrade", upgrade_kind = "variation", target = "Tideglass", description = "Add a second reed silhouette", pipeline = "human_review", status = "pending_review" },
+        new { id = "55555555-5555-5555-5555-555555555555", requester = home.AgentId, participant_id = "42", channel_id = "10", source = "discord", request_type = "new_object", description = "Private Discord proposal", pipeline = "ComfyBlender", status = "pending_review" },
+        new { id = "66666666-6666-6666-6666-666666666666", requester = "Agent_Aster_01", request_type = "upgrade", upgrade_kind = "variation", target = "woodland", description = "Already reviewed", pipeline = "human_review", status = "accepted" }
+    };
+    await File.WriteAllLinesAsync(worldSummaryInbox,
+        worldProposalRows.Select(row => System.Text.Json.JsonSerializer.Serialize(row)));
+    var worldSummary = await worldSummaryQueue.GetPendingWorldSummaryAsync(CancellationToken.None);
+    Assert(worldSummary.Contains("Pending in-world resident proposals (latest 3)", StringComparison.Ordinal) &&
+           !worldSummary.Contains("11111111", StringComparison.Ordinal) &&
+           worldSummary.Contains("22222222", StringComparison.Ordinal) &&
+           worldSummary.Contains("33333333", StringComparison.Ordinal) &&
+           worldSummary.Contains("44444444", StringComparison.Ordinal),
+        "resident summary is bounded to the latest three pending in-world proposals");
+    Assert(worldSummary.Contains("＠everyone", StringComparison.Ordinal) &&
+           !worldSummary.Contains("@everyone", StringComparison.Ordinal),
+        "resident proposal summary neutralizes mass-mention text from proposal data");
+    Assert(!worldSummary.Contains("Private Discord proposal", StringComparison.Ordinal) &&
+           !worldSummary.Contains("66666666", StringComparison.Ordinal),
+        "resident proposal summary excludes private Discord submissions and reviewed entries");
+
     var reviewedRows = await File.ReadAllLinesAsync(inbox);
     var reviewedFirst = System.Text.Json.Nodes.JsonNode.Parse(reviewedRows[0])!.AsObject();
     reviewedFirst["status"] = "accepted";

@@ -18,6 +18,8 @@ Upgrade records use `request_type: "upgrade"`, preserve `upgrade_kind` and (when
 
 The path uses the project's `CaptiveSkyDataRoot` override, so isolated playtests and tests keep their proposals under their own data root. The inbox accepts one-line descriptions up to 240 characters and one-line targets up to 96 characters, rejects duplicate pending proposals from the same resident (including matching target and category for upgrades), and caps pending entries at 64. Upgrade categories are limited to `aesthetic`, `variation`, and `functionality`. A malformed existing record stops writes rather than risking a damaged queue.
 
+An explicitly allow-listed human can use `!request world` in Discord for a read-only summary of up to three recent pending proposals authored in the Unreal world. It excludes Discord-origin requests (which remain private to their submitter), neutralizes mass mentions in proposal text, and neither changes queue status nor triggers generation. The local inbox remains the full review surface.
+
 ## Human handoff
 
 1. List pending entries with `python -I Scripts/AssetPipeline/requests.py list` (add `--all` to include handled entries). The tool prints proposal text as data; it never interprets it as a command.

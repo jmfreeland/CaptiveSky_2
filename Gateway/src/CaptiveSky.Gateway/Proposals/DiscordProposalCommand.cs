@@ -4,7 +4,7 @@ namespace CaptiveSky.Gateway.Proposals;
 
 public static class DiscordProposalCommand
 {
-    public const string Usage = "Examples: `!request object A small copper bell beside the east trail`; `!request upgrade aesthetic InnDoorLantern :: Add brass trim`; `!request upgrade aesthetic western stone tower :: Add weathered lichen`; `!request upgrade variation world :: Add mossy stream stones`; `!request upgrade functionality RavenNest :: Add a sheltered landing rail`; `!request status <8-character-id>`. Upgrade targets may be known IDs or concise descriptions of objects and places. You can also ask Raven to submit one specific idea for human review. These are proposals only; nothing is created automatically.";
+    public const string Usage = "Examples: `!request object A small copper bell beside the east trail`; `!request upgrade aesthetic InnDoorLantern :: Add brass trim`; `!request upgrade aesthetic western stone tower :: Add weathered lichen`; `!request upgrade variation world :: Add mossy stream stones`; `!request upgrade functionality RavenNest :: Add a sheltered landing rail`; `!request status <8-character-id>`; `!request world`. Upgrade targets may be known IDs or concise descriptions of objects and places. You can also ask Raven to submit one specific idea for human review. These are proposals only; nothing is created automatically.";
 
     public static bool IsCommand(string text) =>
         text.StartsWith("!request", StringComparison.OrdinalIgnoreCase) &&
@@ -16,6 +16,12 @@ public static class DiscordProposalCommand
         var args = text[8..].TrimStart();
         return args.StartsWith("status", StringComparison.OrdinalIgnoreCase) &&
                (args.Length == 6 || char.IsWhiteSpace(args[6]));
+    }
+
+    public static bool IsWorldSummaryCommand(string text)
+    {
+        if (!IsCommand(text)) return false;
+        return text[8..].Trim().Equals("world", StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool TryParseStatusRequest(string text, out string requestIdPrefix, out string error)
