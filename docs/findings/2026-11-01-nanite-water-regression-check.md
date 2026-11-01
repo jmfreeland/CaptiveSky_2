@@ -55,3 +55,17 @@ the grove, capturing frame time, whole-device memory, tree silhouettes, and
 ground-cover distribution. If headroom stays below that gate, continue with
 CPU/source-side foliage-memory and texture-budget reductions rather than
 starting another rendered run.
+
+## Follow-up restart (2026-11-01, 03:20 UTC)
+
+At the user's request, the editor was restarted again. A project-browser
+selection first surfaced an `Aura` missing-plugin prompt, so that launch was
+declined rather than disabling the plugin. Launching the exact main D: `.uproject`
+path then opened `CaptiveSky_2` successfully in UE 5.8.3 with the Island loaded.
+The new startup log records `LogConfig: Set CVar [[r.Nanite.Foliage:1]]`,
+confirming the effective foliage setting after this restart. No rendered play
+was started. The latest whole-device sample is 9,623 / 12,282 MiB used
+(2,375 MiB free, 49% GPU, 70 °C), still below the 4 GiB gate. Session Frontend's
+filter found the IslandOcean test, but this attempt did not produce a completed
+test result; treat the previous 03:10 pass as the latest verified automation
+result.
