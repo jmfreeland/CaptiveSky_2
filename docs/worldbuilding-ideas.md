@@ -9,7 +9,10 @@ project-owned bark parent is not yet a runtime fix because it shares that
 closure. Species textures are already project-owned, while each material
 instance also carries seasonal/health/translucency overrides. Preserve that
 art direction when copying the full dependency graph into project content; do
-not flatten it to a two-texture substitute. No assets were changed. Details:
+not flatten it to a two-texture substitute. A read-only nested graph walk found
+62 resolvable function calls and the four unique direct PVE expression assets:
+three virtual textures and `MPC_GlobalFoliageActor`. No assets were changed.
+Details:
 [runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
 
 ## 2026-11-01 — Give the rain basin breathing room

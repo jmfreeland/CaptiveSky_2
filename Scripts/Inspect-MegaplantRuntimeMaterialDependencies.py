@@ -7,7 +7,8 @@ every material slot on the A/B tree variants used by IslandWeather, their
 material-instance parent chains, and recursively referenced packages. Plugin
 content in a runtime material dependency closure is a shipping risk when that
 plugin is editor-only or unavailable in the game target.
-The report includes instance texture/scalar/vector/static-switch overrides so a
+The report includes instance texture/scalar/vector/static-switch overrides,
+nested material-function calls, and direct texture/collection references so a
 project-owned runtime material can be designed against the installed textures
 without editing any assets.
 """
@@ -115,19 +116,42 @@ def material_function_graph(roots):
             continue
 
         calls = []
+        asset_references = []
         for expression in expressions:
-            if not isinstance(expression, unreal.MaterialExpressionMaterialFunctionCall):
-                continue
-            function = expression.get_editor_property("material_function")
-            function_path = object_path(function)
-            calls.append({
-                "node": expression.get_name(),
-                "function": function_path,
-                "setter_available": callable(getattr(expression, "set_material_function", None)),
-            })
-            if function_path and function_path not in visited:
-                pending.append(function_path)
-        graph.append({"asset": path, "class": asset.get_class().get_name(), "function_calls": calls})
+            if isinstance(expression, unreal.MaterialExpressionMaterialFunctionCall):
+                function = expression.get_editor_property("material_function")
+                function_path = object_path(function)
+                calls.append({
+                    "node": expression.get_name(),
+                    "function": function_path,
+                    "setter_available": callable(getattr(expression, "set_material_function", None)),
+                })
+                if function_path and function_path not in visited:
+                    pending.append(function_path)
+
+            reference_properties = []
+            if isinstance(expression, unreal.MaterialExpressionTextureBase):
+                reference_properties.append(("texture", "texture"))
+            if isinstance(expression, unreal.MaterialExpressionCollectionParameter):
+                reference_properties.append(("material_parameter_collection", "collection"))
+            if isinstance(expression, unreal.MaterialExpressionTextureCollection):
+                reference_properties.append(("texture_collection", "texture_collection"))
+            for reference_kind, property_name in reference_properties:
+                referenced_asset = expression.get_editor_property(property_name)
+                asset_references.append({
+                    "graph_asset": path,
+                    "node": expression.get_name(),
+                    "node_class": expression.get_class().get_name(),
+                    "kind": reference_kind,
+                    "asset": object_path(referenced_asset),
+                })
+
+        graph.append({
+            "asset": path,
+            "class": asset.get_class().get_name(),
+            "function_calls": calls,
+            "asset_references": asset_references,
+        })
     return sorted(graph, key=lambda entry: entry["asset"])
 
 
@@ -191,13 +215,27 @@ def main():
         for asset in report["material_function_graph"]
         for call in asset["function_calls"]
     ]
+    graph_asset_references = [
+        reference
+        for asset in report["material_function_graph"]
+        for reference in asset["asset_references"]
+    ]
     unresolved_calls = [call for call in graph_calls if not call["function"]]
     missing_setters = [call for call in graph_calls if not call["setter_available"]]
+    report["material_graph_asset_references"] = graph_asset_references
+    report["material_graph_asset_reference_count"] = len(graph_asset_references)
+    referenced_plugin_assets = sorted({
+        reference["asset"]
+        for reference in graph_asset_references
+        if reference["asset"] and any(reference["asset"].startswith(prefix) for prefix in PLUGIN_PREFIXES)
+    })
+    report["material_graph_plugin_asset_references"] = referenced_plugin_assets
     unreal.log("[MegaplantRuntimeMaterialAudit] REPORT " + json.dumps(report, sort_keys=True))
     unreal.log(
-        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={} graph_assets={} function_calls={} unresolved_calls={} missing_setters={}".format(
+        "[MegaplantRuntimeMaterialAudit] COMPLETE trees={} plugin_dependencies={} graph_assets={} function_calls={} unresolved_calls={} missing_setters={} direct_references={} plugin_direct_assets={}".format(
             len(report["trees"]), len(plugin_packages), len(report["material_function_graph"]),
-            len(graph_calls), len(unresolved_calls), len(missing_setters)
+            len(graph_calls), len(unresolved_calls), len(missing_setters),
+            len(graph_asset_references), len(referenced_plugin_assets)
         )
     )
 

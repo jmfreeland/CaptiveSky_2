@@ -35,12 +35,26 @@ evidence that nested function references can be inspected and likely remapped
 in a project-local graph copy. No expressions were changed, and this does not
 yet prove that copied graphs compile or render correctly.
 
-The function-call graph walk is not a complete graph-copy validator: direct
-texture and collection references on expression nodes have not yet been
-inventoried. Before copying, extend the audit to enumerate those references
-and verify every source exists in the destination closure; then copy/remap into
-a disposable project folder, compile, and preview before touching the live
-species parents. The original PVE graph and Island remain unchanged.
+The same run inventories 12 direct graph references: six to built-in Engine
+textures and six references across four unique PVE assets—the three virtual
+textures (`DefaultDiffuse_VT`, `Leaf_Mask_VT`, `Mask_VT`) and
+`MPC_GlobalFoliageActor`. The references were found in the trunk, leaf, and
+health/season functions. This matches the PVE-specific direct-reference subset
+of the 24-package registry closure; function calls account for the remaining
+PVE packages. The material-expression scan currently covers texture-base,
+material-parameter-collection, and texture-collection properties, not every
+possible asset-bearing expression class, so the registry closure remains the
+broader dependency check.
+
+Epic documents the collection expression's `collection` property in its
+[`MaterialExpressionCollectionParameter` Python API](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/class/MaterialExpressionCollectionParameter);
+the texture-base and texture-collection expression types are also present in
+the [UE 5.8 Python API](https://dev.epicgames.com/documentation/en-us/unreal-engine/python-api/index).
+
+Next, verify the full 24-package source-to-destination mapping, including the
+master material and every function, before copying/remapping into a disposable
+project folder. Compile and preview there before touching the live species
+parents. The original PVE graph and Island remain unchanged.
 
 ## Direction
 
