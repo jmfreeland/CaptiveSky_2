@@ -57,10 +57,16 @@ shortcut; capture the relevant Unreal/Zen logs and identify the owner first.
   `Source/CaptiveSky_2/CaptiveSky_2Character.cpp`, and
   `Source/CaptiveSky_2/Agent/IslandOceanSubsystem.cpp`.
 - Blender 5.2.2 ran the complete `Scripts/tests` suite: 48 tests passed.
+- UE 5.8.3 `CaptiveSky_2Editor` scratch build succeeded: 192 UBT actions,
+  including the full module relink. UBT emitted a deprecation warning that
+  `MetaHumanGenerator` and the project depend on `StructUtils`, deprecated
+  since UE 5.5; it did not fail the build. This compiled the worktree scratch
+  target and did not update the open D: editor's loaded module.
 - Full read-only audit: 513 files compared; 108 identical, 377 different,
   28 live-missing, 0 source-missing.
-- No editor build or rendered gameplay was started; this finding makes no
-  runtime claim beyond what the captured startup logs establish.
+- No build was run in the open D: editor project and no rendered gameplay was
+  started; this finding makes no runtime claim beyond what the captured
+  startup logs establish.
 
 ## Next step
 
