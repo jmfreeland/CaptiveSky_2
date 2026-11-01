@@ -41,3 +41,14 @@ system RAM free. GPU headroom remains below the 4 GiB rendered-play gate even
 though system RAM is available, so keep PIE/Game closed and continue source-side
 work. This sample does not establish texture residency, frame rate, or peak
 playtime memory.
+
+## Evening gate recheck (19:09 UTC)
+
+The connected editor is still open and reports `All Saved`; a read-only desktop
+capture shows the Common Hazel skeletal-mesh preview over the Island editor.
+No Zen warning or crash dialog is visible, and no PIE/Game session is running.
+The whole-device NVIDIA sample reports 10,754 / 12,282 MiB used (1,244 MiB
+free, 68% utilization, 78 C). This is substantially below the 4 GiB minimum
+for rendered validation, so keep the 15–30 minute resident play run gated and
+continue with source-side work. It is a single device-wide sample, not an Unreal
+allocation measurement.
