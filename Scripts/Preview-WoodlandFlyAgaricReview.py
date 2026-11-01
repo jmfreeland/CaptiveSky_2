@@ -144,7 +144,7 @@ def place_candidate():
     log("COMPLETE stage=place " + json.dumps(report, sort_keys=True))
 
 
-try:
+def main():
     stage = os.environ.get("CAPTIVESKY_FUNGUS_REVIEW_STAGE", "").strip().lower()
     if stage == "import":
         import_candidate()
@@ -153,7 +153,12 @@ try:
     elif stage == "place":
         place_candidate()
     else:
-        raise RuntimeError("Set CAPTIVESKY_FUNGUS_REVIEW_STAGE to import, duplicate, or place")
-except Exception:
-    unreal.log_error(PREFIX + "FAILED " + traceback.format_exc())
-    raise
+        log("No stage selected; no assets or maps were changed")
+
+
+if os.environ.get("CAPTIVESKY_FUNGUS_REVIEW_STAGE", "").strip():
+    try:
+        main()
+    except Exception:
+        unreal.log_error(PREFIX + "FAILED " + traceback.format_exc())
+        raise

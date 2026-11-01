@@ -41,9 +41,10 @@ existing review map or duplicate the comparison actor, and never saves the
 source Island. The destination review map is
 `/Game/Generated/ComfyBlender/WoodlandFlyAgaricReview_20261101/Maps/Island_WoodlandFungusAB_20261101`.
 
-This workflow is prepared but **has not been run in Unreal**. The script passes
-Python syntax compilation, and the two focused fly-agaric asset tests pass;
-neither result validates Unreal import, material rendering, or the A/B scene.
+This workflow is prepared but **has not been run in Unreal**. Python syntax
+compilation passes; all 42 `Scripts/tests` cases pass, including three focused
+map-safety tests; and both fly-agaric geometry/material tests pass. None
+validates Unreal import, material rendering, or the A/B scene.
 After reviewing each stage in the editor, compare the existing ochre cluster
 and red-cap candidate at the same visitor-scale angle before considering any
 change to the main map.
