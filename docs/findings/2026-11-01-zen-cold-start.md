@@ -10,8 +10,25 @@ Reviewing the latest project logs changes the likely explanation for the repeate
 
 This is stronger evidence for overlapping editor startups contending on the shared Zen startup/recovery path than for a damaged or unavailable cache. The warning is still real and the delay is undesirable, but the observed launches recovered and attached to DDC. Avoid starting another editor copy while one is opening; do not clear Zen data based on this warning alone. The process list was unavailable during this inspection, so the log correlation does not identify which launcher started each overlapping editor.
 
-Epic's [UE 5.8 Derived Data Cache documentation](https://dev.epicgames.com/documentation/unreal-engine/using-derived-data-cache-in-unreal-engine?lang=en-US) says Zen opens and closes with Unreal Editor by default and can be configured to remain running. That is a supported avenue to avoid repeated cold starts, but this inspection did not change service installation, system startup behavior, cache contents, or project configuration.
+Epic's [UE 5.8 Derived Data Cache documentation](https://dev.epicgames.com/documentation/unreal-engine/using-derived-data-cache-in-unreal-engine?lang=en-US) says Zen opens and closes with Unreal Editor by default and can be configured to remain running. The UE 5.8 release notes specifically recommend `LimitProcessLifetime=false` for workflows where frequent Zen restarts are costly, while warning that automated/build workflows need to account for the longer-lived process.
+
+## Project-level mitigation
+
+`Config/DefaultEngine.ini` now sets `LimitProcessLifetime=False` under
+`[Zen.AutoLaunch]`. This is scoped to projects using this configuration and
+does not install a Windows service, alter the shared Zen cache, or start a
+process immediately. On the next editor launch, Zen should remain available
+after the editor closes, avoiding a cold start on a subsequent launch. The
+editor was not restarted as part of this change. Verify the next single-editor
+launch log shows a short Zen AutoLaunch interval, and confirm Zen remains
+healthy after closing the editor. Do not start overlapping editor copies while
+the first launch is in progress; the setting reduces cold starts but does not
+remove contention if multiple launches concurrently perform recovery.
 
 ## Next diagnostic
 
-If a single-editor launch still shows the warning, capture that launch's `Unreal.log` and `zenserver.log` with no second editor or Unreal automation starting concurrently, then compare the Zen process start/ready interval and any warnings around it. Consider keeping Zen alive between editor sessions only after confirming the preferred service/lifecycle setup; do not clear its cache as a first response. No restart or build is needed for this diagnosis.
+If a single-editor launch still shows the warning after this setting takes
+effect, capture that launch's `Unreal.log` and `zenserver.log` with no second
+editor or Unreal automation starting concurrently, then compare the Zen
+process start/ready interval and any warnings around it. Do not clear its
+cache as a first response.
