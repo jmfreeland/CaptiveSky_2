@@ -82,13 +82,27 @@ the copied graph in a runtime target without the editor module and determine
 whether the runtime module can also be omitted; do not assume that removing the
 entire plugin is valid from the content-package closure alone.
 
+## Disposable test harness
+
+Added `Playtests/MegaplantRuntimeMaterialSandbox/` with a minimal UE 5.8.3
+project, `Scripts/Build-MegaplantRuntimeMaterialSandbox.py` to copy and remap
+the 24 verified packages, and `Scripts/Verify-MegaplantRuntimeMaterialSandbox.py`
+to load and recompile them with PVE disabled. Both scripts pass Python 3.11
+syntax validation; the project descriptor parses and lists 24 unique source
+packages. The first isolated `UnrealEditor-Cmd.exe -run=pythonscript -NullRHI`
+attempt crashed during engine startup with an access violation at address zero,
+before the script ran. No sandbox `Content/` directory or copied assets were
+created. This is not evidence for or against material portability, and the
+NullRHI startup path should not be retried without addressing the bootstrap
+failure first.
+
 This clears the package-mapping/collision gate, not the runtime-readiness gate.
-Next, materialize the complete closure only in a disposable project copy,
-remap its graph references, then compile and preview it with the editor module
-unavailable before touching live species parents. In particular, verify
-virtual-texture support, the foliage collection's runtime behavior, and whether
-the runtime module remains necessary. The original PVE graph and Island remain
-unchanged.
+Next, use the isolated project when a stable UE launch path is available to
+materialize the closure, remap its graph references, then compile and preview
+it with the editor module unavailable before touching live species parents. In
+particular, verify virtual-texture support, the foliage collection's runtime
+behavior, and whether the runtime module remains necessary. The original PVE
+graph and Island remain unchanged.
 
 ## Direction
 
@@ -96,11 +110,14 @@ Do not replace this graph with a bare two-texture material: it would discard
 the authored per-species seasonal, health, and translucency behavior. Next,
 build a disposable project-local copy of the complete dependency closure and
 remap the copied material/function references without changing the plugin
-sample assets. Re-run this audit to prove the runtime closure is clear, compile
-the copied material, then preview one instance-skinned tree before reparenting
-the remaining species. Keep the editor-only module out of the runtime test and
-separately establish whether the plugin's runtime module can be removed.
-Preserve the current parent graph, maps, and all instance overrides until that
-preview has passed. No material assets were created or changed in this
-milestone. The graph API discovery reduces the main implementation uncertainty
-but does not change this safety gate.
+sample assets. The disposable harness is prepared, but its first NullRHI launch
+crashed before script execution; resolve that launch path or wait for a safe
+rendered-editor window before running it. Re-run this audit to prove the
+runtime closure is clear, compile the copied material, then preview one
+instance-skinned tree before reparenting the remaining species. Keep the
+editor-only module out of the runtime test and separately establish whether
+the plugin's runtime module can be removed. Preserve the current parent graph,
+maps, and all instance overrides until that preview has passed. No material
+assets were created or changed in this milestone. The graph API discovery
+reduces the main implementation uncertainty but does not change this safety
+gate.

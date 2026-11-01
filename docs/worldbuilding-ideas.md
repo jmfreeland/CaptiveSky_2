@@ -19,8 +19,12 @@ free. All 24 source `.uasset` files exist in the installed UE plugin (2.41 MiB
 total, with no `.uexp` or `.ubulk` sidecars). The plugin also has a distinct
 Runtime module, so the next check must prove the copied graph works without its
 Editor module and establish whether the Runtime module can also be omitted.
-No assets were changed. Next, copy and remap only in a disposable project copy,
-then compile and preview before touching any live tree parents. Details:
+An isolated project and copy/remap/verify scripts are prepared, but the first
+UE 5.8.3 NullRHI commandlet crashed before script execution; no sandbox assets
+were created. The harness passes offline Python syntax checks. Do not retry
+that startup path until it is understood or a safe rendered-editor window is
+available. No assets were changed. Then copy and remap only in the disposable
+project, compile and preview before touching any live tree parents. Details:
 [runtime material contract](findings/2026-11-01-megaplant-runtime-material-contract.md).
 
 ## 2026-11-01 — Give the rain basin breathing room
