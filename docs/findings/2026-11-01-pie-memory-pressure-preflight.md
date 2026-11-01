@@ -54,3 +54,14 @@ The present run establishes a concrete runtime resource constraint, not a
 rendering regression, a vegetation diagnosis, or a fix. Do not reduce canopy
 counts, disable Nanite Foliage, or change landscape materials on this evidence
 alone.
+
+## Post-teardown retention sample (04:27 UTC)
+
+The editor had returned to edit mode and remained responsive, but memory had
+not recovered to the pre-PIE baseline. UnrealEditor PID 36236 reported a 15.0
+GiB working set and 23.7 GiB private bytes. Windows showed 2,258 MiB of free
+physical RAM; the GPU showed 9,098 / 12,282 MiB used (2,900 MiB free, 40%
+utilization, 72 °C). These are process/device snapshots, not proof that all
+retained memory is leakable or belongs to Island content. They do show that a
+second rendered run should wait until RAM and GPU headroom recover and should
+capture a baseline before pressing Play.
