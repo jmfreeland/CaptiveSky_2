@@ -56,3 +56,25 @@ state remain isolated under the scratch playtest `DataRoot`; they were not
 merged into the main Island save.
 
 Log: [`Codex_ResidentFeedback_20261101.log`](../../Saved/CS58/Saved/Logs/Codex_ResidentFeedback_20261101.log).
+
+## Isolated follow-up attempt — 2026-11-01, 05:55 UTC
+
+A fresh `Start-Spectator.ps1` attempt used the scratch `Saved/CS58` project,
+`-NullRHICharacterFeedback`, Python disabled, situation logging enabled, a
+900-second cap, a 40-request ceiling, and a new isolated `DataRoot`. The engine
+exited after about 25 seconds, before the Island's world-ready marker; the
+supervisor treated exit code 0 as failure. No resident session, model request,
+or playtest state file was produced.
+
+The fresh crash context is the same known startup failure, not evidence of a
+new memory issue: null-address `EXCEPTION_ACCESS_VIOLATION`,
+`SecondsSinceStart=0`, and `PCallStackHash
+4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`, matching the 2026-10-31
+object-feedback crash. The dump remains unsymbolized with UnrealEditor-Core
+frames. Artifacts:
+[`crash log`](../../Saved/CS58/Saved/Crashes/_0000/Codex_ResidentFeedback_20261102.log)
+and [`CrashContext.runtime-xml`](../../Saved/CS58/Saved/Crashes/_0000/CrashContext.runtime-xml).
+
+Do not retry this NullRHI launch unchanged. Resume character feedback only
+after symbolized dump analysis or a materially different startup path; the
+15-minute run documented above remains the latest successful feedback sample.
