@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Separate Zen's slow cold starts from the editor bootstrap crash
+
+The user reports that Unreal warns about Zen Storage taking too long on every
+editor start. Two available 5.8.3 launches took about 27 and 30 seconds; one
+found an existing server with a different run context, shut it down cleanly,
+then reached HTTP `OK`. Most other inspected launches reused Zen and initialized
+in under a second. This confirms the delay is real but does not explain the
+reported every-launch pattern; the warning is distinct from the separate
+pre-initialization editor crash findings. Keep waiting if the active editor is
+still progressing, and do not clear Zen's data or change DDC settings yet.
+Capture the current editor and Zen logs on the next occurrence, without
+restarting an editor that may contain unsaved work. Details:
+[Zen startup delay](findings/2026-11-02-zen-storage-startup-delay.md).
+
 ## 2026-11-01 — Make rendered-play retries wait for symbolized startup-crash evidence
 
 A guarded 15-minute Game feedback launch passed its fresh 4 GiB GPU and RAM
