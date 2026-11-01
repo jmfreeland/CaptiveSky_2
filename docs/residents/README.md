@@ -2,6 +2,8 @@
 
 Drafts of future residents are kept outside `Agents/` so the game and gateway never load them by accident. To bring one to life, copy its identity and personality into `Agents/`, give it a body, and let it start with an empty memory.
 
+The offline regression `Scripts/tests/test_agent_profiles.py` checks that each current resident has both static profile documents and that lived memory/place/relationship/evolution files are not tracked in source.
+
 Current status: `Agent_Rat_01` (the rat) has an active identity/personality profile and spawns in Island Game/PIE when its local body asset is available. The chosen hidden fallen-wood hollow is a home concept, not yet a validated canonical place record, so runtime spawning can still fall back to a navigable point near the Inn. The active profile is in `Agents/Agent_Rat_01/`; keep lived memory, relationships, places, and personality-evolution state local to each data root rather than copying them between checkouts. `Agent_Innkeeper_01` is also active: `IslandInnkeeperSubsystem` spawns its configured body in the Island play world, and its identity/personality live under `Agents/Agent_Innkeeper_01/`; the older innkeeper draft wording below no longer describes runtime status.
 
 ## Agent_Rat_01: the rat (initial identity draft 2026-09-27; active profile 2026-10-10)
