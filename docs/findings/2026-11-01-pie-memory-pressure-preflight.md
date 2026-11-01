@@ -65,3 +65,24 @@ utilization, 72 °C). These are process/device snapshots, not proof that all
 retained memory is leakable or belongs to Island content. They do show that a
 second rendered run should wait until RAM and GPU headroom recover and should
 capture a baseline before pressing Play.
+
+## Correct-project restart recheck (06:20 UTC)
+
+The restart prompt was initially opened from the older
+`D:\Projects - Athena\Unreal\CaptiveSky 5.8\CaptiveSky.uproject`, whose
+descriptor enables `Aura` although the plugin is not installed. That launch was
+closed without disabling the plugin. The actual current project is
+`D:\Projects - Athena\Unreal\CaptiveSky_2\CaptiveSky_2.uproject`; its descriptor
+does not enable Aura. Opening that exact file loaded the Island in UE 5.8.3.
+The new `CaptiveSky_2_2.log` records `bEnableNaniteFoliage=1`,
+`r.Nanite.Foliage:1`, and MapCheck with 0 errors and 0 warnings.
+
+The machine began with 509 MiB of GPU memory in use. After the editor loaded,
+whole-device use rose to 11,620 MiB of 12,282 MiB (662 MiB free, 62% GPU
+utilization, 66 °C); an earlier sample during asset discovery was 11,850 MiB
+used. This is far below the 4 GiB PIE reserve and leaves too little safety
+margin for another rendered session. No PIE/Game run or character feedback
+session was started. The restart verifies the enabled Nanite Foliage setting
+and a clean map check, not any visual or performance benefit. Continue with
+source-side profiling or wait for GPU headroom to recover before attempting the
+bounded player-height shoreline/woodland pass.
