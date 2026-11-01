@@ -94,17 +94,24 @@ the rendered composition/performance.
 
 **Follow-up detail:** direct read-only inspection of D:'s `IslandWeather.cpp`
 shows references to four broadleaf species (maple, aspen, beech, and black
-alder), with no Common Hazel reference. The current D: editor log also contains
-a read-only Megaplant material audit reporting eight tree meshes and no audit
-errors. Neither source references nor asset/material resolution proves that
-the live Island's scatter initialized or those species rendered. Thus the
-reported single-tree appearance may also involve generation/visibility or
-material rendering; a bounded runtime check should record per-species instance
-counts and visible components before source syncing more diversity code.
+alder), with no Common Hazel reference. The latest D: editor log also contains
+a read-only Megaplant material audit reporting nine tree meshes and no audit
+errors. It enumerates A/B variants of Norway maple, European aspen, European
+beech, and black alder, plus Common Hazel A. The same report shows 24 unique
+dependencies under the PVE sample-material mount. This confirms those species
+assets are present in the live project's content registry, but not that the
+Island instanced them. The PVE material references are a separate packaging
+dependency to validate for a hosted build; they are distinct from the retired
+PlantFactory mount. The audit confirms asset/material resolution only; it does
+not prove the live Island scatter initialized or those species rendered. A
+bounded runtime check should record per-species instance counts and visible
+components before source syncing more diversity code.
 
 ## Next step
 
-Agree on a controlled source-sync point for D: (including preservation of any
-live-only edits), then rerun the parity audit. After syncing the Zen config,
-observe a normal editor close/reopen and compare Zen startup timing. Keep the
-water traversal and real-RHI performance checks as separate runtime gates.
+Once GPU headroom permits, inspect live per-species instance counts and
+component visibility, then merge only any missing diversity behavior. Separately,
+agree on a controlled source-sync point for D: (including preservation of any
+live-only edits) before syncing the Zen config and comparing a single-editor
+startup. Keep water traversal and real-RHI performance as separate runtime
+gates.
