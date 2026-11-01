@@ -105,3 +105,32 @@ Do not repeat the same NullRHI bootstrap. Verify the test and updated invitation
 through symbolized crash analysis or a materially different startup path,
 then conduct another bounded feedback session. The earlier successful
 15-minute run remains the only evidence of resident uptake.
+
+## Rendered Game startup comparison — 2026-11-01, 08:53 UTC
+
+A rendered 1280×720 windowed Game/spectator launch was attempted with the same
+15-minute and 40-model-request caps, Python disabled, and an isolated `DataRoot`
+(`Codex_RenderedResidentFeedback_AB_20261101_0853`). This removed `-NullRHI`
+from the startup path, but it also crashed before producing the project's
+normal `Saved/Logs` file or a world-ready marker. The CrashContext again reports
+a null-address `EXCEPTION_ACCESS_VIOLATION`, `SecondsSinceStart=0`, and the same
+`PCallStackHash 4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. The only startup log
+shows Unreal Trace Server error `0x0000a005`, then successful fallback to an
+in-memory trace buffer; this does not establish that tracing caused the crash.
+No in-world decisions, model calls, or screenshots were recorded. This is not
+rendered-playtest evidence and does not establish a VRAM-related failure.
+
+The installed UE 5.8.3 binary is `D:\Games\Epic\UE_5.8` (build
+`5.8.3-58210709`). Its `Engine/Binaries/Win64` directory has
+`UnrealEditor-Core.dll` but no matching `UnrealEditor-Core.pdb`; `windbg`,
+`cdb`, and `llvm-pdbutil` are not available on `PATH`. The dump therefore
+remains unsymbolized in this environment. Artifacts are
+[`startup log`](../../Saved/CS58/Saved/Crashes/_0000/Codex_RenderedResidentFeedback_AB_20261101_0853.log),
+[`CrashContext`](../../Saved/CS58/Saved/Crashes/_0000/CrashContext.runtime-xml),
+and minidump `Saved/CS58/Saved/Crashes/_0000/UEMinidump.dmp`.
+
+Do not repeat either launch recipe unchanged. The next useful step is to obtain
+matching UE 5.8.3 symbols or a symbol-capable debugger and resolve the common
+startup frames. Once startup is diagnosable, retry a single 15-minute,
+isolated-feedback session with the existing real-time/request caps before
+considering a longer 30-minute run.
