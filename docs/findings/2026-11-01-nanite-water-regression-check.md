@@ -97,6 +97,24 @@ rendered-session gate; PIE/Game and character feedback were not started. The
 existing 03:10 `IslandOcean` automation pass remains the latest verified water
 test. No map or gameplay settings were edited during this restart.
 
+## User-approved restart recheck — 03:55 UTC
+
+After the user again confirmed the project was saved, the editor closed
+cleanly and the exact D: `.uproject` was opened. The new startup log records
+`bEnableNaniteFoliage:1` and `r.Nanite.Foliage:1`; `MapCheck` completed with
+0 errors and 0 warnings. The Island editor is open again, but its sea-facing
+viewport does not show the generated woodland. The 4033x4033 landscape
+edit-layer merge warning still exceeds the configured 1024x1024 batch maximum.
+
+A fresh whole-device sample reports 9,599 / 12,282 MiB used (2,399 MiB free),
+42% utilization, and 71 C. This is still below the 4 GiB reserve, so no
+rendered play or resident feedback session was started. The restart verifies
+the project-level Nanite Foliage setting only; it does not validate the
+worktree's un-synchronized A/B tree variants, runtime water traversal, frame
+rate, or peak memory. Keep the matched daylight woodland/shoreline profile as
+the next rendered gate, and do not raise tree counts or cull distances before
+that comparison.
+
 ## Live play-safety cap audit (2026-11-01)
 
 The reopened D: project's `Config/DefaultGame.ini` and
