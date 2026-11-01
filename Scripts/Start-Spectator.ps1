@@ -21,15 +21,17 @@ closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB f
 consecutive low samples (or a failed memory query) terminate only the Game process tree launched here.
 Use -GpuIndex, -MinimumFreeGpuMemoryMiB, and -GpuMemoryMonitorIntervalSeconds to tune the guard.
 
--RequireSystemMemoryHeadroom performs a Windows available-physical-memory preflight before rendered
-play. It fails closed if the OS query fails or less than 4096 MiB is available. Add
--MonitorSystemMemoryHeadroom to a bounded, isolated rendered run to sample RAM during startup and
-play; two consecutive low samples (or a failed query) terminate only the Game process tree launched
-here. Use -MinimumFreeSystemMemoryMiB and -SystemMemoryMonitorIntervalSeconds to tune the guard.
+-RequireSystemMemoryHeadroom performs a Windows available-physical-memory preflight before launch. It
+fails closed if the OS query fails or less than 4096 MiB is available. Add
+-MonitorSystemMemoryHeadroom to a bounded, isolated run (rendered or NullRHI) to sample RAM during
+startup and play; two consecutive low samples (or a failed query) terminate only the Game process
+tree launched here. Use -MinimumFreeSystemMemoryMiB and -SystemMemoryMonitorIntervalSeconds to tune
+the guard.
 
 -NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
 -DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
-minutes and the existing 64-request hard ceiling. Plain -NullRHI remains zero-thinking by default.
+minutes and the existing 64-request hard ceiling. It also requires the system-memory preflight and
+monitor. Plain -NullRHI remains zero-thinking by default.
 Use -UseCommandletExecutable with -NullRHI for a bounded hidden run through UnrealEditor-Cmd.exe;
 the same isolated-data and timeout checks still apply.
 -DisableTraceServer with -NullRHI suppresses the local Unreal Trace Server launch for diagnostics.
@@ -59,7 +61,7 @@ the same isolated-data and timeout checks still apply.
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -MonitorGpuHeadroom -DataRoot Saved/Playtests/GuardedResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -MonitorGpuHeadroom -RequireSystemMemoryHeadroom -MonitorSystemMemoryHeadroom -DataRoot Saved/Playtests/GuardedResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
-./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 64
+./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -RequireSystemMemoryHeadroom -MonitorSystemMemoryHeadroom -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHICommandletSmoke -LogPath Saved/Logs/NullRHICommandletSmoke.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -DisableTraceServer -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHIWithoutTraceServer -LogPath Saved/Logs/NullRHIWithoutTraceServer.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -LogDragonflyFlowerVisits -DataRoot Saved/Playtests/DragonflyFlowers -ViewpointHour 11 -LogPath Saved/Logs/DragonflyFlowers.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 0
@@ -166,6 +168,9 @@ if ($NullRHICharacterFeedback) {
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-NullRHICharacterFeedback requires an isolated -DataRoot." }
 	if (-not $LogSituations) { throw "-NullRHICharacterFeedback requires -LogSituations so resident responses are captured." }
 	if (-not $DisablePython) { throw "-NullRHICharacterFeedback requires -DisablePython." }
+	if (-not $RequireSystemMemoryHeadroom) { throw "-NullRHICharacterFeedback requires -RequireSystemMemoryHeadroom." }
+	if (-not $MonitorSystemMemoryHeadroom) { throw "-NullRHICharacterFeedback requires -MonitorSystemMemoryHeadroom." }
+	if ($MinimumFreeSystemMemoryMiB -lt 4096) { throw "-NullRHICharacterFeedback requires at least 4096 MiB of free system memory." }
 	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
 		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
@@ -220,7 +225,6 @@ if ($RequireGpuHeadroom) {
 }
 if ($MonitorSystemMemoryHeadroom) {
 	if (-not $RequireSystemMemoryHeadroom) { throw "-MonitorSystemMemoryHeadroom requires -RequireSystemMemoryHeadroom for its initial memory preflight." }
-	if ($NullRHI) { throw "-MonitorSystemMemoryHeadroom is for rendered sessions; omit it for -NullRHI." }
 	if ($Continuous) { throw "-MonitorSystemMemoryHeadroom requires a bounded session; it cannot supervise -Continuous." }
 	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-MonitorSystemMemoryHeadroom requires an isolated -DataRoot." }
 	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
@@ -230,13 +234,12 @@ if ($MonitorSystemMemoryHeadroom) {
 	}
 }
 if ($RequireSystemMemoryHeadroom) {
-	if ($NullRHI) { throw "-RequireSystemMemoryHeadroom is only applicable to rendered sessions; omit it for -NullRHI." }
 	Import-Module (Join-Path $PSScriptRoot "SystemMemoryBudget.psm1") -Force
 	try {
 		$freeSystemMemoryMiB = Get-AvailableSystemMemoryMiB
 		$systemMemoryBudget = Assert-SystemMemoryHeadroom -FreeMiB $freeSystemMemoryMiB -MinimumFreeMiB $MinimumFreeSystemMemoryMiB
 	} catch {
-		throw "System memory preflight failed; no rendered session was started. Cause: $($_.Exception.Message)"
+		throw "System memory preflight failed; no game session was started. Cause: $($_.Exception.Message)"
 	}
 	Write-Host ("System memory preflight passed: {0} MiB free (minimum {1} MiB)." -f
 		$systemMemoryBudget.FreeMiB, $MinimumFreeSystemMemoryMiB)

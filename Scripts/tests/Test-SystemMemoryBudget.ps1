@@ -11,7 +11,7 @@ $failedClosed = $false
 try {
 	Assert-SystemMemoryHeadroom -FreeMiB 4095 -MinimumFreeMiB 4096 | Out-Null
 } catch {
-	$failedClosed = $_.Exception.Message.Contains("No rendered session was started")
+	$failedClosed = $_.Exception.Message.Contains("No game session was started")
 }
 if (-not $failedClosed) { throw "An over-budget system-memory snapshot must fail closed." }
 
@@ -25,7 +25,7 @@ if (-not $invalidFailed) { throw "Negative free system memory must be rejected."
 
 $firstLowSample = Get-SystemMemoryHeadroomMonitorDecision -FreeMiB 3000 -MinimumFreeMiB 4096
 if ($firstLowSample.ConsecutiveLowSamples -ne 1 -or $firstLowSample.ShouldStop) {
-	throw "One low system-memory sample should warn but not stop a rendered session."
+	throw "One low system-memory sample should warn but not stop a game session."
 }
 $secondLowSample = Get-SystemMemoryHeadroomMonitorDecision -FreeMiB 2999 -MinimumFreeMiB 4096 -ConsecutiveLowSamples $firstLowSample.ConsecutiveLowSamples
 if ($secondLowSample.ConsecutiveLowSamples -ne 2 -or -not $secondLowSample.ShouldStop) {

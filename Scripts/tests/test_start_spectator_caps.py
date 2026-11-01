@@ -76,6 +76,9 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("-NullRHICharacterFeedback requires an isolated -DataRoot", launcher)
         self.assertIn("-NullRHICharacterFeedback requires -LogSituations", launcher)
         self.assertIn("-NullRHICharacterFeedback requires -DisablePython", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires -RequireSystemMemoryHeadroom", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires -MonitorSystemMemoryHeadroom", launcher)
+        self.assertIn("-NullRHICharacterFeedback requires at least 4096 MiB of free system memory", launcher)
         self.assertIn("-NullRHICharacterFeedback is capped at 900 real-time seconds", launcher)
         self.assertIn("-NullRHICharacterFeedback requires a model-request cap from 1 through 64", launcher)
         self.assertIn("this is the existing hard ceiling", launcher)
@@ -137,13 +140,15 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("$MinimumFreeSystemMemoryMiB = 4096", launcher)
         self.assertIn("Get-AvailableSystemMemoryMiB", launcher)
         self.assertIn("Assert-SystemMemoryHeadroom", launcher)
-        self.assertIn("-RequireSystemMemoryHeadroom is only applicable to rendered sessions", launcher)
+        self.assertIn("-RequireSystemMemoryHeadroom performs a Windows available-physical-memory preflight before launch", launcher)
+        self.assertNotIn("-RequireSystemMemoryHeadroom is only applicable to rendered sessions", launcher)
+        self.assertNotIn("-MonitorSystemMemoryHeadroom is for rendered sessions", launcher)
         self.assertLess(launcher.index("if ($RequireSystemMemoryHeadroom) {"), launcher.index("$projectCandidate ="))
 
         module = (ROOT / "Scripts" / "SystemMemoryBudget.psm1").read_text(encoding="utf-8")
         self.assertIn("GlobalMemoryStatusEx", module)
         self.assertIn("AvailablePhysical", module)
-        self.assertIn("No rendered session was started", module)
+        self.assertIn("No game session was started", module)
         self.assertIn("$FreeMiB -lt $MinimumFreeMiB", module)
 
     def test_system_memory_monitor_is_bounded_and_process_scoped(self) -> None:

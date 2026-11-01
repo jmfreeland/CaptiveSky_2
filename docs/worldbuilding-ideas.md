@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Add a RAM guard to hidden resident-feedback runs
+
+The 15-minute NullRHI character-feedback path now requires the existing 4 GiB
+system-memory preflight and two-consecutive-sample process monitor. This lets
+future resident feedback runs remain independent of rendered-GPU headroom
+without leaving their RAM use unguarded. The 900-second duration cap, 64-request
+hard ceiling, isolated data root, and voluntary character responses remain
+unchanged; the documented invocation uses 32 requests. All 58 source tests and
+the live Windows `GlobalMemoryStatusEx` boundary/monitor tests pass. No Unreal
+session or resident prompt was run because the existing engine pre-init crash
+has not been resolved. Details: [NullRHI feedback RAM guard](findings/2026-11-01-nullrhi-feedback-ram-guard.md).
+
 ## 2026-11-01 — Keep Megaplant materials self-contained at runtime
 
 The expanded UE Editor audit now covers Common Hazel as well as the original

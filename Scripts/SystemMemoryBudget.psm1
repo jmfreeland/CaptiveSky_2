@@ -51,7 +51,7 @@ function Assert-SystemMemoryHeadroom {
 
 	if ($FreeMiB -lt 0) { throw "Invalid system memory budget: free=$FreeMiB MiB." }
 	if ($FreeMiB -lt $MinimumFreeMiB) {
-		throw "System memory preflight failed: only $FreeMiB MiB free; at least $MinimumFreeMiB MiB is required. No rendered session was started."
+		throw "System memory preflight failed: only $FreeMiB MiB free; at least $MinimumFreeMiB MiB is required. No game session was started."
 	}
 
 	[pscustomobject]@{ FreeMiB = $FreeMiB }
