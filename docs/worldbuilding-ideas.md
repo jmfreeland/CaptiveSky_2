@@ -17,6 +17,20 @@ daylight Tideglass-to-woodland route with close/middle/far species visibility,
 frame-time p95 and whole-device VRAM together, once headroom permits. The
 landscape edit-layer merge warning remains visible and was not changed.
 
+## 2026-11-01 — Guard the balance of the broadleaf habitat field
+
+The 81-point representative Island-scale broadleaf test previously selected
+the four species 12, 28, 26, and 15 times. It now also rejects a selection
+field where any species falls below 8 or exceeds 32 samples, protecting
+meaningful representation without pinning exact counts. This is a seeded
+coordinate-field regression only: it does not apply the valid-land mask or
+prove visible runtime placement. The UE 5.8 editor target compiled and linked
+successfully, including `IslandWeatherBroadleafTests.cpp`. The automation was
+not run; the known worktree NullRHI pre-initialization crash remains the reason
+not to retry that launch blindly. Next visual confirmation stays the matched
+daylight Tideglass-to-woodland route, gated on at least 4 GiB free GPU memory
+and the existing 30-FPS floor.
+
 ## 2026-11-01 — Let residents pass the Listening Stones' quiet practice along
 
 A resident who directly witnesses another's quiet visit can now optionally

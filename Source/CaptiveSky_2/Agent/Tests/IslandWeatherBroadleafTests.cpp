@@ -167,10 +167,15 @@ bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Paramet
 				++SpeciesCounts[Species];
 		}
 	}
+	// The representative 81-point Island-scale sample previously resolved to
+	// 12/28/26/15. Keep each species between 8 and 32 so all remain meaningful
+	// communities without pinning the field to exact counts or proving valid land.
 	for (int32 Species = 0; Species < AIslandWeather::BroadleafTreeSpeciesCount; ++Species)
 	{
 		TestTrue(FString::Printf(TEXT("Broadleaf species %d is selectable in the Island-scale habitat field"), Species),
 			SpeciesCounts[Species] > 0);
+		TestTrue(FString::Printf(TEXT("Broadleaf species %d retains a meaningful share of the representative Island-scale field"), Species),
+			SpeciesCounts[Species] >= 8 && SpeciesCounts[Species] <= 32);
 	}
 	return true;
 }
