@@ -2,10 +2,12 @@
 
 Eight Fab flower species and one woodland bluebell clump now grow in small,
 coherent pockets rather than as isolated single accents. Each accepted deterministic site keeps one
-anchor bloom and attempts at most two same-species neighbors, at roughly 5.75 m
-and 8.5 m from that anchor. The existing landscape-only ground trace, slope and
-sea-level checks, landmark exclusions, grove clearances, minimum spacing,
-species selection, and per-site attempt bounds still gate every bloom. Pockets
+anchor bloom and attempts at most two same-species neighbors. Their seeded polar
+offsets are sampled area-uniformly between 4.75 m and 8.75 m, replacing the two
+fixed-radius rings; the existing spacing rejection keeps stems clear. The existing
+landscape-only ground trace, slope and sea-level checks, landmark exclusions,
+grove clearances, minimum spacing, species selection, and per-site attempt
+bounds still gate every bloom. Pockets
 do not create collision, navigation, memory, persistent state, or model calls.
 
 The current code tries at most 256 general meadow sites (the first 160 are
@@ -45,6 +47,22 @@ The roughly 631-instance increase over the previous 359-flower baseline still
 needs a matched rendered view and frame-time profile. The grouping intent and
 placement bounds are verified; gameplay-scale readability and performance are
 not yet verified.
+
+## Companion-bloom spacing variation (2026-11-01)
+
+The two optional companion blooms now use deterministic, area-uniform radial
+offsets instead of repeating the same 5.75 m and 8.5 m rings at every flower
+anchor. The existing per-instance spacing check and three-attempt limit remain
+responsible for rejecting an overlap; no candidate sites, per-site ceiling,
+collision/navigation behavior, or total flower budget changed. The
+`IslandEcology` regression checks repeatability, the 4.75–8.75 m bounds, and
+meaningful radius variation and the annulus's expected mean squared radius over
+representative seeds. The changed source and test compiled and linked in the
+isolated UE 5.8.3 scratch Editor target (34 build actions). The automation was
+not executed because the known NullRHI startup crash remains unresolved. This
+changes the local shape of each pocket without increasing vegetation or GPU
+instance count. A matched rendered comparison is still needed to confirm the
+group silhouette looks more natural at Island scale.
 
 ## Woodland bluebell variant (2026-10-17)
 

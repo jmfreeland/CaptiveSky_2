@@ -706,11 +706,30 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 		AIslandWeather::SelectMeadowFlowerVariant(FlowerPatchProbe + FVector(500.f, -400.f, 0.f), 71, 0.8f));
 	const FVector FlowerPocketA = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0);
 	const FVector FlowerPocketB = AIslandWeather::SelectMeadowFlowerPocketOffset(71, 1);
-	TestTrue(TEXT("Flower pocket offsets are deterministic, bounded, and spaced for separate stems"),
-		FlowerPocketA.Equals(AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0)) &&
-		FlowerPocketA.Size2D() >= 550.f && FlowerPocketA.Size2D() <= 600.f &&
-		FlowerPocketB.Size2D() >= 825.f && FlowerPocketB.Size2D() <= 875.f &&
-		FVector::Dist2D(FlowerPocketA, FlowerPocketB) >= 475.f);
+	bool bFlowerOffsetsRepeatExactly = FlowerPocketA.Equals(AIslandWeather::SelectMeadowFlowerPocketOffset(71, 0)) &&
+		FlowerPocketB.Equals(AIslandWeather::SelectMeadowFlowerPocketOffset(71, 1));
+	float MinimumPocketRadius = MAX_flt;
+	float MaximumPocketRadius = 0.f;
+	double SumSquaredPocketRadius = 0.0;
+	int32 PocketSampleCount = 0;
+	for (int32 PocketSeed = 0; PocketSeed < 128; ++PocketSeed)
+		for (int32 MemberIndex = 0; MemberIndex < AIslandWeather::MeadowFlowersPerPocket - 1; ++MemberIndex)
+		{
+			const float Radius = AIslandWeather::SelectMeadowFlowerPocketOffset(PocketSeed, MemberIndex).Size2D();
+			MinimumPocketRadius = FMath::Min(MinimumPocketRadius, Radius);
+			MaximumPocketRadius = FMath::Max(MaximumPocketRadius, Radius);
+			SumSquaredPocketRadius += static_cast<double>(Radius) * Radius;
+			++PocketSampleCount;
+		}
+	constexpr double ExpectedAreaUniformMeanSquaredRadius =
+		(475.0 * 475.0 + 875.0 * 875.0) * 0.5;
+	const double MeanSquaredPocketRadius = PocketSampleCount > 0
+		? SumSquaredPocketRadius / PocketSampleCount : 0.0;
+	TestTrue(TEXT("Flower pocket offsets are seeded and area-distributed inside the bounded companion ring"),
+		bFlowerOffsetsRepeatExactly && MinimumPocketRadius >= 475.f && MaximumPocketRadius <= 875.f &&
+		MaximumPocketRadius - MinimumPocketRadius >= 250.f &&
+		FMath::Abs(MeanSquaredPocketRadius - ExpectedAreaUniformMeanSquaredRadius) <=
+			ExpectedAreaUniformMeanSquaredRadius * 0.05);
 	TestTrue(TEXT("Flower pockets have a strict three-instance-per-site ceiling"),
 		AIslandWeather::MeadowFlowersPerPocket == 3);
 	int32 MeadowFlowerSpeciesCounts[AIslandWeather::WoodlandBluebellSpeciesIndex + 1] = {};

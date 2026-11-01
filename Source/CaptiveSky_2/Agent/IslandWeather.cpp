@@ -870,14 +870,26 @@ int32 AIslandWeather::SelectWoodlandFoxSpawnCandidate(const TArray<FVector>& Can
 FVector AIslandWeather::SelectMeadowFlowerPocketOffset(int32 Seed, int32 MemberIndex)
 {
 	if (MemberIndex < 0 || MemberIndex >= MeadowFlowersPerPocket - 1) return FVector::ZeroVector;
-	uint32 Hash = static_cast<uint32>(Seed) * 0x9e3779b9u + 0x85ebca6bu;
-	Hash ^= Hash >> 16;
-	Hash *= 0x7feb352du;
-	Hash ^= Hash >> 15;
-	const float Phase = static_cast<float>(Hash) / static_cast<float>(MAX_uint32) * 2.f * PI;
-	constexpr float GoldenAngle = 2.39996323f;
-	const float Angle = Phase + GoldenAngle * MemberIndex;
-	const float Radius = 575.f + 275.f * MemberIndex;
+	auto MixBits = [](uint32 Value)
+	{
+		Value ^= Value >> 16;
+		Value *= 0x7feb352du;
+		Value ^= Value >> 15;
+		Value *= 0x846ca68bu;
+		Value ^= Value >> 16;
+		return Value;
+	};
+	const uint32 PocketSeed = static_cast<uint32>(Seed) * 0x9e3779b9u +
+		(static_cast<uint32>(MemberIndex) + 1u) * 0x85ebca6bu;
+	const double HashRange = 4294967296.0;
+	const float AngleUnit = static_cast<float>((static_cast<double>(MixBits(PocketSeed)) + 0.5) / HashRange);
+	const float RadiusUnit = static_cast<float>((static_cast<double>(MixBits(PocketSeed ^ 0xc2b2ae35u)) + 0.5) / HashRange);
+	const float Angle = AngleUnit * 2.f * PI;
+	// Area-uniform radii avoid the two identical-looking rings used by every pocket.
+	constexpr float InnerRadius = 475.f;
+	constexpr float OuterRadius = 875.f;
+	const float Radius = FMath::Sqrt(FMath::Lerp(InnerRadius * InnerRadius,
+		OuterRadius * OuterRadius, RadiusUnit));
 	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 }
 
