@@ -87,10 +87,20 @@ unsafe without a deliberate source merge.
 
 The current GPU sample was 1,224 MiB free (10,774 MiB used of 12,282 MiB),
 below the established 4 GiB reserve. No PIE, second renderer, source sync, or
-map edit was attempted. The worktree diversity logic is already present; the
-next useful step is a controlled source-sync/merge with the D: checkout,
-followed by a rendered composition and performance review once GPU headroom
-passes the gate.
+map edit was attempted. The worktree diversity logic is already present. Once
+GPU headroom permits, first inspect live per-species scatter counts and
+visibility, then merge any genuinely missing diversity behavior and review
+the rendered composition/performance.
+
+**Follow-up detail:** direct read-only inspection of D:'s `IslandWeather.cpp`
+shows references to four broadleaf species (maple, aspen, beech, and black
+alder), with no Common Hazel reference. The current D: editor log also contains
+a read-only Megaplant material audit reporting eight tree meshes and no audit
+errors. Neither source references nor asset/material resolution proves that
+the live Island's scatter initialized or those species rendered. Thus the
+reported single-tree appearance may also involve generation/visibility or
+material rendering; a bounded runtime check should record per-species instance
+counts and visible components before source syncing more diversity code.
 
 ## Next step
 
