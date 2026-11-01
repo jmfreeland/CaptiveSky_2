@@ -84,7 +84,7 @@ bool FIslandOceanSavedMapCollisionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcean",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandOceanTest, "CaptiveSky2.Agent.IslandOcean.RuntimeSwim",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FIslandOceanTest::RunTest(const FString& Parameters)
@@ -133,9 +133,6 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The authored material comes back"), Plane->GetStaticMeshComponent()->GetMaterial(0) == Flat);
 		TestFalse(TEXT("Nothing stays applied after a restore"), Ocean->IsApplied());
 		Plane->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		Ocean->OnWorldBeginPlay(*World);
-		TestEqual(TEXT("World startup disables stale collision on the hidden legacy ocean plane"),
-			Plane->GetStaticMeshComponent()->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 	}
 
 	AIslandOceanTestCharacter* Player = World->SpawnActor<AIslandOceanTestCharacter>();
@@ -243,6 +240,8 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 			}
 		}
 		Ocean->OnWorldBeginPlay(*World);
+		TestEqual(TEXT("World startup disables stale collision on the hidden legacy ocean plane"),
+			Plane->GetStaticMeshComponent()->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
 		if (WaterMesh)
 		{
 			TestEqual(TEXT("World startup converts a blocking WaterMesh Pawn response to overlap"),
@@ -274,12 +273,18 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		if (bSurfaceQuerySucceeded)
 		{
 			const FCollisionShape PlayerCapsule = FCollisionShape::MakeCapsule(34.f, 88.f);
+			FCollisionQueryParams WaterSweepParams(SCENE_QUERY_STAT(IslandOceanPawnSurfaceSweep), false);
+			WaterSweepParams.AddIgnoredActor(Player);
 			FHitResult WaterSurfaceBlocker;
 			const bool bWaterBlocksPawnCapsule = World->SweepSingleByChannel(WaterSurfaceBlocker,
 				SurfaceLocation + FVector(0.f, 0.f, 500.f), SurfaceLocation - FVector(0.f, 0.f, 120.f),
-				FQuat::Identity, ECC_Pawn, PlayerCapsule);
-			TestFalse(TEXT("A player-sized Pawn sweep crosses the open-water surface without a blocking hit"),
-				bWaterBlocksPawnCapsule);
+				FQuat::Identity, ECC_Pawn, PlayerCapsule, WaterSweepParams);
+			const FString SweepContext = bWaterBlocksPawnCapsule
+				? FString::Printf(TEXT("A player-sized Pawn sweep must cross open water without blocking; hit %s at %s"),
+					WaterSurfaceBlocker.GetComponent() ? *WaterSurfaceBlocker.GetComponent()->GetPathName() : TEXT("unknown component"),
+					*WaterSurfaceBlocker.ImpactPoint.ToString())
+				: TEXT("A player-sized Pawn sweep crosses the open-water surface without a blocking hit");
+			TestFalse(SweepContext, bWaterBlocksPawnCapsule);
 
 			AActor* ShoreGround = World->SpawnActor<AActor>(FVector(2000.f, 0.f, SurfaceLocation.Z - 60.f), FRotator::ZeroRotator);
 			UBoxComponent* ShoreFloor = NewObject<UBoxComponent>(ShoreGround, TEXT("ShoreFloor"));

@@ -194,3 +194,35 @@ warning. Keep the existing 4 GiB headroom gate. Next inspect render-target
 lifetime/resolution in a bounded diagnostic and reduce those buffers only if
 the owning system and visual trade-off are verified. No map, texture-pool, or
 landscape settings were changed during this restart.
+
+## Water automation selection and runtime fixture verification — 2026-11-01
+
+The first post-rebuild attempt to run `CaptiveSky2.Agent.IslandOcean` selected
+only `IslandOcean.SavedMapCollision`: once a child test shared the `IslandOcean`
+prefix, the runner treated the parent path as a group and omitted the transient
+player/swim regression. Renamed that test to
+`CaptiveSky2.Agent.IslandOcean.RuntimeSwim`, making both checks independently
+selectable. The first actual `RuntimeSwim` run then exposed two fixture issues:
+the subsystem begin-play hook was called twice (raising an engine ensure), and
+the capsule sweep hit the earlier test character's own collision cylinder.
+The fixture now calls the hook once after setting up all water surfaces and
+ignores that already-spawned character during the water-only sweep. Failed
+sweeps also report the blocking component and impact point.
+
+Rebuilt the isolated `Saved\CS58` UE 5.8.3 editor target successfully and ran
+`Automation RunTests CaptiveSky2.Agent.IslandOcean.` under NullRHI with resident
+thinking and model requests disabled. The runner found both
+`CaptiveSky2.Agent.IslandOcean.RuntimeSwim` and
+`CaptiveSky2.Agent.IslandOcean.SavedMapCollision`; both completed with
+`Success`, exit code 0. The runtime test exercised generated ocean-collider and
+water-mesh Pawn-response cleanup, a player-sized capsule sweep through open
+water, surface query/swim entry, swim movement and wake, shallow-shore exit,
+and shallow-water walking. The saved-map test loaded `/Game/Maps/Island` and
+checked its authored ocean plane, native ocean, and water zone.
+
+This closes the automation-selection gap and verifies the collision path in a
+transient NullRHI world. It still does **not** prove that a real player can no
+longer walk on water in the rendered Island: the last observed editor warning
+showed only 634 MiB of GPU memory over budget, below the established 4 GiB
+headroom gate. Do not start PIE for this check until that gate is met; then do
+a short real-RHI shoreline entry and open-water traversal and record the result.
