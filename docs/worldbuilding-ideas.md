@@ -12,6 +12,18 @@ the live Windows `GlobalMemoryStatusEx` boundary/monitor tests pass. No Unreal
 session or resident prompt was run because the existing engine pre-init crash
 has not been resolved. Details: [NullRHI feedback RAM guard](findings/2026-11-01-nullrhi-feedback-ram-guard.md).
 
+## 2026-11-01 — Keep legacy PlantFactory out of the active project
+
+A fresh descriptor check confirms `ProceduralVegetationEditor` remains enabled
+for UE 5.8 authoring, while `PlantFactoryPlugin` is absent from
+`CaptiveSky_2.uproject` and its local plugin folder is absent. The remaining
+PlantFactory mentions are migration history and guarded restoration/audit
+scripts, not an active runtime dependency; keep that provenance instead of
+mistaking it for a plugin still in use. A regression test now protects this
+boundary so PVE stays available without reintroducing PlantFactory. The new
+test and all 59 `Scripts/tests` cases pass. No Unreal process, asset, or map was
+changed. Details: [PlantFactory migration](findings/2026-10-12-plantfactory-migration.md).
+
 ## 2026-11-01 — Keep Megaplant materials self-contained at runtime
 
 The expanded UE Editor audit now covers Common Hazel as well as the original
