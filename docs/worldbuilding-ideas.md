@@ -11,11 +11,13 @@ found a false reflection: the model remembered setting a leaf afloat in the
 same response that requested the interaction, although the controller
 rejected it and the saved basin had no leaves. Model memories are now skipped
 for an interaction response; the controller's verified outcome can be
-remembered on a later turn. The isolated UE 5.8.3 editor target compiles these
-changes, but runtime behavior remains unverified: the focused commandlet
-crashes before automation startup, and PowerShell did not permit the bounded
-feedback launcher. Details: [tide awareness and verified interaction
-memories](findings/2026-11-01-tide-awareness-and-verified-memories.md).
+remembered on a later turn. The isolated UE 5.8.3 target compiles the changes,
+and a bounded 15-minute `-NullRHI` Game pass subsequently verified the shared
+tide cue and successful basin interactions. Rat's and the Innkeeper's saved
+memories followed verified outcomes; Aster and Raven declined the optional
+check-in and were left quiet. Runtime automation assertions and rendered
+visuals remain outstanding. Details: [tide awareness and verified
+interaction memories](findings/2026-11-01-tide-awareness-and-verified-memories.md).
 
 ## 2026-11-01 — Let seasonal flowers open and fade at different times
 

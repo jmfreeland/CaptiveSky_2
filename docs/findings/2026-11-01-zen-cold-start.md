@@ -25,6 +25,14 @@ healthy after closing the editor. Do not start overlapping editor copies while
 the first launch is in progress; the setting reduces cold starts but does not
 remove contention if multiple launches concurrently perform recovery.
 
+The first bounded UE Game launch after the change logged the desired
+`LimitProcessLifetime=false` context and left `zenserver.exe` running after the
+game exited. The local dashboard at `http://localhost:8558/dashboard` returned
+HTTP 200, and the process was responsive. This confirms the project setting is
+being applied to Game startup and keeps Zen available after Game exit; the next
+editor launch is still needed to verify its startup warning and post-editor
+lifetime specifically.
+
 ## Next diagnostic
 
 If a single-editor launch still shows the warning after this setting takes
