@@ -109,7 +109,9 @@ components before source syncing more diversity code.
 
 ## Next step
 
-**Current desktop recheck:** a read-only app snapshot shows both `CaptiveSky_2 - Unreal Editor` and a separate `Tree_Common_Hazel_01_A` asset-editor window; the mesh preview is focused. This confirms the Hazel asset is open for inspection, not that it has been placed or rendered on the Island. The latest D: log has no `Island tree mix` runtime count entry. The latest GPU sample is 10,774/12,282 MiB used (1,224 MiB free), 43% utilization, 76°C, below the 4 GiB reserve. No editor input, PIE, additional renderer, source sync, or map edit was performed.
+**Current desktop recheck:** a read-only app snapshot shows both `CaptiveSky_2 - Unreal Editor` and a separate `Tree_Common_Hazel_01_A` asset-editor window; the mesh preview is focused. This confirms the Hazel asset is open for inspection, not that it has been placed or rendered on the Island. The latest D: log has no `Island tree mix` runtime count entry. The GPU sample is 10,774/12,282 MiB used (1,224 MiB free), 44% utilization, 75°C, below the 4 GiB reserve. No editor input, PIE, additional renderer, source sync, or map edit was performed.
+
+**Texture-pool versus full-GPU-memory recheck:** both the current worktree and D: `DefaultEngine.ini` set `r.Streaming.PoolSize=4096` and `r.Streaming.LimitPoolSizeToVRAM=1`. The active D: editor log also reports `Texture pool size now 4096 MB`. This is the streaming-pool setting, not total GPU allocation; the available 1,224 MiB is device-wide free VRAM. `nvidia-smi` exposed process IDs but denied process names, so this sample cannot attribute the allocation. Do not raise the pool or start another renderer without a settled `stat streaming` sample from the user's warning view and more GPU headroom.
 
 Once GPU headroom permits, inspect live per-species instance counts and
 component visibility, then merge only any missing diversity behavior. Separately,
