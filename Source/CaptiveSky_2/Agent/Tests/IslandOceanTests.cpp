@@ -222,6 +222,46 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		WaterZone->Update();
 		WaterSubsystem->SetOceanBodyComponent(OceanComponent);
 
+		// Simulate stale/generated collision settings that can appear in a saved
+		// map. BeginPlay must preserve water overlap behavior without letting any
+		// ocean surface hold the Pawn capsule above the water.
+		UWaterMeshComponent* WaterMesh = WaterZone->GetWaterMeshComponent();
+		TestNotNull(TEXT("The transient water zone exposes its rendered mesh component"), WaterMesh);
+		if (WaterMesh)
+		{
+			WaterMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		}
+		const TArray<UPrimitiveComponent*> OceanCollisionComponents = OceanComponent->GetCollisionComponents(false);
+		int32 EnabledOceanCollisionComponentsForcedToBlock = 0;
+		for (UPrimitiveComponent* Collision : OceanCollisionComponents)
+		{
+			if (Collision && Collision->IsCollisionEnabled())
+			{
+				Collision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+				++EnabledOceanCollisionComponentsForcedToBlock;
+			}
+		}
+		Ocean->OnWorldBeginPlay(*World);
+		if (WaterMesh)
+		{
+			TestEqual(TEXT("World startup converts a blocking WaterMesh Pawn response to overlap"),
+				WaterMesh->GetCollisionResponseToChannel(ECC_Pawn), ECR_Overlap);
+		}
+		int32 StillBlockingOceanCollisionComponents = 0;
+		for (UPrimitiveComponent* Collision : OceanComponent->GetCollisionComponents(true))
+		{
+			if (Collision && Collision->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block)
+			{
+				++StillBlockingOceanCollisionComponents;
+			}
+		}
+		TestEqual(TEXT("World startup removes Pawn blocking from generated ocean collision components"),
+			StillBlockingOceanCollisionComponents, 0);
+		if (EnabledOceanCollisionComponentsForcedToBlock == 0)
+		{
+			AddInfo(TEXT("The transient native ocean generated no enabled collision components; the WaterMesh guard was exercised."));
+		}
+
 		FVector SurfaceLocation = FVector::ZeroVector;
 		FVector SurfaceNormal = FVector::UpVector;
 		FVector WaterVelocity = FVector::ZeroVector;

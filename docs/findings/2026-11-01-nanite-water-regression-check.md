@@ -149,3 +149,23 @@ saved Island passes the collision assertions or that player traversal now
 swims. Run the focused test from an editor that loads this worktree module;
 then perform the same real-RHI shoreline traversal only after the 4 GiB GPU
 headroom gate is met.
+
+## Runtime water-surface Pawn guard
+
+Follow-up source review found that play start only disabled the named legacy
+`OceanPlane`; it did not sanitize a blocking Pawn response on generated
+`AWaterBodyOcean` collision hulls or the visible `AWaterZone` mesh. The ocean
+subsystem now changes only those surfaces' `ECC_Pawn` response from Block to
+Overlap, preserving the water-body overlap/query path used for underwater
+effects and the existing wave-height swimming logic. The transient
+`IslandOcean` regression forces a stale blocking response on the zone mesh and
+on any enabled generated ocean colliders before `OnWorldBeginPlay`, then
+asserts startup removes Pawn blocking.
+
+The isolated UE 5.8.3 Editor target compiled and linked successfully after
+this guard (5 build actions). Neither this automation nor the saved-map audit
+has executed against the new worktree module. The live D: editor remains on its
+separate module, and the NullRHI startup crash and sub-4-GiB GPU reserve still
+preclude a safe behavior/render claim. Verify the focused test in a validation
+editor, then use a bounded real-RHI shoreline traversal when memory headroom
+allows.
