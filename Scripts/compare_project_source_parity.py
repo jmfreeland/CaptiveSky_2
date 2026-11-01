@@ -11,8 +11,8 @@ import subprocess
 import sys
 
 
-RUNTIME_ROOTS = ("Source", "Config", "Scripts")
-SOURCE_SUFFIXES = {".cpp", ".h", ".cs", ".ini", ".uproject", ".py", ".ps1"}
+RUNTIME_ROOTS = ("Source", "Config", "Scripts", "*.uproject", "*.uplugin")
+SOURCE_SUFFIXES = {".cpp", ".h", ".cs", ".ini", ".uproject", ".uplugin", ".py", ".ps1"}
 
 
 def tracked_runtime_sources(worktree_root):

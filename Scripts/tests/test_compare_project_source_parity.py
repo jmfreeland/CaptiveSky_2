@@ -53,11 +53,14 @@ class ProjectSourceParityTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     PARITY["_safe_relative_path"](value)
 
-    def test_tracked_runtime_list_includes_project_zen_config(self):
+    def test_tracked_runtime_list_includes_zen_config_and_unreal_descriptors(self):
         worktree_root = SCRIPT.parents[1]
         paths = PARITY["tracked_runtime_sources"](worktree_root)
 
         self.assertIn("Config/DefaultEngine.ini", paths)
+        self.assertIn("CaptiveSky_2.uproject", paths)
+        self.assertIn("*.uplugin", PARITY["RUNTIME_ROOTS"])
+        self.assertIn(".uplugin", PARITY["SOURCE_SUFFIXES"])
 
 
 if __name__ == "__main__":

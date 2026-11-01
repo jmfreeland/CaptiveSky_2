@@ -4,24 +4,26 @@
 
 The Unreal project currently opened from `D:/Projects - Athena/Unreal/CaptiveSky_2`
 is not simply missing one recent fix. A read-only comparison against this
-worktree found 377 different files and 28 files missing from D:, out of 513
-tracked runtime, config, and script files (108 identical). Differences include
-all four project config files and many asset-pipeline scripts. Treat the D:
-project and this source worktree as separate code states; do not assume a
-committed worktree change is present in the editor.
+worktree found 378 different files and 30 files missing from D:, out of 516
+tracked runtime, config, script, and Unreal project/plugin descriptor files
+(108 identical). Differences include the root `.uproject`, all four project
+config files, and many asset-pipeline scripts. Treat the D: project and this
+source worktree as separate code states; do not assume a committed worktree
+change is present in the editor.
 
 The differences are distributed across the checkout, not just pipeline noise:
 
 | Root | Identical | Different | Missing from D: |
 | --- | ---: | ---: | ---: |
+| project/plugin descriptors | 0 | 1 | 0 |
 | `Config/` | 2 | 4 | 0 |
 | `Source/` | 97 | 202 | 4 |
 | `Scripts/` | 9 | 171 | 26 |
 
 In particular, 202 source files differ. This is too broad for a safe blind
 copy; first identify live-only edits in D: and choose an intentional merge or
-build/sync strategy. The `.uproject` and Content assets were not part of this
-source/config/script count.
+build/sync strategy. The tracked `.uproject` is included; Content assets are
+not part of this source/config/script/descriptor count.
 
 Use the read-only audit before diagnosing a live-editor/source discrepancy:
 
@@ -55,15 +57,16 @@ shortcut; capture the relevant Unreal/Zen logs and identify the owner first.
 
 - Focused comparison reported `DIFFERENT` for `Config/DefaultEngine.ini`,
   `Source/CaptiveSky_2/CaptiveSky_2Character.cpp`, and
-  `Source/CaptiveSky_2/Agent/IslandOceanSubsystem.cpp`.
+  `Source/CaptiveSky_2/Agent/IslandOceanSubsystem.cpp`. The root
+  `CaptiveSky_2.uproject` descriptor is also different.
 - Blender 5.2.2 ran the complete `Scripts/tests` suite: 48 tests passed.
 - UE 5.8.3 `CaptiveSky_2Editor` scratch build succeeded: 192 UBT actions,
   including the full module relink. UBT emitted a deprecation warning that
   `MetaHumanGenerator` and the project depend on `StructUtils`, deprecated
   since UE 5.5; it did not fail the build. This compiled the worktree scratch
   target and did not update the open D: editor's loaded module.
-- Full read-only audit: 513 files compared; 108 identical, 377 different,
-  28 live-missing, 0 source-missing.
+- Full read-only audit: 516 files compared; 108 identical, 378 different,
+  30 live-missing, 0 source-missing.
 - No build was run in the open D: editor project and no rendered gameplay was
   started; this finding makes no runtime claim beyond what the captured
   startup logs establish.
