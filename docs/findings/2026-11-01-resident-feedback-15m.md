@@ -156,8 +156,11 @@ test passed with exit code 0 at 23:22 UTC. This covers dispatch, not successful
 arrival in a rendered world; a new character playtest remains needed to verify
 arrival, close-range recheck, and the resulting leaf presentation.
 
-The broader pre-existing `IslandRainBasinWorld` automation still has one
-separate fixture failure: its seven raised approach blockers do not make
-`HasClearGroundedApproach` reject the basin as expected. Keep this distinct
-from the passing dispatch regression; investigate the collision fixture before
-using that broader test as a green gate.
+The broader `IslandRainBasinWorld` automation initially failed its raised-
+blocker case for a fixture reason: the test spawned each blocker at its target,
+then assigned a new root component, which reset its actor transform to the
+origin. The blocker actors now receive their target transform after component
+registration. With that correction and the concrete Rat controller fixture,
+`CaptiveSky2.Agent.IslandRainBasinWorld` passed with exit code 0 at 23:30 UTC.
+This now validates both the dispatch regression and the basin's approach-side
+clearance test, though still in NullRHI rather than rendered gameplay.

@@ -253,13 +253,14 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 	{
 		const float Angle = UE_TWO_PI * static_cast<float>(Index) / 8.f;
 		const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
-		AActor* Blocker = World->SpawnActor<AActor>(BasinGround + Direction * 260.f + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator);
+		AActor* Blocker = World->SpawnActor<AActor>();
 		if (!Blocker) return nullptr;
 		UBoxComponent* Box = NewObject<UBoxComponent>(Blocker);
 		Blocker->SetRootComponent(Box);
 		Box->SetBoxExtent(FVector(50.f, 50.f, 100.f));
 		Box->SetCollisionProfileName(TEXT("BlockAll"));
 		Box->RegisterComponent();
+		Blocker->SetActorLocation(BasinGround + Direction * 260.f + FVector(0.f, 0.f, 100.f), false, nullptr, ETeleportType::TeleportPhysics);
 		return Blocker;
 	};
 	TArray<AActor*> ApproachBlockers;
