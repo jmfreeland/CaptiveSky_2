@@ -1,5 +1,22 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Confirm Nanite Foliage after the editor restart
+
+The user-approved restart reopened the actual D: `CaptiveSky_2` project in UE
+5.8.3. Startup waited several minutes for Zen Storage; the Zen log then
+confirmed the server was running and the Island viewport loaded. Querying
+`r.Nanite.Foliage` in the editor returned `1` with `LastSetBy:
+ProjectSetting`. The editor reports **All Saved**. This confirms activation in
+the live project, not a visual or performance improvement: the saved viewport
+faces offshore and does not show runtime-generated tree communities.
+
+The whole-device GPU sample was 9,475 / 12,282 MiB used (2,523 MiB free),
+42% utilization and 68 °C. That is below the existing 4 GiB headroom gate, so
+no PIE/Game run was started. Preserve the 30-FPS floor; next capture the
+daylight Tideglass-to-woodland route with close/middle/far species visibility,
+frame-time p95 and whole-device VRAM together, once headroom permits. The
+landscape edit-layer merge warning remains visible and was not changed.
+
 ## 2026-11-01 — Let residents pass the Listening Stones' quiet practice along
 
 A resident who directly witnesses another's quiet visit can now optionally
