@@ -276,8 +276,10 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestNotNull(TEXT("The lunar disc is preallocated in the shared sky mesh"), MoonSection);
 		if (MoonSection)
 		{
-			TestEqual(TEXT("The smooth moon disc has one center plus 48 perimeter vertices"), MoonSection->ProcVertexBuffer.Num(), 49);
-			TestEqual(TEXT("The moon disc is a lightweight 48-triangle fan"), MoonSection->ProcIndexBuffer.Num(), 144);
+			TestEqual(TEXT("The phase-shaped moon disc uses two vertices per band row"),
+				MoonSection->ProcVertexBuffer.Num(), (AIslandDayNight::MoonDiscBandCount + 1) * 2);
+			TestEqual(TEXT("The phase-shaped moon stays within a lightweight two-triangle-per-band budget"),
+				MoonSection->ProcIndexBuffer.Num(), AIslandDayNight::MoonDiscBandCount * 6);
 			TestFalse(TEXT("The moon disc starts hidden in daylight"), MoonSection->bSectionVisible);
 		}
 	}
@@ -401,7 +403,24 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	VerifyForwardLightSelection(TEXT("Full moon"));
 	if (Clock->Starfield)
 		if (const FProcMeshSection* MoonSection = Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1))
+		{
 			TestTrue(TEXT("A clear, risen full moon reveals its procedural disc"), MoonSection->bSectionVisible);
+			const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
+			FVector MoonRight = FVector::CrossProduct(MoonDirection, FVector::UpVector).GetSafeNormal();
+			if (MoonRight.IsNearlyZero()) MoonRight = FVector::CrossProduct(MoonDirection, FVector::RightVector).GetSafeNormal();
+			const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
+			float MinMoonX = MAX_flt;
+			float MaxMoonX = -MAX_flt;
+			for (const FProcMeshVertex& Vertex : MoonSection->ProcVertexBuffer)
+			{
+				const float X = FVector::DotProduct(Vertex.Position - MoonCenter, MoonRight);
+				MinMoonX = FMath::Min(MinMoonX, X);
+				MaxMoonX = FMath::Max(MaxMoonX, X);
+			}
+			TestTrue(TEXT("A near-full phase lights both limbs of the lunar disc"),
+				MinMoonX < -0.95f * AIslandDayNight::MoonDiscRadius &&
+				MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
+		}
 	const float FullMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near full moon, the moon moves opposite the sun's arc"), FullMoonOffset > 170.f);
 	const FString FullMoonDescription = Clock->DescribeTime();
@@ -461,6 +480,32 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	Clock->UpdateLighting();
 	TestTrue(TEXT("Overcast clouds attenuate the actual moonlight component"), Clock->Moon->Intensity < ClearMoonlight);
 	Weather->WeatherSeed = ClearSeed;
+	Clock->DayNumber = 5;
+	Clock->CurrentHour = 21.f;
+	Clock->UpdateLighting();
+	const FProcMeshSection* WaxingCrescentSection = Clock->Starfield
+		? Clock->Starfield->GetProcMeshSection(AIslandDayNight::NightStarSectionCount + 1) : nullptr;
+	TestTrue(TEXT("A clear, risen waxing crescent is visible"), WaxingCrescentSection && WaxingCrescentSection->bSectionVisible);
+	if (WaxingCrescentSection)
+	{
+		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
+		FVector MoonRight = FVector::CrossProduct(MoonDirection, FVector::UpVector).GetSafeNormal();
+		if (MoonRight.IsNearlyZero()) MoonRight = FVector::CrossProduct(MoonDirection, FVector::RightVector).GetSafeNormal();
+		const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
+		float MinMoonX = MAX_flt;
+		float MaxMoonX = -MAX_flt;
+		for (const FProcMeshVertex& Vertex : WaxingCrescentSection->ProcVertexBuffer)
+		{
+			const float X = FVector::DotProduct(Vertex.Position - MoonCenter, MoonRight);
+			MinMoonX = FMath::Min(MinMoonX, X);
+			MaxMoonX = FMath::Max(MaxMoonX, X);
+		}
+		TestTrue(TEXT("The waxing crescent reveals only the sunlit right-hand arc"),
+			MinMoonX > 0.35f * AIslandDayNight::MoonDiscRadius &&
+			MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
+	}
+	Clock->DayNumber = 15;
+	Clock->CurrentHour = 0.f;
 	Clock->UpdateLighting();
 	TestTrue(TEXT("The ambient sky retains the tested low-light visibility floor"),
 		FMath::IsNearlyEqual(Sky->GetLightComponent()->Intensity,

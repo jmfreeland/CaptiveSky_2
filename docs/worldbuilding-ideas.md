@@ -8,8 +8,11 @@ now carries a small disc at the actual moon-light direction; it dims with phase
 and cloud transmission, and hides below the horizon, in daylight, at new moon,
 or under thick cloud. It uses 48 triangles and no additional actor or asset.
 Build and deterministic visibility tests are the immediate checks; a night
-render still needs GPU headroom. The disc is phase-tinted rather than a shaped
-crescent, which remains an art upgrade. See [visible lunar disc](findings/2026-11-01-visible-lunar-disc.md).
+render still needs GPU headroom. The first pass was a uniformly tinted disc.
+A follow-up now shapes the actual lit silhouette through the waxing and waning
+cycle, while leaving the unlit portion open so stars are not covered by a dark
+circle. Details and unverified render limitations are in
+[phase-shaped moon](findings/2026-11-01-phase-shaped-moon.md).
 
 ## 2026-11-01 — Let residents see the shooting stars they describe
 

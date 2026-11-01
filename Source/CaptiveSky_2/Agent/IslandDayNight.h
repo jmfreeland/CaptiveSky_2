@@ -52,6 +52,9 @@ public:
 	static constexpr float NightStarShellRadius = 2000000.f;
 	static constexpr float NightStarHalfSizeMin = 1200.f;
 	static constexpr float NightStarHalfSizeMax = 2400.f;
+	/** The visible lunar disc is a compact, phase-shaped mesh on the shared sky shell. */
+	static constexpr int32 MoonDiscBandCount = 48;
+	static constexpr float MoonDiscRadius = 9000.f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Island|Lighting")
 	TObjectPtr<UDirectionalLightComponent> Moon;
 	/** Dim, shadowless sky fill that stays above the horizon all night. The true moon sits below it for much of the cycle (a new moon never rises at night), so on its own it left the Island black. */
