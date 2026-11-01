@@ -197,6 +197,11 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 	{
 		const FString Nearby = Basin->DescribeNearby(BasinActor->GetActorLocation());
 		TestTrue(TEXT("A resident nearby receives the basin interaction affordance"), Nearby.Contains(TEXT("RainBasin")) && Nearby.Contains(TEXT("interact")));
+		const FString FartherNearby = Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(700.f, 0.f, 0.f));
+		TestTrue(TEXT("A resident beyond interaction range is told to approach before choosing to interact"),
+			FartherNearby.Contains(TEXT("move_to with target RainBasin")) && FartherNearby.Contains(TEXT("within four metres")) && FartherNearby.Contains(TEXT("will not work")));
+		TestTrue(TEXT("A resident already in reach is told what interaction will do"),
+			Nearby.Contains(TEXT("Within reach, Interact sets a leaf afloat")));
 		TestTrue(TEXT("A resident outside the notice radius receives no basin prompt"), Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(0.f, 0.f, UIslandRainBasinSubsystem::NoticeRadius + 100.f)).IsEmpty());
 		BasinActor->StartWaterRipple(FVector(0.f, 0.f, 0.f));
 		TestTrue(TEXT("A water impact starts a transient basin ripple"), BasinActor->IsWaterRippleActive());

@@ -426,8 +426,11 @@ FString UIslandRainBasinSubsystem::DescribeNearby(const FVector& Position) const
 	if (!State.bPlaced) return FString();
 	const float Distance = FVector::Dist(State.Location, Position);
 	if (Distance > NoticeRadius) return FString();
-	return FString::Printf(TEXT(" A shallow stone rain basin stands %.0f metres away (move_to/interact target: RainBasin). %s Interact sets a leaf afloat when the water is deep enough, once per resident per day; the leaves stay."),
-		Distance / 100.f, *DescribeWater(State.Water, State.Leaves.Num()));
+	const TCHAR* InteractionGuidance = Distance > 400.f
+		? TEXT(" To float a leaf, first choose move_to with target RainBasin; after arriving within four metres, decide whether to interact. Interacting from here will not work.")
+		: TEXT(" Within reach, Interact sets a leaf afloat when the water is deep enough, once per resident per day; the leaves stay.");
+	return FString::Printf(TEXT(" A shallow stone rain basin stands %.0f metres away (move_to/interact target: RainBasin). %s%s"),
+		Distance / 100.f, *DescribeWater(State.Water, State.Leaves.Num()), InteractionGuidance);
 }
 
 void UIslandRainBasinSubsystem::ForceWater(float Water)
