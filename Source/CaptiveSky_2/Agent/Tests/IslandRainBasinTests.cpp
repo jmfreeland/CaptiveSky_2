@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
+#include "AutonomousAgentAIController.h"
 #include "IslandRainBasin.h"
 #include "AgentBrainComponent.h"
 #include "IslandInteractionTestPlayerController.h"
@@ -199,7 +200,9 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A resident nearby receives the basin interaction affordance"), Nearby.Contains(TEXT("RainBasin")) && Nearby.Contains(TEXT("interact")));
 		const FString FartherNearby = Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(700.f, 0.f, 0.f));
 		TestTrue(TEXT("A resident beyond interaction range is told to approach before choosing to interact"),
-			FartherNearby.Contains(TEXT("move_to with target RainBasin")) && FartherNearby.Contains(TEXT("within four metres")) && FartherNearby.Contains(TEXT("will not work")));
+			FartherNearby.Contains(TEXT("move_to with target RainBasin")) && FartherNearby.Contains(TEXT("within four metres")) &&
+			FartherNearby.Contains(TEXT("explicit interact choice may start a bounded approach")) &&
+			FartherNearby.Contains(TEXT("interaction is rechecked only within four metres")));
 		TestTrue(TEXT("A resident already in reach is told what interaction will do"),
 			Nearby.Contains(TEXT("Within reach, Interact sets a leaf afloat")));
 		TestTrue(TEXT("A resident outside the notice radius receives no basin prompt"), Basin->DescribeNearby(BasinActor->GetActorLocation() + FVector(0.f, 0.f, UIslandRainBasinSubsystem::NoticeRadius + 100.f)).IsEmpty());
@@ -258,10 +261,22 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 			const FString SystemPrompt = Brain->BuildSystemPrompt({});
 			TestTrue(TEXT("Resident situation names the nearby basin and its exact interaction target"),
 				Situation.Contains(TEXT("rain basin")) && Situation.Contains(TEXT("RainBasin")) && Situation.Contains(TEXT("rainwater")));
-			TestTrue(TEXT("Resident prompt separates out-of-range object approach from interaction while forbidding wildlife pursuit"),
-				SystemPrompt.Contains(TEXT("more than four metres away, choose move_to with its exact target first")) &&
+			TestTrue(TEXT("Resident prompt explains bounded stationary-target approach while forbidding wildlife pursuit"),
+				SystemPrompt.Contains(TEXT("choose move_to with its exact target first")) &&
 				SystemPrompt.Contains(TEXT("Wildlife are never movement targets")) &&
+				SystemPrompt.Contains(TEXT("between four and twenty-five metres away")) &&
+				SystemPrompt.Contains(TEXT("a bounded approach may happen before the interaction is rechecked")) &&
+				SystemPrompt.Contains(TEXT("A failed or interrupted approach never triggers an interaction")) &&
 				SystemPrompt.Contains(TEXT("interact only when already within four metres")));
+
+			const FVector ResidentPosition = Resident->GetActorLocation();
+			Resident->SetActorLocation(BasinActor->GetActorLocation() + FVector(1700.f, 0.f, 40.f), false, nullptr, ETeleportType::TeleportPhysics);
+			TestTrue(TEXT("A resident's explicit basin interaction may approach from the observed 17-metre range"),
+				AAutonomousAgentAIController::ShouldAutoApproachInteraction(Resident, BasinActor, FName(TEXT("RainBasin"))));
+			Resident->SetActorLocation(BasinActor->GetActorLocation() + FVector(2600.f, 0.f, 40.f), false, nullptr, ETeleportType::TeleportPhysics);
+			TestFalse(TEXT("Automatic basin approach remains bounded to twenty-five metres"),
+				AAutonomousAgentAIController::ShouldAutoApproachInteraction(Resident, BasinActor, FName(TEXT("RainBasin"))));
+			Resident->SetActorLocation(ResidentPosition, false, nullptr, ETeleportType::TeleportPhysics);
 
 			const bool bCanInteract = IslandInteractionUtility::CanInteract(Resident, BasinActor, 250.f);
 			TestTrue(*FString::Printf(TEXT("Resident can perceive the basin at %.1f cm (hidden=%d)"),

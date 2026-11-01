@@ -33,6 +33,18 @@ The current whole-device GPU sample is 9,601 / 12,282 MiB used (2,681 MiB
 free), below the 4 GiB rendered-play gate, so no PIE/Game session was started.
 This is not yet a replay of Rat's basin interaction.
 
+## Guidance consistency follow-up
+
+The resident system prompt and basin's own out-of-range description now agree:
+moving to `RainBasin` first remains the recommendation, while an explicit
+interaction choice may start the existing bounded approach and is rechecked
+only within interaction range. The basin world fixture now covers the observed
+17 m target distance and rejects automatic approach at 26 m; it also checks the
+updated resident and basin guidance. The UE 5.8.3 scratch Editor target compiled
+and linked all three changed translation units. These new assertions have not
+been executed because the previously recorded NullRHI startup crash is still
+unresolved. No editor window was restarted or used to validate the module.
+
 ## Next check
 
 When a validation editor safely loads this worktree module, run the focused
