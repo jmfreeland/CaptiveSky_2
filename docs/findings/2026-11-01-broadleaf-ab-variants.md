@@ -39,9 +39,18 @@ or DynamicWind fallback in the next runtime check.
 ## Not yet verified
 
 The focused Unreal automation has not run against this build, and the live
-editor still holds its previous DLL. A current `nvidia-smi` sample reports
-9,489 / 12,282 MiB used (2,509 MiB free), below the project's 4 GiB rendered
-session gate. Do not start PIE/Game just to inspect the split at this headroom.
+editor still holds its previous DLL. The actual D: `CaptiveSky_2` editor has
+since been restarted and confirms `r.Nanite.Foliage=1`, but that project has
+not been synchronized with this worktree's A/B module. The setting check does
+not validate these variants or their appearance.
+
+A fresh whole-device sample on 2026-11-01 reports 9,732 / 12,282 MiB used
+(2,266 MiB free), 42% utilization, and 68 °C. This remains below the project's
+4 GiB rendered-session gate. Do not start PIE/Game just to inspect the split at
+this headroom; WDDM's device-wide figure cannot attribute memory to Unreal
+alone. The live project's Nanite setting and this worktree's new canopy remain
+separate validation items.
+
 The established NullRHI startup crash also remains unresolved, so no identical
 headless retry was made.
 
