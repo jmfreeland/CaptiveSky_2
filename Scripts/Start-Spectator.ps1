@@ -21,6 +21,12 @@ closed if nvidia-smi is unavailable or the selected GPU has less than 4096 MiB f
 consecutive low samples (or a failed memory query) terminate only the Game process tree launched here.
 Use -GpuIndex, -MinimumFreeGpuMemoryMiB, and -GpuMemoryMonitorIntervalSeconds to tune the guard.
 
+-RequireSystemMemoryHeadroom performs a Windows available-physical-memory preflight before rendered
+play. It fails closed if the OS query fails or less than 4096 MiB is available. Add
+-MonitorSystemMemoryHeadroom to a bounded, isolated rendered run to sample RAM during startup and
+play; two consecutive low samples (or a failed query) terminate only the Game process tree launched
+here. Use -MinimumFreeSystemMemoryMiB and -SystemMemoryMonitorIntervalSeconds to tune the guard.
+
 -NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
 -DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
 minutes and the existing 64-request hard ceiling. Plain -NullRHI remains zero-thinking by default.
@@ -52,6 +58,7 @@ the same isolated-data and timeout checks still apply.
 ./Scripts/Start-Spectator.ps1 -Windowed -DisablePython -LogSituations -DataRoot Saved/Playtests/CharacterFeedback -LogPath Saved/Logs/CharacterFeedback.log -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -DataRoot Saved/Playtests/ResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -MonitorGpuHeadroom -DataRoot Saved/Playtests/GuardedResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
+./Scripts/Start-Spectator.ps1 -Windowed -LogSituations -RequireGpuHeadroom -MonitorGpuHeadroom -RequireSystemMemoryHeadroom -MonitorSystemMemoryHeadroom -DataRoot Saved/Playtests/GuardedResidentFeedback -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 32
 ./Scripts/Start-Spectator.ps1 -NullRHI -NullRHICharacterFeedback -DisablePython -LogSituations -DataRoot Saved/Playtests/ResidentFeedbackNullRHI -LogPath Saved/Logs/ResidentFeedbackNullRHI.log -StartupTimeoutSeconds 300 -MaxRealtimeSeconds 900 -MaxModelRequests 64
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHICommandletSmoke -LogPath Saved/Logs/NullRHICommandletSmoke.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
 ./Scripts/Start-Spectator.ps1 -UseCommandletExecutable -DisableTraceServer -NullRHI -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/NullRHIWithoutTraceServer -LogPath Saved/Logs/NullRHIWithoutTraceServer.log -StartupTimeoutSeconds 120 -MaxRealtimeSeconds 30 -MaxModelRequests 0
@@ -100,9 +107,13 @@ param(
 	[switch]$ForceMemoryDDC,
 	[switch]$RequireGpuHeadroom,
 	[switch]$MonitorGpuHeadroom,
+	[switch]$RequireSystemMemoryHeadroom,
+	[switch]$MonitorSystemMemoryHeadroom,
 	[ValidateRange(0, 15)][int]$GpuIndex = 0,
 	[ValidateRange(512, 16384)][int]$MinimumFreeGpuMemoryMiB = 4096,
 	[ValidateRange(1, 60)][int]$GpuMemoryMonitorIntervalSeconds = 5,
+	[ValidateRange(512, 32768)][int]$MinimumFreeSystemMemoryMiB = 4096,
+	[ValidateRange(1, 60)][int]$SystemMemoryMonitorIntervalSeconds = 5,
 	[switch]$Continuous,
 	[string]$ProjectPath,
 	[ValidatePattern('^/Game/[A-Za-z0-9_./-]+$')][string]$MapPath = "/Game/Maps/Island",
@@ -207,6 +218,31 @@ if ($RequireGpuHeadroom) {
 	Write-Host ("GPU memory preflight passed on GPU {0}: {1} MiB free of {2} MiB (minimum {3} MiB)." -f
 		$GpuIndex, $gpuBudget.FreeMiB, $gpuBudget.TotalMiB, $MinimumFreeGpuMemoryMiB)
 }
+if ($MonitorSystemMemoryHeadroom) {
+	if (-not $RequireSystemMemoryHeadroom) { throw "-MonitorSystemMemoryHeadroom requires -RequireSystemMemoryHeadroom for its initial memory preflight." }
+	if ($NullRHI) { throw "-MonitorSystemMemoryHeadroom is for rendered sessions; omit it for -NullRHI." }
+	if ($Continuous) { throw "-MonitorSystemMemoryHeadroom requires a bounded session; it cannot supervise -Continuous." }
+	if ([string]::IsNullOrWhiteSpace($DataRoot)) { throw "-MonitorSystemMemoryHeadroom requires an isolated -DataRoot." }
+	if (-not $PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxRealtimeSeconds") -or
+		-not $PSBoundParameters.ContainsKey("MaxModelRequests")) {
+		throw "-MonitorSystemMemoryHeadroom requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps."
+	}
+}
+if ($RequireSystemMemoryHeadroom) {
+	if ($NullRHI) { throw "-RequireSystemMemoryHeadroom is only applicable to rendered sessions; omit it for -NullRHI." }
+	Import-Module (Join-Path $PSScriptRoot "SystemMemoryBudget.psm1") -Force
+	try {
+		$systemMemory = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+		if (-not $systemMemory -or $null -eq $systemMemory.FreePhysicalMemory) { throw "Windows did not report FreePhysicalMemory." }
+		$freeSystemMemoryMiB = [long][math]::Floor([double]$systemMemory.FreePhysicalMemory / 1024.0)
+		$systemMemoryBudget = Assert-SystemMemoryHeadroom -FreeMiB $freeSystemMemoryMiB -MinimumFreeMiB $MinimumFreeSystemMemoryMiB
+	} catch {
+		throw "System memory preflight failed; no rendered session was started. Cause: $($_.Exception.Message)"
+	}
+	Write-Host ("System memory preflight passed: {0} MiB free (minimum {1} MiB)." -f
+		$systemMemoryBudget.FreeMiB, $MinimumFreeSystemMemoryMiB)
+}
 $projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
 	Join-Path $PSScriptRoot "..\CaptiveSky_2.uproject"
 } elseif ([System.IO.Path]::IsPathRooted($ProjectPath)) {
@@ -237,7 +273,7 @@ if ($PSBoundParameters.ContainsKey("StartupTimeoutSeconds") -and [string]::IsNul
 	$startupLogName = "SpectatorStartup_$((Get-Date).ToString('yyyyMMdd_HHmmss_fff')).log"
 	$LogPath = Join-Path (Join-Path $projectRoot "Saved\Logs") $startupLogName
 }
-function Stop-LaunchedGameForGpuMonitor([System.Diagnostics.Process]$Game, [string]$Reason) {
+function Stop-LaunchedGameForMemoryMonitor([System.Diagnostics.Process]$Game, [string]$Reason) {
 	$message = "$Reason Only the Game process tree launched by this script will be terminated."
 	$Game.Refresh()
 	if (-not $Game.HasExited) {
@@ -251,6 +287,26 @@ function Stop-LaunchedGameForGpuMonitor([System.Diagnostics.Process]$Game, [stri
 	throw $message
 }
 
+function Invoke-SystemMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref]$ConsecutiveLowSamples) {
+	$Game.Refresh()
+	if ($Game.HasExited) { return }
+	try {
+		$systemMemory = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+		if (-not $systemMemory -or $null -eq $systemMemory.FreePhysicalMemory) { throw "Windows did not report FreePhysicalMemory." }
+		$freeSystemMemoryMiB = [long][math]::Floor([double]$systemMemory.FreePhysicalMemory / 1024.0)
+		$decision = Get-SystemMemoryHeadroomMonitorDecision -FreeMiB $freeSystemMemoryMiB `
+			-MinimumFreeMiB $MinimumFreeSystemMemoryMiB -ConsecutiveLowSamples $ConsecutiveLowSamples.Value
+	} catch {
+		Stop-LaunchedGameForMemoryMonitor $Game "System memory monitor returned unusable data; stopping because available RAM is unknown. Cause: $($_.Exception.Message)"
+	}
+	$ConsecutiveLowSamples.Value = $decision.ConsecutiveLowSamples
+	Write-Host ("System memory monitor: {0} MiB free; low samples {1}/2 (minimum {2} MiB)." -f
+		$decision.FreeMiB, $decision.ConsecutiveLowSamples, $MinimumFreeSystemMemoryMiB)
+	if ($decision.ShouldStop) {
+		Stop-LaunchedGameForMemoryMonitor $Game "System memory headroom remained below $MinimumFreeSystemMemoryMiB MiB for two consecutive samples ($($decision.FreeMiB) MiB free)."
+	}
+}
+
 function Invoke-GpuMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref]$ConsecutiveLowSamples) {
 	$Game.Refresh()
 	if ($Game.HasExited) { return }
@@ -258,23 +314,23 @@ function Invoke-GpuMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref]$C
 		$gpuMemoryRows = & $gpuMemoryTool.Source "--id=$GpuIndex" "--query-gpu=memory.used,memory.total" "--format=csv,noheader,nounits" 2>$null
 		$gpuMemoryExitCode = $LASTEXITCODE
 	} catch {
-		Stop-LaunchedGameForGpuMonitor $Game "nvidia-smi could not run during the rendered session; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
+		Stop-LaunchedGameForMemoryMonitor $Game "nvidia-smi could not run during the rendered session; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
 	}
 	if ($gpuMemoryExitCode -ne 0) {
-		Stop-LaunchedGameForGpuMonitor $Game "nvidia-smi could not read GPU $GpuIndex during the rendered session; stopping because GPU memory state is unknown."
+		Stop-LaunchedGameForMemoryMonitor $Game "nvidia-smi could not read GPU $GpuIndex during the rendered session; stopping because GPU memory state is unknown."
 	}
 	try {
 		$gpuMemory = ConvertFrom-NvidiaGpuMemoryOutput -OutputLines $gpuMemoryRows
 		$decision = Get-GpuHeadroomMonitorDecision -UsedMiB $gpuMemory.UsedMiB -TotalMiB $gpuMemory.TotalMiB `
 			-MinimumFreeMiB $MinimumFreeGpuMemoryMiB -ConsecutiveLowSamples $ConsecutiveLowSamples.Value
 	} catch {
-		Stop-LaunchedGameForGpuMonitor $Game "GPU memory monitor returned unusable data; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
+		Stop-LaunchedGameForMemoryMonitor $Game "GPU memory monitor returned unusable data; stopping because GPU memory state is unknown. Cause: $($_.Exception.Message)"
 	}
 	$ConsecutiveLowSamples.Value = $decision.ConsecutiveLowSamples
 	Write-Host ("GPU memory monitor: {0} MiB free of {1} MiB; low samples {2}/2 (minimum {3} MiB)." -f
 		$decision.FreeMiB, $gpuMemory.TotalMiB, $decision.ConsecutiveLowSamples, $MinimumFreeGpuMemoryMiB)
 	if ($decision.ShouldStop) {
-		Stop-LaunchedGameForGpuMonitor $Game "GPU memory headroom remained below $MinimumFreeGpuMemoryMiB MiB for two consecutive samples ({$($decision.FreeMiB)} MiB free)."
+		Stop-LaunchedGameForMemoryMonitor $Game "GPU memory headroom remained below $MinimumFreeGpuMemoryMiB MiB for two consecutive samples ({$($decision.FreeMiB)} MiB free)."
 	}
 }
 
@@ -381,6 +437,8 @@ if (-not $Continuous) {
 	$startupTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	$lastGpuMonitorCheck = [DateTime]::UtcNow
 	$consecutiveLowGpuSamples = 0
+	$lastSystemMemoryMonitorCheck = [DateTime]::UtcNow
+	$consecutiveLowSystemMemorySamples = 0
 	$startupLogPosition = if (Test-Path -LiteralPath $LogPath) { (Get-Item -LiteralPath $LogPath).Length } else { 0L }
 	$mapObjectName = ($MapPath -split '/')[-1]
 	$worldAssetPath = [regex]::Escape("$MapPath.$mapObjectName")
@@ -390,6 +448,10 @@ if (-not $Continuous) {
 		if ($MonitorGpuHeadroom -and ([DateTime]::UtcNow - $lastGpuMonitorCheck).TotalSeconds -ge $GpuMemoryMonitorIntervalSeconds) {
 			$lastGpuMonitorCheck = [DateTime]::UtcNow
 			Invoke-GpuMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowGpuSamples)
+		}
+		if ($MonitorSystemMemoryHeadroom -and ([DateTime]::UtcNow - $lastSystemMemoryMonitorCheck).TotalSeconds -ge $SystemMemoryMonitorIntervalSeconds) {
+			$lastSystemMemoryMonitorCheck = [DateTime]::UtcNow
+			Invoke-SystemMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowSystemMemorySamples)
 		}
 		if (Test-Path -LiteralPath $LogPath) {
 			$logStream = $null
@@ -429,11 +491,21 @@ if (-not $Continuous) {
 	}
 	if ($bWorldReady -and -not $game.HasExited) {
 		Write-Host "Island world-ready after $([Math]::Round($startupTimer.Elapsed.TotalSeconds, 1)) seconds; waiting for the existing play/request caps."
-		if ($MonitorGpuHeadroom) {
+		if ($MonitorGpuHeadroom -or $MonitorSystemMemoryHeadroom) {
 			while (-not $game.HasExited) {
-				if ($game.WaitForExit($GpuMemoryMonitorIntervalSeconds * 1000)) { break }
-				$lastGpuMonitorCheck = [DateTime]::UtcNow
-				Invoke-GpuMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowGpuSamples)
+				$activeIntervals = @()
+				if ($MonitorGpuHeadroom) { $activeIntervals += $GpuMemoryMonitorIntervalSeconds }
+				if ($MonitorSystemMemoryHeadroom) { $activeIntervals += $SystemMemoryMonitorIntervalSeconds }
+				$monitorIntervalSeconds = ($activeIntervals | Measure-Object -Minimum).Minimum
+				if ($game.WaitForExit($monitorIntervalSeconds * 1000)) { break }
+				if ($MonitorGpuHeadroom) {
+					$lastGpuMonitorCheck = [DateTime]::UtcNow
+					Invoke-GpuMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowGpuSamples)
+				}
+				if ($MonitorSystemMemoryHeadroom) {
+					$lastSystemMemoryMonitorCheck = [DateTime]::UtcNow
+					Invoke-SystemMemoryMonitorCheck -Game $game -ConsecutiveLowSamples ([ref]$consecutiveLowSystemMemorySamples)
+				}
 			}
 		} else {
 			$game.WaitForExit()

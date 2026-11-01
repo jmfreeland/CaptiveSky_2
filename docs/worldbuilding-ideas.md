@@ -1,5 +1,24 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Tighten the rendered-play safety gate after a PIE memory spike
+
+The restarted D: editor reported 6,560 MiB of free GPU memory while idle, but
+the first PIE preview fell to 483 MiB free and displayed Unreal's system
+Memory Pressure Warning within 36 seconds. GPU free memory recovered only to
+2,898 MiB after PIE stopped; Windows then had 1.90 GiB free physical RAM. The
+session stopped with zero character-model requests. This is point-sample
+evidence, not a frame-time or peak profile. It shows an idle-only 4 GiB GPU
+gate is insufficient: check system RAM too, and stop immediately on the first
+memory-pressure warning. Do not yet cut tree counts or disable Nanite based on
+this alone. The live D: source also differs from the Codex worktree, so this
+run does not validate the worktree's newer water or A/B canopy changes. The
+bounded spectator launcher now has an opt-in Windows RAM preflight and
+two-sample runtime monitor that complements the GPU guard; query failures fail
+closed, and it only terminates its own launched Game process. The actual
+low-RAM preflight rejected this machine at 2,269 MiB free. It does not intercept
+manual PIE from the editor. Details:
+[rendered PIE memory-pressure preflight](findings/2026-11-01-pie-memory-pressure-preflight.md).
+
 ## 2026-11-01 — Remove center-weighting from woodland scatter
 
 Woodland layers already overlap, but their candidates used a radius drawn

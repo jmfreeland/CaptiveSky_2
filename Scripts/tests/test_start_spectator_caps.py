@@ -127,6 +127,36 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("Only the Game process tree launched by this script will be terminated", launcher)
         self.assertIn("-MonitorGpuHeadroom to a bounded, isolated rendered run", launcher)
 
+    def test_system_memory_gate_checks_ram_before_project_launch(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$RequireSystemMemoryHeadroom", launcher)
+        self.assertIn("$MinimumFreeSystemMemoryMiB = 4096", launcher)
+        self.assertIn("Get-CimInstance -ClassName Win32_OperatingSystem", launcher)
+        self.assertIn("FreePhysicalMemory", launcher)
+        self.assertIn("Assert-SystemMemoryHeadroom", launcher)
+        self.assertIn("-RequireSystemMemoryHeadroom is only applicable to rendered sessions", launcher)
+        self.assertLess(launcher.index("if ($RequireSystemMemoryHeadroom) {"), launcher.index("$projectCandidate ="))
+
+        module = (ROOT / "Scripts" / "SystemMemoryBudget.psm1").read_text(encoding="utf-8")
+        self.assertIn("No rendered session was started", module)
+        self.assertIn("$FreeMiB -lt $MinimumFreeMiB", module)
+
+    def test_system_memory_monitor_is_bounded_and_process_scoped(self) -> None:
+        launcher = LAUNCHER.read_text(encoding="utf-8")
+
+        self.assertIn("[switch]$MonitorSystemMemoryHeadroom", launcher)
+        self.assertIn("-MonitorSystemMemoryHeadroom requires -RequireSystemMemoryHeadroom", launcher)
+        self.assertIn("-MonitorSystemMemoryHeadroom requires a bounded session", launcher)
+        self.assertIn("-MonitorSystemMemoryHeadroom requires an isolated -DataRoot", launcher)
+        self.assertIn("-MonitorSystemMemoryHeadroom requires explicit -StartupTimeoutSeconds, -MaxRealtimeSeconds, and -MaxModelRequests caps", launcher)
+        self.assertIn("Get-SystemMemoryHeadroomMonitorDecision", launcher)
+        self.assertIn("$Game.Kill($true)", launcher)
+        self.assertIn("Only the Game process tree launched by this script will be terminated", launcher)
+
+        module = (ROOT / "Scripts" / "SystemMemoryBudget.psm1").read_text(encoding="utf-8")
+        self.assertIn("ShouldStop = ($nextLowSamples -ge $RequiredConsecutiveLowSamples)", module)
+
 
 if __name__ == "__main__":
     unittest.main()
