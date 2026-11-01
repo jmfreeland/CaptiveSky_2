@@ -60,7 +60,7 @@ namespace AgentModelTier
 
 	FString BuildResidentFeedbackInvitationPrompt()
 	{
-		return TEXT("A one-time optional check-in from outside the Island: If you wish, use speech to share one thing you would like to explore, change, preserve, or understand here. If a particular object or place could feel better suited to life here, you may also propose an aesthetic, variation, or functionality upgrade using request_upgrade. If something useful feels genuinely missing, you may instead suggest one concrete physical object using request_object. Either request is only a suggestion for human review; you do not have to propose, build, or change anything. You may ignore this and continue as usual; no action is expected, and nothing changes automatically.");
+		return TEXT("A one-time, optional check-in from outside the Island. Please share one short spoken reflection on the last few minutes: something you enjoyed noticing, want to explore, or would change or preserve here. If nothing comes to mind, you may say \"nothing in particular\" or remain quiet. If you have a concrete proposal, you may optionally use request_upgrade for an aesthetic, variation, or functionality change to an existing object, or request_object for one useful missing physical object. Both requests are suggestions for human review; nothing is built or changed automatically.");
 	}
 
 	FTurnFacts GatherTurnFacts(const AActor* Owner, const FAgentConversationContext& Context)

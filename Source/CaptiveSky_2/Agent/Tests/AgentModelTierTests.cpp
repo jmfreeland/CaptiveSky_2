@@ -40,15 +40,20 @@ bool FAgentModelTierTest::RunTest(const FString& Parameters)
 		ShouldInviteResidentFeedback(std::numeric_limits<double>::quiet_NaN(), false, 0, true));
 
 	const FString FeedbackPrompt = BuildResidentFeedbackInvitationPrompt();
+	TestTrue(TEXT("The optional check-in clearly requests a short spoken reflection"),
+		FeedbackPrompt.Contains(TEXT("Please share one short spoken reflection")));
+	TestTrue(TEXT("The reflection can be about something noticed, wanted, changed, or preserved"),
+		FeedbackPrompt.Contains(TEXT("enjoyed noticing, want to explore, or would change or preserve")));
 	TestTrue(TEXT("The optional check-in names the existing object-upgrade action"), FeedbackPrompt.Contains(TEXT("request_upgrade")));
 	TestTrue(TEXT("The optional check-in makes the missing-object request path discoverable"),
-		FeedbackPrompt.Contains(TEXT("request_object")) && FeedbackPrompt.Contains(TEXT("concrete physical object")));
+		FeedbackPrompt.Contains(TEXT("request_object")) && FeedbackPrompt.Contains(TEXT("one useful missing physical object")));
 	TestTrue(TEXT("The check-in makes aesthetic, variation, and functionality proposals discoverable"),
-		FeedbackPrompt.Contains(TEXT("aesthetic, variation, or functionality upgrade")));
+		FeedbackPrompt.Contains(TEXT("aesthetic, variation, or functionality change")));
 	TestTrue(TEXT("Object and upgrade ideas remain suggestions for human review"),
-		FeedbackPrompt.Contains(TEXT("Either request is only a suggestion for human review")));
-	TestTrue(TEXT("Residents may ignore the check-in without taking action"),
-		FeedbackPrompt.Contains(TEXT("You may ignore this")) && FeedbackPrompt.Contains(TEXT("nothing changes automatically")));
+		FeedbackPrompt.Contains(TEXT("Both requests are suggestions for human review")));
+	TestTrue(TEXT("Residents can remain quiet without proposing an action"), FeedbackPrompt.Contains(TEXT("remain quiet")));
+	TestTrue(TEXT("Requests remain suggestions for human review and never change the world automatically"),
+		FeedbackPrompt.Contains(TEXT("suggestions for human review")) && FeedbackPrompt.Contains(TEXT("nothing is built or changed automatically")));
 
 	FTurnFacts Quiet;
 	TestFalse(TEXT("Nothing near and nobody speaking is a light turn"), NeedsFullModel(Quiet));

@@ -78,3 +78,30 @@ and [`CrashContext.runtime-xml`](../../Saved/CS58/Saved/Crashes/_0000/CrashConte
 Do not retry this NullRHI launch unchanged. Resume character feedback only
 after symbolized dump analysis or a materially different startup path; the
 15-minute run documented above remains the latest successful feedback sample.
+
+## Clearer optional reflection prompt — 2026-11-01
+
+The one-time check-in now directly invites one short spoken reflection about
+the last few minutes, with concrete themes (something enjoyed noticing, a wish
+to explore, or something to change or preserve). A resident with nothing to
+add may say so or remain quiet. Optional `request_upgrade` and `request_object`
+proposals remain for human review; nothing is created or changed automatically.
+This aims to make a useful reflection easier to give without making speech or
+requests obligatory.
+
+`CaptiveSky_2Editor` compiled successfully in the isolated C: worktree after
+this change. The focused `CaptiveSky2.Agent.ModelTier` automation did not
+produce a valid test result: the first command-line attempt misquoted
+`-ExecCmds`, and the corrected attempt exited without writing its requested
+log. The subsequent 900-second feedback run never reached world-ready. Its
+crash context records a null `EXCEPTION_ACCESS_VIOLATION`,
+`SecondsSinceStart=0`, and hash
+`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. A retry with Trace Server disabled
+produced the same signature. No prompt assertion or resident response ran;
+these attempts are not playtest results. The data roots are isolated under
+`Saved/Playtests/Codex_ResidentFeedbackPromptTune*`.
+
+Do not repeat the same NullRHI bootstrap. Verify the test and updated invitation
+through symbolized crash analysis or a materially different startup path,
+then conduct another bounded feedback session. The earlier successful
+15-minute run remains the only evidence of resident uptake.
