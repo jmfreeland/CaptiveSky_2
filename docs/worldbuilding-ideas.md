@@ -161,6 +161,14 @@ daylight Tideglass-to-woodland route with close/middle/far species visibility,
 frame-time p95 and whole-device VRAM together, once headroom permits. The
 landscape edit-layer merge warning remains visible and was not changed.
 
+A later user-approved restart of the exact D: project completed at 07:56 UTC.
+The fresh `CaptiveSky_2.log` again sets `r.Nanite.ProjectEnabled=1` and
+`r.Nanite.Foliage=1`; Island MapCheck reports 0 errors and 0 warnings. At
+08:01 UTC `nvidia-smi` showed 11,675 / 12,282 MiB used (323 MiB free), 47%
+utilization, and 73 °C. No PIE or resident session was started. The latest
+restart and resource gate are recorded in
+[`editor restart memory recheck`](findings/2026-11-01-editor-restart-memory-recheck.md).
+
 ## 2026-11-01 — Guard the balance of the broadleaf habitat field
 
 The 81-point representative Island-scale broadleaf test previously selected
