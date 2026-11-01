@@ -38,3 +38,25 @@ The UE 5.8.3 scratch Editor target rebuilt successfully after the prompt change.
 The focused `IslandRainBasin` and `IslandRainBasinWorld` automation tests both
 passed under NullRHI, including an assertion for the global prompt contract.
 Run log: [`Codex_RainBasinGlobalRange_20261101.log`](../../Saved/CS58/Saved/Logs/Codex_RainBasinGlobalRange_20261101.log).
+
+## Post-change resident retest attempt
+
+A fresh isolated 900-second NullRHI character-feedback run was attempted with
+the new prompt, Python disabled, situation logging enabled, and a 40-request
+ceiling. `Start-Spectator.ps1` correctly rejected the process: it exited with
+code 0 without producing its normal project log or the Island world-ready
+marker. The crash artifact records a game-thread `EXCEPTION_ACCESS_VIOLATION`
+reading null at zero seconds since start, process ID 0, with hash
+`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`; its stack contains only unsymbolized
+UnrealEditor-Core and UnrealEditor offsets. This matches the known startup
+failure signature; the log's Unreal Trace Server error is not evidence of its
+cause. No resident behavior or prompt uptake was observed, and the attempt must
+not be counted as a playtest.
+
+No local CDB/WinDbg executable or matching UnrealEditor PDB was present at the
+checked Windows SDK and UE 5.8.3 engine paths, so this attempt does not provide
+a new diagnosis. Do not repeat the same launch path blindly; obtain a
+symbolized dump or materially different engine startup path first. The latest
+device sample remains below the separate 4 GiB rendered-session gate.
+
+Crash artifact: [`Codex_PostRangePrompt_20261101.log`](../../Saved/CS58/Saved/Crashes/_0000/Codex_PostRangePrompt_20261101.log).
