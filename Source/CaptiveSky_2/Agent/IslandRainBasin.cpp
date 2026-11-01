@@ -549,6 +549,7 @@ bool UIslandRainBasinSubsystem::PlaceBasin()
 		FCollisionQueryParams Clearance(SCENE_QUERY_STAT(IslandBasinClearance), false);
 		Clearance.AddIgnoredActor(Hit.GetActor());
 		if (World->OverlapAnyTestByChannel(Hit.ImpactPoint + FVector(0.f, 0.f, 95.f), FQuat::Identity, ECC_Visibility, FCollisionShape::MakeSphere(70.f), Clearance)) continue;
+		if (!HasClearGroundedApproach(*World, Hit.ImpactPoint)) continue;
 		FNavLocation Walkable;
 		if (Navigation && Navigation->GetDefaultNavDataInstance() &&
 			(!Navigation->ProjectPointToNavigation(Hit.ImpactPoint, Walkable, FVector(80.f, 80.f, 150.f)) || FVector::Dist2D(Walkable.Location, Hit.ImpactPoint) > 80.f))
@@ -559,6 +560,40 @@ bool UIslandRainBasinSubsystem::PlaceBasin()
 		return true;
 	}
 	UE_LOG(LogIslandRainBasin, Warning, TEXT("Could not find flat open ground for the rain basin near the ListeningStones; none was placed."));
+	return false;
+}
+
+bool UIslandRainBasinSubsystem::HasClearGroundedApproach(UWorld& World, const FVector& BasinGround)
+{
+	// The basin is a hand-scale interaction. Require at least two nearby, level
+	// capsule-sized standing spots so it cannot spawn inside a ring of rocks or
+	// vegetation and leave residents with a single fragile approach direction.
+	constexpr float ApproachRadius = 260.f;
+	constexpr float CapsuleRadius = 42.f;
+	constexpr float CapsuleHalfHeight = 90.f;
+	constexpr int32 RequiredApproachSpots = 2;
+	constexpr int32 CandidateCount = 8;
+	int32 ClearApproachSpots = 0;
+
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(IslandBasinApproachClearance), false);
+	for (int32 Index = 0; Index < CandidateCount; ++Index)
+	{
+		const float Angle = UE_TWO_PI * static_cast<float>(Index) / static_cast<float>(CandidateCount);
+		const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+		const FVector Probe = BasinGround + Direction * ApproachRadius;
+		FHitResult GroundHit;
+		if (!World.LineTraceSingleByChannel(GroundHit, Probe + FVector(0.f, 0.f, 120.f),
+			Probe - FVector(0.f, 0.f, 160.f), ECC_Visibility, Query) ||
+			GroundHit.ImpactNormal.Z < 0.92f || FMath::Abs(GroundHit.ImpactPoint.Z - BasinGround.Z) > 45.f)
+			continue;
+
+		const FVector CapsuleCenter = GroundHit.ImpactPoint + FVector(0.f, 0.f, CapsuleHalfHeight + 4.f);
+		if (World.OverlapAnyTestByChannel(CapsuleCenter, FQuat::Identity, ECC_Pawn,
+			FCollisionShape::MakeCapsule(CapsuleRadius, CapsuleHalfHeight), Query))
+			continue;
+
+		if (++ClearApproachSpots >= RequiredApproachSpots) return true;
+	}
 	return false;
 }
 

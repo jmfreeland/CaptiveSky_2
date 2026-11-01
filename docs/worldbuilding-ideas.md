@@ -1,5 +1,17 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Give the rain basin breathing room
+
+Resident feedback found Rat's direct approach to the basin blocked by
+StarterContent rocks. Placement now screens for at least two grounded,
+capsule-clear standing spots around each candidate, reducing the chance that a
+good-looking basin site is awkward to use. The focused UE automation was added
+and compiled, but not run because the active editor is the separate live D:
+checkout and headless NullRHI startup is currently unreliable. This does not
+guarantee a clear path through the surrounding woodland; verify the detour and
+interaction in rendered play when the GPU/editor gate permits. Details:
+[approach-clearance finding](findings/2026-11-01-rain-basin-approach-clearance.md).
+
 ## 2026-11-01 — Add Common Hazel to the mature woodland canopy
 
 The installed Common Hazel A mesh has a distinctive multi-stem form and a

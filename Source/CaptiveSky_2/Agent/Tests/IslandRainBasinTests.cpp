@@ -202,6 +202,31 @@ bool FIslandRainBasinWorldTest::RunTest(const FString& Parameters)
 		BasinActor && IslandInteractionUtility::GetTargetTag(BasinActor) == FName(TEXT("RainBasin")));
 	TestTrue(TEXT("The basin actor occupies its saved ground position plus its inspection lift"),
 		BasinActor && BasinActor->GetActorLocation().Equals(Basin->GetState().Location + FVector(0.f, 0.f, AIslandRainBasin::OriginLift), 0.1f));
+	const FVector BasinGround = Basin->GetState().Location;
+	TestTrue(TEXT("A clear basin has multiple capsule-sized grounded approach spots"),
+		UIslandRainBasinSubsystem::HasClearGroundedApproach(*World, BasinGround));
+	auto AddApproachBlocker = [World, &BasinGround](int32 Index) -> AActor*
+	{
+		const float Angle = UE_TWO_PI * static_cast<float>(Index) / 8.f;
+		const FVector Direction(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
+		AActor* Blocker = World->SpawnActor<AActor>(BasinGround + Direction * 260.f + FVector(0.f, 0.f, 100.f), FRotator::ZeroRotator);
+		if (!Blocker) return nullptr;
+		UBoxComponent* Box = NewObject<UBoxComponent>(Blocker);
+		Blocker->SetRootComponent(Box);
+		Box->SetBoxExtent(FVector(50.f, 50.f, 100.f));
+		Box->SetCollisionProfileName(TEXT("BlockAll"));
+		Box->RegisterComponent();
+		return Blocker;
+	};
+	TArray<AActor*> ApproachBlockers;
+	ApproachBlockers.Add(AddApproachBlocker(0));
+	TestTrue(TEXT("One obstructed side leaves the basin approachable from other sides"),
+		UIslandRainBasinSubsystem::HasClearGroundedApproach(*World, BasinGround));
+	for (int32 Index = 1; Index < 7; ++Index) ApproachBlockers.Add(AddApproachBlocker(Index));
+	TestEqual(TEXT("The approach-blocker fixture is complete"), ApproachBlockers.Num(), 7);
+	TestFalse(TEXT("A basin with only one clear standing side is rejected"),
+		UIslandRainBasinSubsystem::HasClearGroundedApproach(*World, BasinGround));
+	for (AActor* Blocker : ApproachBlockers) if (IsValid(Blocker)) Blocker->Destroy();
 	if (BasinActor)
 	{
 		const FString Nearby = Basin->DescribeNearby(BasinActor->GetActorLocation());

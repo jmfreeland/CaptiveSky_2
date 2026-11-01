@@ -150,6 +150,7 @@ protected:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
 private:
+	friend class FIslandRainBasinWorldTest;
 	FIslandBasinState State;
 	TWeakObjectPtr<AIslandRainBasin> Actor;
 	bool bDirty = false;
@@ -163,6 +164,7 @@ private:
 	FString GetStorageFilePath() const;
 	void Load();
 	void Save();
+	static bool HasClearGroundedApproach(UWorld& World, const FVector& BasinGround);
 	bool PlaceBasin();
 	void Refresh();
 };
