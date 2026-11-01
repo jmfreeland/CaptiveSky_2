@@ -96,3 +96,18 @@ The post-restart `nvidia-smi` sample was 9,599 / 12,282 MiB used, leaving
 rendered-session gate; PIE/Game and character feedback were not started. The
 existing 03:10 `IslandOcean` automation pass remains the latest verified water
 test. No map or gameplay settings were edited during this restart.
+
+## Live play-safety cap audit (2026-11-01)
+
+The reopened D: project's `Config/DefaultGame.ini` and
+`AgentPlaySessionSubsystem` source still set the default session to 1,800 real
+seconds and 120 model requests; its request clamp is also 120. The tracked
+worktree now defaults and hard-caps sessions at 64 requests. The D: project's
+`Start-Spectator.ps1` does expose explicit per-run lower limits (0–120), so a
+future isolated feedback session can use a 900-second deadline and a 64-request
+cap without changing the live project configuration. This only proves the
+launcher argument is available; no such session was started, and the current
+2.4 GiB free GPU sample remains below the rendered-play gate. Before any
+model-active live run, verify its startup log reports the explicit 900/64 caps
+and keep its data root isolated. The D: project has not been synchronized with
+the worktree's 64-request hard ceiling.
