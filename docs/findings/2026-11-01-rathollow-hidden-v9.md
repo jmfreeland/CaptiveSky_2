@@ -35,3 +35,41 @@ Review a disposable Unreal import for material appearance, ground contact, entra
 readability at Rat scale, collision, navigation, and Nanite/foliage compatibility.
 No live map, object placement, character memory, or `wildlife_homes` data was changed
 for this candidate.
+
+## Copied-map review workflow
+
+`Scripts/Preview-RatHollowV9Review.py` now provides three explicit Unreal Python
+stages. `import` reads this checkout's verified FBX and imports it to a new
+`RatHollowHiddenV9Review` content folder with a separate texture-library folder;
+it refuses to overwrite an existing mesh and validates the imported five-box
+collision report. `duplicate` copies `/Game/Maps/Island` to
+`/Game/Generated/ComfyBlender/RatHollowHiddenV9Review/Maps/Island_RatHollowV9Review`
+without loading or saving the source. `place` only works when that copied map is
+already open, and saves only that copy while preserving the authored collision.
+
+Placement has no default coordinate. It requires
+`Saved/Playtests/Codex_RatHollowV9Review/site.json` in the active project, with a
+candidate index and XYZ copied from an `Island.RatHollowSiteAudit` log under
+that project's `Saved` tree, written within the prior 24 hours. The stage rejects
+near-misses, nonmatching coordinates, a canonical Island viewport, and duplicate
+review actors. It does not write the canonical wildlife-home record or resident
+memory.
+
+In the Unreal Python console, set
+`CAPTIVESKY_RATHOLLOW_REVIEW_CHECKOUT_ROOT` to this source checkout and run
+`Scripts/Preview-RatHollowV9Review.py` once per stage with
+`CAPTIVESKY_RATHOLLOW_REVIEW_STAGE` set to `import`, then `duplicate`. Open the
+copied review map manually. After a fresh qualifying site audit, create
+`site.json` under the review data folder with `site_id`, `candidate_index`,
+`location_cm` `[X,Y,Z]`, `rotation_degrees` `[Pitch,Yaw,Roll]`, and the
+project-relative `audit_log` path. Copy the index and exact XYZ from one
+qualified candidate line. Only then run the `place` stage. Do not use Site A/B
+from the old trials as defaults.
+
+Eight focused source tests pass for audit freshness/coordinate matching, required
+collisions, copy-only map saving, and refusal to place on the source map; the
+58-test `Scripts/tests` suite also passes. These are mocked/source checks only:
+no Unreal import, map duplication, placement, or visual/navigation review has
+been run. Once the editor's project checkout is confirmed and a current audit
+produces a qualified site, run the three stages and inspect Rat-eye and visitor
+views before deciding whether this candidate is ready for a home record.

@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Prepare a no-default-site review for Rat's fallen-wood hollow
+
+The offline-preferred V9 hollow now has a staged Unreal review workflow that
+imports it to a dedicated asset/library destination, copies the Island, and
+places it only in an already-open review copy. Placement requires a qualified
+`Island.RatHollowSiteAudit` candidate from the prior 24 hours and an exact
+coordinate match; prior Site A/B suggestions remain unapproved. Eight focused
+script checks and all
+58 `Scripts/tests` cases pass. The workflow has not been run in Unreal, so this
+is preparation rather than a home-placement approval. Next: confirm the active
+editor checkout, obtain a current qualified site audit, then review ground
+contact, Rat-width access, concealment, and visitor-scale appearance before
+writing any canonical home state. Details: [RatHollow V9 review](findings/2026-11-01-rathollow-hidden-v9.md).
+
 ## 2026-11-01 — Keep investigating recurring Zen cold starts without risking the cache
 
 The user reports a slow-Zen warning on every editor launch. Archived UE 5.8.3
