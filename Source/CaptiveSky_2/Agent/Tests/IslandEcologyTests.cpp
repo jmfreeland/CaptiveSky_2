@@ -1672,11 +1672,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			It->RippleCheckRemaining = 1.f;
 			It->RavenCheckRemaining = 1.f;
 			Clock->DayNumber = 1;
-			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.75f;
+			Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.75f;
 			It->SetActorLocation(CrabHome);
 			It->Tick(0.f);
 			const float EbbingDrift = FVector::Dist2D(CrabHome, It->GetActorLocation());
-			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.25f;
 			It->SetActorLocation(CrabHome);
 			It->Tick(0.f);
 			const float HighWaterDrift = FVector::Dist2D(CrabHome, It->GetActorLocation());
@@ -1709,11 +1709,11 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 		{
 			const FVector PeriwinkleHome = Snail->HomeLocation;
 			Clock->DayNumber = 1;
-			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.75f;
+			Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.75f;
 			Snail->Tick(0.f);
 			const float EbbStalkLength = Snail->EyeStalks[0]->GetRelativeScale3D().Z;
 			const float EbbApertureHeight = Snail->Aperture->GetRelativeScale3D().Z;
-			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.25f;
 			Snail->Tick(0.f);
 			TestTrue(TEXT("The first periwinkle retracts its eye stalks and narrows the shell opening at low tide"),
 				EbbStalkLength < Snail->EyeStalks[0]->GetRelativeScale3D().Z &&
@@ -1765,7 +1765,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			RainResponsiveSnail->ApplyPalette();
 		}
 		const float OriginalHour = Clock->CurrentHour;
-		Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+		Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.25f;
 		Weather->WeatherSeed = StormSeed;
 		const float StormRainIntensity = Weather->SampleRainIntensity(World->GetTimeSeconds());
 		RainResponsiveSnail->Tick(0.f);
@@ -2660,7 +2660,7 @@ bool FIslandNightEcologyTest::RunTest(const FString& Parameters)
 			const float OriginalPeriwinkleTestHour = Clock->CurrentHour;
 			const int32 OriginalPeriwinkleTestDay = Clock->DayNumber;
 			Clock->DayNumber = 1;
-			Clock->CurrentHour = UIslandTideglassSubsystem::TidalDayHours * 0.25f;
+			Clock->CurrentHour = AIslandDayNight::SemidiurnalTidePeriodHours * 0.25f;
 			const FVector PeriwinkleTestHome = TestPoolLocation + FVector(120.f, 0.f, 0.f);
 			WatchablePeriwinkle->SetActorLocation(PeriwinkleTestHome);
 			WatchablePeriwinkle->HomeLocation = PeriwinkleTestHome;

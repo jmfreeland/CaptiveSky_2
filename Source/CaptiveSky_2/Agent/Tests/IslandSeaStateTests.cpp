@@ -3,6 +3,9 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GerstnerWaterWaves.h"
+#include "IslandDayNight.h"
+#include "WaterBodyOceanActor.h"
+#include "WaterBodyOceanComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandSeaStateTest, "CaptiveSky2.Agent.IslandSeaState",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -48,7 +51,37 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 	if (TestNotNull(TEXT("The sea-state subsystem exists in a game world"), Subsystem))
 	{
 		TestFalse(TEXT("Nothing is bound without an ocean"), Subsystem->IsBound());
+		TestFalse(TEXT("No ocean tide target is bound without an ocean"), Subsystem->IsOceanBound());
 		TestFalse(TEXT("A missing wave set is refused"), Subsystem->BindWaves(nullptr));
+
+		AWaterBodyOcean* OceanActor = World->SpawnActor<AWaterBodyOcean>();
+		AIslandDayNight* IslandClock = World->SpawnActor<AIslandDayNight>();
+		UWaterBodyOceanComponent* OceanComponent = OceanActor
+			? Cast<UWaterBodyOceanComponent>(OceanActor->GetWaterBodyComponent()) : nullptr;
+		TestNotNull(TEXT("The ocean tide fixture has a WaterBodyOcean component"), OceanComponent);
+		TestNotNull(TEXT("The ocean tide fixture has an Island clock"), IslandClock);
+		if (OceanComponent && IslandClock)
+		{
+			OceanComponent->SetHeightOffset(4.5f);
+			Subsystem->OceanComponent = OceanComponent;
+			Subsystem->IslandClock = IslandClock;
+			Subsystem->AuthoredOceanHeightOffsetCm = OceanComponent->GetHeightOffset();
+			Subsystem->AppliedOceanTideOffsetCm = 0.f;
+			Subsystem->bHasAppliedOceanTideOffset = false;
+			IslandClock->CurrentHour = 3.105f;
+			IslandClock->DayNumber = 1;
+			Subsystem->ApplyOceanTideOffset();
+			TestTrue(TEXT("Spring high water offsets, rather than replaces, the authored ocean level"),
+				FMath::IsNearlyEqual(OceanComponent->GetHeightOffset(), 4.5f + 14.f * AIslandDayNight::TideLevel(1, 3.105f), 0.01f));
+
+			IslandClock->CurrentHour = 9.315f;
+			Subsystem->ApplyOceanTideOffset();
+			TestTrue(TEXT("Low water uses the same semidiurnal Island tide curve"),
+				FMath::IsNearlyEqual(OceanComponent->GetHeightOffset(), 4.5f + 14.f * AIslandDayNight::TideLevel(1, 9.315f), 0.01f));
+
+			Subsystem->RestoreOceanTideOffset();
+			TestEqual(TEXT("World teardown restores the authored ocean height offset"), OceanComponent->GetHeightOffset(), 4.5f);
+		}
 
 		UGerstnerWaterWaves* Waves = NewObject<UGerstnerWaterWaves>(GetTransientPackage());
 		UGerstnerWaterWaveGeneratorSimple* Generator = NewObject<UGerstnerWaterWaveGeneratorSimple>(Waves);

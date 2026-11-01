@@ -3,17 +3,18 @@
 ## 2026-11-01 — Let residents read the changing tide, and remember only what happened
 
 Rat and the Innkeeper both wondered how the shore changes as the tide falls.
-Tideglass now exposes a deterministic rising/falling/turning cue alongside its
-existing waterline height in nearby resident perception, giving their
-observations a direction and phase rather than just a measurement. Review of
-the bounded Raven session also found a false reflection: the model remembered
-setting a leaf afloat in the same response that requested the interaction,
-although the controller rejected it and the saved basin had no leaves. Model
-memories are now skipped for an interaction response; the controller's
-verified outcome can be remembered on a later turn. The isolated UE 5.8.3
-editor target compiles these changes, but the focused commandlet crashes before
-automation startup, so tide perception and the regression test remain
-unverified at runtime. Details: [tide awareness and verified interaction
+Tideglass and the WaterBodyOcean now follow the Island's same semidiurnal
+spring/neap curve, with a subtle height offset on the actual ocean and a
+rising/falling/turning cue in nearby resident perception. The time look-ahead
+now crosses midnight continuously. Review of the bounded Raven session also
+found a false reflection: the model remembered setting a leaf afloat in the
+same response that requested the interaction, although the controller
+rejected it and the saved basin had no leaves. Model memories are now skipped
+for an interaction response; the controller's verified outcome can be
+remembered on a later turn. The isolated UE 5.8.3 editor target compiles these
+changes, but runtime behavior remains unverified: the focused commandlet
+crashes before automation startup, and PowerShell did not permit the bounded
+feedback launcher. Details: [tide awareness and verified interaction
 memories](findings/2026-11-01-tide-awareness-and-verified-memories.md).
 
 ## 2026-11-01 — Let seasonal flowers open and fade at different times

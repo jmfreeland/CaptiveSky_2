@@ -6,14 +6,15 @@
 
 class UGerstnerWaterWaveGeneratorSimple;
 class UGerstnerWaterWaves;
+class AIslandDayNight;
+class UWaterBodyOceanComponent;
 
 /**
- * Lets the Water-plugin ocean (WaterBodyOcean) follow the island weather: a calm day lies low and gentle, wind
- * and storms raise the swell and sharpen the crests. It scales the ocean's Gerstner generator amplitude and
- * steepness (never wavelength, so wave phase does not jump) toward a smoothed "sea" level, and puts the authored
- * values back at end play because the wave asset is shared. Authored values are the full-storm ceiling, so the
- * water body's cached maximum wave height is never exceeded.
- * Does nothing without a WaterBodyOcean using a simple Gerstner generator. Console: Island.Sea [0..1|-1].
+ * Lets the Water-plugin ocean (WaterBodyOcean) follow the Island tide and weather. The ocean height follows the
+ * shared semidiurnal spring/neap curve; weather scales the Gerstner amplitude and steepness (never wavelength,
+ * so wave phase does not jump) toward a smoothed sea state. Authored height and wave values are restored at end
+ * play because the ocean and wave asset are shared. Authored wave values remain the full-storm ceiling.
+ * Tides work without a Gerstner generator; the weather-driven swell requires one. Console: Island.Sea [0..1|-1].
  */
 UCLASS()
 class CAPTIVESKY_2_API UIslandSeaStateSubsystem : public UTickableWorldSubsystem
@@ -27,6 +28,8 @@ public:
 	static constexpr float CalmAmplitudeScale = 0.4f;
 	static constexpr float CalmSteepnessScale = 0.7f;
 	static constexpr float StormSteepnessScale = 1.4f;
+	static constexpr float OceanTideUpdateIntervalSeconds = 2.f;
+	static constexpr float OceanTideUpdateThresholdCm = 0.2f;
 
 	/** 0 glassy to 1 full storm from the weather's storm intensity and ambient wind (0..1 of its maximum). */
 	static float TargetSea(float Storm, float Wind01);
@@ -43,6 +46,7 @@ public:
 	void ApplySea(float Sea);
 	void RestoreWaves();
 	bool IsBound() const { return Waves.IsValid(); }
+	bool IsOceanBound() const { return OceanComponent.IsValid(); }
 	float GetSea() const { return Sea; }
 	/** Developer override; negative follows the weather. */
 	void SetForcedSea(float InForcedSea) { ForcedSea = InForcedSea; }
@@ -59,6 +63,12 @@ protected:
 private:
 	friend class FIslandSeaStateTest;
 
+	TWeakObjectPtr<UWaterBodyOceanComponent> OceanComponent;
+	TWeakObjectPtr<AIslandDayNight> IslandClock;
+	float AuthoredOceanHeightOffsetCm = 0.f;
+	float AppliedOceanTideOffsetCm = 0.f;
+	bool bHasAppliedOceanTideOffset = false;
+	float SinceOceanTideUpdate = 0.f;
 	TWeakObjectPtr<UGerstnerWaterWaves> Waves;
 	TWeakObjectPtr<UGerstnerWaterWaveGeneratorSimple> Generator;
 	float AuthoredMinAmplitude = 0.f;
@@ -72,4 +82,6 @@ private:
 	bool bSeaInitialized = false;
 
 	float SampleWeatherSea() const;
+	void ApplyOceanTideOffset();
+	void RestoreOceanTideOffset();
 };

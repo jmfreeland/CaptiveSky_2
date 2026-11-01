@@ -6,8 +6,11 @@
 #include "GerstnerWaterWaves.h"
 #include "HAL/IConsoleManager.h"
 #include "IslandWeather.h"
+#include "IslandDayNight.h"
+#include "IslandTideglassSubsystem.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "WaterBodyComponent.h"
+#include "WaterBodyOceanComponent.h"
 #include "WaterBodyOceanActor.h"
 #include "WaterWaves.h"
 
@@ -114,6 +117,34 @@ void UIslandSeaStateSubsystem::RestoreWaves()
 	bSeaInitialized = false;
 }
 
+void UIslandSeaStateSubsystem::ApplyOceanTideOffset()
+{
+	UWaterBodyOceanComponent* Ocean = OceanComponent.Get();
+	const AIslandDayNight* Clock = IslandClock.Get();
+	if (!Ocean || !Clock) return;
+
+	const float TideOffset = UIslandTideglassSubsystem::TideOffsetCm(Clock->CurrentHour, Clock->DayNumber);
+	if (bHasAppliedOceanTideOffset &&
+		FMath::Abs(TideOffset - AppliedOceanTideOffsetCm) < OceanTideUpdateThresholdCm) return;
+
+	Ocean->SetHeightOffset(AuthoredOceanHeightOffsetCm + TideOffset);
+	AppliedOceanTideOffsetCm = TideOffset;
+	bHasAppliedOceanTideOffset = true;
+}
+
+void UIslandSeaStateSubsystem::RestoreOceanTideOffset()
+{
+	if (UWaterBodyOceanComponent* Ocean = OceanComponent.Get())
+	{
+		Ocean->SetHeightOffset(AuthoredOceanHeightOffsetCm);
+	}
+	OceanComponent.Reset();
+	IslandClock.Reset();
+	AppliedOceanTideOffsetCm = 0.f;
+	bHasAppliedOceanTideOffset = false;
+	SinceOceanTideUpdate = 0.f;
+}
+
 float UIslandSeaStateSubsystem::SampleWeatherSea() const
 {
 	UWorld* World = GetWorld();
@@ -137,12 +168,27 @@ bool UIslandSeaStateSubsystem::DoesSupportWorldType(const EWorldType::Type World
 void UIslandSeaStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	for (TActorIterator<AIslandDayNight> It(&InWorld); It; ++It)
+	{
+		IslandClock = *It;
+		break;
+	}
 	for (TActorIterator<AWaterBodyOcean> It(&InWorld); It; ++It)
 	{
 		UWaterBodyComponent* Body = It->GetWaterBodyComponent();
+		if (UWaterBodyOceanComponent* Ocean = Cast<UWaterBodyOceanComponent>(Body))
+		{
+			OceanComponent = Ocean;
+			AuthoredOceanHeightOffsetCm = Ocean->GetHeightOffset();
+			AppliedOceanTideOffsetCm = 0.f;
+			bHasAppliedOceanTideOffset = false;
+			ApplyOceanTideOffset();
+			UE_LOG(LogTemp, Log, TEXT("IslandSeaState: applying Island-clock tides to ocean %s (authored height offset %.1f cm)"),
+				*It->GetActorNameOrLabel(), AuthoredOceanHeightOffsetCm);
+		}
 		UWaterWavesBase* Base = Body ? Body->GetWaterWaves() : nullptr;
 		UGerstnerWaterWaves* Gerstner = Base ? Cast<UGerstnerWaterWaves>(Base->GetWaterWaves()) : nullptr;
-		if (BindWaves(Gerstner))
+		if (Gerstner && BindWaves(Gerstner))
 		{
 			UE_LOG(LogTemp, Log, TEXT("IslandSeaState: following the weather on %s (authored amplitude %.1f-%.1f cm, steepness %.2f/%.2f)"),
 				*It->GetActorNameOrLabel(), AuthoredMinAmplitude, AuthoredMaxAmplitude, AuthoredSmallSteepness, AuthoredLargeSteepness);
@@ -154,28 +200,43 @@ void UIslandSeaStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 void UIslandSeaStateSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	SinceUpdate += DeltaTime;
-	if (SinceUpdate < UpdateIntervalSeconds) return;
-	const float Elapsed = SinceUpdate;
-	SinceUpdate = 0.f;
+	if (Waves.IsValid())
+	{
+		SinceUpdate += DeltaTime;
+		if (SinceUpdate >= UpdateIntervalSeconds)
+		{
+			const float Elapsed = SinceUpdate;
+			SinceUpdate = 0.f;
 
-	const float Console = CVarIslandSea.GetValueOnGameThread();
-	const float Forced = Console >= 0.f ? Console : ForcedSea;
-	if (Forced >= 0.f)
-	{
-		Sea = FMath::Clamp(Forced, 0.f, 1.f);
-		bSeaInitialized = true;
+			const float Console = CVarIslandSea.GetValueOnGameThread();
+			const float Forced = Console >= 0.f ? Console : ForcedSea;
+			if (Forced >= 0.f)
+			{
+				Sea = FMath::Clamp(Forced, 0.f, 1.f);
+				bSeaInitialized = true;
+			}
+			else if (!bSeaInitialized)
+			{
+				Sea = SampleWeatherSea();
+				bSeaInitialized = true;
+			}
+			else
+			{
+				Sea = StepSea(Sea, SampleWeatherSea(), Elapsed);
+			}
+			if (FMath::Abs(Sea - AppliedSea) >= 0.01f) ApplySea(Sea);
+		}
 	}
-	else if (!bSeaInitialized)
+
+	if (OceanComponent.IsValid())
 	{
-		Sea = SampleWeatherSea();
-		bSeaInitialized = true;
+		SinceOceanTideUpdate += DeltaTime;
+		if (SinceOceanTideUpdate >= OceanTideUpdateIntervalSeconds)
+		{
+			SinceOceanTideUpdate = 0.f;
+			ApplyOceanTideOffset();
+		}
 	}
-	else
-	{
-		Sea = StepSea(Sea, SampleWeatherSea(), Elapsed);
-	}
-	if (FMath::Abs(Sea - AppliedSea) >= 0.01f) ApplySea(Sea);
 }
 
 TStatId UIslandSeaStateSubsystem::GetStatId() const
@@ -185,11 +246,12 @@ TStatId UIslandSeaStateSubsystem::GetStatId() const
 
 bool UIslandSeaStateSubsystem::IsTickable() const
 {
-	return !IsTemplate() && Waves.IsValid();
+	return !IsTemplate() && (Waves.IsValid() || OceanComponent.IsValid());
 }
 
 void UIslandSeaStateSubsystem::Deinitialize()
 {
+	RestoreOceanTideOffset();
 	RestoreWaves();
 	Super::Deinitialize();
 }

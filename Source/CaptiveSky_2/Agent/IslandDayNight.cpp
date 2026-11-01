@@ -315,28 +315,37 @@ FString AIslandDayNight::DescribeStars(float Night, float CloudCover, float Luna
 	return TEXT(" Stars scatter across the dark sky.");
 }
 
-static constexpr float TidePeriodHours = 12.42f;
-
 static float TideRange(int32 IslandDay, float IslandHour)
 {
 	// Spring tides at new and full moon (progress 0 and 0.5), neaps at the quarters.
-	return 0.65f + 0.35f * FMath::Abs(FMath::Cos(AIslandDayNight::LunarPhaseProgress(IslandDay, IslandHour) * 4.f * UE_PI));
+	return 0.65f + 0.35f * FMath::Abs(FMath::Cos(AIslandDayNight::LunarPhaseProgress(IslandDay, IslandHour) * 2.f * UE_PI));
 }
 
 float AIslandDayNight::TideLevel(int32 IslandDay, float IslandHour)
 {
 	if (!FMath::IsFinite(IslandHour)) return 0.f;
 	const double Hours = double(FMath::Max(1, IslandDay) - 1) * 24.0 + double(WrapHour(IslandHour));
-	const float Angle = float(FMath::Fmod(Hours, double(TidePeriodHours)) / double(TidePeriodHours)) * 2.f * UE_PI;
+	const float Angle = float(FMath::Fmod(Hours, double(SemidiurnalTidePeriodHours)) / double(SemidiurnalTidePeriodHours)) * 2.f * UE_PI;
 	return FMath::Clamp(TideRange(IslandDay, IslandHour) * FMath::Sin(Angle), -1.f, 1.f);
+}
+
+float AIslandDayNight::TideLevelChange(int32 IslandDay, float IslandHour, float LookAheadHours)
+{
+	if (!FMath::IsFinite(IslandHour) || !FMath::IsFinite(LookAheadHours) || LookAheadHours < 0.f) return 0.f;
+	const int32 SafeDay = FMath::Max(1, IslandDay);
+	const float SafeHour = WrapHour(IslandHour);
+	const double CurrentHours = double(SafeDay - 1) * 24.0 + double(SafeHour);
+	const double FutureHours = CurrentHours + double(LookAheadHours);
+	const int32 FutureDay = FMath::Max(1, static_cast<int32>(FMath::FloorToDouble(FutureHours / 24.0)) + 1);
+	const float FutureHour = static_cast<float>(FMath::Fmod(FutureHours, 24.0));
+	return TideLevel(FutureDay, FutureHour) - TideLevel(SafeDay, SafeHour);
 }
 
 FString AIslandDayNight::DescribeTide(int32 IslandDay, float IslandHour)
 {
 	if (!FMath::IsFinite(IslandHour)) return FString();
 	const float Now = TideLevel(IslandDay, IslandHour);
-	const float Later = TideLevel(IslandDay, IslandHour + 0.25f);
-	const float Slope = Later - Now;
+	const float Slope = TideLevelChange(IslandDay, IslandHour, 0.25f);
 	FString Out;
 	if (FMath::Abs(Slope) < 0.012f) Out = Now > 0.f ? TEXT(" The tide is at its height and slack.") : TEXT(" The tide is at its lowest ebb and slack.");
 	else Out = FString::Printf(TEXT(" The tide is %s and the water stands %s."), Slope > 0.f ? TEXT("rising") : TEXT("falling"),

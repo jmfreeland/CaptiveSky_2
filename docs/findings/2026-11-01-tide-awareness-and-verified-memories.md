@@ -6,9 +6,13 @@ In the isolated 15-minute resident session, Rat and the Innkeeper separately
 asked to understand how the shoreline changes as the tide falls. Tideglass
 already supplies a bounded tide-height cue, so resident perception now also
 describes whether the water is flooding, ebbing, or turning at high/low water.
-The trend is derived from deterministic tide samples a quarter Island-hour
-apart, including across the Island-day boundary; it creates no new actors,
-assets, or ticking work.
+Review found that Tideglass had been using a 24.84-hour curve while the Island's
+sea description used a 12.42-hour semidiurnal tide. Tideglass and the actual
+WaterBodyOcean height now share the Island clock's normalized tide function,
+including spring/neap variation. Tide look-ahead also advances the day at
+midnight. The ocean uses the Water plugin's height-offset API instead of moving
+its actor or water bounds; updates are rate-limited and the authored offset is
+restored on world teardown.
 
 The same session exposed a memory-truth bug. At 10:19:52 UTC Raven's RainBasin
 interaction was rejected as a recent repeat inspection. The isolated basin
@@ -25,10 +29,13 @@ existing idle-reflection storage remains covered.
 
 ## Validation and remaining uncertainty
 
-The tide-direction and resident-perception assertions, and the premature
-interaction-memory regression, are in the automation suite. Two UE 5.8.3
-isolated editor builds succeeded, including the tide and memory changes and
-their tests. The focused commandlet attempt crashed before engine/test startup
+The tide-curve consistency and midnight assertions, ocean-height restoration
+case, resident-perception checks, and premature interaction-memory regression
+are in the automation suite. The UE 5.8.3 isolated editor target compiled
+successfully after correcting a numeric-limit sentinel and updating ecology
+tests to use the shared semidiurnal-period constant (87.6 seconds, 39 actions).
+Runtime behavior remains unverified: the focused commandlet
+attempt crashed before engine/test startup
 (`SecondsSinceStart=0`, null access violation, hash
 `F405610C114D120D4B6F5ABA901EC469AC9FAA26`), matching the recurring headless
 bootstrap failure; no automation assertions ran. Do not count compilation as a

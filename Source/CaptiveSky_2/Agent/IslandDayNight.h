@@ -14,6 +14,7 @@ class CAPTIVESKY_2_API AIslandDayNight : public AActor
 {
 	GENERATED_BODY()
 public:
+	static constexpr float SemidiurnalTidePeriodHours = 12.42f;
 	AIslandDayNight();
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Island|Time", meta=(ClampMin="1"))
 	float DayLengthMinutes = 40.f;
@@ -109,6 +110,8 @@ public:
 	static FString DescribeStars(float Night, float CloudCover, float LunarIllumination, float MoonElevation);
 	/** Tide height -1..1 for the Island moment: two highs a day (12.42 h apart), larger spring tides near new and full moon, smaller neaps near the quarters. Pure. */
 	static float TideLevel(int32 IslandDay, float IslandHour);
+	/** Normalized tide change over a forward interval, advancing the Island day at midnight. Pure. */
+	static float TideLevelChange(int32 IslandDay, float IslandHour, float LookAheadHours);
 	/** Whether the tide is rising, falling or turning, with the next high water; spring or neap noted when pronounced. Pure. */
 	static FString DescribeTide(int32 IslandDay, float IslandHour);
 	/** Felt air warmth 0..1 from daily and seasonal cycles; cloud moderates both. Pure. */

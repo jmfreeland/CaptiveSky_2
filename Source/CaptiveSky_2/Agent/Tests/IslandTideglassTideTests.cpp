@@ -16,23 +16,27 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTideglassTideTest, "CaptiveSky2.Agent.Ti
 
 bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 {
-	const float NewMoonHigh = UIslandTideglassSubsystem::TideOffsetCm(6.21f, 1);
-	const float NewMoonLow = UIslandTideglassSubsystem::TideOffsetCm(18.63f, 1);
+	const float NewMoonHigh = UIslandTideglassSubsystem::TideOffsetCm(3.105f, 1);
+	const float NewMoonLow = UIslandTideglassSubsystem::TideOffsetCm(9.315f, 1);
 	TestTrue(TEXT("A new-moon high tide remains within the subtle waterline bound"),
-		NewMoonHigh > 13.8f && NewMoonHigh <= UIslandTideglassSubsystem::MaximumTideOffsetCm);
+		NewMoonHigh > 13.5f && NewMoonHigh <= UIslandTideglassSubsystem::MaximumTideOffsetCm);
 	TestTrue(TEXT("The following semidiurnal low tide is almost equally below the resting level"),
-		NewMoonLow < -13.8f && NewMoonLow >= -UIslandTideglassSubsystem::MaximumTideOffsetCm);
+		NewMoonLow < -13.5f && NewMoonLow >= -UIslandTideglassSubsystem::MaximumTideOffsetCm);
+	TestTrue(TEXT("The second daily high follows the 12.42-hour ocean tide"),
+		UIslandTideglassSubsystem::TideOffsetCm(15.525f, 1) > 13.5f);
+	TestTrue(TEXT("Tideglass shares the Island ocean's normalized tide curve"),
+		FMath::IsNearlyEqual(NewMoonHigh, AIslandDayNight::TideLevel(1, 3.105f) * UIslandTideglassSubsystem::MaximumTideOffsetCm, 0.001f));
 	using ETideTrend = UIslandTideglassSubsystem::ETideTrend;
 	TestEqual(TEXT("Tideglass is flooding before spring high water"),
-		UIslandTideglassSubsystem::GetTideTrend(5.5f, 1), ETideTrend::Rising);
+		UIslandTideglassSubsystem::GetTideTrend(2.5f, 1), ETideTrend::Rising);
 	TestEqual(TEXT("Tideglass is near its high-water turn"),
-		UIslandTideglassSubsystem::GetTideTrend(6.21f, 1), ETideTrend::NearHighWater);
+		UIslandTideglassSubsystem::GetTideTrend(3.105f, 1), ETideTrend::NearHighWater);
 	TestEqual(TEXT("Tideglass is ebbing after spring high water"),
-		UIslandTideglassSubsystem::GetTideTrend(8.5f, 1), ETideTrend::Falling);
+		UIslandTideglassSubsystem::GetTideTrend(4.f, 1), ETideTrend::Falling);
 	TestEqual(TEXT("Tideglass is near its low-water turn"),
-		UIslandTideglassSubsystem::GetTideTrend(18.63f, 1), ETideTrend::NearLowWater);
+		UIslandTideglassSubsystem::GetTideTrend(9.315f, 1), ETideTrend::NearLowWater);
 	TestEqual(TEXT("Tideglass resumes flooding after low water"),
-		UIslandTideglassSubsystem::GetTideTrend(20.f, 1), ETideTrend::Rising);
+		UIslandTideglassSubsystem::GetTideTrend(10.5f, 1), ETideTrend::Rising);
 	TestEqual(TEXT("The tide is flooding immediately before the Island day boundary"),
 		UIslandTideglassSubsystem::GetTideTrend(23.9f, 1), ETideTrend::Rising);
 	TestEqual(TEXT("The tide remains flooding immediately after the Island day boundary"),
@@ -88,7 +92,7 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Tideglass integration clock spawned"), Clock) ||
 		!TestNotNull(TEXT("Tideglass integration marker spawned"), PoolMarker) ||
 		!TestNotNull(TEXT("Tideglass integration footprint spawned"), PoolFootprint)) return false;
-	Clock->CurrentHour = 6.21f;
+	Clock->CurrentHour = 3.105f;
 	Clock->DayNumber = 1;
 	PoolMarker->Tags.Add(TEXT("IslandLandmark"));
 	PoolMarker->Tags.Add(TEXT("TideglassPool"));
@@ -125,7 +129,7 @@ bool FIslandTideglassTideTest::RunTest(const FString& Parameters)
 		const float BaseZ = Subsystem->RuntimeSurfaceBaseLocation.Z;
 		TestTrue(TEXT("Runtime water rises to the new-moon high-tide offset"),
 			FMath::IsNearlyEqual(Subsystem->RuntimeSurface->GetComponentLocation().Z - BaseZ, NewMoonHigh, 0.1f));
-		Clock->CurrentHour = 18.63f;
+				Clock->CurrentHour = 9.315f;
 		Subsystem->Tick(0.5f);
 		TestTrue(TEXT("Tick moves the same transient surface down to low tide"),
 			FMath::IsNearlyEqual(Subsystem->RuntimeSurface->GetComponentLocation().Z - BaseZ, NewMoonLow, 0.1f));

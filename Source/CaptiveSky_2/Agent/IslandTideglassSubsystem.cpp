@@ -22,34 +22,18 @@ const TCHAR* UIslandTideglassSubsystem::RippleMaterialPath = TEXT("/Game/Materia
 
 float UIslandTideglassSubsystem::TideOffsetCm(float IslandHour, int32 IslandDay)
 {
-	const int32 SafeDay = FMath::Max(1, IslandDay);
-	const float Hour = AIslandDayNight::WrapHour(IslandHour);
-	const double ElapsedHours = static_cast<double>(SafeDay - 1) * 24.0 + Hour;
-	const double LunarProgress = AIslandDayNight::LunarPhaseProgress(SafeDay, Hour);
-	const double LunarAngle = LunarProgress * 2.0 * PI;
-	// New and full moons reinforce the spring range; quarter moons temper it. The
-	// small closed pool never follows the ocean's full storm swell.
-	const float SpringRange = 0.66f + 0.34f * FMath::Abs(FMath::Cos(LunarAngle));
-	const double TideAngle = 2.0 * PI * ElapsedHours / TidalDayHours;
-	return MaximumTideOffsetCm * SpringRange * static_cast<float>(FMath::Sin(TideAngle));
+	// Share the semidiurnal tide and lunar spring/neap phase with the Island's
+	// sea description and ocean surface, rather than inventing a second clock.
+	return MaximumTideOffsetCm * AIslandDayNight::TideLevel(IslandDay, IslandHour);
 }
 
 UIslandTideglassSubsystem::ETideTrend UIslandTideglassSubsystem::GetTideTrend(float IslandHour, int32 IslandDay)
 {
 	const float CurrentHour = AIslandDayNight::WrapHour(IslandHour);
-	const float CurrentOffset = TideOffsetCm(CurrentHour, IslandDay);
-	constexpr float LookAheadHours = 0.25f;
-	float FutureHour = CurrentHour + LookAheadHours;
-	int32 FutureDay = FMath::Max(1, IslandDay);
-	if (FutureHour >= 24.f)
-	{
-		FutureHour -= 24.f;
-		++FutureDay;
-	}
-	const float FutureOffset = TideOffsetCm(FutureHour, FutureDay);
-	const float Change = FutureOffset - CurrentOffset;
-	if (FMath::Abs(Change) <= 0.1f && FMath::Abs(CurrentOffset) >= MaximumTideOffsetCm * 0.5f)
-		return CurrentOffset >= 0.f ? ETideTrend::NearHighWater : ETideTrend::NearLowWater;
+	const float CurrentLevel = AIslandDayNight::TideLevel(IslandDay, CurrentHour);
+	const float Change = AIslandDayNight::TideLevelChange(IslandDay, CurrentHour, 0.25f);
+	if (FMath::Abs(Change) <= 0.012f && FMath::Abs(CurrentLevel) >= 0.5f)
+		return CurrentLevel >= 0.f ? ETideTrend::NearHighWater : ETideTrend::NearLowWater;
 	return Change > 0.f ? ETideTrend::Rising : ETideTrend::Falling;
 }
 

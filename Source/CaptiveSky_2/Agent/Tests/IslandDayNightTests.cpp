@@ -90,6 +90,14 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Tide stays within -1..1"), bBounded);
 		TestTrue(TEXT("A day sees both high and low water"), bHigh && bLow);
 		TestTrue(TEXT("The tide both rises and falls"), bRising && bFalling);
+                const float BeforeMidnightTideChange = AIslandDayNight::TideLevelChange(1, 23.9f, 0.25f);
+                const float ExpectedMidnightTideChange = AIslandDayNight::TideLevel(2, 0.15f) - AIslandDayNight::TideLevel(1, 23.9f);
+                TestTrue(TEXT("A tide look-ahead advances the lunar and semidiurnal clock across midnight"),
+                        FMath::IsNearlyEqual(BeforeMidnightTideChange, ExpectedMidnightTideChange, 0.0001f));
+                TestTrue(TEXT("Invalid tide look-ahead inputs are harmless"),
+                        AIslandDayNight::TideLevelChange(1, NAN, 0.25f) == 0.f &&
+                        AIslandDayNight::TideLevelChange(1, 12.f, NAN) == 0.f &&
+                        AIslandDayNight::TideLevelChange(1, 12.f, -0.25f) == 0.f);
 		float BiggestDay = 0.f, SmallestDay = 1.f;
 		for (int32 Day = 1; Day <= 30; ++Day)
 		{
@@ -98,6 +106,13 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 			BiggestDay = FMath::Max(BiggestDay, DayMax); SmallestDay = FMath::Min(SmallestDay, DayMax);
 		}
 		TestTrue(TEXT("Spring tides near full range, neaps clearly smaller"), BiggestDay > 0.95f && SmallestDay < 0.85f);
+                const float NewMoonHigh = AIslandDayNight::TideLevel(1, 3.105f);
+                const float FirstQuarterHigh = AIslandDayNight::TideLevel(8, 3.105f);
+                const float FullMoonHigh = AIslandDayNight::TideLevel(15, 3.105f);
+                const float LastQuarterHigh = AIslandDayNight::TideLevel(23, 3.105f);
+                TestTrue(TEXT("New/full spring tides are higher than first/last-quarter neaps"),
+					NewMoonHigh > FirstQuarterHigh + 0.2f && FullMoonHigh > FirstQuarterHigh + 0.2f &&
+					NewMoonHigh > LastQuarterHigh + 0.2f && FullMoonHigh > LastQuarterHigh + 0.2f);
 		TestTrue(TEXT("Non-finite hour is harmless"), AIslandDayNight::DescribeTide(1, NAN).IsEmpty() && AIslandDayNight::TideLevel(1, NAN) == 0.f);
 	}
 	{

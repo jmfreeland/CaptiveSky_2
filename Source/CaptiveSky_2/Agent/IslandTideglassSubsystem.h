@@ -29,7 +29,6 @@ public:
 
 	static const TCHAR* MaterialPath;
 	static const TCHAR* RippleMaterialPath;
-	static constexpr float TidalDayHours = 24.84f;
 	static constexpr float MaximumTideOffsetCm = 14.f;
 	/** Small semidiurnal tide: spring range follows new/full moon, reduced at quarter moons. */
 	static float TideOffsetCm(float IslandHour, int32 IslandDay);
