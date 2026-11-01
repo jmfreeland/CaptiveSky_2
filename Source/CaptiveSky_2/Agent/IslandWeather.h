@@ -145,6 +145,8 @@ public:
 	static float GetBroadleafTreeHeight(int32 SpeciesIndex, float HeightSample);
 	/** Divide the fixed mixed-tree budget fairly across assets that resolved at runtime. */
 	static int32 GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount);
+	/** Map a stable [0,1] sample to an area-uniform radius inside an annulus (cm). */
+	static float SampleUniformAnnulusRadius(float UnitSample, float InnerRadius, float OuterRadius);
 
 protected:
 	virtual void BeginPlay() override;

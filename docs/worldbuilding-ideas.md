@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Remove center-weighting from woodland scatter
+
+Woodland layers already overlap, but their candidates used a radius drawn
+uniformly rather than an area-uniform radius. That subtly packed candidates
+toward each grove center. The seeded scatter now transforms the same single
+random sample with the annulus area law for grove centers, mature trees,
+saplings, shrubs, rhododendrons, and coppice. It preserves the current tree and
+ground-cover budgets, spacing, and overlap. A focused math regression covers
+the area median, endpoints, clamping, and invalid samples. This is a geometric
+correction, not visual proof; the matched rendered comparison remains pending
+while GPU memory is below the 4 GiB gate. Details:
+[area-uniform woodland scatter](findings/2026-11-01-area-uniform-woodland-scatter.md).
+
 ## 2026-11-01 — Give each broadleaf canopy a second local silhouette
 
 The Island's four broadleaf species now have a deterministic A/B mesh split,

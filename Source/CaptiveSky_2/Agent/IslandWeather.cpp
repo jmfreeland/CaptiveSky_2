@@ -1770,7 +1770,7 @@ void AIslandWeather::InitializeGroundCover()
 						{
 							const FVector& Anchor = ExclusionLocations[GroveIndex];
 							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = SpruceRandom.FRandRange(3500.f, 6500.f);
+							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), 3500.f, 6500.f);
 							Candidate = Anchor + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						}
 						else
@@ -1806,7 +1806,7 @@ void AIslandWeather::InitializeGroundCover()
 					for (int32 Attempt = 0; Attempt < MaxSpruceTracesPerGrove && GroundCoverTreeCount - TreesBeforeGrove < SpruceTreesPerGrove; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SpruceRandom.FRandRange(SpruceGroveInnerRadius, SpruceGroveOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), SpruceGroveInnerRadius, SpruceGroveOuterRadius);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bNearLandmark = false;
 						for (const FVector& Exclusion : ExclusionLocations)
@@ -1897,7 +1897,7 @@ void AIslandWeather::InitializeGroundCover()
 					for (int32 Attempt = 0; Attempt < MaxSaplingTracesPerGrove && SpruceSaplingCount - SaplingsBeforeGrove < SaplingsPerGrove; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SpruceRandom.FRandRange(SaplingInnerRadius, SaplingOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), SaplingInnerRadius, SaplingOuterRadius);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bNearLandmark = false;
 						for (const FVector& Exclusion : ExclusionLocations)
@@ -1936,7 +1936,7 @@ void AIslandWeather::InitializeGroundCover()
 						for (int32 Attempt = 0; Attempt < MaxShrubTracesPerGrove && GroundCoverShrubCount - ShrubsBeforeGrove < ShrubsPerGrove; ++Attempt)
 						{
 							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = SpruceRandom.FRandRange(ShrubInnerRadius, ShrubOuterRadius);
+							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), ShrubInnerRadius, ShrubOuterRadius);
 							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 							bool bNearLandmark = false;
 							for (const FVector& Exclusion : ExclusionLocations)
@@ -1979,7 +1979,7 @@ void AIslandWeather::InitializeGroundCover()
 							GroundCoverFlowerCount - FlowersBeforeGrove < RhododendronsPerGrove; ++Attempt)
 						{
 							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = SpruceRandom.FRandRange(RhododendronInnerRadius, RhododendronOuterRadius);
+							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), RhododendronInnerRadius, RhododendronOuterRadius);
 							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 							bool bNearLandmark = false;
 							for (const FVector& Exclusion : ExclusionLocations)
@@ -2030,7 +2030,7 @@ void AIslandWeather::InitializeGroundCover()
 							GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount < MaxWoodlandCoppices; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SpruceRandom.FRandRange(WoodlandCoppiceInnerRadius, WoodlandCoppiceOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), WoodlandCoppiceInnerRadius, WoodlandCoppiceOuterRadius);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)
@@ -3949,6 +3949,15 @@ int32 AIslandWeather::GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount)
 	if (AvailableSpeciesCount <= 0) return 0;
 	const int32 BoundedSpeciesCount = FMath::Min(AvailableSpeciesCount, BroadleafTreeSpeciesCount);
 	return FMath::DivideAndRoundUp(BroadleafTreePopulationBudget, BoundedSpeciesCount);
+}
+
+float AIslandWeather::SampleUniformAnnulusRadius(float UnitSample, float InnerRadius, float OuterRadius)
+{
+	if (!FMath::IsFinite(UnitSample) || !FMath::IsFinite(InnerRadius) || !FMath::IsFinite(OuterRadius)) return 0.f;
+	const float SafeInnerRadius = FMath::Max(0.f, FMath::Min(InnerRadius, OuterRadius));
+	const float SafeOuterRadius = FMath::Max(SafeInnerRadius, FMath::Max(InnerRadius, OuterRadius));
+	const float AreaSample = FMath::Clamp(UnitSample, 0.f, 1.f);
+	return FMath::Sqrt(FMath::Lerp(FMath::Square(SafeInnerRadius), FMath::Square(SafeOuterRadius), AreaSample));
 }
 
 void AIslandWeather::AddTransientGust(const FVector& Center, const FVector& Direction, float PeakSpeed, float Radius, float DurationSeconds)

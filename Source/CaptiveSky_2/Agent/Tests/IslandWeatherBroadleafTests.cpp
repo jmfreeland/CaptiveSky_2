@@ -104,6 +104,19 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 			AIslandWeather::WoodlandCoppiceOuterRadiusCm));
 	TestTrue(TEXT("Mature trees, saplings, shrubs, flowers and coppice share a mixed radial habitat"),
 		SharedLayerInnerRadius < SharedLayerOuterRadius);
+	const float AreaMedianRadius = AIslandWeather::SampleUniformAnnulusRadius(0.5f, 0.f, 1800.f);
+	TestTrue(TEXT("The median sample bisects mature-grove area rather than radius"),
+		FMath::IsNearlyEqual(AreaMedianRadius, FMath::Sqrt(FMath::Square(1800.f) * 0.5f), 0.01f));
+	TestEqual(TEXT("Annulus sampling honors its inner radius"),
+		AIslandWeather::SampleUniformAnnulusRadius(0.f, 800.f, 2800.f), 800.f);
+	TestEqual(TEXT("Annulus sampling honors its outer radius"),
+		AIslandWeather::SampleUniformAnnulusRadius(1.f, 800.f, 2800.f), 2800.f);
+	TestEqual(TEXT("Annulus sampling clamps values below the inner boundary"),
+		AIslandWeather::SampleUniformAnnulusRadius(-1.f, 800.f, 2800.f), 800.f);
+	TestEqual(TEXT("Annulus sampling clamps values above the outer boundary"),
+		AIslandWeather::SampleUniformAnnulusRadius(2.f, 800.f, 2800.f), 2800.f);
+	TestEqual(TEXT("Non-finite annulus samples resolve safely"),
+		AIslandWeather::SampleUniformAnnulusRadius(std::numeric_limits<float>::quiet_NaN(), 800.f, 2800.f), 0.f);
 
 	const AIslandWeather* Defaults = GetDefault<AIslandWeather>();
 	const UInstancedSkinnedMeshComponent* BlackAlders = Defaults ? Defaults->IslandBlackAlders : nullptr;
