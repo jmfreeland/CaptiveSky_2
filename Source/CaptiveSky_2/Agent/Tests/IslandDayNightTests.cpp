@@ -118,6 +118,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		AIslandDayNight::DescribeHorizonColour(12.f, 0.5f).IsEmpty() && AIslandDayNight::DescribeHorizonColour(NAN, 0.5f).IsEmpty());
 	TestTrue(TEXT("Dawn is coolest, mid-afternoon warmest"), AIslandDayNight::WarmthLevel(5.f, 0.f) < 0.01f && AIslandDayNight::WarmthLevel(17.f, 0.f) > 0.99f);
 	TestTrue(TEXT("Cloud pulls the extremes toward the middle"), AIslandDayNight::WarmthLevel(17.f, 1.f) < AIslandDayNight::WarmthLevel(17.f, 0.f) && AIslandDayNight::WarmthLevel(5.f, 1.f) > AIslandDayNight::WarmthLevel(5.f, 0.f));
+	const float SpringFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 1);
+	const float SummerFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 91);
+	const float AutumnFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 181);
+	const float WinterFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 271);
+	TestTrue(TEXT("Season gently warms midsummer and cools midwinter with mild equinoxes"),
+		SummerFeel > SpringFeel && FMath::IsNearlyEqual(SpringFeel, AutumnFeel, 0.001f) &&
+		WinterFeel < SpringFeel && FMath::IsNearlyEqual(SpringFeel, AIslandDayNight::WarmthLevel(11.f, 0.f, 361), 0.001f));
+	TestTrue(TEXT("Cloud moderates the seasonal warmth swing"),
+		SummerFeel - WinterFeel > AIslandDayNight::WarmthLevel(11.f, 1.f, 91) - AIslandDayNight::WarmthLevel(11.f, 1.f, 271));
 	TestTrue(TEXT("Cold before dawn"), AIslandDayNight::DescribeWarmth(5.f, 0.f).Contains(TEXT("cold")));
 	TestTrue(TEXT("Warm in the afternoon"), AIslandDayNight::DescribeWarmth(16.f, 0.f).Contains(TEXT("warm")));
 	TestTrue(TEXT("Evening cools"), AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("cooling")) || AIslandDayNight::DescribeWarmth(23.f, 0.f).Contains(TEXT("losing")));
@@ -125,6 +134,10 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wind bites cool air"), AIslandDayNight::DescribeChill(5.f, 0.f, 0.f, 400.f).Contains(TEXT("bites")));
 	TestTrue(TEXT("Cold wind-driven rain cuts"), AIslandDayNight::DescribeChill(5.f, 0.f, 0.8f, 400.f).Contains(TEXT("cuts through")));
 	TestTrue(TEXT("Warm breeze is welcome"), AIslandDayNight::DescribeChill(17.f, 0.f, 0.f, 400.f).Contains(TEXT("welcome")));
+	TestTrue(TEXT("Resident chill perception includes the Island season"),
+		AIslandDayNight::DescribeWarmth(11.f, 0.f, 91).Contains(TEXT("mild")) &&
+		AIslandDayNight::DescribeWarmth(11.f, 0.f, 271).Contains(TEXT("cool")) &&
+		AIslandDayNight::DescribeChill(11.f, 0.f, 0.f, 400.f, 271).Contains(TEXT("bites")));
 	TestTrue(TEXT("Calm mild air says nothing"), AIslandDayNight::DescribeChill(11.f, 0.f, 0.f, 50.f).IsEmpty());
 	TestTrue(TEXT("Non-finite weather says nothing"), AIslandDayNight::DescribeChill(5.f, 0.f, NAN, 400.f).IsEmpty());
 	TestTrue(TEXT("Noon is six hours from sunset"), FMath::IsNearlyEqual(AIslandDayNight::HoursUntilSunEdge(12.f), 6.f, 0.001f));

@@ -103,12 +103,12 @@ public:
 	static float TideLevel(int32 IslandDay, float IslandHour);
 	/** Whether the tide is rising, falling or turning, with the next high water; spring or neap noted when pronounced. Pure. */
 	static FString DescribeTide(int32 IslandDay, float IslandHour);
-	/** Air warmth 0 (coldest) .. 1 (warmest): coolest just before dawn, warmest mid-afternoon, damped by cloud. Pure. */
-	static float WarmthLevel(float IslandHour, float CloudCover);
-	/** How the air feels on the skin: chilly before dawn, warming through the morning, warm in the afternoon, cooling at dusk. Pure. */
-	static FString DescribeWarmth(float IslandHour, float CloudCover);
+	/** Felt air warmth 0..1 from daily and seasonal cycles; cloud moderates both. Pure. */
+	static float WarmthLevel(float IslandHour, float CloudCover, int32 IslandDay = 1);
+	/** How daily and seasonal warmth feels on the skin through the day. Pure. */
+	static FString DescribeWarmth(float IslandHour, float CloudCover, int32 IslandDay = 1);
 	/** How wind and rain change the felt warmth: a biting wind on cool air, a chilling rain, a welcome breeze on a warm day; empty when they change nothing. WindSpeed in cm/s. Pure. */
-	static FString DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed);
+	static FString DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed, int32 IslandDay = 1);
 	/** Hours until the sun next crosses the horizon (sunrise at 06:00, sunset at 18:00), 0..24. Pure. */
 	static float HoursUntilSunEdge(float IslandHour);
 	/** How long until sunset by day or sunrise by night, in whole hours; empty within the half hour of the edge (DescribeSunEdge speaks then). Pure. */

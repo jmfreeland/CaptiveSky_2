@@ -360,7 +360,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			{
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeGround(Environment->GetWetness(), Environment->GetRainIntensity());
 				NearbyBeings += UIslandEnvironmentSubsystem::DescribeAir(Environment->GetMist());
-				if (LocalClock) NearbyBeings += AIslandDayNight::DescribeChill(LocalClock->CurrentHour, It->SampleCloudCover(SkyNow), Environment->GetRainIntensity(), It->SampleWind(Location, SkyNow).Size2D());
+				if (LocalClock) NearbyBeings += AIslandDayNight::DescribeChill(LocalClock->CurrentHour, It->SampleCloudCover(SkyNow), Environment->GetRainIntensity(), It->SampleWind(Location, SkyNow).Size2D(), LocalClock->DayNumber);
 				if (const UIslandRainbowSubsystem* Rainbow = GetWorld()->GetSubsystem<UIslandRainbowSubsystem>())
 					NearbyBeings += UIslandRainbowSubsystem::DescribeRainbow(Rainbow->GetStrength());
 				if (const UIslandDewSubsystem* Dew = GetWorld()->GetSubsystem<UIslandDewSubsystem>())

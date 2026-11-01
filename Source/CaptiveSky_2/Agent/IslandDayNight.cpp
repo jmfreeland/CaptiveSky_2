@@ -635,7 +635,7 @@ void AIslandDayNight::UpdateLighting()
 		PrimaryLight->SetForwardShadingPriority(DirectionalLights.Num() - 1);
 }
 
-float AIslandDayNight::WarmthLevel(float IslandHour, float CloudCover)
+float AIslandDayNight::WarmthLevel(float IslandHour, float CloudCover, int32 IslandDay)
 {
 	if (!FMath::IsFinite(IslandHour)) return 0.5f;
 	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
@@ -643,12 +643,18 @@ float AIslandDayNight::WarmthLevel(float IslandHour, float CloudCover)
 	const float Raw = 0.5f - 0.5f * FMath::Cos((Hour - 5.f) / 24.f * 2.f * PI);
 	// Cloud holds the day's heat down and the night's heat in: pull toward the middle.
 	const float Damp = 1.f - 0.5f * FMath::Clamp(FMath::IsFinite(CloudCover) ? CloudCover : 0.f, 0.f, 1.f);
-	return 0.5f + (Raw - 0.5f) * Damp;
+	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % CalendarDaysPerYear;
+	// The temperate year is mild at the spring/autumn boundaries, warmest near midsummer,
+	// and coolest near midwinter. Keep this as a small felt-temperature offset, not a forecast.
+	const float SeasonalPhase = (static_cast<float>(DayOfYear) - CalendarDaysPerSeason) /
+		static_cast<float>(CalendarDaysPerYear) * 2.f * PI;
+	const float SeasonalOffset = 0.14f * FMath::Cos(SeasonalPhase);
+	return FMath::Clamp(0.5f + (Raw - 0.5f) * Damp + SeasonalOffset * Damp, 0.f, 1.f);
 }
 
-FString AIslandDayNight::DescribeWarmth(float IslandHour, float CloudCover)
+FString AIslandDayNight::DescribeWarmth(float IslandHour, float CloudCover, int32 IslandDay)
 {
-	const float Warmth = WarmthLevel(IslandHour, CloudCover);
+	const float Warmth = WarmthLevel(IslandHour, CloudCover, IslandDay);
 	const float Hour = FMath::Fmod(FMath::Fmod(IslandHour, 24.f) + 24.f, 24.f);
 	const bool bWarming = Hour >= 5.f && Hour < 17.f;
 	if (Warmth < 0.2f) return TEXT(" The air is cold.");
@@ -657,10 +663,10 @@ FString AIslandDayNight::DescribeWarmth(float IslandHour, float CloudCover)
 	return TEXT(" The air is warm.");
 }
 
-FString AIslandDayNight::DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed)
+FString AIslandDayNight::DescribeChill(float IslandHour, float CloudCover, float Rain, float WindSpeed, int32 IslandDay)
 {
 	if (!FMath::IsFinite(Rain) || !FMath::IsFinite(WindSpeed)) return FString();
-	const float Warmth = WarmthLevel(IslandHour, CloudCover);
+	const float Warmth = WarmthLevel(IslandHour, CloudCover, IslandDay);
 	const bool bWindy = WindSpeed >= 320.f;
 	const bool bRaining = Rain >= 0.3f;
 	if (Warmth < 0.4f && bWindy && bRaining) return TEXT(" Cold rain driven by the wind cuts through anything you wear.");
@@ -716,7 +722,7 @@ FString AIslandDayNight::DescribeTime() const
 		? FString(TEXT(" A shooting star streaks across the sky.")) : FString();
 	const FString Hidden = IsMoonHiddenByCloud(MoonElevation, NightAmount(CurrentHour), CloudNow)
 		? FString(TEXT(" Thick cloud hides the moon; the night is dim.")) : FString();
-	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour) + DescribeWarmth(CurrentHour, CloudNow) + DescribeDaylightLeft(CurrentHour);
+	const FString Tide = DescribeTide(DayNumber, CurrentHour) + DescribeMoonHorizon(DayNumber, CurrentHour) + DescribeWarmth(CurrentHour, CloudNow, DayNumber) + DescribeDaylightLeft(CurrentHour);
 	const FString Stars = DescribeStars(NightAmount(CurrentHour), CloudNow, LunarLight, MoonElevation);
 	return FString::Printf(TEXT(" It is %s on the Island (approximately %02d:%02d). The moon is at %s with %s illumination and is %s; the moon's rise and set shift through the cycle. The sun follows its daily arc; cloud cover gently softens direct and ambient daylight.%s%s%s%s%s"),
 		Phase, FMath::FloorToInt(CurrentHour), FMath::FloorToInt(FMath::Frac(CurrentHour) * 60.f), LunarName, LunarBrightness, MoonPosition, *SunEdge, *Hidden, *Stars, *Meteor, *Tide);
