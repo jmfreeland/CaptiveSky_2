@@ -170,6 +170,12 @@ preclude a safe behavior/render claim. Verify the focused test in a validation
 editor, then use a bounded real-RHI shoreline traversal when memory headroom
 allows.
 
+The transient water fixture now also sweeps a player-sized capsule through the
+ocean with the `Pawn` collision channel after the startup guard runs. This is a
+more direct check that no water surface returns a blocking hit, complementing
+the component-response assertions and saved-map audit. It compiles in the
+isolated target; it has not executed under the current NullRHI/editor limits.
+
 ## User-authorized restart recheck — 2026-11-01 05:21 UTC
 
 After the user confirmed the Island was saved, the live editor was closed

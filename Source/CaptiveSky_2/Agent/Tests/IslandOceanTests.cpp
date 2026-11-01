@@ -2,6 +2,7 @@
 #include "IslandOceanSubsystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "CollisionShape.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -272,6 +273,14 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 
 		if (bSurfaceQuerySucceeded)
 		{
+			const FCollisionShape PlayerCapsule = FCollisionShape::MakeCapsule(34.f, 88.f);
+			FHitResult WaterSurfaceBlocker;
+			const bool bWaterBlocksPawnCapsule = World->SweepSingleByChannel(WaterSurfaceBlocker,
+				SurfaceLocation + FVector(0.f, 0.f, 500.f), SurfaceLocation - FVector(0.f, 0.f, 120.f),
+				FQuat::Identity, ECC_Pawn, PlayerCapsule);
+			TestFalse(TEXT("A player-sized Pawn sweep crosses the open-water surface without a blocking hit"),
+				bWaterBlocksPawnCapsule);
+
 			AActor* ShoreGround = World->SpawnActor<AActor>(FVector(2000.f, 0.f, SurfaceLocation.Z - 60.f), FRotator::ZeroRotator);
 			UBoxComponent* ShoreFloor = NewObject<UBoxComponent>(ShoreGround, TEXT("ShoreFloor"));
 			ShoreGround->SetRootComponent(ShoreFloor);
