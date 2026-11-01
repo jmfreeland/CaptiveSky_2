@@ -153,6 +153,15 @@ float AIslandWeather::SampleLandscapeCommunityFieldAtScale(const FVector& Positi
 	return SampleGroundCoverFieldAtScale(Position, Seed, FieldCellSizeCm);
 }
 
+float AIslandWeather::GetWoodlandGroveRadiusScaleAt(const FVector& Position, int32 Seed)
+{
+	if (Position.ContainsNaN()) return 1.f;
+	// Adjacent groves share a gentle, low-frequency footprint tendency. This avoids
+	// repeating identical circular layers without adding or removing instances.
+	const float GroveField = SampleGroundCoverFieldAtScale(Position, Seed, 9000.f);
+	return FMath::Lerp(0.82f, 1.18f, GroveField);
+}
+
 AIslandWeather::AIslandWeather()
 {
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
@@ -1800,13 +1809,16 @@ void AIslandWeather::InitializeGroundCover()
 					// sprinkling a few isolated broadleaf trees uniformly through every grove.
 					const bool bBroadleafGrove = SampleGroundCoverField(GroveCenter,
 						WeatherSeed ^ 0x6a09e667) > 0.25f;
+					const float GroveRadiusScale = GetWoodlandGroveRadiusScaleAt(
+						GroveCenter, WeatherSeed ^ 0xbb67ae85);
 
 					const int32 TreesBeforeGrove = GroundCoverTreeCount;
 					const int32 BroadleafTreesBeforeGrove = BroadleafTreeCount;
 					for (int32 Attempt = 0; Attempt < MaxSpruceTracesPerGrove && GroundCoverTreeCount - TreesBeforeGrove < SpruceTreesPerGrove; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), SpruceGroveInnerRadius, SpruceGroveOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(),
+							SpruceGroveInnerRadius * GroveRadiusScale, SpruceGroveOuterRadius * GroveRadiusScale);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bNearLandmark = false;
 						for (const FVector& Exclusion : ExclusionLocations)
@@ -1897,7 +1909,8 @@ void AIslandWeather::InitializeGroundCover()
 					for (int32 Attempt = 0; Attempt < MaxSaplingTracesPerGrove && SpruceSaplingCount - SaplingsBeforeGrove < SaplingsPerGrove; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), SaplingInnerRadius, SaplingOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(),
+							SaplingInnerRadius * GroveRadiusScale, SaplingOuterRadius * GroveRadiusScale);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bNearLandmark = false;
 						for (const FVector& Exclusion : ExclusionLocations)
@@ -1936,7 +1949,8 @@ void AIslandWeather::InitializeGroundCover()
 						for (int32 Attempt = 0; Attempt < MaxShrubTracesPerGrove && GroundCoverShrubCount - ShrubsBeforeGrove < ShrubsPerGrove; ++Attempt)
 						{
 							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), ShrubInnerRadius, ShrubOuterRadius);
+							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(),
+								ShrubInnerRadius * GroveRadiusScale, ShrubOuterRadius * GroveRadiusScale);
 							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 							bool bNearLandmark = false;
 							for (const FVector& Exclusion : ExclusionLocations)
@@ -1979,7 +1993,8 @@ void AIslandWeather::InitializeGroundCover()
 							GroundCoverFlowerCount - FlowersBeforeGrove < RhododendronsPerGrove; ++Attempt)
 						{
 							const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), RhododendronInnerRadius, RhododendronOuterRadius);
+							const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(),
+								RhododendronInnerRadius * GroveRadiusScale, RhododendronOuterRadius * GroveRadiusScale);
 							const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 							bool bNearLandmark = false;
 							for (const FVector& Exclusion : ExclusionLocations)
@@ -2030,7 +2045,8 @@ void AIslandWeather::InitializeGroundCover()
 							GroundCoverBirchCoppiceCount + GroundCoverHazelCoppiceCount < MaxWoodlandCoppices; ++Attempt)
 					{
 						const float Angle = SpruceRandom.FRandRange(0.f, 2.f * PI);
-						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(), WoodlandCoppiceInnerRadius, WoodlandCoppiceOuterRadius);
+						const float Radius = SampleUniformAnnulusRadius(SpruceRandom.FRand(),
+							WoodlandCoppiceInnerRadius * GroveRadiusScale, WoodlandCoppiceOuterRadius * GroveRadiusScale);
 						const FVector Candidate = GroveCenter + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 0.f);
 						bool bTooClose = false;
 						for (const FVector& Exclusion : ExclusionLocations)

@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-01 — Let woodland communities vary without multiplying trees
+
+Every grove previously shared identical planting radii, which can reveal the
+procedural pattern even when individual positions are randomized. A smooth,
+seeded habitat field now gently expands or contracts all five layers of each
+grove while leaving population budgets and safety clearances intact. The change
+builds successfully in the isolated UE 5.8.3 target; its rendered appearance
+still needs a matched route comparison after GPU and system-memory headroom
+meet the play gate. Details: [irregular grove footprints](findings/2026-11-01-irregular-grove-footprints.md).
+
 ## 2026-11-01 — Let a resident finish an interaction they explicitly chose
 
 The isolated 15-minute feedback log caught Rat choosing the rain-basin leaf

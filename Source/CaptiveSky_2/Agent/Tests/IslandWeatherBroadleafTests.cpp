@@ -117,6 +117,27 @@ bool FIslandWeatherBroadleafDiversityTest::RunTest(const FString& Parameters)
 		AIslandWeather::SampleUniformAnnulusRadius(2.f, 800.f, 2800.f), 2800.f);
 	TestEqual(TEXT("Non-finite annulus samples resolve safely"),
 		AIslandWeather::SampleUniformAnnulusRadius(std::numeric_limits<float>::quiet_NaN(), 800.f, 2800.f), 0.f);
+	const FVector GroveScalePosition(-104250.f, 98250.f, 0.f);
+	const float GroveRadiusScale = AIslandWeather::GetWoodlandGroveRadiusScaleAt(GroveScalePosition, 0x3c6ef372);
+	TestTrue(TEXT("Grove footprint scale stays inside its restrained 0.82..1.18 range"),
+		GroveRadiusScale >= 0.82f && GroveRadiusScale <= 1.18f);
+	TestEqual(TEXT("Grove footprint variation is stable for the same world position and seed"),
+		AIslandWeather::GetWoodlandGroveRadiusScaleAt(GroveScalePosition, 0x3c6ef372), GroveRadiusScale);
+	TestTrue(TEXT("Invalid grove positions use the neutral footprint scale"),
+		FMath::IsNearlyEqual(AIslandWeather::GetWoodlandGroveRadiusScaleAt(
+			FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), 0x3c6ef372), 1.f));
+	float MinimumGroveScale = MAX_flt;
+	float MaximumGroveScale = -MAX_flt;
+	for (int32 GridY = -8; GridY <= 8; ++GridY)
+		for (int32 GridX = -8; GridX <= 8; ++GridX)
+		{
+			const FVector Sample = GroveScalePosition + FVector(GridX * 5000.f, GridY * 5000.f, 0.f);
+			const float Scale = AIslandWeather::GetWoodlandGroveRadiusScaleAt(Sample, 0x3c6ef372);
+			MinimumGroveScale = FMath::Min(MinimumGroveScale, Scale);
+			MaximumGroveScale = FMath::Max(MaximumGroveScale, Scale);
+		}
+	TestTrue(TEXT("Nearby Island-scale grove footprints do not all repeat the same radius"),
+		MaximumGroveScale - MinimumGroveScale >= 0.12f);
 
 	const AIslandWeather* Defaults = GetDefault<AIslandWeather>();
 	const UInstancedSkinnedMeshComponent* BlackAlders = Defaults ? Defaults->IslandBlackAlders : nullptr;

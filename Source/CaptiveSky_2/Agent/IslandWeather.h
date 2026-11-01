@@ -147,6 +147,8 @@ public:
 	static int32 GetBroadleafSpeciesLimit(int32 AvailableSpeciesCount);
 	/** Map a stable [0,1] sample to an area-uniform radius inside an annulus (cm). */
 	static float SampleUniformAnnulusRadius(float UnitSample, float InnerRadius, float OuterRadius);
+	/** Smoothly vary woodland grove footprints by world position and seed, without changing their population budgets. */
+	static float GetWoodlandGroveRadiusScaleAt(const FVector& Position, int32 Seed);
 
 protected:
 	virtual void BeginPlay() override;
