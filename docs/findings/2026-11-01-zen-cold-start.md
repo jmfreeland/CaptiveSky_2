@@ -33,10 +33,21 @@ being applied to Game startup and keeps Zen available after Game exit; the next
 editor launch is still needed to verify its startup warning and post-editor
 lifetime specifically.
 
+**Live-project configuration check (2026-11-01):** the current D: project log
+`CaptiveSky_2_2.log` still shows Zen launched with `--owner-pid 20644`, then
+becoming healthy after 52.602 seconds. A read-only check of that project's
+`Config/DefaultEngine.ini` found no `[Zen.AutoLaunch]` / `LimitProcessLifetime`
+entry. The persistent-lifetime mitigation is present in this worktree's
+configuration, but has not reached the D: project currently being opened.
+Thus the repeated cold start is expected for that live project; the earlier
+paired-launch contention can add further delay when starts overlap. No cache
+reset or live-project write was made.
+
 ## Next diagnostic
 
-If a single-editor launch still shows the warning after this setting takes
-effect, capture that launch's `Unreal.log` and `zenserver.log` with no second
-editor or Unreal automation starting concurrently, then compare the Zen
-process start/ready interval and any warnings around it. Do not clear its
+Once the setting is applied to the D: project, verify a single-editor launch
+and confirm the process stays healthy after closing the editor. If that launch
+still shows the warning, capture its `Unreal.log` and `zenserver.log` with no
+second editor or Unreal automation starting concurrently, then compare the
+Zen process start/ready interval and any warnings around it. Do not clear its
 cache as a first response.
