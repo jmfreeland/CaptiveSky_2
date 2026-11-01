@@ -33,6 +33,8 @@ The local generated index at `Saved/CaptiveSky/ComfyBlender/ASSETS.md` is the cu
 
 `WoodlandFernCluster` adds a broad, layered frond silhouette to the understory candidate roster. Its seven-frond source exports an 85 × 87 × 40 cm, 1,974-triangle collisionless FBX with four green material slots; Blender 5.2.2 re-import reports `PROBLEMS []`. The fern remains an unplaced candidate: compare it under Island lighting and among grass before considering any population. Its ignored local export is at `Saved/CaptiveSky/ComfyBlender/WoodlandFernCluster/`; see [`2026-11-01 woodland fern candidate`](../../docs/findings/2026-11-01-woodland-fern-cluster.md).
 
+`WoodlandRamsons` adds a spring woodland-floor silhouette: seven basal two-leaf rosettes and three leafless flower scapes with white starry umbels. Its 119 × 123 × 32 cm collisionless FBX has 4,222 triangles and five plain material slots; Blender 5.2.2 re-import reports `PROBLEMS []`. This is a composed clump for sparse damp-shade microhabitats, not a blanket-scatter mesh; it remains unplaced and has no seasonal visibility logic. See [`2026-11-01 woodland ramsons candidate`](../../docs/findings/2026-11-01-woodland-ramsons-candidate.md).
+
 After importing a reviewed mesh, `Config/IslandProps.json` can reference it with an explicit Unreal object path, for example `"asset_path": "/Game/Generated/ComfyBlender/RatHollow/SM_RatHollow_01"`. The placement script still accepts legacy `"asset"` entries under `/Game/Generated/Tripo`. It preflights all meshes and ground samples before replacing generated-prop actors; `PLACE_PROPS_DRYRUN=1` reports the plan without destroying, spawning, or saving actors. Do not add the Rat's location until the hollow has been imported and checked in the world.
 
 ## Layout
