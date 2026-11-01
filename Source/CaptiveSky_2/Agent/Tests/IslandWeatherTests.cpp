@@ -17,6 +17,26 @@
 #include "GameFramework/Character.h"
 #include "Misc/ScopeExit.h"
 #include "Sound/SoundWaveProcedural.h"
+#include <limits>
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandFungusGroundCoverClearanceTest,
+	"CaptiveSky2.Agent.FungusGroundCoverClearance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandFungusGroundCoverClearanceTest::RunTest(const FString& Parameters)
+{
+	const FVector FungusClusterCenter(-100520.f, 100920.f, 0.f);
+	TestTrue(TEXT("Ground cover clears the combined fungus and plant footprint plus a small breathing margin"),
+		AIslandWeather::IsWithinFungusGroundCoverClearance(FungusClusterCenter + FVector(54.f, 0.f, 900.f),
+			FungusClusterCenter, 12.f + 18.f));
+	TestFalse(TEXT("Fungus clearing ends at its measured visual boundary"),
+		AIslandWeather::IsWithinFungusGroundCoverClearance(FungusClusterCenter + FVector(55.f, 0.f, 0.f),
+			FungusClusterCenter, 12.f + 18.f));
+	TestFalse(TEXT("Invalid fungus footprint does not create an unbounded clearing"),
+		AIslandWeather::IsWithinFungusGroundCoverClearance(FungusClusterCenter + FVector(30.f, 0.f, 0.f),
+			FungusClusterCenter, std::numeric_limits<float>::infinity()));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherTest, "CaptiveSky2.Agent.IslandWeather",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

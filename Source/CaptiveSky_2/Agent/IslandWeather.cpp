@@ -663,6 +663,16 @@ bool AIslandWeather::IsWithinCurioGroundCoverClearance(const FVector& Position, 
 	return FVector::DistSquared2D(Position, CurioPosition) < FMath::Square(ClearanceRadius);
 }
 
+bool AIslandWeather::IsWithinFungusGroundCoverClearance(const FVector& Position, const FVector& FungusPosition,
+	float CombinedVisualFootprintRadius)
+{
+	if (Position.ContainsNaN() || FungusPosition.ContainsNaN()) return false;
+	const float VisualFootprint = FMath::IsFinite(CombinedVisualFootprintRadius)
+		? FMath::Max(0.f, CombinedVisualFootprintRadius) : 0.f;
+	constexpr float BreathingRoom = 25.f;
+	return FVector::DistSquared2D(Position, FungusPosition) < FMath::Square(VisualFootprint + BreathingRoom);
+}
+
 void AIslandWeather::BuildTidepoolPeriwinkleShoreOffsets(int32 Index, TArray<FVector>& OutOffsets)
 {
 	OutOffsets.Reset();
@@ -1184,6 +1194,23 @@ void AIslandWeather::InitializeGroundCover()
 		for (TActorIterator<AIslandCurio> It(GetWorld()); It; ++It)
 			ScatterCurios.Add(It->GetRecord());
 	UE_LOG(LogIslandWeather, Log, TEXT("Ground-cover scatter keeps clearances around %d curio(s)."), ScatterCurios.Num());
+	TArray<TPair<FVector, float>> WoodlandFungusFootprints;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		TArray<UStaticMeshComponent*> MeshComponents;
+		It->GetComponents<UStaticMeshComponent>(MeshComponents);
+		for (const UStaticMeshComponent* Component : MeshComponents)
+		{
+			const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+			if (!Mesh || Mesh->GetFName() != FName(TEXT("SM_WoodlandFungusCluster_01"))) continue;
+			const FBoxSphereBounds& WorldBounds = Component->Bounds;
+			WoodlandFungusFootprints.Emplace(WorldBounds.Origin,
+				FMath::Max(WorldBounds.BoxExtent.X, WorldBounds.BoxExtent.Y));
+		}
+	}
+	if (!WoodlandFungusFootprints.IsEmpty())
+		UE_LOG(LogIslandWeather, Log, TEXT("Ground-cover scatter preserves breathing room around %d woodland fungus cluster(s)."),
+			WoodlandFungusFootprints.Num());
 	FIslandTrailLedger TrailLedgerForScatter;
 	const FIslandTrailLedger* TrailLedger = nullptr;
 	if (const UIslandTrailSubsystem* TrailSubsystem = GetWorld()->GetSubsystem<UIslandTrailSubsystem>())
@@ -1195,6 +1222,7 @@ void AIslandWeather::InitializeGroundCover()
 		TrailLedger = &TrailLedgerForScatter;
 	}
 	int32 RatHollowClearedInstanceCount = 0;
+	int32 FungusClearedInstanceCount = 0;
 	TMap<const UStaticMesh*, float> GroundCoverMeshFootprintRadii;
 	const UHierarchicalInstancedStaticMeshComponent* GroundCoverComponents[] = {
 		ShoreGrassA.Get(), ShoreGrassB.Get(), GrassC, ShoreGroundPlants.Get(),
@@ -1209,6 +1237,7 @@ void AIslandWeather::InitializeGroundCover()
 	}
 	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios,
 		&PeriwinkleGroundCoverHomes, &RatHollowApproaches, &RatHollowClearedInstanceCount,
+		&WoodlandFungusFootprints, &FungusClearedInstanceCount,
 		&GroundCoverMeshFootprintRadii](
 		const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
@@ -1260,30 +1289,38 @@ void AIslandWeather::InitializeGroundCover()
 			const int32 GrassVariant = (SpeciesVariant - 5) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
+		float VisualFootprintRadius = 0.f;
+		if (const float* MeshFootprintRadius = GroundCoverMeshFootprintRadii.Find(Species->GetStaticMesh()))
+		{
+			const float InstanceScaleXY = FMath::Max(FMath::Abs(Scale.X), FMath::Abs(Scale.Y));
+			VisualFootprintRadius = *MeshFootprintRadius * InstanceScaleXY;
+		}
+		for (const TPair<FVector, float>& Fungus : WoodlandFungusFootprints)
+			if (IsWithinFungusGroundCoverClearance(GroundHit.ImpactPoint, Fungus.Key,
+				Fungus.Value + VisualFootprintRadius))
+			{
+				++FungusClearedInstanceCount;
+				return;
+			}
 		if (!RatHollowApproaches.IsEmpty() || !PeriwinkleGroundCoverHomes.IsEmpty())
 		{
-			if (const float* MeshFootprintRadius = GroundCoverMeshFootprintRadii.Find(Species->GetStaticMesh()))
-			{
-				const float InstanceScaleXY = FMath::Max(FMath::Abs(Scale.X), FMath::Abs(Scale.Y));
-				const float VisualFootprintRadius = *MeshFootprintRadius * InstanceScaleXY;
-				// Keep the low shoreline understorey and species mix intact; only tall grasses
-				// are withheld from a periwinkle's immediate sightline.
-				const bool bTallGrass = Species == ShoreGrassA.Get() || Species == ShoreGrassB.Get() || Species == GrassC;
-				if (bTallGrass)
-					for (const FVector& Home : PeriwinkleGroundCoverHomes)
-						if (IsWithinTidepoolPeriwinkleClearance(GroundHit.ImpactPoint, Home, VisualFootprintRadius))
-						{
-							++GroundCoverPeriwinkleClearedInstanceCount;
-							return;
-						}
-				for (const TPair<FVector, FVector>& Approach : RatHollowApproaches)
-					if (IsWithinRatHollowApproachClearance(GroundHit.ImpactPoint, Approach.Key, Approach.Value,
-						VisualFootprintRadius))
+			// Keep the low shoreline understorey and species mix intact; only tall grasses
+			// are withheld from a periwinkle's immediate sightline.
+			const bool bTallGrass = Species == ShoreGrassA.Get() || Species == ShoreGrassB.Get() || Species == GrassC;
+			if (bTallGrass)
+				for (const FVector& Home : PeriwinkleGroundCoverHomes)
+					if (IsWithinTidepoolPeriwinkleClearance(GroundHit.ImpactPoint, Home, VisualFootprintRadius))
 					{
-						++RatHollowClearedInstanceCount;
+						++GroundCoverPeriwinkleClearedInstanceCount;
 						return;
 					}
-			}
+			for (const TPair<FVector, FVector>& Approach : RatHollowApproaches)
+				if (IsWithinRatHollowApproachClearance(GroundHit.ImpactPoint, Approach.Key, Approach.Value,
+					VisualFootprintRadius))
+				{
+					++RatHollowClearedInstanceCount;
+					return;
+				}
 		}
 		Species->AddInstance(FTransform(Rotation, Location, Scale), true);
 		++GroundCoverInstanceCount;
@@ -2577,6 +2614,9 @@ void AIslandWeather::InitializeGroundCover()
 	if (!PeriwinkleGroundCoverHomes.IsEmpty())
 		UE_LOG(LogIslandWeather, Log, TEXT("Tideglass periwinkle clearings preserved %d grounded homes and skipped %d candidate ground-cover instances."),
 			PeriwinkleGroundCoverHomes.Num(), GroundCoverPeriwinkleClearedInstanceCount);
+	if (!WoodlandFungusFootprints.IsEmpty())
+		UE_LOG(LogIslandWeather, Log, TEXT("Woodland fungus breathing room skipped %d candidate ground-cover instances."),
+			FungusClearedInstanceCount);
 	if (GroundCoverInstanceCount == 0)
 		UE_LOG(LogIslandWeather, Warning, TEXT("No Island ground-cover instances placed; check landmark tags and ground collision."));
 }

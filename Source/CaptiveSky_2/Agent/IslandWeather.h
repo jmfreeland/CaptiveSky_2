@@ -159,6 +159,7 @@ protected:
 
 private:
 	friend class FIslandWeatherTest;
+	friend class FIslandFungusGroundCoverClearanceTest;
 	friend class FIslandWeatherMeadowHabitatTest;
 	friend class FIslandMeadowBudgetTest;
 	friend class FIslandWeatherBroadleafDiversityTest;
@@ -312,6 +313,8 @@ private:
 		const TArray<FVector>& OtherAnchors);
 	/** Keep a resident-scale open patch around lasting curios so meadow cover cannot bury them. */
 	static bool IsWithinCurioGroundCoverClearance(const FVector& Position, const FVector& CurioPosition, EIslandCurioKind Kind);
+	/** Preserve a small breathing margin around authored woodland fungus, including foliage overhang. */
+	static bool IsWithinFungusGroundCoverClearance(const FVector& Position, const FVector& FungusPosition, float CombinedVisualFootprintRadius);
 	/** Deterministic candidate offsets shared by Tideglass shoreline scatter and periwinkle homes. */
 	static void BuildTidepoolPeriwinkleShoreOffsets(int32 Index, TArray<FVector>& OutOffsets);
 	/** Preserve a small readable ground-level clearing around each grounded periwinkle home. */
