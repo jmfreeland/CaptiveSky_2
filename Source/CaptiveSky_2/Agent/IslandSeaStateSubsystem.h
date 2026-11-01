@@ -7,6 +7,7 @@
 class UGerstnerWaterWaveGeneratorSimple;
 class UGerstnerWaterWaves;
 class AIslandDayNight;
+class AWaterBodyOcean;
 class UWaterBodyOceanComponent;
 
 /**
@@ -64,8 +65,11 @@ private:
 	friend class FIslandSeaStateTest;
 
 	TWeakObjectPtr<UWaterBodyOceanComponent> OceanComponent;
+	TWeakObjectPtr<AWaterBodyOcean> OceanActor;
 	TWeakObjectPtr<AIslandDayNight> IslandClock;
 	float AuthoredOceanHeightOffsetCm = 0.f;
+	FTransform AuthoredOceanTransform = FTransform::Identity;
+	float OceanTideRebaseCm = 0.f;
 	float AppliedOceanTideOffsetCm = 0.f;
 	bool bHasAppliedOceanTideOffset = false;
 	float SinceOceanTideUpdate = 0.f;
@@ -82,6 +86,7 @@ private:
 	bool bSeaInitialized = false;
 
 	float SampleWeatherSea() const;
+	bool BindOcean(AWaterBodyOcean* InOceanActor);
 	void ApplyOceanTideOffset();
 	void RestoreOceanTideOffset();
 };

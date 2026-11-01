@@ -127,9 +127,35 @@ void UIslandSeaStateSubsystem::ApplyOceanTideOffset()
 	if (bHasAppliedOceanTideOffset &&
 		FMath::Abs(TideOffset - AppliedOceanTideOffsetCm) < OceanTideUpdateThresholdCm) return;
 
-	Ocean->SetHeightOffset(AuthoredOceanHeightOffsetCm + TideOffset);
+	// The Water plugin clamps negative component height offsets to zero. Rebase
+	// the ocean actor downward once, then keep the component offset non-negative
+	// across the full spring-tide range so low water remains visible to the API.
+	Ocean->SetHeightOffset(AuthoredOceanHeightOffsetCm + OceanTideRebaseCm + TideOffset);
 	AppliedOceanTideOffsetCm = TideOffset;
 	bHasAppliedOceanTideOffset = true;
+}
+
+bool UIslandSeaStateSubsystem::BindOcean(AWaterBodyOcean* InOceanActor)
+{
+	if (!InOceanActor) return false;
+	UWaterBodyOceanComponent* Ocean = Cast<UWaterBodyOceanComponent>(InOceanActor->GetWaterBodyComponent());
+	if (!Ocean) return false;
+
+	OceanActor = InOceanActor;
+	OceanComponent = Ocean;
+	AuthoredOceanHeightOffsetCm = Ocean->GetHeightOffset();
+	AuthoredOceanTransform = InOceanActor->GetActorTransform();
+	OceanTideRebaseCm = FMath::Max(0.f, UIslandTideglassSubsystem::MaximumTideOffsetCm - AuthoredOceanHeightOffsetCm);
+	AppliedOceanTideOffsetCm = 0.f;
+	bHasAppliedOceanTideOffset = false;
+	if (OceanTideRebaseCm > 0.f)
+	{
+		FTransform TideTransform = AuthoredOceanTransform;
+		TideTransform.AddToTranslation(FVector(0.f, 0.f, -OceanTideRebaseCm));
+		InOceanActor->SetActorTransform(TideTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	}
+	ApplyOceanTideOffset();
+	return true;
 }
 
 void UIslandSeaStateSubsystem::RestoreOceanTideOffset()
@@ -138,11 +164,17 @@ void UIslandSeaStateSubsystem::RestoreOceanTideOffset()
 	{
 		Ocean->SetHeightOffset(AuthoredOceanHeightOffsetCm);
 	}
+	if (AWaterBodyOcean* Actor = OceanActor.Get())
+	{
+		Actor->SetActorTransform(AuthoredOceanTransform, false, nullptr, ETeleportType::TeleportPhysics);
+	}
+	OceanActor.Reset();
 	OceanComponent.Reset();
 	IslandClock.Reset();
 	AppliedOceanTideOffsetCm = 0.f;
 	bHasAppliedOceanTideOffset = false;
 	SinceOceanTideUpdate = 0.f;
+	OceanTideRebaseCm = 0.f;
 }
 
 float UIslandSeaStateSubsystem::SampleWeatherSea() const
@@ -176,13 +208,8 @@ void UIslandSeaStateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	for (TActorIterator<AWaterBodyOcean> It(&InWorld); It; ++It)
 	{
 		UWaterBodyComponent* Body = It->GetWaterBodyComponent();
-		if (UWaterBodyOceanComponent* Ocean = Cast<UWaterBodyOceanComponent>(Body))
+		if (UWaterBodyOceanComponent* Ocean = Cast<UWaterBodyOceanComponent>(Body); Ocean && BindOcean(*It))
 		{
-			OceanComponent = Ocean;
-			AuthoredOceanHeightOffsetCm = Ocean->GetHeightOffset();
-			AppliedOceanTideOffsetCm = 0.f;
-			bHasAppliedOceanTideOffset = false;
-			ApplyOceanTideOffset();
 			UE_LOG(LogTemp, Log, TEXT("IslandSeaState: applying Island-clock tides to ocean %s (authored height offset %.1f cm)"),
 				*It->GetActorNameOrLabel(), AuthoredOceanHeightOffsetCm);
 		}

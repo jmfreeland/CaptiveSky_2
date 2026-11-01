@@ -36,7 +36,8 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The sea moves toward its target"), Rising > 0.f && Rising < 1.f);
 	TestTrue(TEXT("Seas build faster than they settle"), Rising > Falling);
 	TestEqual(TEXT("No time passing changes nothing"), Sea::StepSea(0.3f, 1.f, 0.f), 0.3f);
-	TestEqual(TEXT("A non-finite current sea safely recovers from calm"), Sea::StepSea(NAN, 1.f, 10.f), 0.f);
+	TestTrue(TEXT("A non-finite current sea recovers from the calm baseline before advancing"),
+		FMath::IsNearlyEqual(Sea::StepSea(NAN, 1.f, 10.f), Sea::StepSea(0.f, 1.f, 10.f), 0.0001f));
 	TestEqual(TEXT("A non-finite target preserves the finite current sea"), Sea::StepSea(0.4f, NAN, 10.f), 0.4f);
 	TestEqual(TEXT("A non-finite timestep cannot poison the sea"), Sea::StepSea(0.4f, 1.f, INFINITY), 0.4f);
 	TestEqual(TEXT("Negative current sea is clamped before transition"), Sea::StepSea(-1.f, 0.f, 10.f), 0.f);
@@ -63,24 +64,28 @@ bool FIslandSeaStateTest::RunTest(const FString& Parameters)
 		if (OceanComponent && IslandClock)
 		{
 			OceanComponent->SetHeightOffset(4.5f);
-			Subsystem->OceanComponent = OceanComponent;
 			Subsystem->IslandClock = IslandClock;
-			Subsystem->AuthoredOceanHeightOffsetCm = OceanComponent->GetHeightOffset();
-			Subsystem->AppliedOceanTideOffsetCm = 0.f;
-			Subsystem->bHasAppliedOceanTideOffset = false;
+			const FTransform AuthoredOceanTransform = OceanActor->GetActorTransform();
+			const float AuthoredSurfaceZ = AuthoredOceanTransform.GetLocation().Z + OceanComponent->GetHeightOffset();
 			IslandClock->CurrentHour = 3.105f;
 			IslandClock->DayNumber = 1;
-			Subsystem->ApplyOceanTideOffset();
+			TestTrue(TEXT("The sea-state subsystem binds the ocean"), Subsystem->BindOcean(OceanActor));
 			TestTrue(TEXT("Spring high water offsets, rather than replaces, the authored ocean level"),
-				FMath::IsNearlyEqual(OceanComponent->GetHeightOffset(), 4.5f + 14.f * AIslandDayNight::TideLevel(1, 3.105f), 0.01f));
+				FMath::IsNearlyEqual(OceanActor->GetActorLocation().Z + OceanComponent->GetHeightOffset(),
+					AuthoredSurfaceZ + 14.f * AIslandDayNight::TideLevel(1, 3.105f), 0.01f));
 
 			IslandClock->CurrentHour = 9.315f;
 			Subsystem->ApplyOceanTideOffset();
-			TestTrue(TEXT("Low water uses the same semidiurnal Island tide curve"),
-				FMath::IsNearlyEqual(OceanComponent->GetHeightOffset(), 4.5f + 14.f * AIslandDayNight::TideLevel(1, 9.315f), 0.01f));
+			const float ExpectedLowWaterOffset = 4.5f + 14.f * AIslandDayNight::TideLevel(1, 9.315f);
+			TestTrue(*FString::Printf(TEXT("Low water uses the shared semidiurnal tide curve (actual %.3f cm, expected %.3f cm)"),
+				OceanActor->GetActorLocation().Z + OceanComponent->GetHeightOffset() - AuthoredOceanTransform.GetLocation().Z,
+				ExpectedLowWaterOffset),
+				FMath::IsNearlyEqual(OceanActor->GetActorLocation().Z + OceanComponent->GetHeightOffset(),
+					AuthoredSurfaceZ + 14.f * AIslandDayNight::TideLevel(1, 9.315f), 0.01f));
 
 			Subsystem->RestoreOceanTideOffset();
 			TestEqual(TEXT("World teardown restores the authored ocean height offset"), OceanComponent->GetHeightOffset(), 4.5f);
+			TestTrue(TEXT("World teardown restores the authored ocean transform"), OceanActor->GetActorTransform().Equals(AuthoredOceanTransform, 0.001f));
 		}
 
 		UGerstnerWaterWaves* Waves = NewObject<UGerstnerWaterWaves>(GetTransientPackage());

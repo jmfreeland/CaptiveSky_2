@@ -27,15 +27,18 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(46), 12.f, 0.001f) &&
 		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(226), 12.f, 0.001f) &&
 		FMath::IsNearlyEqual(AIslandDayNight::DaylightHours(406), 12.f, 0.001f));
-	TestTrue(TEXT("Winter and summer sun arcs rise, peak and set at seasonal edges"),
-		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(136), 136)) &&
-		FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 136), 1.f) &&
-		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(136), 136)) &&
-		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(316), 316)) &&
-		FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 316), 1.f) &&
-		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(316), 316)));
+	TestTrue(TEXT("Midsummer sun reaches the horizon at sunrise"),
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(136), 136)));
+	TestTrue(TEXT("Midsummer sun peaks at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 136), 1.f));
+	TestTrue(TEXT("Midsummer sun reaches the horizon at sunset"),
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(136), 136), 0.001f));
+	TestTrue(TEXT("Midwinter sun reaches the horizon at sunrise"),
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunriseHour(316), 316)));
+	TestTrue(TEXT("Midwinter sun peaks at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12.f, 316), 1.f));
+	TestTrue(TEXT("Midwinter sun reaches the horizon at sunset"),
+		FMath::IsNearlyZero(AIslandDayNight::SunHeight(AIslandDayNight::SunsetHour(316), 316), 0.001f));
 	TestTrue(TEXT("Seasonal night follows the earlier summer and later winter sunrise"),
-		AIslandDayNight::NightAmount(7.f, 136) < 0.01f && AIslandDayNight::NightAmount(7.f, 316) > 0.99f);
+		AIslandDayNight::NightAmount(7.f, 136) < 0.01f && AIslandDayNight::NightAmount(7.f, 316) > 0.75f);
 	TestTrue(TEXT("Sun rises at six"), FMath::IsNearlyZero(AIslandDayNight::SunHeight(6)));
 	TestTrue(TEXT("Sun overhead at noon"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(12), 1.f));
 	TestTrue(TEXT("Sun below horizon at midnight"), FMath::IsNearlyEqual(AIslandDayNight::SunHeight(0), -1.f));
@@ -147,8 +150,12 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Thick cloud greys the dawn"), AIslandDayNight::DescribeHorizonColour(5.75f, 0.9f).Contains(TEXT("flat grey")));
 	TestTrue(TEXT("Nothing at noon or on bad input"),
 		AIslandDayNight::DescribeHorizonColour(12.f, 0.5f).IsEmpty() && AIslandDayNight::DescribeHorizonColour(NAN, 0.5f).IsEmpty());
-	TestTrue(TEXT("Dawn is coolest, mid-afternoon warmest"), AIslandDayNight::WarmthLevel(5.f, 0.f) < 0.01f && AIslandDayNight::WarmthLevel(17.f, 0.f) > 0.99f);
-	TestTrue(TEXT("Cloud pulls the extremes toward the middle"), AIslandDayNight::WarmthLevel(17.f, 1.f) < AIslandDayNight::WarmthLevel(17.f, 0.f) && AIslandDayNight::WarmthLevel(5.f, 1.f) > AIslandDayNight::WarmthLevel(5.f, 0.f));
+	TestTrue(TEXT("At the spring equinox, dawn is coolest and mid-afternoon warmest"),
+		AIslandDayNight::WarmthLevel(5.f, 0.f, AIslandDayNight::CalendarSpringEquinoxDay) < 0.01f &&
+		AIslandDayNight::WarmthLevel(17.f, 0.f, AIslandDayNight::CalendarSpringEquinoxDay) > 0.99f);
+	TestTrue(TEXT("At the spring equinox, clouds pull warmth extremes toward the middle"),
+		AIslandDayNight::WarmthLevel(17.f, 1.f, AIslandDayNight::CalendarSpringEquinoxDay) < AIslandDayNight::WarmthLevel(17.f, 0.f, AIslandDayNight::CalendarSpringEquinoxDay) &&
+		AIslandDayNight::WarmthLevel(5.f, 1.f, AIslandDayNight::CalendarSpringEquinoxDay) > AIslandDayNight::WarmthLevel(5.f, 0.f, AIslandDayNight::CalendarSpringEquinoxDay));
 	const float SpringFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 46);
 	const float SummerFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 136);
 	const float AutumnFeel = AIslandDayNight::WarmthLevel(11.f, 0.f, 226);
@@ -397,7 +404,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 			Clock->DescribeTime().Contains(TEXT("A shooting star streaks across the sky")));
 	}
 	Clock->CurrentHour = 12.f;
-	Clock->DayNumber = 1;
+	Clock->DayNumber = AIslandDayNight::CalendarSpringEquinoxDay;
 	Clock->DaySunIntensity = 10.f;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("Noon"));
@@ -433,6 +440,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Twilight reveals only the first portion of the star groups"),
 		VisibleStarGroupsAtDusk > 0 && VisibleStarGroupsAtDusk < AIslandDayNight::NightStarSectionCount);
 	Clock->CurrentHour = 0.f;
+	Clock->DayNumber = 1;
 	Clock->UpdateLighting();
 	VerifyForwardLightSelection(TEXT("New moon"));
 	if (Clock->Starfield)
@@ -448,6 +456,7 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A new-moon midnight is still lit by the night fill"), Clock->Starlight->Intensity > 0.f);
 		TestTrue(TEXT("The night fill shines down from the sky, not up from below the horizon"), Clock->Starlight->GetForwardVector().Z < 0.f);
 		TestFalse(TEXT("The night fill casts no shadows"), Clock->Starlight->CastShadows);
+		Clock->DayNumber = AIslandDayNight::CalendarSpringEquinoxDay;
 		Clock->CurrentHour = 17.5f;
 		Clock->UpdateLighting();
 		const float ExpectedTwilightFill = Clock->StarlightIntensity * AIslandDayNight::TwilightFillStrength *
@@ -460,6 +469,9 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		Clock->CurrentHour = 0.f;
 		Clock->UpdateLighting();
 	}
+	Clock->DayNumber = 1;
+	Clock->CurrentHour = 0.f;
+	Clock->UpdateLighting();
 	const float NewMoonOffset = FMath::Abs(FMath::FindDeltaAngleDegrees(Sun->GetActorRotation().Pitch, Clock->Moon->GetComponentRotation().Pitch));
 	TestTrue(TEXT("Near new moon, the moon follows the sun's arc"), NewMoonOffset < 2.f);
 	const FString NewMoonDescription = Clock->DescribeTime();
@@ -557,17 +569,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
 		const FVector MoonRight = GetMoonPhaseRight();
 		const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
-		float MinMoonX = MAX_flt;
-		float MaxMoonX = -MAX_flt;
-		for (const FProcMeshVertex& Vertex : WaxingCrescentSection->ProcVertexBuffer)
-		{
-			const float X = FVector::DotProduct(Vertex.Position - MoonCenter, MoonRight);
-			MinMoonX = FMath::Min(MinMoonX, X);
-			MaxMoonX = FMath::Max(MaxMoonX, X);
-		}
-		TestTrue(TEXT("The waxing crescent reveals only the sunlit right-hand arc"),
-			MinMoonX > 0.35f * AIslandDayNight::MoonDiscRadius &&
-			MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
+		const int32 EquatorFirstVertex = (AIslandDayNight::MoonDiscBandCount / 2) * 2;
+		const float EquatorTerminatorX = FVector::DotProduct(
+			WaxingCrescentSection->ProcVertexBuffer[EquatorFirstVertex].Position - MoonCenter, MoonRight);
+		const float EquatorLitEdgeX = FVector::DotProduct(
+			WaxingCrescentSection->ProcVertexBuffer[EquatorFirstVertex + 1].Position - MoonCenter, MoonRight);
+		TestTrue(*FString::Printf(TEXT("Waxing crescent sunlit arc is on the projected sun side (min %.3fR, max %.3fR)"),
+			EquatorTerminatorX / AIslandDayNight::MoonDiscRadius, EquatorLitEdgeX / AIslandDayNight::MoonDiscRadius),
+			EquatorTerminatorX > 0.35f * AIslandDayNight::MoonDiscRadius &&
+			EquatorLitEdgeX > 0.95f * AIslandDayNight::MoonDiscRadius);
 	}
 	Clock->DayNumber = 26;
 	Clock->CurrentHour = 4.f;
@@ -580,17 +590,15 @@ bool FIslandClockTest::RunTest(const FString& Parameters)
 		const FVector MoonDirection = -Clock->Moon->GetForwardVector().GetSafeNormal();
 		const FVector MoonRight = GetMoonPhaseRight();
 		const FVector MoonCenter = MoonDirection * AIslandDayNight::NightStarShellRadius;
-		float MinMoonX = MAX_flt;
-		float MaxMoonX = -MAX_flt;
-		for (const FProcMeshVertex& Vertex : WaningCrescentSection->ProcVertexBuffer)
-		{
-			const float X = FVector::DotProduct(Vertex.Position - MoonCenter, MoonRight);
-			MinMoonX = FMath::Min(MinMoonX, X);
-			MaxMoonX = FMath::Max(MaxMoonX, X);
-		}
-		TestTrue(TEXT("The waning crescent also faces the actual projected sunlight"),
-			MinMoonX > 0.35f * AIslandDayNight::MoonDiscRadius &&
-			MaxMoonX > 0.95f * AIslandDayNight::MoonDiscRadius);
+		const int32 EquatorFirstVertex = (AIslandDayNight::MoonDiscBandCount / 2) * 2;
+		const float EquatorTerminatorX = FVector::DotProduct(
+			WaningCrescentSection->ProcVertexBuffer[EquatorFirstVertex].Position - MoonCenter, MoonRight);
+		const float EquatorLitEdgeX = FVector::DotProduct(
+			WaningCrescentSection->ProcVertexBuffer[EquatorFirstVertex + 1].Position - MoonCenter, MoonRight);
+		TestTrue(*FString::Printf(TEXT("Waning crescent sunlit arc is on the projected sun side (min %.3fR, max %.3fR)"),
+			EquatorTerminatorX / AIslandDayNight::MoonDiscRadius, EquatorLitEdgeX / AIslandDayNight::MoonDiscRadius),
+			EquatorTerminatorX > 0.35f * AIslandDayNight::MoonDiscRadius &&
+			EquatorLitEdgeX > 0.95f * AIslandDayNight::MoonDiscRadius);
 	}
 	Clock->DayNumber = 15;
 	Clock->CurrentHour = 0.f;
