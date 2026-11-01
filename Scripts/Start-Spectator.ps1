@@ -233,9 +233,7 @@ if ($RequireSystemMemoryHeadroom) {
 	if ($NullRHI) { throw "-RequireSystemMemoryHeadroom is only applicable to rendered sessions; omit it for -NullRHI." }
 	Import-Module (Join-Path $PSScriptRoot "SystemMemoryBudget.psm1") -Force
 	try {
-		$systemMemory = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-		if (-not $systemMemory -or $null -eq $systemMemory.FreePhysicalMemory) { throw "Windows did not report FreePhysicalMemory." }
-		$freeSystemMemoryMiB = [long][math]::Floor([double]$systemMemory.FreePhysicalMemory / 1024.0)
+		$freeSystemMemoryMiB = Get-AvailableSystemMemoryMiB
 		$systemMemoryBudget = Assert-SystemMemoryHeadroom -FreeMiB $freeSystemMemoryMiB -MinimumFreeMiB $MinimumFreeSystemMemoryMiB
 	} catch {
 		throw "System memory preflight failed; no rendered session was started. Cause: $($_.Exception.Message)"
@@ -291,9 +289,7 @@ function Invoke-SystemMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref
 	$Game.Refresh()
 	if ($Game.HasExited) { return }
 	try {
-		$systemMemory = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-		if (-not $systemMemory -or $null -eq $systemMemory.FreePhysicalMemory) { throw "Windows did not report FreePhysicalMemory." }
-		$freeSystemMemoryMiB = [long][math]::Floor([double]$systemMemory.FreePhysicalMemory / 1024.0)
+		$freeSystemMemoryMiB = Get-AvailableSystemMemoryMiB
 		$decision = Get-SystemMemoryHeadroomMonitorDecision -FreeMiB $freeSystemMemoryMiB `
 			-MinimumFreeMiB $MinimumFreeSystemMemoryMiB -ConsecutiveLowSamples $ConsecutiveLowSamples.Value
 	} catch {

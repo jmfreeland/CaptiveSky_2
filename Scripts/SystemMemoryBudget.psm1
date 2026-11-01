@@ -1,3 +1,47 @@
+if (-not ("CaptiveSky.Win32MemoryStatusEx" -as [type])) {
+	Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace CaptiveSky {
+	[StructLayout(LayoutKind.Sequential)]
+	public sealed class Win32MemoryStatusEx {
+		public uint Length;
+		public uint MemoryLoad;
+		public ulong TotalPhysical;
+		public ulong AvailablePhysical;
+		public ulong TotalPageFile;
+		public ulong AvailablePageFile;
+		public ulong TotalVirtual;
+		public ulong AvailableVirtual;
+		public ulong AvailableExtendedVirtual;
+
+		public Win32MemoryStatusEx() {
+			Length = (uint)Marshal.SizeOf(typeof(Win32MemoryStatusEx));
+		}
+	}
+
+	public static class Win32Memory {
+		[DllImport("kernel32.dll", SetLastError = true)]
+		[return: MarshalAs(UnmanagedType.Bool)]
+		public static extern bool GlobalMemoryStatusEx([In, Out] Win32MemoryStatusEx status);
+	}
+}
+"@
+}
+
+function Get-AvailableSystemMemoryMiB {
+	[CmdletBinding()]
+	param()
+
+	$status = [CaptiveSky.Win32MemoryStatusEx]::new()
+	if (-not [CaptiveSky.Win32Memory]::GlobalMemoryStatusEx($status)) {
+		$errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+		throw "GlobalMemoryStatusEx failed with Win32 error $errorCode."
+	}
+	[long][math]::Floor([double]$status.AvailablePhysical / 1MB)
+}
+
 function Assert-SystemMemoryHeadroom {
 	[CmdletBinding()]
 	param(
@@ -31,4 +75,4 @@ function Get-SystemMemoryHeadroomMonitorDecision {
 	}
 }
 
-Export-ModuleMember -Function Assert-SystemMemoryHeadroom, Get-SystemMemoryHeadroomMonitorDecision
+Export-ModuleMember -Function Get-AvailableSystemMemoryMiB, Assert-SystemMemoryHeadroom, Get-SystemMemoryHeadroomMonitorDecision

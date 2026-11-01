@@ -1,6 +1,9 @@
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "..\SystemMemoryBudget.psm1") -Force
 
+$availablePhysicalMiB = Get-AvailableSystemMemoryMiB
+if ($availablePhysicalMiB -le 0) { throw "Windows must report positive available physical memory." }
+
 $budget = Assert-SystemMemoryHeadroom -FreeMiB 4096 -MinimumFreeMiB 4096
 if ($budget.FreeMiB -ne 4096) { throw "Exact system-memory reserve boundary should pass." }
 
