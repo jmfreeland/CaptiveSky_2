@@ -864,11 +864,11 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 	const int32 PreviousDayValue = SavedDay.Get(1);
 	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
 	SavedDay = FMath::Max(1, Day);
-	// A new Island day ages every arrangement a little.
-	if (SavedDay.GetValue() != ShownArrangementDay)
-		for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 	if (Save())
 	{
+		// Refresh only after the durable day change succeeds.
+		if (SavedDay.GetValue() != ShownArrangementDay)
+			for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
 		if (SavedDay.GetValue() != PreviousDayValue)
 			for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
 		return true;
@@ -884,6 +884,30 @@ bool UIslandWorldStateSubsystem::SaveWetness(float Wetness)
 	const TOptional<float> PreviousWetness = SavedWetness;
 	SavedWetness = FMath::Clamp(Wetness, 0.f, 1.f);
 	if (Save()) return true;
+	SavedWetness = PreviousWetness;
+	return false;
+}
+
+bool UIslandWorldStateSubsystem::SaveClockAndWetness(float Hour, int32 Day, float Wetness)
+{
+	if (!FMath::IsFinite(Wetness)) return false;
+	const TOptional<float> PreviousHour = SavedHour;
+	const TOptional<int32> PreviousDay = SavedDay;
+	const TOptional<float> PreviousWetness = SavedWetness;
+	const int32 PreviousDayValue = SavedDay.Get(1);
+	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
+	SavedDay = FMath::Max(1, Day);
+	SavedWetness = FMath::Clamp(Wetness, 0.f, 1.f);
+	if (Save())
+	{
+		if (SavedDay.GetValue() != ShownArrangementDay)
+			for (const FIslandArrangementSite& Site : ArrangementSites) RefreshArrangementActor(Site);
+		if (SavedDay.GetValue() != PreviousDayValue)
+			for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
+		return true;
+	}
+	SavedHour = PreviousHour;
+	SavedDay = PreviousDay;
 	SavedWetness = PreviousWetness;
 	return false;
 }

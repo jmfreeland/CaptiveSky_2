@@ -568,11 +568,12 @@ bool AIslandDayNight::PersistHour()
 	if (!GetWorld()) return false;
 	UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
 	if (!WorldState) return false;
-	const bool bClockSaved = !bResumeSavedTime || WorldState->SaveClock(CurrentHour, DayNumber);
-	bool bWetnessSaved = true;
-	if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
-		bWetnessSaved = WorldState->SaveWetness(Environment->GetWetness());
-	return bClockSaved && bWetnessSaved;
+	const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>();
+	if (bResumeSavedTime && Environment)
+		return WorldState->SaveClockAndWetness(CurrentHour, DayNumber, Environment->GetWetness());
+	if (bResumeSavedTime)
+		return WorldState->SaveClock(CurrentHour, DayNumber);
+	return !Environment || WorldState->SaveWetness(Environment->GetWetness());
 }
 
 void AIslandDayNight::UpdateLighting()

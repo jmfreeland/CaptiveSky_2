@@ -14,7 +14,8 @@ Game/PIE run. See [Tideglass Pawn collision](findings/2026-11-02-tideglass-pawn-
 ## 2026-11-02 — Surface failed Island clock saves
 
 Periodic and final clock/environment persistence now report failed writes
-instead of silently ignoring `SaveClock`/`SaveWetness` results, and the
+instead of silently ignoring save results. When both clock and wetness are
+being saved, they are written in one atomic world-state replacement. The
 focused persistence fixture asserts a successful explicit boundary flush and
 that an unreadable existing snapshot makes the flush fail without overwriting
 it. The UE 5.8.3 Editor target built; automation remains unrun behind the

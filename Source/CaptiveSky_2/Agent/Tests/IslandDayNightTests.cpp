@@ -665,6 +665,11 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock->CurrentHour = 21.5f;
 	Clock->DayNumber = 4;
 	TestTrue(TEXT("Explicit session-boundary flush reports persisted clock and wetness"), Clock->PersistHour());
+	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	TestTrue(TEXT("One boundary flush commits clock and wetness together"), State &&
+		State->GetSavedHour().IsSet() && FMath::IsNearlyEqual(State->GetSavedHour().GetValue(), 21.5f, 0.01f) &&
+		State->GetSavedDay().Get(1) == 4 && State->GetSavedWetness().IsSet() &&
+		FMath::IsNearlyEqual(State->GetSavedWetness().GetValue(), 0.74f, 0.01f));
 	EndSession(World, Clock);
 	TestTrue(TEXT("Ending play saves the Island hour"), FPaths::FileExists(StateFile));
 	FString SavedState;
@@ -704,6 +709,9 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Unreadable-state fixture is created"), FFileHelper::SaveStringToFile(UnreadablePayload, *UnreadableStateFile));
 	Clock = StartSession(World, UnreadableStateFile, true);
 	TestFalse(TEXT("Boundary flush reports failure when world state was unreadable"), Clock->PersistHour());
+	UIslandWorldStateSubsystem* UnreadableState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	TestFalse(TEXT("Failed atomic flush leaves saved clock unset"), UnreadableState && UnreadableState->GetSavedHour().IsSet());
+	TestFalse(TEXT("Failed atomic flush leaves saved wetness unset"), UnreadableState && UnreadableState->GetSavedWetness().IsSet());
 	EndSession(World, Clock);
 	FString PreservedPayload;
 	TestTrue(TEXT("Unreadable state remains available for inspection"), FFileHelper::LoadFileToString(PreservedPayload, *UnreadableStateFile));

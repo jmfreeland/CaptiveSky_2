@@ -5,7 +5,10 @@ the durable clock and wetness writes. It now returns success only when the
 required writes succeed, logs periodic and final `EndPlay` failures, and lets
 the focused persistence fixture assert a successful explicit boundary flush.
 The authored `bResumeSavedTime=false` mode still intentionally skips saving the
-clock; environment wetness remains persisted when available.
+clock; environment wetness remains persisted when available. When both clock
+resume and environment state are active, hour/day/wetness now go through one
+atomic world-state replacement instead of two consecutive replacements, so a
+failure cannot leave a new clock paired with old wetness.
 
 The fixture also supplies an unreadable existing world-state file and asserts
 that the explicit flush reports failure and leaves the original payload
@@ -14,7 +17,8 @@ weakening the subsystem's refusal to overwrite unreadable user data.
 
 The isolated UE 5.8.3 `CaptiveSky_2Editor` target built successfully after the
 change. The `CaptiveSky2.Agent.DayNightPersistence` automation source also
-compiled, including both flush outcomes, but was not run: the known Unreal
+compiled, including both flush outcomes and reload of the saved clock/day and
+wetness, but was not run: the known Unreal
 commandlet pre-initialization crash has not been diagnosed. This is not proof
 that a live shutdown flush succeeds under filesystem failure.
 

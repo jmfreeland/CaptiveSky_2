@@ -308,6 +308,8 @@ public:
 	bool SaveClock(float Hour, int32 Day);
 	/** Records lingering ground wetness independently of whether the Island clock resumes. */
 	bool SaveWetness(float Wetness);
+	/** Atomically records the clock/day and wetness in one durable snapshot. */
+	bool SaveClockAndWetness(float Hour, int32 Day, float Wetness);
 
 	/** The running clock's day number, or 1 when the level has no clock. */
 	static int32 CurrentIslandDay(const UWorld* World);
