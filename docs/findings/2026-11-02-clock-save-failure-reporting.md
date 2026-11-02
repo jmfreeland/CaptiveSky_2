@@ -12,13 +12,15 @@ failure cannot leave a new clock paired with old wetness.
 
 The fixture also supplies an unreadable existing world-state file and asserts
 that the explicit flush reports failure and leaves the original payload
-untouched. This exercises the fail-closed contract in test code without
-weakening the subsystem's refusal to overwrite unreadable user data.
+untouched. A separate missing-parent write fixture forces the atomic file
+replacement to fail and asserts that neither the in-memory clock nor wetness
+is committed. These exercise the fail-closed contract without weakening the
+subsystem's refusal to overwrite unreadable user data.
 
 The isolated UE 5.8.3 `CaptiveSky_2Editor` target built successfully after the
 change. The `CaptiveSky2.Agent.DayNightPersistence` automation source also
-compiled, including both flush outcomes and reload of the saved clock/day and
-wetness, but was not run: the known Unreal
+compiled, including successful persistence/reload and unreadable-file and
+failed-write cases, but was not run: the known Unreal
 commandlet pre-initialization crash has not been diagnosed. This is not proof
 that a live shutdown flush succeeds under filesystem failure.
 

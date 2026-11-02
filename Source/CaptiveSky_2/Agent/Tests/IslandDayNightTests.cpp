@@ -717,6 +717,16 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Unreadable state remains available for inspection"), FFileHelper::LoadFileToString(PreservedPayload, *UnreadableStateFile));
 	TestEqual(TEXT("Failed flush never overwrites unreadable world state"), PreservedPayload, UnreadablePayload);
 	IFileManager::Get().Delete(*UnreadableStateFile, false, true, true);
+
+	const FString MissingParent = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() /
+		TEXT("Automation") / TEXT("IslandClock") / FString::Printf(TEXT("FlushFailure_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
+	TestFalse(TEXT("Write-failure fixture parent does not exist"), IFileManager::Get().DirectoryExists(*MissingParent));
+	Clock = StartSession(World, MissingParent / TEXT("WorldState.json"), true);
+	TestFalse(TEXT("Boundary flush reports a failed durable replacement"), Clock->PersistHour());
+	UIslandWorldStateSubsystem* FailedWriteState = World->GetSubsystem<UIslandWorldStateSubsystem>();
+	TestFalse(TEXT("Failed replacement rolls back the in-memory clock"), FailedWriteState && FailedWriteState->GetSavedHour().IsSet());
+	TestFalse(TEXT("Failed replacement rolls back the in-memory wetness"), FailedWriteState && FailedWriteState->GetSavedWetness().IsSet());
+	EndSession(World, Clock);
 	IFileManager::Get().Delete(*StateFile, false, true, true);
 	return true;
 }

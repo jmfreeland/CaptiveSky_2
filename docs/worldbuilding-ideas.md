@@ -18,7 +18,8 @@ instead of silently ignoring save results. When both clock and wetness are
 being saved, they are written in one atomic world-state replacement. The
 focused persistence fixture asserts a successful explicit boundary flush and
 that an unreadable existing snapshot makes the flush fail without overwriting
-it. The UE 5.8.3 Editor target built; automation remains unrun behind the
+it, and a forced write failure leaves the in-memory clock/wetness uncommitted.
+The UE 5.8.3 Editor target built; automation remains unrun behind the
 known startup crash. This supports, but does not implement, the future hosted
 pause-on-empty lifecycle. See [clock save failure reporting](findings/2026-11-02-clock-save-failure-reporting.md).
 

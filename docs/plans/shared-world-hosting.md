@@ -28,7 +28,8 @@ turn the existing local files into an accidentally networked database.
   snapshot replacement; periodic and `EndPlay` failures are logged instead of
   silently discarded. The focused persistence fixture asserts a successful
   explicit boundary flush and a failed flush against an unreadable existing
-  snapshot without overwriting it. The target compiles, but these automation
+  snapshot without overwriting it, plus rollback after a forced write failure.
+  The target compiles, but these automation
   assertions have not run in the current unstable engine startup environment.
   This reports local save health, but does not itself pause a host, reject
   reconnects, or fence asynchronous resident callbacks.
