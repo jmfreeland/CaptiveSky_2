@@ -73,6 +73,19 @@ footprint, and all data stayed isolated. Details:
 [15-minute resident feedback](findings/2026-11-02-resident-feedback-15m.md) and
 [object-target feedback follow-up](findings/2026-11-02-resident-feedback-object-targets.md).
 
+## 2026-11-02 — Review Tideglass under moonlight
+
+Rat's request to see Tideglass by moonlight is a concrete art-direction cue.
+The source already provides a lunar-phase-, night-, and cloud-responsive
+directional moon, while the transient pool material has specular response and
+a restrained edge-reflection tint. That makes moonlight response plausible,
+but is not visual proof. Current free GPU memory is about 1,981 MiB of 12,282,
+below the project's 4 GiB rendered-run reserve, so no renderer was started.
+Next: when the rendered-memory preflight passes, capture a matched moonlit
+Tideglass view and judge whether the water, shore, and surrounding species
+actually read as a place worth visiting after dark. Keep the 30-FPS floor and
+do not add another shader effect until the image shows what is missing.
+
 ## 2026-11-02 — Let visitors read Tideglass's changing waterline
 
 When a visitor uses Interact without a nearby target, the environmental notes
