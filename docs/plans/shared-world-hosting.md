@@ -23,6 +23,16 @@ turn the existing local files into an accidentally networked database.
   from `AIslandDayNight::EndPlay`; an orderly stop therefore flushes the latest
   clock/environment snapshot, while an abrupt process kill can still lose the
   interval since the last periodic save.
+- **Clock/offline-time audit (2026-11-02):** `AIslandDayNight::BeginPlay`
+  restores the saved Island hour and day directly; its only time advancement
+  is from in-world `Tick` delta, with no UTC downtime calculation. The saved
+  environment's `observed_utc` is not consumed by the Unreal simulation, and
+  the Gateway describes that sample as historical rather than live weather.
+  `CaptiveSky2.Agent.DayNightPersistence` covers resume of the saved hour/day
+  and wetness plus the opt-out-to-`StartHour` path; the Gateway checks cover
+  the historical-weather wording. These are source-level regression fixtures;
+  runtime execution of the focused Unreal automation remains unverified in
+  the current unstable startup environment.
 - `UIslandTrailSubsystem` persists its own per-map trail ledger. Resident
   identity, episodic memory, and relationship state live in separate
   `Agents/<AgentId>/` files. `CaptiveSkyDataRoot` relocates local data but does
