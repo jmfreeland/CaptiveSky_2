@@ -38,7 +38,12 @@ duplicate rejection, and the per-resident pending limit. The worktree editor
 target built, and `CaptiveSky2.Agent.NearbyVegetationPerception` passed in the
 isolated `Saved/CS58` project under NullRHI with thinking disabled and zero
 model requests. This validates text targeting, not rendered recognition of
-individual props. Log: `Saved/CS58/Saved/Logs/Codex_UpgradeTargetPerception_Final_20261102.log`.
+individual props. A subsequent isolated resident session exposed the new
+relative labels in Raven's context, but residents chose conversation, rain
+observation, and stone arranging rather than an upgrade proposal; the run ended
+early under the RAM safety guard. This is useful agency evidence, not a failed
+upgrade feature test. Details: [object-target feedback follow-up](findings/2026-11-02-resident-feedback-object-targets.md).
+Log: `Saved/CS58/Saved/Logs/Codex_UpgradeTargetPerception_Final_20261102.log`.
 
 ## 2026-11-02 — Let visitors notice the changing sky
 
