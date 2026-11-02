@@ -557,7 +557,9 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	NoticeBoard->SetCollisionProfileName(TEXT("BlockAll"));
 	NoticeBoard->RegisterComponent();
 	GeneratedLabelProp->SetActorLocation(FVector(600.f, 0.f, 0.f));
+	#if WITH_EDITOR
 	GeneratedLabelProp->SetActorLabel(TEXT("StaticMeshActor_27"));
+#endif
 	AActor* SidePropActor = World->SpawnActor<AActor>(FVector(0.f, 700.f, 0.f), FRotator::ZeroRotator, Spawn);
 	UStaticMeshComponent* SideProp = NewObject<UStaticMeshComponent>(SidePropActor);
 	SidePropActor->SetRootComponent(SideProp);
@@ -565,7 +567,9 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	SideProp->SetCollisionProfileName(TEXT("BlockAll"));
 	SideProp->RegisterComponent();
 	SidePropActor->SetActorLocation(FVector(400.f, 500.f, 0.f));
+	#if WITH_EDITOR
 	SidePropActor->SetActorLabel(TEXT("StaticMeshActor_28"));
+#endif
 	AActor* MatineeCameraProxy = World->SpawnActor<AActor>(FVector(200.f, -250.f, 0.f), FRotator::ZeroRotator, Spawn);
 	UStaticMeshComponent* MatineeCameraMesh = NewObject<UStaticMeshComponent>(MatineeCameraProxy);
 	MatineeCameraProxy->SetRootComponent(MatineeCameraMesh);
@@ -573,7 +577,9 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	MatineeCameraMesh->SetCollisionProfileName(TEXT("BlockAll"));
 	MatineeCameraMesh->RegisterComponent();
 	MatineeCameraProxy->SetActorLocation(FVector(200.f, -250.f, 0.f));
+	#if WITH_EDITOR
 	MatineeCameraProxy->SetActorLabel(TEXT("MatineeCam SM"));
+#endif
 	const FString NoticeBoardSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby ordinary prop remains available for an optional upgrade proposal"),
 		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered")) && NoticeBoardSituation.Contains(TEXT("request_upgrade")));

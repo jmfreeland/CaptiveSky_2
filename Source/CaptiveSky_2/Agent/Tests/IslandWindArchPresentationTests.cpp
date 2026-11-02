@@ -66,9 +66,9 @@ bool FIslandWindArchPresentationTest::RunTest(const FString& Parameters)
 		if (Marker && Pillars.Num() == 2 && Beam)
 		{
 			for (const AStaticMeshActor* Pillar : Pillars)
-				AddInfo(FString::Printf(TEXT("Saved Wind Arch pillar %s at %s, extent %s"), *Pillar->GetActorLabel(),
+				AddInfo(FString::Printf(TEXT("Saved Wind Arch pillar %s at %s, extent %s"), *Pillar->GetName(),
 					*Pillar->GetActorLocation().ToCompactString(), *Pillar->GetStaticMeshComponent()->Bounds.BoxExtent.ToCompactString()));
-			AddInfo(FString::Printf(TEXT("Saved Wind Arch lintel %s at %s, extent %s"), *Beam->GetActorLabel(),
+			AddInfo(FString::Printf(TEXT("Saved Wind Arch lintel %s at %s, extent %s"), *Beam->GetName(),
 				*Beam->GetActorLocation().ToCompactString(), *Beam->GetStaticMeshComponent()->Bounds.BoxExtent.ToCompactString()));
 		}
 	}

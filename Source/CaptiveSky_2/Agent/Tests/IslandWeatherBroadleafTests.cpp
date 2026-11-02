@@ -215,6 +215,7 @@ bool FIslandWeatherBroadleafNaniteReadinessAssetsTest::RunTest(const FString& Pa
 	{
 		USkeletalMesh* BroadleafAsset = LoadObject<USkeletalMesh>(nullptr, AssetPath);
 		TestNotNull(FString::Printf(TEXT("Broadleaf skeletal mesh is available: %s"), AssetPath), BroadleafAsset);
+#if WITH_EDITOR
 		if (BroadleafAsset)
 		{
 			TestTrue(FString::Printf(TEXT("Broadleaf mesh has Nanite enabled: %s"), AssetPath),
@@ -222,6 +223,7 @@ bool FIslandWeatherBroadleafNaniteReadinessAssetsTest::RunTest(const FString& Pa
 			TestTrue(FString::Printf(TEXT("Broadleaf mesh is a Nanite Assembly: %s"), AssetPath),
 				BroadleafAsset->IsNaniteAssembly());
 		}
+#endif
 	}
 	const TCHAR* BroadleafVariantBPaths[] =
 	{

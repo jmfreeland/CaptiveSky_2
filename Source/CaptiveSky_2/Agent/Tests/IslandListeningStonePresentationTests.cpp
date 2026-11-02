@@ -277,7 +277,7 @@ bool FIslandListeningStonePresentationTest::RunTest(const FString& Parameters)
 		for (const AStaticMeshActor* Proxy : Proxies)
 		{
 			if (Proxy)
-				AddInfo(FString::Printf(TEXT("Saved Listening Stone %s at %s, extent %s"), *Proxy->GetActorLabel(),
+				AddInfo(FString::Printf(TEXT("Saved Listening Stone %s at %s, extent %s"), *Proxy->GetName(),
 					*Proxy->GetActorLocation().ToCompactString(), *Proxy->GetStaticMeshComponent()->Bounds.BoxExtent.ToCompactString()));
 		}
 	}

@@ -114,7 +114,9 @@ UTexture2D* UIslandEnvironmentSubsystem::CreateDynamicWindNoiseTexture()
 	Texture->AddressX = TA_Wrap;
 	Texture->AddressY = TA_Wrap;
 	Texture->NeverStream = true;
+#if WITH_EDITORONLY_DATA
 	Texture->MipGenSettings = TMGS_NoMipmaps;
+#endif
 
 	TArray<FColor> Pixels;
 	Pixels.SetNumUninitialized(DynamicWindNoiseSize * DynamicWindNoiseSize);

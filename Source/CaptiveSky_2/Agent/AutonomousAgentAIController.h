@@ -46,6 +46,10 @@ public:
 	/** A resident approaches another body to conversation distance without seeking its capsule centre. */
 	static constexpr float ResidentApproachStandOffDistance = 350.f;
 	static constexpr float ResidentApproachAltitudeOffset = 180.f;
+	/** Open-ground work remains reachable when the closest NavMesh point is slightly off the site centre. */
+	static constexpr float ArrangementSiteUseRadius = 400.f;
+	/** Shared planar/vertical range check for arranging stones at an open-ground site. */
+	static bool IsWithinArrangementSiteUseRadius(const FVector& AgentLocation, const FVector& SiteLocation);
 	static FVector BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);
 	/** Horizontal stand-off point when the target is elevated above the mover's walkable plane. */
 	static FVector BuildGroundedResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation);

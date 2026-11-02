@@ -167,7 +167,9 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	{
 		AStaticMeshActor* Prop = World->SpawnActor<AStaticMeshActor>(Position, FRotator::ZeroRotator);
 		if (!Prop) return;
+		#if WITH_EDITOR
 		Prop->SetActorLabel(Label);
+		#endif
 		if (UStaticMeshComponent* Mesh = Prop->GetStaticMeshComponent())
 		{
 			Mesh->SetStaticMesh(TestPropMesh);
@@ -225,11 +227,14 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	ARavenAgentAIController* MakerController = World->SpawnActor<ARavenAgentAIController>();
 	MakerController->Possess(Maker);
 	TestTrue(TEXT("Arranging from afar is refused"), Arrange(MakerController, TEXT("ArrangingGround_1"), TEXT("ring"), TEXT("Far"), TEXT("")).Contains(TEXT("too far")));
-	Maker->SetActorLocation(First.Location + FVector(120, 0, 100));
+	// The closest projected walkable point can be 3.4m from the site centre. A 4m
+	// use radius keeps an agent from being stranded just outside the build gate.
+	Maker->SetActorLocation(First.Location + FVector(350, 0, 100));
 	TestTrue(TEXT("An unknown form is refused"), Arrange(MakerController, TEXT("ArrangingGround_1"), TEXT("pyramid"), TEXT("X"), TEXT("")).Contains(TEXT("ring, line, spiral, or pair")));
 	const FString Made = Arrange(MakerController, TEXT("ArrangingGround_1"), TEXT(" Ring "), TEXT("Evening \"watch\"\nfor the tide, which is a title far longer than sixty characters allow"), TEXT("To mark where the chime\tcarries farthest."));
 	const FIslandArrangementSite* Work = State->FindArrangementSite(TEXT("ArrangingGround_1"));
-	TestTrue(TEXT("A resident makes a lasting ring"), Work && Work->bHasWork && Work->Form == EIslandArrangementForm::Ring && Made.Contains(TEXT("stays in the world")));
+	TestTrue(TEXT("A resident can arrange stones from a 3.5m walkable approach"),
+		Work && Work->bHasWork && Work->Form == EIslandArrangementForm::Ring && Made.Contains(TEXT("stays in the world")));
 	TestTrue(TEXT("Titles are single-line, bounded, and quote-free"), Work && Work->Title.Len() <= 60 && !Work->Title.Contains(TEXT("\n")) && !Work->Title.Contains(TEXT("\"")) && Work->Title.StartsWith(TEXT("Evening watch for the tide")));
 	TestTrue(TEXT("Intent is kept in the maker's words"), Work && Work->Intent == TEXT("To mark where the chime carries farthest"));
 	AIslandArrangement* Visible = FindArrangementActor(World, TEXT("ArrangingGround_1"));

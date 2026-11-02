@@ -18,6 +18,23 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentMovementTest, "CaptiveSky2.Agent.ResidentApproach",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FArrangementSiteProximityTest, "CaptiveSky2.Agent.ArrangementSiteProximity",
+	EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+
+bool FArrangementSiteProximityTest::RunTest(const FString& Parameters)
+{
+	const FVector SiteLocation(100.f, -50.f, 20.f);
+	TestTrue(TEXT("A resident can arrange from the typical 3.5m NavMesh approach"),
+		AAutonomousAgentAIController::IsWithinArrangementSiteUseRadius(SiteLocation + FVector(350.f, 0.f, 100.f), SiteLocation));
+	TestTrue(TEXT("The four-metre planar boundary is inclusive"),
+		AAutonomousAgentAIController::IsWithinArrangementSiteUseRadius(SiteLocation + FVector(400.f, 0.f, 250.f), SiteLocation));
+	TestFalse(TEXT("A resident outside the four-metre planar radius cannot arrange"),
+		AAutonomousAgentAIController::IsWithinArrangementSiteUseRadius(SiteLocation + FVector(401.f, 0.f, 0.f), SiteLocation));
+	TestFalse(TEXT("A resident on a different vertical level cannot arrange"),
+		AAutonomousAgentAIController::IsWithinArrangementSiteUseRadius(SiteLocation + FVector(0.f, 0.f, 251.f), SiteLocation));
+	return true;
+}
+
 bool FAgentMovementTest::RunTest(const FString& Parameters)
 {
 	const float StandOff = AAutonomousAgentAIController::ResidentApproachStandOffDistance;

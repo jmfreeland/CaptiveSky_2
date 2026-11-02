@@ -1041,6 +1041,12 @@ bool AAutonomousAgentAIController::CanArrangeStones() const
 	return Body && Body->GetCharacterMovement()->IsMovingOnGround() && !IsActionInProgress();
 }
 
+bool AAutonomousAgentAIController::IsWithinArrangementSiteUseRadius(const FVector& AgentLocation, const FVector& SiteLocation)
+{
+	return FVector::Dist2D(AgentLocation, SiteLocation) <= ArrangementSiteUseRadius &&
+		FMath::Abs(AgentLocation.Z - SiteLocation.Z) <= 250.f;
+}
+
 void AAutonomousAgentAIController::ArrangeStones(const FAgentDecision& Decision)
 {
 	APawn* Body = GetPawn();
@@ -1048,9 +1054,9 @@ void AAutonomousAgentAIController::ArrangeStones(const FAgentDecision& Decision)
 	const FName SiteId(*Decision.ActionTarget);
 	const FIslandArrangementSite* Site = WorldState ? WorldState->FindArrangementSite(SiteId) : nullptr;
 	if (!Body || !Site) { ReportAction(TEXT("There is no arranging ground by that name here. Nothing changed.")); return; }
-	if (FVector::Dist2D(Body->GetActorLocation(), Site->Location) > 300.f || FMath::Abs(Body->GetActorLocation().Z - Site->Location.Z) > 250.f)
+	if (!IsWithinArrangementSiteUseRadius(Body->GetActorLocation(), Site->Location))
 	{
-		ReportAction(TEXT("You are too far from that arranging ground; move_to it and stand within three metres first. Nothing changed."));
+		ReportAction(TEXT("You are too far from that arranging ground; move_to it and stand within four metres first. Nothing changed."));
 		return;
 	}
 	if (!CanArrangeStones()) { ReportAction(TEXT("Stones can only be arranged while settled on the ground. Nothing changed.")); return; }

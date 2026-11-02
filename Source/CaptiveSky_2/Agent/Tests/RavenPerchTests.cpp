@@ -1580,7 +1580,7 @@ bool FRavenShelterCandidateAuditTest::RunTest(const FString& Parameters)
 				Best.CoverCount = CoverCount;
 				Best.bWindSheltered = bWindSheltered;
 				Best.SupportLabel = SupportHit.GetActor()
-					? SupportHit.GetActor()->GetActorLabel() : TEXT("unknown support actor");
+					? SupportHit.GetActor()->GetName() : TEXT("unknown support actor");
 				Best.WindReport = WindReport;
 				bHasBestCandidate = true;
 			}

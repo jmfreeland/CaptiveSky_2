@@ -556,7 +556,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				if (!Site.bHasWork)
 				{
 					NearbyBeings += FString::Printf(TEXT(" Loose stones could be arranged here (build target: %s). ")
-						TEXT("To arrange there, stand within three metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
+						TEXT("To arrange there, stand within four metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
 						*SiteName);
 					continue;
 				}
@@ -903,9 +903,13 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 
 			const UStaticMeshComponent* MeshComponent = It->FindComponentByClass<UStaticMeshComponent>();
 			if (!MeshComponent || !MeshComponent->GetStaticMesh()) continue;
-			if (IsMatineeCameraProxyName(It->GetActorLabel(false)) ||
+			FString ActorLabel = It->GetName();
+#if WITH_EDITOR
+			ActorLabel = It->GetActorLabel(false);
+#endif
+			if (IsMatineeCameraProxyName(ActorLabel) ||
 				IsMatineeCameraProxyName(MeshComponent->GetStaticMesh()->GetName())) continue;
-			FString Label = It->GetActorLabel(false);
+			FString Label = MoveTemp(ActorLabel);
 			Label.ReplaceInline(TEXT("\r"), TEXT(" "));
 			Label.ReplaceInline(TEXT("\n"), TEXT(" "));
 			Label.ReplaceInline(TEXT("\""), TEXT("'"));
