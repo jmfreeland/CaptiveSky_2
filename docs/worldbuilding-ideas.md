@@ -1,5 +1,16 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Keep the Tideglass pool surface from supporting the visitor
+
+The transient procedural water had no collision, but the hidden flattened
+blockout sphere still blocked Pawn, likely explaining the reported walk-on-
+water behavior. At world begin, only that sphere's Pawn response is now
+ignored even if the water material is unavailable; query/physics mode and
+other channels remain, and the authored Pawn response is restored at teardown.
+The focused regression and UE 5.8.3 Editor target compile successfully;
+automation and actual entry/traversal remain unverified until a safe matching
+Game/PIE run. See [Tideglass Pawn collision](findings/2026-11-02-tideglass-pawn-collision.md).
+
 ## 2026-11-02 — Let residents know when today's stone work is already done
 
 The resident situation now stops offering an empty arranging ground as a

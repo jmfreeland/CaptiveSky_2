@@ -197,13 +197,11 @@ bool UIslandTideglassSubsystem::ApplyPoolMaterial(UMaterialInterface* Material)
 		return true;
 	}
 	RestorePoolMaterial();
+	SuppressPoolPawnCollision(PoolSurface);
 	RuntimeSurface = CreatePoolSurfaceMesh(PoolSurface);
 	if (!RuntimeSurface) return false;
 	RuntimeSurfaceBaseLocation = RuntimeSurface->GetComponentLocation();
 	AppliedTideOffsetCm = TNumericLimits<float>::Max();
-	BlockoutSurface = PoolSurface;
-	bBlockoutWasVisible = PoolSurface->IsVisible();
-	bBlockoutWasHiddenInGame = PoolSurface->bHiddenInGame;
 	PoolSurface->SetVisibility(false);
 	PoolSurface->SetHiddenInGame(true);
 	RuntimeSurface->SetMaterial(0, RuntimeMaterial);
@@ -232,6 +230,23 @@ bool UIslandTideglassSubsystem::TriggerSurfaceRipple(const FVector& WorldCenter,
 	return true;
 }
 
+void UIslandTideglassSubsystem::SuppressPoolPawnCollision(UStaticMeshComponent* PoolSurface)
+{
+	if (!IsValid(PoolSurface)) return;
+	if (BlockoutSurface == PoolSurface && bBlockoutPawnResponseSaved)
+	{
+		PoolSurface->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+		return;
+	}
+	if (BlockoutSurface || RuntimeSurface) RestorePoolMaterial();
+	BlockoutSurface = PoolSurface;
+	bBlockoutWasVisible = PoolSurface->IsVisible();
+	bBlockoutWasHiddenInGame = PoolSurface->bHiddenInGame;
+	SavedBlockoutPawnResponse = PoolSurface->GetCollisionResponseToChannel(ECC_Pawn);
+	bBlockoutPawnResponseSaved = true;
+	PoolSurface->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+}
+
 void UIslandTideglassSubsystem::TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material)
 {
 	if (!Material) return;
@@ -255,6 +270,8 @@ void UIslandTideglassSubsystem::RestorePoolMaterial()
 {
 	if (BlockoutSurface)
 	{
+		if (bBlockoutPawnResponseSaved)
+			BlockoutSurface->SetCollisionResponseToChannel(ECC_Pawn, SavedBlockoutPawnResponse);
 		BlockoutSurface->SetVisibility(bBlockoutWasVisible);
 		BlockoutSurface->SetHiddenInGame(bBlockoutWasHiddenInGame);
 	}
@@ -264,6 +281,7 @@ void UIslandTideglassSubsystem::RestorePoolMaterial()
 	}
 	RuntimeSurface = nullptr;
 	BlockoutSurface = nullptr;
+	bBlockoutPawnResponseSaved = false;
 	AppliedTo.Reset();
 	AppliedTideOffsetCm = TNumericLimits<float>::Max();
 	TideUpdateAccumulator = 0.f;
@@ -384,6 +402,8 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 	}
 	if (!PoolMarker) return;
+	if (UStaticMeshComponent* PoolSurface = FindPoolSurface(&InWorld))
+		SuppressPoolPawnCollision(PoolSurface);
 
 	// A tiny, transient pair of frogs adds life to the damp margin without
 	// changing the saved map. Positions are derived from the pool footprint and
@@ -442,7 +462,7 @@ void UIslandTideglassSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	if (!Material)
 	{
-		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water is unavailable: could not load %s or %s; the white blockout surface remains visible."), RippleMaterialPath, MaterialPath);
+		UE_LOG(LogIslandTideglass, Warning, TEXT("Tideglass runtime water is unavailable: could not load %s or %s; the blockout surface remains visible but non-blocking to Pawns."), RippleMaterialPath, MaterialPath);
 		return;
 	}
 	if (!ApplyPoolMaterial(Material))

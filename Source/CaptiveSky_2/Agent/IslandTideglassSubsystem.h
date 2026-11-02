@@ -63,6 +63,7 @@ private:
 	friend class FIslandTideglassSurfaceTest;
 	friend class FIslandTideglassTideTest;
 	static void TuneReadablePoolMaterial(UMaterialInstanceDynamic* Material);
+	void SuppressPoolPawnCollision(UStaticMeshComponent* PoolSurface);
 	void UpdateTideSurface();
 	void ApplyShoreStonePresentation();
 	void RestoreShoreStonePresentation();
@@ -84,4 +85,6 @@ private:
 	float TideUpdateAccumulator = 0.f;
 	bool bBlockoutWasVisible = true;
 	bool bBlockoutWasHiddenInGame = false;
+	ECollisionResponse SavedBlockoutPawnResponse = ECR_Block;
+	bool bBlockoutPawnResponseSaved = false;
 };

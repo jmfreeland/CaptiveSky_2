@@ -58,6 +58,9 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			UStaticMeshComponent* Surface = SurfaceActor->GetStaticMeshComponent();
 			Surface->SetStaticMesh(Sphere);
 			SurfaceActor->SetActorScale3D(FVector(4.f, 4.f, 0.1f));
+			Surface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			Surface->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+			Surface->SetCollisionResponseToChannel(ECC_Visibility, ECR_Overlap);
 			Surface->SetMaterial(0, AuthoredBlockout);
 
 			for (int32 Index = 0; Index < 4; ++Index)
@@ -76,6 +79,15 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("All four synthetic shore-stone collision proxies spawn"), ShoreStoneProxies.Num(), 4);
 
 			TestTrue(TEXT("The subsystem finds the flattened sphere beside the tagged pool"), Tideglass->FindPoolSurface(World) == Surface);
+			Tideglass->SuppressPoolPawnCollision(Surface);
+			TestEqual(TEXT("Pool Pawns are not blocked before a visual water material is available"),
+				Surface->GetCollisionResponseToChannel(ECC_Pawn), ECR_Ignore);
+			TestTrue(TEXT("The no-material fallback keeps the blockout visible"), Surface->IsVisible() && !Surface->bHiddenInGame);
+			TestEqual(TEXT("The no-material fallback retains query and physics collision"),
+				Surface->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+			Tideglass->RestorePoolMaterial();
+			TestEqual(TEXT("The no-material fallback teardown restores authored Pawn collision"),
+				Surface->GetCollisionResponseToChannel(ECC_Pawn), ECR_Block);
 			UMaterialInterface* StartupMaterial = RippleWater ? RippleWater : PoolWater ? PoolWater : PreviewWater;
 			Tideglass->MaterialOverride = (RippleWater || PoolWater) ? nullptr : PreviewWater;
 			World->BeginPlay();
@@ -145,8 +157,14 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 					WaterSection && WaterSection->ProcIndexBuffer.Num() >= 3 && WaterSection->ProcIndexBuffer[0] == 0 &&
 					WaterSection->ProcIndexBuffer[1] == 2 && WaterSection->ProcIndexBuffer[2] == 1);
 				TestTrue(TEXT("The hidden map sphere retains its authored material while transient water is active"), Surface->GetMaterial(0) == AuthoredBlockout);
-				TestTrue(TEXT("The generated water surface does not replace the blockout's collision"),
-					RuntimeWater->GetCollisionEnabled() == ECollisionEnabled::NoCollision);
+				TestEqual(TEXT("The visual-only water surface does not add collision"),
+					RuntimeWater->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+				TestEqual(TEXT("The hidden blockout surface stops blocking the visitor pawn while water is active"),
+					Surface->GetCollisionResponseToChannel(ECC_Pawn), ECR_Ignore);
+				TestEqual(TEXT("The blockout retains its query and physics collision modes"),
+					Surface->GetCollisionEnabled(), ECollisionEnabled::QueryAndPhysics);
+				TestEqual(TEXT("Non-pawn water-surface queries retain their authored response"),
+					Surface->GetCollisionResponseToChannel(ECC_Visibility), ECR_Overlap);
 				TestTrue(TEXT("The old sphere is hidden only while the procedural surface is active"), Surface->bHiddenInGame);
 			}
 
@@ -193,6 +211,10 @@ bool FIslandTideglassSurfaceTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("Teardown restores the authored blockout material"), Surface->GetMaterial(0) == AuthoredBlockout);
 			TestTrue(TEXT("Teardown restores the blockout component visibility"), Surface->IsVisible());
 			TestFalse(TEXT("Teardown restores the blockout sphere visibility"), Surface->bHiddenInGame);
+			TestEqual(TEXT("Teardown restores the blockout's authored pawn collision response"),
+				Surface->GetCollisionResponseToChannel(ECC_Pawn), ECR_Block);
+			TestEqual(TEXT("Teardown preserves the blockout's authored non-pawn collision response"),
+				Surface->GetCollisionResponseToChannel(ECC_Visibility), ECR_Overlap);
 			TestNull(TEXT("Teardown destroys the transient procedural water surface"), Tideglass->RuntimeSurface.Get());
 			TestFalse(TEXT("No Tideglass material remains applied after restore"), Tideglass->IsApplied());
 			if (PoolWater)
