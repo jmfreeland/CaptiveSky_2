@@ -124,6 +124,7 @@ protected:
 private:
 	friend class FIslandEnvironmentTest;
 	friend class FIslandWeatherObservationTest;
+	friend class FIslandSkyObservationTest;
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialParameterCollection> Collection;
 	UPROPERTY(Transient)

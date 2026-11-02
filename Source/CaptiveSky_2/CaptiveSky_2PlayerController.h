@@ -138,6 +138,7 @@ protected:
 	FString DescribeWorldInteractionHint(AActor* Target) const;
 	FString DescribeTrailUnderfoot() const;
 	FString DescribeLocalWeather() const;
+	FString DescribeLocalSky() const;
 	FString DescribeNearbyTide() const;
 	int32 NextEnvironmentalObservationIndex = 0;
 	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;

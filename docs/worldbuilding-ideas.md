@@ -1,5 +1,16 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let visitors notice the changing sky
+
+The on-demand `E: notice your surroundings` cycle now includes the Island's
+existing dawn/dusk horizon description or the current night-sky description
+when those conditions apply. The note reads the live clock and cloud cover,
+does no per-frame scan or persistent write, and is suppressed under the inn
+roof. A focused controller automation covers clear night, seasonal sunrise,
+indoor suppression, and midday without claiming visible stars. The UE 5.8.3
+editor target compiles; runtime automation still hits the known zero-second
+engine bootstrap crash. Details are in the [sky-observation finding](findings/2026-11-02-visitor-sky-observation.md).
+
 ## 2026-11-02 — Let visitors read Tideglass's changing waterline
 
 When a visitor uses Interact without a nearby target, the environmental notes

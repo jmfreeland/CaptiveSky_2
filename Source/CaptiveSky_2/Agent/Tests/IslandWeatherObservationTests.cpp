@@ -120,3 +120,59 @@ bool FIslandTideObservationTest::RunTest(const FString& Parameters)
 	World->DestroyWorld(false);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandSkyObservationTest, "CaptiveSky2.Agent.VisitorSkyObservation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandSkyObservationTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Synthetic sky-observation world created"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->BeginPlay();
+
+	UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
+	TestNotNull(TEXT("Synthetic sky-observation world owns the environment subsystem"), Environment);
+	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>();
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 90.f), FRotator::ZeroRotator);
+	UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+	AIslandInteractionTestPlayerController* Controller = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	TestNotNull(TEXT("Island clock created for sky observation"), Clock);
+	TestNotNull(TEXT("Visitor created for sky observation"), Visitor);
+	TestNotNull(TEXT("Caption widget created for sky observation"), Caption);
+	TestNotNull(TEXT("Visitor controller created for sky observation"), Controller);
+	if (Environment && Clock && Visitor && Caption && Controller)
+	{
+		Clock->bAdvanceTime = false;
+		Clock->DayNumber = 100;
+		Clock->CurrentHour = 23.5f;
+		Controller->SetFixturePawn(Visitor);
+		Controller->SetCaptionWidget(Caption);
+		Controller->BindFixtureInput();
+		TestTrue(TEXT("A visitor can notice the actual night-sky conditions on demand"),
+			Controller->PressBoundE() && Caption->GetDisplayedCaption().ToString().Contains(TEXT("You pause to read the sky")) &&
+			(Caption->GetDisplayedCaption().ToString().Contains(TEXT("stars")) ||
+				Caption->GetDisplayedCaption().ToString().Contains(TEXT("No stars"))));
+
+		Environment->Indoors = 1.f;
+		TestTrue(TEXT("The visitor does not receive an outdoor sky observation under the inn roof"),
+			Controller->PressBoundE() && !Caption->GetDisplayedCaption().ToString().Contains(TEXT("read the sky")));
+
+		Environment->Indoors = 0.f;
+		Clock->CurrentHour = AIslandDayNight::SunriseHour(Clock->DayNumber) + 0.1f;
+		TestTrue(TEXT("A visitor can notice the actual seasonal sunrise and horizon color"),
+			Controller->PressBoundE() && Caption->GetDisplayedCaption().ToString().Contains(TEXT("sun has just cleared the horizon")) &&
+			Caption->GetDisplayedCaption().ToString().Contains(TEXT("horizon glows")));
+
+		Clock->CurrentHour = 12.f;
+		TestTrue(TEXT("A midday visitor is not told that stars are visible"),
+			Controller->PressBoundE() && !Caption->GetDisplayedCaption().ToString().Contains(TEXT("read the sky")) &&
+			!Caption->GetDisplayedCaption().ToString().Contains(TEXT("stars")));
+	}
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}

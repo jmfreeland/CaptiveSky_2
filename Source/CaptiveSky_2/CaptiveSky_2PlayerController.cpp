@@ -189,6 +189,33 @@ FString ACaptiveSky_2PlayerController::DescribeLocalWeather() const
 		Environment->GetWind(), Environment->GetMist());
 }
 
+FString ACaptiveSky_2PlayerController::DescribeLocalSky() const
+{
+	UWorld* World = GetWorld();
+	if (!World) return FString();
+
+	const UIslandEnvironmentSubsystem* Environment = World->GetSubsystem<UIslandEnvironmentSubsystem>();
+	if (Environment && Environment->GetIndoors() >= 0.5f) return FString();
+	const float CloudCover = Environment ? Environment->GetCloudCover() : 0.f;
+
+	for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+	{
+		const int32 Day = It->DayNumber;
+		const float Hour = It->CurrentHour;
+		FString Observation = AIslandDayNight::DescribeSunEdge(Hour, Day) +
+			AIslandDayNight::DescribeHorizonColour(Hour, CloudCover, Day);
+		if (Observation.IsEmpty())
+		{
+			const float Night = AIslandDayNight::NightAmount(Hour, Day);
+			const float Moonlight = AIslandDayNight::LunarIllumination(Day, Hour);
+			const float MoonHeight = AIslandDayNight::MoonHeight(Day, Hour);
+			Observation = AIslandDayNight::DescribeStars(Night, CloudCover, Moonlight, MoonHeight);
+		}
+		return Observation.IsEmpty() ? FString() : FString::Printf(TEXT("You pause to read the sky.%s"), *Observation);
+	}
+	return FString();
+}
+
 FString ACaptiveSky_2PlayerController::DescribeNearbyTide() const
 {
 	const APawn* PlayerPawn = GetPawn();
@@ -334,6 +361,9 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		{
 			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
 		}
+
+		const FString SkyFact = DescribeLocalSky();
+		if (!SkyFact.IsEmpty()) EnvironmentalObservations.Add(SkyFact);
 
 		const FString TideFact = DescribeNearbyTide();
 		if (!TideFact.IsEmpty()) EnvironmentalObservations.Add(TideFact);
