@@ -173,6 +173,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	friend class FIslandGroundCoverTest;
 	friend class FIslandMeadowFlowerSpeciesTest;
+	friend class FIslandDragonflyMeadowFlowerResponseTest;
 	friend class FIslandFoxResidentGlanceCaptureTest;
 	friend class FIslandFoxStagAwarenessCaptureTest;
 	friend class FIslandMinnowTest;

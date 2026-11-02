@@ -45,3 +45,21 @@ Rendered flower silhouettes and colors, actual dragonfly attraction during
 these added windows, and frame-time impact still need a memory-gated review
 once at least 4 GiB of GPU memory is free. Do not raise the flower instance
 budget as part of that review.
+
+## Dragonfly flight integration regression
+
+`CaptiveSky2.Agent.Ecology.DragonflySeasonalFlowerVisit` now joins the
+production seasonal visibility update and nearest-bloom query to a dragonfly's
+temporary flower hover and flight response. Its synthetic, asset-free fixture
+checks that a spring bluebell is queryable and draws a dragonfly into a brief
+hover, that the dragonfly bends its flight toward the hover station, and that
+the same bloom is unavailable in summer. It does not add actors or alter the
+Island's scatter, tick cadence, state, or request budget.
+
+The UE 5.8.3 `CaptiveSky_2Editor` Development target compiled and linked
+successfully (17 build actions, 209 seconds), including the new fixture and
+both production ecology translation units. The automation was not launched:
+fresh Editor-Cmd/Game startup is still failing before test discovery in this
+environment, and repeating the same launch would not provide new evidence.
+Thus the integration check is compile-verified, not runtime-passed; a rendered
+pollinator visit also remains gated on at least 4 GiB free GPU memory.

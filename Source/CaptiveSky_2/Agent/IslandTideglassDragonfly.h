@@ -42,6 +42,7 @@ private:
 	friend class FIslandNightEcologyTest;
 	friend class FIslandTideglassDragonflyFrogResponseWorldTest;
 	friend class FIslandTideglassDragonflyListeningStonesTest;
+	friend class FIslandDragonflyMeadowFlowerResponseTest;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
 	TObjectPtr<UStaticMeshComponent> Head;
 	UPROPERTY(VisibleAnywhere, Category="Island|Ecology")
