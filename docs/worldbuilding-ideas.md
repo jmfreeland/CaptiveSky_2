@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Keep RatHollow placement tied to a fresh Island audit
+
+The active D: Island state currently has no `wildlife_homes` record, and the
+newest named RatHollow site-review audit I found is from October 16. It is too
+old to satisfy the V9 review workflow's 24-hour gate, so no candidate location
+is approved and the live map remains unchanged. The full 64-test
+`Scripts/tests` suite passes under Blender 5.2.2's bundled Python, including
+the review script's stale/mismatched-site refusals and source-map protection.
+Next, obtain a fresh qualified `Island.RatHollowSiteAudit` result in the
+correct project, then inspect only a copied-map placement for Rat-scale access,
+concealment, ground contact, collision, and navigation before creating any
+canonical home record. See the [V9 review workflow](findings/2026-11-01-rathollow-hidden-v9.md).
+
 ## 2026-11-02 — Let visitors feel the lee of the Island's landmarks
 
 The on-demand `E: notice your surroundings` cycle now includes the same
