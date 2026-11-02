@@ -365,8 +365,8 @@ public:
 	const TArray<FIslandGuestBookEntry>& GetGuestBookEntries() const { return GuestBookEntries; }
 	/** Adds one cleaned line per resident per Island day. The oldest line rolls off at the fixed cap. */
 	FString WriteGuestBook(const FString& AgentId, const FString& Line, int32 Today, bool& bOutChanged);
-	/** Writes for the single local visitor identity using the active Island day and shared daily limit. */
-	FString WriteVisitorGuestBook(const FString& Line, bool& bOutChanged);
+	/** Writes for a visitor identity using the active Island day and that identity's daily limit. */
+	FString WriteVisitorGuestBook(const FString& VisitorId, const FString& Line, bool& bOutChanged);
 	/** Whether this identity has already written today; used to present honest UI before accepting text. */
 	bool HasGuestBookEntryToday(const FString& AgentId) const;
 	/** Developer reversal for all guest-book lines. */

@@ -1542,9 +1542,9 @@ FString UIslandWorldStateSubsystem::WriteGuestBook(const FString& AgentId, const
 	return FString::Printf(TEXT("You leave this line in the inn guest book: \"%s\" The book keeps at most %d recent lines; anyone who reads it can see this one signed with your name."), *CleanLine, MaxGuestBookEntries);
 }
 
-FString UIslandWorldStateSubsystem::WriteVisitorGuestBook(const FString& Line, bool& bOutChanged)
+FString UIslandWorldStateSubsystem::WriteVisitorGuestBook(const FString& VisitorId, const FString& Line, bool& bOutChanged)
 {
-	return WriteGuestBook(TEXT("Visitor"), Line, DisplayDay(), bOutChanged);
+	return WriteGuestBook(VisitorId.IsEmpty() ? TEXT("Visitor") : VisitorId, Line, DisplayDay(), bOutChanged);
 }
 
 bool UIslandWorldStateSubsystem::HasGuestBookEntryToday(const FString& AgentId) const

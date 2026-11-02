@@ -30,6 +30,8 @@ class ACaptiveSky_2PlayerController : public APlayerController
 public:
 	/** Human-readable, non-triggering prompt for the keyboard conversation shortcut. */
 	static FString FormatConversationHint(const FString& AgentName, bool bTouchControls);
+	/** Stable per-Island pseudonym for an authenticated online visitor; empty IDs use the local Visitor identity. */
+	static FString BuildAuthenticatedVisitorIdentity(const FString& AuthenticatedAccountId, const FString& MapName);
 	void SubmitConversation(const FString& Utterance);
 	void CloseConversation();
 	void SubmitGuestBookEntry(const FString& Line);
@@ -143,6 +145,7 @@ protected:
 	FString DescribeLocalWindShelter() const;
 	FString DescribeLocalSky() const;
 	FString DescribeNearbyTide() const;
+	FString GetVisitorIdentity() const;
 	int32 NextEnvironmentalObservationIndex = 0;
 	TMap<TWeakObjectPtr<AActor>, double> WorldInteractionCooldowns;
 

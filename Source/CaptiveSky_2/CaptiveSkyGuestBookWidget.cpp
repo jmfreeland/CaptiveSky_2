@@ -47,11 +47,11 @@ TSharedRef<SWidget> UCaptiveSkyGuestBookWidget::RebuildWidget()
 	];
 }
 
-void UCaptiveSkyGuestBookWidget::OpenFor(const FString& LatestEntries, bool bCanWriteToday)
+void UCaptiveSkyGuestBookWidget::OpenFor(const FString& LatestEntries, bool bCanWriteToday, const FString& VisitorName)
 {
 	bMayWriteToday = bCanWriteToday;
 	SetVisibility(ESlateVisibility::Visible);
-	const FString PrivacyNote = TEXT("Notes are public, signed as Visitor, and may be read by the Island's residents. One line per Island day; 180 characters maximum. Do not put private information here.");
+	const FString PrivacyNote = FString::Printf(TEXT("Notes are public, signed as %s, and may be read by the Island's residents. One line per Island day; 180 characters maximum. Do not put private information here."), VisitorName.IsEmpty() ? TEXT("Visitor") : *VisitorName);
 	DisplayedContent = LatestEntries + TEXT("\n\n") + (bCanWriteToday
 		? PrivacyNote + TEXT("\nEnter saves; Escape closes.")
 		: TEXT("You have already left a line today. You may read the book again tomorrow.\nEscape closes."));

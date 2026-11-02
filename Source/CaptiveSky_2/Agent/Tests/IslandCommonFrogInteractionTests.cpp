@@ -44,6 +44,16 @@ bool FIslandCommonFrogInteractionTest::RunTest(const FString& Parameters)
 		ACaptiveSky_2PlayerController::FormatConversationHint(FString(), false).IsEmpty());
 	TestTrue(TEXT("Touch-control visitors are not shown an unavailable keyboard shortcut"),
 		ACaptiveSky_2PlayerController::FormatConversationHint(TEXT("Aster"), true).IsEmpty());
+	const FString VisitorOne = ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(TEXT("account-one"), TEXT("Island"));
+	const FString VisitorOneAgain = ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(TEXT("account-one"), TEXT("Island"));
+	const FString VisitorTwo = ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(TEXT("account-two"), TEXT("Island"));
+	const FString VisitorOneElsewhere = ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(TEXT("account-one"), TEXT("OtherIsland"));
+	TestEqual(TEXT("Anonymous/local play preserves its familiar Visitor identity"),
+		ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(FString(), TEXT("Island")), FString(TEXT("Visitor")));
+	TestEqual(TEXT("An authenticated visitor keeps a stable Island pseudonym across reconnects"), VisitorOneAgain, VisitorOne);
+	TestTrue(TEXT("Distinct authenticated visitors have separate persistent contribution identities"), VisitorOne != VisitorTwo);
+	TestTrue(TEXT("Authenticated identity pseudonyms are scoped to an Island"), VisitorOne != VisitorOneElsewhere);
+	TestFalse(TEXT("A raw account identifier is never written into public Island records"), VisitorOne.Contains(TEXT("account-one")));
 	TestTrue(TEXT("The player proximity hint describes quiet frog observation naturally"),
 		VisitorController && VisitorController->DescribeWorldInteractionHint(Frog).Contains(TEXT("quietly watch a wild common frog")));
 	TestFalse(TEXT("Wild frogs remain non-movement targets"), IslandInteractionUtility::IsMovementTargetAllowed(Frog));

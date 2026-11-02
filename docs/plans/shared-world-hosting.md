@@ -96,6 +96,14 @@ keys. Keep resident episodic memories, relationship records, and personality
 history private to that `AgentId`; replicate only the public actions and facts
 other beings could actually observe.
 
+Human contribution limits are keyed by an authenticated online identity, then
+stored as an Island-scoped pseudonym rather than the raw account ID. Local and
+offline play retains the single `Visitor` identity. An unauthenticated hosted
+session must not be presented as having per-person durable limits: require an
+identity provider before enabling public hosting, or keep contributions
+disabled until one is configured. Player names and client-supplied IDs are not
+identity proofs.
+
 ## Persistence evolution
 
 1. **First private-hosted prototype:** retain the current local/offline file

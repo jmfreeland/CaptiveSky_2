@@ -29,9 +29,26 @@
 #include "Agent/IslandWeather.h"
 #include "Agent/IslandTidepoolMinnows.h"
 #include "EngineUtils.h"
+#include "GameFramework/PlayerState.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
+#include "Misc/SecureHash.h"
 #include "TimerManager.h"
+
+FString ACaptiveSky_2PlayerController::BuildAuthenticatedVisitorIdentity(const FString& AuthenticatedAccountId, const FString& MapName)
+{
+	if (AuthenticatedAccountId.IsEmpty()) return TEXT("Visitor");
+	const FString IslandScopedIdentity = MapName + TEXT("|") + AuthenticatedAccountId;
+	return TEXT("Visitor_") + FMD5::HashAnsiString(*IslandScopedIdentity).Left(16);
+}
+
+FString ACaptiveSky_2PlayerController::GetVisitorIdentity() const
+{
+	const APlayerState* AuthenticatedPlayerState = GetPlayerState<APlayerState>();
+	if (!AuthenticatedPlayerState || !AuthenticatedPlayerState->GetUniqueId().IsValid()) return TEXT("Visitor");
+	const FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
+	return BuildAuthenticatedVisitorIdentity(AuthenticatedPlayerState->GetUniqueId().ToString(), MapName);
+}
 
 void ACaptiveSky_2PlayerController::BeginPlay()
 {
@@ -504,7 +521,7 @@ void ACaptiveSky_2PlayerController::OpenArrangement(AActor* Target)
 	}
 
 	const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(World);
-	const FString VisitorId(TEXT("Visitor"));
+	const FString VisitorId = GetVisitorIdentity();
 	const bool bUsedToday = State->HasArrangedStonesToday(VisitorId, Today);
 	const bool bOwnWork = Site->bHasWork && Site->MakerAgentId == VisitorId;
 	const bool bAlreadyResponded = Site->Responses.ContainsByPredicate([&VisitorId](const FIslandArrangementResponse& Response)
@@ -551,14 +568,15 @@ void ACaptiveSky_2PlayerController::SubmitVisitorArrangement(const FString& Form
 	}
 
 	bool bChanged = false;
-	const FString Result = State->ArrangeStones(Site->Id, Form, Title, Intent, TEXT("Visitor"),
+	const FString VisitorId = GetVisitorIdentity();
+	const FString Result = State->ArrangeStones(Site->Id, Form, Title, Intent, VisitorId,
 		UIslandWorldStateSubsystem::CurrentIslandDay(World), bChanged);
 	Site = State->FindArrangementSite(Target->GetSiteId());
 	const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(World);
-	const bool bUsedToday = State->HasArrangedStonesToday(TEXT("Visitor"), Today);
-	const bool bOwnWork = Site && Site->bHasWork && Site->MakerAgentId == TEXT("Visitor");
-	const bool bAlreadyResponded = Site && Site->Responses.ContainsByPredicate([](const FIslandArrangementResponse& Response)
-		{ return Response.AgentId == TEXT("Visitor"); });
+	const bool bUsedToday = State->HasArrangedStonesToday(VisitorId, Today);
+	const bool bOwnWork = Site && Site->bHasWork && Site->MakerAgentId == VisitorId;
+	const bool bAlreadyResponded = Site && Site->Responses.ContainsByPredicate([&VisitorId](const FIslandArrangementResponse& Response)
+		{ return Response.AgentId == VisitorId; });
 	ArrangementWidget->ShowResult(Result, Site && Site->bHasWork,
 		Site && !Site->bHasWork && !bUsedToday,
 		Site && Site->bHasWork && !bOwnWork && !bAlreadyResponded && !bUsedToday && Site->Responses.Num() < AIslandArrangement::MaxResponses,
@@ -617,7 +635,8 @@ void ACaptiveSky_2PlayerController::OpenGuestBook(AActor* Target)
 	if (!GuestBookTarget.IsValid()) return;
 	GetWorldTimerManager().ClearTimer(AmbientSpeechHideTimer);
 	HideAmbientSpeech();
-	GuestBookWidget->OpenFor(LatestEntries, !State->HasGuestBookEntryToday(TEXT("Visitor")));
+	const FString VisitorId = GetVisitorIdentity();
+	GuestBookWidget->OpenFor(LatestEntries, !State->HasGuestBookEntryToday(VisitorId), VisitorId);
 	bGuestBookPanelOpen = true;
 	if (AmbientSpeechWidget) AmbientSpeechWidget->HideInteractionHint();
 	SetGuestBookInputMode(true);
@@ -639,11 +658,12 @@ void ACaptiveSky_2PlayerController::SubmitGuestBookEntry(const FString& Line)
 	}
 
 	bool bChanged = false;
-	const FString Result = State->WriteVisitorGuestBook(Line, bChanged);
+	const FString VisitorId = GetVisitorIdentity();
+	const FString Result = State->WriteVisitorGuestBook(VisitorId, Line, bChanged);
 	FString LatestEntries;
 	IslandInteractionUtility::Perform(Visitor, Book, LatestEntries);
 	GuestBookWidget->ShowWriteResult(Result, LatestEntries,
-		!State->HasGuestBookEntryToday(TEXT("Visitor")), bChanged);
+		!State->HasGuestBookEntryToday(VisitorId), bChanged);
 }
 
 void ACaptiveSky_2PlayerController::CloseGuestBook()

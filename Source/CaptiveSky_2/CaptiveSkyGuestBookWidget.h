@@ -16,7 +16,7 @@ class CAPTIVESKY_2_API UCaptiveSkyGuestBookWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void OpenFor(const FString& LatestEntries, bool bCanWriteToday);
+	void OpenFor(const FString& LatestEntries, bool bCanWriteToday, const FString& VisitorName = TEXT("Visitor"));
 	void ShowWriteResult(const FString& Result, const FString& LatestEntries, bool bCanWriteToday, bool bClearInput);
 	TSharedPtr<SWidget> GetPreferredInputWidget() const;
 	FString GetDisplayedContent() const { return DisplayedContent; }
