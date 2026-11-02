@@ -1,5 +1,16 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let ground-cover communities follow less regular edges
+
+The broad seeded ground-cover species field now bends through two smooth,
+independent 24 m noise fields, with a maximum 9 m displacement. This keeps the
+existing species and instance budgets unchanged while avoiding long, overly
+regular transitions between plant communities. The UE 5.8.3 Game target built
+successfully. This is a spatial-composition experiment, not rendered proof; the
+existing Island ecology automation should be rerun and a matched visual check
+is still needed when GPU headroom permits. Details: [ground-cover community
+warp](findings/2026-11-02-groundcover-community-warp.md).
+
 ## 2026-11-02 — Let the meadow change with the seasons
 
 The eight generic Fab flower forms now open and fade in overlapping windows

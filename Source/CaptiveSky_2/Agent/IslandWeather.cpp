@@ -719,11 +719,19 @@ void AIslandWeather::BuildGroundCoverOffsets(int32 Seed, int32 ClumpCount, float
 
 int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure, float WetEdgeMoisture)
 {
-	// Continuous seeded fields create meandering communities instead of square
-	// 14 m tiles; inputs remain world-space so trace order cannot affect placement.
+	// Slowly warp the broad species field with two independent, finer noise fields.
+	// The bounded displacement bends community edges without adding instances or
+	// breaking the broad habitat patches into noisy, per-blade alternation.
+	constexpr float CommunityWarpCellSize = 2400.f;
+	constexpr float CommunityWarpDistance = 900.f;
+	const float CommunityWarpX = (SampleGroundCoverFieldAtScale(Position, Seed ^ 0x6d2b79f5, CommunityWarpCellSize) - 0.5f) * 2.f;
+	const float CommunityWarpY = (SampleGroundCoverFieldAtScale(Position, Seed ^ 0x1b873593, CommunityWarpCellSize) - 0.5f) * 2.f;
+	const FVector WarpedPosition = Position + FVector(CommunityWarpX * CommunityWarpDistance,
+		CommunityWarpY * CommunityWarpDistance, 0.f);
+	// Inputs remain world-space so trace order cannot affect placement.
 	const uint32 Hash = HashGroundCoverFieldCell(FMath::FloorToInt(Position.X / 1400.f),
 		FMath::FloorToInt(Position.Y / 1400.f), Seed);
-	const float SpeciesField = SampleGroundCoverField(Position, Seed);
+	const float SpeciesField = SampleGroundCoverFieldAtScale(WarpedPosition, Seed, 4200.f);
 	const float WetPatchThreshold = SampleGroundCoverField(Position, Seed ^ 0x54f0e1a5);
 	const float PatchExposureThreshold = SampleGroundCoverField(Position, Seed ^ 0x2e7a4c31);
 	const int32 Variant = FMath::Min(10, FMath::FloorToInt(SpeciesField * 11.f));
