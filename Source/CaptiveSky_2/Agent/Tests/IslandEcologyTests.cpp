@@ -599,6 +599,17 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nearby plants within one botanical patch share a species"),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(200.f, -300.f, 0.f), 71));
+	const FVector MeanderingCommunityProbe(60800.f, 12800.f, 0.f);
+	TSet<int32> MeanderingCommunitySpecies;
+	for (int32 X = -3; X <= 3; ++X)
+		for (int32 Y = -3; Y <= 3; ++Y)
+			MeanderingCommunitySpecies.Add(AIslandWeather::SelectGroundCoverVariant(
+				MeanderingCommunityProbe + FVector(X * 400.f, Y * 400.f, 0.f), 71));
+	TestTrue(TEXT("A broad species community can meander into neighboring forms along an irregular boundary"),
+		MeanderingCommunitySpecies.Num() >= 2);
+	TestEqual(TEXT("The meandering boundary still keeps nearby plants botanically coherent"),
+		AIslandWeather::SelectGroundCoverVariant(MeanderingCommunityProbe, 71),
+		AIslandWeather::SelectGroundCoverVariant(MeanderingCommunityProbe + FVector(200.f, 200.f, 0.f), 71));
 	int32 SpeciesCounts[11] = {};
 	int32 ExposedGrassCounts[3] = {};
 	const TArray<FVector> ExposedAnchors = {FVector::ZeroVector};
