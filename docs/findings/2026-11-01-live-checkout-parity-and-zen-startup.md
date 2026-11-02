@@ -123,9 +123,13 @@ water traversal and real-RHI performance as separate runtime gates.
 ## Live editor recheck (2026-11-02)
 
 The Unreal Editor is open and responsive on `/Game/Maps/Island`. A read-only
-viewport inspection shows a ground-level woodland/mushroom composition with
-thick foreground grass; this camera does not provide a useful mature-canopy
-species comparison. No PIE or other renderer was started.
+viewport inspection at the initial camera showed a ground-level
+woodland/mushroom composition with thick foreground grass. A wider camera view
+showed broad exposed brown ground between short grass tufts, a large boulder
+dominating the near-right foreground, and no useful mature-canopy species
+comparison. This is an editor viewport, not a gameplay-quality or island-wide
+composition verdict; the live source is also behind the worktree. No PIE or
+other renderer was started.
 
 The on-disk D: project still declares four broadleaf species in
 `IslandWeather.h` (file timestamp 2026-10-29) and its `IslandWeather.cpp` has
@@ -142,6 +146,9 @@ already-tested species work after reviewing the exact D:-only edits, followed
 by a bounded runtime census and a matched rendered comparison when GPU
 headroom permits. Do not add species, instance count, or cull distance until
 that comparison establishes a perceptual need and performance margin.
+For ground-cover composition, first compare landmark-scale gameplay views and
+patch counts; preserve the existing instance budget while tuning scatter, and
+do not increase overall density based on this one editor camera.
 
 ## Active-project water collision merge (2026-11-01)
 
