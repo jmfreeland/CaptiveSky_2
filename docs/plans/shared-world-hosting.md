@@ -23,6 +23,12 @@ turn the existing local files into an accidentally networked database.
   from `AIslandDayNight::EndPlay`; an orderly stop therefore flushes the latest
   clock/environment snapshot, while an abrupt process kill can still lose the
   interval since the last periodic save.
+- `AIslandDayNight::PersistHour` now returns whether the requested clock and
+  wetness writes succeeded. Periodic and `EndPlay` failures are logged instead
+  of being silently discarded; the focused persistence fixture asserts a
+  successful explicit session-boundary flush. This reports local save health,
+  but does not itself pause a host, reject reconnects, or fence asynchronous
+  resident callbacks.
 - **Clock/offline-time audit (2026-11-02):** `AIslandDayNight::BeginPlay`
   restores the saved Island hour and day directly; its only time advancement
   is from in-world `Tick` delta, with no UTC downtime calculation. The saved

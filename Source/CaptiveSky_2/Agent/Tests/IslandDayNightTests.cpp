@@ -664,6 +664,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The environment starts from its saved wetness"), Environment && FMath::IsNearlyEqual(Environment->GetWetness(), 0.74f));
 	Clock->CurrentHour = 21.5f;
 	Clock->DayNumber = 4;
+	TestTrue(TEXT("Explicit session-boundary flush reports persisted clock and wetness"), Clock->PersistHour());
 	EndSession(World, Clock);
 	TestTrue(TEXT("Ending play saves the Island hour"), FPaths::FileExists(StateFile));
 	FString SavedState;

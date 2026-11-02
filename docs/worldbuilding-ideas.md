@@ -11,6 +11,15 @@ The focused regression and UE 5.8.3 Editor target compile successfully;
 automation and actual entry/traversal remain unverified until a safe matching
 Game/PIE run. See [Tideglass Pawn collision](findings/2026-11-02-tideglass-pawn-collision.md).
 
+## 2026-11-02 — Surface failed Island clock saves
+
+Periodic and final clock/environment persistence now report failed writes
+instead of silently ignoring `SaveClock`/`SaveWetness` results, and the
+focused persistence fixture asserts a successful explicit boundary flush.
+The UE 5.8.3 Editor target built; automation remains unrun behind the known
+startup crash. This supports, but does not implement, the future hosted
+pause-on-empty lifecycle. See [clock save failure reporting](findings/2026-11-02-clock-save-failure-reporting.md).
+
 ## 2026-11-02 — Let residents know when today's stone work is already done
 
 The resident situation now stops offering an empty arranging ground as a

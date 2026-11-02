@@ -1,0 +1,21 @@
+# Report clock and environment snapshot failures
+
+`AIslandDayNight::PersistHour` previously discarded the boolean results from
+the durable clock and wetness writes. It now returns success only when the
+required writes succeed, logs periodic and final `EndPlay` failures, and lets
+the focused persistence fixture assert a successful explicit boundary flush.
+The authored `bResumeSavedTime=false` mode still intentionally skips saving the
+clock; environment wetness remains persisted when available.
+
+The isolated UE 5.8.3 `CaptiveSky_2Editor` target built successfully after the
+change. The `CaptiveSky2.Agent.DayNightPersistence` automation source also
+compiled, including the new assertion, but was not run: the known Unreal
+commandlet pre-initialization crash has not been diagnosed. This is not proof
+that a live shutdown flush succeeds under filesystem failure.
+
+This is a prerequisite for the resolved hosted empty-world policy, not its
+implementation. A future authoritative visitor-lifecycle coordinator must
+check this result before claiming a clean pause, reject new visitors if the
+flush fails, and fence late resident callbacks at the session boundary. No
+visitor accounting, network authentication, or host shutdown behavior was
+added here.

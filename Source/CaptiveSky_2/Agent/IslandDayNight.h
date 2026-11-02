@@ -145,7 +145,7 @@ private:
 	UMaterialInterface* StarMaterial = nullptr;
 	void BuildStarfield();
 	void UpdateStarfieldVisibility(float SolarElevation);
-	void PersistHour();
+	bool PersistHour();
 	friend class FIslandClockTest;
 	friend class FIslandClockPersistenceTest;
 	void UpdateLighting();

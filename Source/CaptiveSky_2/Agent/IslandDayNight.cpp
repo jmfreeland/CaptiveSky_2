@@ -547,24 +547,32 @@ void AIslandDayNight::Tick(float DeltaSeconds)
 	UpdateLighting();
 	// Save occasionally too, so a crash or forced stop loses at most a minute of Island time.
 	SecondsSinceSave += FMath::Max(0.f, DeltaSeconds);
-	if (SecondsSinceSave >= 60.f) PersistHour();
+	if (SecondsSinceSave >= 60.f && !PersistHour())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Periodic Island clock/environment snapshot failed; a later retry will occur."));
+	}
 }
 
 void AIslandDayNight::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	PersistHour();
+	if (!PersistHour())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Island clock/environment snapshot did not fully persist during EndPlay; the last saved snapshot may be stale."));
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
-void AIslandDayNight::PersistHour()
+bool AIslandDayNight::PersistHour()
 {
 	SecondsSinceSave = 0.f;
-	if (!GetWorld()) return;
+	if (!GetWorld()) return false;
 	UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>();
-	if (!WorldState) return;
-	if (bResumeSavedTime) WorldState->SaveClock(CurrentHour, DayNumber);
+	if (!WorldState) return false;
+	const bool bClockSaved = !bResumeSavedTime || WorldState->SaveClock(CurrentHour, DayNumber);
+	bool bWetnessSaved = true;
 	if (const UIslandEnvironmentSubsystem* Environment = GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>())
-		WorldState->SaveWetness(Environment->GetWetness());
+		bWetnessSaved = WorldState->SaveWetness(Environment->GetWetness());
+	return bClockSaved && bWetnessSaved;
 }
 
 void AIslandDayNight::UpdateLighting()
