@@ -18,6 +18,27 @@ Rat, and the Innkeeper), one trail event, and the two session-boundary events.
 Four optional feedback check-ins occurred at about 12 minutes; the 32-request
 ceiling was not approached.
 
+## Runtime vegetation census
+
+At world initialization, the isolated worktree run placed 15,513 woodland
+trees including 8,537 saplings. Its fixed 3,600-tree broadleaf mix contained
+720 each of Norway maple, European aspen, European beech, black alder, and
+Common Hazel, distributed across 372 of 500 groves. The four taller species
+used both A and B mesh silhouettes; Hazel was A-only. This is stronger than a
+source or asset-registry check: the five-species scatter actually materialized
+in the 15-minute scratch Game session. Log: `Codex_ResidentFeedback_20261102_0117.log`.
+
+The separate on-disk D: project is behind this worktree: its
+`IslandWeather.h` still declares four broadleaf species, and its
+`IslandWeather.cpp` has no Common Hazel reference. That source sets broadleaf
+fade/cull ranges of 80–125 m (maple/aspen/beech) and 120–220 m (alder), while
+spruce remains to 550 m. A distant composition can therefore plausibly read
+as spruce-only once the broadleaf layers have culled; that is an inference,
+not a rendered-view diagnosis. The latest D: editor log has no runtime tree-mix
+census, so the editor's loaded module and actual visible distribution remain
+unverified. Do not raise cull ranges or tree counts until a matched rendered
+view clears the GPU reserve and measures performance.
+
 ## What residents noticed
 
 Three residents chose to speak at the optional check-in:

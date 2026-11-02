@@ -13,6 +13,18 @@ visible, hidden, and distant cases. This is behavior evidence only, not proof
 of species readability in the rendered Island. Details: [visitor wildlife
 observation](findings/2026-11-02-visitor-wildlife-observation.md).
 
+## 2026-11-02 — Confirm the five-species woodland scatter in a live scratch run
+
+The guarded 15-minute scratch Game run actually materialized the worktree's
+five broadleaf canopy species at 720 each, across 372/500 groves, while
+holding the 3,600-tree budget fixed. The separate on-disk D: checkout still
+declares four broadleaf species and lacks Common Hazel; its broadleaf cull
+ranges also end well before spruce's 550 m horizon. That can make a broad
+view read as spruce-only, but remains a distance-based inference until a
+rendered view is inspected. Keep the count/cull settings unchanged until
+headroom permits a matched visual/performance check. Details and the exact
+runtime census are in the [15-minute resident finding](findings/2026-11-02-resident-feedback-15m.md#runtime-vegetation-census).
+
 ## 2026-11-02 — Let visitors notice the changing sky
 
 The on-demand `E: notice your surroundings` cycle now includes the Island's
