@@ -122,11 +122,12 @@ namespace
 			{
 				Existing->DistanceCm = DistanceCm;
 				Existing->Location = Location;
+				Existing->bHasLocation = true;
 				Existing->BloomProgress = BloomProgress;
 			}
 			return;
 		}
-		Patches.Add({ DisplayName, DistanceCm, Location, BloomProgress });
+		Patches.Add({ DisplayName, DistanceCm, Location, true, BloomProgress });
 	}
 }
 
@@ -241,7 +242,7 @@ FString IslandVegetationUtility::FormatVisitorObservation(
 	{
 		if (Patch.DisplayName.IsEmpty()) continue;
 		FString Detail = Patch.DisplayName;
-		if (IsValid(Observer) && FMath::IsFinite(Patch.DistanceCm) && Patch.DistanceCm > 0.f &&
+		if (IsValid(Observer) && Patch.bHasLocation && FMath::IsFinite(Patch.DistanceCm) && Patch.DistanceCm > 0.f &&
 			FMath::IsFinite(Patch.Location.X) && FMath::IsFinite(Patch.Location.Y) &&
 			FMath::IsFinite(Patch.Location.Z))
 		{

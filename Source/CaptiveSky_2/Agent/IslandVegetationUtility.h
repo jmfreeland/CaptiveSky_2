@@ -13,6 +13,7 @@ struct FIslandVegetationPatch
 	FString DisplayName;
 	float DistanceCm = 0.f;
 	FVector Location = FVector::ZeroVector;
+	bool bHasLocation = false;
 	/** Negative when this patch has no authored seasonal bloom calendar. */
 	float BloomProgress = -1.f;
 };
