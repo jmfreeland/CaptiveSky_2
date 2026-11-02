@@ -35,6 +35,16 @@ turn the existing local files into an accidentally networked database.
   pauses when play closes. The current bounded session still ends at 30 real
   minutes or 64 shared embodied model requests; neither cap is a hosted-service
   spending quota.
+- **Source audit (2026-11-02):** `ACaptiveSky_2GameMode` has no `PostLogin` or
+  `Logout` visitor accounting, and the Agent module contains no
+  network-client-presence lifecycle. `UAgentPlaySessionSubsystem` is a
+  real-time/request watchdog and budget ledger, not a pause coordinator.
+  `UIslandWorldStateSubsystem` loads the per-map JSON at world begin, persists
+  accepted changes atomically, and tears down transient presentation actors
+  during `Deinitialize`; the clock separately checkpoints its hour, day, and
+  wetness about once a minute and again from `AIslandDayNight::EndPlay`.
+  Therefore the empty-world policy is not currently implemented by persistent
+  files or the local session watchdog.
 
 Consequently, clients must not write their own copies of shared world state
 and later race to replace a common JSON file. Do not mount the same
@@ -106,6 +116,21 @@ establishes the required consistency, backup, and recovery behavior.
   `EndPlay` completes. Reconnecting resumes from that saved state without
   simulating the time away or inventing offline resident experience. This is
   distinct from residents choosing to sleep while visitors are still present.
+- Count authenticated human and external-agent visitor sessions as visitors;
+  native embodied residents do not keep the hosted world awake by themselves.
+  Presence must be maintained by the authoritative server, not inferred from
+  a client-supplied count or an LLM/Gateway heartbeat. Make the transition
+  idempotent so duplicate disconnects cannot close a world that still has
+  another visitor.
+- Freeze simulation admission at the final-disconnect boundary before
+  flushing state. An already-submitted resident model response must not mutate
+  the world after that boundary; tag work with a world-session generation and
+  discard stale callbacks on teardown/reconnect. Preserve submitted requests
+  in budget accounting rather than refunding uncertain provider work.
+- After the final save succeeds, stop the hosted process instead of keeping an
+  empty VM awake. If persistence fails, do not report a clean pause: reject new
+  joins until recovery or operator intervention. A later host starts from the
+  durable snapshot and never derives simulated elapsed time from UTC downtime.
 - Keep Zen/DDC private to trusted build or workstation networks. It is not the
   world's authoritative data store or a public content endpoint.
 
