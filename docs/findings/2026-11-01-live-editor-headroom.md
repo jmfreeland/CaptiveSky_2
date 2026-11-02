@@ -52,3 +52,19 @@ free, 68% utilization, 78 C). This is substantially below the 4 GiB minimum
 for rendered validation, so keep the 15–30 minute resident play run gated and
 continue with source-side work. It is a single device-wide sample, not an Unreal
 allocation measurement.
+
+## Read-only recheck — 2026-11-02
+
+Computer Use returned two windows for the installed UE 5.8 editor: the main
+`CaptiveSky_2 - Unreal Editor` and a separate `Tree_Common_Hazel_01_A` skeletal
+mesh preview. The asset preview reports `All Saved`; the main Island viewport
+is visible behind it on the close WoodlandFungusCluster review patch. This is
+not a visitor-scale woodland view and does not establish that the worktree's
+newer species scatter code is loaded or visually successful. The play control
+is idle; no PIE/Game session was started.
+
+`nvidia-smi` reports 10,743 / 12,282 MiB in use (1,255 MiB free), 44%
+utilization, and 74 C. This is below the established 4 GiB rendered-session
+reserve. Leave the editor and open asset untouched, and keep rendered
+validation gated until device-wide headroom recovers; continue with source-side
+work in the meantime.
