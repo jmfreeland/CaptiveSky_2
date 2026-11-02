@@ -17,6 +17,11 @@ physical memory fell below 4,096 MiB on two checks (4,063 then 3,940 MiB), and
 the launcher terminated only the Game process tree. The session therefore
 ended with exit code 1 by design, at roughly ten minutes; it is not a completed
 15-minute feedback run. Do not use this as rendered, FPS, or GPU evidence.
+After the launcher stopped the Game process, the same Windows memory API
+reported 9,669 MiB available again, and the process list contained no Unreal
+process. This closely associates the temporary pressure with the active
+session, but the run did not capture per-process RSS or identify which Game
+subsystem accounted for it.
 
 ## What residents chose
 
