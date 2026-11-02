@@ -5,6 +5,8 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "AgentPlaySessionSubsystem.generated.h"
 
+DECLARE_MULTICAST_DELEGATE(FOnVisitorWorldResumed);
+
 /**
  * Independent wall-clock watchdog. Exists for every play session, not as a placed actor.
  *
@@ -59,6 +61,14 @@ public:
 	bool TryReserveModelRequest(const FString& AgentId = FString(), bool bLight = false);
 	/** Releases a reservation after its provider callback; request and real-time caps remain authoritative. */
 	void CompleteModelRequest();
+	/** Fence resident work at the final-visitor boundary; already-submitted provider work remains budgeted. */
+	void PauseResidentWorkForEmptyWorld();
+	/** Reopen resident work for a newly connected visitor. */
+	void ResumeResidentWorkForVisitor();
+	uint64 GetWorldSessionGeneration() const { return WorldSessionGeneration; }
+	bool IsWorldSessionGenerationCurrent(uint64 Generation) const { return Generation == WorldSessionGeneration && bAcceptingResidentWork; }
+	bool IsAcceptingResidentWork() const { return bAcceptingResidentWork; }
+	FOnVisitorWorldResumed OnVisitorWorldResumed;
 	bool IsExpired() const;
 	static double ClampDuration(double Requested);
 	static int32 ClampRequestLimit(int32 Requested);
@@ -74,6 +84,8 @@ private:
 	bool bHasExplicitRequestCap = false;
 	FTSTicker::FDelegateHandle Watchdog;
 	bool bStopRequested = false;
+	bool bAcceptingResidentWork = true;
+	uint64 WorldSessionGeneration = 1;
 	bool CheckDeadline(float DeltaSeconds);
 	double NowOverride = -1.0;
 	double RequestCapReachedAt = -1.0;

@@ -78,15 +78,44 @@ UAgentConsolidationComponent::UAgentConsolidationComponent()
 
 UAgentConsolidationComponent::~UAgentConsolidationComponent() = default;
 
+void UAgentConsolidationComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance()
+		? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
+	if (Session)
+	{
+		BoundPlaySession = Session;
+		Session->OnVisitorWorldResumed.AddUObject(this, &UAgentConsolidationComponent::HandleVisitorWorldResumed);
+	}
+}
+
 void UAgentConsolidationComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	++SleepGeneration;
+	if (UAgentPlaySessionSubsystem* Session = BoundPlaySession.Get())
+	{
+		Session->OnVisitorWorldResumed.RemoveAll(this);
+	}
+	BoundPlaySession.Reset();
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(RestTimer);
 	}
 	Provider.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+void UAgentConsolidationComponent::HandleVisitorWorldResumed()
+{
+	if (!bDeferredSleepCompletionAfterWorldResume) return;
+	bDeferredSleepCompletionAfterWorldResume = false;
+	if (ConsciousState == EAgentConsciousState::Consolidating)
+	{
+		// The provider response belonged to the prior world session. Preserve sleep state while empty,
+		// then wake without applying a personality or memory change once the visitor returns.
+		FinishSleep();
+	}
 }
 
 void UAgentConsolidationComponent::SetConsciousState(const EAgentConsciousState NewState)
@@ -185,10 +214,11 @@ void UAgentConsolidationComponent::StartConsolidation()
 	Request.Messages.Add(Message);
 
 	const int32 Generation = SleepGeneration;
+	const uint64 RequestWorldSessionGeneration = Session ? Session->GetWorldSessionGeneration() : 0;
 	TWeakObjectPtr<UAgentConsolidationComponent> WeakThis(this);
 	TWeakObjectPtr<UAgentPlaySessionSubsystem> WeakSession(Session);
 	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda(
-		[WeakThis, WeakSession, Memories, Generation](const FAgentLLMResult& Result)
+		[WeakThis, WeakSession, Memories, Generation, RequestWorldSessionGeneration](const FAgentLLMResult& Result)
 		{
 			if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get())
 			{
@@ -198,6 +228,21 @@ void UAgentConsolidationComponent::StartConsolidation()
 			if (!StrongThis || StrongThis->SleepGeneration != Generation ||
 				StrongThis->ConsciousState != EAgentConsciousState::Consolidating)
 			{
+				return;
+			}
+			if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get();
+				StrongSession && !StrongSession->IsWorldSessionGenerationCurrent(RequestWorldSessionGeneration))
+			{
+				if (!StrongSession->IsAcceptingResidentWork())
+				{
+					StrongThis->bDeferredSleepCompletionAfterWorldResume = true;
+				}
+				else
+				{
+					StrongThis->FinishSleep();
+				}
+				UE_LOG(LogAgentConsolidation, Display,
+					TEXT("Discarded stale sleep-consolidation response from an earlier world session."));
 				return;
 			}
 			if (Result.bSuccess)

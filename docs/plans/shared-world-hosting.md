@@ -55,16 +55,21 @@ turn the existing local files into an accidentally networked database.
   pauses when play closes. The current bounded session still ends at 30 real
   minutes or 64 shared embodied model requests; neither cap is a hosted-service
   spending quota.
-- **Source audit (2026-11-02):** `ACaptiveSky_2GameMode` has no `PostLogin` or
-  `Logout` visitor accounting, and the Agent module contains no
-  network-client-presence lifecycle. `UAgentPlaySessionSubsystem` is a
-  real-time/request watchdog and budget ledger, not a pause coordinator.
-  `UIslandWorldStateSubsystem` loads the per-map JSON at world begin, persists
-  accepted changes atomically, and tears down transient presentation actors
-  during `Deinitialize`; the clock separately checkpoints its hour, day, and
-  wetness about once a minute and again from `AIslandDayNight::EndPlay`.
-  Therefore the empty-world policy is not currently implemented by persistent
-  files or the local session watchdog.
+- **Dedicated-host pause prototype (2026-11-02):** with the explicit
+  `-CaptiveSkyPauseWhenEmpty` switch, `ACaptiveSky_2GameMode` fences resident
+  requests at map initialization, checkpoints clock/wetness, pauses an empty
+  dedicated world, and resumes it on the next `PostLogin`. Final `Logout`
+  performs the same boundary checkpoint. Thought and sleep-consolidation
+  callbacks carry a world-session generation so stale responses cannot create
+  post-disconnect actions, memories, or personality changes. The configured
+  Blueprint GameMode is covered by a source automation assertion; the Editor
+  target compiles. Runtime automation and real disconnect/reconnect behavior
+  remain unverified behind the current startup crash. This prototype counts
+  Unreal network players only, does not stop the host process, and is not
+  enabled for local/editor/listen-server play; external-channel visitor leases
+  and cloud authentication are still missing. A failed/missing clock checkpoint
+  gates future joins for operator recovery. See the [hosted pause prototype
+  finding](../findings/2026-11-02-hosted-empty-world-pause-prototype.md).
 
 Consequently, clients must not write their own copies of shared world state
 and later race to replace a common JSON file. Do not mount the same

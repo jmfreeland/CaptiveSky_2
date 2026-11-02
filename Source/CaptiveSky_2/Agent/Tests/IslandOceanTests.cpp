@@ -14,6 +14,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/Material.h"
 #include "CaptiveSky_2Character.h"
+#include "CaptiveSky_2GameMode.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandOceanTestCharacter.h"
 #include "IslandSurfaceSwimMovementComponent.h"
@@ -98,6 +99,8 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 	{
 		const AGameModeBase* IslandGameMode = Cast<AGameModeBase>(IslandGameModeClass->GetDefaultObject());
 		TestNotNull(TEXT("The configured Island GameMode default object exists"), IslandGameMode);
+		TestTrue(TEXT("The configured Island GameMode inherits the hosted-visitor lifecycle hooks"),
+			IslandGameModeClass->IsChildOf(ACaptiveSky_2GameMode::StaticClass()));
 		TestTrue(TEXT("The configured Island GameMode uses the custom water-aware character"),
 			IslandGameMode && IslandGameMode->DefaultPawnClass &&
 			IslandGameMode->DefaultPawnClass->IsChildOf(ACaptiveSky_2Character::StaticClass()));

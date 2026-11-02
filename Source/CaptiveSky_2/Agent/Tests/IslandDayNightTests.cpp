@@ -642,7 +642,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	auto EndSession = [](UWorld* World, AIslandDayNight* Clock)
 	{
 		// Fixture actors are never initialized for play, so the engine skips EndPlay; run its save directly.
-		Clock->PersistHour();
+		Clock->FlushDurableState();
 		Clock->Destroy();
 		GEngine->DestroyWorldContext(World);
 		World->DestroyWorld(false);
@@ -664,7 +664,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("The environment starts from its saved wetness"), Environment && FMath::IsNearlyEqual(Environment->GetWetness(), 0.74f));
 	Clock->CurrentHour = 21.5f;
 	Clock->DayNumber = 4;
-	TestTrue(TEXT("Explicit session-boundary flush reports persisted clock and wetness"), Clock->PersistHour());
+	TestTrue(TEXT("Explicit session-boundary flush reports persisted clock and wetness"), Clock->FlushDurableState());
 	State = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	TestTrue(TEXT("One boundary flush commits clock and wetness together"), State &&
 		State->GetSavedHour().IsSet() && FMath::IsNearlyEqual(State->GetSavedHour().GetValue(), 21.5f, 0.01f) &&
@@ -708,7 +708,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	const FString UnreadablePayload = TEXT("not a valid world-state document");
 	TestTrue(TEXT("Unreadable-state fixture is created"), FFileHelper::SaveStringToFile(UnreadablePayload, *UnreadableStateFile));
 	Clock = StartSession(World, UnreadableStateFile, true);
-	TestFalse(TEXT("Boundary flush reports failure when world state was unreadable"), Clock->PersistHour());
+	TestFalse(TEXT("Boundary flush reports failure when world state was unreadable"), Clock->FlushDurableState());
 	UIslandWorldStateSubsystem* UnreadableState = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	TestFalse(TEXT("Failed atomic flush leaves saved clock unset"), UnreadableState && UnreadableState->GetSavedHour().IsSet());
 	TestFalse(TEXT("Failed atomic flush leaves saved wetness unset"), UnreadableState && UnreadableState->GetSavedWetness().IsSet());
@@ -722,7 +722,7 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 		TEXT("Automation") / TEXT("IslandClock") / FString::Printf(TEXT("FlushFailure_%s"), *FGuid::NewGuid().ToString(EGuidFormats::Digits)));
 	TestFalse(TEXT("Write-failure fixture parent does not exist"), IFileManager::Get().DirectoryExists(*MissingParent));
 	Clock = StartSession(World, MissingParent / TEXT("WorldState.json"), true);
-	TestFalse(TEXT("Boundary flush reports a failed durable replacement"), Clock->PersistHour());
+	TestFalse(TEXT("Boundary flush reports a failed durable replacement"), Clock->FlushDurableState());
 	UIslandWorldStateSubsystem* FailedWriteState = World->GetSubsystem<UIslandWorldStateSubsystem>();
 	TestFalse(TEXT("Failed replacement rolls back the in-memory clock"), FailedWriteState && FailedWriteState->GetSavedHour().IsSet());
 	TestFalse(TEXT("Failed replacement rolls back the in-memory wetness"), FailedWriteState && FailedWriteState->GetSavedWetness().IsSet());

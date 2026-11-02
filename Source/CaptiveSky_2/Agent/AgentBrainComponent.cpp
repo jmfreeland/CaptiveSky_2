@@ -1501,8 +1501,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	TWeakObjectPtr<UAgentBrainComponent> WeakThis(this);
 	TWeakObjectPtr<UAgentMemoryComponent> WeakMemory(MemoryComp);
 	TWeakObjectPtr<UAgentPlaySessionSubsystem> WeakSession(Session);
+	const uint64 RequestWorldSessionGeneration = Session ? Session->GetWorldSessionGeneration() : 0;
 
-	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, WeakSession, Context, bLight, bFeedbackInvitationDue](const FAgentLLMResult& Result)
+	Provider->SendRequest(Request, FOnAgentLLMComplete::CreateLambda([WeakThis, WeakMemory, WeakSession, Context, bLight, bFeedbackInvitationDue, RequestWorldSessionGeneration](const FAgentLLMResult& Result)
 	{
 		if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get())
 		{
@@ -1514,6 +1515,20 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			return;
 		}
 		StrongThis->bRequestInFlight = false;
+		if (UAgentPlaySessionSubsystem* StrongSession = WeakSession.Get();
+			StrongSession && !StrongSession->IsWorldSessionGenerationCurrent(RequestWorldSessionGeneration))
+		{
+			// Provider work is charged, but its response must not create memories or actions after the
+			// final-visitor boundary. Complete the async StateTree task with an empty decision so it can
+			// retry normally after a visitor reconnects and the world resumes.
+			FAgentDecision DeferredDecision;
+			StrongThis->LastDecision = DeferredDecision;
+			StrongThis->LastConversationContext = Context;
+			StrongThis->BroadcastDecisionReady(DeferredDecision);
+			StrongThis->OnDecisionCompleteForStateTree.ExecuteIfBound(DeferredDecision);
+			UE_LOG(LogAgentBrain, Display, TEXT("Discarded stale resident response from an earlier world session."));
+			return;
+		}
 
 		FAgentDecision Decision;
 		if (Result.bSuccess)

@@ -132,6 +132,8 @@ public:
 	static float CloudSkylightTransmission(float CloudCover);
 	static float CloudMoonlightTransmission(float CloudCover);
 	FString DescribeTime() const;
+	/** Atomically checkpoint the current clock and wetness for an orderly hosted pause. */
+	bool FlushDurableState();
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 #if WITH_EDITOR

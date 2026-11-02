@@ -562,6 +562,11 @@ void AIslandDayNight::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+bool AIslandDayNight::FlushDurableState()
+{
+	return PersistHour();
+}
+
 bool AIslandDayNight::PersistHour()
 {
 	SecondsSinceSave = 0.f;

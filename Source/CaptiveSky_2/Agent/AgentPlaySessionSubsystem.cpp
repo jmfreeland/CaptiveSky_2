@@ -132,7 +132,7 @@ bool UAgentPlaySessionSubsystem::IsExpired() const
 bool UAgentPlaySessionSubsystem::TryReserveModelRequest(const FString& AgentId, bool bLight)
 {
 	// A reached cap may be draining requests already in flight, but it must never admit another one.
-	if (IsExpired() || HasReachedRequestCap()) return false;
+	if (!bAcceptingResidentWork || IsExpired() || HasReachedRequestCap()) return false;
 	if (bContinuousPlay)
 	{
 		if (!bLedgerPersistenceHealthy) return false;
@@ -186,6 +186,23 @@ void UAgentPlaySessionSubsystem::CompleteModelRequest()
 	}
 	--ModelRequestsInFlight;
 	UE_LOG(LogAgentSession, Verbose, TEXT("Model request completed; %d request(s) remain in flight."), ModelRequestsInFlight);
+}
+
+void UAgentPlaySessionSubsystem::PauseResidentWorkForEmptyWorld()
+{
+	if (!bAcceptingResidentWork) return;
+	bAcceptingResidentWork = false;
+	++WorldSessionGeneration;
+	UE_LOG(LogAgentSession, Display, TEXT("Resident work fenced at empty-world boundary (world session %llu)."), WorldSessionGeneration);
+}
+
+void UAgentPlaySessionSubsystem::ResumeResidentWorkForVisitor()
+{
+	if (bAcceptingResidentWork) return;
+	bAcceptingResidentWork = true;
+	++WorldSessionGeneration;
+	UE_LOG(LogAgentSession, Display, TEXT("Resident work resumed for visitor (world session %llu)."), WorldSessionGeneration);
+	OnVisitorWorldResumed.Broadcast();
 }
 
 double UAgentPlaySessionSubsystem::Now() const

@@ -86,6 +86,7 @@ public:
 	FString GetPersonalityHistoryPath() const;
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
@@ -108,8 +109,11 @@ private:
 	FString PendingSleepExperience;
 	TArray<FString> PendingSleepExperienceTags;
 	bool bStateLoaded = false;
+	bool bDeferredSleepCompletionAfterWorldResume = false;
+	TWeakObjectPtr<class UAgentPlaySessionSubsystem> BoundPlaySession;
 
 	void SetConsciousState(EAgentConsciousState NewState);
+	void HandleVisitorWorldResumed();
 	void StartConsolidation();
 	void QueueSleepExperience(const FString& Experience, const TArray<FString>& Tags);
 	void AppendPendingSleepExperience();

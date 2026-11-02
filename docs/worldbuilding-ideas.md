@@ -41,6 +41,20 @@ sleep state without experiencing elapsed offscreen world time. On return, the
 Island resumes from the preserved state. This keeps offline hosting from
 silently aging the world or creating events while nobody is present.
 
+## 2026-11-02 — Prototype pause-on-empty for a dedicated Island host
+
+The project GameMode now supports a private dedicated-server path behind
+`-CaptiveSkyPauseWhenEmpty`: resident work is fenced at startup and final
+disconnect, clock/wetness are checkpointed, and the Unreal world pauses until
+the next visitor logs in. Async thought and sleep-consolidation responses from
+the prior world session are discarded without refunding their request budget.
+Local/editor play is unaffected. UE 5.8.3 Editor target compilation and linking
+passed; runtime disconnect/reconnect tests remain pending. This is not ready
+for public hosting: external-channel visitor leases and authentication are not
+connected, the process itself is not stopped, and failure paths need runtime
+exercise. A failed/missing clock checkpoint rejects future joins pending
+operator recovery. Details: [dedicated-host pause prototype](findings/2026-11-02-hosted-empty-world-pause-prototype.md).
+
 ## 2026-11-02 — Groundcover still needs stronger visitor-facing composition
 
 The current live editor viewport shows scattered groundcover tufts over broad

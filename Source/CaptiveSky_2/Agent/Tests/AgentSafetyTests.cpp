@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 #include "AgentPlaySessionSubsystem.h"
 #include "AutonomousAgentAIController.h"
+#include "CaptiveSky_2GameMode.h"
 #include "Engine/GameInstance.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
@@ -10,6 +11,18 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAgentSafetyTest, "CaptiveSky2.Agent.SessionSafety", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FAgentSafetyTest::RunTest(const FString& Parameters)
 {
+	TestTrue(TEXT("An opted-in dedicated host pauses with no connected visitors"),
+		ACaptiveSky_2GameMode::ShouldPauseHostedWorld(NM_DedicatedServer, true, 0));
+	TestFalse(TEXT("Local standalone play is never paused by hosted-presence policy"),
+		ACaptiveSky_2GameMode::ShouldPauseHostedWorld(NM_Standalone, true, 0));
+	TestFalse(TEXT("Hosted-presence policy is opt-in"),
+		ACaptiveSky_2GameMode::ShouldPauseHostedWorld(NM_DedicatedServer, false, 0));
+	TestFalse(TEXT("A connected visitor keeps the hosted Island awake"),
+		ACaptiveSky_2GameMode::ShouldPauseHostedWorld(NM_DedicatedServer, true, 1));
+	TestTrue(TEXT("A dedicated host rejects joins when the last checkpoint failed"),
+		ACaptiveSky_2GameMode::ShouldRejectHostedJoin(true, true));
+	TestFalse(TEXT("A local session is not gated by hosted checkpoint recovery"),
+		ACaptiveSky_2GameMode::ShouldRejectHostedJoin(false, true));
 	TestEqual(TEXT("Thirty minute maximum"), UAgentPlaySessionSubsystem::ClampDuration(99999), 1800.0);
 	TestEqual(TEXT("Zero cannot disable watchdog"), UAgentPlaySessionSubsystem::ClampDuration(0), 1.0);
 	TestEqual(TEXT("Short smoke-test duration"), UAgentPlaySessionSubsystem::ClampDuration(12), 12.0);
@@ -64,6 +77,20 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	UGameInstance* Instance = NewObject<UGameInstance>();
 	UAgentPlaySessionSubsystem* Session = NewObject<UAgentPlaySessionSubsystem>(Instance);
 	Session->StartedAt = FPlatformTime::Seconds();
+	const uint64 InitialWorldGeneration = Session->GetWorldSessionGeneration();
+	TestTrue(TEXT("Resident work admits requests during a visitor session"), Session->TryReserveModelRequest());
+	Session->PauseResidentWorkForEmptyWorld();
+	TestFalse(TEXT("Empty Island rejects new resident work"), Session->TryReserveModelRequest());
+	TestFalse(TEXT("An in-flight callback is fenced at the empty-world boundary"),
+		Session->IsWorldSessionGenerationCurrent(InitialWorldGeneration));
+	TestEqual(TEXT("Pausing does not refund provider work already submitted"), Session->ModelRequests, 1);
+	Session->ResumeResidentWorkForVisitor();
+	TestFalse(TEXT("Reconnect does not make a response from the previous world session current"),
+		Session->IsWorldSessionGenerationCurrent(InitialWorldGeneration));
+	TestTrue(TEXT("Resident work resumes for the reconnecting visitor"),
+		Session->IsWorldSessionGenerationCurrent(Session->GetWorldSessionGeneration()));
+	Session->CompleteModelRequest();
+	Session->ModelRequests = 0;
 	Session->MaxModelRequests = 2;
 	TestTrue(TEXT("First reservation accepted"), Session->TryReserveModelRequest());
 	TestTrue(TEXT("Last reservation accepted"), Session->TryReserveModelRequest());
