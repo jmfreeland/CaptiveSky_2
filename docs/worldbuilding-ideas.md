@@ -8,8 +8,19 @@ when those conditions apply. The note reads the live clock and cloud cover,
 does no per-frame scan or persistent write, and is suppressed under the inn
 roof. A focused controller automation covers clear night, seasonal sunrise,
 indoor suppression, and midday without claiming visible stars. The UE 5.8.3
-editor target compiles; runtime automation still hits the known zero-second
-engine bootstrap crash. Details are in the [sky-observation finding](findings/2026-11-02-visitor-sky-observation.md).
+editor target compiles and the focused NullRHI automation passed. Details are
+in the [sky-observation finding](findings/2026-11-02-visitor-sky-observation.md).
+
+## 2026-11-02 — Ask residents what felt alive after a short Island visit
+
+A guarded 15-minute NullRHI session reached world-ready and ended normally
+with 16 of 32 allowed model requests. Rat, Raven, and Aster each chose to
+share a brief reflection about the wet Tideglass edge—the minnow's surface
+ripple, rain rings, and a circling dragonfly. The Innkeeper chose not to
+speak. No object or upgrade requests were made, and all playtest state remains
+in a fresh isolated data root. Their repeated attention to small water
+movement is a useful art-direction signal, not rendered-visibility proof.
+Details: [15-minute resident feedback](findings/2026-11-02-resident-feedback-15m.md).
 
 ## 2026-11-02 — Let visitors read Tideglass's changing waterline
 
