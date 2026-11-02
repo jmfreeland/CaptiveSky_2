@@ -15,9 +15,10 @@ Game/PIE run. See [Tideglass Pawn collision](findings/2026-11-02-tideglass-pawn-
 
 Periodic and final clock/environment persistence now report failed writes
 instead of silently ignoring `SaveClock`/`SaveWetness` results, and the
-focused persistence fixture asserts a successful explicit boundary flush.
-The UE 5.8.3 Editor target built; automation remains unrun behind the known
-startup crash. This supports, but does not implement, the future hosted
+focused persistence fixture asserts a successful explicit boundary flush and
+that an unreadable existing snapshot makes the flush fail without overwriting
+it. The UE 5.8.3 Editor target built; automation remains unrun behind the
+known startup crash. This supports, but does not implement, the future hosted
 pause-on-empty lifecycle. See [clock save failure reporting](findings/2026-11-02-clock-save-failure-reporting.md).
 
 ## 2026-11-02 — Let residents know when today's stone work is already done

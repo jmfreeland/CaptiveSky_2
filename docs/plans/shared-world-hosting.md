@@ -26,9 +26,11 @@ turn the existing local files into an accidentally networked database.
 - `AIslandDayNight::PersistHour` now returns whether the requested clock and
   wetness writes succeeded. Periodic and `EndPlay` failures are logged instead
   of being silently discarded; the focused persistence fixture asserts a
-  successful explicit session-boundary flush. This reports local save health,
-  but does not itself pause a host, reject reconnects, or fence asynchronous
-  resident callbacks.
+  successful explicit session-boundary flush and a failed flush against an
+  unreadable existing snapshot without overwriting it. The target compiles,
+  but these automation assertions have not run in the current unstable engine
+  startup environment. This reports local save health, but does not itself
+  pause a host, reject reconnects, or fence asynchronous resident callbacks.
 - **Clock/offline-time audit (2026-11-02):** `AIslandDayNight::BeginPlay`
   restores the saved Island hour and day directly; its only time advancement
   is from in-world `Tick` delta, with no UTC downtime calculation. The saved

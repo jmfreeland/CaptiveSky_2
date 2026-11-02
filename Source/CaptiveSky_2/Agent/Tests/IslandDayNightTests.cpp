@@ -697,6 +697,18 @@ bool FIslandClockPersistenceTest::RunTest(const FString& Parameters)
 	Clock = StartSession(World, StateFile, false);
 	TestEqual(TEXT("Opting out of resume starts at Start Hour"), Clock->CurrentHour, 9.f);
 	EndSession(World, Clock);
+
+	const FString UnreadableStateFile = FPaths::ConvertRelativePathToFull(
+		FPaths::ProjectSavedDir() / TEXT("Automation") / TEXT("IslandClock") / TEXT("UnreadableWorldState.json"));
+	const FString UnreadablePayload = TEXT("not a valid world-state document");
+	TestTrue(TEXT("Unreadable-state fixture is created"), FFileHelper::SaveStringToFile(UnreadablePayload, *UnreadableStateFile));
+	Clock = StartSession(World, UnreadableStateFile, true);
+	TestFalse(TEXT("Boundary flush reports failure when world state was unreadable"), Clock->PersistHour());
+	EndSession(World, Clock);
+	FString PreservedPayload;
+	TestTrue(TEXT("Unreadable state remains available for inspection"), FFileHelper::LoadFileToString(PreservedPayload, *UnreadableStateFile));
+	TestEqual(TEXT("Failed flush never overwrites unreadable world state"), PreservedPayload, UnreadablePayload);
+	IFileManager::Get().Delete(*UnreadableStateFile, false, true, true);
 	IFileManager::Get().Delete(*StateFile, false, true, true);
 	return true;
 }

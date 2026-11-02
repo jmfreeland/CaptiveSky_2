@@ -7,9 +7,14 @@ the focused persistence fixture assert a successful explicit boundary flush.
 The authored `bResumeSavedTime=false` mode still intentionally skips saving the
 clock; environment wetness remains persisted when available.
 
+The fixture also supplies an unreadable existing world-state file and asserts
+that the explicit flush reports failure and leaves the original payload
+untouched. This exercises the fail-closed contract in test code without
+weakening the subsystem's refusal to overwrite unreadable user data.
+
 The isolated UE 5.8.3 `CaptiveSky_2Editor` target built successfully after the
 change. The `CaptiveSky2.Agent.DayNightPersistence` automation source also
-compiled, including the new assertion, but was not run: the known Unreal
+compiled, including both flush outcomes, but was not run: the known Unreal
 commandlet pre-initialization crash has not been diagnosed. This is not proof
 that a live shutdown flush succeeds under filesystem failure.
 
