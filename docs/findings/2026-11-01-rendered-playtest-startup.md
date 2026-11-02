@@ -105,3 +105,24 @@ symbols against the exact installed engine binaries before retrying resident
 feedback. Until then, do not rerun an equivalent launch; the earlier bounded
 15-minute NullRHI resident-feedback session remains the latest successful
 character sample.
+
+## Current-worktree feedback launch recheck — 2026-11-02
+
+The guarded `-NullRHICharacterFeedback` launcher was rechecked against both
+the worktree's root project and the established `Saved/CS58/CaptiveSky_2.uproject`
+scratch project. Both passed the 4 GiB system-memory preflight (10,464 MiB and
+10,442 MiB free, respectively), then exited before world-ready at
+`SecondsSinceStart=0` with the same null-address `EXCEPTION_ACCESS_VIOLATION`
+and `PCallStackHash=4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. The scratch
+launch therefore does not provide a materially different startup path in this
+environment, despite being the context used by earlier successful sessions.
+Neither attempt reached resident initialization or made model requests; both
+used isolated data roots. The latest saved log and dump are under
+`Saved/CS58/Saved/Crashes/_0000/` (scratch attempt), while the root-project
+attempt's artifacts are under `Saved/Crashes/_0000/`.
+
+Do not repeat either launch unchanged. The most recent successful resident
+feedback remains the separately logged 900-second session documented in
+[`2026-11-02-resident-feedback-15m.md`](2026-11-02-resident-feedback-15m.md).
+Rendered and NullRHI feedback are both blocked pending new crash-symbol or
+startup-path evidence; this failure does not invalidate that earlier run.
