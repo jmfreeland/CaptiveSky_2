@@ -18,6 +18,17 @@ woodland route at player height before changing global density; pair the visual
 review with frame-time and whole-device memory measurements. See [live
 groundcover observation](findings/2026-11-02-live-editor-groundcover-observation.md).
 
+## 2026-11-02 — Soften bare soil without increasing meadow budgets
+
+The broad-meadow field's open-glade acceptance floor rose from 8% to 14%,
+while its nested-patch strength was recalibrated to keep mean acceptance near
+46%. This should soften the largest bare patches without adding a plant layer
+or increasing the candidate ceiling; lush masses and visible glades remain.
+The UE 5.8.3 Editor target compiled, including the focused mean/contrast
+regression, but the test was not run because of the known zero-second startup
+crash. A matched, player-height visual and performance check is still needed.
+Details: [open-glade cover](findings/2026-11-02-groundcover-open-glade-floor.md).
+
 ## 2026-11-02 — Keep dragonfly flower visits light at Island scale
 
 The nearby blooming-flower query now uses the 15 m flower-cell index already

@@ -915,10 +915,12 @@ float AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(float HabitatComm
 	const float MidCommunity = FMath::IsFinite(MeadowSubcommunity) ? FMath::Clamp(MeadowSubcommunity, 0.f, 1.f) : 0.5f;
 	const float FineCommunity = FMath::IsFinite(MeadowMicroPatch) ? FMath::Clamp(MeadowMicroPatch, 0.f, 1.f) : 0.5f;
 	// A 180 m habitat field creates visitor-scale glades and lush masses; 60 m and
-	// 9 m fields soften their edges. Keep the mean near the previous 46% while
-	// increasing spatial contrast, without changing candidate or instance budgets.
-	constexpr float OpenGladeFloor = 0.08f;
-	constexpr float NestedPatchStrength = 3.16f;
+	// 9 m fields soften their edges. A slightly denser floor softens bare-soil
+	// gaps while retaining visitor-readable glades and lush masses; the lower
+	// signal strength keeps mean acceptance near its previous 46% without changing
+	// candidate or instance budgets.
+	constexpr float OpenGladeFloor = 0.14f;
+	constexpr float NestedPatchStrength = 2.65f;
 	const float LushSignal = (1.f - BroadHabitat) * (1.f - MidCommunity) * (1.f - FineCommunity);
 	return FMath::Clamp(OpenGladeFloor + NestedPatchStrength * LushSignal, OpenGladeFloor, 1.f);
 }

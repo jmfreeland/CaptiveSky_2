@@ -14,7 +14,7 @@ bool FIslandWeatherMeadowHabitatTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Meadow habitat retains full lush-community coverage"),
 		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f, 0.f), 1.f));
 	TestTrue(TEXT("Nested open habitat leaves readable glades"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f, 1.f), 0.08f));
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f, 1.f), 0.14f));
 	TestTrue(TEXT("Three habitat scales create stronger glade-to-lush contrast"),
 		AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.1f, 0.1f, 0.1f) -
 		AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.9f, 0.9f, 0.9f) > 0.7f);
