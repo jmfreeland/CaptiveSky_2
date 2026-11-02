@@ -50,6 +50,52 @@ bool FIslandWeatherMeadowHabitatTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherWindArchFestucaPatchTest,
+	"CaptiveSky2.Agent.IslandWeather.WindArchFestucaPatches",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWeatherWindArchFestucaPatchTest::RunTest(const FString& Parameters)
+{
+	TestFalse(TEXT("Invalid coordinates do not select Festuca"),
+		AIslandWeather::ShouldUseWindArchFestucaAt(FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), 0x2c17));
+	const FVector Sample(17200.f, -8310.f, 0.f);
+	TestEqual(TEXT("Wind Arch Festuca selection is stable for a point and seed"),
+		AIslandWeather::ShouldUseWindArchFestucaAt(Sample, 0x2c17),
+		AIslandWeather::ShouldUseWindArchFestucaAt(Sample, 0x2c17));
+
+	constexpr int32 GridSize = 128;
+	constexpr float GridSpacingCm = 250.f;
+	int32 FestucaSelections = 0;
+	int32 NeighborPairs = 0;
+	int32 MatchingNeighbors = 0;
+	for (int32 Y = 0; Y < GridSize; ++Y)
+		for (int32 X = 0; X < GridSize; ++X)
+		{
+			const FVector Position((X - GridSize / 2) * GridSpacingCm, (Y - GridSize / 2) * GridSpacingCm, 0.f);
+			const bool bSelected = AIslandWeather::ShouldUseWindArchFestucaAt(Position, 0x2c17);
+			FestucaSelections += bSelected ? 1 : 0;
+			if (X + 1 < GridSize)
+			{
+				++NeighborPairs;
+				MatchingNeighbors += bSelected == AIslandWeather::ShouldUseWindArchFestucaAt(
+					Position + FVector(GridSpacingCm, 0.f, 0.f), 0x2c17) ? 1 : 0;
+			}
+			if (Y + 1 < GridSize)
+			{
+				++NeighborPairs;
+				MatchingNeighbors += bSelected == AIslandWeather::ShouldUseWindArchFestucaAt(
+					Position + FVector(0.f, GridSpacingCm, 0.f), 0x2c17) ? 1 : 0;
+			}
+		}
+	const float SelectionShare = static_cast<float>(FestucaSelections) / FMath::Square(GridSize);
+	const float NeighborAgreement = static_cast<float>(MatchingNeighbors) / NeighborPairs;
+	TestTrue(TEXT("Festuca remains a bounded minority of eligible exposed grass sites"),
+		SelectionShare >= 0.15f && SelectionShare <= 0.45f);
+	TestTrue(TEXT("Nearby Wind Arch sites form coherent patches, not candidate-order alternation"),
+		NeighborAgreement > 0.60f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherBroadleafDiversityTest,
 	"CaptiveSky2.Agent.IslandWeather.BroadleafDiversity",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -746,6 +746,18 @@ int32 AIslandWeather::SelectGroundCoverVariant(const FVector& Position, int32 Se
 	return Variant;
 }
 
+bool AIslandWeather::ShouldUseWindArchFestucaAt(const FVector& Position, int32 Seed)
+{
+	if (Position.ContainsNaN()) return false;
+	// Roughly one quarter of eligible exposed-grass candidates become Festuca,
+	// but neighboring candidates now share broad, irregular patches instead of
+	// inheriting a four-step pattern from candidate-generation order.
+	constexpr int32 FestucaPatchSeed = 0x6a09e667;
+	constexpr float FestucaPatchCellSizeCm = 800.f;
+	constexpr float FestucaPatchThreshold = 0.34f;
+	return SampleGroundCoverFieldAtScale(Position, Seed ^ FestucaPatchSeed, FestucaPatchCellSizeCm) < FestucaPatchThreshold;
+}
+
 float AIslandWeather::CalculateGroundCoverExposure(const FVector& Position, const TArray<FVector>& ExposedAnchors,
 	const TArray<FVector>& OtherAnchors)
 {
@@ -1351,7 +1363,7 @@ void AIslandWeather::InitializeGroundCover()
 		&PeriwinkleGroundCoverHomes, &RatHollowApproaches, &RatHollowClearedInstanceCount,
 		&WoodlandFungusFootprints, &FungusClearedInstanceCount,
 		&GroundCoverMeshFootprintRadii](
-		const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
+		const FHitResult& GroundHit, const FTransform& Offset, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
 		if (TrailLedger && IsGroundCoverWithinWornTrailClearance(*TrailLedger, GroundHit.ImpactPoint))
 		{
@@ -1373,7 +1385,8 @@ void AIslandWeather::InitializeGroundCover()
 		// Nearby wet/social landmarks keep their own habitat: the closest anchor owns the patch.
 		const float Exposure = CalculateGroundCoverExposure(GroundHit.ImpactPoint, ExposedHabitatAnchors, OtherHabitatAnchors);
 		const int32 SpeciesVariant = SelectGroundCoverVariant(GroundHit.ImpactPoint, WeatherSeed, Exposure, WetEdgeMoisture);
-		if (bWindArch && SpeciesVariant >= 5 && Index % 4 == 0 && IslandFestuca && IslandFestuca->GetStaticMesh())
+		if (bWindArch && SpeciesVariant >= 5 && ShouldUseWindArchFestucaAt(GroundHit.ImpactPoint, WeatherSeed) &&
+			IslandFestuca && IslandFestuca->GetStaticMesh())
 		{
 			Species = IslandFestuca;
 			const FBoxSphereBounds Bounds = Species->GetStaticMesh()->GetBounds();
@@ -1524,7 +1537,7 @@ void AIslandWeather::InitializeGroundCover()
 				? CalculateGroundCoverWetEdgeMoisture(GroundHit.ImpactPoint, Landmark->GetActorLocation(), OtherHabitatAnchors,
 					TideglassClearRadius + 100.f, TideglassClearRadius + 1800.f)
 				: 0.f;
-			PlaceFoliage(GroundHit, Offset, Index, bWindArch, WetEdgeMoisture);
+			PlaceFoliage(GroundHit, Offset, bWindArch, WetEdgeMoisture);
 			if (bTideglass) TideglassGroundCoverLocations.Add(GroundHit.ImpactPoint);
 		}
 
@@ -1684,7 +1697,7 @@ void AIslandWeather::InitializeGroundCover()
 				if (!GetWorld()->LineTraceSingleByChannel(PatchHit,
 					FVector(PatchCandidate.X, PatchCandidate.Y, TraceTop), FVector(PatchCandidate.X, PatchCandidate.Y, TraceBottom), ECC_WorldStatic, Query) ||
 					!Cast<ALandscapeProxy>(PatchHit.GetActor()) || PatchHit.ImpactNormal.Z < 0.72f || PatchHit.ImpactPoint.Z < SeaLevel + 100.f) continue;
-				PlaceFoliage(PatchHit, PatchOffsets[ClumpIndex], ClumpIndex + MeadowCenters.Num());
+				PlaceFoliage(PatchHit, PatchOffsets[ClumpIndex]);
 			}
 		};
 		auto TryAddMeadowCenter = [this, &MeadowTraceCount, &Query, &TraceTop, &TraceBottom, SeaLevel](const FVector& Candidate, FVector& OutCenter)
@@ -1822,7 +1835,7 @@ void AIslandWeather::InitializeGroundCover()
 			const FTransform Offset(FQuat(FVector::UpVector, MeadowRandom.FRandRange(0.f, 2.f * PI)), FVector::ZeroVector,
 				FVector(MeadowRandom.FRandRange(0.8f, 1.2f)));
 			const int32 InstanceCountBefore = GroundCoverInstanceCount;
-			PlaceFoliage(CandidateHit, Offset, CandidateIndex);
+			PlaceFoliage(CandidateHit, Offset);
 			if (bGatherMeadowSpatialDiagnostics && GroundCoverInstanceCount > InstanceCountBefore)
 			{
 				const FIntPoint Tile(FMath::FloorToInt(CandidateHit.ImpactPoint.X / MeadowSpatialDiagnosticTileSizeCm),

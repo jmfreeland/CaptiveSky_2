@@ -167,6 +167,7 @@ private:
 	friend class FIslandWeatherTest;
 	friend class FIslandFungusGroundCoverClearanceTest;
 	friend class FIslandWeatherMeadowHabitatTest;
+	friend class FIslandWeatherWindArchFestucaPatchTest;
 	friend class FIslandMeadowBudgetTest;
 	friend class FIslandWeatherBroadleafDiversityTest;
 	friend class FIslandNightEcologyTest;
@@ -317,6 +318,8 @@ private:
 		TArray<FTransform>& OutTransforms);
 	/** Stable botanical patch: 0..4 broadleaf, 5..10 grass. Exposure favours grass and wet edges favour broadleaf without adding instances. */
 	static int32 SelectGroundCoverVariant(const FVector& Position, int32 Seed, float Exposure = 0.f, float WetEdgeMoisture = 0.f);
+	/** Select Festuca in coherent, seeded Wind Arch patches rather than by candidate-generation order. */
+	static bool ShouldUseWindArchFestucaAt(const FVector& Position, int32 Seed);
 	/** Closest landmark owns the zone; the exposed core feathers between 50 and 65 metres. */
 	static float CalculateGroundCoverExposure(const FVector& Position, const TArray<FVector>& ExposedAnchors,
 		const TArray<FVector>& OtherAnchors);
