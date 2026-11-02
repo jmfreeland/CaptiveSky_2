@@ -83,6 +83,8 @@ public:
 	static constexpr int32 BoundedAutonomousRequestLimit = 30;
 	/** Minimum spacing between autonomous background requests; direct conversations remain immediate. */
 	static constexpr double MinimumBackgroundThinkIntervalSeconds = 240.0;
+	/** After choosing to approach another resident, recheck the social moment after a quiet beat, not a full think interval. */
+	static constexpr double SocialArrivalThinkDelaySeconds = 45.0;
 	static bool IsAutonomousRequestLimitReached(int32 RequestCount, bool bContinuousPlay);
 	static constexpr float WanderMinimumDistance = 100.f;
 	static constexpr float WanderAcceptanceRadius = 50.f;
@@ -117,6 +119,8 @@ public:
 
 	FString DescribeActionState() const;
 	static double BackgroundDelay(int32 Repeats, double BaseSeconds);
+	static bool IsResidentApproachTarget(FName TargetTag);
+	static double SocialArrivalThinkDeadline(double NowSeconds, double ExistingDeadlineSeconds);
 
 protected:
 	bool CanFollowWanderCuriosityToward(const AActor* Landmark, double Now) const;
@@ -129,6 +133,7 @@ protected:
 	/** Whether this body is settled enough to arrange stones by hand, beak, or otherwise. */
 	virtual bool CanArrangeStones() const;
 	void ArrangeStones(const FAgentDecision& Decision);
+	void ScheduleSocialArrivalThink(FName CompletedTargetTag);
 	void WriteGuestBook(const FAgentDecision& Decision);
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 	void ReportAction(const FString& Outcome);

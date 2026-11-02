@@ -55,6 +55,18 @@ connected, the process itself is not stopped, and failure paths need runtime
 exercise. A failed/missing clock checkpoint rejects future joins pending
 operator recovery. Details: [dedicated-host pause prototype](findings/2026-11-02-hosted-empty-world-pause-prototype.md).
 
+## 2026-11-02 — Let an approached resident revisit the social moment sooner
+
+The 15-minute scratch log showed Aster approach Raven, wait through the normal
+four-minute autonomous interval, then ask to approach again despite already
+being at Raven's conversational stand-off. A successful or already-satisfied
+resident approach now advances the next existing thought to a 45-second quiet
+beat. This adds no model request and does not force speech; current cooldowns,
+recipient choice, and request caps still apply. UE 5.8.3 Editor target
+compilation passed with the focused timing/tag regression included. Runtime
+automation and an in-world conversation sample remain pending because of the
+known startup crash. Details: [resident social arrival beat](findings/2026-11-02-resident-social-arrival-beat.md).
+
 ## 2026-11-02 — Groundcover still needs stronger visitor-facing composition
 
 The current live editor viewport shows scattered groundcover tufts over broad

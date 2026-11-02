@@ -37,6 +37,18 @@ bool FArrangementSiteProximityTest::RunTest(const FString& Parameters)
 
 bool FAgentMovementTest::RunTest(const FString& Parameters)
 {
+	TestTrue(TEXT("Stable resident approach targets qualify for a social arrival check-in"),
+		AAutonomousAgentAIController::IsResidentApproachTarget(FName(TEXT("ApproachAgent_Agent_Raven_01"))));
+	TestFalse(TEXT("Landmark movement does not receive a social arrival check-in"),
+		AAutonomousAgentAIController::IsResidentApproachTarget(FName(TEXT("RainBasin"))));
+	TestFalse(TEXT("Unrelated actor tags do not receive a social arrival check-in"),
+		AAutonomousAgentAIController::IsResidentApproachTarget(FName(TEXT("Agent_Raven_01"))));
+	TestEqual(TEXT("An approach shortens a distant next-thought deadline to one quiet social beat"),
+		AAutonomousAgentAIController::SocialArrivalThinkDeadline(100.0, 340.0), 100.0 + AAutonomousAgentAIController::SocialArrivalThinkDelaySeconds);
+	TestEqual(TEXT("A nearer existing thought is never delayed by the social nudge"),
+		AAutonomousAgentAIController::SocialArrivalThinkDeadline(100.0, 110.0), 110.0);
+	TestEqual(TEXT("An already-due thought receives a brief pause rather than firing in the arrival callback"),
+		AAutonomousAgentAIController::SocialArrivalThinkDeadline(100.0, 90.0), 100.0 + AAutonomousAgentAIController::SocialArrivalThinkDelaySeconds);
 	const float StandOff = AAutonomousAgentAIController::ResidentApproachStandOffDistance;
 	TestTrue(TEXT("The approach stand-off exceeds the combined radius of two placeholder capsules"), StandOff > 2.f * 42.f);
 	TestEqual(TEXT("The raven's approach height is explicit and bounded"),

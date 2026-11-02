@@ -151,6 +151,20 @@ double AAutonomousAgentAIController::BackgroundDelay(int32 Repeats, double BaseS
 		MinimumBackgroundThinkIntervalSeconds, 300.0);
 }
 
+bool AAutonomousAgentAIController::IsResidentApproachTarget(FName TargetTag)
+{
+	return TargetTag.ToString().StartsWith(TEXT("ApproachAgent_"), ESearchCase::CaseSensitive);
+}
+
+double AAutonomousAgentAIController::SocialArrivalThinkDeadline(double NowSeconds, double ExistingDeadlineSeconds)
+{
+	if (!FMath::IsFinite(NowSeconds)) return ExistingDeadlineSeconds;
+	const double SocialCheckInDeadline = NowSeconds + SocialArrivalThinkDelaySeconds;
+	return FMath::IsFinite(ExistingDeadlineSeconds) && ExistingDeadlineSeconds > NowSeconds
+		? FMath::Min(ExistingDeadlineSeconds, SocialCheckInDeadline)
+		: SocialCheckInDeadline;
+}
+
 bool AAutonomousAgentAIController::IsActionInProgress() const { return GetMoveStatus() == EPathFollowingStatus::Moving; }
 FVector AAutonomousAgentAIController::BuildResidentApproachPoint(const FVector& MoverLocation, const FVector& TargetLocation)
 {
@@ -930,11 +944,23 @@ void AAutonomousAgentAIController::OnMoveCompleted(FAIRequestID RequestID, const
 			return;
 		}
 	}
+	const FName CompletedTargetTag = PendingGroundMoveTargetTag;
 	PendingGroundMoveTargetName = NAME_None;
 	PendingGroundMoveTargetTag = NAME_None;
 	GroundedLandmarkRecoveryAttempts = 0;
+	if (Result.IsSuccess()) ScheduleSocialArrivalThink(CompletedTargetTag);
 	ReportAction(Result.IsSuccess() ? TEXT("Reached the requested destination. Arrival is complete; it does not imply an interaction or a discovery.") : TEXT("Movement did not complete (blocked, cancelled, or unreachable). Choose a reachable destination instead of repeating this route."));
 }
+
+void AAutonomousAgentAIController::ScheduleSocialArrivalThink(FName CompletedTargetTag)
+{
+	if (!IsResidentApproachTarget(CompletedTargetTag)) return;
+	NextThinkAt = SocialArrivalThinkDeadline(FPlatformTime::Seconds(), NextThinkAt);
+	UE_LOG(LogAutonomousAgentAI, Log,
+		TEXT("Resident approach completed; next already-budgeted background thought will recheck the nearby social moment after a %.0f second quiet pause."),
+		SocialArrivalThinkDelaySeconds);
+}
+
 void AAutonomousAgentAIController::InspectTarget(FName Target)
 {
 	if (Target.IsNone()) { ReportAction(TEXT("Inspection failed: no target supplied.")); return; }
@@ -1273,8 +1299,19 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 					}
 					else
 					{
+						PendingGroundMoveTargetName = TargetActor->GetFName();
+						PendingGroundMoveTargetTag = TargetTag;
 						const EPathFollowingRequestResult::Type GroundedResult = MoveToLocation(GroundGoal.Location,
 							WanderAcceptanceRadius, true, true, false, false, nullptr, false);
+						if (GroundedResult == EPathFollowingRequestResult::AlreadyAtGoal)
+						{
+							ScheduleSocialArrivalThink(TargetTag);
+						}
+						if (GroundedResult != EPathFollowingRequestResult::RequestSuccessful)
+						{
+							PendingGroundMoveTargetName = NAME_None;
+							PendingGroundMoveTargetTag = NAME_None;
+						}
 						ReportAction(GroundedResult == EPathFollowingRequestResult::Failed
 							? TEXT("Approach failed: the raven's elevated position has no grounded conversational route that could start.")
 							: GroundedResult == EPathFollowingRequestResult::AlreadyAtGoal
@@ -1283,8 +1320,19 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 						break;
 					}
 				}
+				PendingGroundMoveTargetName = TargetActor->GetFName();
+				PendingGroundMoveTargetTag = TargetTag;
 				const EPathFollowingRequestResult::Type Result = MoveToActor(TargetActor,
 					ResidentApproachStandOffDistance, true, true, false, nullptr, false);
+				if (Result == EPathFollowingRequestResult::AlreadyAtGoal)
+				{
+					ScheduleSocialArrivalThink(TargetTag);
+				}
+				if (Result != EPathFollowingRequestResult::RequestSuccessful)
+				{
+					PendingGroundMoveTargetName = NAME_None;
+					PendingGroundMoveTargetTag = NAME_None;
+				}
 				ReportAction(Result == EPathFollowingRequestResult::Failed
 					? TEXT("Approach failed: no complete route to a reachable conversational space near the other resident.")
 					: Result == EPathFollowingRequestResult::AlreadyAtGoal
