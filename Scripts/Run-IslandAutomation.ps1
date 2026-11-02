@@ -3,19 +3,32 @@ param(
 	[ValidatePattern('^[A-Za-z0-9_.+]+$')]
 	[string]$Test,
 	[string]$EngineDir = 'D:\Games\Epic\UE_5.8',
+	[string]$ProjectPath,
 	[ValidateRange(30, 900)][int]$TimeoutSeconds = 240,
 	[ValidateRange(512, 32768)][int]$MinimumFreeSystemMemoryMiB = 4096,
 	[switch]$DryRun
 )
 
 $ErrorActionPreference = 'Stop'
-$projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$project = Join-Path $projectRoot 'CaptiveSky_2.uproject'
+$workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$projectCandidate = if ([string]::IsNullOrWhiteSpace($ProjectPath)) {
+	Join-Path $workspaceRoot 'CaptiveSky_2.uproject'
+} elseif ([System.IO.Path]::IsPathRooted($ProjectPath)) {
+	$ProjectPath
+} else {
+	Join-Path $workspaceRoot $ProjectPath
+}
+$project = [System.IO.Path]::GetFullPath($projectCandidate)
+$workspacePrefix = $workspaceRoot.TrimEnd('\') + '\'
+if (-not $project.StartsWith($workspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+	throw "ProjectPath must remain inside this worktree: $workspaceRoot"
+}
+$projectRoot = Split-Path -Parent $project
 $editor = Join-Path $EngineDir 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$playtestsRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'Saved\Playtests'))
+$playtestsRoot = [System.IO.Path]::GetFullPath((Join-Path $workspaceRoot 'Saved\Playtests'))
 $runId = '{0}_{1}' -f (Get-Date -Format 'yyyyMMdd_HHmmss'), ([guid]::NewGuid().ToString('N').Substring(0, 8))
 $dataRoot = Join-Path $playtestsRoot (Join-Path "Automation_$runId" 'Data')
-$logDirectory = Join-Path $projectRoot 'Saved\Logs'
+$logDirectory = Join-Path $workspaceRoot 'Saved\Logs'
 $logPath = Join-Path $logDirectory "Automation_$runId.log"
 
 if (-not (Test-Path -LiteralPath $project -PathType Leaf)) { throw "Project file not found: $project" }

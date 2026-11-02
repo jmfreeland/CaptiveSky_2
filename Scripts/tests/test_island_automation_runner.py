@@ -23,11 +23,18 @@ class IslandAutomationRunnerTests(unittest.TestCase):
 
     def test_test_filter_and_data_root_are_restricted(self) -> None:
         self.assertIn("[ValidatePattern('^[A-Za-z0-9_.+]+$')]", self.runner)
-        self.assertIn("Join-Path $projectRoot 'Saved\\Playtests'", self.runner)
+        self.assertIn("Join-Path $workspaceRoot 'Saved\\Playtests'", self.runner)
         self.assertIn("Automation_$runId", self.runner)
         self.assertIn("Refusing to reuse an existing automation data root", self.runner)
         self.assertIn("'-CaptiveSkyDisableAgentThinking'", self.runner)
         self.assertIn("'-CaptiveSkyMaxModelRequests=0'", self.runner)
+
+    def test_optional_project_must_remain_inside_worktree(self) -> None:
+        self.assertIn("[string]$ProjectPath", self.runner)
+        self.assertIn("ProjectPath must remain inside this worktree", self.runner)
+        self.assertIn("Join-Path $workspaceRoot 'Saved\\Playtests'", self.runner)
+        self.assertIn("Join-Path $workspaceRoot 'Saved\\Logs'", self.runner)
+        self.assertIn("Join-Path $projectRoot 'Saved\\Crashes'", self.runner)
 
     def test_memory_preflight_and_process_timeout_guard_launch(self) -> None:
         self.assertIn("MinimumFreeSystemMemoryMiB = 4096", self.runner)
