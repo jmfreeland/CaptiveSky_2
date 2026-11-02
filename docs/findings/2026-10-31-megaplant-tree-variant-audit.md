@@ -30,3 +30,15 @@ before deciding whether C/D or a new species adds useful value.
 
 `CaptiveSky2.Agent.IslandWeather.BroadleafNaniteReadinessAssets` passed in the
 isolated UE 5.8 scratch project (`Saved/CS58/Saved/Logs/Codex_Broadleaf_DynamicWind_20261102.log`, exit code 0). This validates the asset loading, Nanite assembly, and enabled Dynamic Wind user-data checks for all four B meshes against the scratch content set. It does not validate the live Island's rendered distribution or GPU cost. During the run, Unreal logged repeated async skinned-asset compile estimates of 4.6 GiB against an available estimate that fell from about 4.1 to 3.9 GiB; keep the render/memory gate closed until a controlled in-editor check shows safe headroom.
+
+The same scratch project passed `CaptiveSky2.Agent.IslandWeather.BroadleafDiversity`
+and `CaptiveSky2.Agent.IslandWeather.BroadleafNaniteReadinessAssets` together
+on 2026-11-02 (`Saved/CS58/Saved/Logs/Codex_BroadleafBaseline_20261102.log`,
+exit code 0). The diversity test asserts all five runtime species, the fixed
+3,600-tree population budget, and Common Hazel's non-colliding instanced
+component and 80–125 m cull range. The asset test also loads Common Hazel A
+and verifies its Nanite assembly. This confirms Hazel is already wired into
+the current worktree's five-species runtime mix; it is not merely a separate
+coppice asset. The tests load the scratch-linked Island package but do not
+save or render it, so the live D: editor's visible species mix and actual GPU
+cost still require the gated rendered check.
