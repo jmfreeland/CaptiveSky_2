@@ -27,7 +27,7 @@ public:
 	/** Briefly widen the school's circling path in response to a visible, nearby surface ripple. */
 	bool RespondToSurfaceRipple();
 	/** Describes a recent surface break to a nearby observer for the next already-scheduled decision. */
-	FString DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const;
+	FString DescribeRecentSurfaceBreak(const AActor* Observer) const;
 	/** True only during the brief visible fish hop that produces a surface break. */
 	bool IsMakingSurfaceBreak() const;
 	/** World position of the currently breaking fish, or the school origin if none is active. */
@@ -97,6 +97,8 @@ private:
 	float RippleCheckRemaining = 0.f;
 	float SurfaceBreakRemaining = 13.f;
 	float SurfaceBreakContextRemaining = 0.f;
+	FVector SurfaceBreakWorldLocation = FVector::ZeroVector;
+	bool bHasRecentSurfaceBreakLocation = false;
 	float SurfaceBreakHopRemaining = 0.f;
 	float ElapsedSeconds = 0.f;
 	float SwimPhaseRadians = 0.f;

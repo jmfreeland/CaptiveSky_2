@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let residents locate the minnow's brief ripple
+
+The next already-scheduled resident action context now carries the actual
+position of a recent minnow surface break and describes it by approximate
+distance and relative direction. The splash and its short-lived nature remain
+unchanged; this adds no tick, poll, model request, lasting memory, or movement
+target. The isolated UE 5.8.3 Game target compiled with a focused context
+regression, but Unreal startup remains unstable, so runtime automation and
+behavior are not yet verified. Details: [minnow event wayfinding](findings/2026-11-02-minnow-event-wayfinding.md).
+
 ## 2026-11-02 — Help visitors find the plant they notice
 
 On-demand plant observations now identify the nearest visible patch by

@@ -548,7 +548,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 			FMath::IsNearlyZero(School->SurfacePulseRemaining));
 		TestTrue(TEXT("The next surface break is delayed to keep wildlife effects sparse"),
 			FMath::IsNearlyEqual(School->SurfaceBreakRemaining, 19.f - HopTickSeconds, 0.05f));
-		Visitor->SetActorLocation(School->GetActorLocation() + FVector(300.f, 0.f, 0.f));
+		Visitor->SetActorLocation(School->SurfaceBreakWorldLocation + FVector(-300.f, 0.f, 0.f));
+		Visitor->SetActorRotation(FRotator::ZeroRotator);
 		ARavenAgentAIController* CueObserverController = World->SpawnActor<ARavenAgentAIController>(Spawn);
 		if (TestNotNull(TEXT("A resident controller can inspect its immediate wildlife context"), CueObserverController))
 		{
@@ -559,6 +560,8 @@ bool FIslandMinnowTest::RunTest(const FString& Parameters)
 				FMath::IsNearlyEqual(School->SurfaceBreakContextRemaining, AIslandTidepoolMinnows::SurfaceBreakContextLifetime - HopTickSeconds, 0.05f));
 			TestTrue(TEXT("A nearby resident receives the faded surface-break cue in its next action context"),
 				NearbyContext.Contains(TEXT("Nearby transient wildlife cue")) && NearbyContext.Contains(TEXT("ripple has faded")));
+			TestTrue(TEXT("The resident can locate the brief cue relative to its current facing"),
+				NearbyContext.Contains(TEXT("about 3 metres ahead of you")));
 			Visitor->SetActorLocation(School->GetActorLocation() + FVector(1600.f, 0.f, 0.f));
 			TestFalse(TEXT("The same transient cue is omitted outside the habitat radius"),
 				CueObserverController->DescribeActionState().Contains(TEXT("Nearby transient wildlife cue")));

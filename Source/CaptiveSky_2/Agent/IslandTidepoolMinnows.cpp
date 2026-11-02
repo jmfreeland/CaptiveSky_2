@@ -556,16 +556,35 @@ bool AIslandTidepoolMinnows::RespondToSurfaceRipple()
 	return true;
 }
 
-FString AIslandTidepoolMinnows::DescribeRecentSurfaceBreak(const FVector& ObserverLocation) const
+FString AIslandTidepoolMinnows::DescribeRecentSurfaceBreak(const AActor* Observer) const
 {
-	if (SurfaceBreakContextRemaining <= 0.f ||
-		FVector::DistSquared2D(ObserverLocation, GetActorLocation()) > FMath::Square(1100.f) ||
-		FMath::Abs(ObserverLocation.Z - GetActorLocation().Z) > 500.f)
+	if (!IsValid(Observer) || SurfaceBreakContextRemaining <= 0.f || !bHasRecentSurfaceBreakLocation ||
+		FVector::DistSquared2D(Observer->GetActorLocation(), SurfaceBreakWorldLocation) > FMath::Square(1100.f) ||
+		FMath::Abs(Observer->GetActorLocation().Z - GetActorLocation().Z) > 500.f)
 	{
 		return FString();
 	}
 
-	return TEXT("A minnow made a brief surface break in the Tideglass shallows within the last few minutes. The ripple has faded; the school remains wild and nothing lasting changed.");
+	const FVector Offset = SurfaceBreakWorldLocation - Observer->GetActorLocation();
+	const FVector HorizontalOffset(Offset.X, Offset.Y, 0.f);
+	const FVector HorizontalForward = FVector(Observer->GetActorForwardVector().X,
+		Observer->GetActorForwardVector().Y, 0.f).GetSafeNormal();
+	const FVector HorizontalRight = FVector(Observer->GetActorRightVector().X,
+		Observer->GetActorRightVector().Y, 0.f).GetSafeNormal();
+	FString LocationCue = TEXT("nearby");
+	if (!HorizontalOffset.IsNearlyZero() && !HorizontalForward.IsNearlyZero() && !HorizontalRight.IsNearlyZero())
+	{
+		const float ForwardAmount = FVector::DotProduct(HorizontalOffset, HorizontalForward);
+		const float RightAmount = FVector::DotProduct(HorizontalOffset, HorizontalRight);
+		const TCHAR* Direction = FMath::Abs(ForwardAmount) >= FMath::Abs(RightAmount)
+			? (ForwardAmount >= 0.f ? TEXT("ahead of you") : TEXT("behind you"))
+			: (RightAmount >= 0.f ? TEXT("to your right") : TEXT("to your left"));
+		const int32 DistanceMetres = FMath::Max(1,
+			FMath::RoundToInt(FVector::Dist2D(Observer->GetActorLocation(), SurfaceBreakWorldLocation) / 100.f));
+		LocationCue = FString::Printf(TEXT("about %d metres %s"), DistanceMetres, Direction);
+	}
+	return FString::Printf(TEXT("A minnow made a brief surface break in the Tideglass shallows %s within the last few minutes. The ripple has faded; the school remains wild and nothing lasting changed."),
+		*LocationCue);
 }
 
 bool AIslandTidepoolMinnows::IsMakingSurfaceBreak() const
@@ -625,6 +644,8 @@ void AIslandTidepoolMinnows::TryCreateSurfaceBreak(float RainIntensity)
 		Ripple->ConfigureAsMinnowImpact();
 		SurfaceBreakHopFishIndex = BreakingFishIndex;
 		SurfaceBreakHopRemaining = SurfaceBreakHopDurationSeconds;
+		SurfaceBreakWorldLocation = RippleLocation;
+		bHasRecentSurfaceBreakLocation = true;
 		SurfaceBreakFishIndex = (SurfaceBreakFishIndex + 1) % Fish.Num();
 		SurfaceBreakRemaining = SurfaceBreakInterval(NightRest);
 		SurfaceBreakContextRemaining = SurfaceBreakContextLifetime;

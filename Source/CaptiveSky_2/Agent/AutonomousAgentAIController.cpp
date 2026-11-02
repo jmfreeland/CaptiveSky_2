@@ -820,7 +820,7 @@ FString AAutonomousAgentAIController::DescribeActionState() const
 	{
 		for (TActorIterator<AIslandTidepoolMinnows> It(GetWorld()); It; ++It)
 		{
-			const FString WildlifeCue = It->DescribeRecentSurfaceBreak(Observer->GetActorLocation());
+						const FString WildlifeCue = It->DescribeRecentSurfaceBreak(Observer);
 			if (WildlifeCue.IsEmpty()) continue;
 			Result += TEXT(" Nearby transient wildlife cue: ") + WildlifeCue;
 			break;
