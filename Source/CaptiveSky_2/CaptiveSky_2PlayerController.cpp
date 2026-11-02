@@ -25,6 +25,7 @@
 #include "Agent/IslandWorldStateSubsystem.h"
 #include "Agent/IslandSpectator.h"
 #include "Agent/IslandEnvironmentSubsystem.h"
+#include "Agent/IslandDayNight.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -188,6 +189,32 @@ FString ACaptiveSky_2PlayerController::DescribeLocalWeather() const
 		Environment->GetWind(), Environment->GetMist());
 }
 
+FString ACaptiveSky_2PlayerController::DescribeNearbyTide() const
+{
+	const APawn* PlayerPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!PlayerPawn || !World) return FString();
+
+	constexpr float TideglassObservationRadiusCm = 1200.f;
+	const AActor* NearestTideglass = nullptr;
+	float NearestDistanceSquared = FMath::Square(TideglassObservationRadiusCm);
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("TideglassPool"))) continue;
+		const float DistanceSquared = FVector::DistSquared2D(PlayerPawn->GetActorLocation(), It->GetActorLocation());
+		if (DistanceSquared <= NearestDistanceSquared)
+		{
+			NearestTideglass = *It;
+			NearestDistanceSquared = DistanceSquared;
+		}
+	}
+	if (!NearestTideglass) return FString();
+
+	for (TActorIterator<AIslandDayNight> It(World); It; ++It)
+		return FString::Printf(TEXT("You pause beside Tideglass.%s"), *AIslandDayNight::DescribeTide(It->DayNumber, It->CurrentHour));
+	return FString();
+}
+
 FString ACaptiveSky_2PlayerController::DescribeWorldInteractionHint(AActor* Target) const
 {
 	if (!Target) return FString();
@@ -303,6 +330,9 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		{
 			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
 		}
+
+		const FString TideFact = DescribeNearbyTide();
+		if (!TideFact.IsEmpty()) EnvironmentalObservations.Add(TideFact);
 
 		if (!EnvironmentalObservations.IsEmpty())
 		{

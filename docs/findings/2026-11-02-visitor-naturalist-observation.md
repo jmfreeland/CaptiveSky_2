@@ -37,3 +37,25 @@ assertions for spring bloom and the absence of a spring-bloom claim in summer;
 the 3,600-tree prompt fixture averaged 0.404 ms over 10 warmed samples. Log:
 `Saved/Logs/Codex_SeasonalNaturalist_NullRHI.log`. Caption appearance in PIE
 still needs a rendered, memory-gated visual check.
+
+## Tideglass field note
+
+When Interact has no closer visible world target, the visitor can now receive a
+local tide note if within 12 m of the `TideglassPool` marker. It uses the
+current `AIslandDayNight` day/hour and existing `DescribeTide` function, so the
+direction and spring/neap wording stay aligned with the world's lunar tide.
+The observation only runs on key press, has no memory/world-state/model side
+effects, and is absent when Tideglass or its clock is not nearby. The focused
+automation covers a rising-tide caption beside the pool and its absence from a
+faraway visitor.
+
+UE 5.8.3 `CaptiveSky_2Editor` Development compiled and linked successfully,
+including the controller and focused test. The NullRHI run was attempted once
+and exited before test discovery with the known zero-second
+`EXCEPTION_ACCESS_VIOLATION`, crash hash
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26` (`Saved/Crashes/_0000`). Therefore
+the new test is compiled but **not runtime-passed**. Do not repeat the same
+startup recipe until the shared bootstrap crash is diagnosed or the launch
+context materially changes. Next: restore reliable automation startup, rerun
+`CaptiveSky2.Agent.VisitorTideObservation`, then verify the caption in the
+Island only when the existing rendered-GPU reserve allows a safe visual check.

@@ -1,8 +1,10 @@
 #include "Misc/AutomationTest.h"
 #include "CaptiveSkyAmbientSpeechWidget.h"
 #include "Engine/Engine.h"
+#include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
+#include "IslandDayNight.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandInteractionTestPlayerController.h"
 
@@ -63,6 +65,52 @@ bool FIslandWeatherObservationTest::RunTest(const FString& Parameters)
 		Controller->RefreshInteractionHintForTest();
 		TestTrue(TEXT("Outdoor weather prompt is suppressed under the inn roof"),
 			Caption->GetDisplayedInteractionHint().IsEmpty());
+	}
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTideObservationTest, "CaptiveSky2.Agent.VisitorTideObservation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandTideObservationTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Synthetic Tideglass visitor world created"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->BeginPlay();
+
+	AIslandDayNight* Clock = World->SpawnActor<AIslandDayNight>();
+	ATargetPoint* Tideglass = World->SpawnActor<ATargetPoint>(FVector(700.f, 0.f, 90.f), FRotator::ZeroRotator);
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 90.f), FRotator::ZeroRotator);
+	UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+	AIslandInteractionTestPlayerController* Controller = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	TestNotNull(TEXT("Island clock created for tide observation"), Clock);
+	TestNotNull(TEXT("Tideglass landmark created for proximity gating"), Tideglass);
+	TestNotNull(TEXT("Visitor created for tide observation"), Visitor);
+	TestNotNull(TEXT("Caption widget created for tide observation"), Caption);
+	TestNotNull(TEXT("Visitor controller created for tide observation"), Controller);
+	if (Clock && Tideglass && Visitor && Caption && Controller)
+	{
+		Clock->bAdvanceTime = false;
+		Clock->DayNumber = 1;
+		Clock->CurrentHour = 2.5f;
+		Tideglass->Tags.Add(TEXT("TideglassPool"));
+		Controller->SetFixturePawn(Visitor);
+		Controller->SetCaptionWidget(Caption);
+		Controller->BindFixtureInput();
+		TestTrue(TEXT("A visitor can read the live tide near Tideglass without an interaction target"),
+			Controller->PressBoundE() && Caption->GetDisplayedCaption().ToString().Contains(TEXT("You pause beside Tideglass")) &&
+			Caption->GetDisplayedCaption().ToString().Contains(TEXT("tide is rising")));
+
+		Visitor->SetActorLocation(FVector(3000.f, 0.f, 90.f));
+		Controller->RefreshInteractionHintForTest();
+		TestTrue(TEXT("Tideglass is not offered as a local observation from far away"),
+			Controller->PressBoundE() && !Caption->GetDisplayedCaption().ToString().Contains(TEXT("tide is rising")));
 	}
 
 	GEngine->DestroyWorldContext(World);
