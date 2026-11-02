@@ -1,5 +1,14 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Make embodied turn routing fail closed on malformed leases
+
+The Gateway now requires its Unreal embodiment lease to use the supported
+schema and carry a non-empty session identity before routing Discord turns to
+the body. Focused checks cover unsupported and incomplete leases; the Gateway
+check suite passes. This lease only grants brain/inbox ownership and is not an
+in-world visitor session, so Discord activity does not keep an empty hosted
+Island awake. Details: [versioned embodiment lease](findings/2026-11-02-versioned-embodiment-lease.md).
+
 ## 2026-11-02 — End spectator mode when its visitor disconnects
 
 The spectator director opts into ticking while paused. If its viewer logged

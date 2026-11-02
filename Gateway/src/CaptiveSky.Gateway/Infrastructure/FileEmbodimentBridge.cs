@@ -21,7 +21,9 @@ public sealed class FileEmbodimentBridge(AgentHome home, EmbodimentConfiguration
             await using var stream = new FileStream(PresencePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             var presence = await JsonSerializer.DeserializeAsync<EmbodimentPresence>(stream, JsonOptions, cancellationToken);
             return presence is not null &&
+                   presence.SchemaVersion == 1 &&
                    string.Equals(presence.AgentId, home.AgentId, StringComparison.Ordinal) &&
+                   !string.IsNullOrWhiteSpace(presence.SessionId) &&
                    presence.ExpiresAt > DateTimeOffset.UtcNow;
         }
         catch (IOException)

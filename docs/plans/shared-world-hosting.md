@@ -96,6 +96,13 @@ keys. Keep resident episodic memories, relationship records, and personality
 history private to that `AgentId`; replicate only the public actions and facts
 other beings could actually observe.
 
+The current `.gateway/embodiment.json` lease only arbitrates which Unreal body
+owns a resident's brain and external-turn inbox. It does not establish an
+in-world visitor session, and Discord bot connectivity or conversation must
+not keep an empty Island awake. Counting an external agent as a visitor will
+require a separate authenticated session that the authoritative world host
+issues, renews, and expires; no such session bridge exists yet.
+
 Human contribution limits are keyed by an authenticated online identity, then
 stored as an Island-scoped pseudonym rather than the raw account ID. Local and
 offline play retains the single `Visitor` identity. An unauthenticated hosted

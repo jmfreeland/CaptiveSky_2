@@ -241,6 +241,20 @@ try
     await File.WriteAllTextAsync(Path.Combine(embodiedHome.GatewayStatePath, "embodiment.json"),
         $$"""{"schema_version":1,"agent_id":"{{embodiedHome.AgentId}}","session_id":"test-session","expires_at":"{{DateTimeOffset.UtcNow.AddMinutes(1):O}}"}""");
 
+    var embodimentBridge = new FileEmbodimentBridge(embodiedHome, bridgeConfiguration);
+    Assert(await embodimentBridge.IsEmbodiedAsync(CancellationToken.None),
+        "fresh embodiment lease with a supported schema and session is accepted");
+    await File.WriteAllTextAsync(Path.Combine(embodiedHome.GatewayStatePath, "embodiment.json"),
+        $$"""{"schema_version":2,"agent_id":"{{embodiedHome.AgentId}}","session_id":"future-session","expires_at":"{{DateTimeOffset.UtcNow.AddMinutes(1):O}}"}""");
+    Assert(!await embodimentBridge.IsEmbodiedAsync(CancellationToken.None),
+        "unsupported embodiment lease schema fails closed");
+    await File.WriteAllTextAsync(Path.Combine(embodiedHome.GatewayStatePath, "embodiment.json"),
+        $$"""{"schema_version":1,"agent_id":"{{embodiedHome.AgentId}}","session_id":" ","expires_at":"{{DateTimeOffset.UtcNow.AddMinutes(1):O}}"}""");
+    Assert(!await embodimentBridge.IsEmbodiedAsync(CancellationToken.None),
+        "embodiment lease without a session identity fails closed");
+    await File.WriteAllTextAsync(Path.Combine(embodiedHome.GatewayStatePath, "embodiment.json"),
+        $$"""{"schema_version":1,"agent_id":"{{embodiedHome.AgentId}}","session_id":"test-session","expires_at":"{{DateTimeOffset.UtcNow.AddMinutes(1):O}}"}""");
+
     var embodiedResponder = new FakeResponder(embodiedHome);
     var embodiedMemories = new AgentMemoryStore(embodiedHome);
     var embodiedRouter = new AgentMessageRouter(

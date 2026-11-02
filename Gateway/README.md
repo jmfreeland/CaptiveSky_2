@@ -21,7 +21,7 @@ Discord is the first channel adapter, not part of the agent model. Routing, iden
 - A per-agent gateway lease prevents two gateway processes from thinking as the same being simultaneously.
 - Headless LLM replies have a persisted per-agent rolling budget of 64 turns per 30 minutes. When exhausted, Raven says the message wasn't read or saved and gives an approximate retry time; an unreadable budget state fails closed. Embodied replies continue to use Unreal's existing play-session cap.
 - Each Discord route filters for permitted messages addressed to that agent, then processes them in arrival order through a bounded 16-message queue. This prevents ordinary channel chatter or a message burst from creating an unbounded task backlog behind the per-agent lease; when the queue is full, the message is explicitly not queued and the channel receives a throttled resend notice.
-- Every autonomous Unreal body publishes a short-lived embodiment lease. Only one body with a given `AgentId` may own it.
+- Every autonomous Unreal body publishes a short-lived, versioned embodiment lease with a non-empty session ID. The gateway fails closed on unknown schemas or missing session identity; this lease arbitrates which process owns the resident's brain, not whether a Discord user or agent is an in-world visitor. Only one body with a given `AgentId` may own it.
 
 ## Embodiment handoff
 
