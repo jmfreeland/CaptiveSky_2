@@ -86,3 +86,18 @@ remains below the 4 GiB rendered-play gate. Keep the route/profile and 15-minute
 resident-feedback run deferred until both GPU and system-memory preflights pass;
 do not lower the reserve to force a run. This is one device-wide sample, not an
 Unreal allocation or frame-time measurement.
+
+## Fresh editor and headroom recheck — 2026-11-02 07:26 UTC
+
+The main `CaptiveSky_2 - Unreal Editor` window remains open and responsive on
+`/Game/Maps/Island`, outside PIE. The current close-up view shows the existing
+WoodlandFungusCluster review patch, tall foreground grass, and the Wind Arch;
+it is still not a visitor-scale Game capture. No level or editor state was
+changed.
+
+`nvidia-smi` reports 10,019 / 12,282 MiB used (1,979 MiB free, 57%
+utilization). This remains below the 4 GiB rendered-session reserve, so keep
+the rendered 15–30 minute character-feedback run gated. The source-side plant
+wayfinding fallback correction compiled successfully in the isolated UE
+5.8.3 Game target, but its editor automation still needs a stable UE startup.
+This sample is device-wide and does not attribute the allocation to Unreal.
