@@ -62,6 +62,14 @@ confirms the current startup fault also blocks fresh play/feedback runs, not
 just automation discovery. The earlier successful 15-minute session remains
 valid evidence for its own build and date, but not for today's newer changes.
 
+A further fresh, guarded Game launch explicitly used `-notraceserver`. The
+prior run's Unreal Trace Server error disappeared, but the Island still exited
+before world-ready with the same null-address access violation and identical
+Game call-stack hash `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`. Therefore the
+trace-server launch error is not the trigger. Stop varying the same project
+startup path until symbolized dump evidence or a materially different engine
+environment is available.
+
 [`Scripts/Run-IslandAutomation.ps1`](../../Scripts/Run-IslandAutomation.ps1)
 standardizes the non-`-game` Editor-Cmd route with a fresh isolated data root,
 zero resident model requests, a 4-minute timeout, a 4 GiB system-memory floor
