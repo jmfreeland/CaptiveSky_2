@@ -74,6 +74,15 @@ or start another renderer to force this check. Next: after a safe editor reload,
 run `CaptiveSky2.Agent.IslandOcean` and test an actual player entry into the
 water. Details: [active-project water collision merge](findings/2026-11-01-live-checkout-parity-and-zen-startup.md#active-project-water-collision-merge-2026-11-01).
 
+**Worktree validation (2026-11-02):** in the isolated `Saved/CS58` project,
+`CaptiveSky2.Agent.IslandOcean.RuntimeSwim` and
+`CaptiveSky2.Agent.IslandOcean.SavedMapCollision` both passed under `-NullRHI`.
+The fixture verifies that startup removes Pawn blocking from generated ocean
+collision and that a player-sized capsule can cross open water and return to a
+shore floor. This validates the worktree's runtime behavior, not the separate
+D: editor's loaded module or rendered player traversal; keep that final check
+pending a safe editor reload and sufficient headroom.
+
 ## 2026-11-01 — Give headless correspondents the same bounded reply horizon
 
 The Unreal play-session path already stops after 30 real minutes or 64 shared

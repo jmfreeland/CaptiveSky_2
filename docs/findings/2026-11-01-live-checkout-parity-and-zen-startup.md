@@ -142,6 +142,17 @@ confirm it. The editor-held DLL was not terminated. This source change is
 limited to water collision and does not synchronize the divergent
 `IslandWeather.cpp` or any other D: source.
 
+**Isolated worktree verification (2026-11-02):** the current worktree scratch
+project passed both `CaptiveSky2.Agent.IslandOcean.RuntimeSwim` and
+`CaptiveSky2.Agent.IslandOcean.SavedMapCollision` under `-NullRHI` (exit code
+0; `Saved/CS58/Saved/Logs/Codex_WaterCollision_20261102.log`). The runtime
+fixture begins with Pawn-blocking generated WaterBodyOcean and WaterMesh
+components, verifies world startup changes them to overlap, then passes a
+player-capsule sweep through open water and a shoreline exit check. This
+validates the current worktree implementation in the isolated fixture; it
+does not prove the separate D: editor has this module loaded or replace actual
+player traversal in rendered gameplay.
+
 **Desktop recheck (2026-11-01):** a read-only app inventory shows the UE 5.8
 `UnrealEditor.exe` application running with both `CaptiveSky_2 - Unreal
 Editor` and `Tree_Common_Hazel_01_A` windows. A shell process query returned no
