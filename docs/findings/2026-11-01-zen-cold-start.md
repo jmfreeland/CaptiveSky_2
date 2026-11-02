@@ -78,3 +78,27 @@ the warning, capture its `Unreal.log` and `zenserver.log` with no second editor
 or Unreal automation starting concurrently, then compare the Zen process
 start/ready interval and any warnings around it. Do not clear its cache as a
 first response.
+
+## Read-only recheck — 2026-11-02
+
+The user reports the slow-start notice on each launch. `zen.exe service status`
+still reports that the `ZenServer` Windows service is not installed; Unreal
+owns the process lifecycle. The shared Zen data directory currently contains
+1,001 session directories (2,002 files, 33,989,999 bytes), while startup logs
+report loading 1,000 persisted sessions. This agrees with the earlier isolated
+comparison where a fresh data root started in 0.17 seconds and a copy of the
+2,000 session files took 33.5 seconds. The accumulated Multi-User session
+history is therefore the strongest measured cause of the long start; the
+parallel-editor wait seen in another launch may add contention, but is not
+needed to reproduce most of the delay. Do not clear or bulk-delete the session
+history: its user value has not been established.
+
+The active D: project's `DefaultEngine.ini` has
+`[Zen.AutoLaunch] LimitProcessLifetime=False`, last written at 21:51 on
+2026-11-01. The current editor log began its session at 07:54, before that
+setting was added, and continued writing through 00:01 on 2026-11-02. Thus this
+editor session cannot verify whether the keep-alive setting prevents a later
+cold start. Leave the current editor alone; test on a future planned,
+single-editor launch after this session is safely closed. Windows Application
+and Defender event-log queries were denied by the current environment, so no
+new event-level cause was available.
