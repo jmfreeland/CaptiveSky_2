@@ -545,6 +545,14 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	SideProp->RegisterComponent();
 	SidePropActor->SetActorLocation(FVector(400.f, 500.f, 0.f));
 	SidePropActor->SetActorLabel(TEXT("StaticMeshActor_28"));
+	AActor* MatineeCameraProxy = World->SpawnActor<AActor>(FVector(200.f, -250.f, 0.f), FRotator::ZeroRotator, Spawn);
+	UStaticMeshComponent* MatineeCameraMesh = NewObject<UStaticMeshComponent>(MatineeCameraProxy);
+	MatineeCameraProxy->SetRootComponent(MatineeCameraMesh);
+	MatineeCameraMesh->SetStaticMesh(NoticeBoardMesh);
+	MatineeCameraMesh->SetCollisionProfileName(TEXT("BlockAll"));
+	MatineeCameraMesh->RegisterComponent();
+	MatineeCameraProxy->SetActorLocation(FVector(200.f, -250.f, 0.f));
+	MatineeCameraProxy->SetActorLabel(TEXT("MatineeCam SM"));
 	const FString NoticeBoardSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby ordinary prop remains available for an optional upgrade proposal"),
 		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered")) && NoticeBoardSituation.Contains(TEXT("request_upgrade")));
@@ -553,6 +561,8 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered', about 6 metres to your right")));
 	TestFalse(TEXT("Residents are not asked to target engine-generated actor labels"),
 		NoticeBoardSituation.Contains(TEXT("StaticMeshActor_27")) || NoticeBoardSituation.Contains(TEXT("StaticMeshActor_28")));
+	TestFalse(TEXT("An Unreal Matinee camera proxy is not presented as an upgradeable world object"),
+		NoticeBoardSituation.Contains(TEXT("MatineeCam")));
 
 	struct FInstalledPlantLabelCase
 	{

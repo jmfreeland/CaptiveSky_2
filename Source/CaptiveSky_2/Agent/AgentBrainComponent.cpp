@@ -17,6 +17,8 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonSerializer.h"
 #include "EngineUtils.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Components/InstancedSkinnedMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
@@ -79,6 +81,16 @@ namespace
 			if (bNumericSuffix) return true;
 		}
 		return false;
+	}
+
+	bool IsMatineeCameraProxyName(const FString& Name)
+	{
+		FString NormalizedName = Name;
+		NormalizedName.ToLowerInline();
+		NormalizedName.ReplaceInline(TEXT(" "), TEXT(""));
+		NormalizedName.ReplaceInline(TEXT("_"), TEXT(""));
+		NormalizedName.ReplaceInline(TEXT("-"), TEXT(""));
+		return NormalizedName.Contains(TEXT("matineecam"));
 	}
 }
 
@@ -881,6 +893,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
 			if (*It == Owner || It->IsHidden() || It->ActorHasTag(TEXT("IslandLife")) ||
+				It->ActorHasTag(TEXT("AgentPerceptionExclude")) || It->ActorHasTag(TEXT("EditorOnly")) ||
+				It->IsA<ACameraActor>() || It->FindComponentByClass<UCameraComponent>() ||
 				It->ActorHasTag(TEXT("IslandLandmark")) ||
 				IslandInteractionUtility::GetTargetTag(*It) != NAME_None ||
 				It->FindComponentByClass<UInstancedStaticMeshComponent>()) continue;
@@ -889,6 +903,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 
 			const UStaticMeshComponent* MeshComponent = It->FindComponentByClass<UStaticMeshComponent>();
 			if (!MeshComponent || !MeshComponent->GetStaticMesh()) continue;
+			if (IsMatineeCameraProxyName(It->GetActorLabel(false)) ||
+				IsMatineeCameraProxyName(MeshComponent->GetStaticMesh()->GetName())) continue;
 			FString Label = It->GetActorLabel(false);
 			Label.ReplaceInline(TEXT("\r"), TEXT(" "));
 			Label.ReplaceInline(TEXT("\n"), TEXT(" "));
