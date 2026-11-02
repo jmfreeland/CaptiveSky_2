@@ -68,3 +68,21 @@ utilization, and 74 C. This is below the established 4 GiB rendered-session
 reserve. Leave the editor and open asset untouched, and keep rendered
 validation gated until device-wide headroom recovers; continue with source-side
 work in the meantime.
+
+## Fresh viewport and headroom recheck — 2026-11-02 00:32 UTC
+
+After the unchanged Common Hazel preview was minimized, the main Island editor
+showed the close WoodlandFungusCluster view unobstructed. The visitor-height
+composition is dominated by a broad mushroom cluster and tall, dense grass on
+both sides of a narrow ground strip; the Wind Arch and mountain ridge sit behind
+it. The frame proves these layers can coexist in the editor, but not that a
+visitor can traverse the route, that broadleaf species read distinctly, or that
+the current source worktree is loaded in this separate D: project. No PIE/Game
+session was started.
+
+The current `nvidia-smi` sample is 10,017 / 12,282 MiB used (2,265 MiB free,
+47% utilization, 77 C). Free memory has improved since the previous sample but
+remains below the 4 GiB rendered-play gate. Keep the route/profile and 15-minute
+resident-feedback run deferred until both GPU and system-memory preflights pass;
+do not lower the reserve to force a run. This is one device-wide sample, not an
+Unreal allocation or frame-time measurement.
