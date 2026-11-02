@@ -43,7 +43,9 @@ resulting resident daylight and wind/chill descriptions. The
 bloom windows, spring/autumn boundaries, year wrap, and compatibility behavior
 for unknown indices. A 2026-11-02 UE 5.8.3 scratch build and focused `-NullRHI`
 automations also pass; see [seasonal meadow phenology](../findings/2026-11-02-seasonal-meadow-phenology.md).
-Rendered readability and pollinator selection across the new generic windows
-remain unverified. Validation should also check that a saved Island day
-continues through a season boundary without resetting the independent lunar
-phase; later visual ecology work can build on the same persistent day number.
+The production flower query now has a focused regression confirming spring and
+autumn bloom eligibility and winter dormancy. Rendered readability and actual
+dragonfly attraction across the new windows remain unverified. Validation
+should also check that a saved Island day continues through a season boundary
+without resetting the independent lunar phase; later visual ecology work can
+build on the same persistent day number.

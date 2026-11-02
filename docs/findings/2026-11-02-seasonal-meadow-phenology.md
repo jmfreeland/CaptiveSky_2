@@ -29,8 +29,19 @@ wrap, and a visitor's nearby wildflower-bloom caption. The final log is
 disabled agent thinking and model requests and used a dedicated playtest data
 root.
 
+## Pollinator query follow-up
+
+The `CaptiveSky2.Agent.MeadowFlowerSpecies` NullRHI automation now also drives
+the production seasonal visibility/scaling update and the exact
+`FindNearestMeadowFlower` query used by dragonflies. It confirms that the
+spring form can be found in spring, is absent from the query in autumn, a
+long-season meadow form can be found in autumn, and no generic bloom is
+available in winter. Log: `Saved/Logs/Codex_SeasonalPollinator_20261102.log`.
+This verifies query eligibility, not a rendered dragonfly flight or visitor
+readability; those still need a memory-gated visual review.
+
 NullRHI establishes the calendar and caption behavior, not a visual claim.
-Rendered flower silhouettes and colors, pollinator choices during these added
-windows, and frame-time impact still need a memory-gated review once at least
-4 GiB of GPU memory is free. Do not raise the flower instance budget as part of
-that review.
+Rendered flower silhouettes and colors, actual dragonfly attraction during
+these added windows, and frame-time impact still need a memory-gated review
+once at least 4 GiB of GPU memory is free. Do not raise the flower instance
+budget as part of that review.

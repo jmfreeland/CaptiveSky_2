@@ -197,6 +197,61 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 		AIslandWeather::IsWithinTideglassPollinatorFlowerSiteClearance(
 			FVector(std::numeric_limits<float>::quiet_NaN(), 0.f, 0.f), TideglassReservationCenter, 71));
 
+	const UWorld::InitializationValues Init = UWorld::InitializationValues()
+		.AllowAudioPlayback(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* TestWorld = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("A transient meadow-query world was created"), TestWorld) ||
+		!TestNotNull(TEXT("The engine is available for the meadow-query fixture"), GEngine))
+	{
+		if (TestWorld) TestWorld->DestroyWorld(false);
+		return false;
+	}
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(TestWorld);
+	ON_SCOPE_EXIT
+	{
+		GEngine->DestroyWorldContext(TestWorld);
+		TestWorld->DestroyWorld(false);
+	};
+	FActorSpawnParameters Spawn;
+	Spawn.ObjectFlags |= RF_Transient;
+	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIslandWeather* Weather = TestWorld->SpawnActor<AIslandWeather>(Spawn);
+	UStaticMesh* FixtureFlowerMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!TestNotNull(TEXT("A transient weather actor was spawned"), Weather) ||
+		!TestNotNull(TEXT("An engine mesh is available for flower-query fixtures"), FixtureFlowerMesh)) return false;
+	Weather->IslandMeadowFlowerBaseTransforms.SetNum(AIslandWeather::MeadowFlowerSpeciesCount);
+	Weather->IslandMeadowFlowerBloomScales.SetNum(AIslandWeather::MeadowFlowerSpeciesCount);
+	auto AddSeasonalFlowerFixture = [Weather, FixtureFlowerMesh](int32 SpeciesIndex, const FVector& Location)
+	{
+		if (!Weather->IslandMeadowFlowers.IsValidIndex(SpeciesIndex) || !Weather->IslandMeadowFlowers[SpeciesIndex]) return false;
+		UHierarchicalInstancedStaticMeshComponent* Flowers = Weather->IslandMeadowFlowers[SpeciesIndex];
+		Flowers->ClearInstances();
+		Flowers->SetStaticMesh(FixtureFlowerMesh);
+		Flowers->SetVisibility(false, true);
+		const FTransform BaseTransform(FRotator::ZeroRotator, Location);
+		Flowers->AddInstance(BaseTransform, true);
+		Weather->IslandMeadowFlowerBaseTransforms[SpeciesIndex] = { BaseTransform };
+		Weather->IslandMeadowFlowerBloomScales[SpeciesIndex].Reset();
+		return true;
+	};
+	if (!AddSeasonalFlowerFixture(0, FVector(400.f, 0.f, 0.f)) ||
+		!AddSeasonalFlowerFixture(6, FVector(800.f, 0.f, 0.f))) return false;
+	Weather->UpdateSeasonalFlowerVisibility(4.0);
+	FVector NearestFlower = FVector::ZeroVector;
+	TestTrue(TEXT("A spring-opened generic flower is visible to the existing pollinator query"),
+		Weather->FindNearestMeadowFlower(FVector(400.f, 0.f, 0.f), 100.f, NearestFlower) &&
+		NearestFlower.Equals(FVector(400.f, 0.f, 0.f), 0.1f));
+	Weather->UpdateSeasonalFlowerVisibility(200.0);
+	TestFalse(TEXT("A spring-only generic form is no longer offered to pollinators in autumn"),
+		Weather->FindNearestMeadowFlower(FVector(400.f, 0.f, 0.f), 100.f, NearestFlower));
+	TestTrue(TEXT("A long-season generic meadow form remains available to pollinators in autumn"),
+		Weather->FindNearestMeadowFlower(FVector(800.f, 0.f, 0.f), 100.f, NearestFlower) &&
+		NearestFlower.Equals(FVector(800.f, 0.f, 0.f), 0.1f));
+	Weather->UpdateSeasonalFlowerVisibility(271.0);
+	TestFalse(TEXT("Generic flowers in winter are absent from the pollinator query"),
+		Weather->FindNearestMeadowFlower(FVector(600.f, 0.f, 0.f), 500.f, NearestFlower));
+
 	// Mirror the deterministic Tideglass offset chain without landscape traces or
 	// other scene clearances. Reserve the eight flower pockets before selecting
 	// cattails, and ensure the established ten-instance/80-candidate bounds hold.
