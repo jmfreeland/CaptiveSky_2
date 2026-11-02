@@ -140,6 +140,7 @@ protected:
 	FString DescribeTrailUnderfoot() const;
 	FString DescribeNearbyWildlife() const;
 	FString DescribeLocalWeather() const;
+	FString DescribeLocalWindShelter() const;
 	FString DescribeLocalSky() const;
 	FString DescribeNearbyTide() const;
 	int32 NextEnvironmentalObservationIndex = 0;

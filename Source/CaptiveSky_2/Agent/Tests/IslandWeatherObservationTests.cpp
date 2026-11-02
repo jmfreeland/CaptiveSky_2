@@ -7,6 +7,8 @@
 #include "IslandDayNight.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandInteractionUtility.h"
+#include "IslandWeather.h"
+#include "Components/BoxComponent.h"
 #include "IslandInteractionTestPlayerController.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherObservationTest, "CaptiveSky2.Agent.VisitorWeatherObservation",
@@ -45,13 +47,28 @@ bool FIslandWeatherObservationTest::RunTest(const FString& Parameters)
 	Environment->Wind = FVector(400.f, 0.f, 0.f);
 
 	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 90.f), FRotator::ZeroRotator);
+	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>();
 	UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
 	AIslandInteractionTestPlayerController* Controller = World->SpawnActor<AIslandInteractionTestPlayerController>();
 	TestNotNull(TEXT("Visitor pawn created for weather observation"), Visitor);
+	TestNotNull(TEXT("Weather actor created for local wind shelter observation"), Weather);
 	TestNotNull(TEXT("Caption widget created for weather observation"), Caption);
 	TestNotNull(TEXT("Visitor controller created for weather observation"), Controller);
-	if (Visitor && Caption && Controller)
+	if (Visitor && Weather && Caption && Controller)
 	{
+		Weather->MaximumWindSpeed = 300.f;
+		for (int32 Second = 0; Second < 3600 && Weather->SampleWind(Visitor->GetActorLocation(), World->GetTimeSeconds()).Size() < 80.f; ++Second)
+			Weather->WeatherTimeOffset += 1.0;
+		const FVector AmbientWind = Weather->SampleWind(Visitor->GetActorLocation(), World->GetTimeSeconds());
+		TestTrue(TEXT("Fixture wind is strong enough to assess horizontal shelter"), AmbientWind.Size() >= 80.f);
+		AActor* WindBlocker = World->SpawnActor<AActor>();
+		UBoxComponent* BlockerBox = NewObject<UBoxComponent>(WindBlocker);
+		WindBlocker->SetRootComponent(BlockerBox);
+		BlockerBox->SetBoxExtent(FVector(120.f, 120.f, 150.f));
+		BlockerBox->SetCollisionProfileName(TEXT("BlockAll"));
+		BlockerBox->RegisterComponent();
+		WindBlocker->SetActorLocation(Visitor->GetActorLocation() - AmbientWind.GetSafeNormal() * 300.f);
+
 		Controller->SetFixturePawn(Visitor);
 		Controller->SetCaptionWidget(Caption);
 		Controller->BindFixtureInput();
@@ -61,6 +78,23 @@ bool FIslandWeatherObservationTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("E reports current rain and wind without a model call"), Controller->PressBoundE() &&
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("Steady rain")) &&
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("steady wind")));
+		bool bShelteredWasReported = false;
+		for (int32 Attempt = 0; Attempt < 8 && !bShelteredWasReported; ++Attempt)
+		{
+			Controller->PressBoundE();
+			bShelteredWasReported = Caption->GetDisplayedCaption().ToString().Contains(TEXT("sheltered from the present horizontal wind"));
+		}
+		TestTrue(TEXT("On-demand visitor notes can identify nearby upwind shelter without implying a roof or safe perch"),
+			bShelteredWasReported && Caption->GetDisplayedCaption().ToString().Contains(TEXT("overhead rain cover")));
+
+		WindBlocker->SetActorEnableCollision(false);
+		bool bExposureWasReported = false;
+		for (int32 Attempt = 0; Attempt < 8 && !bExposureWasReported; ++Attempt)
+		{
+			Controller->PressBoundE();
+			bExposureWasReported = Caption->GetDisplayedCaption().ToString().Contains(TEXT("exposed to the present horizontal wind"));
+		}
+		TestTrue(TEXT("Removing the obstruction changes the note back to the exposed condition"), bExposureWasReported);
 
 		Environment->Indoors = 1.f;
 		Controller->RefreshInteractionHintForTest();

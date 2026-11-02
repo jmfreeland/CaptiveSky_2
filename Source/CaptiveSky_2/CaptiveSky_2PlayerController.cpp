@@ -26,6 +26,7 @@
 #include "Agent/IslandSpectator.h"
 #include "Agent/IslandEnvironmentSubsystem.h"
 #include "Agent/IslandDayNight.h"
+#include "Agent/IslandWeather.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -227,6 +228,26 @@ FString ACaptiveSky_2PlayerController::DescribeLocalWeather() const
 		Environment->GetWind(), Environment->GetMist());
 }
 
+FString ACaptiveSky_2PlayerController::DescribeLocalWindShelter() const
+{
+	const APawn* PlayerPawn = GetPawn();
+	UWorld* World = GetWorld();
+	if (!PlayerPawn || !World) return FString();
+
+	for (TActorIterator<AIslandWeather> It(World); It; ++It)
+	{
+		const FVector Position = PlayerPawn->GetActorLocation();
+		if (It->SampleWind(Position, World->GetTimeSeconds()).Size() < 35.f) return FString();
+
+		// Reuse the same conservative six-metre upwind test used by residents.
+		// This describes horizontal wind only; the result deliberately does not
+		// claim overhead rain cover or a safe place to perch or nest.
+		return FString::Printf(TEXT("You pause to notice the wind. %s"),
+			*It->DescribeWindShelterAt(Position, PlayerPawn));
+	}
+	return FString();
+}
+
 FString ACaptiveSky_2PlayerController::DescribeLocalSky() const
 {
 	UWorld* World = GetWorld();
@@ -402,6 +423,9 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		{
 			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
 		}
+
+		const FString WindShelterFact = DescribeLocalWindShelter();
+		if (!WindShelterFact.IsEmpty()) EnvironmentalObservations.Add(WindShelterFact);
 
 		const FString SkyFact = DescribeLocalSky();
 		if (!SkyFact.IsEmpty()) EnvironmentalObservations.Add(SkyFact);

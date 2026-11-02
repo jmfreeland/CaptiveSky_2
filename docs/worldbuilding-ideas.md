@@ -1,5 +1,16 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let visitors feel the lee of the Island's landmarks
+
+The on-demand `E: notice your surroundings` cycle now includes the same
+conservative six-metre upwind obstruction check used in resident nest-site
+scouting. It can tell a visitor that the present horizontal wind is blocked or
+exposed, and explicitly says this does not establish roof cover or a safe
+perch. Calm conditions suppress the note. The UE 5.8.3 Game target built and
+compiled the focused regression source; runtime automation and a rendered
+caption check remain pending. Details: [visitor wind-shelter observation
+](findings/2026-11-02-visitor-wind-shelter-observation.md).
+
 ## 2026-11-02 — Let ground-cover communities follow less regular edges
 
 The broad seeded ground-cover species field now bends through two smooth,
