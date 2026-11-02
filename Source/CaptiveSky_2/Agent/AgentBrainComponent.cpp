@@ -237,6 +237,8 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					*OtherAgentId, Distance / 100.f, *OtherAgentId);
 				if (OwnSocial)
 				{
+					if (OwnSocial->IsWithinSpeakingRange(*It))
+						NearbyBeings += TEXT(" You are already within normal speaking range; another move_to toward them is unnecessary. If you wish to make contact, choose Speak; a quiet pause or another activity is equally fine.");
 					const float CooldownSeconds = OwnSocial->GetConversationCooldownRemainingWith(OtherAgentId);
 					if (CooldownSeconds > 0.f)
 					{

@@ -165,6 +165,12 @@ bool FAgentCraftTeachingTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("The learner begins without preordained craft knowledge"), WorldState->HasCraftKnowledge(TEXT("HearthLoaf"), LearnerId));
 	const FString TeacherSituation = Teacher->Brain->BuildSituationSummary(FAgentConversationContext());
 	const FString LearnerSituation = Learner->Brain->BuildSituationSummary(FAgentConversationContext());
+	TestTrue(TEXT("A resident already within speaking range is not nudged to repeat an approach"),
+		TeacherSituation.Contains(TEXT("already within normal speaking range")) &&
+		TeacherSituation.Contains(TEXT("another move_to toward them is unnecessary")));
+	TestTrue(TEXT("The speaking-range cue keeps speech optional and offers quiet alternatives"),
+		TeacherSituation.Contains(TEXT("If you wish to make contact, choose Speak")) &&
+		TeacherSituation.Contains(TEXT("a quiet pause or another activity is equally fine")));
 	TestTrue(TEXT("Only a resident who knows the tradition sees its exact optional teaching ID"),
 		TeacherSituation.Contains(TEXT("teach_craft ID: HearthLoaf")) && !LearnerSituation.Contains(TEXT("teach_craft ID: HearthLoaf")));
 	TestTrue(TEXT("A resident with witnessed quiet-listening memory sees its optional teaching ID"),

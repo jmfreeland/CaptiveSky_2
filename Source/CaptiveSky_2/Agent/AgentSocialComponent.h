@@ -77,6 +77,8 @@ public:
 	int32 MaximumPendingUtterances = 4;
 
 	void ReceiveUtterance(const FAgentSocialUtterance& Utterance);
+	/** Uses the same distance rule as automatic and directed social speech. */
+	bool IsWithinSpeakingRange(const AAutonomousAgentCharacter* Other) const;
 	/** Remaining real-time pause before an automatic conversation with this resident can begin. */
 	float GetConversationCooldownRemainingWith(const FString& OtherAgentId) const;
 	/** True while this resident is reserved for one mutual automatic exchange. */
@@ -102,7 +104,6 @@ private:
 	UAgentBrainComponent* GetBrain() const;
 	AAutonomousAgentCharacter* GetAgentOwner() const;
 	AAutonomousAgentCharacter* FindAgent(const FString& IdOrName) const;
-	bool IsWithinSpeakingRange(const AAutonomousAgentCharacter* Other) const;
 	bool IsCoolingDownWith(const FString& OtherAgentId) const;
 	bool IsConversationReplyPauseActive() const;
 	bool TryReserveAutomaticConversation(UAgentSocialComponent* OtherSocial, const FString& OwnAgentId,
