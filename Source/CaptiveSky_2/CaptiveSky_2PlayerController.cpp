@@ -180,6 +180,44 @@ FString ACaptiveSky_2PlayerController::DescribeTrailUnderfoot() const
 	return Trail->DescribeUnderfoot(PlayerPawn->GetActorLocation(), Wetness);
 }
 
+FString ACaptiveSky_2PlayerController::DescribeNearbyWildlife() const
+{
+	const APawn* Visitor = GetPawn();
+	UWorld* World = GetWorld();
+	if (!Visitor || !World) return FString();
+
+	constexpr float WildlifeObservationRadiusCm = 1800.f;
+	AActor* NearestWildlife = nullptr;
+	FString WildlifeDescription;
+	float NearestDistanceSquared = FMath::Square(WildlifeObservationRadiusCm);
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (!It->ActorHasTag(TEXT("IslandLife"))) continue;
+
+		const FName TargetTag = IslandInteractionUtility::GetTargetTag(*It);
+		const TCHAR* Description = nullptr;
+		if (TargetTag == FName(TEXT("WoodlandDeer"))) Description = TEXT("a stag browsing at the woodland edge");
+		else if (TargetTag == FName(TEXT("WoodlandFox"))) Description = TEXT("a fox moving along the woodland margin");
+		else if (TargetTag == FName(TEXT("Firefly"))) Description = TEXT("a firefly glimmering nearby");
+		else if (TargetTag == FName(TEXT("TidepoolCrab"))) Description = TEXT("a small shore crab working along the tide line");
+		else if (TargetTag == FName(TEXT("TidepoolPeriwinkle"))) Description = TEXT("a periwinkle clinging to the shore rocks");
+		else if (TargetTag == FName(TEXT("TideglassDragonfly"))) Description = TEXT("a dragonfly hovering above the shore");
+		else if (TargetTag == FName(TEXT("TideglassFrog"))) Description = TEXT("a common frog resting among damp plants");
+		else if (TargetTag == FName(TEXT("MinnowSchool"))) Description = TEXT("a small school of minnows turning through the shallows");
+		if (!Description) continue;
+
+		const float DistanceSquared = FVector::DistSquared(Visitor->GetActorLocation(), It->GetActorLocation());
+		if (DistanceSquared >= NearestDistanceSquared || !IslandInteractionUtility::CanInteract(Visitor, *It, WildlifeObservationRadiusCm)) continue;
+		NearestWildlife = *It;
+		WildlifeDescription = Description;
+		NearestDistanceSquared = DistanceSquared;
+	}
+
+	return NearestWildlife
+		? FString::Printf(TEXT("You notice %s nearby and leave it undisturbed."), *WildlifeDescription)
+		: FString();
+}
+
 FString ACaptiveSky_2PlayerController::DescribeLocalWeather() const
 {
 	const UWorld* World = GetWorld();
@@ -347,6 +385,9 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		{
 			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause to read the ground. %s"), *TrailFact));
 		}
+
+		const FString WildlifeFact = DescribeNearbyWildlife();
+		if (!WildlifeFact.IsEmpty()) EnvironmentalObservations.Add(WildlifeFact);
 
 		if (const APawn* PlayerPawn = GetPawn())
 		{

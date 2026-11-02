@@ -40,6 +40,7 @@ public:
 	
 protected:
 	friend class FIslandCommonFrogInteractionTest;
+	friend class FIslandWildlifeObservationTest;
 
 	/** Input Mapping Contexts */
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
@@ -137,6 +138,7 @@ protected:
 	void HideAmbientSpeech();
 	FString DescribeWorldInteractionHint(AActor* Target) const;
 	FString DescribeTrailUnderfoot() const;
+	FString DescribeNearbyWildlife() const;
 	FString DescribeLocalWeather() const;
 	FString DescribeLocalSky() const;
 	FString DescribeNearbyTide() const;

@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "IslandDayNight.h"
 #include "IslandEnvironmentSubsystem.h"
+#include "IslandInteractionUtility.h"
 #include "IslandInteractionTestPlayerController.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWeatherObservationTest, "CaptiveSky2.Agent.VisitorWeatherObservation",
@@ -170,6 +171,75 @@ bool FIslandSkyObservationTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("A midday visitor is not told that stars are visible"),
 			Controller->PressBoundE() && !Caption->GetDisplayedCaption().ToString().Contains(TEXT("read the sky")) &&
 			!Caption->GetDisplayedCaption().ToString().Contains(TEXT("stars")));
+	}
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandWildlifeObservationTest, "CaptiveSky2.Agent.VisitorWildlifeObservation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIslandWildlifeObservationTest::RunTest(const FString& Parameters)
+{
+	const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+	if (!TestNotNull(TEXT("Synthetic visitor wildlife world created"), World)) return false;
+	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->BeginPlay();
+
+	ACharacter* Visitor = World->SpawnActor<ACharacter>(FVector(100.f, 0.f, 90.f), FRotator::ZeroRotator);
+	ATargetPoint* Stag = World->SpawnActor<ATargetPoint>(FVector(1000.f, 0.f, 90.f), FRotator::ZeroRotator);
+	UCaptiveSkyAmbientSpeechWidget* Caption = NewObject<UCaptiveSkyAmbientSpeechWidget>(World, NAME_None, RF_Transient);
+	AIslandInteractionTestPlayerController* Controller = World->SpawnActor<AIslandInteractionTestPlayerController>();
+	TestNotNull(TEXT("Visitor pawn created for wildlife observation"), Visitor);
+	TestNotNull(TEXT("Wildlife actor created for wildlife observation"), Stag);
+	TestNotNull(TEXT("Caption widget created for wildlife observation"), Caption);
+	TestNotNull(TEXT("Visitor controller created for wildlife observation"), Controller);
+	if (Visitor && Stag && Caption && Controller)
+	{
+		Stag->Tags.Add(TEXT("IslandLife"));
+		Stag->Tags.Add(TEXT("WoodlandDeer"));
+		Stag->SetActorHiddenInGame(false);
+		TestEqual(TEXT("The fixture is classified as a stag"), IslandInteractionUtility::GetTargetTag(Stag), FName(TEXT("WoodlandDeer")));
+		TestTrue(TEXT("The visible fixture passes the same visibility gate as direct interactions"),
+			IslandInteractionUtility::CanInteract(Visitor, Stag, 1800.f));
+		Controller->SetFixturePawn(Visitor);
+		Controller->SetCaptionWidget(Caption);
+		Controller->BindFixtureInput();
+		TestTrue(TEXT("The wildlife observation helper resolves the nearest visible species"),
+			Controller->DescribeNearbyWildlife().Contains(TEXT("stag browsing")));
+		bool bSawWildlife = false;
+		FString CaptionsSeen;
+		for (int32 Attempt = 0; Attempt < 8 && !bSawWildlife; ++Attempt)
+		{
+			TestTrue(TEXT("E remains bound during the observation cycle"), Controller->PressBoundE());
+			const FString CaptionText = Caption->GetDisplayedCaption().ToString();
+			CaptionsSeen += FString::Printf(TEXT("[%d] %s "), Attempt, *CaptionText);
+			bSawWildlife = CaptionText.Contains(TEXT("stag browsing")) && CaptionText.Contains(TEXT("leave it undisturbed"));
+		}
+		TestTrue(FString::Printf(TEXT("The on-demand observation cycle includes visible wildlife beyond direct interaction range without disturbing it. Captions: %s"), *CaptionsSeen), bSawWildlife);
+
+		Stag->SetActorHiddenInGame(true);
+		bool bHiddenWildlifeWasNamed = false;
+		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+		{
+			Controller->PressBoundE();
+			bHiddenWildlifeWasNamed |= Caption->GetDisplayedCaption().ToString().Contains(TEXT("stag browsing"));
+		}
+		TestFalse(TEXT("Hidden wildlife is not described as visible"), bHiddenWildlifeWasNamed);
+
+		Stag->SetActorHiddenInGame(false);
+		Visitor->SetActorLocation(FVector(3000.f, 0.f, 90.f));
+		bool bDistantWildlifeWasNamed = false;
+		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+		{
+			Controller->PressBoundE();
+			bDistantWildlifeWasNamed |= Caption->GetDisplayedCaption().ToString().Contains(TEXT("stag browsing"));
+		}
+		TestFalse(TEXT("Distant wildlife is not described as local"), bDistantWildlifeWasNamed);
 	}
 
 	GEngine->DestroyWorldContext(World);

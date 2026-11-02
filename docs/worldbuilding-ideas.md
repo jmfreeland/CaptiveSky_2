@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let visitors quietly notice nearby wildlife
+
+When a visitor uses the on-demand outdoor observation cycle without a close
+interaction target, it can now name the nearest visible IslandLife species
+within 18 m: stag, fox, firefly, shore crab, periwinkle, dragonfly, frog, or
+minnows. The note explicitly leaves the animal undisturbed; it neither moves
+the wildlife nor changes memory/world state or calls a model. Discovery is
+interaction-triggered, not a background scan. The focused UE 5.8.3
+`CaptiveSky2.Agent.VisitorWildlifeObservation` NullRHI automation passed for
+visible, hidden, and distant cases. This is behavior evidence only, not proof
+of species readability in the rendered Island. Details: [visitor wildlife
+observation](findings/2026-11-02-visitor-wildlife-observation.md).
+
 ## 2026-11-02 — Let visitors notice the changing sky
 
 The on-demand `E: notice your surroundings` cycle now includes the Island's
