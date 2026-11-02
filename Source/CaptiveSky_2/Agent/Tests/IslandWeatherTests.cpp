@@ -535,12 +535,24 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	NoticeBoard->SetStaticMesh(NoticeBoardMesh);
 	NoticeBoard->SetCollisionProfileName(TEXT("BlockAll"));
 	NoticeBoard->RegisterComponent();
+	GeneratedLabelProp->SetActorLocation(FVector(600.f, 0.f, 0.f));
 	GeneratedLabelProp->SetActorLabel(TEXT("StaticMeshActor_27"));
+	AActor* SidePropActor = World->SpawnActor<AActor>(FVector(0.f, 700.f, 0.f), FRotator::ZeroRotator, Spawn);
+	UStaticMeshComponent* SideProp = NewObject<UStaticMeshComponent>(SidePropActor);
+	SidePropActor->SetRootComponent(SideProp);
+	SideProp->SetStaticMesh(NoticeBoardMesh);
+	SideProp->SetCollisionProfileName(TEXT("BlockAll"));
+	SideProp->RegisterComponent();
+	SidePropActor->SetActorLocation(FVector(400.f, 500.f, 0.f));
+	SidePropActor->SetActorLabel(TEXT("StaticMeshActor_28"));
 	const FString NoticeBoardSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby ordinary prop remains available for an optional upgrade proposal"),
 		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered")) && NoticeBoardSituation.Contains(TEXT("request_upgrade")));
-	TestFalse(TEXT("Residents are not asked to target an engine-generated actor label"),
-		NoticeBoardSituation.Contains(TEXT("StaticMeshActor_27")));
+	TestTrue(TEXT("Two props with the same mesh label are distinguished by their resident-relative direction"),
+		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered', about 6 metres ahead of you")) &&
+		NoticeBoardSituation.Contains(TEXT("Notice Board Weathered', about 6 metres to your right")));
+	TestFalse(TEXT("Residents are not asked to target engine-generated actor labels"),
+		NoticeBoardSituation.Contains(TEXT("StaticMeshActor_27")) || NoticeBoardSituation.Contains(TEXT("StaticMeshActor_28")));
 
 	struct FInstalledPlantLabelCase
 	{

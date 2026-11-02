@@ -25,6 +25,21 @@ rendered view is inspected. Keep the count/cull settings unchanged until
 headroom permits a matched visual/performance check. Details and the exact
 runtime census are in the [15-minute resident finding](findings/2026-11-02-resident-feedback-15m.md#runtime-vegetation-census).
 
+## 2026-11-02 — Make generic object-upgrade proposals easier to target
+
+Visible ordinary static-mesh props now include resident-relative direction as
+well as distance in the existing optional `request_upgrade` context. This
+helps distinguish two similar props with the same mesh-derived label; the
+scan remains local, line-of-sight checked, and capped at the three nearest
+objects. Upgrade requests can still name stable IDs, descriptive locations,
+or a genuinely world-level target, but are only recorded for human review.
+The request-queue automation confirms all three upgrade kinds, target forms,
+duplicate rejection, and the per-resident pending limit. The worktree editor
+target built, and `CaptiveSky2.Agent.NearbyVegetationPerception` passed in the
+isolated `Saved/CS58` project under NullRHI with thinking disabled and zero
+model requests. This validates text targeting, not rendered recognition of
+individual props. Log: `Saved/CS58/Saved/Logs/Codex_UpgradeTargetPerception_Final_20261102.log`.
+
 ## 2026-11-02 — Let visitors notice the changing sky
 
 The on-demand `E: notice your surroundings` cycle now includes the Island's
