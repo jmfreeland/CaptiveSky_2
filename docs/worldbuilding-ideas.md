@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Give Black Alder a damp woodland edge
+
+The five-species broadleaf field now uses the existing Tideglass wetness
+gradient to form coherent Black Alder patches near the pool, leaving the
+existing species and instance budgets untouched. The isolated UE 5.8.3 Game
+target compiled successfully, including the new focused regression; its Editor
+automation and rendered appearance remain unverified. Next compare the same
+Tideglass-to-woodland view when a stable editor test run and the GPU reserve are
+available. Details: [wet-edge broadleaf affinity](findings/2026-11-02-wet-edge-broadleaf-affinity.md).
+
 ## 2026-11-02 — Keep RatHollow placement tied to a fresh Island audit
 
 The active D: Island state currently has no `wildlife_homes` record, and the

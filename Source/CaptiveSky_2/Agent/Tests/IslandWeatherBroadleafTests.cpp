@@ -317,5 +317,35 @@ bool FIslandWeatherBroadleafHabitatSelectionTest::RunTest(const FString& Paramet
 		TestTrue(FString::Printf(TEXT("Broadleaf species %d retains a meaningful share of the representative Island-scale field"), Species),
 			SpeciesCounts[Species] >= 5 && SpeciesCounts[Species] <= 28);
 	}
+
+	int32 DryAlderSelections = 0;
+	int32 WetAlderSelections = 0;
+	int32 WetNonAlderSelections = 0;
+	for (int32 GridY = -80; GridY <= 80; ++GridY)
+	{
+		for (int32 GridX = -80; GridX <= 80; ++GridX)
+		{
+			const FVector Sample = FVector(GridX * 100.f, GridY * 100.f, 0.f);
+			const int32 DrySpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(Sample, HabitatSeed);
+			const int32 WetSpecies = AIslandWeather::GetBroadleafSpeciesIndexAt(Sample, HabitatSeed, 1.f);
+			if (DrySpecies == 3) ++DryAlderSelections;
+			if (WetSpecies == 3) ++WetAlderSelections;
+			else ++WetNonAlderSelections;
+		}
+	}
+	TestTrue(TEXT("Saturated wet-edge habitat favors Black Alder over the dry field"),
+		WetAlderSelections > DryAlderSelections * 2);
+	TestTrue(TEXT("The wet edge remains a mixed canopy rather than an Alder monoculture"),
+		WetNonAlderSelections > WetAlderSelections / 4);
+	const FVector WetSample(700.f, -1200.f, 0.f);
+	TestEqual(TEXT("The same wet-edge point and seed select the same canopy species"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed, 1.f),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed, 1.f));
+	TestEqual(TEXT("Invalid moisture safely preserves the dry habitat selection"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed, std::numeric_limits<float>::quiet_NaN()),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed));
+	TestEqual(TEXT("Wetness above one clamps to the fully wet species pattern"),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed, 3.f),
+		AIslandWeather::GetBroadleafSpeciesIndexAt(WetSample, HabitatSeed, 1.f));
 	return true;
 }

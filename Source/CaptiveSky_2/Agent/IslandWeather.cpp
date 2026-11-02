@@ -2074,8 +2074,12 @@ void AIslandWeather::InitializeGroundCover()
 							// Choose species from the same smooth, seeded habitat field used by the
 							// meadow. Nearby trees therefore form loose species patches instead of
 							// every grove repeating a strict four-species rotation.
+							const float AlderWetness = bHasTideglassFlowerAnchor && TideglassPoolClearanceRadius > 0.f
+								? CalculateGroundCoverWetEdgeMoisture(TreeHit.ImpactPoint, TideglassFlowerAnchor, OtherHabitatAnchors,
+									TideglassPoolClearanceRadius + 100.f, TideglassPoolClearanceRadius + 5000.f)
+								: 0.f;
 							const int32 FirstSpecies = GetBroadleafSpeciesIndexAt(
-								TreeHit.ImpactPoint, WeatherSeed ^ 0x3b67ae85);
+								TreeHit.ImpactPoint, WeatherSeed ^ 0x3b67ae85, AlderWetness);
 							for (int32 Offset = 0; Offset < BroadleafTreeSpeciesCount && !bUsedBroadleaf; ++Offset)
 								bUsedBroadleaf = TryAddSpecies((FirstSpecies + Offset) % BroadleafTreeSpeciesCount);
 						}
@@ -4225,9 +4229,23 @@ int32 AIslandWeather::GetBroadleafSpeciesIndex(float SpeciesField)
 		FMath::FloorToInt(ClampedField * BroadleafTreeSpeciesCount));
 }
 
-int32 AIslandWeather::GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed)
+int32 AIslandWeather::GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed, float WetEdgeMoisture)
 {
-	return GetBroadleafSpeciesIndex(SampleGroundCoverField(Position, Seed));
+	if (Position.ContainsNaN()) return 0;
+	const float SpeciesField = SampleGroundCoverField(Position, Seed);
+	const float Wetness = FMath::IsFinite(WetEdgeMoisture) ? FMath::Clamp(WetEdgeMoisture, 0.f, 1.f) : 0.f;
+	if (Wetness <= 0.f) return GetBroadleafSpeciesIndex(SpeciesField);
+
+	// Give Alder a moisture-linked advantage in patches rather than making every wet-edge tree Alder.
+	// A separate, shorter field keeps those patches spatially coherent without consuming placement RNG.
+	constexpr int32 BlackAlderSpeciesIndex = 3;
+	const float AlderPatchField = SampleGroundCoverFieldAtScale(Position, Seed ^ 0x165667b1, 2600.f);
+	if (AlderPatchField < Wetness * 0.6f) return BlackAlderSpeciesIndex;
+
+	// Preserve a balanced choice among the other four species where Alder is not selected.
+	const float DrySpeciesField = FMath::IsFinite(SpeciesField) ? FMath::Clamp(SpeciesField, 0.f, 1.f) : 0.f;
+	const int32 NonAlderSpecies = FMath::Min(3, FMath::FloorToInt(DrySpeciesField * 4.f));
+	return NonAlderSpecies >= BlackAlderSpeciesIndex ? NonAlderSpecies + 1 : NonAlderSpecies;
 }
 
 int32 AIslandWeather::GetBroadleafVariantIndexAt(const FVector& Position, int32 Seed)

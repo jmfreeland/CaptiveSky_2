@@ -143,8 +143,8 @@ public:
 	static bool ShouldIncludeResidentInSwayFocus(bool bIsPlayerControlled, bool bWasRecentlyRendered);
 	/** Map a stable [0, 1] local habitat field to a broadleaf species without favoring any one type. */
 	static int32 GetBroadleafSpeciesIndex(float SpeciesField);
-	/** Resolve the seeded, smoothed habitat field at a tree position to its local broadleaf species. */
-	static int32 GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed);
+	/** Resolve the seeded, smoothed habitat field at a tree position to its local broadleaf species. Wet edges gently favor Black Alder. */
+	static int32 GetBroadleafSpeciesIndexAt(const FVector& Position, int32 Seed, float WetEdgeMoisture = 0.f);
 	/** Resolve a stable local A/B canopy variant without consuming placement RNG. */
 	static int32 GetBroadleafVariantIndexAt(const FVector& Position, int32 Seed);
 	/** Resolve an A-only diagnostic profile without changing the deterministic variant field. */
