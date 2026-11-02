@@ -120,6 +120,29 @@ Once GPU headroom permits, inspect live per-species instance counts and
 component visibility, then merge only any missing diversity behavior. Keep
 water traversal and real-RHI performance as separate runtime gates.
 
+## Live editor recheck (2026-11-02)
+
+The Unreal Editor is open and responsive on `/Game/Maps/Island`. A read-only
+viewport inspection shows a ground-level woodland/mushroom composition with
+thick foreground grass; this camera does not provide a useful mature-canopy
+species comparison. No PIE or other renderer was started.
+
+The on-disk D: project still declares four broadleaf species in
+`IslandWeather.h` (file timestamp 2026-10-29) and its `IslandWeather.cpp` has
+no Common Hazel component/reference. By contrast, the current worktree's
+2026-11-02 bounded NullRHI run logged 720 instances each of maple, aspen,
+beech, black alder, and common hazel. This confirms a real source-parity gap,
+not that the visible editor scene currently has only one tree species: the
+live viewport angle and loaded module/census do not establish that.
+
+The current device sample is 1,979 MiB free of 12,282 MiB, below the established
+4 GiB rendered-play reserve. Leave the editor and D: checkout untouched. The
+next tree-diversity step is a deliberate, narrowly scoped merge of the
+already-tested species work after reviewing the exact D:-only edits, followed
+by a bounded runtime census and a matched rendered comparison when GPU
+headroom permits. Do not add species, instance count, or cull distance until
+that comparison establishes a perceptual need and performance margin.
+
 ## Active-project water collision merge (2026-11-01)
 
 The D: `IslandOceanSubsystem.cpp` differed from the current worktree: it only
