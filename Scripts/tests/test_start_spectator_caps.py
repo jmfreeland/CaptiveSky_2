@@ -162,9 +162,13 @@ class StartSpectatorCapTests(unittest.TestCase):
         self.assertIn("Get-SystemMemoryHeadroomMonitorDecision", launcher)
         self.assertIn("$Game.Kill($true)", launcher)
         self.assertIn("Only the Game process tree launched by this script will be terminated", launcher)
+        self.assertIn("Get-LaunchedGameMemorySummary -Game $Game", launcher)
+        self.assertIn("process-memory sample unavailable", launcher)
 
         module = (ROOT / "Scripts" / "SystemMemoryBudget.psm1").read_text(encoding="utf-8")
         self.assertIn("ShouldStop = ($nextLowSamples -ge $RequiredConsecutiveLowSamples)", module)
+        self.assertIn("WorkingSetMiB =", module)
+        self.assertIn("PrivateBytesMiB =", module)
 
 
 if __name__ == "__main__":

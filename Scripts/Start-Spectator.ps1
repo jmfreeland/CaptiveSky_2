@@ -25,8 +25,9 @@ Use -GpuIndex, -MinimumFreeGpuMemoryMiB, and -GpuMemoryMonitorIntervalSeconds to
 fails closed if the OS query fails or less than 4096 MiB is available. Add
 -MonitorSystemMemoryHeadroom to a bounded, isolated run (rendered or NullRHI) to sample RAM during
 startup and play; two consecutive low samples (or a failed query) terminate only the Game process
-tree launched here. Use -MinimumFreeSystemMemoryMiB and -SystemMemoryMonitorIntervalSeconds to tune
-the guard.
+tree launched here. Each sample also reports the launched Game process's working set and private
+bytes when available; this telemetry does not change the system-wide guard. Use
+-MinimumFreeSystemMemoryMiB and -SystemMemoryMonitorIntervalSeconds to tune the guard.
 
 -NullRHICharacterFeedback is a hidden, non-rendered resident-feedback run. It requires an isolated
 -DataRoot, -LogSituations, -DisablePython, explicit startup/time/request caps, and is limited to 15
@@ -299,10 +300,23 @@ function Invoke-SystemMemoryMonitorCheck([System.Diagnostics.Process]$Game, [ref
 		Stop-LaunchedGameForMemoryMonitor $Game "System memory monitor returned unusable data; stopping because available RAM is unknown. Cause: $($_.Exception.Message)"
 	}
 	$ConsecutiveLowSamples.Value = $decision.ConsecutiveLowSamples
-	Write-Host ("System memory monitor: {0} MiB free; low samples {1}/2 (minimum {2} MiB)." -f
-		$decision.FreeMiB, $decision.ConsecutiveLowSamples, $MinimumFreeSystemMemoryMiB)
+	$gameMemory = Get-LaunchedGameMemorySummary -Game $Game
+	Write-Host ("System memory monitor: {0} MiB free; low samples {1}/2 (minimum {2} MiB); {3}." -f
+		$decision.FreeMiB, $decision.ConsecutiveLowSamples, $MinimumFreeSystemMemoryMiB, $gameMemory)
 	if ($decision.ShouldStop) {
 		Stop-LaunchedGameForMemoryMonitor $Game "System memory headroom remained below $MinimumFreeSystemMemoryMiB MiB for two consecutive samples ($($decision.FreeMiB) MiB free)."
+	}
+}
+
+function Get-LaunchedGameMemorySummary([System.Diagnostics.Process]$Game) {
+	$gameId = "unknown"
+	try {
+		$gameId = $Game.Id
+		$snapshot = Get-ProcessMemorySnapshot -Process $Game
+		return ("Game PID {0}: working set {1} MiB, private bytes {2} MiB" -f
+			$snapshot.ProcessId, $snapshot.WorkingSetMiB, $snapshot.PrivateBytesMiB)
+	} catch {
+		return "Game PID ${gameId}: process-memory sample unavailable"
 	}
 }
 

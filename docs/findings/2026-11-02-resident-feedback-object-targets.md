@@ -57,6 +57,10 @@ Compared with the earlier clean 15-minute sample, this run had less initial
 headroom and consumed the available reserve during play. Before another long
 NullRHI feedback run, determine what else was using memory and whether the Game
 process's resident growth is repeatable; keep the 4 GiB preflight and monitor.
-If RAM headroom is healthy, resume at the same 15-minute/32-request bounds and
-review the optional check-in as well as choices. Do not merge isolated agent
-memory into canonical saves.
+As a diagnostic follow-up, `Start-Spectator.ps1` now records the launched Game
+PID's working set and private bytes alongside each five-second system-memory
+sample when those process metrics are available. This does not alter the global
+RAM threshold or process-scoped stop behavior. The PowerShell system-memory
+tests pass, including a live-process snapshot check. If RAM headroom is healthy,
+resume at the same 15-minute/32-request bounds and review the optional check-in
+as well as choices. Do not merge isolated agent memory into canonical saves.

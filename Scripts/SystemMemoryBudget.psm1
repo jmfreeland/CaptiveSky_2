@@ -75,4 +75,17 @@ function Get-SystemMemoryHeadroomMonitorDecision {
 	}
 }
 
-Export-ModuleMember -Function Get-AvailableSystemMemoryMiB, Assert-SystemMemoryHeadroom, Get-SystemMemoryHeadroomMonitorDecision
+function Get-ProcessMemorySnapshot {
+	[CmdletBinding()]
+	param([Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process)
+
+	$Process.Refresh()
+	if ($Process.HasExited) { throw "Process $($Process.Id) exited before its memory snapshot." }
+	[pscustomobject]@{
+		ProcessId = $Process.Id
+		WorkingSetMiB = [long][math]::Floor([double]$Process.WorkingSet64 / 1MB)
+		PrivateBytesMiB = [long][math]::Floor([double]$Process.PrivateMemorySize64 / 1MB)
+	}
+}
+
+Export-ModuleMember -Function Get-AvailableSystemMemoryMiB, Assert-SystemMemoryHeadroom, Get-SystemMemoryHeadroomMonitorDecision, Get-ProcessMemorySnapshot
