@@ -21,3 +21,19 @@ assets because the worktree has no `Content/Maps/Island.umap`; these did not
 prevent the focused test from passing. Next visual check: in a playable Island,
 press E in a quiet patch with several nearby plant species and confirm the
 caption cycles between available observations without affecting vegetation.
+
+## Seasonal field-note extension
+
+Nearby bluebells, Tideglass marsh marigolds, and yellow-flag irises now use the
+existing `AIslandDayNight` calendar and `AIslandWeather` bloom curve to add a
+brief “beginning to bloom” or “in bloom” cue when appropriate. If no Island
+clock is present, the note falls back to the species name without guessing a
+season. This remains an on-demand observation and does not affect the existing
+per-instance bloom animation or write state.
+
+UE 5.8.3 `CaptiveSky_2Editor` Development rebuilt successfully. The focused
+`CaptiveSky2.Agent.NearbyVegetationPerception` NullRHI automation passed with
+assertions for spring bloom and the absence of a spring-bloom claim in summer;
+the 3,600-tree prompt fixture averaged 0.404 ms over 10 warmed samples. Log:
+`Saved/Logs/Codex_SeasonalNaturalist_NullRHI.log`. Caption appearance in PIE
+still needs a rendered, memory-gated visual check.

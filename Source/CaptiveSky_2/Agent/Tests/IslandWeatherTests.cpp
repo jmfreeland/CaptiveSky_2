@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "AgentBrainComponent.h"
+#include "IslandDayNight.h"
 #include "IslandVegetationUtility.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
@@ -371,10 +372,14 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	Spawn.ObjectFlags |= RF_Transient;
 	Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AIslandWeather* Weather = World->SpawnActor<AIslandWeather>(Spawn);
+	AIslandDayNight* DayNight = World->SpawnActor<AIslandDayNight>(Spawn);
 	ACharacter* Observer = World->SpawnActor<ACharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Observer spawned"), Observer) ||
+	if (!TestNotNull(TEXT("Weather actor spawned"), Weather) || !TestNotNull(TEXT("Island clock spawned"), DayNight) ||
+		!TestNotNull(TEXT("Observer spawned"), Observer) ||
 		!TestNotNull(TEXT("Engine cube mesh loaded for one foliage instance"), Cube)) return false;
+	DayNight->DayNumber = 30;
+	DayNight->CurrentHour = 12.f;
 
 	UHierarchicalInstancedStaticMeshComponent* Foliage = nullptr;
 	TArray<UHierarchicalInstancedStaticMeshComponent*> FoliageComponents;
@@ -470,6 +475,16 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	const FString BluebellSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("Residents perceive the dedicated woodland-bluebell species by its common name"),
 		BluebellSituation.Contains(TEXT("patch of woodland bluebells")));
+	const FString SpringVisitorObservation = IslandVegetationUtility::FormatVisitorObservation(
+		IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 5));
+	TestTrue(TEXT("Visitors learn when nearby woodland bluebells are in bloom"),
+		SpringVisitorObservation.Contains(TEXT("woodland bluebells are in bloom")));
+	DayNight->DayNumber = 100;
+	const FString SummerVisitorObservation = IslandVegetationUtility::FormatVisitorObservation(
+		IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 5));
+	TestFalse(TEXT("Visitors are not told spring bluebells are in bloom during summer"),
+		SummerVisitorObservation.Contains(TEXT("woodland bluebells are in bloom")));
+	DayNight->DayNumber = 30;
 	BluebellFoliage->SetVisibility(false);
 	const FString DormantBluebellSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestFalse(TEXT("A dormant or hidden bluebell component is not described as a visible patch"),

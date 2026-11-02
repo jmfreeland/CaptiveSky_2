@@ -7,6 +7,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "IslandDayNight.h"
 #include "IslandWeather.h"
 
 namespace
@@ -16,6 +17,14 @@ namespace
 		double DistanceSquared = TNumericLimits<double>::Max();
 		FVector Location = FVector::ZeroVector;
 	};
+
+	int32 GetSeasonalMeadowFlowerSpeciesIndex(FName ComponentName)
+	{
+		if (ComponentName == TEXT("IslandMeadowBluebells")) return AIslandWeather::WoodlandBluebellSpeciesIndex;
+		if (ComponentName == TEXT("IslandTideglassMarshMarigolds")) return AIslandWeather::TideglassMarshMarigoldSpeciesIndex;
+		if (ComponentName == TEXT("IslandTideglassYellowFlagIrises")) return AIslandWeather::TideglassYellowFlagIrisSpeciesIndex;
+		return INDEX_NONE;
+	}
 
 	bool IsVisibleFromObserver(const AActor* Observer, const AIslandWeather* Weather,
 		const FVector& ViewStart, const FVector& InstanceLocation, float BoundsHeight,
@@ -96,16 +105,20 @@ namespace
 	}
 
 	void AddOrUpdatePatch(TArray<FIslandVegetationPatch>& Patches, const FString& DisplayName,
-		float DistanceCm)
+		float DistanceCm, float BloomProgress = -1.f)
 	{
 		if (DisplayName.IsEmpty()) return;
 		if (FIslandVegetationPatch* Existing = Patches.FindByPredicate(
 			[&DisplayName](const FIslandVegetationPatch& Patch) { return Patch.DisplayName == DisplayName; }))
 		{
-			Existing->DistanceCm = FMath::Min(Existing->DistanceCm, DistanceCm);
+			if (DistanceCm < Existing->DistanceCm)
+			{
+				Existing->DistanceCm = DistanceCm;
+				Existing->BloomProgress = BloomProgress;
+			}
 			return;
 		}
-		Patches.Add({ DisplayName, DistanceCm });
+		Patches.Add({ DisplayName, DistanceCm, BloomProgress });
 	}
 }
 
@@ -156,6 +169,15 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 	FVector ViewStart = Observer->GetActorLocation();
 	FRotator ViewRotation = Observer->GetActorRotation();
 	Observer->GetActorEyesViewPoint(ViewStart, ViewRotation);
+	double IslandDayProgress = 0.0;
+	bool bHasIslandDayProgress = false;
+	for (TActorIterator<AIslandDayNight> DayNightIt(World); DayNightIt; ++DayNightIt)
+	{
+		if (!IsValid(*DayNightIt) || DayNightIt->DayNumber < 1 || !FMath::IsFinite(DayNightIt->CurrentHour)) continue;
+		IslandDayProgress = DayNightIt->DayNumber + AIslandDayNight::WrapHour(DayNightIt->CurrentHour) / 24.0;
+		bHasIslandDayProgress = true;
+		break;
+	}
 
 	for (TActorIterator<AIslandWeather> WeatherIt(World); WeatherIt; ++WeatherIt)
 	{
@@ -172,8 +194,12 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 			FNearbyVegetationInstance Nearest;
 			if (!FindNearestVisibleInstance(Observer, Weather, ViewStart, Foliage, Mesh, Indices,
 				static_cast<float>(SearchRadiusSquared), Nearest)) continue;
-			AddOrUpdatePatch(Patches, DescribeStaticVegetation(*Mesh, Foliage->GetFName()),
-				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)));
+			const FName ComponentName = Foliage->GetFName();
+			const int32 FlowerSpeciesIndex = GetSeasonalMeadowFlowerSpeciesIndex(ComponentName);
+			const float BloomProgress = FlowerSpeciesIndex != INDEX_NONE && bHasIslandDayProgress
+				? AIslandWeather::GetMeadowFlowerSpeciesBloomProgress(FlowerSpeciesIndex, IslandDayProgress) : -1.f;
+			AddOrUpdatePatch(Patches, DescribeStaticVegetation(*Mesh, ComponentName),
+				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)), BloomProgress);
 		}
 
 		TArray<UActorComponent*> TreeComponents;
@@ -201,11 +227,19 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 FString IslandVegetationUtility::FormatVisitorObservation(const TArray<FIslandVegetationPatch>& Patches)
 {
 	if (Patches.IsEmpty()) return FString();
-	TArray<FString> Names;
+	TArray<FString> Details;
 	for (const FIslandVegetationPatch& Patch : Patches)
-		if (!Patch.DisplayName.IsEmpty()) Names.AddUnique(Patch.DisplayName);
-	if (Names.IsEmpty()) return FString();
+	{
+		if (Patch.DisplayName.IsEmpty()) continue;
+		FString Detail = Patch.DisplayName;
+		if (Patch.BloomProgress >= 0.6f)
+			Detail += TEXT(" are in bloom");
+		else if (Patch.BloomProgress >= 0.08f)
+			Detail += TEXT(" are beginning to bloom");
+		Details.AddUnique(MoveTemp(Detail));
+	}
+	if (Details.IsEmpty()) return FString();
 
-	const FString Plants = FString::Join(Names, TEXT(", "));
+	const FString Plants = FString::Join(Details, TEXT(", "));
 	return FString::Printf(TEXT("You pause to notice %s nearby. You leave every plant growing, rooted, and undisturbed."), *Plants);
 }

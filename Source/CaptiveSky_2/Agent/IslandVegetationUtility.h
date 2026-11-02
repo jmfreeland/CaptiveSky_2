@@ -12,6 +12,8 @@ struct FIslandVegetationPatch
 {
 	FString DisplayName;
 	float DistanceCm = 0.f;
+	/** Negative when this patch has no authored seasonal bloom calendar. */
+	float BloomProgress = -1.f;
 };
 
 /** Shared, read-only vegetation naming and nearby-patch observation helpers. */
