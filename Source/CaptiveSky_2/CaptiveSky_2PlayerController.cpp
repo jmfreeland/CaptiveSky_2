@@ -414,7 +414,7 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 		{
 			const TArray<FIslandVegetationPatch> NearbyPlants = IslandVegetationUtility::FindNearbyVisiblePatches(
 				PlayerPawn, 650.f, 3);
-			const FString PlantFact = IslandVegetationUtility::FormatVisitorObservation(NearbyPlants);
+			const FString PlantFact = IslandVegetationUtility::FormatVisitorObservation(NearbyPlants, PlayerPawn);
 			if (!PlantFact.IsEmpty()) EnvironmentalObservations.Add(PlantFact);
 		}
 

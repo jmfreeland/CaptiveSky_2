@@ -112,7 +112,7 @@ namespace
 	}
 
 	void AddOrUpdatePatch(TArray<FIslandVegetationPatch>& Patches, const FString& DisplayName,
-		float DistanceCm, float BloomProgress = -1.f)
+		float DistanceCm, const FVector& Location, float BloomProgress = -1.f)
 	{
 		if (DisplayName.IsEmpty()) return;
 		if (FIslandVegetationPatch* Existing = Patches.FindByPredicate(
@@ -121,11 +121,12 @@ namespace
 			if (DistanceCm < Existing->DistanceCm)
 			{
 				Existing->DistanceCm = DistanceCm;
+				Existing->Location = Location;
 				Existing->BloomProgress = BloomProgress;
 			}
 			return;
 		}
-		Patches.Add({ DisplayName, DistanceCm, BloomProgress });
+		Patches.Add({ DisplayName, DistanceCm, Location, BloomProgress });
 	}
 }
 
@@ -206,7 +207,7 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 			const float BloomProgress = FlowerSpeciesIndex != INDEX_NONE && bHasIslandDayProgress
 				? AIslandWeather::GetMeadowFlowerSpeciesBloomProgress(FlowerSpeciesIndex, IslandDayProgress) : -1.f;
 			AddOrUpdatePatch(Patches, DescribeStaticVegetation(*Mesh, ComponentName),
-				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)), BloomProgress);
+				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)), Nearest.Location, BloomProgress);
 		}
 
 		TArray<UActorComponent*> TreeComponents;
@@ -221,7 +222,7 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 			if (!FindNearestVisibleInstance(Observer, Weather, ViewStart, Trees, Mesh,
 				static_cast<float>(SearchRadiusSquared), Nearest)) continue;
 			AddOrUpdatePatch(Patches, DescribeBroadleafTree(*Mesh),
-				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)));
+				FMath::Sqrt(static_cast<float>(Nearest.DistanceSquared)), Nearest.Location);
 		}
 	}
 
@@ -231,7 +232,8 @@ TArray<FIslandVegetationPatch> IslandVegetationUtility::FindNearbyVisiblePatches
 	return Patches;
 }
 
-FString IslandVegetationUtility::FormatVisitorObservation(const TArray<FIslandVegetationPatch>& Patches)
+FString IslandVegetationUtility::FormatVisitorObservation(
+	const TArray<FIslandVegetationPatch>& Patches, const AActor* Observer)
 {
 	if (Patches.IsEmpty()) return FString();
 	TArray<FString> Details;
@@ -239,6 +241,25 @@ FString IslandVegetationUtility::FormatVisitorObservation(const TArray<FIslandVe
 	{
 		if (Patch.DisplayName.IsEmpty()) continue;
 		FString Detail = Patch.DisplayName;
+		if (IsValid(Observer) && FMath::IsFinite(Patch.DistanceCm) && Patch.DistanceCm > 0.f &&
+			FMath::IsFinite(Patch.Location.X) && FMath::IsFinite(Patch.Location.Y) &&
+			FMath::IsFinite(Patch.Location.Z))
+		{
+			const FVector Offset = Patch.Location - Observer->GetActorLocation();
+			const FVector Forward = Observer->GetActorForwardVector();
+			const FVector Right = Observer->GetActorRightVector();
+			const float ForwardAmount = FVector::DotProduct(Offset, Forward);
+			const float RightAmount = FVector::DotProduct(Offset, Right);
+			const FString Direction = FMath::Abs(ForwardAmount) >= FMath::Abs(RightAmount)
+				? (ForwardAmount >= 0.f ? TEXT("ahead of you") : TEXT("behind you"))
+				: (RightAmount >= 0.f ? TEXT("to your right") : TEXT("to your left"));
+			const int32 DistanceMetres = FMath::Max(1, FMath::RoundToInt(Patch.DistanceCm / 100.f));
+			Detail += FString::Printf(TEXT(" about %d metres %s"), DistanceMetres, *Direction);
+		}
+		else
+		{
+			Detail += TEXT(" nearby");
+		}
 		if (Patch.BloomProgress >= 0.6f)
 			Detail += TEXT(" are in bloom");
 		else if (Patch.BloomProgress >= 0.08f)
@@ -248,5 +269,5 @@ FString IslandVegetationUtility::FormatVisitorObservation(const TArray<FIslandVe
 	if (Details.IsEmpty()) return FString();
 
 	const FString Plants = FString::Join(Details, TEXT(", "));
-	return FString::Printf(TEXT("You pause to notice %s nearby. You leave every plant growing, rooted, and undisturbed."), *Plants);
+	return FString::Printf(TEXT("You pause to notice %s. You leave every plant growing, rooted, and undisturbed."), *Plants);
 }

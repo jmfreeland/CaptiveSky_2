@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Help visitors find the plant they notice
+
+On-demand plant observations now identify the nearest visible patch by
+approximate distance and relative direction, so a visitor can look toward the
+named species instead of receiving only a vague “nearby.” The observation uses
+the already-selected visible instance and adds no scan or rendering work. The
+isolated UE 5.8.3 Game target compiled successfully, including the focused
+regression source; runtime caption verification remains blocked by the known
+zero-second Unreal startup crash. Details: [visitor plant wayfinding](findings/2026-11-02-visitor-plant-wayfinding.md).
+
 ## 2026-11-02 — Give Black Alder a damp woodland edge
 
 The five-species broadleaf field now uses the existing Tideglass wetness

@@ -395,13 +395,19 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Visitors can notice a nearby visible HISM vegetation patch"),
 		VisitorPatches.ContainsByPredicate([](const FIslandVegetationPatch& Patch)
 			{ return Patch.DisplayName == TEXT("Cube vegetation"); }));
-	const FString VisitorObservation = IslandVegetationUtility::FormatVisitorObservation(VisitorPatches);
+	const FString VisitorObservation = IslandVegetationUtility::FormatVisitorObservation(VisitorPatches, Observer);
 	TestTrue(TEXT("Visitor observation remains descriptive and leaves plants undisturbed"),
 		VisitorObservation.Contains(TEXT("leave every plant growing, rooted, and undisturbed")));
 	TestTrue(TEXT("Visitor observation includes the nearby plant name"),
 		VisitorObservation.Contains(TEXT("Cube vegetation")));
+	TestTrue(TEXT("Visitor observation gives a nearby plant's direction and approximate distance"),
+		VisitorObservation.Contains(TEXT("about 3 metres ahead of you")));
 	TestTrue(TEXT("An empty patch list produces no visitor caption"),
 		IslandVegetationUtility::FormatVisitorObservation(TArray<FIslandVegetationPatch>()).IsEmpty());
+	const FString UnlocatedObservation = IslandVegetationUtility::FormatVisitorObservation(
+		TArray<FIslandVegetationPatch>{ { TEXT("distant plants"), 300.f } }, Observer);
+	TestTrue(TEXT("An observation without a location safely falls back to nearby wording"),
+		UnlocatedObservation.Contains(TEXT("distant plants nearby")));
 	UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Observer);
 	Observer->AddInstanceComponent(Brain);
 	Brain->RegisterComponent();
