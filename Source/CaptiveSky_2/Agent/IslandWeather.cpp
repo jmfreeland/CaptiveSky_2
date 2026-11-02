@@ -966,23 +966,65 @@ bool AIslandWeather::FindNearestMeadowFlower(const FVector& Position, float MaxD
 	const float MaxDistanceSquared = FMath::Square(MaxDistance);
 	float NearestDistanceSquared = MaxDistanceSquared;
 	bool bFoundFlower = false;
-	for (const UHierarchicalInstancedStaticMeshComponent* FlowerSpecies : IslandMeadowFlowers)
+	for (int32 SpeciesIndex = 0; SpeciesIndex < IslandMeadowFlowers.Num(); ++SpeciesIndex)
 	{
+		const UHierarchicalInstancedStaticMeshComponent* FlowerSpecies = IslandMeadowFlowers[SpeciesIndex];
 		if (!FlowerSpecies || !FlowerSpecies->IsVisible() || FlowerSpecies->GetInstanceCount() <= 0) continue;
-		for (int32 InstanceIndex = 0; InstanceIndex < FlowerSpecies->GetInstanceCount(); ++InstanceIndex)
+
+		auto ConsiderFlower = [&](int32 InstanceIndex)
 		{
+			if (InstanceIndex < 0 || InstanceIndex >= FlowerSpecies->GetInstanceCount()) return;
 			FTransform InstanceTransform;
-			if (!FlowerSpecies->GetInstanceTransform(InstanceIndex, InstanceTransform, true)) continue;
+			if (!FlowerSpecies->GetInstanceTransform(InstanceIndex, InstanceTransform, true)) return;
 			const FVector FlowerScale = InstanceTransform.GetScale3D();
-			if (FMath::Min3(FMath::Abs(FlowerScale.X), FMath::Abs(FlowerScale.Y), FMath::Abs(FlowerScale.Z)) < 0.05f) continue;
+			if (FMath::Min3(FMath::Abs(FlowerScale.X), FMath::Abs(FlowerScale.Y), FMath::Abs(FlowerScale.Z)) < 0.05f) return;
 			const FVector FlowerLocation = InstanceTransform.GetLocation();
-			if (FlowerLocation.ContainsNaN()) continue;
+			if (FlowerLocation.ContainsNaN()) return;
 			const float DistanceSquared = FVector::DistSquared(Position, FlowerLocation);
-			if (DistanceSquared >= NearestDistanceSquared) continue;
+			if (DistanceSquared >= NearestDistanceSquared) return;
 			NearestDistanceSquared = DistanceSquared;
 			OutFlowerLocation = FlowerLocation;
 			bFoundFlower = true;
+		};
+
+		const TArray<FTransform>* FlowerBaselines = IslandMeadowFlowerBaseTransforms.IsValidIndex(SpeciesIndex)
+			? &IslandMeadowFlowerBaseTransforms[SpeciesIndex] : nullptr;
+		const TMap<FIntPoint, TArray<int32>>* FlowerCells = MeadowFlowerCells.IsValidIndex(SpeciesIndex)
+			? &MeadowFlowerCells[SpeciesIndex] : nullptr;
+		const FVector ComponentScale = FlowerSpecies->GetComponentScale().GetAbs();
+		const float MinimumComponentScale = FMath::Min3(ComponentScale.X, ComponentScale.Y, ComponentScale.Z);
+		bool bUsedSpatialIndex = false;
+		if (FlowerBaselines && FlowerCells && FlowerCells->Num() > 0 &&
+			FlowerBaselines->Num() == FlowerSpecies->GetInstanceCount() &&
+			FMath::IsFinite(MinimumComponentScale) && MinimumComponentScale > KINDA_SMALL_NUMBER)
+		{
+			const FVector LocalPosition = FlowerSpecies->GetComponentTransform().InverseTransformPosition(Position);
+			const float LocalRadius = MaxDistance / MinimumComponentScale;
+			if (!LocalPosition.ContainsNaN() && FMath::IsFinite(LocalRadius) &&
+				LocalRadius <= GroundCoverSwayCellSize * 8.f)
+			{
+				const int32 MinCellX = FMath::FloorToInt((LocalPosition.X - LocalRadius) / GroundCoverSwayCellSize);
+				const int32 MaxCellX = FMath::FloorToInt((LocalPosition.X + LocalRadius) / GroundCoverSwayCellSize);
+				const int32 MinCellY = FMath::FloorToInt((LocalPosition.Y - LocalRadius) / GroundCoverSwayCellSize);
+				const int32 MaxCellY = FMath::FloorToInt((LocalPosition.Y + LocalRadius) / GroundCoverSwayCellSize);
+				for (int32 CellY = MinCellY; CellY <= MaxCellY; ++CellY)
+				{
+					for (int32 CellX = MinCellX; CellX <= MaxCellX; ++CellX)
+					{
+						if (const TArray<int32>* CellIndices = FlowerCells->Find(FIntPoint(CellX, CellY)))
+							for (const int32 InstanceIndex : *CellIndices) ConsiderFlower(InstanceIndex);
+					}
+				}
+				bUsedSpatialIndex = true;
+			}
 		}
+
+		// Synthetic/editor fixtures and partially built previews may not have the
+		// sway-cell cache yet. Preserve their previous behavior while the live
+		// initialized Island takes the bounded nearby-cell path above.
+		if (!bUsedSpatialIndex)
+			for (int32 InstanceIndex = 0; InstanceIndex < FlowerSpecies->GetInstanceCount(); ++InstanceIndex)
+				ConsiderFlower(InstanceIndex);
 	}
 	return bFoundFlower;
 }

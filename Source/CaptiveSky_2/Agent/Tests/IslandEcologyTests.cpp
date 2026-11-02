@@ -230,13 +230,21 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 		Flowers->SetStaticMesh(FixtureFlowerMesh);
 		Flowers->SetVisibility(false, true);
 		const FTransform BaseTransform(FRotator::ZeroRotator, Location);
-		Flowers->AddInstance(BaseTransform, true);
+		const int32 InstanceIndex = Flowers->AddInstance(BaseTransform, true);
+		if (InstanceIndex == INDEX_NONE) return false;
 		Weather->IslandMeadowFlowerBaseTransforms[SpeciesIndex] = { BaseTransform };
 		Weather->IslandMeadowFlowerBloomScales[SpeciesIndex].Reset();
+		TMap<FIntPoint, TArray<int32>>& FlowerCells = Weather->MeadowFlowerCells[SpeciesIndex];
+		FlowerCells.Reset();
+		constexpr float FlowerCellSize = 1500.f;
+		const FIntPoint Cell(FMath::FloorToInt(Location.X / FlowerCellSize),
+			FMath::FloorToInt(Location.Y / FlowerCellSize));
+		FlowerCells.FindOrAdd(Cell).Add(InstanceIndex);
 		return true;
 	};
 	if (!AddSeasonalFlowerFixture(0, FVector(400.f, 0.f, 0.f)) ||
-		!AddSeasonalFlowerFixture(6, FVector(800.f, 0.f, 0.f))) return false;
+		!AddSeasonalFlowerFixture(6, FVector(800.f, 0.f, 0.f)) ||
+		!AddSeasonalFlowerFixture(7, FVector(1600.f, 0.f, 0.f))) return false;
 	Weather->UpdateSeasonalFlowerVisibility(4.0);
 	FVector NearestFlower = FVector::ZeroVector;
 	TestTrue(TEXT("A spring-opened generic flower is visible to the existing pollinator query"),
@@ -248,6 +256,18 @@ bool FIslandMeadowFlowerSpeciesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A long-season generic meadow form remains available to pollinators in autumn"),
 		Weather->FindNearestMeadowFlower(FVector(800.f, 0.f, 0.f), 100.f, NearestFlower) &&
 		NearestFlower.Equals(FVector(800.f, 0.f, 0.f), 0.1f));
+	TestTrue(TEXT("A flower just across the nearby 15 m cell edge is still found"),
+		Weather->FindNearestMeadowFlower(FVector(1490.f, 0.f, 0.f), 200.f, NearestFlower) &&
+		NearestFlower.Equals(FVector(1600.f, 0.f, 0.f), 0.1f));
+	UHierarchicalInstancedStaticMeshComponent* AutumnFlowers = Weather->IslandMeadowFlowers[6];
+	AutumnFlowers->SetWorldLocation(FVector(-1000.f, -3000.f, 0.f));
+	TestTrue(TEXT("The flower-cell lookup handles translated components at negative world coordinates"),
+		Weather->FindNearestMeadowFlower(FVector(-200.f, -3000.f, 0.f), 100.f, NearestFlower) &&
+		NearestFlower.Equals(FVector(-200.f, -3000.f, 0.f), 0.1f));
+	Weather->MeadowFlowerCells[6].Reset();
+	TestTrue(TEXT("A missing preview cell cache falls back to the full flower scan"),
+		Weather->FindNearestMeadowFlower(FVector(-200.f, -3000.f, 0.f), 100.f, NearestFlower) &&
+		NearestFlower.Equals(FVector(-200.f, -3000.f, 0.f), 0.1f));
 	Weather->UpdateSeasonalFlowerVisibility(271.0);
 	TestFalse(TEXT("Generic flowers in winter are absent from the pollinator query"),
 		Weather->FindNearestMeadowFlower(FVector(600.f, 0.f, 0.f), 500.f, NearestFlower));

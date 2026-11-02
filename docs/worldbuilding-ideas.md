@@ -1,5 +1,26 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## Hosting rule — pause the Island when empty
+
+When the last visitor leaves, the hosted Island pauses and preserves its state.
+Its clock and ecology do not advance offline; conscious residents enter their
+sleep state without experiencing elapsed offscreen world time. On return, the
+Island resumes from the preserved state. This keeps offline hosting from
+silently aging the world or creating events while nobody is present.
+
+## 2026-11-02 — Keep dragonfly flower visits light at Island scale
+
+The nearby blooming-flower query now uses the 15 m flower-cell index already
+built for local foliage sway instead of checking every flower instance across
+all 11 species on each pollinator check. It preserves the existing bloom,
+visibility, and exact world-distance rules, with a full-scan fallback for
+uncached previews or unusually wide queries. The focused seasonal-flower
+fixture covers indexed lookup across a cell edge, translated components,
+negative world coordinates, and the fallback. UE 5.8.3 compiled and linked the
+Editor target; automation remains unrun because of the known early Unreal
+startup crash. This is a source-level workload reduction, not a measured FPS
+claim. Details: [pollinator flower spatial query](findings/2026-11-02-pollinator-flower-spatial-query.md).
+
 ## 2026-11-02 — Let visitors find the minnow's recent ripple
 
 The visitor's existing on-demand `E` nature cycle now includes the same
