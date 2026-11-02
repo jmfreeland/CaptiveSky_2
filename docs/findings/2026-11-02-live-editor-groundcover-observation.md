@@ -29,11 +29,18 @@ actor selection and viewport framing were transient editor UI state only; no
 map was saved. The current viewport does not provide a trustworthy beauty
 capture.
 
+In a subsequent read-only Details-panel check, the selected `TideglassPool`
+entry appeared as an instanced actor with a `StaticMeshComponent`. It is not
+itself a native WaterBody actor. The selected component's mesh and material
+names remained unreadable in the narrow Details panel; this does not identify
+the visible white material or prove that all six matching actors are alike.
+
 ## Next validation
 
-First inspect the Tideglass-labelled actors' actual mesh and material
-assignments in the matching project, then decide whether the white forms are
-intentional water/props or unfinished presentation. After that, use a
+Inspect the Tideglass-labelled actors' actual mesh and material assignments
+in the matching project, including whether any native WaterBody supplies the
+actual water surface, then decide whether the white forms are intentional
+water/props or unfinished presentation. After that, use a
 deliberate player-height route from Tideglass toward woodland with a wide
 establishing view and a close groundcover view. Inspect broad soil gaps and
 mature canopy silhouettes without inferring Island-wide coverage from one

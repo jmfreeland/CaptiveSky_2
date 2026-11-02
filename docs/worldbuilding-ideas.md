@@ -24,13 +24,14 @@ The current live editor viewport shows scattered groundcover tufts over broad
 exposed brown soil, with a large foreground rock dominating the frame and no
 canopy visible in that camera slice. A follow-up view toward Tideglass also
 shows a broad flat white surface and separate white spherical forms; their
-mesh/material identities still need inspection. These are local editor
-observations, not an Island-wide or runtime verdict. First identify the
-Tideglass actors and resolve any unfinished presentation in the matching
-project, then validate a deliberate Tideglass-to-woodland route at player
-height before changing global density; pair visual review with frame-time and
-whole-device memory measurements. See [live groundcover observation and
-Tideglass follow-up](findings/2026-11-02-live-editor-groundcover-observation.md).
+mesh/material identities still need inspection. One selected Outliner entry
+is an instanced static-mesh actor, not a native WaterBody. These are local
+editor observations, not an Island-wide or runtime verdict. First identify
+the Tideglass actors and the actual water surface, then resolve any unfinished
+presentation in the matching project and validate a deliberate Tideglass-to-
+woodland route at player height before changing global density; pair visual
+review with frame-time and whole-device memory measurements. See [live
+groundcover observation and Tideglass follow-up](findings/2026-11-02-live-editor-groundcover-observation.md).
 
 ## 2026-11-02 — Soften bare soil without increasing meadow budgets
 
