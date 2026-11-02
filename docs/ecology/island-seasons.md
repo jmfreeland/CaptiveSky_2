@@ -25,16 +25,25 @@ sunrise and sunset. The minnow transition keeps its former equinox timing but
 eases at the new winter/summer horizons. Woodland bluebells and Tideglass marsh
 marigolds now bloom in spring; yellow-flag iris spans spring and summer. Those
 specialist instances go dormant by component visibility outside their authored
-seasons, while general meadow species remain year-round. This changes no
-instance budget or collision state and updates only on ecology refresh, not
-every frame. Seasonal regrowth, color change, and broader tree phenology remain
-future work.
+seasons. The eight generic Fab flower forms now use overlapping visual bloom
+windows across spring, summer, and autumn, all reaching dormancy at the winter
+boundary. Their component and instance position seed a small stagger so a
+whole patch does not open or close together. These are aesthetic schedules for
+unnamed meshes, not claims about the exact plant species. Visitors can now hear
+when nearby generic wildflowers are beginning to bloom or fully open. This
+changes no instance budget or collision state and updates only on ecology
+refresh, not every frame. Rendered readability, pollinator selection across
+the new windows, seasonal regrowth, color change, and broader tree phenology
+remain future work.
 
 The focused `IslandDayNight` regression covers the season boundaries, annual
 photoperiod and warmth extrema, day/night intervals, cloud damping, and the
 resulting resident daylight and wind/chill descriptions. The
-`IslandWeather.SeasonalFlowers` automation passes under UE 5.8.3 `-NullRHI`,
-covering bloom boundaries, year wrap, and the year-round fallback. Validation
-should also check that a saved Island day continues through the boundary
-without resetting the independent lunar phase; later visual ecology work can
-build on the same persistent day number.
+`IslandWeather.SeasonalFlowers` automation covers specialist and generic
+bloom windows, spring/autumn boundaries, year wrap, and compatibility behavior
+for unknown indices. A 2026-11-02 UE 5.8.3 scratch build and focused `-NullRHI`
+automations also pass; see [seasonal meadow phenology](../findings/2026-11-02-seasonal-meadow-phenology.md).
+Rendered readability and pollinator selection across the new generic windows
+remain unverified. Validation should also check that a saved Island day
+continues through a season boundary without resetting the independent lunar
+phase; later visual ecology work can build on the same persistent day number.

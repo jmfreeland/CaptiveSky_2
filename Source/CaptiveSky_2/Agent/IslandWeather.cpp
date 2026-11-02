@@ -77,6 +77,42 @@ namespace
 		}
 	};
 
+	struct FMeadowFlowerBloomWindow
+	{
+		float StartDay = 0.f;
+		float EndDay = 0.f;
+		float TransitionDays = 1.f;
+	};
+
+	bool TryGetMeadowFlowerBloomWindow(int32 SpeciesIndex, FMeadowFlowerBloomWindow& OutWindow)
+	{
+		// The Fab flower meshes have generic names rather than verified botanical
+		// identities. These overlapping windows are an art-direction schedule that
+		// keeps the meadow changing through spring, summer, and autumn.
+		static constexpr FMeadowFlowerBloomWindow GeneralMeadowWindows[] =
+		{
+			{ 0.f, 118.f, 3.f }, { 24.f, 154.f, 3.f }, { 64.f, 210.f, 3.f }, { 0.f, 90.f, 3.f },
+			{ 33.f, 176.f, 3.f }, { 92.f, 226.f, 3.f }, { 50.f, 264.f, 3.f }, { 132.f, 270.f, 3.f }
+		};
+		if (SpeciesIndex >= 0 && SpeciesIndex < UE_ARRAY_COUNT(GeneralMeadowWindows))
+		{
+			OutWindow = GeneralMeadowWindows[SpeciesIndex];
+			return true;
+		}
+		if (SpeciesIndex == AIslandWeather::WoodlandBluebellSpeciesIndex ||
+			SpeciesIndex == AIslandWeather::TideglassMarshMarigoldSpeciesIndex)
+		{
+			OutWindow = { 0.f, static_cast<float>(AIslandDayNight::CalendarDaysPerSeason), 1.f };
+			return true;
+		}
+		if (SpeciesIndex == AIslandWeather::TideglassYellowFlagIrisSpeciesIndex)
+		{
+			OutWindow = { 0.f, 2.f * AIslandDayNight::CalendarDaysPerSeason, 1.f };
+			return true;
+		}
+		return false;
+	}
+
 	uint32 HashGroundCoverFieldCell(int32 CellX, int32 CellY, int32 Seed)
 	{
 		uint32 Hash = static_cast<uint32>(CellX) * 0x8da6b343u ^ static_cast<uint32>(CellY) * 0xd8163841u ^ static_cast<uint32>(Seed) * 0xcb1ab31fu;
@@ -164,31 +200,24 @@ float AIslandWeather::GetWoodlandGroveRadiusScaleAt(const FVector& Position, int
 
 float AIslandWeather::GetMeadowFlowerSpeciesBloomProgress(int32 SpeciesIndex, double IslandDay)
 {
-	if (SpeciesIndex != WoodlandBluebellSpeciesIndex && SpeciesIndex != TideglassMarshMarigoldSpeciesIndex &&
-		SpeciesIndex != TideglassYellowFlagIrisSpeciesIndex)
-		return 1.f; // General meadow species have no authored flowering calendar yet.
+	FMeadowFlowerBloomWindow BloomWindow;
+	if (!TryGetMeadowFlowerBloomWindow(SpeciesIndex, BloomWindow)) return 1.f;
 	if (!FMath::IsFinite(IslandDay)) return 0.f;
 
 	const double DayOfYear = FMath::Fmod(FMath::Max(1.0, IslandDay) - 1.0,
 		static_cast<double>(AIslandDayNight::CalendarDaysPerYear));
-	const float SeasonLength = SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex
-		? 2.f * AIslandDayNight::CalendarDaysPerSeason
-		: static_cast<float>(AIslandDayNight::CalendarDaysPerSeason);
-	constexpr float TransitionDays = 1.f;
 	const float Day = static_cast<float>(DayOfYear);
-	return FMath::SmoothStep(0.f, TransitionDays, Day) *
-		(1.f - FMath::SmoothStep(SeasonLength - TransitionDays, SeasonLength, Day));
+	return FMath::SmoothStep(BloomWindow.StartDay, BloomWindow.StartDay + BloomWindow.TransitionDays, Day) *
+		(1.f - FMath::SmoothStep(BloomWindow.EndDay - BloomWindow.TransitionDays, BloomWindow.EndDay, Day));
 }
 
 bool AIslandWeather::DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay)
 {
+	FMeadowFlowerBloomWindow BloomWindow;
+	if (!TryGetMeadowFlowerBloomWindow(SpeciesIndex, BloomWindow)) return true;
 	const int32 DayOfYear = (FMath::Max(1, IslandDay) - 1) % AIslandDayNight::CalendarDaysPerYear;
-	const int32 SeasonIndex = DayOfYear / AIslandDayNight::CalendarDaysPerSeason;
-	if (SpeciesIndex == WoodlandBluebellSpeciesIndex || SpeciesIndex == TideglassMarshMarigoldSpeciesIndex)
-		return SeasonIndex == 0; // Spring; the instance bloom curve stages the actual flowers within it.
-	if (SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex)
-		return SeasonIndex <= 1; // Spring through summer.
-	return true; // The general meadow species have no authored flowering calendar yet.
+	return DayOfYear >= FMath::FloorToInt(BloomWindow.StartDay) &&
+		DayOfYear < FMath::CeilToInt(BloomWindow.EndDay);
 }
 
 void AIslandWeather::UpdateSeasonalFlowerVisibility(double IslandDayProgress)
@@ -209,16 +238,12 @@ void AIslandWeather::UpdateSeasonalFlowerVisibility(double IslandDayProgress)
 		for (int32 InstanceIndex = 0; InstanceIndex < InstanceCount; ++InstanceIndex)
 		{
 			float BloomScale = 1.f;
-			if (SpeciesIndex == WoodlandBluebellSpeciesIndex || SpeciesIndex == TideglassMarshMarigoldSpeciesIndex ||
-				SpeciesIndex == TideglassYellowFlagIrisSpeciesIndex)
-			{
-				const FVector Location = bCanUpdateTransforms
-					? BaseTransforms[InstanceIndex].GetLocation() : FVector::ZeroVector;
-				const float LocalStagger = SampleGroundCoverFieldAtScale(Location,
-					WeatherSeed ^ (SpeciesIndex * 0x45d9f3b), 500.f);
-				const double StaggeredIslandDay = IslandDayProgress + (static_cast<double>(LocalStagger) - 0.5) * 1.2;
-				BloomScale = GetMeadowFlowerSpeciesBloomProgress(SpeciesIndex, StaggeredIslandDay);
-			}
+			const FVector Location = bCanUpdateTransforms
+				? BaseTransforms[InstanceIndex].GetLocation() : FVector::ZeroVector;
+			const float LocalStagger = SampleGroundCoverFieldAtScale(Location,
+				WeatherSeed ^ (SpeciesIndex * 0x45d9f3b), 500.f);
+			const double StaggeredIslandDay = IslandDayProgress + (static_cast<double>(LocalStagger) - 0.5) * 1.2;
+			BloomScale = GetMeadowFlowerSpeciesBloomProgress(SpeciesIndex, StaggeredIslandDay);
 
 			const float PreviousScale = InstanceIndex < PreviousBloomScaleCount ? BloomScales[InstanceIndex] : -1.f;
 			BloomScales[InstanceIndex] = BloomScale;

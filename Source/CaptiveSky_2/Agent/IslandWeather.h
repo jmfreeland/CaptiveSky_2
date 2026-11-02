@@ -75,9 +75,9 @@ public:
 	static constexpr int32 WoodlandBluebellSpeciesIndex = 8;
 	static constexpr int32 TideglassMarshMarigoldSpeciesIndex = 9;
 	static constexpr int32 TideglassYellowFlagIrisSpeciesIndex = 10;
-	/** Seasonal phenology for named habitat specialists; general meadow forms remain year-round. */
+	/** Seasonal bloom calendars for generic meadow forms and named habitat specialists. */
 	static bool DoesMeadowFlowerSpeciesBloomInSeason(int32 SpeciesIndex, int32 IslandDay);
-	/** Smooth seasonal bloom amount in [0, 1] at a 1-based fractional Island day. */
+	/** Smooth seasonal bloom amount in [0, 1] at a 1-based fractional Island day. Generic forms use aesthetic, not botanical, calendars. */
 	static float GetMeadowFlowerSpeciesBloomProgress(int32 SpeciesIndex, double IslandDay);
 	static constexpr float WoodlandBluebellInnerRadius = 1200.f;
 	static constexpr float WoodlandBluebellOuterRadius = 3800.f;

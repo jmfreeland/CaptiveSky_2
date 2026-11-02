@@ -479,6 +479,27 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 		IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 5));
 	TestTrue(TEXT("Visitors learn when nearby woodland bluebells are in bloom"),
 		SpringVisitorObservation.Contains(TEXT("woodland bluebells are in bloom")));
+	UHierarchicalInstancedStaticMeshComponent* GenericMeadowFlowers = nullptr;
+	for (UHierarchicalInstancedStaticMeshComponent* Candidate : FoliageComponents)
+		if (Candidate && Candidate->GetFName() == TEXT("IslandMeadowFlowerA"))
+		{
+			GenericMeadowFlowers = Candidate;
+			break;
+		}
+	if (!TestNotNull(TEXT("Weather actor exposes the production generic meadow-flower component"), GenericMeadowFlowers)) return false;
+	GenericMeadowFlowers->SetStaticMesh(FlowerMesh);
+	GenericMeadowFlowers->SetVisibility(true);
+	GenericMeadowFlowers->SetHiddenInGame(false);
+	GenericMeadowFlowers->AddInstance(FTransform(FRotator::ZeroRotator, FVector(450.f, 75.f, 0.f)));
+	if (Foliage != GenericMeadowFlowers) Foliage->SetVisibility(false);
+	const TArray<FIslandVegetationPatch> SpringFlowerPatches = IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 32);
+	const FString GenericSpringFlowerObservation = IslandVegetationUtility::FormatVisitorObservation(
+		SpringFlowerPatches);
+	TestTrue(TEXT("Visitors also hear when a nearby generic meadow flower form is in bloom"),
+		SpringFlowerPatches.ContainsByPredicate([](const FIslandVegetationPatch& Patch)
+			{ return Patch.DisplayName == TEXT("wildflowers") && Patch.BloomProgress >= 0.6f; }) &&
+		GenericSpringFlowerObservation.Contains(TEXT("wildflowers are in bloom")));
+	if (Foliage != GenericMeadowFlowers) Foliage->SetVisibility(true);
 	DayNight->DayNumber = 100;
 	const FString SummerVisitorObservation = IslandVegetationUtility::FormatVisitorObservation(
 		IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 5));

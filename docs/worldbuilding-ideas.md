@@ -1,5 +1,18 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let the meadow change with the seasons
+
+The eight generic Fab flower forms now open and fade in overlapping windows
+across spring, summer, and autumn, with three-day transitions and a subtle
+stable spatial stagger. This keeps spring, midsummer, and late-autumn meadows
+from looking identical without increasing the foliage count or introducing
+per-frame updates. The forms are not botanically identified, so these are
+visual habitat rhythms rather than asserted species calendars. The on-demand
+visitor nature note can distinguish flowers beginning to bloom from open
+flowers. UE 5.8.3 built successfully; focused NullRHI seasonal and nearby
+vegetation-perception automations passed. Rendered appearance remains pending
+the 4 GiB GPU reserve. Details: [seasonal meadow phenology](findings/2026-11-02-seasonal-meadow-phenology.md).
+
 ## 2026-11-02 — Let visitors quietly notice nearby wildlife
 
 When a visitor uses the on-demand outdoor observation cycle without a close

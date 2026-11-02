@@ -20,6 +20,13 @@ namespace
 
 	int32 GetSeasonalMeadowFlowerSpeciesIndex(FName ComponentName)
 	{
+		static const FName GenericFlowerComponents[] =
+		{
+			TEXT("IslandMeadowFlowerA"), TEXT("IslandMeadowFlowerB"), TEXT("IslandMeadowFlowerC"), TEXT("IslandMeadowFlowerD"),
+			TEXT("IslandMeadowFlowerE"), TEXT("IslandMeadowFlowerF"), TEXT("IslandMeadowFlowerG"), TEXT("IslandMeadowFlowerH")
+		};
+		for (int32 SpeciesIndex = 0; SpeciesIndex < UE_ARRAY_COUNT(GenericFlowerComponents); ++SpeciesIndex)
+			if (ComponentName == GenericFlowerComponents[SpeciesIndex]) return SpeciesIndex;
 		if (ComponentName == TEXT("IslandMeadowBluebells")) return AIslandWeather::WoodlandBluebellSpeciesIndex;
 		if (ComponentName == TEXT("IslandTideglassMarshMarigolds")) return AIslandWeather::TideglassMarshMarigoldSpeciesIndex;
 		if (ComponentName == TEXT("IslandTideglassYellowFlagIrises")) return AIslandWeather::TideglassYellowFlagIrisSpeciesIndex;

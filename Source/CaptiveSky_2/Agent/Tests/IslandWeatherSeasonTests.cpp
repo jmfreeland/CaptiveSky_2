@@ -45,11 +45,25 @@ bool FIslandWeatherSeasonalFlowersTest::RunTest(const FString& Parameters)
 			AIslandDayNight::CalendarDaysPerYear + 1.5), 0.5f, 0.001f) &&
 		Weather::DoesMeadowFlowerSpeciesBloomInSeason(Weather::WoodlandBluebellSpeciesIndex,
 			AIslandDayNight::CalendarDaysPerYear + 1));
-	TestTrue(TEXT("Unclassified meadow species remain available year-round"),
+	TestTrue(TEXT("Generic meadow flowers share the spring flush"),
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(0, 1) &&
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(3, 90));
+	TestFalse(TEXT("Short spring flowers rest by summer"),
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(3, 91));
+	TestTrue(TEXT("Generic flower calendars overlap through summer and autumn"),
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(2, 136) &&
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(7, 230));
+	TestFalse(TEXT("All generic meadow flowers rest in winter"),
 		Weather::DoesMeadowFlowerSpeciesBloomInSeason(0, 316) &&
-		Weather::DoesMeadowFlowerSpeciesBloomInSeason(7, 136));
-	TestTrue(TEXT("Unclassified meadow species keep their existing full-size appearance"),
-		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(0, 1.5), 1.f, 0.001f));
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(7, 271));
+	TestTrue(TEXT("A generic meadow form eases into bloom across three Island days"),
+		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(0, 2.5), 0.5f, 0.001f) &&
+		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(0, 4.0), 1.f, 0.001f));
+	TestTrue(TEXT("Late-season meadow forms open gradually rather than appearing as one synchronized patch"),
+		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(7, 134.5), 0.5f, 0.001f));
+	TestTrue(TEXT("Unknown meadow indices retain the year-round compatibility fallback"),
+		Weather::DoesMeadowFlowerSpeciesBloomInSeason(11, 316) &&
+		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(11, 1.5), 1.f, 0.001f));
 	TestTrue(TEXT("A non-finite calendar sample fails closed for seasonal specialists"),
 		FMath::IsNearlyEqual(Weather::GetMeadowFlowerSpeciesBloomProgress(
 			Weather::WoodlandBluebellSpeciesIndex, std::numeric_limits<double>::infinity()), 0.f, 0.001f));
