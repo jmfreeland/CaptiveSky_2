@@ -22,11 +22,15 @@ silently aging the world or creating events while nobody is present.
 
 The current live editor viewport shows scattered groundcover tufts over broad
 exposed brown soil, with a large foreground rock dominating the frame and no
-canopy visible in that camera slice. This is only a local editor observation,
-not an Island-wide or runtime verdict. Next validate a deliberate Tideglass-to-
-woodland route at player height before changing global density; pair the visual
-review with frame-time and whole-device memory measurements. See [live
-groundcover observation](findings/2026-11-02-live-editor-groundcover-observation.md).
+canopy visible in that camera slice. A follow-up view toward Tideglass also
+shows a broad flat white surface and separate white spherical forms; their
+mesh/material identities still need inspection. These are local editor
+observations, not an Island-wide or runtime verdict. First identify the
+Tideglass actors and resolve any unfinished presentation in the matching
+project, then validate a deliberate Tideglass-to-woodland route at player
+height before changing global density; pair visual review with frame-time and
+whole-device memory measurements. See [live groundcover observation and
+Tideglass follow-up](findings/2026-11-02-live-editor-groundcover-observation.md).
 
 ## 2026-11-02 — Soften bare soil without increasing meadow budgets
 

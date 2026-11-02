@@ -16,13 +16,28 @@ richness, overall scatter quality, or player-distance readability. It also
 provides no FPS, VRAM, or texture-budget measurement. No level or asset was
 changed during this check.
 
+## Follow-up viewport check
+
+The same open editor was then framed on a visible actor labelled
+`TideglassPool`. The view shows a broad, flat white surface at the pool edge
+and several separate white spherical forms against the exposed soil and low
+groundcover. The Outliner search returned six actors with the
+`TideglassPool` label. This appearance is consistent with unresolved/default
+materials or blockout geometry, but the actor meshes and material assignments
+were not inspected, so their identity and cause are not yet confirmed. The
+actor selection and viewport framing were transient editor UI state only; no
+map was saved. The current viewport does not provide a trustworthy beauty
+capture.
+
 ## Next validation
 
-Use a deliberate player-height route from the Tideglass toward woodland, with
-a wide establishing view and a close groundcover view. Inspect the broad,
-uninterrupted soil between existing vegetation patches and mature canopy
-silhouettes at the same time; do not infer landscape-wide coverage from a
-single editor camera. Compare frame time and whole-device memory before
-raising instance counts. The currently open D: editor project is separate from
-this worktree, so worktree-side species and scatter changes must be deliberately
-integrated and rebuilt before they can be evaluated in that editor.
+First inspect the Tideglass-labelled actors' actual mesh and material
+assignments in the matching project, then decide whether the white forms are
+intentional water/props or unfinished presentation. After that, use a
+deliberate player-height route from Tideglass toward woodland with a wide
+establishing view and a close groundcover view. Inspect broad soil gaps and
+mature canopy silhouettes without inferring Island-wide coverage from one
+camera. Compare frame time and whole-device memory before raising instance
+counts. The open D: editor project is separate from this worktree, so
+worktree-side changes must be deliberately integrated and rebuilt before they
+can be evaluated in that editor.
