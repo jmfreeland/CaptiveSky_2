@@ -18,6 +18,11 @@ turn the existing local files into an accidentally networked database.
   replacement. It is deliberately scoped to Game/PIE worlds and refuses to
   overwrite unreadable state. This is a useful single-writer local backend,
   not a multi-server transaction system.
+- Accepted lasting mutations call the atomic world-state save before reporting
+  success. The Island clock also saves its hour/day and wetness periodically and
+  from `AIslandDayNight::EndPlay`; an orderly stop therefore flushes the latest
+  clock/environment snapshot, while an abrupt process kill can still lose the
+  interval since the last periodic save.
 - `UIslandTrailSubsystem` persists its own per-map trail ledger. Resident
   identity, episodic memory, and relationship state live in separate
   `Agents/<AgentId>/` files. `CaptiveSkyDataRoot` relocates local data but does
@@ -94,11 +99,13 @@ establishes the required consistency, backup, and recovery behavior.
 - **Empty-world policy (resolved 2026-11-02):** when the last human visitor
   leaves, pause the Island completely and preserve its state. Do not advance
   the clock, weather, ecology, resident thought/sleep/consolidation, or any
-  other simulation while there are no visitors. Flush accepted mutations at
-  the disconnect boundary, then let the hosted process stop; reconnecting
-  resumes from that saved state without simulating the time away or inventing
-  offline resident experience. This is distinct from residents choosing to
-  sleep while visitors are still present.
+  other simulation while there are no visitors. At the disconnect boundary,
+  stop accepting new simulation work, allow the world's orderly shutdown path
+  to finish its final clock/environment save, verify durable accepted
+  mutations, then stop the hosted process. Do not force-kill it before
+  `EndPlay` completes. Reconnecting resumes from that saved state without
+  simulating the time away or inventing offline resident experience. This is
+  distinct from residents choosing to sleep while visitors are still present.
 - Keep Zen/DDC private to trusted build or workstation networks. It is not the
   world's authoritative data store or a public content endpoint.
 
