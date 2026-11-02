@@ -42,6 +42,26 @@ are under `Saved/CS58`; the run-specific log/data locations are under
 `Saved/Logs` and `Saved/Playtests`. No visual, gameplay, frame-rate, or VRAM
 improvement is claimed.
 
+To test the repository's PCG-startup hypothesis, only the ignored
+`Saved/CS58/CaptiveSky_2.uproject` scratch descriptor was changed to disable
+`PCG`, `PCGToolset`, `PCGWaterInterop`, and `ProceduralVegetationEditor`. The
+same focused launch still failed with the same
+`F405610C114D120D4B6F5ABA901EC469AC9FAA26` call-stack hash. This does not
+establish which engine/plugin frame is faulty, but shows that toggling these
+project plugin entries alone did not change the observed startup path. Do not
+repeat that variation without new symbolized crash evidence.
+
+The refreshed 35-action Game target also built successfully, but a new guarded
+`Start-Spectator.ps1 -NullRHICharacterFeedback` attempt exited with code 0
+before the Island's world-ready marker. Its crash report is a null-address
+access violation with call-stack hash
+`4DCE2FEABCC3C947BBCB4179F07C8373B60F798D`; the eight UnrealEditor-Core frame
+offsets match the Editor-Cmd crash, while the executable frames differ as
+expected for the Game binary. No resident session or model request began. This
+confirms the current startup fault also blocks fresh play/feedback runs, not
+just automation discovery. The earlier successful 15-minute session remains
+valid evidence for its own build and date, but not for today's newer changes.
+
 [`Scripts/Run-IslandAutomation.ps1`](../../Scripts/Run-IslandAutomation.ps1)
 standardizes the non-`-game` Editor-Cmd route with a fresh isolated data root,
 zero resident model requests, a 4-minute timeout, a 4 GiB system-memory floor
