@@ -47,6 +47,18 @@ itself a native WaterBody actor. The selected component's mesh and material
 names remained unreadable in the narrow Details panel; this does not identify
 the visible white material or prove that all six matching actors are alike.
 
+## GPU-headroom recheck — 19:37 local
+
+With the editor viewport open on Tideglass, read-only `nvidia-smi` telemetry
+reported 9,892 MiB used of 12,282 MiB, 53% GPU utilization, 73 C, and 70 W of
+an 80 W cap. The driver is in WDDM mode and listed no per-process GPU entries,
+so this is whole-device telemetry and cannot be attributed solely to Unreal.
+It nevertheless shows little physical-memory headroom and active GPU load;
+given the earlier in-editor exhausted-memory warning, do not begin a 15–30
+minute play run from this state. First identify the loaded project's path and
+the Tideglass mesh/material assignments, then remeasure headroom and establish
+a stable frame-time baseline before playing.
+
 ## Next validation
 
 Inspect the Tideglass-labelled actors' actual mesh and material assignments
