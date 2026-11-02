@@ -41,6 +41,9 @@ and monitor, and explicit successful-test-result verification. Its first
 launches exposed the early crash; it now surfaces a recent crash report when
 Unreal exits before creating the requested log. Do not repeat the same launch
 recipe until the startup context changes or the underlying crash is diagnosed.
+Four Python regression checks for the runner's argument restrictions,
+isolation, memory/timeout guards, and success-result verification pass under
+Blender 5.2.2 Python; they validate the harness contract, not Unreal startup.
 
 Next: once whole-device GPU headroom and a stable test/preview session permit,
 compare the Wind Arch ground-level composition and per-species counts against
