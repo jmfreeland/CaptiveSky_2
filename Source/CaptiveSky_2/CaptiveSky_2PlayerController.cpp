@@ -20,6 +20,7 @@
 #include "Agent/IslandArrangement.h"
 #include "Agent/IslandRainBasin.h"
 #include "Agent/IslandInteractionUtility.h"
+#include "Agent/IslandVegetationUtility.h"
 #include "Agent/IslandTrail.h"
 #include "Agent/IslandWorldStateSubsystem.h"
 #include "Agent/IslandSpectator.h"
@@ -248,15 +249,10 @@ void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 		return;
 	}
 	FString Hint = DescribeWorldInteractionHint(FindNearestWorldInteraction());
-	if (Hint.IsEmpty() && !DescribeTrailUnderfoot().IsEmpty())
+	if (Hint.IsEmpty() && (!DescribeTrailUnderfoot().IsEmpty() || !DescribeLocalWeather().IsEmpty()))
 	{
 		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
-		Hint = FString::Printf(TEXT("%s: read the nearby tracks"), *Input);
-	}
-	if (Hint.IsEmpty() && !DescribeLocalWeather().IsEmpty())
-	{
-		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
-		Hint = FString::Printf(TEXT("%s: feel the weather"), *Input);
+		Hint = FString::Printf(TEXT("%s: notice tracks, plants, or weather"), *Input);
 	}
 	if (!ShouldUseTouchControls())
 	{
@@ -286,17 +282,33 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 	AActor* Target = FindNearestWorldInteraction();
 	if (!Target)
 	{
+		TArray<FString> EnvironmentalObservations;
 		FString TrailFact = DescribeTrailUnderfoot();
 		TrailFact.TrimStartAndEndInline();
 		if (!TrailFact.IsEmpty())
 		{
-			ShowWorldInteractionCaption(FString::Printf(TEXT("You pause to read the ground. %s"), *TrailFact));
-			return;
+			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause to read the ground. %s"), *TrailFact));
 		}
+
+		if (const APawn* PlayerPawn = GetPawn())
+		{
+			const TArray<FIslandVegetationPatch> NearbyPlants = IslandVegetationUtility::FindNearbyVisiblePatches(
+				PlayerPawn, 650.f, 3);
+			const FString PlantFact = IslandVegetationUtility::FormatVisitorObservation(NearbyPlants);
+			if (!PlantFact.IsEmpty()) EnvironmentalObservations.Add(PlantFact);
+		}
+
 		const FString WeatherFact = DescribeLocalWeather();
 		if (!WeatherFact.IsEmpty())
 		{
-			ShowWorldInteractionCaption(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
+			EnvironmentalObservations.Add(FString::Printf(TEXT("You pause outdoors. %s"), *WeatherFact));
+		}
+
+		if (!EnvironmentalObservations.IsEmpty())
+		{
+			const int32 ObservationIndex = NextEnvironmentalObservationIndex % EnvironmentalObservations.Num();
+			NextEnvironmentalObservationIndex = (ObservationIndex + 1) % EnvironmentalObservations.Num();
+			ShowWorldInteractionCaption(EnvironmentalObservations[ObservationIndex]);
 			return;
 		}
 		ShowWorldInteractionCaption(TEXT("Nothing nearby catches your eye. Move closer to a landmark or wild creature and try E again."));

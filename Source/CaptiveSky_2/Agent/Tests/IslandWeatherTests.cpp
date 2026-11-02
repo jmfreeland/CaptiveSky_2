@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "AgentBrainComponent.h"
+#include "IslandVegetationUtility.h"
 #include "IslandWeather.h"
 #include "IslandPoolRippleEffect.h"
 #include "IslandLightning.h"
@@ -385,6 +386,17 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 	Foliage->SetHiddenInGame(false);
 	Foliage->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Foliage->AddInstance(FTransform(FRotator::ZeroRotator, FVector(300.f, 0.f, 0.f)));
+	const TArray<FIslandVegetationPatch> VisitorPatches = IslandVegetationUtility::FindNearbyVisiblePatches(Observer, 650.f, 3);
+	TestTrue(TEXT("Visitors can notice a nearby visible HISM vegetation patch"),
+		VisitorPatches.ContainsByPredicate([](const FIslandVegetationPatch& Patch)
+			{ return Patch.DisplayName == TEXT("Cube vegetation"); }));
+	const FString VisitorObservation = IslandVegetationUtility::FormatVisitorObservation(VisitorPatches);
+	TestTrue(TEXT("Visitor observation remains descriptive and leaves plants undisturbed"),
+		VisitorObservation.Contains(TEXT("leave every plant growing, rooted, and undisturbed")));
+	TestTrue(TEXT("Visitor observation includes the nearby plant name"),
+		VisitorObservation.Contains(TEXT("Cube vegetation")));
+	TestTrue(TEXT("An empty patch list produces no visitor caption"),
+		IslandVegetationUtility::FormatVisitorObservation(TArray<FIslandVegetationPatch>()).IsEmpty());
 	UAgentBrainComponent* Brain = NewObject<UAgentBrainComponent>(Observer);
 	Observer->AddInstanceComponent(Brain);
 	Brain->RegisterComponent();
@@ -414,13 +426,20 @@ bool FIslandNearbyVegetationPerceptionTest::RunTest(const FString& Parameters)
 		BroadleafSituation.Contains(TEXT("move_to target: Norway maple")));
 	USkeletalMesh* CommonHazelTestMesh = NewObject<USkeletalMesh>(Weather, TEXT("Tree_Common_Hazel_01_A"));
 	TestNotNull(TEXT("A transient common-hazel mesh can exercise resident species naming"), CommonHazelTestMesh);
-	BroadleafTrees->SetSkinnedAsset(CommonHazelTestMesh);
+	UInstancedSkinnedMeshComponent* CommonHazelTrees = NewObject<UInstancedSkinnedMeshComponent>(Weather);
+	Weather->AddInstanceComponent(CommonHazelTrees);
+	CommonHazelTrees->SetSkinnedAsset(CommonHazelTestMesh);
+	CommonHazelTrees->RegisterComponent();
+	CommonHazelTrees->SetVisibility(true);
+	CommonHazelTrees->SetHiddenInGame(false);
+	CommonHazelTrees->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CommonHazelTrees->AddInstance(FTransform(FRotator::ZeroRotator, FVector(375.f, 0.f, 0.f)), 0, true);
 	const FString CommonHazelSituation = Brain->BuildSituationSummary(FAgentConversationContext());
 	TestTrue(TEXT("A nearby Hazel patch is described by its common species name for an optional upgrade"),
 		CommonHazelSituation.Contains(TEXT("patch of common hazel trees")) && CommonHazelSituation.Contains(TEXT("request_upgrade")));
 	TestFalse(TEXT("Hazel perception does not expose the imported technical asset name"),
 		CommonHazelSituation.Contains(TEXT("Tree Common Hazel")));
-	BroadleafTrees->SetSkinnedAsset(NorwayMapleTestMesh);
+	CommonHazelTrees->SetVisibility(false);
 
 	BroadleafTrees->SetVisibility(false);
 	const FString HiddenBroadleafSituation = Brain->BuildSituationSummary(FAgentConversationContext());

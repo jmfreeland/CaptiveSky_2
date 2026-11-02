@@ -27,6 +27,7 @@
 #include "IslandPoolRippleEffect.h"
 #include "IslandWindMoteEffect.h"
 #include "IslandDayNight.h"
+#include "IslandVegetationUtility.h"
 #include "IslandTideglassSubsystem.h"
 #include "AutonomousAgentAIController.h"
 #include "RavenAgentAIController.h"
@@ -61,42 +62,6 @@ namespace
 		for (const FAgentPersonalityTendency& Tendency : Consolidation->GetEvolvingTendencies())
 			Tendencies.Emplace(Tendency.Name, Tendency.Strength);
 		return AgentModelTier::FormatEvolvingTendencies(Tendencies);
-	}
-
-	FString DescribeVegetationMesh(const UStaticMesh& Mesh, const UHierarchicalInstancedStaticMeshComponent& Foliage)
-	{
-		const FName ComponentName = Foliage.GetFName();
-		if (ComponentName == TEXT("IslandMeadowBluebells")) return TEXT("woodland bluebells");
-		if (ComponentName == TEXT("IslandTideglassMarshMarigolds")) return TEXT("Tideglass marsh marigolds");
-		if (ComponentName == TEXT("IslandTideglassYellowFlagIrises")) return TEXT("yellow-flag irises");
-		const FString Name = Mesh.GetName();
-		const FString LowerName = Name.ToLower();
-		const FString LowerPath = Mesh.GetPathName().ToLower();
-		if (LowerPath.Contains(TEXT("/flowermesh/")) || LowerName.StartsWith(TEXT("flower_"))) return TEXT("wildflowers");
-		if (LowerPath.Contains(TEXT("/groundplantmesh/")) || LowerName.StartsWith(TEXT("ground_"))) return TEXT("low groundcover");
-		if (LowerPath.Contains(TEXT("/pn_interactivespruceforest/")) || LowerName.StartsWith(TEXT("spruce_"))) return TEXT("spruce trees");
-		if (LowerName.StartsWith(TEXT("festuca_")) || LowerName.StartsWith(TEXT("phalaris_"))) return TEXT("grasses");
-
-		FString DisplayName = Name;
-		DisplayName.RemoveFromStart(TEXT("SM_"));
-		DisplayName.RemoveFromStart(TEXT("SKM_"));
-		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
-		return DisplayName + TEXT(" vegetation");
-	}
-
-	FString DescribeBroadleafTreeMesh(const USkeletalMesh& Mesh)
-	{
-		const FString LowerName = Mesh.GetName().ToLower();
-		if (LowerName.Contains(TEXT("norway_maple"))) return TEXT("Norway maple trees");
-		if (LowerName.Contains(TEXT("european_aspen"))) return TEXT("European aspen trees");
-		if (LowerName.Contains(TEXT("european_beech"))) return TEXT("European beech trees");
-		if (LowerName.Contains(TEXT("black_alder"))) return TEXT("black alder trees");
-		if (LowerName.Contains(TEXT("common_hazel"))) return TEXT("common hazel trees");
-
-		FString DisplayName = Mesh.GetName();
-		DisplayName.RemoveFromStart(TEXT("SKM_"));
-		DisplayName.ReplaceInline(TEXT("_"), TEXT(" "));
-		return DisplayName + TEXT(" trees");
 	}
 
 	bool IsGeneratedActorLabel(const FString& Label)
@@ -791,7 +756,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				}
 				if (!bFoundVisibleInstance) continue;
 
-				FString DisplayName = DescribeVegetationMesh(*Mesh, *Foliage);
+				FString DisplayName = IslandVegetationUtility::DescribeStaticVegetation(*Mesh, Foliage->GetFName());
 				const FName MeshName = Mesh->GetFName();
 				FNearbyPlantPatch* ExistingPatch = NearbyPlantPatches.FindByPredicate(
 					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });
@@ -862,7 +827,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 					[MeshName](const FNearbyPlantPatch& Patch) { return Patch.MeshName == MeshName; });
 				if (!ExistingPatch || NearestVisibleDistanceSquared < ExistingPatch->DistanceSquared)
 				{
-					const FString DisplayName = DescribeBroadleafTreeMesh(*Mesh);
+					const FString DisplayName = IslandVegetationUtility::DescribeBroadleafTree(*Mesh);
 					if (ExistingPatch)
 					{
 						ExistingPatch->DistanceSquared = NearestVisibleDistanceSquared;
