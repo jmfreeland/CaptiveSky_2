@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let visitors find the minnow's recent ripple
+
+The visitor's existing on-demand `E` nature cycle now includes the same
+time-limited minnow surface-break note residents receive, including relative
+direction and distance. It is only offered within the existing habitat range;
+the ripple itself remains brief, and the cue adds no recurring scan, target,
+interaction, or persistent change. The UE 5.8.3 Game target compiled with a
+focused visitor-caption regression, but automation remains unrun until the
+known startup crash is diagnosed. Details: [visitor minnow event observation](findings/2026-11-02-visitor-minnow-event-observation.md).
+
 ## 2026-11-02 — Let residents locate the minnow's brief ripple
 
 The next already-scheduled resident action context now carries the actual

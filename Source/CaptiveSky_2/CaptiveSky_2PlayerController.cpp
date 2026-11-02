@@ -27,6 +27,7 @@
 #include "Agent/IslandEnvironmentSubsystem.h"
 #include "Agent/IslandDayNight.h"
 #include "Agent/IslandWeather.h"
+#include "Agent/IslandTidepoolMinnows.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "InputCoreTypes.h"
@@ -409,6 +410,17 @@ void ACaptiveSky_2PlayerController::InteractWithNearestWorldObject()
 
 		const FString WildlifeFact = DescribeNearbyWildlife();
 		if (!WildlifeFact.IsEmpty()) EnvironmentalObservations.Add(WildlifeFact);
+
+                if (const APawn* Visitor = GetPawn())
+                {
+                        for (TActorIterator<AIslandTidepoolMinnows> It(GetWorld()); It; ++It)
+                        {
+                                const FString SurfaceBreakFact = It->DescribeRecentSurfaceBreak(Visitor);
+                                if (SurfaceBreakFact.IsEmpty()) continue;
+                                EnvironmentalObservations.Add(SurfaceBreakFact);
+                                break;
+                        }
+                }
 
 		if (const APawn* PlayerPawn = GetPawn())
 		{

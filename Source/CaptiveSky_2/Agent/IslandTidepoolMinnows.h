@@ -46,6 +46,7 @@ private:
 	friend class FIslandMinnowTest;
 	friend class FIslandMinnowFrogCueTest;
 	friend class FIslandMinnowSwimmingVisitorTest;
+	friend class FIslandWildlifeObservationTest;
 	friend class FIslandNightEcologyTest;
 	friend class FIslandCommonFrogMinnowTests;
 	friend class FIslandPeriwinkleMinnowAttentionTest;

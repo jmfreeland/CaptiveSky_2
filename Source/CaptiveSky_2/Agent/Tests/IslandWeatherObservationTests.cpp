@@ -8,6 +8,7 @@
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandInteractionUtility.h"
 #include "IslandWeather.h"
+#include "IslandTidepoolMinnows.h"
 #include "Components/BoxComponent.h"
 #include "IslandInteractionTestPlayerController.h"
 
@@ -255,6 +256,28 @@ bool FIslandWildlifeObservationTest::RunTest(const FString& Parameters)
 			bSawWildlife = CaptionText.Contains(TEXT("stag browsing")) && CaptionText.Contains(TEXT("leave it undisturbed"));
 		}
 		TestTrue(FString::Printf(TEXT("The on-demand observation cycle includes visible wildlife beyond direct interaction range without disturbing it. Captions: %s"), *CaptionsSeen), bSawWildlife);
+
+                AIslandTidepoolMinnows* Minnows = World->SpawnActor<AIslandTidepoolMinnows>(
+                        FVector(400.f, 0.f, 90.f), FRotator::ZeroRotator);
+                TestNotNull(TEXT("Minnow school created for the brief-surface-break visitor observation"), Minnows);
+                if (Minnows)
+                {
+                        Minnows->SurfaceBreakContextRemaining = 30.f;
+                        Minnows->SurfaceBreakWorldLocation = FVector(400.f, 0.f, 90.f);
+                        Minnows->bHasRecentSurfaceBreakLocation = true;
+                        bool bVisitorSawRipple = false;
+                        FString RippleCaptions;
+                        for (int32 Attempt = 0; Attempt < 8 && !bVisitorSawRipple; ++Attempt)
+                        {
+                                TestTrue(TEXT("E remains available for the brief-surface-break observation"), Controller->PressBoundE());
+                                const FString CaptionText = Caption->GetDisplayedCaption().ToString();
+                                RippleCaptions += FString::Printf(TEXT("[%d] %s "), Attempt, *CaptionText);
+                                bVisitorSawRipple = CaptionText.Contains(TEXT("minnow made a brief surface break")) &&
+                                        CaptionText.Contains(TEXT("about 3 metres ahead of you"));
+                        }
+                        TestTrue(FString::Printf(TEXT("Visitors can locate a recent minnow ripple from an on-demand nature note. Captions: %s"),
+                                *RippleCaptions), bVisitorSawRipple);
+                }
 
 		Stag->SetActorHiddenInGame(true);
 		bool bHiddenWildlifeWasNamed = false;
