@@ -91,11 +91,14 @@ establishes the required consistency, backup, and recovery behavior.
   autonomous Discord messages or unbounded background thinking.
 - Preserve human review before proposals create/import/place assets. Client
   text and agent proposals are untrusted data, never tool commands.
-- Resolve the empty-world time policy before continuous hosting: should the
-  Island pause when empty, advance only its clock/ecology, or keep residents
-  actively embodied? The first network prototype should pause when empty and
-  avoid inventing elapsed resident experience; later behavior needs an
-  explicit, testable world-sleep design.
+- **Empty-world policy (resolved 2026-11-02):** when the last human visitor
+  leaves, pause the Island completely and preserve its state. Do not advance
+  the clock, weather, ecology, resident thought/sleep/consolidation, or any
+  other simulation while there are no visitors. Flush accepted mutations at
+  the disconnect boundary, then let the hosted process stop; reconnecting
+  resumes from that saved state without simulating the time away or inventing
+  offline resident experience. This is distinct from residents choosing to
+  sleep while visitors are still present.
 - Keep Zen/DDC private to trusted build or workstation networks. It is not the
   world's authoritative data store or a public content endpoint.
 
@@ -105,6 +108,10 @@ establishes the required consistency, backup, and recovery behavior.
    same clock, resident locations/speech, landmark response, and one lasting
    world-state edit. Reconnect both and confirm the edit occurs once and is
    still present.
+   Also disconnect the final visitor, verify the clock/ecology/resident state
+   stops changing and durable accepted state is flushed, then reconnect after
+   an elapsed real-time interval and confirm the Island resumes without
+   offline catch-up or fabricated resident memories.
 2. Verify the server rejects an out-of-range, occluded, cooldown-blocked, or
    unauthorized mutation even when a client requests it; verify private
    memories and another visitor's identity do not leak.
