@@ -29,6 +29,18 @@ actor selection and viewport framing were transient editor UI state only; no
 map was saved. The current viewport does not provide a trustworthy beauty
 capture.
 
+## Current desktop recheck
+
+A direct Computer Use app inventory now exposes an open `UnrealEditor.exe`
+window titled `CaptiveSky_2 - Unreal Editor`, with the `Island` map tab and the
+same Tideglass viewport visible. This supersedes the earlier shell-only check
+that returned no Unreal process; process enumeration in this session is
+incomplete and must not be used to conclude the editor is closed. The window UI
+does not expose the loaded project's full path, so this observation alone does
+not prove whether the live editor uses this C: worktree or the separate D:
+checkout. The white surface/spheres and exposed soil remain visible. No level,
+asset, or component property was changed.
+
 In a subsequent read-only Details-panel check, the selected `TideglassPool`
 entry appeared as an instanced actor with a `StaticMeshComponent`. It is not
 itself a native WaterBody actor. The selected component's mesh and material
