@@ -215,6 +215,7 @@ bool FIslandEnvironmentTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The resident's actual perception summary receives the interior evidence"), ResidentBrain->BuildSituationSummary(FAgentConversationContext()).Contains(TEXT("inside the Island inn")));
 	}
 	TestFalse(TEXT("A point outside the roof is not perceived as indoors"), UIslandEnvironmentSubsystem::IsInsideInnAt(World, FVector(900.f, 0.f, 0.f)));
+	Clock->DayNumber = AIslandDayNight::CalendarSpringEquinoxDay;
 	Clock->CurrentHour = 17.f;
 	Environment->Tick(0.5f);
 	UTexture2D* DynamicWindNoise = Environment->DynamicWindTexture;
