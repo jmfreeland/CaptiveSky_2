@@ -56,14 +56,14 @@ bool FIslandWeatherObservationTest::RunTest(const FString& Parameters)
 		Controller->BindFixtureInput();
 		Controller->RefreshInteractionHintForTest();
 		TestEqual(TEXT("Active outdoor weather offers a local interaction"),
-			Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: feel the weather")));
+			Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: notice your surroundings")));
 		TestTrue(TEXT("E reports current rain and wind without a model call"), Controller->PressBoundE() &&
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("Steady rain")) &&
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("steady wind")));
 
 		Environment->Indoors = 1.f;
 		Controller->RefreshInteractionHintForTest();
-		TestTrue(TEXT("Outdoor weather prompt is suppressed under the inn roof"),
+		TestTrue(TEXT("Environmental observation prompt is suppressed under the inn roof"),
 			Caption->GetDisplayedInteractionHint().IsEmpty());
 	}
 
@@ -103,6 +103,9 @@ bool FIslandTideObservationTest::RunTest(const FString& Parameters)
 		Controller->SetFixturePawn(Visitor);
 		Controller->SetCaptionWidget(Caption);
 		Controller->BindFixtureInput();
+		Controller->RefreshInteractionHintForTest();
+		TestEqual(TEXT("A clear, dry visitor still discovers the environmental observation action"),
+			Caption->GetDisplayedInteractionHint().ToString(), FString(TEXT("E: notice your surroundings")));
 		TestTrue(TEXT("A visitor can read the live tide near Tideglass without an interaction target"),
 			Controller->PressBoundE() && Caption->GetDisplayedCaption().ToString().Contains(TEXT("You pause beside Tideglass")) &&
 			Caption->GetDisplayedCaption().ToString().Contains(TEXT("tide is rising")));

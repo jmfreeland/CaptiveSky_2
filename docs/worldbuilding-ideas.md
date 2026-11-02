@@ -5,11 +5,13 @@
 When a visitor uses Interact without a nearby target, the environmental notes
 now include the Island clock's current lunar tide when Tideglass is within
 12 m. The note is on-demand, read-only, and uses the same tide model as the
-pool; it makes no model call or persistent change. UE 5.8.3 compiled and linked
-the controller and focused near/far test. The headless run hit the machine's
-known zero-second Unreal startup access violation before test discovery, so
-runtime behavior remains unverified. Retry only after that bootstrap issue is
-diagnosed or the startup context materially changes. Details:
+pool; it makes no model call or persistent change. The no-target action also
+has a generic outdoor hint, so it remains discoverable on clear, dry ground
+without scanning the world on the UI refresh timer. UE 5.8.3 compiled and
+linked the controller and focused near/far test. The headless run hit the
+machine's known zero-second Unreal startup access violation before test
+discovery, so runtime behavior remains unverified. Retry only after that
+bootstrap issue is diagnosed or the startup context materially changes. Details:
 [visitor naturalist observation](findings/2026-11-02-visitor-naturalist-observation.md).
 
 ## 2026-11-01 — Help visitors discover resident conversation

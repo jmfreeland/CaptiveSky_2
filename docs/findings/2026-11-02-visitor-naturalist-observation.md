@@ -47,7 +47,11 @@ direction and spring/neap wording stay aligned with the world's lunar tide.
 The observation only runs on key press, has no memory/world-state/model side
 effects, and is absent when Tideglass or its clock is not nearby. The focused
 automation covers a rising-tide caption beside the pool and its absence from a
-faraway visitor.
+faraway visitor. To make the no-target observation discoverable in clear,
+dry weather, the outdoor hint now offers `E: notice your surroundings`; the
+existing indoor suppression remains. This uses the environment subsystem's
+already-available indoor value and adds no repeated actor scan to the hint
+refresh timer.
 
 UE 5.8.3 `CaptiveSky_2Editor` Development compiled and linked successfully,
 including the controller and focused test. The NullRHI run was attempted once

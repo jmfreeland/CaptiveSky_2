@@ -276,10 +276,14 @@ void ACaptiveSky_2PlayerController::UpdateWorldInteractionHint()
 		return;
 	}
 	FString Hint = DescribeWorldInteractionHint(FindNearestWorldInteraction());
-	if (Hint.IsEmpty() && (!DescribeTrailUnderfoot().IsEmpty() || !DescribeLocalWeather().IsEmpty()))
+	if (Hint.IsEmpty())
 	{
-		const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
-		Hint = FString::Printf(TEXT("%s: notice tracks, plants, or weather"), *Input);
+		const UIslandEnvironmentSubsystem* Environment = GetWorld() ? GetWorld()->GetSubsystem<UIslandEnvironmentSubsystem>() : nullptr;
+		if (!Environment || Environment->GetIndoors() < 0.5f)
+		{
+			const FString Input = ShouldUseTouchControls() ? TEXT("Interact") : TEXT("E");
+			Hint = FString::Printf(TEXT("%s: notice your surroundings"), *Input);
+		}
 	}
 	if (!ShouldUseTouchControls())
 	{
