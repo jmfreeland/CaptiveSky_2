@@ -88,3 +88,25 @@ compare the Wind Arch ground-level composition and per-species counts against
 the previous generation-order distribution. Keep the 30-FPS and VRAM gates in
 place, and revert the patch-field choice if it reads as a single broad patch or
 an empty verge at the actual landmark scale.
+
+## Existing minidump inspection (2026-11-02)
+
+The fresh `Saved/Crashes/_0000/UEMinidump.dmp` from the 08:09 resident-feedback
+attempt was opened read-only in Visual Studio 2026. Its summary confirms a
+main-thread `0xC0000005` access violation reading address zero in
+`UnrealEditor-Core.dll` from the installed UE 5.8.3 build. Visual Studio's raw
+stack shows five `UnrealEditor-Core.dll` frames; the top address is
+`0x00007FF9C1D98346`. The crash context carries the same repeated call-stack
+hash `4DCE2FEABCC3C947BBCB4179F07C8373B60F798D` seen on the prior guarded
+launches. The stack remains unsymbolized: the installed engine has no
+`UnrealEditor-Core.pdb`, and Visual Studio reports that symbols were not
+included for that module. This confirms the existing startup failure but does
+not identify a faulty function or justify another identical launch attempt.
+
+Next diagnostic step: install UE 5.8's **Editor symbols for debugging** through
+Epic Games Launcher (Engine tile → Options → select the symbols component →
+Apply), then reopen this existing dump and inspect the symbolized stack. This
+may require a substantial download, so do not install it without the owner's
+go-ahead. Epic's [engine installation guide](https://dev.epicgames.com/documentation/unreal-engine/install-unreal-engine)
+documents the component. No source, project, or editor state was changed during
+the dump inspection.
