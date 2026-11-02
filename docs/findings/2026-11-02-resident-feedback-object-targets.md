@@ -53,14 +53,45 @@ are visible and recognizable to a human visitor.
 The chronicle and agent memories remain isolated under the playtest root. The
 full Game log is
 `Saved/CS58/Saved/Logs/Codex_ResidentFeedback_ObjectTargets_20261102.log`.
-Compared with the earlier clean 15-minute sample, this run had less initial
-headroom and consumed the available reserve during play. Before another long
-NullRHI feedback run, determine what else was using memory and whether the Game
-process's resident growth is repeatable; keep the 4 GiB preflight and monitor.
-As a diagnostic follow-up, `Start-Spectator.ps1` now records the launched Game
-PID's working set and private bytes alongside each five-second system-memory
-sample when those process metrics are available. This does not alter the global
-RAM threshold or process-scoped stop behavior. The PowerShell system-memory
-tests pass, including a live-process snapshot check. If RAM headroom is healthy,
-resume at the same 15-minute/32-request bounds and review the optional check-in
-as well as choices. Do not merge isolated agent memory into canonical saves.
+The launcher now records the launched Game PID's working set and private bytes
+alongside each five-second system-memory sample when those process metrics are
+available. This does not alter the global RAM threshold or process-scoped stop
+behavior. The PowerShell system-memory tests pass, including a live-process
+snapshot check.
+
+### Follow-up guarded 15-minute memory-profile run
+
+A second hidden session used the same UE 5.8.3 scratch project and safeguards,
+with a separate data root at
+`Saved/CS58/Saved/Playtests/Codex_ResidentFeedback_MemoryProfile_20261102/`.
+Preflight passed with 11,927 MiB available; world-ready took 38.8 seconds. The
+run completed its 900.1-second play cap normally with 16 of 32 model requests
+and no in-flight calls. Zen was already running and initialized in 0.018
+seconds, so this still does not test a cold Zen start.
+
+The Game's initial process sample was only 331 MiB private bytes, then grew
+during world load to about 5,396 MiB. Thereafter it was nearly flat: about
+5,392–5,403 MiB private bytes and 5,237–5,251 MiB working set through the end
+of the run. Available system memory stayed above approximately 6,400 MiB after
+world-ready, with no low samples. This materially supports a large but stable
+Game startup footprint, rather than steady memory growth over a 15-minute
+session. In the earlier interrupted run, preflight began about 2,150 MiB lower;
+after allowing for the same roughly 5.4 GiB Game footprint, its eventual
+crossing of the 4 GiB reserve is unsurprising. Keep the reserve and monitor;
+future runs should retain this per-process trace. No rendered, FPS, or GPU
+claim is made.
+
+All four residents answered the optional check-in. The Innkeeper enjoyed rain
+stippling the basin and wanted to explore how the Listening Stones answer;
+Aster would preserve the weather-made water movement; Rat wanted to see
+Tideglass under moonlight; Raven would preserve the quiet changing details.
+Earlier in the session, the Innkeeper chose to float a leaf in Rain Basin,
+which the chronicle confirms persisted in this isolated world state. No
+`request_upgrade` or `request_object` proposal was made. These reflections are
+art-direction signals, not proof of what visitors can see in a rendered build.
+Do not merge isolated agent memory into canonical saves.
+
+The follow-up log is
+`Saved/CS58/Saved/Logs/Codex_ResidentFeedback_MemoryProfile_20261102.log`; its
+chronicle and resident memories are beside it under the separate playtest data
+root.
