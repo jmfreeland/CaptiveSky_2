@@ -529,6 +529,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			// Ground residents notice arranging grounds nearby; a raven can spot a landing site from farther away.
 			int32 NoticedSites = 0;
 			int32 LearnedWorks = 0;
+			const bool bCanArrangeStonesToday = !OwnId.IsEmpty() && !WorldState->HasArrangedStonesToday(OwnId, Today);
 			for (const FIslandArrangementSite& Site : WorldState->GetArrangementSites())
 			{
 				if (LearnedWorks >= 3 || OwnId.IsEmpty() || !Site.bHasWork || Site.MakerAgentId == OwnId ||
@@ -555,9 +556,16 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearbyBeings += FString::Printf(TEXT(" About %.0f metres away is an open-ground site near the ListeningStones (move_to/land target: %s). "), Metres, *SiteName);
 				if (!Site.bHasWork)
 				{
-					NearbyBeings += FString::Printf(TEXT(" Loose stones could be arranged here (build target: %s). ")
-						TEXT("To arrange there, stand within four metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
-						*SiteName);
+					if (bCanArrangeStonesToday)
+					{
+						NearbyBeings += FString::Printf(TEXT(" Loose stones could be arranged here (build target: %s). ")
+							TEXT("To arrange there, stand within four metres and use build with that target, a \"form\" (ring, line, spiral, or pair), a short \"title\", and your \"intent\". The work would stay after this session; arranging is never required."),
+							*SiteName);
+					}
+					else if (!OwnId.IsEmpty())
+					{
+						NearbyBeings += TEXT(" The loose stones remain undisturbed; you have already made a stone arrangement or response today, so this has no build action for you until a later Island day. You may still pass by or simply leave it be.");
+					}
 					continue;
 				}
 				// Lasting public work is a place worth finding again. Remember only its visible

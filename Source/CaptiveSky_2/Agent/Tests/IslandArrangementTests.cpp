@@ -224,6 +224,10 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 		EmptyGroundReturn.Contains(TEXT("move_to target: ArrangingGround_1")));
 
 	ACharacter* Maker = World->SpawnActor<ACharacter>(First.Location + FVector(3000, 0, 100), FRotator::ZeroRotator);
+	UAgentMemoryComponent* MakerMemory = NewObject<UAgentMemoryComponent>(Maker);
+	MakerMemory->AgentId = ArrangerAgentId;
+	Maker->AddInstanceComponent(MakerMemory);
+	MakerMemory->RegisterComponent();
 	ARavenAgentAIController* MakerController = World->SpawnActor<ARavenAgentAIController>();
 	MakerController->Possess(Maker);
 	TestTrue(TEXT("Arranging from afar is refused"), Arrange(MakerController, TEXT("ArrangingGround_1"), TEXT("ring"), TEXT("Far"), TEXT("")).Contains(TEXT("too far")));
@@ -242,6 +246,11 @@ bool FIslandArrangementTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("A new work carries one small, visible three-stone signature"), Visible ? Visible->GetVisibleMotifCount() : 0, 3);
 	Maker->SetActorLocation(Sites[1].Location + FVector(120, 0, 100));
 	TestTrue(TEXT("One arrangement per resident per Island day"), Arrange(MakerController, TEXT("ArrangingGround_2"), TEXT("line"), TEXT("Again"), TEXT("")).Contains(TEXT("already arranged stones today")));
+	const FString CooldownView = DescribeFrom(World, Sites[1].Location + FVector(150, 0, 100), ArrangerAgentId);
+	TestTrue(TEXT("After using today's stone work, empty ground stays a movement target but is no longer offered as a build action"),
+		CooldownView.Contains(TEXT("move_to/land target: ArrangingGround_2")) &&
+		CooldownView.Contains(TEXT("already made a stone arrangement or response today")) &&
+		!CooldownView.Contains(TEXT("build target: ArrangingGround_2")));
 
 	// Others see the shape and age, never the maker, title, or intent.
 	const FString Bystander = DescribeFrom(World, First.Location + FVector(0, 200, 100), BystanderAgentId);

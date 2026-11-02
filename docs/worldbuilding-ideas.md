@@ -1,5 +1,15 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — Let residents know when today's stone work is already done
+
+The resident situation now stops offering an empty arranging ground as a
+`build` target after that resident has used their one daily arrangement or
+response. The grounds remain valid places to pass through or land; this only
+removes a stale action suggestion and explains the wait. The focused
+arrangement regression and UE 5.8.3 Editor target compile successfully, though
+automation remains unrun behind the known startup crash. See [stone-work
+cooldown context](findings/2026-11-02-stone-arrangement-cooldown-context.md).
+
 ## Hosting rule — pause the Island when empty
 
 When the last visitor leaves, the hosted Island pauses and preserves its state.
