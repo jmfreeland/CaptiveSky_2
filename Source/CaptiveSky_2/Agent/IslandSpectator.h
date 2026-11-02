@@ -65,6 +65,7 @@ public:
 
 	void BeginSpectating(APlayerController* Player);
 	void EndSpectating();
+	bool IsViewing(const APlayerController* Player) const;
 
 	/** Cut to a speaking resident (any actor with a location; residents arrive through the speech bus). */
 	void FocusOnSpeaker(AActor* Speaker, const FString& Speech);
@@ -135,8 +136,9 @@ public:
 	AIslandSpectatorDirector* GetDirector() const { return Director.Get(); }
 	/** Applies the startup clock override only when an isolated CaptiveSkyDataRoot is present. */
 	static bool ApplyIsolatedStartHourOverride(UWorld* World, const FString& CommandLine, float& OutHour);
-	void StartSpectating();
+	void StartSpectating(APlayerController* Player = nullptr);
 	void StopSpectating();
+	void StopSpectatingFor(APlayerController* Player);
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;

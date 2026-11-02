@@ -282,6 +282,11 @@ void AIslandSpectatorDirector::EndSpectating()
 	HiddenPawn.Reset();
 }
 
+bool AIslandSpectatorDirector::IsViewing(const APlayerController* Player) const
+{
+	return Player && Viewer.Get() == Player;
+}
+
 void AIslandSpectatorDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (bTraceProfileActive)
@@ -557,11 +562,11 @@ void UIslandSpectatorSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}), 1.f, true, 1.f);
 }
 
-void UIslandSpectatorSubsystem::StartSpectating()
+void UIslandSpectatorSubsystem::StartSpectating(APlayerController* Player)
 {
 	UWorld* World = GetWorld();
-	APlayerController* Player = World ? World->GetFirstPlayerController() : nullptr;
-	if (!Player || IsSpectating()) return;
+	APlayerController* ViewerPlayer = Player ? Player : (World ? World->GetFirstPlayerController() : nullptr);
+	if (!World || !ViewerPlayer || IsSpectating()) return;
 	if (!bIsolatedStartHourOverrideConsumed)
 	{
 		float AppliedHour = 0.f;
@@ -574,7 +579,7 @@ void UIslandSpectatorSubsystem::StartSpectating()
 	FActorSpawnParameters Spawn;
 	Spawn.ObjectFlags |= RF_Transient;
 	Director = World->SpawnActor<AIslandSpectatorDirector>(Spawn);
-	if (Director.IsValid()) Director->BeginSpectating(Player);
+	if (Director.IsValid()) Director->BeginSpectating(ViewerPlayer);
 }
 
 bool UIslandSpectatorSubsystem::ApplyIsolatedStartHourOverride(UWorld* World, const FString& CommandLine, float& OutHour)
@@ -605,6 +610,12 @@ void UIslandSpectatorSubsystem::StopSpectating()
 	Director->EndSpectating();
 	Director->Destroy();
 	Director.Reset();
+}
+
+void UIslandSpectatorSubsystem::StopSpectatingFor(APlayerController* Player)
+{
+	if (!Director.IsValid() || !Director->IsViewing(Player)) return;
+	StopSpectating();
 }
 
 static FAutoConsoleCommandWithWorld GIslandSpectateCommand(

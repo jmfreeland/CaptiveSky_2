@@ -3,6 +3,7 @@
 #include "CaptiveSky_2GameMode.h"
 #include "Agent/AgentPlaySessionSubsystem.h"
 #include "Agent/IslandDayNight.h"
+#include "Agent/IslandSpectator.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/Controller.h"
@@ -88,6 +89,13 @@ void ACaptiveSky_2GameMode::PostLogin(APlayerController* NewPlayer)
 
 void ACaptiveSky_2GameMode::Logout(AController* Exiting)
 {
+	if (UWorld* World = GetWorld())
+	{
+		if (UIslandSpectatorSubsystem* Spectator = World->GetSubsystem<UIslandSpectatorSubsystem>())
+		{
+			Spectator->StopSpectatingFor(Cast<APlayerController>(Exiting));
+		}
+	}
 	Super::Logout(Exiting);
 	const UWorld* World = GetWorld();
 	if (!World || !ShouldPauseHostedWorld(World->GetNetMode(),

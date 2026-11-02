@@ -140,6 +140,26 @@ bool FIslandSpectatorTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Leaving spectator mode returns control"), !Player->IsMoveInputIgnored() && !Player->IsLookInputIgnored());
 	if (Player->PlayerCameraManager) TestTrue(TEXT("The player's view returns to their body"), Player->GetViewTarget() == Visitor);
 
+	UIslandSpectatorSubsystem* SpectatorSubsystem = World->GetSubsystem<UIslandSpectatorSubsystem>();
+	TestNotNull(TEXT("The world owns a spectator lifecycle subsystem"), SpectatorSubsystem);
+	if (SpectatorSubsystem)
+	{
+		SpectatorSubsystem->StartSpectating(Player);
+		AIslandSpectatorDirector* DisconnectDirector = SpectatorSubsystem->GetDirector();
+		TestNotNull(TEXT("A visitor spectator can be restarted"), DisconnectDirector);
+		if (DisconnectDirector)
+		{
+			APlayerController* OtherVisitor = World->SpawnActor<APlayerController>();
+			SpectatorSubsystem->StopSpectatingFor(OtherVisitor);
+			TestTrue(TEXT("Another visitor's logout does not stop this spectator"), SpectatorSubsystem->IsSpectating());
+			SpectatorSubsystem->StopSpectatingFor(Player);
+			TestFalse(TEXT("The departing viewer's logout stops the spectator director"), SpectatorSubsystem->IsSpectating());
+			TestTrue(TEXT("Logout cleanup restores the hidden visitor pawn"), !Visitor->IsHidden() && Visitor->GetActorEnableCollision());
+			TestTrue(TEXT("Logout cleanup restores the visitor's input"), !Player->IsMoveInputIgnored() && !Player->IsLookInputIgnored());
+			TestTrue(TEXT("Logout cleanup returns the view to the visitor pawn"), Player->GetViewTarget() == Visitor);
+		}
+	}
+
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	IFileManager::Get().Delete(*StateFile, false, true, true);

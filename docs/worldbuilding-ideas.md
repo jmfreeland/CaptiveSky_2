@@ -1,5 +1,19 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-02 — End spectator mode when its visitor disconnects
+
+The spectator director opts into ticking while paused. If its viewer logged
+out, the weak controller could become invalid while the transient camera and
+hidden pawn were left behind; the empty hosted Island could then retain an
+orphaned paused-tick actor, and a returning viewer could not take over that
+stale director. GameMode logout now stops only the spectator owned by the
+departing controller before the controller is torn down, restoring its pawn,
+collision, input, and view and destroying the camera director. The focused
+spectator regression verifies that another controller cannot stop the active
+viewer and that the correct viewer's cleanup restores them. The UE 5.8.3
+Editor target compiled successfully; runtime automation is still gated by the
+known startup crash. See [spectator disconnect cleanup](findings/2026-11-02-spectator-disconnect-cleanup.md).
+
 ## 2026-11-02 — Keep the Tideglass pool surface from supporting the visitor
 
 The transient procedural water had no collision, but the hidden flattened
