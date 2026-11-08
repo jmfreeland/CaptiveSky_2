@@ -1,5 +1,51 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-08 — Make consequential events visible, turn a shoreline into an investigation, and preserve discoveries as culture
+
+**Repository review:** As of 2026-11-08, the latest visible main commit remains `a35f5cf7` (2026-11-01), which published the previous weekly recommendations. The latest underlying implementation commit is `83981bee` (2026-10-29), documenting a Listening Stones startup crash. No intervening implementation changes were visible in the commit search. Therefore these recommendations are new *next slices*, not claims that the November 1 Atlas, tidepool beauty scene or taught-practice features were implemented. The project already contains `IslandTrail` 1.5 m cells/12 m summaries and resident path affinity, `IslandChronicle` and `Scripts/Build-Chronicle.py`, witnessed Listening Stones etiquette, `IslandTidepoolCrab`, `IslandTidepoolPeriwinkle`, `IslandTidepoolMinnows`, `IslandWrack`, frog/Raven attention, shoreline review tooling, and known material/GPU/startup problems.
+
+### 1. Introduce a causal-event ledger for encounters that matter
+
+**Experience:** A resident sees a crab uncover an unusual object in wrack, picks it up, and later mentions it to another resident. A read-only inspection shows the causal chain: wrack deposited → crab investigated → resident noticed → object recovered → resident communicated. If nobody witnessed it, the event still happened, but nobody mysteriously knows it.
+
+**Why:** The repo has many beautifully bounded wildlife attention cues, but these rarely cause durable social or material consequences. An engine-neutral typed `WorldEvent` contract with stable IDs, actors, location, provenance, effects and optional witnessed-by references can connect ecology, resident knowledge and future culture without making Unreal actors canonical. This complements, rather than duplicates, the proposed World Atlas: the ledger creates trustworthy causal facts; the Atlas visualizes them.
+
+**Existing fit:** `IslandChronicle`, persistent `IslandWorldStateSubsystem`, `IslandWrack`, tidepool crab investigations, resident memory and delivered-speech machinery. Do not add extra model calls or imply an LLM is required for every event.
+
+**Smallest step:** One event type, `shore_find_discovered`, triggered only by a validated interaction with an existing wrack item; include immutable source ID, place, world day, materialized object ID and witnessed-by evidence. Implement a deterministic serialization/replay test and an optional downstream resident observation, without changing any actor ownership model yet.
+
+**First visual milestone:** a 15-second close view where a crab's wrack detour reveals a small unusual object; a nearby resident notices it and later the object is physically present at a known location. One distinctive found-object asset with believable wetness and a readable pickup/inspect animation will matter enormously.
+
+### 2. Build a rain-to-clear shoreline material state, not another static beauty shot
+
+**Experience:** The player arrives at Tideglass in cold rain: rock darkens, runoff follows tiny channels, sea wrack glistens and pools ripple. The rain ends, wind changes, and surfaces dry at different rates. The same camera now reveals color and texture without a level reload.
+
+**Why:** This is a substantial visible improvement and makes weather/ecology legible as state rather than just a sky setting. It is a more focused, dynamic complement to last week's tidepool composition, not another request for more shoreline creatures or plants.
+
+**Existing fit:** Tideglass water, rain/wind/daylight responses, shoreline wrack, existing wetness/material systems and real-RHI capture harness. Known `M_Island_Textured_Wet` invalid texture-index warnings and instanced-material fallbacks must be fixed/isolated before treating the result as verified.
+
+**Smallest step:** In a disposable shoreline review copy, pick one 5 m patch and author a deterministic `SurfaceMoisture` material parameter (rain input, exposure, drainage, decay). Drive only two existing rock/ground material instances plus one runoff decal or Niagara effect. Capture fixed-camera rain, immediately after rain and drying frames; benchmark VRAM and p95 after reliable startup is restored. Avoid increasing global instance count.
+
+**First visual milestone:** three matched real-RHI frames and a short uninterrupted transition showing materially convincing wet rock, runoff and drying, with no Default Material fallback. One excellent scan-quality wet-rock set, surface roughness variation and restrained runoff VFX are the high-return art assets.
+
+### 3. Let residents make field records and teach observation, not just etiquette
+
+**Experience:** A resident repeatedly observes an animal behavior or unusual shore object, makes a simple sketch/field note, and later shows it to someone else. The second resident can recognize a similar occurrence, while uncertainty and mistaken inference remain possible. A physical notebook or display accumulates drawings and observations rather than generic exposition.
+
+**Why:** This is culture emerging from attention and craft: discovery → interpretation → representation → transmission → refinement. It differs from the prior baking craft lineage and Listening Stones custom: the cultural artifact is a *record of the world*, and its content is tied to witnessed evidence rather than omniscient facts.
+
+**Existing fit:** Raven/crab/frog/periwinkle cues, resident observation and memory, `IslandChronicle`, craft-tradition attempt/lesson records, inn/social interactions and object persistence. Keep the underlying `ObservationRecord` engine-neutral; Unreal renders the notebook and actions.
+
+**Smallest step:** One resident can record one observed tidepool phenomenon as a structured `FieldNote` (event ID, observer, time, location, observed fact, tentative interpretation, optional sketch asset). Persist it and allow one delivered conversation to share the note's contents with another resident. Do not manufacture a drawing with an LLM; start with one approved sketch variant.
+
+**First visual milestone:** two physical notebook pages: an initial crab/wrack sketch and a later annotated variant by another resident, visibly different but traceable to the original. A hand-drawn illustration/ink-and-paper material kit and one believable page-turn animation offer disproportionate payoff.
+
+### Concept art — The shore as a place of discovery
+
+**Complete reproducible direction/prompt:** Cinematic 16:9 low camera at tidepool height after a passing rain squall, early evening with cool slate clouds and a narrow pink/gold opening near the horizon. Dominant foreground: a richly textured shallow pool with legible underwater stone, kelp, small anemones, periwinkles and one crab investigating storm wrack; wet dark rocks frame the pool. On the left, one practical-clothed resident crouches and points out a small unfamiliar recovered object, while a companion studies it; a third resident a little higher up records a precise field sketch in a notebook. Their interaction is a plausible chance encounter, not a staged festival. Background: a modest weatherproof research/work shelter with functional glazing, metal fasteners and timber where useful, a small renewable-power element where practical, scattered working tools and a few people independently exploring the shore; beyond lie windswept trees, open sea and distant islands. A dog stands on the rocks. Strong material distinction between wet stone, algae, shell, transparent water, fabric, glass and weathered wood. Subtle post-rain atmospheric effects, warm interior lights against cold shore, a faint rainbow in clearing cloud. The signature detail is the chain of attention: crab → object → resident → field notebook. No fixed era, no generic fantasy or cyberpunk. Mood: scientific curiosity, humane discovery, quietly extraordinary natural life. Treat this as an aspirational target, not proof these art assets exist in the repo.
+
+**Generated image:** created in the ChatGPT run on 2026-11-08 and delivered there. The GitHub text-file writer does not accept binary PNG content, so no image path in `docs/concept-art/` is claimed.
+
 ## 2026-11-01 — Make world history inspectable, make the shoreline tactile, and let practices travel
 
 **Repository review (main, latest commit `83981bee`, 2026-10-29):** The October 25 proposals have already generated real code. `IslandTrail` now exposes deterministic 12 m worn-ground summaries, recovery evidence, resident observations and a bounded 15% affinity for established paths in wander ranking. Listening Stones now have quiet-visit cues, directly witnessed practice memory, and a conditional far-side approach for residents who learned the etiquette. These are promising but not fully verified in Game: several focused test runs are blocked by pre-initialization Unreal crashes. The shore has grown a genuine micro-ecology: tidepool crabs inspect materialized storm wrack, raven attends to crabs, periwinkles and frogs notice minnow surface breaks, and a V3 rat-hollow entrance has passed offline asset tests but has not been imported. Runtime woodland generation reports 3,600 mixed broadleaf trees across 381/500 groves, but several instanced materials still fall back to Default Material, `M_Island_Textured_Wet` reports an invalid texture index, and GPU headroom remains uncertain. Recent logs distinguish compile/test-source success from runtime validation; preserve that distinction.
