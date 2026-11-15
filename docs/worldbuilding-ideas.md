@@ -1,5 +1,51 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-15 — Make world modifications transactional, make nighttime interiors beautiful, and let excellence acquire provenance
+
+**Repository review (2026-11-15):** Current commit search still ends with the 2026-11-08 documentation commit `0e662c93`; the last underlying implementation commit visible is `83981bee` (2026-10-29). No verified new code landed since the previous review. Consequently the World Atlas, causal ledger, shoreline wetness and field-note proposals must not be described as implemented. Existing concrete anchors remain `IslandWorldStateSubsystem`, `IslandTrail` (1.5 m wear cells, 12 m summaries), `IslandChronicle` and `Scripts/Build-Chronicle.py`, resident asset-request validation, Listening Stones etiquette, Aster/Innkeeper agents, craft-tradition records, weather/daylight and the persistent startup/material/VRAM issues.
+
+### 1. Turn a resident's small place improvement into a validated transaction
+
+**Experience:** Rowan proposes a safer passage across a repeatedly used muddy stretch. The request becomes an inspectable plan: two stepping stones and a narrow drained edge, then an actual world change. Reloading Unreal preserves it; undoing the change restores the previous state. A resident can later repair or extend it.
+
+**Why:** Prior desire paths capture accumulated use, but intent becoming safe, persistent built infrastructure is a distinct architectural milestone. Canonical `WorldModificationTransaction` contains immutable proposal ID, proposer, place anchor, allowed operation list, validation result, dependencies, applied revision and reversible layer deltas. The deterministic executor—not an LLM or actor—owns placement, collision and ecological constraints. Base geology stays immutable.
+
+**Existing fit:** `IslandTrail` identifies genuine traffic, the resident asset-request validation path already rejects malformed targets, and `IslandWorldStateSubsystem` provides persistence. Unreal can materialize a compacted surface, two approved stepping-stone meshes and vegetation exclusions from the transaction.
+
+**Smallest step:** Support only `place_stepping_stones` on one hand-approved anchor and fixed bounded footprint. Implement validate/apply/undo/replay and tests for duplicate execution, invalid placement and persistence. Do not attempt general terrain sculpting.
+
+**First visual milestone:** Three fixed-angle captures of the same muddy corridor: worn route, approved stones installed, then a second resident using the new crossing. A superb wet-stone pair and subtle compacted-ground material matter more than a large asset library.
+
+### 2. Make one night interior a genuinely dramatic Unreal beauty benchmark
+
+**Experience:** Walk from a cold, windblown exterior into the existing Inn after dark. Eyes adjust; warm practical pools of light reveal cloth, glass, worked timber, faces, bread and small resident possessions. Through the glazing, weather continues independently. The room feels inhabited rather than decorated.
+
+**Why:** The current visual bottleneck is not lack of ecological behaviors. A bounded interior tests Lumen/reflections, material coherence, lighting exposure, silhouettes and high-quality human embodiment without adding thousands of outdoor instances. It is a fresh visual target rather than another Tideglass panorama or shoreline wetness pass.
+
+**Existing fit:** The Innkeeper and Aster, prepared MetaHuman sources, the existing Inn/blockout, weather/day-night systems and fixed-camera capture/performance harness. Startup failures, default-material fallbacks and GPU memory must be measured honestly; a compile is not proof of a working beauty scene.
+
+**Smallest step:** Create a disposable Inn-night review variant with one 5–8 m room, one window, three practical light sources and five carefully selected hero surfaces. Use fixed interior/exterior camera pairs; tune exposure and reflections, profile p95/VRAM, and avoid global lighting changes.
+
+**First visual milestone:** A 20-second seamless exterior-to-interior walkthrough with believable face lighting, readable material differences and the living weather visible outside. A first-rate window/glass treatment, one tactile table, fabric and practical fixtures have disproportionate visual payoff.
+
+### 3. Give craft excellence a traceable public history
+
+**Experience:** A visitor notices an unusually fine object in the Inn. Its maker, a failed predecessor, a teacher and a later adaptation are discoverable through actual resident dialogue or object inspection. Another resident copies a technique, improves it and leaves a distinguishable derivative. Excellence becomes something people can recognize, debate, preserve and transmit.
+
+**Why:** Craft records and practice memory become culture only when specific artifacts, makers and evaluations persist. Avoid a global numerical 'beauty' score. Store attributed judgments, observable properties, provenance and disagreements as canonical records; Unreal merely renders the artifact and presentation.
+
+**Existing fit:** Aster/Innkeeper, craft attempts/lessons, resident memory, delivered speech and `IslandChronicle`. Unlike last week's field notebook, the focus is the social life and historical lineage of a *made object*.
+
+**Smallest step:** Introduce one engine-neutral `ArtifactLineageRecord` with maker, source attempt, material/technique tags, parent artifact, witnesses and attributed appraisal. Connect two hand-authored variants of one existing craft object and one delivered conversation; test that knowledge does not transfer without communication.
+
+**First visual milestone:** Two visibly related objects displayed together in the Inn, with a resident explaining what the second maker learned and changed. High-quality close-up object art, fingerprints/wear and careful display lighting matter far more than procedural asset generation.
+
+### Concept art — The Moonwell Instrument Hall (long-horizon wild card)
+
+**Complete reproducible art direction/prompt:** Cinematic 16:9, ultra-realistic interior looking across a monumental cavernous civic workshop under a circular snow-filled oculus and full moon. The primary silhouette is a vast collaboratively built kinetic acoustic instrument: suspended metal rings, resonators, cables, carved stone panels, weathered ceramic vessels and adjustable mechanisms, built and repaired over generations. Foreground left, a young craftswoman tunes an etched stone plate with a small mallet while an older maker guides her; to the right, a scholar sketches and annotates a record; other residents work on the mechanism across narrow bridges and platforms. This is an actual working place, not an abandoned temple or fantasy shrine. Basalt walls, ice ledges, damp stone floors, drainage channels, arches and warm working lamps contrast with cold blue moonlight and falling snow. Material hierarchy: dark mineral rock, tarnished bronze/steel, pale ceramics, hand-worn timber, wool, wet reflections. Technology is purposeful: engineered tensioners, safety railings and maintainable access coexist with ancient components because the instrument has accumulated repairs and new knowledge. Culture is visible in dated replacement plates, engraved maker marks, rehearsal notes, imperfect prototypes and distinct generations of workmanship. Mood: immense, mysterious, communal, precise, deeply beautiful; not medieval, sci-fi or cyberpunk. Wide interior perspective, strong scale figures, no coast, no golden-hour overlook. Signature detail: one new bright resonator hangs beside centuries-old darkened ones, revealing a living tradition of improvement. Aspirational visual target, not a claim that this location or art exists in the current repository.
+
+**Generated image:** created in the 2026-11-15 ChatGPT run. Binary upload is not supported by the available text-only GitHub file writer; the image is delivered in the conversation, with no unverified repository image path.
+
 ## 2026-11-08 — Make consequential events visible, turn a shoreline into an investigation, and preserve discoveries as culture
 
 **Repository review:** As of 2026-11-08, the latest visible main commit remains `a35f5cf7` (2026-11-01), which published the previous weekly recommendations. The latest underlying implementation commit is `83981bee` (2026-10-29), documenting a Listening Stones startup crash. No intervening implementation changes were visible in the commit search. Therefore these recommendations are new *next slices*, not claims that the November 1 Atlas, tidepool beauty scene or taught-practice features were implemented. The project already contains `IslandTrail` 1.5 m cells/12 m summaries and resident path affinity, `IslandChronicle` and `Scripts/Build-Chronicle.py`, witnessed Listening Stones etiquette, `IslandTidepoolCrab`, `IslandTidepoolPeriwinkle`, `IslandTidepoolMinnows`, `IslandWrack`, frog/Raven attention, shoreline review tooling, and known material/GPU/startup problems.
