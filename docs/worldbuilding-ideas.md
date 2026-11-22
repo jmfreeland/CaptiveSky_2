@@ -1,5 +1,47 @@
 # Captive Sky — Weekly Worldbuilding Ideas
 
+## 2026-11-22 — Promises, Wind Arch weather theatre, and names that become history
+
+**Repository review (2026-11-22):** GitHub's latest visible commit is the November 15 worldbuilding documentation update `f11e47ee`; the latest implementation-related commit remains October 29's Listening Stones etiquette work (`83981bee` documentation, `8e8071d2` controller/tests). That work's own findings report compilation but not a successful focused PIE/NullRHI run due to a startup access violation. No new implementation was verified this week. These proposals are therefore bounded next experiments, not claims of completed systems. Anchors: `IslandWorldStateSubsystem`, `IslandChronicle`, `IslandTrail`, `AutonomousAgentAIController`, `AgentMemoryComponent`, `IslandListeningStonePresentation`, Island clock/weather, Wind Arch and existing capture/PIE diagnostics.
+
+### 1. A resident promise that can actually be kept — or broken
+
+**Experience:** Aster tells the Innkeeper she will bring something to the Inn tomorrow. The world clock advances even when no human watches. She remembers the commitment, chooses whether to act, and the Innkeeper can later acknowledge delivery, lateness, or failure. This is a small but meaningful NPC-to-NPC social consequence rather than another scripted interaction.
+
+**Why and fit:** Current resident memory and delivered speech support interpersonal events, while WorldState and Chronicle can preserve a durable obligation. An engine-neutral `SocialCommitment` record should contain stable IDs, parties, agreed action/object, deadline in world time, source conversation, state transitions, and witnessed outcome. The scheduler evaluates deadlines without needing Unreal rendering or an extra LLM call; resident agency decides how to respond.
+
+**Smallest step:** One whitelisted `bring_object_to_place` commitment between Aster and the Innkeeper, with deterministic due/fulfilled/expired transitions, persistence/replay tests, and explicit non-fulfilment behavior. Do not invent an omniscient relationship score.
+
+**First visual milestone:** The promised object appears on the Inn counter after delivery, or an empty reserved space remains and the Innkeeper mentions the missed promise. A distinctive, well-authored prop makes the consequence legible.
+
+### 2. Turn Wind Arch into a weather-and-light visual benchmark
+
+**Experience:** A player walks beneath Wind Arch as a squall moves through. Wind visibly changes vegetation silhouettes and airborne spray; cloud shadows sweep across the stone; a brief clearing produces a striking shaft of cold light. The landmark feels monumental without adding a new building or increasing foliage counts.
+
+**Why and fit:** Wind Arch already has visitor behavior and the Island already drives weather, wind and daylight. Recent visual investigations identified material fallbacks, GPU-memory pressure and unreliable startup. A tightly bounded weather sequence gives the project a compelling visual win and a repeatable performance target without a costly new biome.
+
+**Smallest step:** One fixed camera path and three authored weather presets (approach, squall, clearing), using existing rock/foliage assets, corrected material instances, Niagara mist/spray and directional/volumetric lighting. Record GPU memory and p95 frame time; first stabilize the editor startup and confirm the scene actually runs.
+
+**First visual milestone:** A 20-second continuous Wind Arch shot with readable scale, moving weather, differentiated wet stone and foliage, no default-material fallbacks and no VRAM warnings. High-quality rock surface/decals and restrained VFX offer the highest art return.
+
+### 3. Let residents negotiate names for places
+
+**Experience:** Two residents refer to the same overlooked clearing differently. Through repeated conversations, one name catches on; an older name survives in someone else's memory. A small handmade marker or map label eventually reflects a community choice. The name has history, not a global instant rename.
+
+**Why and fit:** The Island already has landmarks, resident memory, delivered conversations and Chronicle. Introduce an engine-neutral `PlaceNameClaim` with place ID, proposed label, proposer, evidence, learned-from provenance, adoption events and competing alternatives. Canonical place identity never changes; names are socially held claims, not the truth of geography.
+
+**Smallest step:** One existing place anchor, two resident-proposed labels, one witnessed transmission and deterministic read-only inspection of who knows which name. No automatic LLM renaming of map assets.
+
+**First visual milestone:** A subtle resident-made marker at a real clearing and two dialogue lines that use different names correctly. One carefully designed sign/engraving asset would make cultural history physically visible.
+
+### Concept art — The Winter Mirror Array (long-horizon wild card)
+
+**Complete reproducible art direction:** Wide 16:9 cinematic high-angle view of a remote alpine plateau in a fierce winter storm, emphatically not a coastal overlook or golden-hour village. An accumulated resident-built observatory and circular field of many individually maintained reflective panels occupy the snow, each oriented for a practical optical or atmospheric experiment. One sheltered work building uses a taut translucent canopy, rugged stone foundations, accessible steel framing and warm task lighting; a compact instrument dome and weather mast stand nearby. Several appropriately equipped residents are servicing mirrors, recording observations and following worn paths between stations. Old repaired mirror frames stand beside newer precise units, revealing engineering lineage and shared scientific culture. Towering blue-gray icy cliffs, drifting snow, a narrow dramatic opening in the clouds and luminous aurora create scale and atmosphere. Compose a sweeping spiral of mirrors as the main graphic motif, tiny human figures for scale, deep blue snow and dark rock against warm practical lights and flashes of reflected sky. Technologies are chosen for environmental function rather than any fixed era. Mood: severe, exhilarating, beautiful through cooperative ingenuity. Signature detail: different generations of mirror repairs visibly coexist, making resident-made history legible. This is aspirational art, not a claim that the alpine site or observatory already exists in Unreal.
+
+**Image:** Generated in ChatGPT for the November 22 entry. Binary PNG persistence to the GitHub repository was not available through the text-only file writer.
+
+---
+
 ## 2026-11-15 — Make world modifications transactional, make nighttime interiors beautiful, and let excellence acquire provenance
 
 **Repository review (2026-11-15):** Current commit search still ends with the 2026-11-08 documentation commit `0e662c93`; the last underlying implementation commit visible is `83981bee` (2026-10-29). No verified new code landed since the previous review. Consequently the World Atlas, causal ledger, shoreline wetness and field-note proposals must not be described as implemented. Existing concrete anchors remain `IslandWorldStateSubsystem`, `IslandTrail` (1.5 m wear cells, 12 m summaries), `IslandChronicle` and `Scripts/Build-Chronicle.py`, resident asset-request validation, Listening Stones etiquette, Aster/Innkeeper agents, craft-tradition records, weather/daylight and the persistent startup/material/VRAM issues.
