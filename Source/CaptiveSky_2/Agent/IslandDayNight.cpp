@@ -359,7 +359,19 @@ void AIslandDayNight::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float PreviousHour = CurrentHour;
 	if (bAdvanceTime) CurrentHour = WrapHour(CurrentHour + FMath::Max(0.f, DeltaSeconds) * 24.0 / (FMath::Max(1.f, DayLengthMinutes) * 60.0));
-	if (CurrentHour < PreviousHour) ++DayNumber;
+	if (CurrentHour < PreviousHour)
+	{
+		++DayNumber;
+		if (bResumeSavedTime)
+		{
+			// SaveClock advances commitments with the new day in the same world-state save.
+			PersistHour();
+		}
+		else if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		{
+			WorldState->AdvanceSocialCommitments(DayNumber);
+		}
+	}
 	UpdateLighting();
 	// Save occasionally too, so a crash or forced stop loses at most a minute of Island time.
 	SecondsSinceSave += FMath::Max(0.f, DeltaSeconds);

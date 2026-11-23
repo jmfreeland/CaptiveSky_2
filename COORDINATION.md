@@ -27,6 +27,7 @@ Both `AGENTS.md` (read by Codex CLI) and `CLAUDE.md` (read by Claude Code) point
 
 | Agent | Files / Area | Task | Since |
 |---|---|---|---|
+| Codex | Source/CaptiveSky_2/Agent/IslandDayNight.cpp | Advance social commitments when the Island day rolls over, so due/expired outcomes update during ordinary play without per-frame work | 2026-11-23 |
 | Codex | Source/CaptiveSky_2/Agent/AgentLLMTypes.h, Source/CaptiveSky_2/Agent/AgentBrainComponent.{h,cpp}, Source/CaptiveSky_2/Agent/AgentSocialComponent.{h,cpp}, Scripts/Inspect-PlaceNameClaims.py, Scripts/Build-Chronicle.py, docs/findings/2026-11-23-place-name-claims.md, docs/worldbuilding-ideas.md | Persist promise and name effects only after the listener accepts a delivered line; UE build and live transmission still need verification | 2026-11-23 |
 | Codex | Source/CaptiveSky_2/Agent/AutonomousAgentAIController.cpp, Source/CaptiveSky_2/Agent/IslandWorldStateSubsystem.cpp, Scripts/Place-IslandBlueJar.py, docs/findings/2026-11-23-social-commitment-conversation.md | Correct BlueJar surface placement using mesh bounds minima; record editor verification as pending while the user uses the shared computer | 2026-11-23 |
 | Codex | Source/CaptiveSky_2/Agent/AgentModelTier.cpp, Source/CaptiveSky_2/Agent/Tests/AgentModelTierTests.cpp | Clarify the bounded 12-minute resident feedback invitation after two 15-minute playtests produced only silent check-ins; preserve resident opt-out and review-only requests | 2026-11-01 |
