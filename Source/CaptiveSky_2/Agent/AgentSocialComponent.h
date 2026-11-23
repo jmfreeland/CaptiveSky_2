@@ -114,7 +114,8 @@ private:
 	void DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
 		const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId = FString(),
 		const FString& TeachCraftTraditionId = FString(), const FString& PromiseObjectId = FString(),
-		const FString& PromiseTargetPlaceId = FString(), int32 PromiseDueInDays = 0);
+		const FString& PromiseTargetPlaceId = FString(), int32 PromiseDueInDays = 0,
+		const FString& PlaceNameTarget = FString(), const FString& PlaceNameLabel = FString());
 
 	UFUNCTION()
 	void HandleDecisionReady(const FAgentDecision& Decision);

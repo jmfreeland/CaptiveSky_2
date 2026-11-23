@@ -15,6 +15,20 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAgentSocial, Log, All);
 
+static bool NormalizePersonalPlaceName(FString& Name)
+{
+	Name.TrimStartAndEndInline();
+	if (Name.Len() < 3 || Name.Len() > 40) return false;
+	bool bHasLetter = false;
+	for (const TCHAR Character : Name)
+	{
+		if (FChar::IsAlpha(Character)) bHasLetter = true;
+		else if (!FChar::IsDigit(Character) && Character != TEXT(' ') && Character != TEXT('\'') &&
+			Character != TEXT('-') && Character != TEXT('.')) return false;
+	}
+	return bHasLetter;
+}
+
 UAgentSocialComponent::UAgentSocialComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -323,7 +337,8 @@ void UAgentSocialComponent::HandleDecisionReady(const FAgentDecision& Decision)
 		{
 			DeliverSpeech(Sender, Decision.Speech, CompletedUtterance.ConversationId, CompletedUtterance.TurnIndex + 1,
 				Decision.TeachArrangement, Decision.TeachCraft, Decision.PromiseObjectId,
-				Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays);
+				Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays,
+				Decision.PlaceNameTarget, Decision.PlaceNameLabel);
 		}
 		else
 		{
@@ -370,14 +385,16 @@ void UAgentSocialComponent::TryBeginSpontaneousConversation(const FAgentDecision
 		RecipientMemory->GetResolvedAgentId(), ConversationId))
 	{
 		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement,
-			Decision.TeachCraft, Decision.PromiseObjectId, Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays);
+			Decision.TeachCraft, Decision.PromiseObjectId, Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays,
+			Decision.PlaceNameTarget, Decision.PlaceNameLabel);
 	}
 }
 
 void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
 	const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId,
 	const FString& TeachCraftTraditionId, const FString& PromiseObjectId,
-	const FString& PromiseTargetPlaceId, int32 PromiseDueInDays)
+	const FString& PromiseTargetPlaceId, int32 PromiseDueInDays,
+	const FString& PlaceNameTarget, const FString& PlaceNameLabel)
 {
 	AAutonomousAgentCharacter* Speaker = GetAgentOwner();
 	if (!Speaker || !Recipient || Speech.IsEmpty() || !IsWithinSpeakingRange(Recipient))
@@ -416,6 +433,33 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	if (UAgentSocialSubsystem* SocialSubsystem = GetWorld()->GetSubsystem<UAgentSocialSubsystem>())
 	{
 		SocialSubsystem->PublishSpeech(Speaker, Speech);
+	}
+
+	// A place name is a resident's attributed claim, not a canonical rename.
+	// Record it only when the speaker knows the exact anchor and says the offered name.
+	FString PersonalName = PlaceNameLabel;
+	UAgentBrainComponent* SpeakerBrain = Speaker->FindComponentByClass<UAgentBrainComponent>();
+	if (SpeakerBrain && SpeakerBrain->KnowsRememberedPlace(PlaceNameTarget) &&
+		NormalizePersonalPlaceName(PersonalName) && Speech.Contains(PersonalName, ESearchCase::IgnoreCase))
+	{
+		const FName PlaceId(*PlaceNameTarget);
+		FString ConversationKey = ConversationId;
+		ConversationKey.ReplaceInline(TEXT("-"), TEXT(""));
+		const TArray<FString> ClaimTags = {
+			TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(), TEXT("claimed-by:") + SpeakerId,
+			TEXT("conversation:") + ConversationKey, TEXT("turn:") + FString::FromInt(TurnIndex)
+		};
+		SpeakerMemory->AppendMemory(SpeakerMemory->MakeMemory(EAgentMemoryType::Conversation,
+			FString::Printf(TEXT("I call the place %s \"%s\"; this is my personal name for it, not an official renaming."),
+				*PlaceId.ToString(), *PersonalName), 0.78f, ClaimTags));
+		RecipientMemory->AppendMemory(RecipientMemory->MakeMemory(EAgentMemoryType::Conversation,
+			FString::Printf(TEXT("%s told me they call the place %s \"%s\"; this is their personal name, not an official renaming."),
+				*SpeakerName, *PlaceId.ToString(), *PersonalName), 0.78f,
+			{ TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(),
+			  TEXT("learned-from:") + SpeakerId, TEXT("conversation:") + ConversationKey,
+			  TEXT("turn:") + FString::FromInt(TurnIndex) }));
+		UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] %s shared personal place name '%s' for %s with %s (conversation %s, turn %d)."),
+			*SpeakerId, *PersonalName, *PlaceId.ToString(), *RecipientId, *ConversationId, TurnIndex);
 	}
 
 	// Persist the one deliberately offered promise only after a nearby, mutually

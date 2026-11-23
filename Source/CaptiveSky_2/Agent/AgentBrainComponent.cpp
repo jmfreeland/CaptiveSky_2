@@ -200,6 +200,15 @@ void UAgentBrainComponent::RememberPlace(FName Target, const FString& Label, con
 	if (bPlacesDirty && SaveRememberedPlaces()) bPlacesDirty = false;
 }
 
+bool UAgentBrainComponent::KnowsRememberedPlace(const FString& Target) const
+{
+	if (Target.IsEmpty()) return false;
+	LoadRememberedPlaces();
+	const FName TargetName(*Target);
+	return RememberedPlaces.ContainsByPredicate([TargetName](const FRememberedPlace& Place)
+		{ return Place.Target == TargetName; });
+}
+
 FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationContext& Context) const
 {
 	AActor* Owner = GetOwner();
@@ -1013,13 +1022,25 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			}
 		}
 	}
+	if (Context.Text.IsEmpty() || Context.bAgentToAgent)
+	{
+		LoadRememberedPlaces();
+		if (Context.Text.IsEmpty())
+		{
+			// Small lasting things are only noticed up close, so a resident that never moves on never meets them.
+			if (const int32 Lingered = CountLingeringDecisions(RecentDecisionSpots, Location, 1200.f); Lingered >= 6)
+				NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
+			NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 300.f, 3);
+		}
+		if (Context.bAgentToAgent && !RememberedPlaces.IsEmpty())
+		{
+			NearbyBeings += TEXT(" Your personally remembered place IDs (optional targets for a personal place_name, only if your spoken line uses your chosen name):");
+			for (const FRememberedPlace& Place : RememberedPlaces)
+				NearbyBeings += FString::Printf(TEXT(" %s (%s);"), *Place.Target.ToString(), *Place.Label);
+		}
+	}
 	if (Context.Text.IsEmpty())
 	{
-		// Small lasting things are only noticed up close, so a resident that never moves on never meets them.
-		if (const int32 Lingered = CountLingeringDecisions(RecentDecisionSpots, Location, 1200.f); Lingered >= 6)
-			NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
-		LoadRememberedPlaces();
-		NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 300.f, 3);
 		return FString::Printf(TEXT("You are at position (%.0f, %.0f, %.0f). Nearby:%s no one is speaking to you right now. Decide what to do."),
 			Location.X, Location.Y, Location.Z, *NearbyBeings);
 	}
@@ -1101,7 +1122,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade|practice_craft\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"promise\": {\"object_id\": \"BlueJar\", \"place_id\": \"InnCounter\", \"due_in_days\": 1}, \"craft_id\": \"<exact known tradition ID, or a new safe ID for first practice>\", \"craft_name\": \"<short name, only for a new tradition>\", \"craft_source\": \"<brief inspiration, only for a new tradition>\", \"craft_parameters\": [{\"id\": \"hydration|rise|heat|salt\", \"value\": 0.0}], \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade|practice_craft\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"place_name\": {\"place_id\": \"<exact remembered place ID>\", \"name\": \"<your optional personal name for it>\"}, \"promise\": {\"object_id\": \"BlueJar\", \"place_id\": \"InnCounter\", \"due_in_days\": 1}, \"craft_id\": \"<exact known tradition ID, or a new safe ID for first practice>\", \"craft_name\": \"<short name, only for a new tradition>\", \"craft_source\": \"<brief inspiration, only for a new tradition>\", \"craft_parameters\": [{\"id\": \"hydration|rise|heat|salt\", \"value\": 0.0}], \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"For move_to, interact, build, land, and practice_craft, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
 		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
@@ -1109,6 +1130,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"In an in-world conversation with another resident, you may optionally set teach_craft to one exact ID from the craft traditions you personally know, only when your speech deliberately shares that practice. The nearby recipient gains attributed knowledge only after the line is delivered in the reserved, in-range resident conversation. Do not set it for the player, Discord, or any external correspondent; do not claim an item was made or given. Teaching is optional; do not invent an ID or make teaching a duty. "
+		"In a nearby in-world conversation with another resident, you may optionally set place_name to {place_id, name} for a place anchor in your own remembered places, only when the spoken line actually uses the name you chose. The name is your personal description, not a canonical rename; competing names may coexist. Only a successfully delivered resident-to-resident line records your claim and lets that listener know who used it. Do not invent a place ID, claim another resident shares your opinion, or use this for the player or external correspondents. Naming is optional and should grow from your experience, never be a duty. "
 		"Only Aster speaking to the Innkeeper in a nearby, in-world resident conversation may optionally set promise to exactly {object_id: BlueJar, place_id: InnCounter, due_in_days: 1}. Set it only when you freely choose to tell the Innkeeper you will bring the blue jar to the inn counter tomorrow, and make that promise explicit in your spoken line. It records the words after delivery; it does not mean the jar exists, is carried, or has been delivered. Do not promise on the player's behalf, to external correspondents, or as a duty. Promising is optional; silence or another topic is equally valid. "
 		"You may optionally choose practice_craft only when the current situation explicitly says you are close enough to the lit InnHearth. Use target InnHearth. If you already know the tradition, copy its exact ID and do not rename it; otherwise you may begin one only when genuinely curious, with a short safe craft_id (ASCII letters, digits, _ or -), a concise craft_name, and a brief source grounded in your memory, observation, or curiosity. Give one to four intended settings using only hydration, rise, heat, or salt, each in range 0..1. These are speculative notes, not measured ingredients, quality, or proof of success. The record is unrated, one attempt per Island day, and creates no ingredients, food, or prop. This action uses the current thought only; do not repeat it as a duty. "
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. If the situation names your assigned WildlifeHome target, you may move_to there and choose sleep after arriving; that records where you rested, not proof of shelter, safety, comfort, or recovery. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
@@ -1554,6 +1576,12 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("influence"), Decision.Influence);
 		(*ActionObj)->TryGetStringField(TEXT("teach_arrangement"), Decision.TeachArrangement);
 		(*ActionObj)->TryGetStringField(TEXT("teach_craft"), Decision.TeachCraft);
+		const TSharedPtr<FJsonObject>* PlaceNameObj = nullptr;
+		if ((*ActionObj)->TryGetObjectField(TEXT("place_name"), PlaceNameObj) && PlaceNameObj && PlaceNameObj->IsValid())
+		{
+			(*PlaceNameObj)->TryGetStringField(TEXT("place_id"), Decision.PlaceNameTarget);
+			(*PlaceNameObj)->TryGetStringField(TEXT("name"), Decision.PlaceNameLabel);
+		}
 		const TSharedPtr<FJsonObject>* PromiseObj = nullptr;
 		if ((*ActionObj)->TryGetObjectField(TEXT("promise"), PromiseObj) && PromiseObj && PromiseObj->IsValid())
 		{

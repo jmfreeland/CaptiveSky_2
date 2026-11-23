@@ -88,6 +88,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Agent Brain")
 	void RequestContextualDecision(const FAgentConversationContext& Context);
 
+	/** True only when this resident has personally recorded the exact place anchor. */
+	bool KnowsRememberedPlace(const FString& Target) const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

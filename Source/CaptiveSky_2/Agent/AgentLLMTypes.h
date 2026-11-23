@@ -139,6 +139,13 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachCraft;
 
+	/** Optional personal name for a remembered place, shared only through nearby resident speech. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString PlaceNameTarget;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString PlaceNameLabel;
+
 	/** Optional whitelisted promise offered during a delivered resident-to-resident line. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString PromiseObjectId;
