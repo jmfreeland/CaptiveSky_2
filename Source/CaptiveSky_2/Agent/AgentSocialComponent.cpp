@@ -236,7 +236,7 @@ void UAgentSocialComponent::ApplyMutualCooldown(AAutonomousAgentCharacter* Other
 	}
 }
 
-void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Utterance)
+bool UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Utterance)
 {
 	AAutonomousAgentCharacter* Sender = FindAgent(Utterance.SenderAgentId);
 	const UAgentMemoryComponent* OwnMemory = GetOwner()
@@ -247,7 +247,7 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		!IsReservedFor(Utterance.SenderAgentId, Utterance.ConversationId) ||
 		!SenderSocial->IsReservedFor(OwnMemory->GetResolvedAgentId(), Utterance.ConversationId))
 	{
-		return;
+		return false;
 	}
 
 	const UAgentConsolidationComponent* Consolidation = GetOwner()->FindComponentByClass<UAgentConsolidationComponent>();
@@ -257,7 +257,7 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		(Consolidation && !Consolidation->IsAwake()))
 	{
 		FinishAutomaticConversation(Sender, Utterance.ConversationId, true);
-		return;
+		return false;
 	}
 	if (!Utterance.TeachArrangementSiteId.IsEmpty())
 	{
@@ -284,6 +284,7 @@ void UAgentSocialComponent::ReceiveUtterance(const FAgentSocialUtterance& Uttera
 		TEXT("[AgentSocial] %s queued reply turn %d to %s in conversation %s; waiting %.1f real seconds."),
 		*GetNameSafe(GetOwner()), Utterance.TurnIndex, *Utterance.SenderDisplayName,
 		*Utterance.ConversationId, ReplyPauseSeconds);
+	return true;
 }
 
 void UAgentSocialComponent::TryBeginPendingUtterance()
@@ -417,10 +418,22 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	{
 		return;
 	}
-	UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] automatic conversation line %d delivered: %s -> %s (id=%s)."),
-		TurnIndex, *SpeakerId, *RecipientId, *ConversationId);
 	const FString SpeakerName = Speaker->GetAgentDisplayName();
 	const FString RecipientName = Recipient->GetAgentDisplayName();
+	const bool bEndsConversation = IsConversationAtTurnLimit(TurnIndex);
+	FAgentSocialUtterance Utterance;
+	Utterance.ConversationId = ConversationId;
+	Utterance.SenderAgentId = SpeakerId;
+	Utterance.SenderDisplayName = SpeakerName;
+	Utterance.Speech = Speech;
+	Utterance.TeachArrangementSiteId = TeachArrangementSiteId;
+	Utterance.TeachCraftTraditionId = TeachCraftTraditionId;
+	Utterance.TurnIndex = TurnIndex;
+	// Queue the listener's reply first. A rejected line must not become a remembered
+	// promise/name, a relationship interaction, a Chronicle fact, or a public utterance.
+	if (!bEndsConversation && !RecipientSocial->ReceiveUtterance(Utterance)) return;
+	UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] automatic conversation line %d delivered: %s -> %s (id=%s)."),
+		TurnIndex, *SpeakerId, *RecipientId, *ConversationId);
 	if (UAgentRelationshipComponent* Relationships = Speaker->FindComponentByClass<UAgentRelationshipComponent>())
 	{
 		Relationships->RecordInteraction(RecipientId, RecipientName,
@@ -498,18 +511,8 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 		}
 	}
 
-	FAgentSocialUtterance Utterance;
-	Utterance.ConversationId = ConversationId;
-	Utterance.SenderAgentId = SpeakerId;
-	Utterance.SenderDisplayName = SpeakerName;
-	Utterance.Speech = Speech;
-	Utterance.TeachArrangementSiteId = TeachArrangementSiteId;
-	Utterance.TeachCraftTraditionId = TeachCraftTraditionId;
-	Utterance.TurnIndex = TurnIndex;
-	if (IsConversationAtTurnLimit(TurnIndex))
+	if (bEndsConversation)
 	{
 		FinishAutomaticConversation(Recipient, ConversationId, true);
-		return;
 	}
-	RecipientSocial->ReceiveUtterance(Utterance);
 }

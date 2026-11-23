@@ -4,10 +4,11 @@
 
 The resident decision schema can optionally carry one whitelisted promise payload:
 Aster may tell the Innkeeper that she will bring `BlueJar` to `InnCounter` tomorrow.
-The social handoff records it only when the line is accepted through the nearby,
-reserved resident conversation path and the delivered text explicitly contains
-“bring”, “jar”, and “tomorrow”. The world-state ledger remains the authority for
-the record and deadline.
+The social handoff records it only after the listener accepts the line into the
+nearby, reserved conversation queue (or when a valid final turn closes that
+conversation), and the delivered text explicitly contains “bring”, “jar”, and
+“tomorrow”. A rejected utterance cannot create a promise. The world-state ledger
+remains the authority for the record and deadline.
 
 Both participants receive the record in their own internal situation summary,
 including its pending, due, witnessed-fulfilled, or expired status. Other residents

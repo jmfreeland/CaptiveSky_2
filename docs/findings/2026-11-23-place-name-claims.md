@@ -8,6 +8,11 @@ nearby resident-to-resident line, only when the spoken line contains the chosen
 name, and only when the speaker's remembered-place list contains the exact
 anchor ID. Names are short, plain labels. Invalid or unspoken claims are ignored.
 
+The listener must accept the utterance into its conversation queue before the
+speech, social records, or promised side effects are published. A final line
+that closes a reserved conversation is delivered without waiting for another
+reply. Rejected lines leave no place-name memories or Chronicle entry.
+
 The speaker and listener receive separate append-only conversation memories.
 Each record retains the stable place ID, claimant or source resident, source
 conversation ID, and turn number. The listener's memory says who used the name;

@@ -72,7 +72,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Agent Social", meta = (ClampMin = "1", ClampMax = "16"))
 	int32 MaximumPendingUtterances = 4;
 
-	void ReceiveUtterance(const FAgentSocialUtterance& Utterance);
+	bool ReceiveUtterance(const FAgentSocialUtterance& Utterance);
 	/** Remaining real-time pause before an automatic conversation with this resident can begin. */
 	float GetConversationCooldownRemainingWith(const FString& OtherAgentId) const;
 	/** True while this resident is reserved for one mutual automatic exchange. */
