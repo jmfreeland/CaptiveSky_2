@@ -15,6 +15,14 @@ including its pending, due, witnessed-fulfilled, or expired status. Other reside
 and external correspondents do not receive this private context. The summary says
 that it records speech and does not prove the jar exists or was delivered.
 
+Commitment deadlines now advance at the Island day rollover. When saved-clock
+resumption is enabled, the clock persists the new day and due/expired transition
+together through the existing world-state save; with resumption disabled, the
+transition is still advanced for the current session. This avoids waiting for
+Aster to attempt an action before the ledger and Chronicle reflect a missed
+deadline. The source change is committed as `a5e43425`; UE build and live
+rollover behavior remain unverified.
+
 ## Physical delivery path and limits
 
 A follow-up gameplay path offers Aster a visible, tagged `BlueJar` prop to pick
