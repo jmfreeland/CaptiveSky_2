@@ -6,9 +6,10 @@ The offline World Atlas now accepts `wildlife` Chronicle entries and retains bou
 
 ## Verification
 
-- UE 5.8.3 `CaptiveSky_2Editor` compiled and linked successfully (9 UBT actions; 35.19 seconds), compiling the crab, wrack, and focused automation-test sources.
+- UE 5.8.4 `CaptiveSky_2Editor` compiled and linked successfully (9 UBT actions; 35.19 seconds), compiling the crab, wrack, and focused automation-test sources.
 - `python -m unittest Scripts.tests.test_build_chronicle Scripts.tests.test_build_world_atlas`: 11 tests passed, including string-coordinate mapping and source-ID visibility.
-- The focused Unreal command-line automation attempt ended after the AutoSDK validation output and did not create `Saved/Logs/Codex_WrackProvenance_20261123.log`; no pass is claimed for the automation fixture or live detour. No Unreal editor process remains running.
+- UE 5.8.4 `CaptiveSky2.Agent.TidepoolCrabShoreForage` automation passed with exit code 0. The log records the new crab-investigation source ID/location assertions and the resident `shore_find_discovered` record assertion: `Saved/Logs/Codex_WrackProvenanceRetry_20261123.log`.
+- The same command-line run loaded Island and completed its map check with 0 errors and 0 warnings. This confirms startup and the focused fixture, not a live gameplay/visual session.
 - No Island map, canonical WorldState, runtime Content asset, or resident model-call pathway was changed.
 
 This adds provenance to the existing transient crab cue and verified resident inspection record. It does not yet make a discovered object a separate materialized prop, store witness identities, or make residents learn the event through conversation.
