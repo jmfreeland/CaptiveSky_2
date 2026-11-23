@@ -298,11 +298,11 @@ def _fmt(value: float) -> str:
 
 
 def _scale_bar(scale_px_per_cm: float) -> tuple[float, str]:
-    """Choose a readable 1/2/5 distance bar near 120 SVG units wide."""
+    """Choose the largest readable 1/2/5 distance bar no wider than 120 SVG units."""
     desired_cm = 120.0 / scale_px_per_cm
     magnitude = 10 ** math.floor(math.log10(desired_cm))
     ratio = desired_cm / magnitude
-    factor = 1 if ratio <= 1 else 2 if ratio <= 2 else 5 if ratio <= 5 else 10
+    factor = 5 if ratio >= 5 else 2 if ratio >= 2 else 1
     distance_cm = factor * magnitude
     if distance_cm >= 100_000:
         label = f"{distance_cm / 100_000:.3g} km"
