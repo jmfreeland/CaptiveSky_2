@@ -14,14 +14,26 @@ including its pending, due, witnessed-fulfilled, or expired status. Other reside
 and external correspondents do not receive this private context. The summary says
 that it records speech and does not prove the jar exists or was delivered.
 
-## Limits and verification
+## Physical delivery path and limits
 
-This connects the proposal to resident conversation but does not create a jar,
-place it on the counter, or let either resident perform a delivery action yet. The
-word checks are a narrow safeguard for this single prototype, not general natural
-language understanding or proof that every promise is sincere.
+A follow-up gameplay path offers Aster a visible, tagged `BlueJar` prop to pick
+up, attaches it to the resident's hand socket when available (with a body-root
+fallback), and lets her set it down or carry it to `InnCounter`. Delivery
+requires the Innkeeper to be nearby and have line of sight to the placed jar.
+The ledger records fulfillment only after placement and a successful save; if
+the save fails, the jar returns to Aster's hand when possible. A fulfilled ledger
+entry restores the authored jar to the counter after a level reload.
 
-`CaptiveSky_2Editor` built successfully with UE 5.8.3 (14 actions). The focused
-ledger automation was previously run and passed as recorded in
-`2026-11-23-social-commitment-ledger.md`; no new automation test was run for this
-conversation hook.
+The Island map still has no saved `BlueJar` actor. Run
+`Scripts/Place-IslandBlueJar.py` in the editor after the map is no longer open
+elsewhere; it places the imported mesh on `Inn_Table_Front`, tags it `BlueJar`,
+and saves the map. The current editor holds the shared Island map open, so this
+placement has not been applied yet. Content and map assets are gitignored; the
+tracked placement script makes the local setup repeatable. The gameplay code
+compiled, but has not been exercised in-game. It assumes one authored jar and
+tagged `IslandInn`/`InnCounter` actors. The natural-language promise check
+remains a narrow safeguard for this prototype, not proof that every promise is
+sincere.
+
+`CaptiveSky_2Editor` built successfully with UE 5.8.3 (15 actions) after the
+physical-delivery follow-up; no new automation test has been added or run.

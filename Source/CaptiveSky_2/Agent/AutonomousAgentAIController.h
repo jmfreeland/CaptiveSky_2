@@ -118,6 +118,7 @@ protected:
 	virtual bool CanArrangeStones() const;
 	void ArrangeStones(const FAgentDecision& Decision);
 	void WriteGuestBook(const FAgentDecision& Decision);
+	void HandleBlueJarAction(FName Target);
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 	void ReportAction(const FString& Outcome);
 	bool IsResting() const;
@@ -148,6 +149,8 @@ private:
 	double NextThinkAt = 0;
 	double NextRestAt = 0;
 	TMap<FName, double> InspectedUntil;
+	TWeakObjectPtr<AActor> CarriedBlueJar;
+	bool bBlueJarOriginalCollisionEnabled = true;
 	void InspectTarget(FName Target);
 
 	// Bound to the possessed character's Brain->OnDecisionReady.

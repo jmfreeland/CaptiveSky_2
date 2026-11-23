@@ -26,6 +26,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "HAL/PlatformTime.h"
 #include "HAL/IConsoleManager.h"
@@ -1017,6 +1018,218 @@ void AAutonomousAgentAIController::WriteGuestBook(const FAgentDecision& Decision
 		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation, TEXT("Inn guest book: ") + Fact, 0.65f, {TEXT("action-result"), TEXT("guest-book")}));
 }
 
+void AAutonomousAgentAIController::HandleBlueJarAction(FName Target)
+{
+	APawn* Body = GetPawn();
+	auto AttachJarToBody = [Body](AActor* Object) -> bool
+	{
+		if (!Body || !Object) return false;
+		if (USkeletalMeshComponent* Mesh = Body->FindComponentByClass<USkeletalMeshComponent>();
+			Mesh && Mesh->DoesSocketExist(TEXT("hand_r")))
+		{
+			if (!Object->AttachToComponent(Mesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("hand_r"))) return false;
+			Object->SetActorRelativeLocation(FVector::ZeroVector);
+			return true;
+		}
+		USceneComponent* Root = Body->GetRootComponent();
+		if (!Root || !Object->AttachToComponent(Root, FAttachmentTransformRules::KeepWorldTransform)) return false;
+		Object->SetActorRelativeLocation(FVector(45.f, 0.f, -10.f));
+		return true;
+	};
+	auto RestoreCarryAfterFailedDelivery = [this, &AttachJarToBody](AActor* Object) -> bool
+	{
+		if (AttachJarToBody(Object))
+		{
+			Object->SetActorEnableCollision(false);
+			return true;
+		}
+		CarriedBlueJar.Reset();
+		if (Object) Object->SetActorEnableCollision(bBlueJarOriginalCollisionEnabled);
+		return false;
+	};
+	UIslandWorldStateSubsystem* WorldState = GetWorld() ? GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>() : nullptr;
+	if (WorldState)
+		WorldState->AdvanceSocialCommitments(UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()));
+	UAgentMemoryComponent* Memory = Body ? Body->FindComponentByClass<UAgentMemoryComponent>() : nullptr;
+	const FString AgentId = Memory ? Memory->GetResolvedAgentId() : FString();
+	const FIslandSocialCommitmentRecord* Promise = WorldState
+		? WorldState->GetSocialCommitments().FindByPredicate([&AgentId](const FIslandSocialCommitmentRecord& Record)
+		{
+			return Record.ProposerAgentId == AgentId && Record.RecipientAgentId == TEXT("Innkeeper") &&
+				Record.ObjectId == TEXT("BlueJar") && Record.TargetPlaceId == TEXT("InnCounter") &&
+				(Record.Status == EIslandSocialCommitmentStatus::Pending || Record.Status == EIslandSocialCommitmentStatus::Due);
+		})
+		: nullptr;
+	if (!Body || AgentId != TEXT("Aster"))
+	{
+		ReportAction(TEXT("This optional BlueJar action is available to Aster only. Nothing changed."));
+		return;
+	}
+	if (Target == TEXT("SetDownBlueJar") && CarriedBlueJar.IsValid())
+	{
+		const FVector Forward = Body->GetActorForwardVector();
+		const FVector TraceStart = Body->GetActorLocation() + Forward * 80.f + FVector(0.f, 0.f, 160.f);
+		const FVector TraceEnd = TraceStart - FVector(0.f, 0.f, 420.f);
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentBlueJarSetDown), false, Body);
+		Query.AddIgnoredActor(CarriedBlueJar.Get());
+		FHitResult FloorHit;
+		if (!GetWorld()->LineTraceSingleByChannel(FloorHit, TraceStart, TraceEnd, ECC_Visibility, Query))
+		{
+			ReportAction(TEXT("There is no safe visible ground beside you to set the jar down; you are still carrying it."));
+			return;
+		}
+		AActor* JarToDrop = CarriedBlueJar.Get();
+		const FBox JarBounds = JarToDrop->GetComponentsBoundingBox(true);
+		if (!JarBounds.IsValid)
+		{
+			ReportAction(TEXT("The jar has no usable physical bounds, so it remains with you."));
+			return;
+		}
+		const float PivotToBoundsCenterZ = JarBounds.GetCenter().Z - JarToDrop->GetActorLocation().Z;
+		FVector DropLocation = FloorHit.ImpactPoint + Forward * 10.f;
+		DropLocation.Z -= PivotToBoundsCenterZ;
+		JarToDrop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		JarToDrop->SetActorLocation(DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		JarToDrop->SetActorEnableCollision(bBlueJarOriginalCollisionEnabled);
+		CarriedBlueJar.Reset();
+		ReportAction(TEXT("You set the blue jar down on the nearby ground. The promise remains optional and unresolved."));
+		return;
+	}
+	if (!Promise)
+	{
+		ReportAction(TEXT("There is no active BlueJar promise for you to act on. Nothing changed."));
+		return;
+	}
+
+	AActor* Jar = CarriedBlueJar.Get();
+	if (!Jar)
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			if (It->ActorHasTag(TEXT("BlueJar"))) { Jar = *It; break; }
+	if (!Jar || !Jar->FindComponentByClass<UStaticMeshComponent>())
+	{
+		ReportAction(TEXT("There is no visible BlueJar prop in this world to carry; the promise remains unfulfilled."));
+		return;
+	}
+
+	if (Target == TEXT("PickUpBlueJar"))
+	{
+		if (CarriedBlueJar.IsValid())
+		{
+			ReportAction(TEXT("You are already carrying the blue jar. Nothing changed."));
+			return;
+		}
+		if (Jar->GetAttachParentActor())
+		{
+			ReportAction(TEXT("The blue jar is already being carried by someone else; you leave it with them."));
+			return;
+		}
+		const FVector Delta = Jar->GetActorLocation() - Body->GetActorLocation();
+		if (Delta.SizeSquared2D() > FMath::Square(250.f) || FMath::Abs(Delta.Z) > 200.f)
+		{
+			ReportAction(TEXT("The blue jar is out of reach; come within two and a half metres before picking it up."));
+			return;
+		}
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(AgentBlueJarPickup), false, Body);
+		Query.AddIgnoredActor(Jar);
+		FHitResult Hit;
+		const FBox JarBounds = Jar->GetComponentsBoundingBox(true);
+		const FVector JarViewPoint = JarBounds.IsValid ? JarBounds.GetCenter() : Jar->GetActorLocation();
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Body->GetActorLocation() + FVector(0.f, 0.f, 55.f),
+			JarViewPoint, ECC_Visibility, Query))
+		{
+			ReportAction(TEXT("The blue jar is screened from view; find a clear approach before picking it up."));
+			return;
+		}
+		bBlueJarOriginalCollisionEnabled = Jar->GetActorEnableCollision();
+		if (!AttachJarToBody(Jar))
+		{
+			ReportAction(TEXT("The jar could not be picked up; it remains where it was."));
+			return;
+		}
+		Jar->SetActorEnableCollision(false);
+		CarriedBlueJar = Jar;
+		ReportAction(TEXT("You picked up the blue jar. It is visibly carried with you; choose whether and when to bring it to the InnCounter."));
+		return;
+	}
+
+	if (Target != TEXT("DeliverBlueJar") || !CarriedBlueJar.IsValid())
+	{
+		ReportAction(TEXT("You are not carrying the blue jar. Nothing changed."));
+		return;
+	}
+
+	AActor* Counter = nullptr;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		if (It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter"))) { Counter = *It; break; }
+	if (!Counter || FVector::Dist2D(Body->GetActorLocation(), Counter->GetActorLocation()) > 300.f ||
+		FMath::Abs(Body->GetActorLocation().Z - Counter->GetActorLocation().Z) > 250.f)
+	{
+		ReportAction(TEXT("The InnCounter is not within reach. Move to InnCounter before setting the jar down."));
+		return;
+	}
+
+	APawn* Witness = nullptr;
+	for (TActorIterator<AAutonomousAgentCharacter> It(GetWorld()); It; ++It)
+	{
+		const UAgentMemoryComponent* WitnessMemory = It->FindComponentByClass<UAgentMemoryComponent>();
+		if (!WitnessMemory || WitnessMemory->GetResolvedAgentId() != Promise->RecipientAgentId ||
+			FVector::DistSquared(It->GetActorLocation(), Counter->GetActorLocation()) > FMath::Square(400.f)) continue;
+		Witness = *It;
+		break;
+	}
+	if (!Witness)
+	{
+		ReportAction(TEXT("The Innkeeper is not beside the counter to witness delivery yet. The jar remains with you."));
+		return;
+	}
+
+	Jar = CarriedBlueJar.Get();
+	const FBox CounterBounds = Counter->GetComponentsBoundingBox(true);
+	const FBox JarBounds = Jar->GetComponentsBoundingBox(true);
+	if (!CounterBounds.IsValid || !JarBounds.IsValid)
+	{
+		ReportAction(TEXT("The counter or jar has no usable physical bounds; delivery could not be placed."));
+		return;
+	}
+	FVector Placement = CounterBounds.GetCenter();
+	const float JarPivotToBoundsCenterZ = JarBounds.GetCenter().Z - Jar->GetActorLocation().Z;
+	Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsCenterZ + 1.f;
+	Jar->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	Jar->SetActorLocation(Placement, false, nullptr, ETeleportType::TeleportPhysics);
+	Jar->SetActorEnableCollision(bBlueJarOriginalCollisionEnabled);
+	FCollisionQueryParams WitnessQuery(SCENE_QUERY_STAT(AgentBlueJarWitness), false, Witness);
+	WitnessQuery.AddIgnoredActor(Jar);
+	FHitResult WitnessHit;
+	const FVector JarCenter = Jar->GetComponentsBoundingBox(true).GetCenter();
+	if (GetWorld()->LineTraceSingleByChannel(WitnessHit, Witness->GetActorLocation() + FVector(0.f, 0.f, 60.f),
+		JarCenter, ECC_Visibility, WitnessQuery))
+	{
+		const bool bRestoredCarry = RestoreCarryAfterFailedDelivery(Jar);
+		ReportAction(bRestoredCarry
+			? TEXT("The Innkeeper could not see the jar at the counter, so delivery was not witnessed. You are still carrying it.")
+			: TEXT("The Innkeeper could not see the jar, and your body could not take it back. It remains on the counter; the promise is still unfulfilled."));
+		return;
+	}
+
+	const FString Evidence = TEXT("Aster set the visible BlueJar on InnCounter while the Innkeeper stood beside it.");
+	if (!WorldState->RecordSocialCommitmentFulfilled(Promise->Id, AgentId,
+		UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld()), Promise->RecipientAgentId, Evidence))
+	{
+		const bool bRestoredCarry = RestoreCarryAfterFailedDelivery(Jar);
+		ReportAction(bRestoredCarry
+			? TEXT("The delivery could not be recorded; you are still carrying the jar and the promise remains unresolved.")
+			: TEXT("The delivery record could not be saved, and your body could not take the jar back. It remains visibly on the counter, but the promise is still unresolved."));
+		return;
+	}
+
+	CarriedBlueJar.Reset();
+	ReportAction(TEXT("You placed the blue jar on the InnCounter. The Innkeeper saw it there, and the promise is recorded as fulfilled."));
+	if (Memory)
+		Memory->AppendMemory(Memory->MakeMemory(EAgentMemoryType::Observation,
+			TEXT("I brought the visible blue jar to the inn counter; the Innkeeper witnessed it."),
+			0.8f, { TEXT("action-result"), TEXT("blue-jar-delivery"), TEXT("Innkeeper") }));
+}
+
 void AAutonomousAgentAIController::HandleDecisionReady(const FAgentDecision& Decision)
 {
 	if (!Decision.bValid)
@@ -1327,6 +1540,9 @@ void AAutonomousAgentAIController::ActOnDecision(const FAgentDecision& Decision)
 	case EAgentActionType::Build:
 		if (Decision.ActionTarget.StartsWith(TEXT("ArrangingGround"))) ArrangeStones(Decision);
 		else if (Decision.ActionTarget == TEXT("GuestBook")) WriteGuestBook(Decision);
+		else if (Decision.ActionTarget == TEXT("PickUpBlueJar") || Decision.ActionTarget == TEXT("DeliverBlueJar") ||
+			Decision.ActionTarget == TEXT("SetDownBlueJar"))
+			HandleBlueJarAction(FName(*Decision.ActionTarget));
 		else ReportAction(TEXT("This body has no way to build anything yet; nothing changed."));
 		break;
 	case EAgentActionType::Sleep:

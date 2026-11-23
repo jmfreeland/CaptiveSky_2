@@ -265,6 +265,30 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 	if (Curios.Num() == 0) PlaceCurios();
 	if (ArrangementSites.Num() == 0) PlaceArrangementSites();
 	AdvanceSocialCommitments(SavedDay.Get(1));
+	// The map supplies one authored BlueJar actor. Fulfilled records are the
+	// authority for restoring its delivered location after a level reload.
+	for (const FIslandSocialCommitmentRecord& Commitment : SocialCommitments)
+	{
+		if (Commitment.Status != EIslandSocialCommitmentStatus::Fulfilled || Commitment.ObjectId != TEXT("BlueJar") ||
+			Commitment.TargetPlaceId != TEXT("InnCounter")) continue;
+		AActor* Jar = nullptr;
+		AActor* Counter = nullptr;
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (!Jar && It->ActorHasTag(TEXT("BlueJar"))) Jar = *It;
+			if (!Counter && It->ActorHasTag(TEXT("IslandInn")) && It->ActorHasTag(TEXT("InnCounter"))) Counter = *It;
+		}
+		if (!Jar || !Counter) continue;
+		const FBox CounterBounds = Counter->GetComponentsBoundingBox(true);
+		const FBox JarBounds = Jar->GetComponentsBoundingBox(true);
+		if (!CounterBounds.IsValid || !JarBounds.IsValid) continue;
+		FVector Placement = CounterBounds.GetCenter();
+		const float JarPivotToBoundsCenterZ = JarBounds.GetCenter().Z - Jar->GetActorLocation().Z;
+		Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsCenterZ + 1.f;
+		Jar->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		Jar->SetActorLocation(Placement, false, nullptr, ETeleportType::TeleportPhysics);
+		break;
+	}
 	RefreshGuestBookActor();
 	UE_LOG(LogIslandWorldState, Log, TEXT("Loaded %d lasting nest(s) and %d curio(s) from %s"), Nests.Num(), Curios.Num(), *Path);
 }
