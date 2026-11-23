@@ -30,6 +30,12 @@ deadline, leaves room to acknowledge the outcome or move on, and does not assign
 motive, debt, gratitude, or an obligation to apologize. This adds no persistent
 state or model request. The prompt change is not yet built or observed in play.
 
+Creation, due, expiry, and fulfillment Chronicle entries now carry the same
+commitment ID and source conversation ID. This lets an observer trace the
+outcome back to the recorded exchange without duplicating the spoken line or
+implying an unrecorded intent. The Atlas timeline labels lifecycle state
+and displays both IDs; fresh Chronicle data and visual review are still pending.
+
 ## Physical delivery path and limits
 
 A follow-up gameplay path offers Aster a visible, tagged `BlueJar` prop to pick

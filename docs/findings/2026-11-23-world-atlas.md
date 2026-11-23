@@ -10,6 +10,8 @@ The page also summarizes the supplied trail-cell count, sum of per-cell steps, s
 
 The Atlas accepts `place_name_claim` Chronicle entries and shows the claimant's personal label, stable place ID, recipient, conversation, and turn in the event timeline. These records carry no spatial provenance, so they stay out of the map and are labeled without suggesting listener agreement or community adoption.
 
+Social-commitment Chronicle events now preserve the commitment ID and originating conversation ID through creation, due, expiry, and fulfillment. The timeline shows the lifecycle state and both IDs so related outcomes can be followed without guessing from text. Current preview data predates these fields; a fresh stopped-game snapshot and visual review are pending.
+
 The Atlas also accepts `wrack` events for storm-deposited shore material. The current Chronicle record contains descriptive text but no coordinates, so it appears in the timeline without a map marker.
 
 `Scripts/Build-WorldAtlasSnapshot.ps1` provides a guarded refresh path for future snapshots. It refuses to run while `UnrealEditor`, `UnrealEditor-Cmd`, or the packaged CaptiveSky game is running; it copies `WorldState/<Map>.json` plus available trail/Chronicle files, verifies SHA-256 hashes before/after copying, writes a manifest, and builds the Atlas from those copies. The data root defaults to the project directory; pass `-DataRoot` for sessions started with `-CaptiveSkyDataRoot`.

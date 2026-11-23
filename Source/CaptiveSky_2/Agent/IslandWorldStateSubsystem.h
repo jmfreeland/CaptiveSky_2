@@ -490,7 +490,8 @@ private:
 	bool bStorageUnreadable = false;
 
 	bool Save() const;
-	bool AdvanceSocialCommitmentsInternal(int32 Today, TArray<FString>& OutEvents);
+	bool AdvanceSocialCommitmentsInternal(int32 Today, TArray<FIslandSocialCommitmentRecord>& OutEvents);
+	void RecordSocialCommitmentChronicleEvents(const TArray<FIslandSocialCommitmentRecord>& Events) const;
 	void RefreshNestActor(const FIslandNestRecord& Record);
 	void DestroyNestActors();
 	void RefreshWildlifeHomeActor(const FIslandWildlifeHomeRecord& Record);

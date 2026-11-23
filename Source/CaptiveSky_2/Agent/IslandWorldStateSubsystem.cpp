@@ -1019,7 +1019,7 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 	const int32 PreviousDayValue = SavedDay.Get(1);
 	SavedHour = FMath::Clamp(Hour, 0.f, 23.999f);
 	SavedDay = FMath::Clamp(Day, 1, 10000000);
-	TArray<FString> CommitmentEvents;
+	TArray<FIslandSocialCommitmentRecord> CommitmentEvents;
 	if (!AdvanceSocialCommitmentsInternal(SavedDay.GetValue(), CommitmentEvents))
 	{
 		SavedHour = PreviousHour;
@@ -1033,8 +1033,7 @@ bool UIslandWorldStateSubsystem::SaveClock(float Hour, int32 Day)
 	{
 		if (SavedDay.GetValue() != PreviousDayValue)
 			for (const FIslandNestRecord& Nest : Nests) RefreshNestActor(Nest);
-		for (const FString& Event : CommitmentEvents)
-			UIslandChronicleSubsystem::Record(GetWorld(), TEXT("social_commitment"), FString(), Event);
+		RecordSocialCommitmentChronicleEvents(CommitmentEvents);
 		return true;
 	}
 	SavedHour = PreviousHour;
@@ -1844,11 +1843,14 @@ bool UIslandWorldStateSubsystem::CreateBringObjectCommitment(const FIslandSocial
 		FString::Printf(TEXT("promised %s that they would bring %s to %s by Island day %d."),
 			*Record.RecipientAgentId, *Record.ObjectId.ToString(), *Record.TargetPlaceId.ToString(), Record.DueDay),
 		{ { TEXT("id"), Record.Id.ToString() }, { TEXT("event"), TEXT("created") },
-			{ TEXT("recipient"), Record.RecipientAgentId }, { TEXT("due_day"), FString::FromInt(Record.DueDay) } });
+			{ TEXT("recipient"), Record.RecipientAgentId }, { TEXT("due_day"), FString::FromInt(Record.DueDay) },
+			{ TEXT("object_id"), Record.ObjectId.ToString() }, { TEXT("place_id"), Record.TargetPlaceId.ToString() },
+			{ TEXT("conversation_id"), Record.SourceConversationId } });
 	return true;
 }
 
-bool UIslandWorldStateSubsystem::AdvanceSocialCommitmentsInternal(int32 Today, TArray<FString>& OutEvents)
+bool UIslandWorldStateSubsystem::AdvanceSocialCommitmentsInternal(int32 Today,
+	TArray<FIslandSocialCommitmentRecord>& OutEvents)
 {
 	if (Today < 1 || Today > 10000000) return false;
 	for (FIslandSocialCommitmentRecord& Record : SocialCommitments)
@@ -1856,24 +1858,43 @@ bool UIslandWorldStateSubsystem::AdvanceSocialCommitmentsInternal(int32 Today, T
 		if (Record.Status == EIslandSocialCommitmentStatus::Pending && Today >= Record.DueDay)
 		{
 			Record.Status = EIslandSocialCommitmentStatus::Due;
-			OutEvents.Add(FString::Printf(TEXT("Promise %s: %s's promise to bring %s to %s is due on Island day %d."),
-				*Record.Id.ToString(), *Record.ProposerAgentId, *Record.ObjectId.ToString(), *Record.TargetPlaceId.ToString(), Record.DueDay));
+			OutEvents.Add(Record);
 		}
 		if (Record.Status == EIslandSocialCommitmentStatus::Due && Today > Record.DueDay)
 		{
 			Record.Status = EIslandSocialCommitmentStatus::Expired;
 			Record.ExpiredDay = Today;
-			OutEvents.Add(FString::Printf(TEXT("Promise %s: %s did not bring %s to %s by Island day %d; it expired on day %d."),
-				*Record.Id.ToString(), *Record.ProposerAgentId, *Record.ObjectId.ToString(), *Record.TargetPlaceId.ToString(), Record.DueDay, Today));
+			OutEvents.Add(Record);
 		}
 	}
 	return true;
 }
 
+void UIslandWorldStateSubsystem::RecordSocialCommitmentChronicleEvents(
+	const TArray<FIslandSocialCommitmentRecord>& Events) const
+{
+	for (const FIslandSocialCommitmentRecord& Commitment : Events)
+	{
+		const bool bExpired = Commitment.Status == EIslandSocialCommitmentStatus::Expired;
+		const FString EventText = bExpired
+			? FString::Printf(TEXT("Promise %s: %s did not bring %s to %s by Island day %d; it expired on day %d."),
+				*Commitment.Id.ToString(), *Commitment.ProposerAgentId, *Commitment.ObjectId.ToString(),
+				*Commitment.TargetPlaceId.ToString(), Commitment.DueDay, Commitment.ExpiredDay)
+			: FString::Printf(TEXT("Promise %s: %s's promise to bring %s to %s is due on Island day %d."),
+				*Commitment.Id.ToString(), *Commitment.ProposerAgentId, *Commitment.ObjectId.ToString(),
+				*Commitment.TargetPlaceId.ToString(), Commitment.DueDay);
+		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("social_commitment"), Commitment.ProposerAgentId, EventText,
+			{ { TEXT("id"), Commitment.Id.ToString() }, { TEXT("event"), bExpired ? TEXT("expired") : TEXT("due") },
+				{ TEXT("recipient"), Commitment.RecipientAgentId }, { TEXT("due_day"), FString::FromInt(Commitment.DueDay) },
+				{ TEXT("object_id"), Commitment.ObjectId.ToString() }, { TEXT("place_id"), Commitment.TargetPlaceId.ToString() },
+				{ TEXT("conversation_id"), Commitment.SourceConversationId } });
+	}
+}
+
 bool UIslandWorldStateSubsystem::AdvanceSocialCommitments(int32 Today)
 {
 	const TArray<FIslandSocialCommitmentRecord> Previous = SocialCommitments;
-	TArray<FString> Events;
+	TArray<FIslandSocialCommitmentRecord> Events;
 	if (!AdvanceSocialCommitmentsInternal(Today, Events)) return false;
 	if (Events.IsEmpty()) return true;
 	if (!Save())
@@ -1881,8 +1902,7 @@ bool UIslandWorldStateSubsystem::AdvanceSocialCommitments(int32 Today)
 		SocialCommitments = Previous;
 		return false;
 	}
-	for (const FString& Event : Events)
-		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("social_commitment"), FString(), Event);
+	RecordSocialCommitmentChronicleEvents(Events);
 	return true;
 }
 
@@ -1915,7 +1935,10 @@ bool UIslandWorldStateSubsystem::RecordSocialCommitmentFulfilled(FName Id, const
 		FString::Printf(TEXT("brought %s to %s as promised to %s; %s witnessed it."),
 			*Record.ObjectId.ToString(), *Record.TargetPlaceId.ToString(), *Record.RecipientAgentId, *WitnessAgentId),
 		{ { TEXT("id"), Record.Id.ToString() }, { TEXT("event"), TEXT("fulfilled") },
-			{ TEXT("witness"), WitnessAgentId }, { TEXT("evidence"), Record.OutcomeEvidence } });
+			{ TEXT("witness"), WitnessAgentId }, { TEXT("evidence"), Record.OutcomeEvidence },
+			{ TEXT("recipient"), Record.RecipientAgentId }, { TEXT("due_day"), FString::FromInt(Record.DueDay) },
+			{ TEXT("object_id"), Record.ObjectId.ToString() }, { TEXT("place_id"), Record.TargetPlaceId.ToString() },
+			{ TEXT("conversation_id"), Record.SourceConversationId } });
 	return true;
 }
 int32 UIslandWorldStateSubsystem::DisplayDay() const

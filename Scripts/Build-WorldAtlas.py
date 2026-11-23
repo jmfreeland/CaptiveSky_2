@@ -255,17 +255,21 @@ def load_chronicle(path: Path | None) -> dict[str, Any]:
         source_id = entry.get("source_id", "")
         if isinstance(source_id, str) and 0 < len(source_id) <= 80:
             event["source_id"] = source_id
+        conversation_id = entry.get("conversation_id", "")
+        if isinstance(conversation_id, str) and 0 < len(conversation_id) <= 128:
+            event["conversation_id"] = conversation_id
+        if kind == "social_commitment":
+            commitment_id = entry.get("id", "")
+            if isinstance(commitment_id, str) and 0 < len(commitment_id) <= 100:
+                event["commitment_id"] = commitment_id
         if kind == "place_name_claim":
             place_id = entry.get("place_id", "")
             recipient_id = entry.get("with", "")
-            conversation_id = entry.get("conversation_id", "")
             turn = _chronicle_int(entry.get("turn"), 1, 10_000)
             if isinstance(place_id, str) and 0 < len(place_id) <= 100:
                 event["place_id"] = place_id
             if isinstance(recipient_id, str) and 0 < len(recipient_id) <= 100:
                 event["recipient_id"] = recipient_id
-            if isinstance(conversation_id, str) and 0 < len(conversation_id) <= 80:
-                event["conversation_id"] = conversation_id
             if turn is not None:
                 event["turn"] = turn
         if point is not None:
@@ -430,8 +434,10 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
                 location = f'place ID {html.escape(place_id)}; no coordinates supplied'
         source = f' · source {html.escape(event["source_id"])}' if event.get("source_id") else ""
         conversation = f' · conversation {html.escape(event["conversation_id"])}' if event.get("conversation_id") else ""
+        commitment = f' · promise {html.escape(event["commitment_id"])}' if event.get("commitment_id") else ""
+        commitment_state = f' · {html.escape(event["event"])}' if event["type"] == "social_commitment" and event.get("event") else ""
         turn = f' · turn {event["turn"]}' if event.get("turn") is not None else ""
-        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}</span><p>{html.escape(text)}</p><small>{location}{source}{conversation}{turn}</small></li>')
+        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}{commitment_state}</span><p>{html.escape(text)}</p><small>{location}{source}{conversation}{commitment}{turn}</small></li>')
     timeline_html = '\n'.join(timeline) or '<li class="no-events">No accepted chronicle events in this snapshot. The Atlas does not infer activity.</li>'
     freshness = f"Snapshot label: {html.escape(captured_at)}" if captured_at else "Snapshot time not supplied; current runtime state is not queried."
     latest = data["chronicle"]["last_recorded_at"]
