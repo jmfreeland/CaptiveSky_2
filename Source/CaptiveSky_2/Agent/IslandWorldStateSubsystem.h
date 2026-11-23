@@ -224,6 +224,64 @@ struct FIslandCraftTraditionRecord
 	TArray<FIslandCraftAttemptRecord> Attempts;
 };
 
+UENUM(BlueprintType)
+enum class EIslandSocialCommitmentStatus : uint8
+{
+	Pending,
+	Due,
+	Fulfilled,
+	Expired
+};
+
+/** A resident-to-resident promise with a bounded action and an Island-day deadline. */
+USTRUCT(BlueprintType)
+struct FIslandSocialCommitmentRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FName Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FString ProposerAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FString RecipientAgentId;
+
+	/** Only bring_object_to_place is currently accepted by the ledger. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FName ObjectId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FName TargetPlaceId;
+
+	/** Conversation that established the promise; this is provenance, not proof of delivery. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FString SourceConversationId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	int32 CreatedDay = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	int32 DueDay = 2;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	EIslandSocialCommitmentStatus Status = EIslandSocialCommitmentStatus::Pending;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	int32 FulfilledDay = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	int32 ExpiredDay = 0;
+
+	/** Set only after a caller has observed the named object at the promised place. */
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FString OutcomeWitnessAgentId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Island|Social Commitment")
+	FString OutcomeEvidence;
+};
+
 /**
  * Persistent, per-level record of lasting changes residents have made to the world.
  *
@@ -257,6 +315,9 @@ public:
 	static constexpr int32 MaxCraftParameters = 4;
 	static constexpr int32 MaxCraftNameLength = 80;
 	static constexpr int32 MaxCraftSourceLength = 160;
+	static constexpr int32 MaxSocialCommitments = 32;
+	static constexpr int32 MaxSocialCommitmentIdLength = 48;
+	static constexpr int32 MaxSocialCommitmentEvidenceLength = 160;
 
 	/** Tests point this at a scratch file before the world begins play. Empty = the per-map project file. */
 	FString StorageFileOverride;
@@ -380,6 +441,16 @@ public:
 	/** Adds one attributed lesson only when the teacher knows the tradition and the learner does not. */
 	bool RecordCraftTeaching(FName Id, const FString& TeacherAgentId, const FString& LearnerAgentId, int32 Day);
 
+	const TArray<FIslandSocialCommitmentRecord>& GetSocialCommitments() const { return SocialCommitments; }
+	const FIslandSocialCommitmentRecord* FindSocialCommitment(FName Id) const;
+	/** Adds only the currently supported bring_object_to_place action; rejects unknown or duplicate IDs. */
+	bool CreateBringObjectCommitment(const FIslandSocialCommitmentRecord& Record);
+	/** Advances due/expired state using Island days. Safe to call repeatedly and after a resumed session. */
+	bool AdvanceSocialCommitments(int32 Today);
+	/** Records a witnessed delivery. The caller must confirm the named object is physically at the promised place. */
+	bool RecordSocialCommitmentFulfilled(FName Id, const FString& AgentId, int32 Today,
+		const FString& WitnessAgentId, const FString& Evidence);
+
 	/**
 	 * Parses a world-state file into this object's records without spawning, saving, or placing
 	 * anything; usable on a bare instance (e.g. to preview lasting changes in the editor world).
@@ -409,6 +480,7 @@ private:
 	TArray<FIslandArrangementSite> ArrangementSites;
 	TArray<FIslandGuestBookEntry> GuestBookEntries;
 	TArray<FIslandCraftTraditionRecord> CraftTraditions;
+	TArray<FIslandSocialCommitmentRecord> SocialCommitments;
 	TMap<FName, TWeakObjectPtr<AIslandArrangement>> ArrangementActors;
 	TWeakObjectPtr<AIslandGuestBook> GuestBookActor;
 	int32 ShownArrangementDay = 0;
@@ -418,6 +490,7 @@ private:
 	bool bStorageUnreadable = false;
 
 	bool Save() const;
+	bool AdvanceSocialCommitmentsInternal(int32 Today, TArray<FString>& OutEvents);
 	void RefreshNestActor(const FIslandNestRecord& Record);
 	void DestroyNestActors();
 	void RefreshWildlifeHomeActor(const FIslandWildlifeHomeRecord& Record);

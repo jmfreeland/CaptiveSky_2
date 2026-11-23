@@ -73,9 +73,9 @@ bool FIslandCraftTraditionTest::RunTest(const FString& Parameters)
 		PersistenceProbe->FindCraftTradition(TEXT("HearthLoaf"))->Lessons.Num() == 2 &&
 		PersistenceProbe->FindCraftTradition(TEXT("HearthLoaf"))->Attempts.Num() == UIslandWorldStateSubsystem::MaxCraftAttemptsPerTradition);
 	FString SavedJson;
-	TestTrue(TEXT("The saved schema is advanced to version 2 and names the new record array"),
+	TestTrue(TEXT("The saved schema is advanced to version 3 and names the new record array"),
 		FFileHelper::LoadFileToString(SavedJson, *StateFile) &&
-		(SavedJson.Contains(TEXT("\"version\": 2")) || SavedJson.Contains(TEXT("\"version\":2"))) &&
+		(SavedJson.Contains(TEXT("\"version\": 3")) || SavedJson.Contains(TEXT("\"version\":3"))) &&
 		SavedJson.Contains(TEXT("\"craft_traditions\"")));
 
 	const FString LegacyFile = Scratch / (FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".json"));
