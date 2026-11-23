@@ -49,3 +49,29 @@ visually approved.
 No `Content/` asset, saved map, canonical wildlife-home record, or model-request
 setting was changed for this inventory. Build, material, wind, collision,
 render-cost, and in-game concealment validation remain outstanding.
+
+## Responsive-editor preview follow-up
+
+On 2026-10-18, the user confirmed that Unreal Editor was open and responsive.
+The Aspen A skeletal-mesh asset was then opened directly in its asset preview.
+In the reference pose, the visible tree was bare branching geometry with no
+readable leaf canopy. The editor also warned that it had encountered a Nanite
+Assembly while Nanite Foliage was disabled, so the asset might not appear as
+expected. No project setting was changed to dismiss or work around that warning.
+
+The Common Hazel A asset was opened in the same live editor for a read-only
+check. It likewise showed only bare branches in its reference pose, with the
+same Nanite Assembly warning. The viewer overlay reported 389,750 triangles and
+201,072 vertices; the asset tooltip reported 3,714 source triangles, 1,855
+bones, one LOD, and 9,148,498 Nanite triangles. The differing mesh counters are
+recorded as reported rather than reconciled; neither is a gameplay profile.
+
+This live preview is not evidence that Aspen is intrinsically leafless: the
+Nanite Assembly warning may explain the missing canopy, and a reference-pose
+asset preview is not the Island's final rendered material path. It is enough to
+keep the species behind the visual-approval gate. The proposed runtime scatter
+was withdrawn before any build, PIE, or map save; no Megaplant instances were
+added to the Island. The next useful step is a controlled isolated preview
+after the Nanite Assembly/material path is understood, with no global renderer
+setting change and no second full-content preview while the recorded video
+memory pressure remains unresolved.

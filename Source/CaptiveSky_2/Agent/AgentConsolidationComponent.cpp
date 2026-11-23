@@ -172,8 +172,9 @@ void UAgentConsolidationComponent::StartConsolidation()
 	}
 	UAgentPlaySessionSubsystem* Session = GetWorld() && GetWorld()->GetGameInstance()
 		? GetWorld()->GetGameInstance()->GetSubsystem<UAgentPlaySessionSubsystem>() : nullptr;
-	if (Session && !Session->TryReserveModelRequest(Memory->GetResolvedAgentId()))
+	if (!UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(Session, Memory->GetResolvedAgentId()))
 	{
+		UE_LOG(LogAgentConsolidation, Verbose, TEXT("Sleep consolidation skipped because the play-session guard is missing or rejected it."));
 		FinishSleep();
 		return;
 	}

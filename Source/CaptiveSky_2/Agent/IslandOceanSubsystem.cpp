@@ -1,9 +1,14 @@
 #include "IslandOceanSubsystem.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Materials/MaterialInterface.h"
+#include "WaterBodyComponent.h"
+#include "WaterBodyOceanActor.h"
+#include "WaterMeshComponent.h"
+#include "WaterZoneActor.h"
 
 const TCHAR* UIslandOceanSubsystem::MaterialPath = TEXT("/Game/Materials/M_IslandOcean.M_IslandOcean");
 const FName UIslandOceanSubsystem::OceanActorName(TEXT("OceanPlane"));
@@ -47,6 +52,7 @@ void UIslandOceanSubsystem::RestoreOceanMaterial()
 void UIslandOceanSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	int32 WaterPawnBlockersChanged = 0;
 	if (AStaticMeshActor* Plane = FindOceanPlane(&InWorld))
 	{
 		if (UStaticMeshComponent* Mesh = Plane->GetStaticMeshComponent())
@@ -57,6 +63,34 @@ void UIslandOceanSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			UE_LOG(LogTemp, Log, TEXT("IslandOcean: disabled collision on legacy OceanPlane"));
 		}
 	}
+	// The Water plugin can generate collision after the legacy plane is disabled.
+	// Keep its underwater overlap/query behavior, but never let a generated water
+	// hull or visible water mesh become a walkable floor for the player capsule.
+	for (TActorIterator<AWaterBodyOcean> It(&InWorld); It; ++It)
+	{
+		UWaterBodyComponent* WaterBody = It->GetWaterBodyComponent();
+		if (!WaterBody) continue;
+		for (UPrimitiveComponent* Collision : WaterBody->GetCollisionComponents(true))
+		{
+			if (Collision && Collision->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block)
+			{
+				Collision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+				++WaterPawnBlockersChanged;
+				UE_LOG(LogTemp, Warning, TEXT("IslandOcean: changed generated water collision %s from Pawn Block to Overlap"), *Collision->GetPathName());
+			}
+		}
+	}
+	for (TActorIterator<AWaterZone> It(&InWorld); It; ++It)
+	{
+		UWaterMeshComponent* WaterMesh = It->GetWaterMeshComponent();
+		if (WaterMesh && WaterMesh->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block)
+		{
+			WaterMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+			++WaterPawnBlockersChanged;
+			UE_LOG(LogTemp, Warning, TEXT("IslandOcean: changed WaterMesh %s from Pawn Block to Overlap"), *WaterMesh->GetPathName());
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("IslandOcean: checked native ocean surfaces; changed %d Pawn-blocking water components"), WaterPawnBlockersChanged);
 	UMaterialInterface* Material = MaterialOverride ? MaterialOverride.Get() : LoadObject<UMaterialInterface>(nullptr, MaterialPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
 	if (Material && ApplyOceanMaterial(Material))
 		UE_LOG(LogTemp, Log, TEXT("IslandOcean: ocean plane now uses %s"), *Material->GetPathName());

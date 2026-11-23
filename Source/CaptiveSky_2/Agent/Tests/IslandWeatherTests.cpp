@@ -28,18 +28,21 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, true));
 	TestFalse(TEXT("An offscreen non-player resident does not create an invisible plant-sway neighborhood"),
 		AIslandWeather::ShouldIncludeResidentInSwayFocus(false, false));
-	TestTrue(TEXT("Meadow habitat retains lush-community coverage"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f), 0.64f));
-	TestTrue(TEXT("Meadow habitat keeps a light baseline in open communities"),
-		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f), 0.40f));
+	TestTrue(TEXT("Lush meadow pockets accept nearly all candidates to read as coherent clumps"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.f, 0.f), 1.0f));
+	TestTrue(TEXT("Open communities retain a 28% baseline instead of becoming bare cutouts"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(1.f, 1.f), 0.28f));
+	TestTrue(TEXT("Intermediate habitat fields vary smoothly rather than at a hard threshold"),
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(0.25f, 0.5f), 0.55f));
 	TestTrue(TEXT("Invalid meadow fields resolve to a bounded neutral density"),
-		FMath::IsFinite(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
-			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity())));
+		FMath::IsNearlyEqual(AIslandWeather::CalculateLandscapeMeadowAcceptanceChance(
+			std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity()), 0.46f));
 	const FVector TideglassWorldCenter(-99500.f, 100300.f, 2890.f);
 	const FVector TideglassWindArch(-101650.f, 100200.f, 2950.f);
 	const FVector TideglassListeningStones(-101650.f, 101600.f, 2650.f);
 	const FVector TideglassInn(-100085.85f, 103179.61f, 2784.24f);
 	const FVector TideglassInnDoorLantern(-100232.05f, 103623.63f, 2929.24f);
+	const FVector TideglassRainBasin(-100968.37f, 100501.07f, 2742.26f);
 	const FVector DistantLandmark(-106000.f, 100300.f, 0.f);
 	TestEqual(TEXT("The Tideglass source mesh clearance still protects the waterline"),
 		AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
@@ -56,6 +59,12 @@ bool FIslandWeatherTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Distant landmarks retain the full meadow flower clearance"),
 		AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
 			DistantLandmark, TideglassWorldCenter, 306.f, 2600.f), 2600.f);
+	const float RainBasinClearance = AIslandWeather::GetTideglassPollinatorFlowerLandmarkClearance(
+		TideglassRainBasin, TideglassWorldCenter, 306.f, 2600.f);
+	TestEqual(TEXT("The nearby rain basin retains a clear 12 m approach buffer"), RainBasinClearance, 1200.f);
+	TestTrue(TEXT("The rain-basin buffer intentionally reserves only a sector of the pool-edge ring"),
+		FVector::Dist2D(TideglassRainBasin, TideglassWorldCenter) - AIslandWeather::TideglassPollinatorFlowerOuterRadius < RainBasinClearance &&
+		FVector::Dist2D(TideglassRainBasin, TideglassWorldCenter) + AIslandWeather::TideglassPollinatorFlowerInnerRadius > RainBasinClearance);
 	for (const int32 Seed : {-17, 0, 42, 71, 2026})
 	{
 		for (int32 SiteIndex = 0; SiteIndex < AIslandWeather::TideglassPollinatorFlowerSiteCount; ++SiteIndex)

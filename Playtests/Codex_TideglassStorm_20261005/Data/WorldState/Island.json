@@ -1,0 +1,160 @@
+{
+	"version": 1,
+	"nests": [],
+	"curios": [
+		{
+			"id": "PaleStone_1",
+			"kind": "PaleStone",
+			"location": [
+				-101850.90920031071,
+				102270.54864168167,
+				2541.9468218015159
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "PaleStone_2",
+			"kind": "PaleStone",
+			"location": [
+				-102152.54118442535,
+				102689.70284461975,
+				2502.7010174938746
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "PaleStone_3",
+			"kind": "PaleStone",
+			"location": [
+				-102414.44505751133,
+				103118.42800974846,
+				2467.4307689805823
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "PaleStone_4",
+			"kind": "PaleStone",
+			"location": [
+				-102441.52343869209,
+				103652.67887115479,
+				2441.7156187406808
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "PaleStone_5",
+			"kind": "PaleStone",
+			"location": [
+				-102216.67992770672,
+				104239.86240625381,
+				2427.0351071104114
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "PaleStone_6",
+			"kind": "PaleStone",
+			"location": [
+				-102017.67234802246,
+				104778.80744934082,
+				2406.6877283881363
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "Seedpod",
+			"kind": "SeedPod",
+			"location": [
+				-102232.98592120409,
+				105405.60474991798,
+				2371.0927151709166
+			],
+			"state": 0,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		},
+		{
+			"id": "Cairn",
+			"kind": "Cairn",
+			"location": [
+				-101391.68830513954,
+				99337.865978479385,
+				2729.1989959133261
+			],
+			"state": 3,
+			"last_changed_day": -1,
+			"contributors": [],
+			"storm_damaged_day": -1
+		}
+	],
+	"arrangement_sites": [
+		{
+			"id": "ArrangingGround_1",
+			"location": [
+				-100812.50062697686,
+				101890.74501847207,
+				2637.100751702631
+			]
+		},
+		{
+			"id": "ArrangingGround_2",
+			"location": [
+				-102622.69831479053,
+				101611.35448100255,
+				2519.5636117421482
+			]
+		},
+		{
+			"id": "ArrangingGround_3",
+			"location": [
+				-101771.98750206485,
+				100772.46726348536,
+				2624.651163300492
+			]
+		},
+		{
+			"id": "ArrangingGround_4",
+			"location": [
+				-100949.86670812395,
+				100763.80365833211,
+				2697.5762514461831
+			]
+		}
+	],
+	"guest_book": [],
+	"clock":
+	{
+		"hour": 17.50446891784668,
+		"day": 1,
+		"saved_utc": "2026-10-05T21:39:09.124Z"
+	},
+	"weather":
+	{
+		"seconds": 50.446510455512907,
+		"last_storm_mark": -1
+	},
+	"environment":
+	{
+		"wetness": 0
+	}
+}

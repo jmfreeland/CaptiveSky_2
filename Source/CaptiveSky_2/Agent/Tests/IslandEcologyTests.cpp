@@ -521,9 +521,18 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 	const FVector SpeciesPatchProbe(-100500.f, 100500.f, 0.f);
 	TestEqual(TEXT("Ground-cover species selection repeats for the same seed and world position"),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71), AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71));
-	TestEqual(TEXT("Nearby plants within one botanical patch share a species"),
+	TestEqual(TEXT("Plants a centimetre apart share a species within a botanical community"),
 		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe, 71),
-		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(200.f, -300.f, 0.f), 71));
+		AIslandWeather::SelectGroundCoverVariant(SpeciesPatchProbe + FVector(1.f, -1.f, 0.f), 71));
+	int32 SmoothFormerGridBoundaryMatches = 0;
+	for (int32 Sample = 0; Sample < 8; ++Sample)
+	{
+		const FVector BoundaryProbe(1400.f, Sample * 1700.f + 317.f, 0.f);
+		SmoothFormerGridBoundaryMatches += AIslandWeather::SelectGroundCoverVariant(
+			BoundaryProbe - FVector(1.f, 0.f, 0.f), 71) == AIslandWeather::SelectGroundCoverVariant(
+				BoundaryProbe + FVector(1.f, 0.f, 0.f), 71) ? 1 : 0;
+	}
+	TestTrue(TEXT("Former 14 m grid boundaries do not produce abrupt species seams"), SmoothFormerGridBoundaryMatches >= 7);
 	int32 SpeciesCounts[11] = {};
 	int32 ExposedGrassCounts[3] = {};
 	const TArray<FVector> ExposedAnchors = {FVector::ZeroVector};
@@ -636,8 +645,8 @@ bool FIslandGroundCoverTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("Wetness never selects a species slot outside the existing foliage set"), WetEdgeSpecies >= 0 && WetEdgeSpecies <= 10, true);
 			if (DryEdgeSpecies < 5) ++DryEdgeBroadleafPatches;
 			if (WetEdgeSpecies < 5) ++WetEdgeBroadleafPatches;
-			TestEqual(TEXT("Wet-edge species remain coherent within a 14 m botanical patch"), WetEdgeSpecies,
-				AIslandWeather::SelectGroundCoverVariant(Position + FVector(200.f, 200.f, 0.f), 71, 0.f, 1.f));
+			TestEqual(TEXT("Wet-edge species remain coherent at a single plant-clump scale"), WetEdgeSpecies,
+				AIslandWeather::SelectGroundCoverVariant(Position + FVector(10.f, 10.f, 0.f), 71, 0.f, 1.f));
 			TestEqual(TEXT("Wet-edge influence clamps above one"), WetEdgeSpecies,
 				AIslandWeather::SelectGroundCoverVariant(Position, 71, 0.f, 2.f));
 		}

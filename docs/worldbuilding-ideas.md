@@ -282,6 +282,18 @@ deprecated plugin is not a sufficient explanation. Preserve this as a separate
 startup diagnosis and do not repeat the launch until it can be symbolized or
 its environment meaningfully changes.
 
+An engine-only `UnrealEditor-Cmd.exe -version` exited successfully without a
+project. In contrast, opening this project with `-NullRHI` and attempting the
+zero-request `CaptiveSky2.Agent.NightEcology` automation test crashed before
+the project log or test began. Its crash-side log contains the command line;
+the context again reports a null-address access violation at startup, with a
+different Core-only stack hash (`F405610C114D120D4B6F5ABA901EC469AC9FAA26`)
+than the real-RHI Game launch. This narrows the failure to the project-opening
+path rather than D3D or the removed PlantFactory mount, but does not identify
+which project startup dependency is responsible. Evidence:
+`Saved/Crashes/_0000/Codex_BootstrapAfterRetirement_20261013.log` and
+`Saved/Crashes/_0000/CrashContext.runtime-xml`.
+
 ## 2026-10-13 — Installed Beech is not yet a canopy solution
 
 UE 5.8.3 can render the installed European Beech skeletal output through

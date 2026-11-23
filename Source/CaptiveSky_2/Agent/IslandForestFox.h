@@ -67,6 +67,7 @@ private:
 	bool bNoticingFirefly = false;
 	bool bResidentPresenceNearby = false;
 	bool bFireflyPresenceNearby = false;
+	bool bFireflyScreenshotCaptured = false;
 	bool bStartled = false;
 	bool bResting = false;
 	bool bWaking = false;

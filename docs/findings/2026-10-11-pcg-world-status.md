@@ -52,3 +52,22 @@ the current saved Island when no interactive editor is open, as that script's
 read-only usage notes require. If the floating forest is visible only in an
 existing editor/PIE session, first establish whether that session has unsaved
 work and compare it with a clean Island reload; do not overwrite the live map.
+
+## Current evidence recheck (2026-10-18)
+
+The current `Content/Maps/Island.umap` SHA-256 is still
+`72708A860E97801191D7ED404C16CC99026796B1186C8084DD7F8199BE699083`, matching
+the 2026-10-17 package-hash observation. This confirms only that the saved
+package bytes have not changed since that observation; it does not reveal the
+PCG component's activation, visibility, or collision state. The referenced
+`Saved/Logs/Codex_PCGForestAudit_Current_20261017.log` is absent, and the
+available PCG actor-state logs in `Saved/Logs/` are from 2026-10-11.
+
+The current process check found no `UnrealEditor`, `UnrealEditor-Cmd`, or
+`UnrealGame` process, but an equivalent project-open audit is still gated by
+the unresolved UE 5.8 startup crash documented in
+[`project-open-crash-triage.md`](2026-10-17-project-open-crash-triage.md).
+Therefore, the only verified actor state remains the 2026-10-11 cleanup:
+deactivated component, hidden generated instances, and collision disabled.
+Do not infer the current state from the unchanged hash, and do not delete,
+reactivate, or save the PCG forest until a fresh read-only actor audit succeeds.

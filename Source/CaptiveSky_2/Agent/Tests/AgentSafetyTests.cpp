@@ -15,6 +15,8 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Zero model-request budget is a valid closed cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(0), 0);
 	TestEqual(TEXT("Negative model-request budgets clamp to zero"), UAgentPlaySessionSubsystem::ClampRequestLimit(-1), 0);
 	TestEqual(TEXT("Request budget cannot exceed hard cap"), UAgentPlaySessionSubsystem::ClampRequestLimit(1000), 120);
+	TestFalse(TEXT("Missing play-session guard fails closed before model dispatch"),
+		UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(nullptr, TEXT("EditorPreview")));
 	float SessionSeconds = 1800.f;
 	int32 SessionRequests = 120;
 	bool bHasExplicitTimeCap = false;
@@ -70,7 +72,8 @@ bool FAgentSafetyTest::RunTest(const FString& Parameters)
 	NoModelRequests->MaxModelRequests = 0;
 	NoModelRequests->MaxRealtimeSeconds = 60.f;
 	TestFalse(TEXT("Zero model-request cap does not end a no-model diagnostic session early"), NoModelRequests->IsExpired());
-	TestFalse(TEXT("Zero model-request cap rejects the first reservation"), NoModelRequests->TryReserveModelRequest());
+	TestFalse(TEXT("Zero model-request cap rejects the first reservation"),
+		UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(NoModelRequests));
 	TestEqual(TEXT("Rejected zero-cap reservation does not increment the count"), NoModelRequests->ModelRequests, 0);
 	NoModelRequests->StartedAt = FPlatformTime::Seconds() - 2.0;
 	NoModelRequests->MaxRealtimeSeconds = 1.f;

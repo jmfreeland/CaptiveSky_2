@@ -139,6 +139,7 @@
 		},
 		{
 			"name": "02e_TideglassDragonflyClose",
+			"day_dragonflies": true,
 			"from": {
 				"tag": "TideglassDragonfly",
 				"offset": [
@@ -205,9 +206,9 @@
 			"from": {
 				"tag": "Roost_West",
 				"offset": [
-					650,
-					-650,
-					220
+					300,
+					-300,
+					100
 				]
 			},
 			"look": {
@@ -218,20 +219,20 @@
 					-60
 				]
 			},
-			"fov": 45,
+			"fov": 35,
 			"min_height": 160
 		},
 		{
 			"name": "05_StonesFirefly",
 			"from": {
 				"tag": "ListeningStones",
-				"offset": [700, -200, 150]
+				"offset": [700, -480, 220]
 			},
 			"look": {
 				"tag": "NightPreviewFirefly",
 				"offset": [0, 0, 0]
 			},
-			"fov": 50,
+			"fov": 35,
 			"min_height": -1,
 			"night_fireflies": true
 		},

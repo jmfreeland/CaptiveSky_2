@@ -44,6 +44,7 @@ param(
 	[switch]$TideglassDragonflies,
 	[switch]$GroundCover,
 	[switch]$GroundCoverSway,
+	[string]$GroundCoverSoloLayer = "",
 	[switch]$LandmarkRockPreview,
 	[switch]$NoWorldState,
 	[string]$EngineDir = "D:\Games\Epic\UE_5.8"
@@ -98,6 +99,13 @@ if ($Only) { $extra += "-ViewpointOnly=$Only" }
 if ($NightFireflies) { $extra += "-ViewpointNightFireflies" }
 if ($GroundCover -or $GroundCoverSway) { $extra += "-ViewpointGroundCover" }
 if ($GroundCoverSway) { $extra += "-ViewpointGroundCoverSway" }
+if ($GroundCoverSoloLayer) {
+	if ($GroundCoverSoloLayer -notin @("grass", "groundplants", "understory", "trees", "meadow", "meadowtrees", "meadowunderstory", "woodland", "landscape")) {
+		throw "-GroundCoverSoloLayer must be grass, groundplants, understory, trees, meadow, meadowtrees, meadowunderstory, woodland, or landscape."
+	}
+	if (-not ($GroundCover -or $GroundCoverSway)) { throw "-GroundCoverSoloLayer requires -GroundCover or -GroundCoverSway." }
+	$extra += "-ViewpointGroundCoverSoloLayer=$GroundCoverSoloLayer"
+}
 if ($LandmarkRockPreview) { $extra += "-ViewpointLandmarkRockPreview" }
 if ($NoWorldState) { $extra += "-ViewpointNoWorldState" }
 

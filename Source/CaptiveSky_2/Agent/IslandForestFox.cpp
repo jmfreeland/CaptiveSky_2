@@ -7,8 +7,11 @@
 #include "EngineUtils.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
+#include "HAL/FileManager.h"
 #include "IslandFirefly.h"
 #include "Logging/LogMacros.h"
+#include "Misc/Paths.h"
+#include "UnrealClient.h"
 #include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogIslandForestFox, Log, All);
@@ -189,6 +192,19 @@ void AIslandForestFox::CheckForNearbyFirefly()
 		TEXT("Woodland fox noticed firefly at %.1f m (fox=%s, firefly=%s)"),
 		FMath::Sqrt(FVector::DistSquared(GetActorLocation(), NearbyFirefly->GetActorLocation())) / 100.f,
 		*GetActorLocation().ToCompactString(), *NearbyFirefly->GetActorLocation().ToCompactString());
+	FString CapturePath;
+	if (!bFireflyScreenshotCaptured && FParse::Value(FCommandLine::Get(),
+		TEXT("CaptiveSkyFoxFireflyCapture="), CapturePath) && !CapturePath.IsEmpty())
+	{
+		if (FPaths::IsRelative(CapturePath))
+			CapturePath = FPaths::Combine(FPaths::ProjectSavedDir(), CapturePath);
+		CapturePath = FPaths::ConvertRelativePathToFull(CapturePath);
+		FPaths::NormalizeFilename(CapturePath);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(CapturePath), true);
+		FScreenshotRequest::RequestScreenshot(CapturePath, false, false, false, FIntRect(), true);
+		UE_LOG(LogIslandForestFox, Log, TEXT("Requested firefly-glance screenshot at %s"), *CapturePath);
+		bFireflyScreenshotCaptured = true;
+	}
 	NoticeRemaining = FMath::Clamp(LookAroundAnimation->GetPlayLength(), 0.5f, 2.0f);
 	FoxMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 	FoxMesh->PlayAnimation(LookAroundAnimation, false);

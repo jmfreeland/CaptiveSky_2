@@ -60,3 +60,31 @@ A newer read-only capture of the unsaved live map found `Roost_East_FallenWood` 
 The user confirmed that authoring changes were saved. The Unreal Editor is now closed, and no placement was made. Do not run `Scripts/Place-IslandProps.py` until its replacement behavior is narrowed or a specific safe workflow is established: a normal run replaces every actor tagged `GeneratedProp`/`TripoProp` and saves the level. First regenerate/reimport the corrected hollow collision, then choose a hidden, dry, Rat-accessible ground point, validate the approach/orientation and collision, and only then create the home placement and update Rat place-memory.
 
 The bounded read-only `Island.RatHollowSiteAudit` command is implemented in `Source/CaptiveSky_2/Agent/IslandNavProbe.cpp` (commit `c696305`) and only runs in a Game world. The editor is currently closed; its module version, site shortlist, visual habitat quality, navigation, and physical traversal remain unverified. Once reopened, run the site audit in one bounded diagnostic session, visually inspect its suggestions, and physically test the Rat's approach before recording coordinates. The scan itself does not save or modify the world and its output is only a site suggestion, not placement approval.
+
+### Updated real-RHI trial review (2026-10-12)
+
+The latest disposable `/Game/Maps/Island_RatHollowArtPassTrial` captures use
+the Rat-height East Entrance and human-height approach views, with agent
+thinking disabled and zero model requests. The Rat-height view still has a
+large foreground leaf directly across the hollow entrance; the hollow and nest
+are difficult to read, so this composition does not yet deliver the intended
+rat-height “hidden home” reveal. The trial is not a saved-Island placement and
+does not approve a home coordinate. Screenshots:
+[`ArtPassScreenshots/001_Rat_Height__East_Entrance.png`](../../Saved/Playtests/Codex_RatHollowCurrentAudit_20261011/ArtPassScreenshots/001_Rat_Height__East_Entrance.png)
+and
+[`ArtPassScreenshots/002_Human_Approach__Back.png`](../../Saved/Playtests/Codex_RatHollowCurrentAudit_20261011/ArtPassScreenshots/002_Human_Approach__Back.png);
+run log:
+[`Codex_RatHollowArtPassTrialRHI_20261012.log`](../../Saved/Logs/Codex_RatHollowArtPassTrialRHI_20261012.log).
+
+The follow-on Hazel-bark/UV variant on the same disposable map used
+`stat streaming` and reported an effective 4096 MiB pool with 961.18 MiB
+required at the Rat-height entrance. See the
+[`Rat-height capture`](../../Playtests/Codex_RatHollowCurrentAudit_20261011/HazelBarkUVWarmScreenshots/001_Rat_Height__East_Entrance.png)
+and [`run log`](../../Saved/Logs/Codex_RatHollowHazelBarkUVWarmRHI_20261012.log).
+That is useful runtime context for this shot, but not evidence about the
+editor's heavier texture load. It also confirms that the overlay's `Streaming
+Pool 100%` row is not, by itself, an over-budget reading. Keep the prop and trial disposable;
+next art pass should preserve natural concealment while creating a small clear
+approach to the entrance, then repeat both heights without the profiling
+overlay and test the Rat capsule through the hollow before proposing a real
+Island home.

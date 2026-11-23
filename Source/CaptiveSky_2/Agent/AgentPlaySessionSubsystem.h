@@ -55,6 +55,9 @@ public:
 	/** AgentId lets continuous play space out each resident's requests; empty skips that check.
 	 *  A light request (the cheap model) costs a fraction of the allowance and has its own daily ceiling. */
 	bool TryReserveModelRequest(const FString& AgentId = FString(), bool bLight = false);
+	/** Fail-closed dispatch gate for callers that may run outside a game instance or before this subsystem initializes. */
+	static bool TryReserveModelRequestFailClosed(UAgentPlaySessionSubsystem* Session,
+		const FString& AgentId = FString(), bool bLight = false);
 	/** Releases a reservation after its provider callback; request and real-time caps remain authoritative. */
 	void CompleteModelRequest();
 	bool IsExpired() const;

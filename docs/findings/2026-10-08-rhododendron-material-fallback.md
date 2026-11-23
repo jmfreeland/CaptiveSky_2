@@ -79,6 +79,71 @@ capture after coordinating any write to the shared `Content/` asset. Check both
 that the 13 fallback warnings are gone and that the vegetation visibly uses its
 authored material. Keep Starter Content `M_Rock` and `M_Wood_Oak` checks separate.
 
+## Source-pattern reconstruction on a disposable duplicate (2026-10-12)
+
+A new read-only UE 5.8.3 comparison of the healthy Festuca, Phalaris, and Typha
+master graphs found the same resolved PlantFactory calls at slots 4–7 in all
+three. The Rhododendron graph retains the exact corresponding upstream nodes,
+and its four billboard static switches still select the matching null call in
+their True branch. Reconstructing from these peer graphs is therefore
+source-supported, unlike wiring the unrelated similarly named textures.
+
+On the isolated duplicate
+`/Game/Generated/MaterialTests/Codex_RhodoMaterialRepair_20261012/MM_Rhodo_InstancedRepair_Test`
+only, the calls were restored as:
+
+- Calls 4 and 6: `StaticBillboard`, with `TextureCoordinate_2/3` connected to
+  `position uv` and `ComponentMask_0/1` connected to `hook`.
+- Calls 5 and 7: `BillboardMappedNormals`, with `StaticSwitchParameter_4/20`
+  connected to `normal`.
+
+The duplicate's four input mappings were read back and matched all four expected
+sources; its `InstancedStaticMeshes` usage flag is enabled. UE's
+`recompile_material` returned an empty diagnostic list under the PCD3D_SM6
+shader platform. Evidence: `Saved/Logs/Codex_RhodoPeerPins_20261012_final.log`,
+`Saved/Logs/Codex_RhodoDuplicateRepair_Retry_20261012.log`, and
+`Saved/Logs/Codex_RhodoDuplicateCompile_20261012.log`. The original material
+still has SHA256 `2B1746766E5EC27371AFDC7E58B7996A314320161A5CF943792A0D9CBCE055AB`;
+it was not edited. This validates graph reconstruction and a clean SM6
+recompile on the duplicate, **not** rendered appearance or the removal of live
+Game fallback warnings. The compile probe did not load the Island; its 4 GiB
+pool setting is not a texture-budget measurement. Next, visually preview the
+duplicate's material instances on the Rhododendron mesh in an isolated test
+view, then coordinate before applying the verified graph to the shared source
+material.
+
+## Isolated preview attempt stopped for outbound LLM requests (2026-10-12)
+
+An isolated preview level and duplicate material instances were created under
+`/Game/Generated/MaterialTests/Codex_RhodoMaterialRepair_20261012/`; neither
+the Island map nor the original Rhododendron material was changed. While the
+preview commandlet was running, its log recorded 13 POST attempts to
+`https://api.openai.com/v1/chat/completions` (followed by retries). Each logged
+attempt failed at connection time with `Bad access` / `Could not connect to
+server`; there is no successful HTTP response in the log. The process was
+stopped, and no preview image was produced. Evidence:
+`Saved/Logs/Codex_RhodoPreviewBuild_Retry_20261012.log`.
+
+The cause is not established; the endpoint and timing are insufficient to
+attribute the requests confidently to resident thinking, Semantic Search, or
+the MCP plugin. The project default allows up to 120 resident requests per
+play, so a future diagnostic run must explicitly set
+`-CaptiveSkyMaxModelRequests=0` and verify that the relevant provider cannot
+send asset or world context before attempting another capture. Do not resume the
+render test until that is confirmed or the user explicitly approves the
+specific outbound model use. The preview commandlet reported a 4 GiB streaming
+pool, but it did not load the Island and did not measure the Island's texture
+budget.
+
+Follow-up code inspection found that the brain and sleep-consolidation paths
+treated a missing play-session subsystem as permission to continue dispatching.
+Both now use a shared fail-closed reservation gate; the safety test covers a
+missing subsystem and a zero-request cap. The editor-target build succeeded and
+`CaptiveSky2.Agent.SessionSafety` passed in a NullRHI run with a 60-second cap
+and zero permitted model requests. The test log contains no OpenAI chat-completion
+endpoint attempts. This closes the identified missing-guard path, but does not
+identify which subsystem initiated the earlier preview attempts.
+
 ## Scratch-project isolation correction
 
 On 2026-10-08, checking the scratch project's filesystem metadata showed that

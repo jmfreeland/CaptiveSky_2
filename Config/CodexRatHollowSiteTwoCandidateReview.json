@@ -1,0 +1,35 @@
+{
+  "hour": 17.0,
+  "width": 1600,
+  "height": 900,
+  "viewpoints": [
+    {
+      "name": "SiteA_NearSpruce_RatEye",
+      "from": { "at": [-105400, 104200, 2364] },
+      "look": { "at": [-105200, 104200, 2344] },
+      "fov": 70,
+      "min_height": 30
+    },
+    {
+      "name": "SiteA_NearSpruce_HumanApproach",
+      "from": { "at": [-106000, 104600, 2750] },
+      "look": { "at": [-105200, 104200, 2400] },
+      "fov": 65,
+      "min_height": 180
+    },
+    {
+      "name": "SiteB_OpenWoodland_RatEye",
+      "from": { "at": [-104000, 104200, 2405] },
+      "look": { "at": [-103800, 104200, 2385] },
+      "fov": 70,
+      "min_height": 30
+    },
+    {
+      "name": "SiteB_OpenWoodland_HumanApproach",
+      "from": { "at": [-104600, 104600, 2760] },
+      "look": { "at": [-103800, 104200, 2440] },
+      "fov": 65,
+      "min_height": 180
+    }
+  ]
+}

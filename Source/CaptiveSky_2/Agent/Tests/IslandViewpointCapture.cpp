@@ -15,6 +15,7 @@
 #include "IslandArrangement.h"
 #include "IslandGuestBook.h"
 #include "IslandFirefly.h"
+#include "IslandTideglassDragonfly.h"
 #include "IslandWeather.h"
 #include "IslandEnvironmentSubsystem.h"
 #include "IslandTideglassSubsystem.h"
@@ -22,6 +23,8 @@
 #include "Materials/MaterialParameterCollectionInstance.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Components/InstancedSkinnedMeshComponent.h"
+#include "DynamicWindData.h"
 #include "Components/PointLightComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "ContentStreaming.h"
@@ -450,30 +453,56 @@ namespace
 				IStreamingManager::Get().StreamAllResources(2.f);
 				Frames = 0;
 				MeasuredCaptureStartSeconds = 0.0;
+				LastCaptureFrameSeconds = 0.0;
+				MeasuredFrameIntervalsSeconds.Reset();
 			}
 			Capture->GetCaptureComponent2D()->CaptureScene();
 			// A swapped-in landscape graph can take minutes to compile; capturing earlier shows the previous look.
 			if (Frames == 1 && GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
 			++Frames;
 			constexpr int32 CaptureWarmupFrames = 10;
-			if (Frames == CaptureWarmupFrames) MeasuredCaptureStartSeconds = FPlatformTime::Seconds();
+			const double CaptureFrameSeconds = FPlatformTime::Seconds();
+			if (Frames == CaptureWarmupFrames)
+			{
+				MeasuredCaptureStartSeconds = CaptureFrameSeconds;
+				LastCaptureFrameSeconds = CaptureFrameSeconds;
+			}
+			else if (Frames > CaptureWarmupFrames)
+			{
+				MeasuredFrameIntervalsSeconds.Add(FMath::Max(0.0, CaptureFrameSeconds - LastCaptureFrameSeconds));
+				LastCaptureFrameSeconds = CaptureFrameSeconds;
+			}
 			if (Frames < 60) return false;
 
 			FlushRenderingCommands();
 			if (GroundCoverWeather.IsValid() && MeasuredCaptureStartSeconds > 0.0)
 			{
 				const double MeasuredSeconds = FMath::Max(0.001, FPlatformTime::Seconds() - MeasuredCaptureStartSeconds);
-				const double CaptureFramesPerSecond = (Frames - CaptureWarmupFrames) / MeasuredSeconds;
+				const double RawCaptureFramesPerSecond = (Frames - CaptureWarmupFrames) / MeasuredSeconds;
+				// Unreal's connectivity/update checks can block the automation thread for several seconds.
+				// Those stalls are outside the rendered frame workload, so report total wall-clock throughput
+				// but gate on the 95th-percentile frame interval after dropping only >1 s harness stalls.
+				TArray<double> ValidFrameIntervalsSeconds;
+				for (const double FrameInterval : MeasuredFrameIntervalsSeconds)
+					if (FrameInterval <= 1.0) ValidFrameIntervalsSeconds.Add(FrameInterval);
+				ValidFrameIntervalsSeconds.Sort();
+				const int32 P95Index = FMath::Clamp(FMath::CeilToInt(ValidFrameIntervalsSeconds.Num() * 0.95f) - 1,
+					0, FMath::Max(0, ValidFrameIntervalsSeconds.Num() - 1));
+				const double P95FrameSeconds = ValidFrameIntervalsSeconds.IsEmpty() ? 0.0 : ValidFrameIntervalsSeconds[P95Index];
+				const double P95CaptureFramesPerSecond = P95FrameSeconds > 0.0 ? 1.0 / P95FrameSeconds : 0.0;
 				const bool bGameplayScaleView = FVector::Dist(View.From, View.LookAt) <= 10000.f;
 				constexpr double MinimumGameplayScaleCaptureFPS = 30.0;
-				Test->AddInfo(FString::Printf(TEXT("%s: dense ground-cover SceneCapture throughput %.2f FPS over %d measured frames after %d warmup frames."),
-					*View.Name, CaptureFramesPerSecond, Frames - CaptureWarmupFrames, CaptureWarmupFrames));
+				Test->AddInfo(FString::Printf(TEXT("%s: dense ground-cover SceneCapture wall-clock throughput %.2f FPS; p95 frame throughput %.2f FPS over %d valid intervals (%d raw) after %d warmup frames."),
+					*View.Name, RawCaptureFramesPerSecond, P95CaptureFramesPerSecond, ValidFrameIntervalsSeconds.Num(),
+					MeasuredFrameIntervalsSeconds.Num(), CaptureWarmupFrames));
 				if (!bGameplayScaleView)
 					Test->AddInfo(TEXT("This high-altitude overview is outside the gameplay-scale 100 m performance gate; its capture rate is diagnostic only."));
 				else
 				{
-					Test->TestTrue(FString::Printf(TEXT("%s gameplay-scale ground-cover capture sustains the %.0f FPS minimum"),
-						*View.Name, MinimumGameplayScaleCaptureFPS), CaptureFramesPerSecond >= MinimumGameplayScaleCaptureFPS);
+					Test->TestTrue(FString::Printf(TEXT("%s has enough uncontended gameplay-scale frame samples"), *View.Name),
+						ValidFrameIntervalsSeconds.Num() >= 45);
+					Test->TestTrue(FString::Printf(TEXT("%s gameplay-scale ground-cover p95 frame time stays within %.0f FPS"),
+						*View.Name, MinimumGameplayScaleCaptureFPS), P95FrameSeconds > 0.0 && P95CaptureFramesPerSecond >= MinimumGameplayScaleCaptureFPS);
 					Test->AddInfo(TEXT("This offscreen capture is a conservative foliage-performance screen, not a gameplay, packaged-build, or target-hardware frame-rate guarantee."));
 				}
 			}
@@ -585,6 +614,8 @@ namespace
 		int32 Index = 0;
 		int32 Frames = 0;
 		double MeasuredCaptureStartSeconds = 0.0;
+		double LastCaptureFrameSeconds = 0.0;
+		TArray<double> MeasuredFrameIntervalsSeconds;
 		bool bStarted = false;
 		bool bClearGroundCover = false;
 		TArray<FLandscapePreviewBackup> LandscapeBackups;
@@ -747,8 +778,30 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		return false;
 	}
 	const bool bNightFireflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointNightFireflies"));
+	const bool bDayDragonflyPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointTideglassDragonflies"));
+	if (bNightFireflyPreview && bDayDragonflyPreview)
+	{
+		AddError(TEXT("Choose either the night firefly or daytime dragonfly ecology preview."));
+		return false;
+	}
 	const bool bGroundCoverSwayPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCoverSway"));
 	const bool bGroundCoverPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointGroundCover")) || bGroundCoverSwayPreview;
+	FString GroundCoverSoloLayer;
+	const bool bGroundCoverSoloLayer = FParse::Value(FCommandLine::Get(), TEXT("ViewpointGroundCoverSoloLayer="), GroundCoverSoloLayer);
+	if (bGroundCoverSoloLayer && !bGroundCoverPreview)
+	{
+		AddError(TEXT("-ViewpointGroundCoverSoloLayer requires -ViewpointGroundCover."));
+		return false;
+	}
+	if (bGroundCoverSoloLayer && GroundCoverSoloLayer != TEXT("grass") && GroundCoverSoloLayer != TEXT("groundplants") &&
+		GroundCoverSoloLayer != TEXT("understory") && GroundCoverSoloLayer != TEXT("trees") &&
+		GroundCoverSoloLayer != TEXT("meadow") && GroundCoverSoloLayer != TEXT("meadowtrees") &&
+		GroundCoverSoloLayer != TEXT("meadowunderstory") && GroundCoverSoloLayer != TEXT("woodland") &&
+		GroundCoverSoloLayer != TEXT("landscape"))
+	{
+		AddError(TEXT("ViewpointGroundCoverSoloLayer must be grass, groundplants, understory, trees, meadow, meadowtrees, meadowunderstory, woodland, or landscape."));
+		return false;
+	}
 	const bool bLandmarkRockPreview = FParse::Param(FCommandLine::Get(), TEXT("ViewpointLandmarkRockPreview"));
 	FString Only;
 	FParse::Value(FCommandLine::Get(), TEXT("ViewpointOnly="), Only);
@@ -841,6 +894,47 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		RouteFirefly->Tags.AddUnique(TEXT("NightPreviewFirefly"));
 		AddInfo(FString::Printf(TEXT("Night ecology preview spawned %d transient firefly actors; route-side light is %.0f cm from ListeningStones."),
 			PreviewActors.Num(), NearestStoneDistance));
+	}
+	else if (bDayDragonflyPreview)
+	{
+		if (!(Hour >= 6.0 && Hour < 19.0))
+		{
+			AddError(TEXT("Tideglass dragonfly preview requires a daylight hour (06:00–18:59); pass -ViewpointHour=12."));
+			return false;
+		}
+		for (TActorIterator<AIslandDayNight> It(Island); It; ++It)
+		{
+			PreviewClock = *It;
+			OriginalStartHour = It->StartHour;
+			OriginalDayNumber = It->DayNumber;
+			It->StartHour = Hour;
+			if (PreviewDayNumber > 0) It->DayNumber = PreviewDayNumber;
+			It->OnConstruction(It->GetActorTransform());
+			break;
+		}
+		for (TActorIterator<AIslandWeather> It(Island); It; ++It) { PreviewWeather = *It; break; }
+		if (!PreviewClock || !PreviewWeather)
+		{
+			if (PreviewClock)
+			{
+				PreviewClock->StartHour = OriginalStartHour;
+				PreviewClock->DayNumber = OriginalDayNumber;
+				PreviewClock->OnConstruction(PreviewClock->GetActorTransform());
+			}
+			AddError(TEXT("Tideglass dragonfly preview needs the Island day/night and weather actors."));
+			return false;
+		}
+		TSet<AIslandTideglassDragonfly*> ExistingDragonflies;
+		for (TActorIterator<AIslandTideglassDragonfly> It(Island); It; ++It) ExistingDragonflies.Add(*It);
+		PreviewWeather->RefreshNightEcology();
+		int32 PreviewPopulation = 0;
+		for (TActorIterator<AIslandTideglassDragonfly> It(Island); It; ++It)
+		{
+			++PreviewPopulation;
+			if (!ExistingDragonflies.Contains(*It)) PreviewActors.Add(*It);
+		}
+		TestEqual(TEXT("Daylight Tideglass preview produces exactly three transient dragonflies"), PreviewPopulation, 3);
+		AddInfo(FString::Printf(TEXT("Tideglass ecology preview has %d daytime dragonflies for the captured shore composition; preview actors are destroyed afterward."), PreviewPopulation));
 	}
 	if (bGroundCoverPreview)
 	{
@@ -937,11 +1031,16 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Tideglass wet-edge planting stays capped and nonblocking"),
 			TideglassPoolCount > 0 && PreviewWeather->GroundCoverWetlandCount > 0 &&
 			PreviewWeather->GroundCoverWetlandCount <= TideglassPoolCount * 10 &&
-			PreviewWeather->IslandCattails->GetInstanceCount() == PreviewWeather->GroundCoverWetlandCount &&
+			PreviewWeather->IslandCattails->GetInstanceCount() + PreviewWeather->IslandPhalaris->GetInstanceCount() == PreviewWeather->GroundCoverWetlandCount &&
 			PreviewWeather->IslandCattails->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
-			!PreviewWeather->IslandCattails->CanEverAffectNavigation() && PreviewWeather->IslandCattails->IsVisible());
-		TestEqual(TEXT("Every Tideglass cattail has an immutable wind-sway baseline"),
-			PreviewWeather->IslandCattailBaseTransforms.Num(), PreviewWeather->GroundCoverWetlandCount);
+			PreviewWeather->IslandPhalaris->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandCattails->CanEverAffectNavigation() && !PreviewWeather->IslandPhalaris->CanEverAffectNavigation() &&
+			PreviewWeather->IslandCattails->IsVisible() && PreviewWeather->IslandPhalaris->IsVisible());
+		TestEqual(TEXT("Every Tideglass wetland plant has an immutable wind-sway baseline"),
+			PreviewWeather->IslandCattailBaseTransforms.Num() + PreviewWeather->IslandPhalarisBaseTransforms.Num(), PreviewWeather->GroundCoverWetlandCount);
+		AddInfo(FString::Printf(TEXT("Tideglass wet-edge composition: %d Typha cattails + %d Phalaris grass (%d total)."),
+			PreviewWeather->IslandCattails->GetInstanceCount(), PreviewWeather->IslandPhalaris->GetInstanceCount(),
+			PreviewWeather->GroundCoverWetlandCount));
 		const UStaticMesh* ShrubMesh = PreviewWeather->IslandShrubs ? PreviewWeather->IslandShrubs->GetStaticMesh() : nullptr;
 		const UStaticMesh* RhododendronMesh = PreviewWeather->IslandRhododendrons ? PreviewWeather->IslandRhododendrons->GetStaticMesh() : nullptr;
 		const UStaticMesh* SpruceMesh = PreviewWeather->IslandSpruce ? PreviewWeather->IslandSpruce->GetStaticMesh() : nullptr;
@@ -1082,53 +1181,51 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				}
 			}
 		}
-		const UStaticMesh* CattailMesh = PreviewWeather->IslandCattails ? PreviewWeather->IslandCattails->GetStaticMesh() : nullptr;
-		const FBoxSphereBounds CattailBounds = CattailMesh ? CattailMesh->GetBounds() : FBoxSphereBounds();
-		const FVector CattailBottomOffset = CattailBounds.Origin - FVector(0.f, 0.f, CattailBounds.BoxExtent.Z);
-		TArray<FVector> CattailPlantingPoints;
-		bool bCattailsStayInsideHeightBand = CattailMesh != nullptr && !TideglassTestClearances.IsEmpty();
-		bool bCattailsRespectPoolClearance = bCattailsStayInsideHeightBand;
-		float MinCattailSpacing = TNumericLimits<float>::Max();
-		float MinCattailPoolEdgeClearance = TNumericLimits<float>::Max();
-		for (int32 CattailIndex = 0; PreviewWeather->IslandCattails && CattailIndex < PreviewWeather->IslandCattails->GetInstanceCount(); ++CattailIndex)
+		TArray<FVector> WetlandPlantingPoints;
+		float MinWetlandSpacing = TNumericLimits<float>::Max();
+		float MinWetlandPoolEdgeClearance = TNumericLimits<float>::Max();
+		auto ValidateWetlandComponent = [this, &TideglassTestClearances, &WetlandPlantingPoints,
+			&MinWetlandSpacing, &MinWetlandPoolEdgeClearance](UHierarchicalInstancedStaticMeshComponent* Component,
+			float MinHeight, float MaxHeight, const TCHAR* SpeciesName)
 		{
-			FTransform CattailTransform;
-			if (!PreviewWeather->IslandCattails->GetInstanceTransform(CattailIndex, CattailTransform, true))
+			const UStaticMesh* Mesh = Component ? Component->GetStaticMesh() : nullptr;
+			const FBoxSphereBounds Bounds = Mesh ? Mesh->GetBounds() : FBoxSphereBounds();
+			const FVector BottomOffset = Bounds.Origin - FVector(0.f, 0.f, Bounds.BoxExtent.Z);
+			bool bValid = Mesh != nullptr && Component->GetInstanceCount() > 0 && !TideglassTestClearances.IsEmpty();
+			for (int32 Index = 0; Component && Index < Component->GetInstanceCount(); ++Index)
 			{
-				bCattailsStayInsideHeightBand = false;
-				bCattailsRespectPoolClearance = false;
-				continue;
-			}
-			const float CattailHeight = CattailTransform.GetScale3D().Z * 2.f * CattailBounds.BoxExtent.Z;
-			bCattailsStayInsideHeightBand &= CattailHeight >= 169.9f && CattailHeight <= 230.1f;
-			const FVector PlantingPoint = CattailTransform.TransformPosition(CattailBottomOffset);
-			bool bNearPool = false;
-			for (const FTideglassTestClearance& Pool : TideglassTestClearances)
-			{
-				if (Pool.Radius <= 0.f) { bCattailsRespectPoolClearance = false; continue; }
-				const float Distance = FVector::Dist2D(PlantingPoint, Pool.Center);
-				if (Distance >= Pool.Radius + 249.9f && Distance <= Pool.Radius + 1100.1f) bNearPool = true;
-				if (Distance < Pool.Radius + 249.9f)
+				FTransform Transform;
+				if (!Component->GetInstanceTransform(Index, Transform, true)) { bValid = false; continue; }
+				const float Height = Transform.GetScale3D().Z * 2.f * Bounds.BoxExtent.Z;
+				bValid &= Height >= MinHeight - 0.1f && Height <= MaxHeight + 0.1f;
+				const FVector PlantingPoint = Transform.TransformPosition(BottomOffset);
+				bool bNearPool = false;
+				for (const FTideglassTestClearance& Pool : TideglassTestClearances)
 				{
-					bCattailsRespectPoolClearance = false;
-					MinCattailPoolEdgeClearance = FMath::Min(MinCattailPoolEdgeClearance, Distance - Pool.Radius);
+					if (Pool.Radius <= 0.f) { bValid = false; continue; }
+					const float Distance = FVector::Dist2D(PlantingPoint, Pool.Center);
+					if (Distance >= Pool.Radius + 249.9f && Distance <= Pool.Radius + 1100.1f) bNearPool = true;
+					MinWetlandPoolEdgeClearance = FMath::Min(MinWetlandPoolEdgeClearance, Distance - Pool.Radius);
+					bValid &= Distance >= Pool.Radius + 249.9f;
 				}
-				else MinCattailPoolEdgeClearance = FMath::Min(MinCattailPoolEdgeClearance, Distance - Pool.Radius);
+				bValid &= bNearPool;
+				for (const FVector& ExistingPlant : WetlandPlantingPoints)
+				{
+					const float Spacing = FVector::Dist2D(PlantingPoint, ExistingPlant);
+					MinWetlandSpacing = FMath::Min(MinWetlandSpacing, Spacing);
+					bValid &= Spacing >= 299.9f;
+				}
+				WetlandPlantingPoints.Add(PlantingPoint);
 			}
-			bCattailsRespectPoolClearance &= bNearPool;
-			for (const FVector& ExistingCattail : CattailPlantingPoints)
-			{
-				const float Clearance = FVector::Dist2D(PlantingPoint, ExistingCattail);
-				MinCattailSpacing = FMath::Min(MinCattailSpacing, Clearance);
-				bCattailsRespectPoolClearance &= Clearance >= 299.9f;
-			}
-			CattailPlantingPoints.Add(PlantingPoint);
-		}
-		TestTrue(TEXT("Tideglass cattails use the authored 1.7–2.3 m size band"), bCattailsStayInsideHeightBand);
-		AddInfo(FString::Printf(TEXT("Tideglass wet edge placed %d cattails; pool-edge clearance %.1f cm and inter-cattail spacing %.1f cm."),
-			CattailPlantingPoints.Num(), MinCattailPoolEdgeClearance, MinCattailSpacing));
-		TestTrue(TEXT("Tideglass cattails remain outside the 2.5 m shoreline buffer"), MinCattailPoolEdgeClearance >= 249.9f);
-		TestTrue(TEXT("Tideglass cattails grow outside the water and its plant-clearance ring"), bCattailsRespectPoolClearance);
+			TestTrue(FString::Printf(TEXT("Tideglass %s use the authored %.0f–%.0f cm height band, shoreline buffer, pool ring, and shared spacing"),
+				SpeciesName, MinHeight, MaxHeight), bValid);
+		};
+		ValidateWetlandComponent(PreviewWeather->IslandCattails, 170.f, 230.f, TEXT("Typha cattails"));
+		ValidateWetlandComponent(PreviewWeather->IslandPhalaris, 150.f, 185.f, TEXT("Phalaris"));
+		AddInfo(FString::Printf(TEXT("Tideglass wet edge placed %d Typha + %d Phalaris; minimum pool-edge clearance %.1f cm and shared inter-plant spacing %.1f cm."),
+			PreviewWeather->IslandCattails->GetInstanceCount(), PreviewWeather->IslandPhalaris->GetInstanceCount(),
+			MinWetlandPoolEdgeClearance, MinWetlandSpacing));
+		TestTrue(TEXT("All Tideglass wetland plants remain outside the 2.5 m shoreline buffer"), MinWetlandPoolEdgeClearance >= 249.9f);
 		int32 MatureSpruceCount = 0;
 		int32 SaplingCount = 0;
 		const float SpruceMeshHalfHeight = PreviewWeather->IslandSpruce && PreviewWeather->IslandSpruce->GetStaticMesh()
@@ -1141,11 +1238,34 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			if (TreeHeight >= 150.f && TreeHeight <= 450.f) ++SaplingCount;
 			else if (TreeHeight >= 900.f && TreeHeight <= 1800.f) ++MatureSpruceCount;
 		}
-		TestTrue(TEXT("Deterministic mature spruce groves and edge saplings stay within the 500-grove population budget"),
+		const int32 SpruceInstanceCount = PreviewWeather->IslandSpruce ? PreviewWeather->IslandSpruce->GetInstanceCount() : 0;
+		const int32 MapleInstanceCount = PreviewWeather->IslandNorwayMaples ? PreviewWeather->IslandNorwayMaples->GetInstanceCount() : 0;
+		const int32 AspenInstanceCount = PreviewWeather->IslandEuropeanAspens ? PreviewWeather->IslandEuropeanAspens->GetInstanceCount() : 0;
+		const int32 BeechInstanceCount = PreviewWeather->IslandEuropeanBeeches ? PreviewWeather->IslandEuropeanBeeches->GetInstanceCount() : 0;
+		const int32 BirchCoppiceInstanceCount = PreviewWeather->IslandBirchCoppices ? PreviewWeather->IslandBirchCoppices->GetInstanceCount() : 0;
+		TestTrue(TEXT("Deterministic woodland stays within its population budget and shows three Megaplant species plus the birch-coppice layer"),
 			PreviewWeather->GroundCoverTreeCount > 4837 && PreviewWeather->GroundCoverTreeCount <= 26000 &&
 			MatureSpruceCount > 0 && SaplingCount > 0 && SaplingCount <= 10000 &&
-			PreviewWeather->IslandSpruce &&
-			PreviewWeather->IslandSpruce->GetInstanceCount() == PreviewWeather->GroundCoverTreeCount &&
+			PreviewWeather->IslandSpruce && SpruceInstanceCount + MapleInstanceCount + AspenInstanceCount + BeechInstanceCount == PreviewWeather->GroundCoverTreeCount &&
+			PreviewWeather->GroundCoverBirchCoppiceCount == BirchCoppiceInstanceCount && BirchCoppiceInstanceCount > 0 && BirchCoppiceInstanceCount <= 96 &&
+			PreviewWeather->IslandBirchCoppices && PreviewWeather->IslandBirchCoppices->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandBirchCoppices->CanEverAffectNavigation() &&
+			MapleInstanceCount == PreviewWeather->GroundCoverMapleTreeCount && MapleInstanceCount > 0 && MapleInstanceCount <= 320 &&
+			AspenInstanceCount == PreviewWeather->GroundCoverAspenTreeCount && AspenInstanceCount > 0 && AspenInstanceCount <= 320 &&
+			BeechInstanceCount == PreviewWeather->GroundCoverBeechTreeCount && BeechInstanceCount > 0 && BeechInstanceCount <= 320 &&
+			PreviewWeather->IslandNorwayMaples &&
+			PreviewWeather->IslandNorwayMaples->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandNorwayMaples->CanEverAffectNavigation() &&
+			PreviewWeather->IslandNorwayMaples->GetTransformProvider() &&
+			PreviewWeather->IslandNorwayMaples->GetTransformProvider()->IsA<UDynamicWindData>() &&
+			PreviewWeather->IslandEuropeanAspens && PreviewWeather->IslandEuropeanAspens->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandEuropeanAspens->CanEverAffectNavigation() &&
+			PreviewWeather->IslandEuropeanAspens->GetTransformProvider() &&
+			PreviewWeather->IslandEuropeanAspens->GetTransformProvider()->IsA<UDynamicWindData>() &&
+			PreviewWeather->IslandEuropeanBeeches && PreviewWeather->IslandEuropeanBeeches->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
+			!PreviewWeather->IslandEuropeanBeeches->CanEverAffectNavigation() &&
+			PreviewWeather->IslandEuropeanBeeches->GetTransformProvider() &&
+			PreviewWeather->IslandEuropeanBeeches->GetTransformProvider()->IsA<UDynamicWindData>() &&
 			PreviewWeather->IslandSpruce->GetCollisionEnabled() == ECollisionEnabled::NoCollision &&
 			!PreviewWeather->IslandSpruce->CanEverAffectNavigation());
 		bool bSpruceRespectsSpacing = SprucePlantingPoints.Num() == SpruceTreeHeights.Num();
@@ -1161,12 +1281,12 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 		AddInfo(FString::Printf(TEXT("Spruce minimum inter-tree clearance in cm: %.1f (%d instances)"), MinSpruceSpacing, SprucePlantingPoints.Num()));
 		TestTrue(TEXT("Mature spruce and saplings preserve their distinct minimum planting spacings"), bSpruceRespectsSpacing);
 		UHierarchicalInstancedStaticMeshComponent* GrassC = PreviewWeather->FindShoreGrassC();
-		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d + %d + %d ground plants), including %d exposed-hillside patch instances, %d spruce trees (%d mature + %d saplings), and %d broadleaf understory shrubs."),
+		AddInfo(FString::Printf(TEXT("Transient ground-cover preview placed %d nonblocking instances (%d + %d + %d grass clumps, %d + %d + %d + %d + %d ground plants), including %d exposed-hillside patch instances, %d trees (%d mature spruce + %d Norway maples + %d European aspens + %d European beeches + %d saplings), and %d broadleaf understory shrubs."),
 			PreviewWeather->GroundCoverInstanceCount, PreviewWeather->ShoreGrassA->GetInstanceCount(), PreviewWeather->ShoreGrassB->GetInstanceCount(), GrassC ? GrassC->GetInstanceCount() : 0,
 			PreviewWeather->ShoreGroundPlants->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowA->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlantLowB->GetInstanceCount(), PreviewWeather->ShoreGroundPlantLowC->GetInstanceCount(),
 			PreviewWeather->ShoreGroundPlantLowD->GetInstanceCount(), PreviewWeather->GroundCoverMeadowInstanceCount, PreviewWeather->GroundCoverTreeCount,
-			MatureSpruceCount, SaplingCount, PreviewWeather->GroundCoverShrubCount));
+			MatureSpruceCount, MapleInstanceCount, AspenInstanceCount, BeechInstanceCount, SaplingCount, PreviewWeather->GroundCoverShrubCount));
 		AddInfo(FString::Printf(TEXT("Woodland understorey adds %d nonblocking rhododendrons and %d Fab meadow flowers."),
 			PreviewWeather->GroundCoverFlowerCount - MeadowFlowerInstanceCount, MeadowFlowerInstanceCount));
 		if (bGroundCoverSwayPreview)
@@ -1224,6 +1344,7 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			MeasureMaximumSway(PreviewWeather->IslandShrubs, PreviewWeather->IslandShrubBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandRhododendrons, PreviewWeather->IslandRhododendronBaseTransforms);
 			MeasureMaximumSway(PreviewWeather->IslandCattails, PreviewWeather->IslandCattailBaseTransforms);
+			MeasureMaximumSway(PreviewWeather->IslandPhalaris, PreviewWeather->IslandPhalarisBaseTransforms);
 			TestTrue(TEXT("Fixed preview gusts move at least one shore-grass clump"), MaximumVisibleSwayDegrees > 0.1f);
 			TestTrue(TEXT("Fixed preview gusts respect the ten-degree response limit"), MaximumVisibleSwayDegrees <= 10.01f);
 			AddInfo(FString::Printf(TEXT("Applied two fixed transient preview gusts; maximum measured clump sway is %.2f degrees. No weather/world state was saved."), MaximumVisibleSwayDegrees));
@@ -1307,6 +1428,9 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 			bool bRequiresNightFireflies = false;
 			(*Object)->TryGetBoolField(TEXT("night_fireflies"), bRequiresNightFireflies);
 			if (bRequiresNightFireflies && !bNightFireflyPreview) continue;
+			bool bRequiresDayDragonflies = false;
+			(*Object)->TryGetBoolField(TEXT("day_dragonflies"), bRequiresDayDragonflies);
+			if (bRequiresDayDragonflies && !bDayDragonflyPreview) continue;
 			double FieldOfView = 60.0, MinimumHeight = 160.0;
 			(*Object)->TryGetNumberField(TEXT("fov"), FieldOfView);
 			(*Object)->TryGetNumberField(TEXT("min_height"), MinimumHeight);
@@ -1549,6 +1673,53 @@ bool FIslandViewpointCaptureTest::RunTest(const FString& Parameters)
 				Preview->GetCollisionEnabled() == ECollisionEnabled::NoCollision && !Preview->CanEverAffectNavigation());
 		}
 		AddInfo(TEXT("Transient art preview only: six Wind Arch and Listening Stones render components use Starter Content SM_Rock/M_Rock; original blockout meshes remain as collision, and the preview visuals will be removed after capture."));
+	}
+	if (bGroundCoverSoloLayer && PreviewWeather)
+	{
+		TArray<UHierarchicalInstancedStaticMeshComponent*> FoliageComponents;
+		PreviewWeather->GetComponents(FoliageComponents);
+		int32 VisibleLayerComponents = 0;
+		int32 TotalFoliageComponents = 0;
+		for (UHierarchicalInstancedStaticMeshComponent* Component : FoliageComponents)
+		{
+			if (!Component) continue;
+			++TotalFoliageComponents;
+			const FString Name = Component->GetName();
+			const bool bIsGrass = Name.StartsWith(TEXT("ShoreGrass")) || Name == TEXT("IslandFestuca");
+			const bool bIsGroundPlant = Name.Contains(TEXT("GroundPlant")) ||
+				Name.Contains(TEXT("MeadowFlower")) || Name.Contains(TEXT("Cattail")) || Name == TEXT("IslandPhalaris");
+			const bool bIsUnderstory = Name == TEXT("IslandShrubs") || Name == TEXT("IslandRhododendrons");
+			const bool bIsTree = Name == TEXT("IslandSpruce");
+			const bool bIsMeadow = bIsGrass || bIsGroundPlant;
+			const bool bKeepVisible = (GroundCoverSoloLayer == TEXT("grass") && bIsGrass) ||
+				(GroundCoverSoloLayer == TEXT("groundplants") && bIsGroundPlant) ||
+				(GroundCoverSoloLayer == TEXT("meadow") && bIsMeadow) ||
+				(GroundCoverSoloLayer == TEXT("meadowtrees") && (bIsMeadow || bIsTree)) ||
+				(GroundCoverSoloLayer == TEXT("meadowunderstory") && (bIsMeadow || bIsUnderstory)) ||
+				(GroundCoverSoloLayer == TEXT("woodland") && (bIsTree || bIsUnderstory)) ||
+				(GroundCoverSoloLayer == TEXT("understory") && bIsUnderstory) ||
+				(GroundCoverSoloLayer == TEXT("trees") && bIsTree) ||
+				GroundCoverSoloLayer == TEXT("landscape");
+			Component->SetVisibility(bKeepVisible, false);
+			if (bKeepVisible) ++VisibleLayerComponents;
+		}
+		const bool bKeepTreesVisible = GroundCoverSoloLayer == TEXT("woodland") || GroundCoverSoloLayer == TEXT("meadowtrees") ||
+			GroundCoverSoloLayer == TEXT("trees") || GroundCoverSoloLayer == TEXT("landscape");
+		TArray<UInstancedSkinnedMeshComponent*> BroadleafTreeComponents = {
+			PreviewWeather->IslandNorwayMaples, PreviewWeather->IslandEuropeanAspens, PreviewWeather->IslandEuropeanBeeches };
+		for (UInstancedSkinnedMeshComponent* Component : BroadleafTreeComponents)
+		{
+			if (!Component) continue;
+			++TotalFoliageComponents;
+			Component->SetVisibility(bKeepTreesVisible, false);
+			if (bKeepTreesVisible) ++VisibleLayerComponents;
+		}
+		TestTrue(FString::Printf(TEXT("Ground-cover layer '%s' resolves to at least one foliage component"), *GroundCoverSoloLayer),
+			VisibleLayerComponents > 0);
+		if (GroundCoverSoloLayer == TEXT("landscape"))
+			TestEqual(TEXT("The landscape diagnostic preserves every foliage component"), VisibleLayerComponents, TotalFoliageComponents);
+		AddInfo(FString::Printf(TEXT("Layer diagnostic keeps %d HISM components visible for '%s'; all other transient ground cover is hidden."),
+			VisibleLayerComponents, *GroundCoverSoloLayer));
 	}
 	ADD_LATENT_AUTOMATION_COMMAND(FIslandViewpointCaptureCommand(Island, MoveTemp(Viewpoints), static_cast<float>(Hour),
 		FIntPoint(FMath::Clamp(static_cast<int32>(Width), 64, 3840), FMath::Clamp(static_cast<int32>(Height), 64, 2160)), Directory, this,

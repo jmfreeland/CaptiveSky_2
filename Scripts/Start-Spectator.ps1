@@ -25,6 +25,7 @@ toggle back to normal control.
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/BoundedCapture -MaxRealtimeSeconds 45 -MaxModelRequests 1 -StartupTimeoutSeconds 90 -ViewpointFile Config/TideglassMotionProbe.json -ViewpointHour 12
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DataRoot Saved/Playtests/GoldenHour -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ViewpointFile Config/IslandViewpoints.json -ViewpointHour 17
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisablePython -TextureStreamingStats -DataRoot Saved/Playtests/TextureStats -MaxRealtimeSeconds 90 -MaxModelRequests 0
+./Scripts/Start-Spectator.ps1 -Windowed -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/RatHollowSiteAudit -MaxRealtimeSeconds 60 -MaxModelRequests 0 -AdditionalExecCommands 'Island.RatHollowSiteAudit -100415 97968 600 250'
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisablePython -DataRoot Saved/Playtests/TideglassStormProof -MaxRealtimeSeconds 60 -MaxModelRequests 1 -StartupTimeoutSeconds 600 -ScreenshotDirectory Playtests/TideglassStormProof/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -ViewpointHour 12 -ForceStormSeconds 120
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -DisableGroundCoverSway -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSwayOff -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSwayOff/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSwayOff/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSwayOff/DDC
 ./Scripts/Start-Spectator.ps1 -Windowed -Shots -DisableAgentThinking -FoliageSwayRadiusCm 180 -NoZenLocalFallback -ForceMemoryDDC -DataRoot Saved/Playtests/FoliageSway180 -MaxRealtimeSeconds 120 -MaxModelRequests 1 -ScreenshotDirectory Playtests/FoliageSway180/Screenshots -ViewpointFile Config/TideglassMotionProbe.json -CSVProfileFrames 200 -ShaderWorkingDir Saved/Playtests/FoliageSway180/ShaderWorking -LocalDataCachePath Saved/Playtests/FoliageSway180/DDC
@@ -63,6 +64,7 @@ param(
 	[switch]$DisablePython,
 	[switch]$DisableGroundCoverSway,
 	[switch]$TextureStreamingStats,
+	[string[]]$AdditionalExecCommands,
 	[switch]$DisableFoliageMaterialWind,
 	[switch]$DisableOcclusionQueries,
 	[switch]$DisableRHIThread,
@@ -186,6 +188,12 @@ if ($TextureStreamingStats) {
 if ($DisableOcclusionQueries) { $execCommands += "r.AllowOcclusionQueries 0" }
 if ($DisableRHIThread) { $execCommands += "r.RHIThread.Enable 0" }
 if ($DisableDynamicGlobalIllumination) { $execCommands += "r.DynamicGlobalIlluminationMethod 0" }
+foreach ($additionalExecCommand in $AdditionalExecCommands) {
+	if ([string]::IsNullOrWhiteSpace($additionalExecCommand) -or $additionalExecCommand -match '[,\r\n]') {
+		throw "Each -AdditionalExecCommands entry must be one non-empty Unreal console command without commas or line breaks."
+	}
+	$execCommands += $additionalExecCommand.Trim()
+}
 if ($execCommands.Count -gt 0) { $arguments += "-ExecCmds=$($execCommands -join ',')" }
 if ($Continuous) { $arguments += "-CaptiveSkyContinuous" }
 if (-not [string]::IsNullOrWhiteSpace($DataRoot)) { $arguments += "-CaptiveSkyDataRoot=$DataRoot" }

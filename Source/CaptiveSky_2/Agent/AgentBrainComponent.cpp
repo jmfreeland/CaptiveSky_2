@@ -1241,9 +1241,9 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	AgentModelTier::FTurnFacts TurnFacts;
 	if (!LightModel.IsEmpty()) TurnFacts = AgentModelTier::GatherTurnFacts(Owner, Context);
 	const bool bLight = !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(TurnFacts);
-	if (Session && !Session->TryReserveModelRequest(AgentId, bLight))
+	if (!UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(Session, AgentId, bLight))
 	{
-		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred by the play-session guard for %s."), *AgentId);
+		UE_LOG(LogAgentBrain, Verbose, TEXT("Model request deferred because the play-session guard is missing or rejected it for %s."), *AgentId);
 		LastDecision = FAgentDecision();
 		LastConversationContext = Context;
 		BroadcastDecisionReady(LastDecision);

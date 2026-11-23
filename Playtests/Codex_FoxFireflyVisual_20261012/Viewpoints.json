@@ -1,0 +1,14 @@
+{
+  "_comment": "Temporary low three-quarter composition aligned with the observed fox-to-firefly path; use the isolated 20:00 night override. min_height -1 preserves the authored camera height.",
+  "width": 1600,
+  "height": 900,
+  "viewpoints": [
+    {
+      "name": "WoodlandFoxFireflyAtNight",
+      "from": { "at": [-100904.0, 97721.0, 3300.0] },
+      "look": { "at": [-100615.0, 98761.0, 3000.0] },
+      "fov": 65.0,
+      "min_height": -1.0
+    }
+  ]
+}

@@ -306,3 +306,17 @@ Evidence: [60-second warm-up log](../../Saved/Playtests/Codex_WorldLifeReview_20
 [90-second focused-roost log](../../Saved/Playtests/Codex_WorldLifeReview_20261010/WorldLifeReview_RavenNest.log),
 [close-up capture](../../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_RavenNest/001_Nest__Closeup.png),
 [higher-angle capture](../../Saved/Playtests/Codex_WorldLifeReview_20261010/Screenshots_RavenOverlook/001_Nest__Closeup.png).
+
+## 2026-10-22 — editor MCP recheck
+
+`Saved/Logs/CaptiveSky_2.log` last changed at 18:41 local time. Its final
+ModelContextProtocol activity remains the 17:06 dispatch to
+`SlateInspectorToolset.Click`, following the Slate file-picker interaction; the
+only later log line is background Derived Data Cache maintenance. A fresh
+`netstat -ano | findstr :8000` check returned no listener, and a new MCP
+`list_toolsets`/`describe_toolset` request stalled. This does not establish
+whether Unreal is still open, but it does establish that the configured local
+MCP endpoint is not currently reachable from this shell. No editor restart or
+process termination was attempted. The pending material repair and approved
+Island reload remain unperformed; resume only after the editor-side MCP endpoint
+is responding again.

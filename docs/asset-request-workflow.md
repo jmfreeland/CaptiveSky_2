@@ -157,3 +157,12 @@ SHA-256. `dotnet run --no-build` passed all checks when
 `Saved/CompileScratch/GatewayChecks_20261019/` tree. The initial repeat using
 the default Windows temp root hit access denied while writing the headless-turn
 marker; no Discord channel, production inbox, or model provider was contacted.
+
+**Request-path regression (2026-10-29):** the bundled Python runtime passed all
+15 tests in `Scripts/AssetPipeline/tests/test_requests.py`, covering review
+gating, explicit visual-upgrade routing, and keeping functionality upgrades on
+human review. The already-open main UE 5.8 editor also passed
+`CaptiveSky2.Agent.AssetRequestQueue` with result `Success`. This confirms the
+current Python and Unreal queue boundaries agree; it does not exercise a live
+resident choosing a proposal or prove any requested change was implemented in
+the world. No PIE or model provider was used.

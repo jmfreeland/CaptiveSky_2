@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "IslandOceanSubsystem.h"
+#include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -18,6 +19,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "WaterBodyComponent.h"
 #include "WaterBodyOceanActor.h"
+#include "WaterMeshComponent.h"
 #include "WaterSubsystem.h"
 #include "WaterZoneActor.h"
 
@@ -137,6 +139,22 @@ bool FIslandOceanTest::RunTest(const FString& Parameters)
 		WaterZone->AddWaterBodyComponent(OceanComponent);
 		WaterZone->Update();
 		WaterSubsystem->SetOceanBodyComponent(OceanComponent);
+
+		UWaterMeshComponent* NativeWaterMesh = WaterZone->GetWaterMeshComponent();
+		if (TestNotNull(TEXT("The native water zone exposes its generated water mesh"), NativeWaterMesh))
+			NativeWaterMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+		Ocean->OnWorldBeginPlay(*World);
+		if (NativeWaterMesh)
+		{
+			TestEqual(TEXT("World startup makes the native water mesh overlap rather than block the player"),
+				NativeWaterMesh->GetCollisionResponseToChannel(ECC_Pawn), ECR_Overlap);
+		}
+		for (UPrimitiveComponent* WaterCollision : OceanComponent->GetCollisionComponents(true))
+		{
+			if (!WaterCollision) continue;
+			TestFalse(FString::Printf(TEXT("Generated ocean collision %s cannot block the player"), *WaterCollision->GetName()),
+				WaterCollision->GetCollisionResponseToChannel(ECC_Pawn) == ECR_Block);
+		}
 
 		FVector SurfaceLocation = FVector::ZeroVector;
 		FVector SurfaceNormal = FVector::UpVector;

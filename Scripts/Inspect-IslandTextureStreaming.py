@@ -24,6 +24,9 @@ TEXTURE_CANDIDATES = (
     "/Game/PN_interactiveSpruceForest/Textures/Imposter/half_01_imposter_O",
     "/Game/PN_interactiveSpruceForest/Textures/MasterTextures/ModelTextures/Leaf_O",
 )
+TEXTURE_ASSET_ROOTS = (
+    "/Game/Megaplant_Library",
+)
 MAX_REFERENCER_DEPTH = 10
 MAX_REFERENCER_PACKAGES = 5000
 
@@ -62,6 +65,21 @@ def find_island_reference_paths(registry, start_path, reference_options):
     return matches, len(visited), b_hit_limit
 
 
+def find_candidate_textures(registry):
+    """Add imported plant textures to the hand-picked streaming candidates."""
+    candidates = set(TEXTURE_CANDIDATES)
+    for root in TEXTURE_ASSET_ROOTS:
+        assets = registry.get_assets_by_path(root, recursive=True) or []
+        unreal.log("[IslandTextureAssetRoot] root={} registry_assets={}".format(
+            root, len(assets)))
+        for asset_data in assets:
+            class_path = asset_data.asset_class_path
+            class_name = str(class_path.asset_name)
+            if class_name in ("Texture2D", "VirtualTexture2D"):
+                candidates.add(str(asset_data.package_name))
+    return sorted(candidates)
+
+
 def main():
     if not unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH):
         raise RuntimeError("Could not load {} for the read-only texture inventory.".format(MAP_PATH))
@@ -84,7 +102,10 @@ def main():
         include_soft_management_references=False,
         include_hard_management_references=False,
     )
-    for texture_path in TEXTURE_CANDIDATES:
+    texture_candidates = find_candidate_textures(registry)
+    unreal.log("[IslandTextureInventory] candidate_textures={} roots={}".format(
+        len(texture_candidates), ",".join(TEXTURE_ASSET_ROOTS)))
+    for texture_path in texture_candidates:
         referencers = registry.get_referencers(texture_path, reference_options) or []
         names = sorted(str(package_name) for package_name in referencers)
         unreal.log("[IslandTextureReferencers] texture={} count={} packages={}".format(

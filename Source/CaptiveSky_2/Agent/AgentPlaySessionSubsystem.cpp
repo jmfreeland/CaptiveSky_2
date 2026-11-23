@@ -27,6 +27,12 @@ int32 UAgentPlaySessionSubsystem::ClampRequestLimit(int32 Requested)
 	return FMath::Clamp(Requested, 0, 120);
 }
 
+bool UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(UAgentPlaySessionSubsystem* Session,
+	const FString& AgentId, bool bLight)
+{
+	return Session && Session->TryReserveModelRequest(AgentId, bLight);
+}
+
 void UAgentPlaySessionSubsystem::ApplyCommandLineOverrides(const FString& CommandLine, float& InOutSeconds, int32& InOutRequests,
 	bool* bOutHasExplicitTimeCap, bool* bOutHasExplicitRequestCap)
 {
