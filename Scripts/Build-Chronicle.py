@@ -71,6 +71,18 @@ def describe(entry: dict) -> str | None:
         place_id = entry.get("place_id") or "a remembered place"
         listener = name(entry.get("with", ""))
         return f"{who} used {quote(text)} as a personal name for {place_id} while speaking with {listener}."
+    if kind == "social_commitment":
+        event = entry.get("event", "")
+        speaker = f"{who} " if event in ("created", "fulfilled") and entry.get("agent") else ""
+        details = []
+        commitment_id = entry.get("id")
+        conversation_id = entry.get("conversation_id")
+        if isinstance(commitment_id, str) and commitment_id and commitment_id not in text:
+            details.append(f"promise {commitment_id}")
+        if isinstance(conversation_id, str) and conversation_id:
+            details.append(f"source conversation {conversation_id}")
+        provenance = f" [{'; '.join(details)}]" if details else ""
+        return f"{speaker}{text}{provenance}" if text else None
     if kind in LASTING:
         return f"{who} {text}" if entry.get("agent") else text[:1].upper() + text[1:]
     if kind in ("weather", "day", "sky"):
