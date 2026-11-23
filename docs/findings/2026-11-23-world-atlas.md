@@ -4,10 +4,13 @@
 
 The page maps recorded trail cells and stored place coordinates, then lists chronicle events that carry spatial provenance. It supports day and region filters for recorded events, bounded input sizes/counts/coordinates, and HTML escaping. It recognizes supported world/trail schema versions and reports corrupt core inputs; malformed or unsupported chronicle records are skipped. Optional anchors must be supplied explicitly from a source the caller trusts.
 
+Commit `4a22f7ec` adds a proportional 1/2/5 distance scale to the map when spatial evidence is present. A snapshot with no spatial evidence explicitly reports that a scale is unavailable; it does not derive a scale from the empty-map placeholder bounds.
+
 ## Validation
 
 - `python -m unittest Scripts.tests.test_build_world_atlas`: 7 tests passed, covering empty and legacy snapshots, negative coordinates, chronicle coordinate strings, bad and oversized input, corrupt world state, escaping, and event provenance.
 - `git diff --check`: clean.
 - A local preview was generated at ignored path `Saved/WorldAtlas/Island.html` from copies under `Saved/WorldAtlas/Input/`. Those source files are historical: the newest recorded chronicle data is from 2026-11-01. The captured-at label in the generated page discloses the copy date and source timestamp.
+- The listed test run and preview predate the scale-bar change; no tests or browser review have been run for that change. Review its size and label across representative map extents when the shared computer is available.
 
-This is a static snapshot, not a reconstructed historical map: trail cells show what the copied trail file contains, and day filters apply to event markers/listing. No visual browser review was completed under the current Windows browser automation policy.
+This is a static snapshot, not a reconstructed historical map: trail cells show what the copied trail file contains, and day filters apply to event markers/listing. No visual browser review was completed while the user was using the shared computer.
