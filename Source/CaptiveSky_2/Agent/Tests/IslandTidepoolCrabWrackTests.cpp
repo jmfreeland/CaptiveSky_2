@@ -1,8 +1,12 @@
 #include "Misc/AutomationTest.h"
 #include "IslandTidepoolCrab.h"
 #include "IslandWrack.h"
+#include "IslandChronicle.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FIslandTidepoolCrabWrackTest, "CaptiveSky2.Agent.TidepoolCrabShoreForage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -15,6 +19,10 @@ bool FIslandTidepoolCrabWrackTest::RunTest(const FString& Parameters)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
 	if (!TestNotNull(TEXT("A world is required for the local shoreline interaction"), World)) return false;
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	const FString ChroniclePath = FPaths::ProjectSavedDir() / TEXT("Automation") /
+		(FString(TEXT("TidepoolCrabWrack_")) + FGuid::NewGuid().ToString(EGuidFormats::Digits) + TEXT(".jsonl"));
+	UIslandChronicleSubsystem* Chronicle = World->GetSubsystem<UIslandChronicleSubsystem>();
+	if (Chronicle) Chronicle->ChronicleFileOverride = ChroniclePath;
 
 	AIslandTidepoolCrab* Crab = World->SpawnActor<AIslandTidepoolCrab>(FVector::ZeroVector, FRotator::ZeroRotator);
 	AIslandWrack* Wrack = World->SpawnActor<AIslandWrack>(FVector(180.f, 0.f, 30.f), FRotator::ZeroRotator);
@@ -29,6 +37,12 @@ bool FIslandTidepoolCrabWrackTest::RunTest(const FString& Parameters)
 	Wrack->Show(1, EIslandWrackKind::Kelp, 17, 0, false);
 	Crab->CheckForNearbyWrack();
 	TestTrue(TEXT("A nearby shore find draws one brief forage detour"), Crab->IsInvestigatingShoreFind());
+	FString ChronicleText;
+	TestTrue(TEXT("The crab's one-shot investigation is recorded"),
+		Chronicle && FFileHelper::LoadFileToString(ChronicleText, *ChroniclePath) &&
+		ChronicleText.Contains(TEXT("\"event\":\"crab_wrack_investigation\"")) &&
+		ChronicleText.Contains(TEXT("\"source_id\":\"wrack_1\"")) &&
+		ChronicleText.Contains(TEXT("\"at\":\"180.00,0.00,30.00\"")));
 	TestTrue(TEXT("The forage target is the nearby wrack rather than a new saved location"),
 		Crab->WrackInterestLocation.Equals(Wrack->GetActorLocation()));
 	TestFalse(TEXT("Foraging is not misreported as fleeing a disturbance"), Crab->IsScurrying());
@@ -53,6 +67,20 @@ bool FIslandTidepoolCrabWrackTest::RunTest(const FString& Parameters)
 	Crab->SetActorLocation(FVector::ZeroVector);
 	Crab->CheckForNearbyWrack();
 	TestTrue(TEXT("Leaving the wider ring rearms a later visit to that find"), Crab->IsInvestigatingShoreFind());
+	UIslandWrackSubsystem* Shore = World->GetSubsystem<UIslandWrackSubsystem>();
+	TestNotNull(TEXT("The wrack subsystem is present for the resident discovery"), Shore);
+	if (Shore)
+	{
+		Shore->GetLedgerMutable().Add(EIslandWrackKind::Kelp, Wrack->GetActorLocation(), 0.f, 17, 1);
+		FString FindFact;
+		const bool bExamined = Shore->Examine(Wrack->GetItemId(), 1, TEXT("Aster"), FindFact);
+		ChronicleText.Reset();
+		TestTrue(TEXT("A resident's actual inspection records the discovered shore find"), bExamined &&
+			FFileHelper::LoadFileToString(ChronicleText, *ChroniclePath) &&
+			ChronicleText.Contains(TEXT("\"event\":\"shore_find_discovered\"")) &&
+			ChronicleText.Contains(TEXT("\"agent\":\"Aster\"")) &&
+			ChronicleText.Contains(TEXT("\"at\":\"180.00,0.00,30.00\"")));
+	}
 	Crab->SetSheltered(true);
 	TestFalse(TEXT("Night shelter ends a forage detour"), Crab->IsInvestigatingShoreFind());
 	Crab->SetSheltered(false);
@@ -60,5 +88,6 @@ bool FIslandTidepoolCrabWrackTest::RunTest(const FString& Parameters)
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	IFileManager::Get().Delete(*ChroniclePath);
 	return true;
 }

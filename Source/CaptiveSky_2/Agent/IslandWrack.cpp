@@ -821,8 +821,16 @@ bool UIslandWrackSubsystem::Examine(int32 ItemId, int32 Today, const FString& Ag
 		*DescribeItem(Item.Kind, Age, false), *Item.Find, Remaining);
 	if (bNearbyCrabScurried)
 		OutFact += TEXT(" A nearby shore crab darts sideways from the disturbance, then settles again.");
+	const FString SourceId = FString::Printf(TEXT("wrack_%d"), Item.Id);
 	UIslandChronicleSubsystem::Record(GetWorld(), TEXT("wrack_turned"), AgentId,
-		FString::Printf(TEXT("Turned over %s on the shore and found %s."), *DescribeItem(Item.Kind, Age, false), *Item.Find));
+		FString::Printf(TEXT("Turned over %s on the shore and found %s."), *DescribeItem(Item.Kind, Age, false), *Item.Find),
+		{
+			{ TEXT("event"), TEXT("shore_find_discovered") },
+			{ TEXT("source_id"), SourceId },
+			{ TEXT("wrack_id"), FString::FromInt(Item.Id) },
+			{ TEXT("at"), FString::Printf(TEXT("%.2f,%.2f,%.2f"), Item.Position.X, Item.Position.Y, Item.Position.Z) },
+			{ TEXT("find"), Item.Find }
+		});
 	return true;
 }
 

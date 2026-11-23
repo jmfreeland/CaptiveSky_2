@@ -70,6 +70,26 @@ class WorldAtlasInputTests(unittest.TestCase):
         self.assertEqual(loaded["unsupported_types"], 1)
         self.assertEqual(loaded["invalid_lines"], 1)
 
+    def test_spatial_crab_wildlife_event_with_string_at_coordinates_maps_to_its_source(self):
+        chronicle_path = self.root / "chronicle.jsonl"
+        chronicle_path.write_text(json.dumps({
+            "type": "wildlife", "event": "crab_wrack_investigation", "source_id": "wrack_7",
+            "wrack_id": "7", "at": "-120.50,900.25,30.00", "day": 4, "clock": "12:00",
+            "agent": "TidepoolCrab", "text": "A Tideglass shore crab investigates storm wrack 7.",
+        }), encoding="utf-8")
+
+        loaded = ATLAS.load_chronicle(chronicle_path)
+        event = loaded["events"][0]
+        page = ATLAS.render({"world": {"version": 3, "points": [], "skipped_points": 0},
+                             "trails": {"version": 2, "cells": [], "skipped_cells": 0},
+                             "chronicle": loaded, "anchors": [], "anchors_skipped": 0})
+
+        self.assertEqual((event["x"], event["y"]), (-120.5, 900.25))
+        self.assertEqual(event["event"], "crab_wrack_investigation")
+        self.assertEqual(event["source_id"], "wrack_7")
+        self.assertIn("A Tideglass shore crab investigates storm wrack 7.", page)
+        self.assertIn("source wrack_7", page)
+
     def test_out_of_bounds_and_mismatched_cells_are_rejected(self):
         for row in (
             [0, 0, 2, 1, ATLAS.MAX_COORD_CM + 1, 0, 0, 0, 0],

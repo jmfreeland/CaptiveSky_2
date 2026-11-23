@@ -31,7 +31,7 @@ TRAIL_REGION_SPAN = 8
 KNOWN_EVENT_TYPES = {
     "arrangement", "arrangement_response", "basin", "decision", "day", "forage", "guest_book",
     "lightning", "nest", "rainbow", "session", "sky", "social_commitment", "storm_mark", "trail",
-    "weather", "wrack_forage", "wrack_turned", "curio", "sea_state", "wildlife_home",
+    "weather", "wrack_forage", "wrack_turned", "curio", "sea_state", "wildlife", "wildlife_home",
 }
 
 
@@ -252,6 +252,9 @@ def load_chronicle(path: Path | None) -> dict[str, Any]:
             last_recorded_at = timestamp
         event = {"type": kind, "day": day, "clock": clock, "timestamp": timestamp,
                  "agent": agent, "text": text.strip(), "event": str(entry.get("event", ""))[:80]}
+        source_id = entry.get("source_id", "")
+        if isinstance(source_id, str) and 0 < len(source_id) <= 80:
+            event["source_id"] = source_id
         if point is not None:
             event["x"], event["y"] = point
             event["region"] = list(_region_for_xy(*point))
@@ -357,7 +360,8 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
         for event in map_events:
             px, py = xy(event["x"], event["y"])
             region = f"{event['region'][0]},{event['region'][1]}"
-            title = f"Day {event['day']} {event['clock']} • {event['type']}: {event['text']}"
+            source = f" • source {event['source_id']}" if event.get("source_id") else ""
+            title = f"Day {event['day']} {event['clock']} • {event['type']}{source}: {event['text']}"
             svg_parts.append(f'<circle class="event-point type-{html.escape(event["type"], quote=True)}" data-day="{event["day"]}" data-region="{region}" cx="{px:.2f}" cy="{py:.2f}" r="6"><title>{html.escape(title)}</title></circle>')
     svg_parts.append('</svg>')
 
@@ -371,7 +375,8 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
         region = f'{event["region"][0]},{event["region"][1]}' if "region" in event else ""
         location = "mapped" if "x" in event else ("region located" if region else "no spatial provenance")
         text = event["text"] or event["event"] or event["type"].replace("_", " ")
-        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}</span><p>{html.escape(text)}</p><small>{location}</small></li>')
+        source = f' · source {html.escape(event["source_id"])}' if event.get("source_id") else ""
+        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}</span><p>{html.escape(text)}</p><small>{location}{source}</small></li>')
     timeline_html = '\n'.join(timeline) or '<li class="no-events">No accepted chronicle events in this snapshot. The Atlas does not infer activity.</li>'
     freshness = f"Snapshot label: {html.escape(captured_at)}" if captured_at else "Snapshot time not supplied; current runtime state is not queried."
     latest = data["chronicle"]["last_recorded_at"]

@@ -2,6 +2,7 @@
 #include "IslandDayNight.h"
 #include "IslandWeather.h"
 #include "IslandTideglassSubsystem.h"
+#include "IslandChronicle.h"
 #include "RavenAgentAIController.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
@@ -287,6 +288,16 @@ void AIslandTidepoolCrab::CheckForNearbyWrack()
 		WrackInterestLocation = Wrack->GetActorLocation();
 		WrackInterestRemaining = 3.f;
 		WrackInterestCooldownRemaining = 14.f;
+		const FString SourceId = FString::Printf(TEXT("wrack_%d"), Wrack->GetItemId());
+		const FVector EvidenceLocation = Wrack->GetActorLocation();
+		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("wildlife"), TEXT("TidepoolCrab"),
+			FString::Printf(TEXT("A Tideglass shore crab investigates storm wrack %d."), Wrack->GetItemId()),
+			{
+				{ TEXT("event"), TEXT("crab_wrack_investigation") },
+				{ TEXT("source_id"), SourceId },
+				{ TEXT("wrack_id"), FString::FromInt(Wrack->GetItemId()) },
+				{ TEXT("at"), FString::Printf(TEXT("%.2f,%.2f,%.2f"), EvidenceLocation.X, EvidenceLocation.Y, EvidenceLocation.Z) }
+			});
 		return;
 	}
 }

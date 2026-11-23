@@ -37,6 +37,19 @@ class ChronicleRenderTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;not executable&lt;/script&gt;", page)
         self.assertNotIn("<script>not executable</script>", page)
 
+    def test_crab_investigation_and_resident_find_are_in_the_readable_history(self):
+        entries = [
+            {"type": "wildlife", "agent": "TidepoolCrab", "day": 4, "clock": "11:55",
+             "event": "crab_wrack_investigation", "text": "A Tideglass shore crab investigates storm wrack 7."},
+            {"type": "wrack_turned", "agent": "Aster", "day": 4, "clock": "12:00",
+             "event": "shore_find_discovered", "text": "Turned over kelp and found a small crab's hollow."},
+        ]
+
+        markdown = CHRONICLE.render(entries, None)
+
+        self.assertIn("TidepoolCrab A Tideglass shore crab investigates storm wrack 7.", markdown)
+        self.assertIn("Aster Turned over kelp and found a small crab's hollow.", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()
