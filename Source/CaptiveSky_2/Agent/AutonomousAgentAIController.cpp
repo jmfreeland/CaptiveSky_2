@@ -1085,9 +1085,9 @@ void AAutonomousAgentAIController::HandleBlueJarAction(FName Target)
 			ReportAction(TEXT("The jar has no usable physical bounds, so it remains with you."));
 			return;
 		}
-		const float PivotToBoundsCenterZ = JarBounds.GetCenter().Z - JarToDrop->GetActorLocation().Z;
+		const float PivotToBoundsMinZ = JarBounds.Min.Z - JarToDrop->GetActorLocation().Z;
 		FVector DropLocation = FloorHit.ImpactPoint + Forward * 10.f;
-		DropLocation.Z -= PivotToBoundsCenterZ;
+		DropLocation.Z += 1.f - PivotToBoundsMinZ;
 		JarToDrop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		JarToDrop->SetActorLocation(DropLocation, false, nullptr, ETeleportType::TeleportPhysics);
 		JarToDrop->SetActorEnableCollision(bBlueJarOriginalCollisionEnabled);
@@ -1192,8 +1192,8 @@ void AAutonomousAgentAIController::HandleBlueJarAction(FName Target)
 		return;
 	}
 	FVector Placement = CounterBounds.GetCenter();
-	const float JarPivotToBoundsCenterZ = JarBounds.GetCenter().Z - Jar->GetActorLocation().Z;
-	Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsCenterZ + 1.f;
+	const float JarPivotToBoundsMinZ = JarBounds.Min.Z - Jar->GetActorLocation().Z;
+	Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsMinZ + 1.f;
 	Jar->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	Jar->SetActorLocation(Placement, false, nullptr, ETeleportType::TeleportPhysics);
 	Jar->SetActorEnableCollision(bBlueJarOriginalCollisionEnabled);

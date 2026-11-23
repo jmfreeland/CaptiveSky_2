@@ -22,45 +22,49 @@ if not unreal.EditorLevelLibrary.load_level(LEVEL):
 
 actors = unreal.EditorLevelLibrary.get_all_level_actors()
 existing = next((actor for actor in actors if "BlueJar" in actor_tags(actor)), None)
+table = next((actor for actor in actors if actor.get_actor_label() == "Inn_Table_Front"), None)
+if not table:
+    raise RuntimeError("Inn_Table_Front was not found in Island")
+
+mesh = next((unreal.load_asset(path) for path in MESH_PATHS if unreal.load_asset(path)), None)
+if not mesh:
+    raise RuntimeError("Import the BlueJar asset before running this placement script")
+
+table_origin, table_extent = table.get_actor_bounds(False, True)
+table_location = table.get_actor_location()
+table_top = table_origin.z + table_extent.z
 if existing:
-    print("BlueJar already exists: " + existing.get_actor_label())
+    jar = existing
 else:
-    table = next((actor for actor in actors if actor.get_actor_label() == "Inn_Table_Front"), None)
-    if not table:
-        raise RuntimeError("Inn_Table_Front was not found in Island")
-
-    mesh = next((unreal.load_asset(path) for path in MESH_PATHS if unreal.load_asset(path)), None)
-    if not mesh:
-        raise RuntimeError("Import the BlueJar asset before running this placement script")
-
-    table_origin, table_extent = table.get_actor_bounds(False, True)
-    table_location = table.get_actor_location()
-    table_top = table_origin.z + table_extent.z
     initial_location = unreal.Vector(table_location.x, table_location.y, table_top)
     jar = unreal.EditorLevelLibrary.spawn_actor_from_class(
         unreal.StaticMeshActor, initial_location, table.get_actor_rotation())
     if not jar:
         raise RuntimeError("Could not spawn the BlueJar actor")
 
-    component = jar.get_component_by_class(unreal.StaticMeshComponent)
-    if not component:
+component = jar.get_component_by_class(unreal.StaticMeshComponent)
+if not component:
+    if not existing:
         unreal.EditorLevelLibrary.destroy_actor(jar)
-        raise RuntimeError("Spawned StaticMeshActor has no static mesh component")
-    component.set_static_mesh(mesh)
-    component.set_collision_enabled(unreal.CollisionEnabled.QUERY_AND_PHYSICS)
-    jar.set_actor_label("BlueJar")
-    jar.set_editor_property("tags", [unreal.Name("BlueJar")])
+    raise RuntimeError("BlueJar actor has no static mesh component")
+component.set_static_mesh(mesh)
+component.set_collision_enabled(unreal.CollisionEnabled.QUERY_AND_PHYSICS)
+jar.set_actor_label("BlueJar")
+jar.set_editor_property("tags", [unreal.Name("BlueJar")])
 
-    jar_origin, _ = jar.get_actor_bounds(False, True)
-    pivot_to_bounds_center_z = jar_origin.z - jar.get_actor_location().z
-    placement = unreal.Vector(table_location.x, table_location.y,
-                              table_top - pivot_to_bounds_center_z + 1.0)
-    jar.set_actor_location(placement, False, True)
-    if not unreal.EditorLevelLibrary.save_current_level():
+jar.set_actor_rotation(table.get_actor_rotation(), False)
+jar.set_actor_location(unreal.Vector(table_location.x, table_location.y, table_top), False, True)
+jar_origin, jar_extent = jar.get_actor_bounds(False, True)
+pivot_to_bounds_min_z = jar_origin.z - jar_extent.z - jar.get_actor_location().z
+placement = unreal.Vector(table_location.x, table_location.y,
+                          table_top - pivot_to_bounds_min_z + 1.0)
+jar.set_actor_location(placement, False, True)
+if not unreal.EditorLevelLibrary.save_current_level():
+    if not existing:
         unreal.EditorLevelLibrary.destroy_actor(jar)
-        raise RuntimeError("Island map save failed")
-    existing = jar
-    print("Placed BlueJar on Inn_Table_Front using " + mesh.get_path_name())
+    raise RuntimeError("Island map save failed")
+existing = jar
+print("Placed BlueJar on Inn_Table_Front using " + mesh.get_path_name())
 
 result = {
     "map": LEVEL,

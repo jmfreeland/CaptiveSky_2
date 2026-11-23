@@ -24,16 +24,21 @@ The ledger records fulfillment only after placement and a successful save; if
 the save fails, the jar returns to Aster's hand when possible. A fulfilled ledger
 entry restores the authored jar to the counter after a level reload.
 
-The Island map still has no saved `BlueJar` actor. Run
-`Scripts/Place-IslandBlueJar.py` in the editor after the map is no longer open
-elsewhere; it places the imported mesh on `Inn_Table_Front`, tags it `BlueJar`,
-and saves the map. The current editor holds the shared Island map open, so this
-placement has not been applied yet. Content and map assets are gitignored; the
-tracked placement script makes the local setup repeatable. The gameplay code
-compiled, but has not been exercised in-game. It assumes one authored jar and
-tagged `IslandInn`/`InnCounter` actors. The natural-language promise check
-remains a narrow safeguard for this prototype, not proof that every promise is
-sincere.
+The shared editor has saved a tagged `BlueJar` actor on `Inn_Table_Front`; its
+last placement record is in the editor clone's ignored
+`Saved/BlueJarPlacement.json`. Review of the recorded transform exposed a bug:
+the initial setup and delivery code aligned the jar's bounds center to the
+surface instead of aligning its bounds minimum. The placement script and
+runtime set-down, delivery, and reload-restore paths now use the bounds minimum
+relative to the actor pivot. Re-run `Scripts/Place-IslandBlueJar.py` in the
+editor to repair the existing source placement and save the local Island map.
+The user is currently using the shared computer, so this correction has not yet
+been applied or visually checked. Content and map assets are gitignored; the
+tracked script makes the local setup repeatable. The gameplay code previously
+compiled, but has not been exercised in-game after this placement correction.
+It assumes one authored jar and tagged `IslandInn`/`InnCounter` actors. The
+natural-language promise check remains a narrow safeguard for this prototype,
+not proof that every promise is sincere.
 
 `CaptiveSky_2Editor` built successfully with UE 5.8.3 (15 actions) after the
 physical-delivery follow-up; no new automation test has been added or run.

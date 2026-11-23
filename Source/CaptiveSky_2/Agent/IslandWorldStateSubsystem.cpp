@@ -283,8 +283,8 @@ void UIslandWorldStateSubsystem::LoadAndSpawn()
 		const FBox JarBounds = Jar->GetComponentsBoundingBox(true);
 		if (!CounterBounds.IsValid || !JarBounds.IsValid) continue;
 		FVector Placement = CounterBounds.GetCenter();
-		const float JarPivotToBoundsCenterZ = JarBounds.GetCenter().Z - Jar->GetActorLocation().Z;
-		Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsCenterZ + 1.f;
+		const float JarPivotToBoundsMinZ = JarBounds.Min.Z - Jar->GetActorLocation().Z;
+		Placement.Z = CounterBounds.Max.Z - JarPivotToBoundsMinZ + 1.f;
 		Jar->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 		Jar->SetActorLocation(Placement, false, nullptr, ETeleportType::TeleportPhysics);
 		break;
