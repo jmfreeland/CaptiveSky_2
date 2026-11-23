@@ -33,9 +33,13 @@ static bool NormalizePersonalPlaceName(FString& Name)
 static bool ContainsPersonalPlaceName(const FString& Speech, const FString& Name)
 {
 	if (Speech.IsEmpty() || Name.IsEmpty()) return false;
-	auto IsNameCharacter = [](TCHAR Character)
+	auto IsJoinedNameCharacter = [](const FString& Text, int32 Position, bool bToLeft)
 	{
-		return FChar::IsAlnum(Character) || Character == TEXT('_') || Character == TEXT('\'') || Character == 0x2019;
+		const TCHAR Character = Text[Position];
+		if (FChar::IsAlnum(Character) || Character == TEXT('_')) return true;
+		if (Character != TEXT('\'') && Character != 0x2019 && Character != TEXT('-') && Character != TEXT('.')) return false;
+		const int32 Neighbor = bToLeft ? Position - 1 : Position + 1;
+		return Neighbor >= 0 && Neighbor < Text.Len() && FChar::IsAlnum(Text[Neighbor]);
 	};
 	int32 SearchFrom = 0;
 	while (SearchFrom < Speech.Len())
@@ -43,8 +47,8 @@ static bool ContainsPersonalPlaceName(const FString& Speech, const FString& Name
 		const int32 Found = Speech.Find(*Name, ESearchCase::IgnoreCase, ESearchDir::FromStart, SearchFrom);
 		if (Found == INDEX_NONE) return false;
 		const int32 End = Found + Name.Len();
-		const bool bLeftBoundary = Found == 0 || !IsNameCharacter(Speech[Found - 1]);
-		const bool bRightBoundary = End >= Speech.Len() || !IsNameCharacter(Speech[End]);
+		const bool bLeftBoundary = Found == 0 || !IsJoinedNameCharacter(Speech, Found - 1, true);
+		const bool bRightBoundary = End >= Speech.Len() || !IsJoinedNameCharacter(Speech, End, false);
 		if (bLeftBoundary && bRightBoundary) return true;
 		SearchFrom = Found + 1;
 	}
