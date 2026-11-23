@@ -1032,9 +1032,9 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 				NearbyBeings += FString::Printf(TEXT(" You have stayed within about a dozen metres of here for your last %d decisions. Much of the Island lies beyond what you can see from here, and small things are only noticed up close; wander would take you somewhere new nearby, if you feel like it."), Lingered);
 			NearbyBeings += DescribeRememberedPlaces(RememberedPlaces, Location, NoticedNow, 300.f, 3);
 		}
-		if (Context.bAgentToAgent && !RememberedPlaces.IsEmpty())
+		if (!RememberedPlaces.IsEmpty())
 		{
-			NearbyBeings += TEXT(" Your personally remembered place IDs (optional targets for a personal place_name, only if your spoken line uses your chosen name):");
+			NearbyBeings += TEXT(" Your personally remembered place IDs (optional place_name targets only when you speak with another resident and your line uses the chosen name):");
 			for (const FRememberedPlace& Place : RememberedPlaces)
 				NearbyBeings += FString::Printf(TEXT(" %s (%s);"), *Place.Target.ToString(), *Place.Label);
 		}

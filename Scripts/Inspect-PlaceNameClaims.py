@@ -46,7 +46,7 @@ def main() -> None:
         "--agents-dir",
         type=Path,
         default=Path(__file__).resolve().parents[1] / "Agents",
-        help="agent data directory (defaults to the repository Agents directory)",
+        help="Agents folder (defaults to the repository Agents directory)",
     )
     parser.add_argument("--json", action="store_true", help="write the claims as JSON")
     args = parser.parse_args()

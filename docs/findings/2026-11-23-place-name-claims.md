@@ -15,15 +15,16 @@ knowledge is not written into other residents' files. The place ID and map label
 are never changed, and competing personal names can coexist. This adds no model
 call and does not make naming a required action.
 
-The recipient's resident-to-resident prompt includes that resident's own
-remembered anchor IDs, so a response can refer to a place it knows without
-relying on the speaker's memory or an invented identifier. These IDs are not
-added to player or external-correspondence context.
+The resident's own decision prompt includes their remembered anchor IDs, so an
+opening line or response can refer to a place they know without relying on the
+speaker's memory or inventing an identifier. These IDs are not added to player
+or external-correspondence context.
 
 `Scripts/Inspect-PlaceNameClaims.py` reads resident `memory.jsonl` files and
 lists only records tagged `place-name`. It skips blank lines, rejects malformed
 nonblank records, and can emit JSON for deterministic inspection. Pass
-`--agents-dir` to inspect an isolated data root. Running it against the checked-in
+`--agents-dir` with the isolated `Agents` folder to inspect a separate data
+root. Running it against the checked-in
 agent data currently reports no place-name claims, as expected before the new
 runtime path is built and played.
 
