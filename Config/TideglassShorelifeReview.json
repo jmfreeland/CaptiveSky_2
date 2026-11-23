@@ -1,0 +1,17 @@
+{
+  "viewpoints": [
+    {
+      "name": "Tideglass_Shorelife_Close",
+      "from": {
+        "tag": "TideglassPool",
+        "offset": [900, -450, 160]
+      },
+      "look": {
+        "tag": "TideglassPool",
+        "offset": [720, 0, 20]
+      },
+      "fov": 60,
+      "min_height": -1
+    }
+  ]
+}
