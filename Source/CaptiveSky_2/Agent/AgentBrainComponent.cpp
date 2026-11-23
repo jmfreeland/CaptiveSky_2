@@ -960,6 +960,7 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 			if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
 			{
 				const FIslandSocialCommitmentRecord* ActiveBlueJarPromise = nullptr;
+				const FIslandSocialCommitmentRecord* RecentConcludedBlueJarPromise = nullptr;
 				for (const FIslandSocialCommitmentRecord& Commitment : WorldState->GetSocialCommitments())
 				{
 					if (Commitment.ProposerAgentId != OwnId && Commitment.RecipientAgentId != OwnId) continue;
@@ -978,6 +979,32 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 						Commitment.ObjectId == TEXT("BlueJar") && Commitment.TargetPlaceId == TEXT("InnCounter") &&
 						(Commitment.Status == EIslandSocialCommitmentStatus::Pending || Commitment.Status == EIslandSocialCommitmentStatus::Due))
 						ActiveBlueJarPromise = &Commitment;
+					if (Commitment.ProposerAgentId == TEXT("Aster") && Commitment.RecipientAgentId == TEXT("Innkeeper") &&
+						Commitment.ObjectId == TEXT("BlueJar") && Commitment.TargetPlaceId == TEXT("InnCounter") &&
+						(Commitment.Status == EIslandSocialCommitmentStatus::Fulfilled || Commitment.Status == EIslandSocialCommitmentStatus::Expired) &&
+						(!RecentConcludedBlueJarPromise || Commitment.CreatedDay >= RecentConcludedBlueJarPromise->CreatedDay))
+						RecentConcludedBlueJarPromise = &Commitment;
+				}
+				// Keep the outcome socially available without forcing an apology, gratitude, or renewed promise.
+				// Only surface one cue when the other participant has already opened a conversation.
+				if (!ActiveBlueJarPromise && RecentConcludedBlueJarPromise && Context.bAgentToAgent && Context.TurnIndex == 1)
+				{
+					const FString OtherParticipantId = OwnId == TEXT("Aster") ? TEXT("Innkeeper") : TEXT("Aster");
+					if (Context.ParticipantId == OtherParticipantId)
+					{
+						if (RecentConcludedBlueJarPromise->Status == EIslandSocialCommitmentStatus::Fulfilled)
+						{
+							NearbyBeings += OwnId == TEXT("Innkeeper")
+								? TEXT(" The saved record says you witnessed Aster place the jar on the InnCounter. If it feels natural, you may acknowledge that during this conversation or simply move on; it creates no debt or assumed gratitude.")
+								: TEXT(" The saved record says the Innkeeper witnessed you place the jar on the InnCounter. You may acknowledge the outcome during this conversation or simply move on; no particular reaction or further obligation is assumed.");
+						}
+						else
+						{
+							NearbyBeings += OwnId == TEXT("Innkeeper")
+								? TEXT(" The saved record says the deadline passed without witnessed delivery; it does not tell you whether Aster tried or why. If it feels natural, you may mention the missed deadline during this conversation or leave it alone; no explanation or apology is owed.")
+								: TEXT(" The saved record says the deadline passed without witnessed delivery. You may acknowledge it during this conversation, explain only what you know to be true, or leave it alone; no apology or new promise is required.");
+						}
+					}
 				}
 				if (ActiveBlueJarPromise && OwnId == TEXT("Aster"))
 				{

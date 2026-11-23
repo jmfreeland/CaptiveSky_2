@@ -23,6 +23,13 @@ Aster to attempt an action before the ledger and Chronicle reflect a missed
 deadline. The source change is committed as `a5e43425`; UE build and live
 rollover behavior remain unverified.
 
+After a BlueJar commitment is fulfilled or expires, the first incoming line of a
+later conversation between Aster and the Innkeeper may receive one participant-
+specific prompt cue. It distinguishes witnessed delivery from a missed witness
+deadline, leaves room to acknowledge the outcome or move on, and does not assign
+motive, debt, gratitude, or an obligation to apologize. This adds no persistent
+state or model request. The prompt change is not yet built or observed in play.
+
 ## Physical delivery path and limits
 
 A follow-up gameplay path offers Aster a visible, tagged `BlueJar` prop to pick
