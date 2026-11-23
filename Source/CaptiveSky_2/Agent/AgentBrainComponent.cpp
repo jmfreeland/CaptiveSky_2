@@ -942,6 +942,32 @@ FString UAgentBrainComponent::BuildSituationSummary(const FAgentConversationCont
 
 	// Keep perception as plain text at the provider boundary so more body-agnostic
 	// observations and social opportunities can be added without changing callers.
+	if (!Context.bExternal && Owner)
+	{
+		const UAgentMemoryComponent* OwnMemory = Owner->FindComponentByClass<UAgentMemoryComponent>();
+		const FString OwnId = OwnMemory ? OwnMemory->GetResolvedAgentId() : FString();
+		if (!OwnId.IsEmpty())
+		{
+			if (const UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+			{
+				for (const FIslandSocialCommitmentRecord& Commitment : WorldState->GetSocialCommitments())
+				{
+					if (Commitment.ProposerAgentId != OwnId && Commitment.RecipientAgentId != OwnId) continue;
+					const TCHAR* Status = TEXT("pending");
+					switch (Commitment.Status)
+					{
+					case EIslandSocialCommitmentStatus::Due: Status = TEXT("due"); break;
+					case EIslandSocialCommitmentStatus::Fulfilled: Status = TEXT("witnessed fulfilled"); break;
+					case EIslandSocialCommitmentStatus::Expired: Status = TEXT("expired without witnessed fulfillment"); break;
+					default: break;
+					}
+					NearbyBeings += FString::Printf(TEXT(" A recorded promise involving you is %s: %s told %s they would bring %s to %s by Island day %d. This records what was said; it does not establish that the object exists or has been delivered."),
+						Status, *Commitment.ProposerAgentId, *Commitment.RecipientAgentId,
+						*Commitment.ObjectId.ToString(), *Commitment.TargetPlaceId.ToString(), Commitment.DueDay);
+				}
+			}
+		}
+	}
 	if (Context.Text.IsEmpty())
 	{
 		// Small lasting things are only noticed up close, so a resident that never moves on never meets them.
@@ -1030,7 +1056,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"description of the situation. Reply with ONLY a single JSON object, no other text, matching "
 		"exactly this shape:\n"
 		"{\"thought\": \"<brief reasoning>\", "
-		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade|practice_craft\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"craft_id\": \"<exact known tradition ID, or a new safe ID for first practice>\", \"craft_name\": \"<short name, only for a new tradition>\", \"craft_source\": \"<brief inspiration, only for a new tradition>\", \"craft_parameters\": [{\"id\": \"hydration|rise|heat|salt\", \"value\": 0.0}], \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
+		"\"action\": {\"type\": \"idle|move_to|speak|wander|interact|sleep|build|land|request_object|request_upgrade|practice_craft\", \"target\": \"<optional target name>\", \"speech\": \"<optional line to say>\", \"teach_arrangement\": \"<optional public site ID to share during resident conversation>\", \"teach_craft\": \"<optional exact craft-tradition ID from your known traditions to share with another resident>\", \"promise\": {\"object_id\": \"BlueJar\", \"place_id\": \"InnCounter\", \"due_in_days\": 1}, \"craft_id\": \"<exact known tradition ID, or a new safe ID for first practice>\", \"craft_name\": \"<short name, only for a new tradition>\", \"craft_source\": \"<brief inspiration, only for a new tradition>\", \"craft_parameters\": [{\"id\": \"hydration|rise|heat|salt\", \"value\": 0.0}], \"object_request\": \"<short description, only for request_object>\", \"upgrade_target\": \"<identifier or concise description of the object/feature, optional>\", \"upgrade_kind\": \"aesthetic|variation|functionality\", \"upgrade_request\": \"<specific proposed improvement>\"}, "
 		"\"new_memories\": [{\"text\": \"<what to remember>\", \"importance\": 0.0, \"tags\": [\"<tag>\"]}]}\n"
 		"For move_to, interact, build, land, and practice_craft, copy the exact target identifier shown in the current situation. Do not invent or paraphrase a target from its description, your memories, or the image. If no exact target is offered for the place you want, choose wander or idle instead of guessing. "
 		"Remembered places are optional return destinations, not evidence that anything has changed; return only if you are curious. "
@@ -1038,6 +1064,7 @@ FString UAgentBrainComponent::BuildSystemPrompt(const TArray<FAgentMemoryRecord>
 		"When someone has just spoken to you, ordinarily answer them using the speak action unless you have a compelling reason not to.\n"
 		"In an in-world conversation with another resident, you may optionally set teach_arrangement to one exact site ID only when your speech deliberately shares that work's public visible form/site and you made, saw, or were taught about it. This passes only the public form and location, never the maker's private title or intent. Do not set it for the player, Discord, or any external correspondent. Teaching is optional; do not invent a site ID or make teaching a duty. "
 		"In an in-world conversation with another resident, you may optionally set teach_craft to one exact ID from the craft traditions you personally know, only when your speech deliberately shares that practice. The nearby recipient gains attributed knowledge only after the line is delivered in the reserved, in-range resident conversation. Do not set it for the player, Discord, or any external correspondent; do not claim an item was made or given. Teaching is optional; do not invent an ID or make teaching a duty. "
+		"Only Aster speaking to the Innkeeper in a nearby, in-world resident conversation may optionally set promise to exactly {object_id: BlueJar, place_id: InnCounter, due_in_days: 1}. Set it only when you freely choose to tell the Innkeeper you will bring the blue jar to the inn counter tomorrow, and make that promise explicit in your spoken line. It records the words after delivery; it does not mean the jar exists, is carried, or has been delivered. Do not promise on the player's behalf, to external correspondents, or as a duty. Promising is optional; silence or another topic is equally valid. "
 		"You may optionally choose practice_craft only when the current situation explicitly says you are close enough to the lit InnHearth. Use target InnHearth. If you already know the tradition, copy its exact ID and do not rename it; otherwise you may begin one only when genuinely curious, with a short safe craft_id (ASCII letters, digits, _ or -), a concise craft_name, and a brief source grounded in your memory, observation, or curiosity. Give one to four intended settings using only hydration, rise, heat, or salt, each in range 0..1. These are speculative notes, not measured ingredients, quality, or proof of success. The record is unrated, one attempt per Island day, and creates no ingredients, food, or prop. This action uses the current thought only; do not repeat it as a duty. "
 		"Sleep is available after settling on the ground or a perch. If you are near a listed InnBed target, you may name it in the sleep action after arriving; the system records sheltered rest only when the tagged inn roof and wall enclosure pass their geometric checks. This does not restore health or establish warmth or complete dryness. If the situation names your assigned WildlifeHome target, you may move_to there and choose sleep after arriving; that records where you rested, not proof of shelter, safety, comfort, or recovery. Rest is optional, not an assigned home. Idle means quiet waiting, which is a valid choice. "
 		"Use build only with a build target your situation explicitly offers right now. Unlike other effects, what you build remains in the world after this session, and others may come across it; building is never required. "
@@ -1481,6 +1508,21 @@ FAgentDecision UAgentBrainComponent::ParseDecisionAndStoreMemories(const FString
 		(*ActionObj)->TryGetStringField(TEXT("influence"), Decision.Influence);
 		(*ActionObj)->TryGetStringField(TEXT("teach_arrangement"), Decision.TeachArrangement);
 		(*ActionObj)->TryGetStringField(TEXT("teach_craft"), Decision.TeachCraft);
+		const TSharedPtr<FJsonObject>* PromiseObj = nullptr;
+		if ((*ActionObj)->TryGetObjectField(TEXT("promise"), PromiseObj) && PromiseObj && PromiseObj->IsValid())
+		{
+			FString PromiseObjectId;
+			FString PromisePlaceId;
+			double PromiseDueInDays = 0.0;
+			if ((*PromiseObj)->TryGetStringField(TEXT("object_id"), PromiseObjectId) &&
+				(*PromiseObj)->TryGetStringField(TEXT("place_id"), PromisePlaceId) &&
+				(*PromiseObj)->TryGetNumberField(TEXT("due_in_days"), PromiseDueInDays) && PromiseDueInDays == 1.0)
+			{
+				Decision.PromiseObjectId = MoveTemp(PromiseObjectId);
+				Decision.PromiseTargetPlaceId = MoveTemp(PromisePlaceId);
+				Decision.PromiseDueInDays = 1;
+			}
+		}
 		(*ActionObj)->TryGetStringField(TEXT("object_request"), Decision.ObjectRequest);
 		(*ActionObj)->TryGetStringField(TEXT("upgrade_target"), Decision.UpgradeTarget);
 		(*ActionObj)->TryGetStringField(TEXT("upgrade_kind"), Decision.UpgradeKind);

@@ -139,6 +139,17 @@ struct FAgentDecision
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString TeachCraft;
 
+	/** Optional whitelisted promise offered during a delivered resident-to-resident line. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString PromiseObjectId;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	FString PromiseTargetPlaceId;
+
+	/** Only one-day commitments are currently offered by resident speech. */
+	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
+	int32 PromiseDueInDays = 0;
+
 	/** Optional new-object description, only used when ActionType == RequestObject. */
 	UPROPERTY(BlueprintReadWrite, Category = "Agent LLM")
 	FString ObjectRequest;

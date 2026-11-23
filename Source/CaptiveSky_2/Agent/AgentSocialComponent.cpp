@@ -322,7 +322,8 @@ void UAgentSocialComponent::HandleDecisionReady(const FAgentDecision& Decision)
 			CompletedUtterance.TurnIndex < MaximumConversationTurns && IsWithinSpeakingRange(Sender))
 		{
 			DeliverSpeech(Sender, Decision.Speech, CompletedUtterance.ConversationId, CompletedUtterance.TurnIndex + 1,
-				Decision.TeachArrangement, Decision.TeachCraft);
+				Decision.TeachArrangement, Decision.TeachCraft, Decision.PromiseObjectId,
+				Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays);
 		}
 		else
 		{
@@ -368,13 +369,15 @@ void UAgentSocialComponent::TryBeginSpontaneousConversation(const FAgentDecision
 	if (TryReserveAutomaticConversation(RecipientSocial, OwnMemory->GetResolvedAgentId(),
 		RecipientMemory->GetResolvedAgentId(), ConversationId))
 	{
-		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement, Decision.TeachCraft);
+		DeliverSpeech(Recipient, Decision.Speech, ConversationId, 1, Decision.TeachArrangement,
+			Decision.TeachCraft, Decision.PromiseObjectId, Decision.PromiseTargetPlaceId, Decision.PromiseDueInDays);
 	}
 }
 
 void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, const FString& Speech,
 	const FString& ConversationId, int32 TurnIndex, const FString& TeachArrangementSiteId,
-	const FString& TeachCraftTraditionId)
+	const FString& TeachCraftTraditionId, const FString& PromiseObjectId,
+	const FString& PromiseTargetPlaceId, int32 PromiseDueInDays)
 {
 	AAutonomousAgentCharacter* Speaker = GetAgentOwner();
 	if (!Speaker || !Recipient || Speech.IsEmpty() || !IsWithinSpeakingRange(Recipient))
@@ -413,6 +416,38 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	if (UAgentSocialSubsystem* SocialSubsystem = GetWorld()->GetSubsystem<UAgentSocialSubsystem>())
 	{
 		SocialSubsystem->PublishSpeech(Speaker, Speech);
+	}
+
+	// Persist the one deliberately offered promise only after a nearby, mutually
+	// reserved resident line has actually been delivered. This is intent provenance;
+	// it does not create or move the promised object.
+	if (SpeakerId == TEXT("Aster") && RecipientId == TEXT("Innkeeper") &&
+		PromiseObjectId == TEXT("BlueJar") && PromiseTargetPlaceId == TEXT("InnCounter") && PromiseDueInDays == 1 &&
+		Speech.Contains(TEXT("bring"), ESearchCase::IgnoreCase) &&
+		Speech.Contains(TEXT("jar"), ESearchCase::IgnoreCase) &&
+		Speech.Contains(TEXT("tomorrow"), ESearchCase::IgnoreCase))
+	{
+		if (UIslandWorldStateSubsystem* WorldState = GetWorld()->GetSubsystem<UIslandWorldStateSubsystem>())
+		{
+			FString ConversationKey = ConversationId;
+			ConversationKey.ReplaceInline(TEXT("-"), TEXT(""));
+			if (ConversationKey.Len() > 32) ConversationKey.LeftInline(32);
+			const FString PromiseIdText = FString::Printf(TEXT("Promise_%s_T%d"), *ConversationKey, TurnIndex);
+			const int32 Today = UIslandWorldStateSubsystem::CurrentIslandDay(GetWorld());
+			FIslandSocialCommitmentRecord Commitment;
+			Commitment.Id = FName(*PromiseIdText);
+			Commitment.ProposerAgentId = SpeakerId;
+			Commitment.RecipientAgentId = RecipientId;
+			Commitment.ObjectId = FName(*PromiseObjectId);
+			Commitment.TargetPlaceId = FName(*PromiseTargetPlaceId);
+			Commitment.SourceConversationId = ConversationId;
+			Commitment.CreatedDay = Today;
+			Commitment.DueDay = Today + PromiseDueInDays;
+			if (WorldState->CreateBringObjectCommitment(Commitment))
+				UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] %s promised %s to bring %s to %s by Island day %d (conversation %s, turn %d)."),
+					*SpeakerId, *RecipientId, *PromiseObjectId, *PromiseTargetPlaceId,
+					Commitment.DueDay, *ConversationId, TurnIndex);
+		}
 	}
 
 	FAgentSocialUtterance Utterance;
