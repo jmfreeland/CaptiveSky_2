@@ -22,7 +22,7 @@ from pathlib import Path
 
 DEFAULT_LOG = Path(__file__).resolve().parent.parent / "WorldState" / "chronicle.jsonl"
 QUIET = {"idle": "rested", "wander": "wandered", "move_to": "went somewhere", "sleep": "slept"}
-LASTING = {"nest", "curio", "arrangement", "arrangement_response", "guest_book", "storm_mark", "wildlife", "wrack_turned"}
+LASTING = {"nest", "curio", "arrangement", "arrangement_response", "guest_book", "storm_mark", "wildlife", "wrack", "wrack_turned"}
 
 
 def load(path: Path) -> list[dict]:

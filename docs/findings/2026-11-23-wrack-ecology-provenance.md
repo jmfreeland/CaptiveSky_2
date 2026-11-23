@@ -4,6 +4,8 @@ The tidepool crab's existing, bounded wrack-investigation detour now appends one
 
 The offline World Atlas now accepts `wildlife` Chronicle entries and retains bounded `source_id` values in map-marker and timeline provenance. `Build-Chronicle.py` includes both wildlife investigation and wrack-discovery records in its readable history. Existing gameplay timing, movement, inventory, and save behavior were not changed.
 
+The human-readable Chronicle also includes the bulk `wrack` event for storm-deposited shore material. That summary has no exact coordinates; the Atlas keeps it in the timeline without placing it on the map. This formatter/Atlas integration follow-up was made after the verification below and has not been retested.
+
 ## Verification
 
 - UE 5.8.4 `CaptiveSky_2Editor` compiled and linked successfully (9 UBT actions; 35.19 seconds), compiling the crab, wrack, and focused automation-test sources.
