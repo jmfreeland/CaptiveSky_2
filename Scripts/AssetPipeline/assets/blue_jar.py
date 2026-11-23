@@ -7,8 +7,8 @@ NAME = "BlueJar"
 BAKE_SIZE = 1024
 
 # A deep, cool glaze with enough roughness to read as fired pottery in daylight.
-lib.PLAIN["blue_jar_glaze"] = dict(BaseColor=[0.025, 0.11, 0.34], Roughness=0.24)
-lib.PLAIN["blue_jar_slip"] = dict(BaseColor=[0.68, 0.75, 0.78], Roughness=0.42)
+lib.PLAIN["blue_jar_glaze"] = dict(BaseColor=[0.035, 0.15, 0.52], Roughness=0.34)
+lib.PLAIN["blue_jar_slip"] = dict(BaseColor=[0.78, 0.84, 0.92], Roughness=0.48)
 
 
 def build(A):
@@ -22,13 +22,13 @@ def build(A):
         (0.091, 0.155), (0.096, 0.12), (0.091, 0.086), (0.076, 0.05),
         (0.058, 0.035), (0.0, 0.035),
     ]
-    A.lathe("blue_jar_glaze", profile, segs=48, name="blue_jar_body", sharp=48)
+    A.lathe("blue_jar_glaze", profile, segs=72, name="blue_jar_body", sharp=62)
 
     # Two quiet slip lines accent the neck; they follow its turned ceramic rim.
     A.torus("blue_jar_slip", 0.064, 0.0018, loc=(0.0, 0.0, 0.247),
-            segs=48, rsegs=6, name="painted_neck_line")
+            segs=72, rsegs=6, name="painted_neck_line")
     A.torus("blue_jar_slip", 0.071, 0.0015, loc=(0.0, 0.0, 0.026),
-            segs=48, rsegs=6, name="painted_foot_line")
+            segs=72, rsegs=6, name="painted_foot_line")
 
     # A small soft loop handle gives the vessel a readable hand-made silhouette.
     path = []

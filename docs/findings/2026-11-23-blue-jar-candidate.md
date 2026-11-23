@@ -9,16 +9,28 @@ can be inspected before the promise feature depends on it.
 
 The Blender pipeline exported `SM_BlueJar_01.fbx`; Blender re-import verification
 reported one `UVMap`, two material slots, the expected dimensions, one collision
-shape, and `PROBLEMS []`. The local `Preview.png` reads as a compact blue vessel.
-The Unreal content-only import report lists `/Game/Generated/ComfyBlender/BlueJar/SM_BlueJar_01.SM_BlueJar_01`, measured bounds of 21.7 × 21.6 × 26.9 cm, one convex collision shape, and `validation_errors: []`.
+shape, and `PROBLEMS []`. The first preview looked faceted, so the body and trim
+were increased from 48 to 72 radial segments, the smoothing angle was raised, and
+the glaze was brightened and made less reflective. The revised local `Preview.png`
+reads as a smoother, clearer blue vessel. It has 5,452 source triangles.
+
+The first Unreal import remains at
+`/Game/Generated/ComfyBlender/BlueJar/SM_BlueJar_01.SM_BlueJar_01`. UE 5.8 refused
+an in-place mesh reimport, so the revised mesh was imported into the separate
+local review folder `/Game/Generated/ComfyBlender/BlueJar_Refined_20261123/`.
+Its report measured 21.7 × 21.6 × 26.9 cm, one convex collision shape, and
+`validation_errors: []`; its two imported material graphs contain the expected
+revised base-color values.
 
 ## Limits and next step
 
 The optional texture-packing stage did not run because the default Python
 interpreter lacks NumPy. The jar therefore uses simple imported color and
-roughness values without generated texture maps. The preview is not an Unreal
-lighting review, and the prop has not been placed in the Island. Project Content
-and the generated pack are local-only; the tracked asset script is the
-reproducible source. Before placement, inspect the imported mesh in Unreal under
-inn lighting, then connect it to a real resident delivery/carry action rather
-than treating a spoken promise as proof that an object moved.
+roughness values without generated texture maps. Transient Unreal captures at
+Roost_West and ListeningStones showed deep local shadows and still did not provide
+a reliable finish review; an experimental key-lit isolated capture overexposed to
+white and was discarded. No valid Unreal material/lighting review has passed, and
+the prop has not been placed. Project Content and generated packs are local-only;
+the tracked asset script is the reproducible source. Before placement, get a valid
+Unreal material preview, then connect the jar to a real resident delivery/carry
+action rather than treating a spoken promise as proof that an object moved.
