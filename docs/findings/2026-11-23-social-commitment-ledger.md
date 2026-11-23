@@ -29,7 +29,10 @@ as active work in `COORDINATION.md`, so that integration remains a coordinated n
 step. Until then, the subsystem API is a foundation and no resident-facing behavior
 should be claimed as shipped.
 
-`IslandSocialCommitment` automation coverage has been added for validation,
-deadline transitions, witnessed fulfillment, expiry, persistence, and loading a
-legacy version-2 file. The Unreal build and automation test were not run in this
-turn; runtime behavior and the speech-to-delivery loop remain unverified.
+`CaptiveSky_2Editor` built successfully with UE 5.8.3 (13 actions, 68.29 seconds).
+The focused `CaptiveSky2.Agent.IslandSocialCommitment` automation test passed under
+NullRHI with exit code 0; its log is `Saved/Logs/Codex_SocialCommitment_20261123.log`.
+Coverage includes validation, deadline transitions, witnessed fulfillment, expiry,
+persistence, and loading a legacy version-2 file. This verifies the storage and
+state-transition layer; it does not verify the resident-facing speech-to-delivery
+loop or a live Island presentation.
