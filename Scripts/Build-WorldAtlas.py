@@ -297,6 +297,22 @@ def _fmt(value: float) -> str:
     return f"{value:,.0f} cm"
 
 
+def _scale_bar(scale_px_per_cm: float) -> tuple[float, str]:
+    """Choose a readable 1/2/5 distance bar near 120 SVG units wide."""
+    desired_cm = 120.0 / scale_px_per_cm
+    magnitude = 10 ** math.floor(math.log10(desired_cm))
+    ratio = desired_cm / magnitude
+    factor = 1 if ratio <= 1 else 2 if ratio <= 2 else 5 if ratio <= 5 else 10
+    distance_cm = factor * magnitude
+    if distance_cm >= 100_000:
+        label = f"{distance_cm / 100_000:.3g} km"
+    elif distance_cm >= 100:
+        label = f"{distance_cm / 100:.3g} m"
+    else:
+        label = f"{distance_cm:.3g} cm"
+    return distance_cm * scale_px_per_cm, label
+
+
 def render(data: dict[str, Any], captured_at: str | None = None) -> str:
     cells = data["trails"]["cells"]
     points = data["world"]["points"]
@@ -321,6 +337,14 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
     width, height, margin = 1000.0, 680.0, 48.0
     span_x, span_y = max_x - min_x, max_y - min_y
     scale = min((width - margin * 2) / span_x, (height - margin * 2) / span_y)
+    if all_points:
+        bar_px, bar_label = _scale_bar(scale)
+        scale_html = (f'<div class="map-scale" role="img" aria-label="Map scale: {bar_label}">'
+                      f'<span class="scale-caption">Scale</span>'
+                      f'<span class="scale-rule" style="width:{bar_px / width * 100:.3f}%"></span>'
+                      f'<b>{bar_label}</b></div>')
+    else:
+        scale_html = '<div class="map-scale muted">Scale unavailable: this snapshot has no spatial evidence.</div>'
     content_w, content_h = span_x * scale, span_y * scale
     offset_x = (width - content_w) / 2
     offset_y = (height - content_h) / 2
@@ -412,7 +436,7 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
 header{{padding:1.25rem clamp(1rem,4vw,3rem);background:#223b3d;color:#edf0e8}}h1{{margin:.1rem 0;font:500 clamp(1.6rem,3vw,2.5rem)/1.15 Georgia,serif}}header p{{margin:.45rem 0;color:#c5d2ca}}
 main{{max-width:1500px;margin:auto;padding:1rem clamp(.75rem,2vw,1.5rem)}}.notice{{border-left:4px solid #d1a469;padding:.65rem .85rem;background:#fff9ef;margin-bottom:1rem}}
 .filters{{display:flex;gap:1rem;flex-wrap:wrap;align-items:end;margin:1rem 0}}label{{display:grid;gap:.25rem;font-weight:650}}select{{min-width:11rem;padding:.5rem;border:1px solid var(--line);border-radius:.35rem;background:white;color:var(--ink)}}
-.layout{{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr);gap:1rem;align-items:start}}section{{background:#fff;border:1px solid var(--line);border-radius:.55rem;overflow:hidden}}h2{{font:500 1.25rem Georgia,serif;margin:0;padding:.75rem 1rem;border-bottom:1px solid var(--line)}}.map-wrap{{padding:.5rem;background:#e8ede8}}svg{{display:block;width:100%;height:auto;min-height:330px;background:#edf1ed;border:1px solid #d2dbd2}}.trail-cell{{fill:#675d43}}.saved-point{{fill:var(--water);stroke:white;stroke-width:1.5}}.anchor{{fill:#d39552;stroke:#653e1d;stroke-width:1.5}}.event-point{{fill:#a65b46;stroke:white;stroke-width:1.5}}.empty{{fill:#5e706e;font:18px Georgia,serif}}.legend{{display:flex;gap:1rem;flex-wrap:wrap;padding:.65rem 1rem;color:var(--muted);font-size:.9rem}}.key::before{{content:"";display:inline-block;width:.7rem;height:.7rem;border-radius:50%;margin-right:.35rem;background:var(--water)}}.key.trail::before{{border-radius:1px;background:#675d43}}.key.anchor::before{{background:#d39552}}.key.event::before{{background:#a65b46}}
+.layout{{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(320px,.8fr);gap:1rem;align-items:start}}section{{background:#fff;border:1px solid var(--line);border-radius:.55rem;overflow:hidden}}h2{{font:500 1.25rem Georgia,serif;margin:0;padding:.75rem 1rem;border-bottom:1px solid var(--line)}}.map-wrap{{padding:.5rem;background:#e8ede8}}svg{{display:block;width:100%;height:auto;min-height:330px;background:#edf1ed;border:1px solid #d2dbd2}}.map-scale{{display:flex;gap:.55rem;align-items:center;padding:.55rem 0 0;color:var(--muted);font-size:.82rem}}.scale-rule{{display:inline-block;flex:none;height:.55rem;border:solid var(--ink);border-width:2px 1px 0}}.trail-cell{{fill:#675d43}}.saved-point{{fill:var(--water);stroke:white;stroke-width:1.5}}.anchor{{fill:#d39552;stroke:#653e1d;stroke-width:1.5}}.event-point{{fill:#a65b46;stroke:white;stroke-width:1.5}}.empty{{fill:#5e706e;font:18px Georgia,serif}}.legend{{display:flex;gap:1rem;flex-wrap:wrap;padding:.65rem 1rem;color:var(--muted);font-size:.9rem}}.key::before{{content:"";display:inline-block;width:.7rem;height:.7rem;border-radius:50%;margin-right:.35rem;background:var(--water)}}.key.trail::before{{border-radius:1px;background:#675d43}}.key.anchor::before{{background:#d39552}}.key.event::before{{background:#a65b46}}
 .timeline{{max-height:680px;overflow:auto;padding:.6rem 1rem}}ol{{list-style:none;padding:0;margin:0}}li{{padding:.65rem 0;border-bottom:1px solid #e4e9e1}}li:last-child{{border:0}}time,small,.kind{{color:var(--muted);font-size:.8rem}}.kind{{padding:.08rem .35rem;background:#edf2ed;border-radius:.25rem}}li p{{margin:.25rem 0}}.muted{{color:var(--muted)}}.notes{{padding:.5rem 1rem 1rem;color:var(--muted)}}.notes ul{{padding-left:1.2rem}}footer{{padding:1rem;color:var(--muted);font-size:.85rem}}
 @media(max-width:900px){{.layout{{grid-template-columns:1fr}}.timeline{{max-height:480px}}}}
 @media(prefers-color-scheme:dark){{:root{{--ink:#dce6df;--muted:#aabbb2;--paper:#151d1d;--line:#344442}}section{{background:#202c2b}}select{{background:#202c2b;color:var(--ink)}}.map-wrap{{background:#25302e}}svg{{background:#283331;border-color:#344442}}.trail-cell{{fill:#c0a56f}}.saved-point{{stroke:#283331}}.event-point{{stroke:#283331}}.notice{{background:#302a20}}}}
@@ -421,7 +445,7 @@ main{{max-width:1500px;margin:auto;padding:1rem clamp(.75rem,2vw,1.5rem)}}.notic
 <main><div class="notice"><b>Static snapshot.</b> This page reads only the files supplied to the builder. It does not connect to a live Unreal session or infer events that were not recorded.</div>
 <p class="muted">{freshness} {latest_text} World-state schema {data['world']['version']}; trail schema {data['trails']['version'] if data['trails']['version'] is not None else 'not supplied'}.</p>
 <div class="filters"><label>Chronicle day<select id="dayFilter"><option value="all">All recorded days</option>{day_options}</select></label><label>12 m trail region<select id="regionFilter"><option value="all">All regions</option>{region_options}</select></label><span class="muted">Filters affect recorded event markers and the event list. Trail cells show the supplied snapshot, not a reconstructed past.</span></div>
-<div class="layout"><section><h2>Trails and located evidence</h2><div class="map-wrap">{''.join(svg_parts)}</div><div class="legend"><span class="key trail">Wear cell (1.5 m)</span><span class="key">Saved place</span><span class="key anchor">Supplied anchor</span><span class="key event">Chronicle event</span></div><div class="notes">{note_html}</div></section>
+<div class="layout"><section><h2>Trails and located evidence</h2><div class="map-wrap">{''.join(svg_parts)}{scale_html}</div><div class="legend"><span class="key trail">Wear cell (1.5 m)</span><span class="key">Saved place</span><span class="key anchor">Supplied anchor</span><span class="key event">Chronicle event</span></div><div class="notes">{note_html}</div></section>
 <section><h2>Recorded events</h2><div class="timeline"><ol id="eventList">{timeline_html}</ol><p id="filterEmpty" class="muted" hidden>No recorded events match these filters.</p></div></section></div>
 <footer>World XY coordinates are preserved from the snapshot; positive Y is shown north/up. Exact-source provenance appears in map markers. Events without coordinates remain in the timeline only.</footer></main>
 <script type="application/json" id="atlasData">{embedded_data}</script>
