@@ -67,6 +67,10 @@ def describe(entry: dict) -> str | None:
         return None
     if kind == "guest_book":
         return f"{who} wrote in the guest book: {quote(text)}"
+    if kind == "place_name_claim":
+        place_id = entry.get("place_id") or "a remembered place"
+        listener = name(entry.get("with", ""))
+        return f"{who} used {quote(text)} as a personal name for {place_id} while speaking with {listener}."
     if kind in LASTING:
         return f"{who} {text}" if entry.get("agent") else text[:1].upper() + text[1:]
     if kind in ("weather", "day", "sky"):

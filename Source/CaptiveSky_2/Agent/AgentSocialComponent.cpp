@@ -8,6 +8,7 @@
 #include "AgentRelationshipComponent.h"
 #include "AgentSocialSubsystem.h"
 #include "AutonomousAgentCharacter.h"
+#include "IslandChronicle.h"
 #include "IslandWorldStateSubsystem.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
@@ -458,6 +459,9 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 			{ TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(),
 			  TEXT("learned-from:") + SpeakerId, TEXT("conversation:") + ConversationKey,
 			  TEXT("turn:") + FString::FromInt(TurnIndex) }));
+		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("place_name_claim"), SpeakerId, PersonalName,
+			{ { TEXT("place_id"), PlaceId.ToString() }, { TEXT("with"), RecipientId },
+			  { TEXT("conversation_id"), ConversationKey }, { TEXT("turn"), FString::FromInt(TurnIndex) } });
 		UE_LOG(LogAgentSocial, Log, TEXT("[AgentSocial] %s shared personal place name '%s' for %s with %s (conversation %s, turn %d)."),
 			*SpeakerId, *PersonalName, *PlaceId.ToString(), *RecipientId, *ConversationId, TurnIndex);
 	}

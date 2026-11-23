@@ -15,6 +15,11 @@ knowledge is not written into other residents' files. The place ID and map label
 are never changed, and competing personal names can coexist. This adds no model
 call and does not make naming a required action.
 
+The delivered exchange also writes a `place_name_claim` event to the world
+Chronicle, including the stable place ID, listener, conversation ID, and turn.
+`Scripts/Build-Chronicle.py` renders it as an attributed personal name. The
+Chronicle is for observers; it does not reveal the event to other residents.
+
 The resident's own decision prompt includes their remembered anchor IDs, so an
 opening line or response can refer to a place they know without relying on the
 speaker's memory or inventing an identifier. These IDs are not added to player
