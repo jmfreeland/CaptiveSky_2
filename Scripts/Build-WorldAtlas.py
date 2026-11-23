@@ -30,7 +30,7 @@ TRAIL_CELL_SIZE_CM = 150.0
 TRAIL_REGION_SPAN = 8
 KNOWN_EVENT_TYPES = {
     "arrangement", "arrangement_response", "basin", "decision", "day", "forage", "guest_book",
-    "lightning", "nest", "rainbow", "session", "sky", "social_commitment", "storm_mark", "trail",
+    "lightning", "nest", "place_name_claim", "rainbow", "session", "sky", "social_commitment", "storm_mark", "trail",
     "weather", "wrack_forage", "wrack_turned", "curio", "sea_state", "wildlife", "wildlife_home",
 }
 
@@ -255,6 +255,19 @@ def load_chronicle(path: Path | None) -> dict[str, Any]:
         source_id = entry.get("source_id", "")
         if isinstance(source_id, str) and 0 < len(source_id) <= 80:
             event["source_id"] = source_id
+        if kind == "place_name_claim":
+            place_id = entry.get("place_id", "")
+            recipient_id = entry.get("with", "")
+            conversation_id = entry.get("conversation_id", "")
+            turn = _chronicle_int(entry.get("turn"), 1, 10_000)
+            if isinstance(place_id, str) and 0 < len(place_id) <= 100:
+                event["place_id"] = place_id
+            if isinstance(recipient_id, str) and 0 < len(recipient_id) <= 100:
+                event["recipient_id"] = recipient_id
+            if isinstance(conversation_id, str) and 0 < len(conversation_id) <= 80:
+                event["conversation_id"] = conversation_id
+            if turn is not None:
+                event["turn"] = turn
         if point is not None:
             event["x"], event["y"] = point
             event["region"] = list(_region_for_xy(*point))
@@ -406,8 +419,19 @@ def render(data: dict[str, Any], captured_at: str | None = None) -> str:
         region = f'{event["region"][0]},{event["region"][1]}' if "region" in event else ""
         location = "mapped" if "x" in event else ("region located" if region else "no spatial provenance")
         text = event["text"] or event["event"] or event["type"].replace("_", " ")
+        if event["type"] == "place_name_claim":
+            claimed_name = event["text"] or "an unnamed label"
+            place_id = event.get("place_id", "a remembered place")
+            recipient = event.get("recipient_id")
+            text = f'uses “{claimed_name}” as a personal name for {place_id}'
+            if recipient:
+                text += f' and shares it with {recipient}'
+            if "place_id" in event:
+                location = f'place ID {html.escape(place_id)}; no coordinates supplied'
         source = f' · source {html.escape(event["source_id"])}' if event.get("source_id") else ""
-        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}</span><p>{html.escape(text)}</p><small>{location}{source}</small></li>')
+        conversation = f' · conversation {html.escape(event["conversation_id"])}' if event.get("conversation_id") else ""
+        turn = f' · turn {event["turn"]}' if event.get("turn") is not None else ""
+        timeline.append(f'<li data-day="{event["day"]}" data-region="{region}"><time>{html.escape(when)}</time> <b>{html.escape(label)}</b> <span class="kind">{html.escape(event["type"])}</span><p>{html.escape(text)}</p><small>{location}{source}{conversation}{turn}</small></li>')
     timeline_html = '\n'.join(timeline) or '<li class="no-events">No accepted chronicle events in this snapshot. The Atlas does not infer activity.</li>'
     freshness = f"Snapshot label: {html.escape(captured_at)}" if captured_at else "Snapshot time not supplied; current runtime state is not queried."
     latest = data["chronicle"]["last_recorded_at"]

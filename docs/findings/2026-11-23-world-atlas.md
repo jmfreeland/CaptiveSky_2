@@ -8,12 +8,14 @@ Commit `4a22f7ec` adds a proportional 1/2/5 distance scale to the map when spati
 
 The page also summarizes the supplied trail-cell count, sum of per-cell steps, saved place-record count, and chronicle events with a spatial region. These are snapshot totals only; they are not live counts or a reconstruction of prior activity.
 
+The Atlas accepts `place_name_claim` Chronicle entries and shows the claimant's personal label, stable place ID, recipient, conversation, and turn in the event timeline. These records carry no spatial provenance, so they stay out of the map and are labeled without suggesting listener agreement or community adoption.
+
 ## Validation
 
 - `python -m unittest Scripts.tests.test_build_world_atlas`: 7 tests passed, covering empty and legacy snapshots, negative coordinates, chronicle coordinate strings, bad and oversized input, corrupt world state, escaping, and event provenance.
 - `git diff --check`: clean.
 - A local preview was generated at ignored path `Saved/WorldAtlas/Island.html` from copies under `Saved/WorldAtlas/Input/`. Those source files are historical: the newest recorded chronicle data is from 2026-11-01. The captured-at label in the generated page discloses the copy date and source timestamp.
 - After the scale and summary additions, the builder generated `Saved/WorldAtlas/Island-review-20261123.html` from those same historical copies. Static output inspection found 138 trail cells, 541 summed cell steps, 12 saved-place records, 308 located Chronicle events, and a 20 m scale label. The embedded latest-record timestamp remains 2026-11-01; this was not opened in a browser.
-- The listed test run predates the scale-bar and snapshot-summary changes; no tests or browser review have been run for those additions. Review the regenerated preview's scale size/label across representative map extents and the summary on narrow screens when the shared computer is available.
+- The listed test run predates the scale-bar, snapshot-summary, and place-name-claim changes; no tests or browser review have been run for those additions. Review the regenerated preview's scale size/label across representative map extents, the summary on narrow screens, and one claim event in the timeline when fresh data is available.
 
 This is a static snapshot, not a reconstructed historical map: trail cells show what the copied trail file contains, and day filters apply to event markers/listing. No visual browser review was completed while the user was using the shared computer.
