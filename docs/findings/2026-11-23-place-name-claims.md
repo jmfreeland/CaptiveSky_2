@@ -38,6 +38,12 @@ opening line or response can refer to a place they know without relying on the
 speaker's memory or inventing an identifier. These IDs are not added to player
 or external-correspondence context.
 
+Preflight of the checked-in resident profiles found that both Aster and the
+Innkeeper already know the same `Cairn` anchor ID and coordinates in their
+separate `places.json` files. This is a concrete shared target for the first
+runtime exchange; it does not establish that either resident prefers a new name
+or that another resident knows one.
+
 `Scripts/Inspect-PlaceNameClaims.py` reads resident `memory.jsonl` files and
 lists only records tagged `place-name`. It skips blank lines, rejects malformed
 nonblank records, and can emit JSON for deterministic inspection. Pass
