@@ -16,6 +16,8 @@ def collect_claims(agents_dir: Path) -> list[dict[str, object]]:
                     record = json.loads(line)
                 except json.JSONDecodeError as error:
                     raise ValueError(f"{memory_path}:{line_number}: invalid JSON: {error}") from error
+                if not isinstance(record, dict):
+                    raise ValueError(f"{memory_path}:{line_number}: expected a JSON object")
                 tags = record.get("tags", [])
                 if not isinstance(tags, list) or "place-name" not in tags:
                     continue
