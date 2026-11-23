@@ -12,6 +12,8 @@ The Atlas accepts `place_name_claim` Chronicle entries and shows the claimant's 
 
 The Atlas also accepts `wrack` events for storm-deposited shore material. The current Chronicle record contains descriptive text but no coordinates, so it appears in the timeline without a map marker.
 
+`Scripts/Build-WorldAtlasSnapshot.ps1` provides a guarded refresh path for future snapshots. It refuses to run while `UnrealEditor`, `UnrealEditor-Cmd`, or the packaged CaptiveSky game is running; it copies `WorldState/<Map>.json` plus available trail/Chronicle files, verifies SHA-256 hashes before/after copying, writes a manifest, and builds the Atlas from those copies. The data root defaults to the project directory; pass `-DataRoot` for sessions started with `-CaptiveSkyDataRoot`.
+
 ## Validation
 
 - `python -m unittest Scripts.tests.test_build_world_atlas`: 7 tests passed, covering empty and legacy snapshots, negative coordinates, chronicle coordinate strings, bad and oversized input, corrupt world state, escaping, and event provenance.
@@ -19,5 +21,6 @@ The Atlas also accepts `wrack` events for storm-deposited shore material. The cu
 - A local preview was generated at ignored path `Saved/WorldAtlas/Island.html` from copies under `Saved/WorldAtlas/Input/`. Those source files are historical: the newest recorded chronicle data is from 2026-11-01. The captured-at label in the generated page discloses the copy date and source timestamp.
 - After the scale and summary additions, the builder generated `Saved/WorldAtlas/Island-review-20261123.html` from those same historical copies. Static output inspection found 138 trail cells, 541 summed cell steps, 12 saved-place records, 308 located Chronicle events, and a 20 m scale label. The embedded latest-record timestamp remains 2026-11-01; this was not opened in a browser.
 - The listed test run predates the scale-bar, snapshot-summary, place-name-claim, and storm-wrack changes; no tests or browser review have been run for those additions. Review the regenerated preview's scale size/label across representative map extents, the summary on narrow screens, and these event types with a snapshot containing them when fresh data is available.
+- The snapshot wrapper was added while Unreal Editor was open, so it has not been executed. After closing the editor and packaged game, run `./Scripts/Build-WorldAtlasSnapshot.ps1` (or provide `-DataRoot` for the same saved-data root used by the play session), then inspect the manifest and generated Atlas.
 
 This is a static snapshot, not a reconstructed historical map: trail cells show what the copied trail file contains, and day filters apply to event markers/listing. No visual browser review was completed while the user was using the shared computer.
