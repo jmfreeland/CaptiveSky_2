@@ -595,6 +595,26 @@ bool AIslandWeather::IsWithinTidepoolPeriwinkleClearance(const FVector& Position
 	return FVector::DistSquared2D(Position, HomePosition) < FMath::Square(ClearanceRadius);
 }
 
+void AIslandWeather::BuildTidepoolCrabShoreOffsets(TArray<FVector>& OutOffsets)
+{
+	OutOffsets.Reset(TidepoolCrabShoreSiteCount);
+	for (int32 Index = 0; Index < TidepoolCrabShoreSiteCount; ++Index)
+	{
+		const float Angle = static_cast<float>(Index) * PI;
+		OutOffsets.Emplace(FMath::Cos(Angle) * TidepoolCrabShoreSiteRadius,
+			FMath::Sin(Angle) * TidepoolCrabShoreSiteRadius, 900.f);
+	}
+}
+
+bool AIslandWeather::IsWithinTidepoolCrabGroundCoverClearance(const FVector& Position, const FVector& ShoreSite,
+	float VisualFootprintRadius)
+{
+	if (Position.ContainsNaN() || ShoreSite.ContainsNaN()) return false;
+	const float Footprint = FMath::IsFinite(VisualFootprintRadius) ? FMath::Max(0.f, VisualFootprintRadius) : 0.f;
+	return FVector::DistSquared2D(Position, ShoreSite) <
+		FMath::Square(TidepoolCrabGroundCoverClearanceRadius + Footprint);
+}
+
 bool AIslandWeather::IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
 	const FVector& OutwardDirection, float VisualFootprintRadius)
 {
@@ -1027,6 +1047,7 @@ void AIslandWeather::InitializeGroundCover()
 		}
 	}
 	TArray<FVector> PeriwinkleGroundCoverHomes;
+	TArray<FVector> TidepoolCrabGroundCoverHomes;
 	if (TideglassHabitat)
 	{
 		for (int32 Index = 0; Index < 3; ++Index)
@@ -1044,6 +1065,18 @@ void AIslandWeather::InitializeGroundCover()
 				PeriwinkleGroundCoverHomes.Add(GroundHit.Location + FVector(0.f, 0.f, 0.5f));
 				break;
 			}
+		}
+		TArray<FVector> CrabOffsets;
+		BuildTidepoolCrabShoreOffsets(CrabOffsets);
+		FCollisionQueryParams CrabShoreParams(SCENE_QUERY_STAT(IslandTidepoolCrabShore), false, this);
+		CrabShoreParams.AddIgnoredActor(TideglassHabitat);
+		for (const FVector& Offset : CrabOffsets)
+		{
+			const FVector TraceStart = TideglassHabitat->GetActorLocation() + Offset;
+			FHitResult GroundHit;
+			if (GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart,
+				TraceStart - FVector(0.f, 0.f, 2200.f), ECC_WorldStatic, CrabShoreParams))
+				TidepoolCrabGroundCoverHomes.Add(GroundHit.Location + FVector(0.f, 0.f, 0.5f));
 		}
 	}
 	TArray<FIslandCurioRecord> ScatterCurios;
@@ -1079,7 +1112,7 @@ void AIslandWeather::InitializeGroundCover()
 			FMath::Max(MeshBounds.BoxExtent.X, MeshBounds.BoxExtent.Y));
 	}
 	auto PlaceFoliage = [this, GrassC, TrailLedger, &ExposedHabitatAnchors, &OtherHabitatAnchors, &ScatterCurios,
-		&PeriwinkleGroundCoverHomes, &RatHollowApproaches, &RatHollowClearedInstanceCount,
+		&PeriwinkleGroundCoverHomes, &TidepoolCrabGroundCoverHomes, &RatHollowApproaches, &RatHollowClearedInstanceCount,
 		&GroundCoverMeshFootprintRadii](
 		const FHitResult& GroundHit, const FTransform& Offset, int32 Index, bool bWindArch = false, float WetEdgeMoisture = 0.f)
 	{
@@ -1131,7 +1164,7 @@ void AIslandWeather::InitializeGroundCover()
 			const int32 GrassVariant = (SpeciesVariant - 5) / 2;
 			Species = GrassVariant == 0 ? ShoreGrassA.Get() : GrassVariant == 1 ? ShoreGrassB.Get() : GrassC;
 		}
-		if (!RatHollowApproaches.IsEmpty() || !PeriwinkleGroundCoverHomes.IsEmpty())
+		if (!RatHollowApproaches.IsEmpty() || !PeriwinkleGroundCoverHomes.IsEmpty() || !TidepoolCrabGroundCoverHomes.IsEmpty())
 		{
 			if (const float* MeshFootprintRadius = GroundCoverMeshFootprintRadii.Find(Species->GetStaticMesh()))
 			{
@@ -1147,6 +1180,8 @@ void AIslandWeather::InitializeGroundCover()
 							++GroundCoverPeriwinkleClearedInstanceCount;
 							return;
 						}
+				for (const FVector& Home : TidepoolCrabGroundCoverHomes)
+					if (IsWithinTidepoolCrabGroundCoverClearance(GroundHit.ImpactPoint, Home, VisualFootprintRadius)) return;
 				for (const TPair<FVector, FVector>& Approach : RatHollowApproaches)
 					if (IsWithinRatHollowApproachClearance(GroundHit.ImpactPoint, Approach.Key, Approach.Value,
 						VisualFootprintRadius))
@@ -3601,12 +3636,12 @@ void AIslandWeather::RefreshNightEcology()
 		else
 			break;
 	}
-	constexpr int32 DayPopulation = 2;
+	TArray<FVector> ShoreOffsets;
+	BuildTidepoolCrabShoreOffsets(ShoreOffsets);
+	const int32 DayPopulation = ShoreOffsets.Num();
 	while (DayCrabs.Num() < DayPopulation)
 	{
-		const int32 Index = DayCrabs.Num();
-		const float Angle = Index * PI;
-		const FVector ShoreOffset(FMath::Cos(Angle) * 720.f, FMath::Sin(Angle) * 720.f, 900.f);
+		const FVector ShoreOffset = ShoreOffsets[DayCrabs.Num()];
 		const FVector TraceStart = Habitat->GetActorLocation() + ShoreOffset;
 		FHitResult GroundHit;
 		FCollisionQueryParams GroundParams(SCENE_QUERY_STAT(IslandTidepoolCrabShore), false, this);

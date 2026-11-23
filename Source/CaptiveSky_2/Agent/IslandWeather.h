@@ -285,6 +285,14 @@ private:
 	static void BuildTidepoolPeriwinkleShoreOffsets(int32 Index, TArray<FVector>& OutOffsets);
 	/** Preserve a small readable ground-level clearing around each grounded periwinkle home. */
 	static bool IsWithinTidepoolPeriwinkleClearance(const FVector& Position, const FVector& HomePosition, float VisualFootprintRadius = 0.f);
+	static constexpr int32 TidepoolCrabShoreSiteCount = 2;
+	static constexpr float TidepoolCrabShoreSiteRadius = 720.f;
+	static constexpr float TidepoolCrabGroundCoverClearanceRadius = 145.f;
+	/** Stable shore sites shared by daytime crab spawning and ground-cover clearances. */
+	static void BuildTidepoolCrabShoreOffsets(TArray<FVector>& OutOffsets);
+	/** Reserve a compact shoreline opening around each daytime crab site. */
+	static bool IsWithinTidepoolCrabGroundCoverClearance(const FVector& Position, const FVector& ShoreSite,
+		float VisualFootprintRadius = 0.f);
 	/** Keep the Rat-hollow mouth and its short, narrow approach lane open while preserving nearby cover. */
 	static bool IsWithinRatHollowApproachClearance(const FVector& Position, const FVector& EntrancePosition,
 		const FVector& OutwardDirection, float VisualFootprintRadius = 0.f);
