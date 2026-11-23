@@ -485,7 +485,8 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 		FString ConversationKey = ConversationId;
 		ConversationKey.ReplaceInline(TEXT("-"), TEXT(""));
 		const TArray<FString> ClaimTags = {
-			TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(), TEXT("claimed-by:") + SpeakerId,
+			TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(), TEXT("place-label:") + PersonalName,
+			TEXT("claimed-by:") + SpeakerId,
 			TEXT("conversation:") + ConversationKey, TEXT("turn:") + FString::FromInt(TurnIndex)
 		};
 		SpeakerMemory->AppendMemory(SpeakerMemory->MakeMemory(EAgentMemoryType::Conversation,
@@ -494,7 +495,7 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 		RecipientMemory->AppendMemory(RecipientMemory->MakeMemory(EAgentMemoryType::Conversation,
 			FString::Printf(TEXT("%s told me they call the place %s \"%s\"; this is their personal name, not an official renaming."),
 				*SpeakerName, *PlaceId.ToString(), *PersonalName), 0.78f,
-			{ TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(),
+			{ TEXT("place-name"), TEXT("place-id:") + PlaceId.ToString(), TEXT("place-label:") + PersonalName,
 			  TEXT("learned-from:") + SpeakerId, TEXT("conversation:") + ConversationKey,
 			  TEXT("turn:") + FString::FromInt(TurnIndex) }));
 		UIslandChronicleSubsystem::Record(GetWorld(), TEXT("place_name_claim"), SpeakerId, PersonalName,

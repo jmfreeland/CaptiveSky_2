@@ -27,6 +27,12 @@ Chronicle, including the stable place ID, listener, conversation ID, and turn.
 `Scripts/Build-Chronicle.py` renders it as an attributed personal name. The
 Chronicle is for observers; it does not reveal the event to other residents.
 
+Both participants' memory tags now retain the exact `place-label` separately
+from the prose. `Scripts/Inspect-PlaceNameClaims.py` includes that label as a
+field and in its readable output, while keeping each resident's own knowledge
+distinct; it does not count mentions as community adoption. For older records
+without the tag, the inspector falls back to the quoted label in the memory text.
+
 The resident's own decision prompt includes their remembered anchor IDs, so an
 opening line or response can refer to a place they know without relying on the
 speaker's memory or inventing an identifier. These IDs are not added to player

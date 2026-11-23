@@ -1,6 +1,7 @@
 """Read-only listing of attributed resident place-name claims in memory JSONL."""
 import argparse
 import json
+import re
 from pathlib import Path
 
 
@@ -22,6 +23,14 @@ def collect_claims(agents_dir: Path) -> list[dict[str, object]]:
                 if not isinstance(tags, list) or "place-name" not in tags:
                     continue
                 tag_values = [tag for tag in tags if isinstance(tag, str)]
+                raw_text = record.get("text", "")
+                text = raw_text if isinstance(raw_text, str) else ""
+                label = next((tag.removeprefix("place-label:") for tag in tag_values
+                              if tag.startswith("place-label:")), "")
+                if not label:
+                    quoted_label = re.search(r'call the place [^"]*"([^"]{1,40})"', text)
+                    if quoted_label:
+                        label = quoted_label.group(1)
                 claims.append(
                     {
                         "resident": resident_id,
@@ -32,11 +41,12 @@ def collect_claims(agents_dir: Path) -> list[dict[str, object]]:
                                             if tag.startswith("claimed-by:")), ""),
                         "learned_from": next((tag.removeprefix("learned-from:") for tag in tag_values
                                               if tag.startswith("learned-from:")), ""),
+                        "label": label,
                         "conversation": next((tag.removeprefix("conversation:") for tag in tag_values
                                                if tag.startswith("conversation:")), ""),
                         "turn": next((tag.removeprefix("turn:") for tag in tag_values
                                       if tag.startswith("turn:")), ""),
-                        "text": str(record.get("text", "")),
+                        "text": text,
                     }
                 )
     return claims
@@ -61,7 +71,8 @@ def main() -> None:
         return
     for claim in claims:
         source = claim["claimed_by"] or f"learned from {claim['learned_from']}"
-        print(f"{claim['resident']} knows {claim['place_id']} ({source}; "
+        place_name = f'“{claim["label"]}” for {claim["place_id"]}' if claim["label"] else claim["place_id"]
+        print(f"{claim['resident']} knows {place_name} ({source}; "
               f"conversation {claim['conversation']} turn {claim['turn']}): {claim['text']}")
 
 
