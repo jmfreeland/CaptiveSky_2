@@ -30,7 +30,7 @@ TRAIL_CELL_SIZE_CM = 150.0
 TRAIL_REGION_SPAN = 8
 KNOWN_EVENT_TYPES = {
     "arrangement", "arrangement_response", "basin", "decision", "day", "forage", "guest_book",
-    "lightning", "nest", "place_name_claim", "rainbow", "session", "sky", "social_commitment", "storm_mark", "trail",
+    "lightning", "nest", "place_name_claim", "rainbow", "session", "sky", "social_commitment", "storm_mark", "trail", "wrack",
     "weather", "wrack_forage", "wrack_turned", "curio", "sea_state", "wildlife", "wildlife_home",
 }
 
