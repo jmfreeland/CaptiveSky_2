@@ -30,6 +30,27 @@ static bool NormalizePersonalPlaceName(FString& Name)
 	return bHasLetter;
 }
 
+static bool ContainsPersonalPlaceName(const FString& Speech, const FString& Name)
+{
+	if (Speech.IsEmpty() || Name.IsEmpty()) return false;
+	auto IsNameCharacter = [](TCHAR Character)
+	{
+		return FChar::IsAlnum(Character) || Character == TEXT('_') || Character == TEXT('\'') || Character == 0x2019;
+	};
+	int32 SearchFrom = 0;
+	while (SearchFrom < Speech.Len())
+	{
+		const int32 Found = Speech.Find(*Name, ESearchCase::IgnoreCase, ESearchDir::FromStart, SearchFrom);
+		if (Found == INDEX_NONE) return false;
+		const int32 End = Found + Name.Len();
+		const bool bLeftBoundary = Found == 0 || !IsNameCharacter(Speech[Found - 1]);
+		const bool bRightBoundary = End >= Speech.Len() || !IsNameCharacter(Speech[End]);
+		if (bLeftBoundary && bRightBoundary) return true;
+		SearchFrom = Found + 1;
+	}
+	return false;
+}
+
 UAgentSocialComponent::UAgentSocialComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -454,7 +475,7 @@ void UAgentSocialComponent::DeliverSpeech(AAutonomousAgentCharacter* Recipient, 
 	FString PersonalName = PlaceNameLabel;
 	UAgentBrainComponent* SpeakerBrain = Speaker->FindComponentByClass<UAgentBrainComponent>();
 	if (SpeakerBrain && SpeakerBrain->KnowsRememberedPlace(PlaceNameTarget) &&
-		NormalizePersonalPlaceName(PersonalName) && Speech.Contains(PersonalName, ESearchCase::IgnoreCase))
+		NormalizePersonalPlaceName(PersonalName) && ContainsPersonalPlaceName(Speech, PersonalName))
 	{
 		const FName PlaceId(*PlaceNameTarget);
 		FString ConversationKey = ConversationId;

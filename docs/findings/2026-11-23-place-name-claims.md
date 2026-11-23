@@ -5,8 +5,10 @@
 Residents may optionally offer a personal name for a place they have already
 recorded in their own `places.json`. The claim is accepted only on a delivered,
 nearby resident-to-resident line, only when the spoken line contains the chosen
-name, and only when the speaker's remembered-place list contains the exact
-anchor ID. Names are short, plain labels. Invalid or unspoken claims are ignored.
+name as a complete phrase rather than a substring inside a longer word, and only
+when the speaker's remembered-place list contains the exact anchor ID. Matching
+is case-insensitive. Names are short, plain labels. Invalid or unspoken claims
+are ignored.
 
 The listener must accept the utterance into its conversation queue before the
 speech, social records, or promised side effects are published. A final line
