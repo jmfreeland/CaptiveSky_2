@@ -48,9 +48,11 @@ or that another resident knows one.
 lists only records tagged `place-name`. It skips blank lines, rejects malformed
 nonblank records, and can emit JSON for deterministic inspection. Pass
 `--agents-dir` with the isolated `Agents` folder to inspect a separate data
-root. Running it against the checked-in
-agent data currently reports no place-name claims, as expected before the new
-runtime path is built and played.
+root. Its `--knowledge` view groups distinct residents by stable place ID and
+label, retaining whether each entry is a claim or learned-from record; it does
+not count mentions as agreement or adoption. The checked-in agent data currently
+has no place-name claims, as expected before the new runtime path is built and
+played.
 
 ## Limits and verification
 

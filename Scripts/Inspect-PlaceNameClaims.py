@@ -52,6 +52,37 @@ def collect_claims(agents_dir: Path) -> list[dict[str, object]]:
     return claims
 
 
+def print_resident_knowledge(claims: list[dict[str, object]]) -> None:
+    knowledge: dict[tuple[str, str], dict[str, set[str]]] = {}
+    for claim in claims:
+        place_id = claim["place_id"] if isinstance(claim["place_id"], str) else ""
+        label = claim["label"] if isinstance(claim["label"], str) else ""
+        resident = claim["resident"] if isinstance(claim["resident"], str) else ""
+        if not resident:
+            continue
+        claimed_by = claim["claimed_by"] if isinstance(claim["claimed_by"], str) else ""
+        learned_from = claim["learned_from"] if isinstance(claim["learned_from"], str) else ""
+        if claimed_by:
+            role = f"claimed by {claimed_by}"
+        elif learned_from:
+            role = f"learned from {learned_from}"
+        else:
+            role = "recorded"
+        knowledge.setdefault((place_id, label), {}).setdefault(resident, set()).add(role)
+
+    if not knowledge:
+        print("No resident place-name knowledge found.")
+        return
+    print("Resident-held labels (recorded knowledge only; agreement or adoption is not inferred):")
+    for (place_id, label), residents in sorted(knowledge.items(), key=lambda item: (item[0][0].casefold(), item[0][1].casefold())):
+        name = f'“{label}”' if label else "(label unavailable)"
+        holders = ", ".join(
+            f"{resident} ({'; '.join(sorted(roles))})"
+            for resident, roles in sorted(residents.items(), key=lambda item: item[0].casefold())
+        )
+        print(f"{place_id or 'unknown place'}: {name} — {holders}.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -60,11 +91,17 @@ def main() -> None:
         default=Path(__file__).resolve().parents[1] / "Agents",
         help="Agents folder (defaults to the repository Agents directory)",
     )
-    parser.add_argument("--json", action="store_true", help="write the claims as JSON")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", help="write the claims as JSON")
+    output.add_argument("--knowledge", action="store_true",
+                        help="group distinct residents by place and personal label without inferring agreement")
     args = parser.parse_args()
     claims = collect_claims(args.agents_dir)
     if args.json:
         print(json.dumps(claims, ensure_ascii=False, indent=2))
+        return
+    if args.knowledge:
+        print_resident_knowledge(claims)
         return
     if not claims:
         print("No resident place-name claims found.")
