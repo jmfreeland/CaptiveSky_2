@@ -53,3 +53,23 @@ For any approved live observation, confirm the new reply pause in the live log a
 4. memory, world-state, or log errors and the reason the session stops.
 
 Compare the isolated request backlog with the main world. If conversations still feel too frequent, inspect openings across different pairs separately; the per-pair cooldown does not impose a world-wide interval. Preserve the five-minute per-pair minimum and both existing play safeguards.
+
+## One-time resident feedback invitation — 2026-11-25
+
+To give characters a regular chance to offer direct feedback after two
+15-minute playtests produced only silent check-ins, each resident now receives
+one optional caretaker invitation after 12 real minutes in play. If the light
+model is configured, the next autonomous decision is promoted to the full
+model; otherwise the invitation rides the already-full turn. It adds no model
+request. It asks for at most one concrete,
+firsthand-informed `request_upgrade` idea for human review. Normal gameplay,
+silence, or declining to offer feedback remain valid; proposals still do not
+change the world unless a human reviews them.
+
+The current UE 5.8.3 `CaptiveSky_2Editor` target built successfully on
+2026-11-25 (13 actions). A read-only review of the default resident-proposal
+inbox found no matching proposals. No 12-minute live invitation has yet been
+observed, so this verifies compilation only, not that a resident will choose
+to submit feedback. The feature is session-local and applies only to
+autonomous turns; player-directed conversation and external correspondence
+are unchanged.

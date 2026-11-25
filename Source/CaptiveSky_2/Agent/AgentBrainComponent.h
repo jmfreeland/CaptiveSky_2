@@ -125,6 +125,9 @@ private:
 	friend class FAgentConsolidationTest;
 	TUniquePtr<IAgentLLMProvider> Provider;
 	bool bEndedPlay = false;
+	/** Session-local cadence for one optional caretaker feedback invitation. */
+	double AutonomousSessionStartedAtSeconds = 0.0;
+	bool bFeedbackInvitationSent = false;
 	// Where the last few unprompted decisions were made, so a resident can be told when it has not moved on.
 	TArray<FVector> RecentDecisionSpots;
 

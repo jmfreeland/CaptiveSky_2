@@ -3,6 +3,7 @@
 #include "AgentBrainComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "HAL/PlatformTime.h"
 #include "AgentMemoryComponent.h"
 #include "IslandAssetRequestQueue.h"
 #include "AgentExternalBridgeComponent.h"
@@ -90,6 +91,8 @@ void UAgentBrainComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	bEndedPlay = false;
+	AutonomousSessionStartedAtSeconds = FPlatformTime::Seconds();
+	bFeedbackInvitationSent = false;
 	Provider = CreateAgentLLMProvider();
 }
 
@@ -1362,6 +1365,10 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 	const FString LightModel = AgentModelTier::LightModelName();
 	AgentModelTier::FTurnFacts TurnFacts;
 	if (!LightModel.IsEmpty()) TurnFacts = AgentModelTier::GatherTurnFacts(Owner, Context);
+	const bool bFeedbackInvitationDue = Context.Text.IsEmpty() && !bFeedbackInvitationSent &&
+		AutonomousSessionStartedAtSeconds > 0.0 &&
+		FPlatformTime::Seconds() - AutonomousSessionStartedAtSeconds >= 12.0 * 60.0;
+	TurnFacts.bFeedbackInvitationDue = bFeedbackInvitationDue;
 	const bool bLight = !LightModel.IsEmpty() && !AgentModelTier::NeedsFullModel(TurnFacts);
 	if (!UAgentPlaySessionSubsystem::TryReserveModelRequestFailClosed(Session, AgentId, bLight))
 	{
@@ -1396,7 +1403,12 @@ void UAgentBrainComponent::RequestDecisionWithContext(const FAgentConversationCo
 			MemoryText, Importance, Tags));
 	}
 
-	const FString Situation = AddReviewedRequestUpdatesToSituation(BuildSituationSummary(Context), MemoryComp);
+	FString Situation = AddReviewedRequestUpdatesToSituation(BuildSituationSummary(Context), MemoryComp);
+	if (bFeedbackInvitationDue && !bLight)
+	{
+		Situation += TEXT("\n\nA one-time caretaker feedback invitation is available during this play session. If you have a concrete, firsthand-informed idea for an object or world feature that would make daily life here better, you may submit one request_upgrade for human review now. Keep it grounded in something you have noticed. This is optional: continue your ordinary activity or offer no feedback if nothing comes to mind. A proposal changes nothing by itself; do not invent a problem or repeat another resident's idea.");
+		bFeedbackInvitationSent = true;
+	}
 	if (Context.Text.IsEmpty() && GetOwner())
 	{
 		RecentDecisionSpots.Add(GetOwner()->GetActorLocation());

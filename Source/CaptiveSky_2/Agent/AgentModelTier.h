@@ -27,6 +27,8 @@ namespace AgentModelTier
 		float NearestBeingCm = FarCm;
 		float NearestAffordanceCm = FarCm;
 		bool bHasBuildOptions = false;
+		/** A one-time, optional feedback invitation is due on this autonomous turn. */
+		bool bFeedbackInvitationDue = false;
 	};
 
 	CAPTIVESKY_2_API bool NeedsFullModel(const FTurnFacts& Facts);

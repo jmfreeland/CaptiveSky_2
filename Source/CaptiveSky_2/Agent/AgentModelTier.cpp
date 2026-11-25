@@ -40,7 +40,7 @@ namespace AgentModelTier
 
 	bool NeedsFullModel(const FTurnFacts& Facts)
 	{
-		return Facts.bSomeoneAddressedResident || Facts.bHasBuildOptions
+		return Facts.bSomeoneAddressedResident || Facts.bHasBuildOptions || Facts.bFeedbackInvitationDue
 			|| Facts.NearestBeingCm <= BeingRangeCm || Facts.NearestAffordanceCm <= AffordanceRangeCm;
 	}
 
