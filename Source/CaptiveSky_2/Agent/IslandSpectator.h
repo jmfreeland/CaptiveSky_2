@@ -39,6 +39,8 @@ struct FIslandShot
 	FVector Focus = FVector::ZeroVector;
 	/** Optional moving subject shared by the viewpoint's tagged camera and look-at points. */
 	TWeakObjectPtr<AActor> AnchorActor;
+	/** Optional look-at actor, ignored by the establishing-shot visibility check. */
+	TWeakObjectPtr<AActor> LookAtActor;
 	FVector AnchorLocationAtStart = FVector::ZeroVector;
 };
 

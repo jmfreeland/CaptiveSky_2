@@ -96,6 +96,44 @@ namespace
 			Point.Z < Ground.ImpactPoint.Z + MinimumHeight)
 			Point.Z = Ground.ImpactPoint.Z + MinimumHeight;
 	}
+
+	FVector ResolveEstablishingCameraPoint(UWorld* World, const FVector& Focus, const FVector& Desired,
+		const TArray<const AActor*>& Ignore, bool& bOutAdjusted)
+	{
+		bOutAdjusted = false;
+		if (!World) return Desired;
+		const FVector Offset = Desired - Focus;
+		const float Radius = Offset.Size2D();
+		if (Radius <= KINDA_SMALL_NUMBER) return Desired;
+
+		const FVector BaseDirection = Offset.GetSafeNormal2D();
+		const float HeightOffset = Offset.Z;
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(SpectatorEstablishingSightline), false);
+		for (const AActor* Actor : Ignore) Query.AddIgnoredActor(Actor);
+
+		FVector Best = Desired;
+		float BestClearFraction = -1.f;
+		for (const float Yaw : { 0.f, 25.f, -25.f, 50.f, -50.f, 75.f, -75.f, 105.f, -105.f, 140.f, -140.f, 180.f })
+		{
+			const FVector Direction = BaseDirection.RotateAngleAxis(Yaw, FVector::UpVector);
+			const FVector Candidate = Focus + Direction * Radius + FVector(0.f, 0.f, HeightOffset);
+			FHitResult Hit;
+			if (!World->LineTraceSingleByChannel(Hit, Focus, Candidate, ECC_Visibility, Query))
+			{
+				bOutAdjusted = Yaw != 0.f;
+				return Candidate;
+			}
+
+			if (Hit.Time > BestClearFraction)
+			{
+				BestClearFraction = Hit.Time;
+				Best = Hit.Location - (Candidate - Focus).GetSafeNormal() * 25.f;
+			}
+		}
+
+		bOutAdjusted = true;
+		return Best;
+	}
 }
 
 AIslandSpectatorDirector::AIslandSpectatorDirector()
@@ -138,6 +176,7 @@ void AIslandSpectatorDirector::LoadEstablishingShots()
 			AActor* LookAnchor = nullptr;
 			if (!(*Object)->TryGetObjectField(TEXT("from"), From) || !(*Object)->TryGetObjectField(TEXT("look"), Look) ||
 				!ResolveViewpointPoint(World, *From, Shot.From, &FromAnchor) || !ResolveViewpointPoint(World, *Look, Shot.LookAt, &LookAnchor)) continue;
+			Shot.LookAtActor = LookAnchor;
 			if (FromAnchor && FromAnchor == LookAnchor)
 			{
 				Shot.AnchorActor = FromAnchor;
@@ -314,15 +353,28 @@ void AIslandSpectatorDirector::StartShot(const FIslandShot& Shot)
 		Current.Focus += AnchorDelta;
 		Current.AnchorLocationAtStart = AnchorLocation;
 	}
+	if (Current.Kind == EIslandShotKind::Establishing)
+	{
+		TArray<const AActor*> Ignore;
+		if (Current.LookAtActor.IsValid()) Ignore.Add(Current.LookAtActor.Get());
+		if (HiddenPawn.IsValid()) Ignore.Add(HiddenPawn.Get());
+		if (Camera) Ignore.Add(Camera);
+		bool bFromAdjusted = false;
+		bool bToAdjusted = false;
+		Current.From = ResolveEstablishingCameraPoint(GetWorld(), Current.LookAt, Current.From, Ignore, bFromAdjusted);
+		Current.To = ResolveEstablishingCameraPoint(GetWorld(), Current.LookAt, Current.To, Ignore, bToAdjusted);
+		if (bFromAdjusted || bToAdjusted)
+			UE_LOG(LogIslandSpectator, Verbose, TEXT("Adjusted establishing viewpoint '%s' around blocking geometry."), *Current.Title);
+	}
 	Elapsed = 0.f;
 	++ShotIndex;
 	bShotCaptured = false;
 	if (Camera)
 	{
-		Camera->SetActorLocationAndRotation(Shot.From, (Shot.LookAt - Shot.From).Rotation());
-		Camera->GetCameraComponent()->SetFieldOfView(Shot.FieldOfView);
+		Camera->SetActorLocationAndRotation(Current.From, (Current.LookAt - Current.From).Rotation());
+		Camera->GetCameraComponent()->SetFieldOfView(Current.FieldOfView);
 	}
-	if (APawn* Pawn = HiddenPawn.Get()) Pawn->SetActorLocation(Shot.Focus + FVector(0, 0, 100), false, nullptr, ETeleportType::TeleportPhysics);
+	if (APawn* Pawn = HiddenPawn.Get()) Pawn->SetActorLocation(Current.Focus + FVector(0, 0, 100), false, nullptr, ETeleportType::TeleportPhysics);
 	const FString Clock = DescribeClock();
 	if (CaptionText.IsValid()) CaptionText->SetText(FText::FromString(Clock.IsEmpty() ? Shot.Title : Shot.Title + TEXT("  ·  ") + Clock));
 }
