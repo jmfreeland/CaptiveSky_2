@@ -106,8 +106,9 @@ void AAutonomousAgentAIController::OnUnPossess()
 
 void AAutonomousAgentAIController::Think()
 {
+	IConsoleVariable* DisableThinking = IConsoleManager::Get().FindConsoleVariable(TEXT("CaptiveSky.Agent.DisableThinking"));
 	if (FParse::Param(FCommandLine::Get(), TEXT("CaptiveSkyDisableAgentThinking")) ||
-		CVarDisableAgentThinking.GetValueOnGameThread() != 0) return;
+		(DisableThinking && DisableThinking->GetInt() != 0)) return;
 	AAutonomousAgentCharacter* Agent = Cast<AAutonomousAgentCharacter>(GetPawn());
 	if (!Agent || !Agent->Brain || Agent->Brain->bRequestInFlight || IsResting() || IsActionInProgress())
 	{
