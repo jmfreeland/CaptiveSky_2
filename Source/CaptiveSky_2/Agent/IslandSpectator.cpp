@@ -110,6 +110,7 @@ namespace
 		const float HeightOffset = Offset.Z;
 		FCollisionQueryParams Query(SCENE_QUERY_STAT(SpectatorEstablishingSightline), false);
 		for (const AActor* Actor : Ignore) Query.AddIgnoredActor(Actor);
+		const FCollisionShape CameraClearance = FCollisionShape::MakeSphere(45.f);
 
 		FVector Best = Desired;
 		float BestClearFraction = -1.f;
@@ -118,7 +119,10 @@ namespace
 			const FVector Direction = BaseDirection.RotateAngleAxis(Yaw, FVector::UpVector);
 			const FVector Candidate = Focus + Direction * Radius + FVector(0.f, 0.f, HeightOffset);
 			FHitResult Hit;
-			if (!World->LineTraceSingleByChannel(Hit, Focus, Candidate, ECC_Visibility, Query))
+			// A point trace can pass beside nearby furniture even when the camera lens
+			// would sit inside it. Sweep a modest camera-sized volume along the same
+			// path so establishing shots keep some breathing room from the geometry.
+			if (!World->SweepSingleByChannel(Hit, Focus, Candidate, FQuat::Identity, ECC_Visibility, CameraClearance, Query))
 			{
 				bOutAdjusted = Yaw != 0.f;
 				return Candidate;
