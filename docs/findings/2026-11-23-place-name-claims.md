@@ -50,9 +50,10 @@ nonblank records, and can emit JSON for deterministic inspection. Pass
 `--agents-dir` with the isolated `Agents` folder to inspect a separate data
 root. Its `--knowledge` view groups distinct residents by stable place ID and
 label, retaining whether each entry is a claim or learned-from record; it does
-not count mentions as agreement or adoption. The checked-in agent data currently
-has no place-name claims, as expected before the new runtime path is built and
-played.
+not count mentions as agreement or adoption. On 2026-11-25, running this view
+against the checked-in `Agents` data reported no resident place-name knowledge.
+This confirms there are not yet gameplay-generated claim or transmission
+records in that data root; it does not validate the runtime recording path.
 
 ## Limits and verification
 
