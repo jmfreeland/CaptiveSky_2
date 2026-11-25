@@ -67,9 +67,20 @@ silence, or declining to offer feedback remain valid; proposals still do not
 change the world unless a human reviews them.
 
 The current UE 5.8.3 `CaptiveSky_2Editor` target built successfully on
-2026-11-25 (13 actions). A read-only review of the default resident-proposal
-inbox found no matching proposals. No 12-minute live invitation has yet been
-observed, so this verifies compilation only, not that a resident will choose
-to submit feedback. The feature is session-local and applies only to
-autonomous turns; player-directed conversation and external correspondence
-are unchanged.
+2026-11-25 (13 actions). An isolated standalone Game run then reached Island
+and ended at its 960-second cap with 46 model requests and zero in flight. It
+logged no fatal errors. Aster, the Innkeeper, and Raven each received the
+invitation exactly once in an autonomous situation. None chose a
+`request_upgrade`; the isolated run contained no proposal inbox. This confirms
+that the invitation reached each active resident while leaving their next
+action optional. It does not show whether they would offer feedback in a later
+session.
+
+The same run recorded four delivered lines in one Aster–Innkeeper exchange and
+15 completed movement arrivals, so residents continued ordinary gameplay
+alongside the invitation. The log reports `PCD3D_SM6` despite the command-line
+NullRHI argument; this run is not used as a visual review or performance
+sample. Logs and isolated memories are under
+`Saved/Logs/Codex_FeedbackInvitation_20261125_131257.log` and
+`Saved/Playtests/Codex_FeedbackInvitation_20261125_131257/`. Player-directed
+conversation and external correspondence remain unchanged.
