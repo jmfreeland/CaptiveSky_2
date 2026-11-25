@@ -71,3 +71,29 @@ not proof that every promise is sincere.
 
 `CaptiveSky_2Editor` built successfully with UE 5.8.3 (15 actions) after the
 physical-delivery follow-up; no new automation test has been added or run.
+
+## Current-main runtime verification — 2026-11-25
+
+The current `main` editor target built successfully with UE 5.8.3 (13 actions)
+after a separate PIE crash in `AAutonomousAgentAIController::Think()` was traced
+to a null console-variable lookup. The controller now looks up
+`CaptiveSky.Agent.DisableThinking` through `IConsoleManager` and checks for a
+missing variable before reading it (`c7ee0ff0`). This fixed the observed crash
+path; it does not verify the promise or place-name lifecycle.
+
+A standalone spectator session from the current project reached Island
+world-ready, ran for 205.5 seconds, issued 12 model requests, and drained all
+in-flight requests before exiting successfully. The log showed residents
+wandering, approaching landmarks, noticing wildlife, and retaining observations
+about the Listening Stones and wildlife. It recorded no conversations,
+`place_name_claim` events, or `social_commitment` events. The isolated run found
+one Innkeeper observation and two Raven observations; the checked-in resident
+memories were not changed. This is evidence of autonomous movement and
+observation only, not evidence that a promise was made or kept, nor direct
+feedback from a human player or resident.
+
+The visual captures suggest concrete presentation work for a later editor
+session: the shoreline reads sparse, Tideglass ground cover is dense, the Inn
+camera clips through nearby geometry, and the Listening Stones read as stacked
+slabs. These are observations from the captures, not fixes. The UE editor and
+map were not modified during this verification.
