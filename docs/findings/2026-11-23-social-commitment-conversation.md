@@ -55,10 +55,14 @@ surface instead of aligning its bounds minimum. The placement script and
 runtime set-down, delivery, and reload-restore paths now use the bounds minimum
 relative to the actor pivot. Re-run `Scripts/Place-IslandBlueJar.py` in the
 editor to repair the existing source placement and save the local Island map.
-The user is currently using the shared computer, so this correction has not yet
-been applied or visually checked. Content and map assets are gitignored; the
-tracked script makes the local setup repeatable. The gameplay code previously
-compiled, but has not been exercised in-game after this placement correction.
+As of 2026-11-25, the shared editor has `/Game/Maps/Island` loaded but no PIE
+session; this correction has not yet been applied or visually checked. Content
+and map assets are gitignored; the tracked script makes the local setup
+repeatable. The Unreal session log records a successful Live Coding compile at
+07:20 UTC on Nov 23, before the promise
+speech hookup commit at 09:58 UTC and the physical delivery commit at 10:50 UTC.
+That compile does not cover the current gameplay code. A fresh build and in-game
+review are still required after this placement correction.
 It assumes one authored jar and tagged `IslandInn`/`InnCounter` actors. The
 natural-language promise check remains a narrow safeguard for this prototype,
 not proof that every promise is sincere.
